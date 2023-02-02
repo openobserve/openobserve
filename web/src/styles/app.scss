@@ -1,0 +1,41 @@
+.q-w-sm {
+    width: 260px;
+}
+.q-w-md {
+    width: 400px;
+}
+.q-w-lg {
+    width: 600px;
+}
+.q-w-xl {
+    width: 800px;
+}
+.q-w-p50 {
+    min-width: 500px;
+    width: 50vw;
+}
+.q-w-p80 {
+    min-width: 800px;
+    width: 80vw;
+}
+
+.text-decoration-none {
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.text-decoration-none:hover {
+    text-decoration: underline;
+}
+
+.bg-white{
+    background-color: white;
+}
+
+.border-bottom{
+    border-bottom: 1px solid $border-color;
+}
+
+.border-right{
+    border-right: 1px solid $border-color;
+}

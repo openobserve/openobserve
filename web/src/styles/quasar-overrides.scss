@@ -1,0 +1,121 @@
+@mixin scrollbars($size: 6px, $foreground-color: $primary, $background-color: mix($foreground-color, white,  35%)) {
+    // For Google Chrome
+    &::-webkit-scrollbar {
+        width:  $size;
+        height: $size;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $foreground-color;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: $background-color;
+    }
+
+    // For Internet Explorer
+    & {
+        scrollbar-face-color: $foreground-color;
+        scrollbar-track-color: $background-color;
+    }
+}
+
+body{
+    font-family: 'Nunito Sans', sans-serif;
+    @include scrollbars;
+}
+
+.q-list, .q-splitter__panel, .scroll {
+    @include scrollbars;
+}
+
+.q-field{
+    .q-field__control{
+        border-radius: 0px;
+    }
+
+    &--labeled.showLabelOnTop {
+        padding-top: 32px;
+
+        &.q-field {
+            &--float .q-field__label {
+                transform: translate(-0.75rem, -175%);
+                color: $dark-page;
+                font-weight: bold;
+            }
+            .q-field__native {
+                padding: 0 !important;
+            }
+            .q-field__control {
+                border: 1px solid $input-border;
+                background-color: $input-bg;
+            }
+        }
+        &.q-select {
+            .q-field__control-container {
+                padding-top: 0;
+
+                .q-field__native > :first-child {
+                    text-transform: capitalize;
+                    font-size: 0.875rem;
+                    color: $dark-page;
+                    font-weight: 600;
+                }
+            }
+        }
+        .q-field__bottom {
+            padding: 0.875rem 0 0;
+        }
+    }
+
+    &--borderless {
+        .q-field__control {
+            border: none;
+
+            .q-icon {
+                transform: translateY(-2px);
+            }
+        }
+    }
+}
+
+.q-btn:before {
+    border: 1px solid $input-field-border-color;
+    box-shadow: none;
+}
+
+.q-btn--flat:before, .q-btn.no-border::before{
+    border: none;
+}
+
+.q-btn-group{
+    box-shadow: none;
+    border: 1px solid $input-field-border-color;
+}
+
+.q-btn.selected{
+  color: $primary;
+  background: #E3E5FA;
+  font-weight: bolder;
+}
+
+.q-table th { font-weight: bold; }
+
+.q-date__calendar-item > div, .q-date__calendar-item button{
+    &::before{
+        display: none;
+    }
+}
+
+.q-table__card{
+    box-shadow: unset;
+}
+
+.iconHoverBtn {
+    filter: grayscale(1) brightness(0.2);
+    transition: filter 0.25s ease;
+
+    &:hover {
+        filter: none;
+    }
+}

@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.zinc.oxide.cluster";
+option java_outer_classname = "clusterProto";
+
+package cluster;
+
+
+service Search {
+  rpc Search (SearchRequest) returns (SearchResponse) {}
+}
+
+// Job information for a request
+message Job {
+    string session_id = 1;
+    string        job = 2;
+    int32       stage = 3;
+    int32   partition = 4;
+}
+
+message Partition {
+    int64 time_min = 1;
+    int64 time_max = 2;
+}
+
+// Search request type
+enum SearchType {
+    USER       = 0; // user input search request
+    CLUSTER    = 1; // cluster dispatch search request
+    CACHE_ONLY = 2; // ingester node just search local cache
+}
+
+// Search request query
+message SearchQuery {
+    string              sql = 1;
+    string         sql_mode = 2;
+    int32              from = 3;
+    int32              size = 4;
+    int64        start_time = 5;
+    int64          end_time = 6;
+    bool   track_total_hits = 7;
+}
+
+// Search request
+message SearchRequest {
+    Job                        job = 1;
+    string                  org_id = 2;
+    string             stream_type = 3;
+    SearchType               stype = 4;
+    SearchQuery              query = 5;
+    Partition            partition = 6;
+    repeated string      file_list = 7;
+    repeated SearchAggRequest aggs = 8;
+}
+
+// The response message containing the greetings
+message SearchResponse {
+    Job                         job = 1;
+    int32                      took = 2;
+    int64                     total = 3;
+    int32                      from = 4;
+    int32                      size = 5;
+    int32                file_count = 6;
+    int32                 scan_size = 7; // unit: mb
+    bytes                      hits = 8;
+    repeated SearchAggResponse aggs = 9;
+}
+
+message SearchAggRequest {
+    string name = 1;
+    string  sql = 2;
+}
+
+message SearchAggResponse {
+    string name = 1;
+    bytes  hits = 2;
+}

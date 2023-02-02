@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.zinc.oxide.cluster";
+option java_outer_classname = "clusterProto";
+
+package cluster;
+
+message FileDescriptor {
+    FileMeta   meta      = 1;
+    StreamType file_type = 2;
+}
+
+message FileMeta {
+    int64  min_ts          = 1; // microseconds
+    int64  max_ts          = 2; // microseconds
+    uint64 records         = 3;
+    uint64 original_size   = 4;
+    uint64 compressed_size = 5;
+}
+
+enum StreamType {
+    LOGS     = 0;
+    METRICS  = 1;
+    TRACES   = 2;
+    METADATA = 3;
+    FILELIST = 4;
+}
+
+message EmptyResponse {}

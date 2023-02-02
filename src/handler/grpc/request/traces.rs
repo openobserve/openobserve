@@ -1,0 +1,41 @@
+use opentelemetry_proto::tonic::collector::trace::v1::{
+    trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
+};
+use tonic::Status;
+use tonic::{codegen::*, Response};
+
+use crate::infra::config::CONFIG;
+use crate::service::traces::handle_trace_request;
+
+#[derive(Default)]
+pub struct TraceServer {}
+#[async_trait]
+impl TraceService for TraceServer {
+    async fn export(
+        &self,
+        request: tonic::Request<ExportTraceServiceRequest>,
+    ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
+        let metadata = request.metadata().clone();
+        let msg = format!(
+            "Please specify orgnization id with header key '{}' ",
+            &CONFIG.grpc.org_header_key
+        );
+        if !metadata.contains_key(&CONFIG.grpc.org_header_key) {
+            return Err(Status::invalid_argument(msg));
+        }
+
+        let in_req = request.into_inner();
+        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        if org_id.is_none() {
+            return Err(Status::invalid_argument(msg));
+        }
+
+        let thread_id = Arc::new(0);
+        let resp = handle_trace_request(org_id.unwrap().to_str().unwrap(), thread_id, in_req).await;
+        if resp.is_ok() {
+            return Ok(Response::new(ExportTraceServiceResponse {}));
+        } else {
+            Err(Status::internal(resp.err().unwrap().to_string()))
+        }
+    }
+}
