@@ -1,0 +1,367 @@
+<!-- eslint-disable vue/v-on-event-hyphenation -->
+<!-- eslint-disable vue/attribute-hyphenation -->
+<template>
+  <q-page class="q-pa-none" style="min-height: inherit">
+    <q-table
+      ref="qTable"
+      v-model:selected="selected"
+      :rows="logindex"
+      :columns="columns"
+      row-key="id"
+      :pagination="pagination"
+      :filter="filterQuery"
+      :filter-method="filterData"
+      style="width: 100%"
+    >
+      <template #no-data><NoData /></template>
+      <template #header-selection="scope">
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+      </template>
+      <template #body-selection="scope">
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+      </template>
+      <template #body-cell-actions="props">
+        <q-td :props="props">
+          <q-btn
+            icon="img:/assets/images/common/list_icon.svg"
+            :title="t('logindex.schemaHeader')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="listSchema(props)"
+          ></q-btn>
+        </q-td>
+      </template>
+
+      <template #top="scope">
+        <div class="q-table__title">{{ t("logindex.header") }}</div>
+        <q-input
+          v-model="filterQuery"
+          borderless
+          filled
+          dense
+          class="q-ml-auto q-mb-xs no-border"
+          :placeholder="t('logindex.search')"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+        <q-btn
+          class="q-ml-md q-mb-xs text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          icon="refresh"
+          :label="t(`logindex.refreshStats`)"
+          @click="getLogIndex"
+        />
+
+        <QTablePagination
+          :scope="scope"
+          :pageTitle="t('logindex.header')"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
+      </template>
+
+      <template #bottom="scope">
+        <QTablePagination
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="bottom"
+          @update:changeRecordPerPage="changePagination"
+        />
+      </template>
+    </q-table>
+    <q-dialog
+      v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <SchemaIndex v-model="schemaData" />
+    </q-dialog>
+
+    <q-dialog v-model="confirmDelete">
+      <q-card style="width: 240px">
+        <q-card-section class="confirmBody">
+          <div class="head">{{ t("logindex.confirmDeleteHead") }}</div>
+          <div class="para">{{ t("logindex.confirmDeleteMsg") }}</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
+            {{ t("logindex.cancel") }}
+          </q-btn>
+          <q-btn
+            v-close-popup
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+          >
+            {{ t("logindex.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+  </q-page>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref } from "vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar, type QTableProps } from "quasar";
+import { useI18n } from "vue-i18n";
+
+import QTablePagination from "../components/shared/grid/Pagination.vue";
+import indexService from "../services/index";
+import SchemaIndex from "../components/log_index/schema.vue";
+import NoData from "../components/shared/grid/NoData.vue";
+
+export default defineComponent({
+  name: "PageLogIndex",
+  components: { QTablePagination, SchemaIndex, NoData },
+  emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
+  setup(props, { emit }) {
+    const store = useStore();
+    const { t } = useI18n();
+    const q = useQuasar();
+    const router = useRouter();
+    const logindex = ref([]);
+    const showIndexSchemaDialog = ref(false);
+    const confirmDelete = ref<boolean>(false);
+    const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
+    const resultTotal = ref<number>(0);
+    const selected = ref<any>([]);
+    const orgData: any = ref(store.state.selectedOrganization);
+    const qTable: any = ref(null);
+    const columns = ref<QTableProps["columns"]>([
+      {
+        name: "#",
+        label: "#",
+        field: "#",
+        align: "left",
+      },
+      {
+        name: "name",
+        field: "name",
+        label: t("logindex.name"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "stream_type",
+        field: "stream_type",
+        label: t("logindex.type"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "doc_num",
+        field: "doc_num",
+        label: t("logindex.docNum"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "storage_size",
+        field: "storage_size",
+        label: t("logindex.storageSize"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "center",
+      },
+    ]);
+
+    const getLogIndex = () => {
+      if (store.state.selectedOrganization != null) {
+        const dismiss = q.notify({
+          spinner: true,
+          message: "Please wait while loading streams...",
+        });
+
+        indexService
+          .nameList(store.state.selectedOrganization.identifier, "logs", false)
+          .then((res) => {
+            let counter = 0;
+            let doc_num = "";
+            let storage_size = "";
+            let compressed_size = "";
+            resultTotal.value = res.data.list.length;
+            logindex.value = res.data.list.map((data: any) => {
+              doc_num = "--";
+              storage_size = "--";
+              if (data.stats) {
+                doc_num = data.stats.doc_num;
+                storage_size = data.stats.storage_size + " MB";
+                compressed_size = data.stats.compressed_size + " MB";
+              }
+              return {
+                "#": counter <= 9 ? `0${counter++}` : counter++,
+                name: data.name,
+                doc_num: doc_num,
+                storage_size: storage_size,
+                compressed_size: compressed_size,
+                storage_type: data.storage_type,
+                actions: "action buttons",
+                schema: data.schema ? data.schema : [],
+                stream_type: data.stream_type,
+              };
+            });
+
+            dismiss();
+          })
+          .catch((err) => {
+            dismiss();
+            q.notify({
+              type: "negative",
+              message: "Error while pulling stream.",
+              timeout: 2000,
+            });
+          });
+      }
+    };
+
+    getLogIndex();
+
+    const listSchema = (props: any) => {
+      console.log(props.row.schema);
+      schemaData.value.name = props.row.name;
+      schemaData.value.schema = props.row.schema;
+      schemaData.value.stream_type = props.row.stream_type;
+      showIndexSchemaDialog.value = true;
+    };
+
+    const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+    const maxRecordToReturn = ref<number>(100);
+    const selectedPerPage = ref<number>(20);
+    const pagination: any = ref({
+      rowsPerPage: 20,
+    });
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value.setPagination(pagination.value);
+    };
+    const changeMaxRecordToReturn = (val: any) => {
+      maxRecordToReturn.value = val;
+    };
+
+    const deleteIndex = (props: any) => {
+      confirmDelete.value = true;
+    };
+
+    return {
+      t,
+      qTable,
+      router,
+      store,
+      logindex,
+      columns,
+      selected,
+      orgData,
+      getLogIndex,
+      pagination,
+      resultTotal,
+      listSchema,
+      deleteIndex,
+      confirmDelete,
+      schemaData,
+      perPageOptions,
+      selectedPerPage,
+      changePagination,
+      maxRecordToReturn,
+      showIndexSchemaDialog,
+      changeMaxRecordToReturn,
+      filterQuery: ref(""),
+      filterData(rows: any, terms: any) {
+        var filtered = [];
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            rows[i]["stream_type"].toLowerCase().includes(terms)
+          ) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      },
+    };
+  },
+  computed: {
+    selectedOrg() {
+      return this.store.state.selectedOrganization.identifier;
+    },
+  },
+  watch: {
+    selectedOrg(newVal: any, oldVal: any) {
+      this.orgData = newVal;
+      if (
+        (newVal != oldVal || this.logindex.values == undefined) &&
+        this.router.currentRoute.value.name == "logstream"
+      ) {
+        this.logindex = [];
+        this.resultTotal = 0;
+        this.getLogIndex();
+      }
+    },
+  },
+});
+</script>
+
+<style lang="scss">
+.q-table {
+  &__top {
+    border-bottom: 1px solid $border-color;
+    justify-content: flex-end;
+  }
+}
+
+.confirmBody {
+  padding: 11px 1.375rem 0;
+  font-size: 0.875rem;
+  text-align: center;
+  font-weight: 700;
+
+  .head {
+    line-height: 2.125rem;
+    margin-bottom: 0.5rem;
+    color: $dark-page;
+  }
+  .para {
+    color: $light-text;
+  }
+}
+.confirmActions {
+  justify-content: center;
+  padding: 1.25rem 1.375rem 1.625rem;
+  display: flex;
+
+  .q-btn {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+</style>

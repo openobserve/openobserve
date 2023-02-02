@@ -1,0 +1,36 @@
+FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
+WORKDIR /web
+COPY ./web /web/
+
+RUN npm install
+RUN NODE_OPTIONS="--max-old-space-size=6192" npm run build
+
+FROM public.ecr.aws/docker/library/rust:bullseye as builder
+RUN apt-get update
+RUN apt-get install -y protobuf-compiler
+RUN apt-get install -y cmake curl
+
+RUN rustup toolchain install nightly-2023-01-26
+RUN rustup default nightly-2023-01-26
+RUN rustup target add aarch64-unknown-linux-gnu
+
+WORKDIR /app
+COPY . /app
+COPY --from=webBuilder /web/dist web/dist
+
+# RUN cargo build --release
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+  CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+  CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+  RUSTFLAGS='-C target-feature=+aes,+crc,+fhm,+lse,+neon,+jsconv,+sha2'
+RUN cargo build --release --target aarch64-unknown-linux-gnu
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/zinc-oxide /app/target/release/ziox
+
+FROM gcr.io/distroless/cc:latest-arm64 as runtime
+# FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
+# RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
+# RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
+# RUN update-ca-certificates
+COPY --from=builder /app/target/release/ziox /
+COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5
+CMD ["/ziox"]

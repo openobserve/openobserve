@@ -1,0 +1,156 @@
+<template>
+  <q-btn
+    data-cy="syntax-guide-button"
+    size="sm"
+    dense
+    flat
+    class="q-ml-sm q-pa-xs syntax-guide-button"
+    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+    label="Syntax Guide"
+    icon="help"
+  >
+    <q-menu>
+      <q-card flat v-if="!sqlmode">
+        <q-card-section class="syntax-guide-title">
+          <div class="label">Syntax Guide</div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="q-pt-none answers">
+          <div class="syntax-section">
+            <div class="syntax-guide-text">
+              <ul class="guide-list">
+                <li>
+                  For full text search of value ‘error’ use match_all(‘error’)
+                  in query editor
+                </li>
+                <li>
+                  For case-insesitive full text search of value ‘error’ use
+                  match_all_no_case(‘error’)
+                </li>
+                <li>To search value 200 for code column use code=200</li>
+                <li>
+                  To search value ‘stderr’ for stream column use stream=‘stderr’
+                </li>
+                <li>
+                  To use query function named extract_ip on cloumn log use
+                  extract_ip(log) | code=200
+                </li>
+              </ul>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+      <q-card flat v-else>
+        <q-card-section class="syntax-guide-title">
+          <div class="label">Syntax Guide: SQL Mode</div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="q-pt-none answers">
+          <div class="syntax-section">
+            <div class="syntax-guide-text">
+              <ul class="guide-list">
+                <li>
+                  For full text search of value ‘error’ use SELECT * FROM
+                  [Stream Name] WHERE match_all(‘error’)
+                </li>
+                <li>
+                  For case-insesitive full text search of value ‘error’ use
+                  SELECT * FROM [Stream Name] WHERE match_all_no_case(‘error’)
+                </li>
+                <li>
+                  To search value 200 for code column use SELECT * FROM [Stream
+                  Name] WHERE code=200
+                </li>
+                <li>
+                  To search value ‘stderr’ for stream column use SELECT * FROM
+                  [Stream Name] WHERE stream=‘stderr’
+                </li>
+                <li>
+                  To use query function named extract_ip on cloumn log use
+                  SELECT extract_ip(log) FROM [Stream Name] WHERE code=200
+                </li>
+              </ul>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-menu>
+  </q-btn>
+</template>
+
+<script lang="ts">
+import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
+
+export default defineComponent({
+  name: "ComponentSearchSyntaxGuide",
+  props: {
+    sqlmode: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup() {
+    const { t } = useI18n();
+    return {
+      t,
+    };
+  },
+});
+</script>
+
+<style lang="scss" scoped>
+.guide-list {
+  padding: 0 10px;
+  margin: 10px 0 0 0;
+}
+.guide-list li {
+  font-size: 14px;
+  line-height: 23px;
+}
+.q-btn:before {
+  border: 0px solid #d5d5d5;
+}
+
+.syntax-guide-button {
+  cursor: pointer;
+  text-transform: capitalize;
+  padding: 5px 5px;
+  font-weight: bold;
+  border: 1px solid rgba(89, 96, 178, 0.3);
+}
+
+.normal-mode {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #202224;
+}
+
+.sql-mode {
+  background-color: rgba(89, 96, 178, 0.8);
+  color: #ffffff;
+}
+
+.syntax-guide-title {
+  width: 420px;
+
+  .label {
+    font-size: 15px;
+    font-weight: bold;
+  }
+}
+
+.syntax-guide-sub-title {
+  color: $primary;
+  font-size: 15px;
+  margin-left: 5px;
+}
+
+.syntax-guide-text {
+  font-size: 12px;
+  margin-left: 5px;
+}
+
+.syntax-section {
+  margin-bottom: 5px;
+}
+</style>

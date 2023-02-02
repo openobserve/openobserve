@@ -1,0 +1,59 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 058694856476.dkr.ecr.us-west-2.amazonaws.com
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
+
+  build:
+    commands:
+      - pwd
+      - GIT_TAG="$(git describe --tags --abbrev=0)"
+      - GIT_HASH="$(git rev-parse --short HEAD)"
+      - docker build -t ziox:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      
+      - docker tag ziox:latest-arm64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-arm64
+      - docker tag ziox:latest-arm64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-arm64
+      
+      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-arm64
+      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-arm64
+
+      - echo 'Pull amd64 image'
+      - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64
+       
+      - echo 'Create manifests'
+      - docker manifest create 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev --amend 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64 --amend 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-arm64
+      - docker manifest create 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest --amend 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64 --amend 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-arm64
+      
+      - echo 'Push manifests'
+      - docker manifest push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev
+      - docker manifest push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest
+
+      # for ecr-public
+      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
+      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64
+
+      - docker push public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
+      - docker push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64 
+
+      - echo 'Pull amd64 image'
+      - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64
+      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64 public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64 public.ecr.aws/zinclabs/zinc-oxide:latest-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-oxide:latest-amd64
+       
+      - echo 'Create manifests'
+      - docker manifest create public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev --amend public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64 --amend public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64
+      - docker manifest create public.ecr.aws/zinclabs/zinc-oxide:latest --amend public.ecr.aws/zinclabs/zinc-oxide:latest-amd64 --amend public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
+      
+      - echo 'Push manifests'
+      - docker manifest push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev
+      - docker manifest push public.ecr.aws/zinclabs/zinc-oxide:latest
+
+# cache:
+#   paths:
+#     - ./target

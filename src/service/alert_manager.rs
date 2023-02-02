@@ -1,0 +1,138 @@
+use crate::common::notification::send_notification;
+use crate::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
+use crate::meta;
+use crate::meta::alert::{Alert, Evaluate, Trigger, TriggerTimer};
+use crate::meta::search::Request;
+use crate::service::search as SearchService;
+use crate::service::triggers;
+use ahash::AHashMap;
+use chrono::Utc;
+use serde_json::json;
+use tokio::time;
+
+pub async fn run() -> Result<(), anyhow::Error> {
+    for item in TRIGGERS.iter() {
+        if !item.is_ingest_time {
+            let local_item = item.clone();
+            tokio::task::spawn(async move {
+                handle_triggers(&local_item.alert_name.clone(), local_item.clone()).await
+            });
+        }
+    }
+    Ok(())
+}
+pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
+    match super::db::alerts::get(&trigger.org, &trigger.stream, &trigger.alert_name).await {
+        Ok(result) => match result {
+            Some(alert) => {
+                if TRIGGERS_IN_PROCESS.contains_key(alert_name) {
+                    let mut curr_time =
+                        TRIGGERS_IN_PROCESS.get_mut(&alert_name.to_owned()).unwrap();
+                    let delay = trigger.timestamp - curr_time.updated_at;
+                    if delay > 0 {
+                        log::info!(
+                            "Updating timeout for trigger to {}",
+                            curr_time.expires_at + delay
+                        );
+                        curr_time.expires_at += delay;
+                        curr_time.updated_at = trigger.timestamp;
+                    }
+                } else {
+                    let expires_at =
+                        Utc::now().timestamp_micros() + get_micros_from_min(alert.duration); // * 60 * 1000000;
+                    log::info!("Setting timeout for trigger to {}", expires_at);
+                    TRIGGERS_IN_PROCESS.insert(
+                        alert_name.to_owned(),
+                        TriggerTimer {
+                            updated_at: trigger.timestamp,
+                            expires_at,
+                        },
+                    );
+                    handle_trigger(alert_name, alert.clone()).await;
+                }
+            }
+            None => log::error!("[ALERT MANAGER] no alert found for trigger",),
+        },
+        Err(_) => log::error!("[ALERT MANAGER] Error fectching alert",),
+    }
+}
+
+pub async fn handle_trigger(alert_name: &str, alert: Alert) {
+    let mut interval = time::interval(time::Duration::from_secs(
+        (alert.frequency * 60).try_into().unwrap(),
+    ));
+
+    loop {
+        interval.tick().await;
+        let curr_ts = Utc::now().timestamp_micros();
+        let trigger = TRIGGERS.get(&alert_name.to_owned()).unwrap();
+        if TRIGGERS_IN_PROCESS.contains_key(alert_name) {
+            let trigger_time = TRIGGERS_IN_PROCESS.get(&alert_name.to_owned()).unwrap();
+            if curr_ts <= trigger_time.expires_at {
+                let mut query = alert.query.clone().unwrap();
+                let curr_ts = Utc::now().timestamp_micros();
+                query.end_time = curr_ts;
+                query.start_time = curr_ts - get_micros_from_min(alert.duration);
+                let req: meta::search::Request = Request {
+                    query,
+                    aggs: AHashMap::new(),
+                };
+                //let time_elpased = curr_ts - trigger.clone().last_sent_at;
+
+                // do search
+                match SearchService::search(&trigger.org, meta::StreamType::Logs, &req).await {
+                    Ok(res) => {
+                        if !res.hits.is_empty() {
+                            let record = res.hits.first().unwrap().as_object().unwrap();
+                            if alert.condition.clone().evaluate(record.clone()) {
+                                let curr_ts = Utc::now().timestamp_micros();
+                                let mut local_trigger = trigger.clone();
+
+                                if trigger.clone().last_sent_at == 0
+                                    || (trigger.clone().last_sent_at > 0
+                                        && curr_ts - trigger.clone().last_sent_at
+                                            > get_micros_from_min(alert.time_between_alerts))
+                                {
+                                    //Invoke Webhook
+                                    let msg = json!({
+                                        "text":
+                                        format!(
+                                            "For stream {} of organization {} alert {} is active",
+                                            &trigger.stream, &trigger.org, &trigger.alert_name
+                                        )
+                                    });
+                                    let _ = send_notification(&alert.destination, msg).await;
+                                    local_trigger.last_sent_at = curr_ts;
+                                }
+                                //Update trigger for last sent
+
+                                local_trigger.count += 1;
+                                let _ = triggers::save_trigger(
+                                    alert.name.clone(),
+                                    local_trigger.clone(),
+                                )
+                                .await;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("search error: {:?}", err);
+                    }
+                }
+            } else {
+                log::info!(
+                    "Setting to in-active expired trigger with name {}",
+                    &alert_name.to_owned()
+                );
+                let mut local_trigger = trigger.clone();
+                local_trigger.is_valid = false;
+                let _ = triggers::save_trigger(alert.name.clone(), local_trigger.clone()).await;
+                break;
+            }
+        }
+    }
+}
+
+fn get_micros_from_min(min: i64) -> i64 {
+    min * 60 * 1000000
+}

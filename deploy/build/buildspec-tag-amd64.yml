@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 058694856476.dkr.ecr.us-west-2.amazonaws.com
+
+  build:
+    commands:
+      - pwd
+      - GIT_TAG="$(git describe --tags --abbrev=0)"
+      - docker build -t ziox:latest-amd64 -f deploy/build/Dockerfile-tag.amd64 .
+      
+      - docker tag ziox:latest-amd64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:$GIT_TAG-amd64
+      - docker tag ziox:latest-amd64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:latest-amd64
+      
+      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:$GIT_TAG-amd64
+      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:latest-amd64
+
+# cache:
+#   paths:
+#     - ./target
