@@ -1,8 +1,11 @@
+use crate::{
+    handler::http::auth::is_admin_user,
+    infra::config::USERS,
+    service::organization::{self},
+};
 use actix_web::{get, web, HttpResponse, Result};
 use serde::Serialize;
 use std::io::Error;
-
-use crate::{handler::http::auth::is_admin_user, infra::config::USERS};
 
 #[derive(Serialize)]
 struct Organization {
@@ -82,4 +85,10 @@ pub async fn organizations() -> Result<HttpResponse, Error> {
     let org_response = OrganizationResponse { data: [obj] };
 
     Ok(HttpResponse::Ok().json(org_response))
+}
+#[get("/{org_id}/summary")]
+async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let org_summary = organization::get_summary(&org).await;
+    Ok(HttpResponse::Ok().json(org_summary))
 }

@@ -8,42 +8,21 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 use super::auth::validator;
 use super::request::alerts::*;
 use super::request::dashboards::*;
-use super::request::document::data_ingest::*;
-use super::request::functions::udf::*;
+use super::request::functions;
 use super::request::health::{cache_status, healthz};
+use super::request::ingest;
 use super::request::organization::*;
 use super::request::prom::*;
 use super::request::search;
-use super::request::stream::*;
+use super::request::stream;
 use super::request::traces::*;
-use super::request::users::*;
+use super::request::users;
 use crate::infra::config::CONFIG;
-use crate::meta::ingestion::{IngestionResponse, StreamStatus};
-use crate::meta::stream;
-use crate::meta::StreamType;
 
+pub mod openapi;
 pub mod ui;
 
 pub fn get_routes(cfg: &mut web::ServiceConfig) {
-    #[derive(OpenApi)]
-    #[openapi(
-        paths(list_streams, bulk_ingest, multi_ingest),
-        components(schemas(
-            stream::ListStream,
-            stream::Stream,
-            StreamType,
-            stream::Stats,
-            stream::StreamProperty,
-            IngestionResponse,
-            StreamStatus,
-            //SearchResponse
-        )),
-        tags(
-            (name = "Ingestion", description = "Todo management endpoints.")
-        )
-    )]
-    struct ApiDoc;
-
     let auth = HttpAuthentication::basic(validator);
     cfg.service(healthz);
 
@@ -63,31 +42,31 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/auth")
             .wrap(cors.clone())
             .service(organizarions_by_username)
-            .service(authentication),
+            .service(users::authentication),
     );
     cfg.service(
         web::scope("/api")
             .wrap(auth)
             .wrap(cors)
             .service(cache_status)
-            .service(bulk_ingest)
-            .service(multi_ingest)
-            .service(json_ingest)
+            .service(ingest::bulk)
+            .service(ingest::multi)
+            .service(ingest::json)
             .service(search::search)
             .service(search::around)
-            .service(stream_schema)
-            .service(stream_settings)
-            .service(list_streams)
-            .service(org_index)
-            .service(save_function)
-            .service(list_functions)
-            .service(delete_function)
-            .service(save_stream_function)
-            .service(list_stream_function)
-            .service(delete_stream_function)
-            .service(list_users)
-            .service(delete_user)
-            .service(post_user)
+            .service(stream::schema)
+            .service(stream::settings)
+            .service(stream::list)
+            .service(stream::org_index)
+            .service(functions::save_function)
+            .service(functions::list_functions)
+            .service(functions::delete_function)
+            .service(functions::save_stream_function)
+            .service(functions::list_stream_function)
+            .service(functions::delete_stream_function)
+            .service(users::list)
+            .service(users::save)
+            .service(users::delete)
             .service(prometheus_write)
             .service(save_dashboard)
             .service(get_dashboard)
@@ -99,12 +78,13 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(get_alert)
             .service(list_alerts)
             .service(list_stream_alerts)
-            .service(delete_alert),
+            .service(delete_alert)
+            .service(org_summary),
     );
 
-    cfg.service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
-        Url::new("api", "/api-doc/openapi1.json"),
-        ApiDoc::openapi(),
+    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
+        Url::new("api", "/api-doc/openapi.json"),
+        openapi::ApiDoc::openapi(),
     )]));
 
     if CONFIG.common.ui_enabled {

@@ -116,7 +116,7 @@ pub struct Alert {
     pub time_between_alerts: i64,
     pub destination: String,
     #[serde(default)]
-    pub is_ingest_time: bool,
+    pub is_real_time: bool,
 }
 
 impl PartialEq for Alert {

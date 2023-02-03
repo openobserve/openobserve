@@ -250,7 +250,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .max-result {
   width: 170px;
 }
@@ -298,6 +298,7 @@ export default defineComponent({
   .q-table td {
     height: 25px;
     padding: 0px 5px;
+    font-size: 0.75rem;
   }
 
   .q-table__bottom {

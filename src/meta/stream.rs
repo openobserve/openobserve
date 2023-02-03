@@ -1,18 +1,17 @@
+use datafusion::arrow::datatypes::Schema;
+use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 use super::StreamType;
 use crate::common::json;
-
-use datafusion::arrow::datatypes::Schema;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
     pub name: String,
     pub storage_type: String,
     pub stream_type: StreamType,
-    pub stats: Stats,
+    pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
@@ -32,7 +31,7 @@ pub struct StreamQueryParams {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct Stats {
+pub struct StreamStats {
     pub doc_time_min: i64,
     pub doc_time_max: i64,
     pub doc_num: u64,
@@ -48,7 +47,7 @@ pub struct StreamSchema {
     pub schema: Schema,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
@@ -74,7 +73,7 @@ impl Serialize for StreamSettings {
     }
 }
 
-impl Default for Stats {
+impl Default for StreamStats {
     fn default() -> Self {
         Self {
             doc_time_min: 0,
@@ -87,20 +86,20 @@ impl Default for Stats {
     }
 }
 
-impl From<&str> for Stats {
+impl From<&str> for StreamStats {
     fn from(data: &str) -> Self {
-        json::from_str::<Stats>(data).unwrap()
+        json::from_str::<StreamStats>(data).unwrap()
     }
 }
 
-impl From<Stats> for Vec<u8> {
-    fn from(value: Stats) -> Vec<u8> {
+impl From<StreamStats> for Vec<u8> {
+    fn from(value: StreamStats) -> Vec<u8> {
         serde_json::to_vec(&value).unwrap()
     }
 }
 
-impl From<Stats> for String {
-    fn from(data: Stats) -> Self {
+impl From<StreamStats> for String {
+    fn from(data: StreamStats) -> Self {
         json::to_string(&data).unwrap()
     }
 }
@@ -116,9 +115,9 @@ mod test {
 
     #[test]
     fn test_stats() {
-        let stats = Stats::default();
+        let stats = StreamStats::default();
         let stats_str: String = stats.try_into().unwrap();
-        let stats_frm_str = Stats::from(stats_str.as_str());
+        let stats_frm_str = StreamStats::from(stats_str.as_str());
         assert_eq!(stats, stats_frm_str);
     }
 }

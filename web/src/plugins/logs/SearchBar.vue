@@ -138,10 +138,12 @@ export default defineComponent({
     QueryEditor,
     SyntaxGuide,
   },
+  emits: ["searchdata"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
-        this.searchObj.runQuery = true;
+        // this.searchObj.runQuery = true;
+        this.$emit("searchdata");
       }
     },
   },
@@ -198,7 +200,7 @@ export default defineComponent({
             });
 
             if (streamFound == false) {
-              searchObj.data.stream.selectedStream = "";
+              searchObj.data.stream.selectedStream = {};
               searchObj.data.stream.selectedStreamFields = [];
               $q.notify({
                 message: "Stream not found",

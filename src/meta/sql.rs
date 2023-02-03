@@ -62,7 +62,11 @@ impl Sql {
         if statement.is_err() {
             return Err(anyhow::anyhow!(statement.err().unwrap()));
         }
-        let statement = &statement.unwrap()[0];
+        let statement = statement.unwrap();
+        if statement.is_empty() {
+            return Err(anyhow!("sql is empty"));
+        }
+        let statement = &statement[0];
         let sql: Result<Sql, anyhow::Error> = statement.try_into();
         if sql.is_err() {
             return Err(sql.err().unwrap());

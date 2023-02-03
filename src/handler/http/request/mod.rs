@@ -1,8 +1,8 @@
 pub mod alerts;
 pub mod dashboards;
-pub mod document;
 pub mod functions;
 pub mod health;
+pub mod ingest;
 pub mod organization;
 pub mod prom;
 pub mod search;

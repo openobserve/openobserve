@@ -59,7 +59,7 @@ const defaultObject = {
         errorMsg:"",
         stream: {
             streamLists: [],
-            selectedStream: "",
+            selectedStream: {label: "", value: ""},
             selectedStreamFields: [],
             selectedFields:<string[]> [],
             filterField: "",

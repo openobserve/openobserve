@@ -1,24 +1,24 @@
 use dashmap::DashMap;
 
 use crate::meta::common::FileMeta;
-use crate::meta::stream::Stats;
+use crate::meta::stream::StreamStats;
 
 lazy_static! {
-    static ref STATS: DashMap<String, Stats> = DashMap::with_capacity(2);
+    static ref STATS: DashMap<String, StreamStats> = DashMap::with_capacity(2);
 }
 
-const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<Stats>();
+const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 
-pub fn get_stats() -> DashMap<String, Stats> {
+pub fn get_stats() -> DashMap<String, StreamStats> {
     STATS.clone()
 }
 
-pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> Option<Stats> {
+pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> Option<StreamStats> {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     STATS.get(&key).map(|v| *v.value())
 }
 
-pub fn set_stream_stats(org_id: &str, stream_name: &str, stream_type: &str, val: Stats) {
+pub fn set_stream_stats(org_id: &str, stream_name: &str, stream_type: &str, val: StreamStats) {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     STATS.insert(key, val);
 }

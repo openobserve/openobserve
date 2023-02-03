@@ -1,3 +1,10 @@
+use actix_web::{http, HttpResponse};
+use arrow_schema::DataType;
+use chrono::Utc;
+use std::collections::HashMap;
+use std::io::Error;
+use tracing::info_span;
+
 use super::search::sql::Sql;
 use super::{db, triggers};
 use crate::handler::grpc::cluster_rpc;
@@ -5,15 +12,6 @@ use crate::meta;
 use crate::meta::alert::{Alert, AlertList, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::search::Query;
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
-use ahash::AHashMap;
-use arrow_schema::DataType;
-use chrono::Utc;
-use std::io::Error;
-use tracing::info_span;
 
 pub async fn save_alert(
     org_id: String,
@@ -35,7 +33,7 @@ pub async fn save_alert(
     let fields = schema.fields;
     if fields.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             Some(format!("Stream with name {} not found", stream_name)),
         )));
     }
@@ -50,7 +48,7 @@ pub async fn save_alert(
             from: 0,
             size: 0,
         });
-        alert.is_ingest_time = true;
+        alert.is_real_time = true;
 
         //for condtion in alert.trigger.iter_mut() {
         let mut local_fields = fields.clone();
@@ -70,7 +68,7 @@ pub async fn save_alert(
             }
         } else {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST.into(),
                 Some(format!(
                     "Column named {} not found on stream {}",
                     &alert.condition.column, stream_name
@@ -81,14 +79,14 @@ pub async fn save_alert(
     } else {
         let meta_req = meta::search::Request {
             query: alert.clone().query.unwrap(),
-            aggs: AHashMap::new(),
+            aggs: HashMap::new(),
         };
         let req: cluster_rpc::SearchRequest = meta_req.into();
         let sql = Sql::new(&req).await;
 
         if sql.is_err() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST.into(),
                 Some(format!("Invalid query : {:?} ", sql.err())),
             )));
         }
@@ -103,7 +101,7 @@ pub async fn save_alert(
     .await
     .unwrap();
     // For non-ingest alert set trigger immediately
-    if !alert.is_ingest_time {
+    if !alert.is_real_time {
         let trigger = Trigger {
             timestamp: Utc::now().timestamp_micros(),
             is_valid: true,
@@ -126,10 +124,10 @@ pub async fn save_alert(
 pub async fn list_alert(org_id: String, stream_name: Option<&str>) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:list");
     let _guard = loc_span.enter();
-    let udf_list = db::alerts::list(org_id.as_str(), stream_name)
+    let alerts_list = db::alerts::list(org_id.as_str(), stream_name)
         .await
         .unwrap();
-    Ok(HttpResponse::Ok().json(AlertList { list: udf_list }))
+    Ok(HttpResponse::Ok().json(AlertList { list: alerts_list }))
 }
 
 pub async fn delete_alert(
@@ -146,7 +144,7 @@ pub async fn delete_alert(
             "Alert deleted ".to_string(),
         ))),
         Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             Some(err.to_string()),
         ))),
     }
@@ -163,7 +161,7 @@ pub async fn get_alert(
     match result {
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             Some("alert not found".to_string()),
         ))),
     }

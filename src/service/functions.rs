@@ -5,24 +5,24 @@ use actix_web::{
 use std::io::Error;
 use tracing::info_span;
 
-use crate::meta::transform::Transform;
-use crate::meta::transform::TransformList;
+use crate::meta::functions::FunctionList;
+use crate::meta::functions::Transform;
 use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
 
-const SUCESS: &str = "Transform saved successfully";
+const SUCESS: &str = "Function saved successfully";
 const SPECIFY: &str = "Please specify ";
 const STREAM: &str = "stream name ";
-const ORDER: &str = "transform order ";
-const DELETED: &str = "Transform deleted";
+const ORDER: &str = "function order ";
+const DELETED: &str = "Function deleted";
 
-pub async fn register_transform(
+pub async fn register_function(
     org_id: String,
     stream_name: Option<String>,
     name: String,
     mut trans: Transform,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:transform:register");
+    let loc_span = info_span!("service:functions:register");
     let _guard = loc_span.enter();
     match stream_name {
         Some(stream_name) => {
@@ -96,22 +96,22 @@ pub async fn register_transform(
     }
 }
 
-pub async fn list_transform(
+pub async fn list_functions(
     org_id: String,
     stream_name: Option<String>,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:transform:list");
+    let loc_span = info_span!("service:functions:list");
     let _guard = loc_span.enter();
     let udf_list = db::udf::list(org_id.as_str(), stream_name).await.unwrap();
-    Ok(HttpResponse::Ok().json(TransformList { list: udf_list }))
+    Ok(HttpResponse::Ok().json(FunctionList { list: udf_list }))
 }
 
-pub async fn delete_transform(
+pub async fn delete_function(
     org_id: String,
     stream_name: Option<String>,
     name: String,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:transform:delete");
+    let loc_span = info_span!("service:functions:delete");
     let _guard = loc_span.enter();
     let result = db::udf::delete(org_id.as_str(), stream_name, name.as_str()).await;
     match result {

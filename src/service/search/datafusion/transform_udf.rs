@@ -10,7 +10,7 @@ use datafusion::{
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 
-use crate::infra::config::QUERY_TRANSFORMS;
+use crate::infra::config::QUERY_FUNCTIONS;
 
 fn create_user_df(
     fn_name: &str,
@@ -123,7 +123,7 @@ fn eval_user_fn(
 pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
     let mut udf;
     let mut udf_list = Vec::new();
-    for trnasform in QUERY_TRANSFORMS.iter() {
+    for trnasform in QUERY_FUNCTIONS.iter() {
         let key = trnasform.key();
         //do not register ingest_time transforms
         if trnasform.stream_name.is_empty() && key.contains(org_id) {

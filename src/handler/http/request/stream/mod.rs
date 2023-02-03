@@ -1,23 +1,35 @@
+use actix_web::{get, http, post, web, HttpRequest, HttpResponse, Responder};
+use std::collections::HashMap;
+use std::io::Error;
+use std::io::ErrorKind;
+
 use crate::common::http::get_stream_type_from_request;
 use crate::meta::{self, stream::StreamSettings, StreamType};
 use crate::service::stream;
 
-use actix_web::{
-    get,
-    http::{self, header::ContentType},
-    post, web, HttpRequest, HttpResponse, Responder,
-};
-use ahash::AHashMap;
-use std::io::Error;
-use std::io::ErrorKind;
-
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Stream",
+    operation_id = "StreamSchema",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = Stream),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[get("/{org_id}/{stream_name}/schema")]
-async fn stream_schema(
+async fn schema(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
@@ -46,14 +58,31 @@ async fn stream_schema(
     }
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Stream",
+    operation_id = "StreamSettings",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/{stream_name}/settings")]
-async fn stream_settings(
+async fn settings(
     path: web::Path<(String, String)>,
     settings: web::Json<StreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
@@ -90,13 +119,22 @@ async fn stream_settings(
 
 #[utoipa::path(
     context_path = "/api",
+    tag = "Stream",
+    operation_id = "StreamList",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     responses(
-        (status = 200, description = "List streams", body = ListStream)
+        (status = 200, description="Success", content_type = "application/json", body = ListStream),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/streams")]
-async fn list_streams(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let query = web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
@@ -158,7 +196,7 @@ async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> impl Respond
     let es_info = r##"{"name":"Elasticsearch","cluster_name":"N/A","cluster_uuid":"N/A","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"N/A","minimum_wire_version":"N/A","minimum_index_compatibility":"N/A"},"tagline":"You Know, for Search"}"##;
     let es_info = es_info.replace("0.0.0", version);
     HttpResponse::Ok()
-        .content_type(ContentType::json())
+        .content_type(http::header::ContentType::json())
         .insert_header(("X-Elastic-Product", "Elasticsearch"))
         .body(es_info)
 }

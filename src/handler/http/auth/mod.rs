@@ -7,7 +7,7 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 
 use crate::common::auth::get_hash;
 use crate::infra::config::CONFIG;
-use crate::meta::user::Role;
+use crate::meta::user::UserRole;
 use crate::service::users;
 
 pub async fn validator(
@@ -38,31 +38,34 @@ pub async fn validate_credentials(
     user_password: &str,
     path: &str,
 ) -> Result<bool, Error> {
-    let mut user = match path.find('/') {
-        Some(index) => {
-            let org_id = &path[0..index];
-            users::get_user(Some(org_id), user_id).await
-        }
-        None => users::get_user(None, user_id).await,
-    };
-
+    let user;
     //this is only applicable for super admin user
-    if user.is_none() && is_admin_user(user_id).await {
+    if is_admin_user(user_id).await {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
             return Ok(false);
         }
     } else {
-        return Ok(false);
+        user = match path.find('/') {
+            Some(index) => {
+                let org_id = &path[0..index];
+                users::get_user(Some(org_id), user_id).await
+            }
+            None => users::get_user(None, user_id).await,
+        };
     }
 
+    if user.is_none() {
+        return Ok(false);
+    }
     let user = user.unwrap();
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass) {
         return Ok(false);
     }
     if !path.contains("/user")
-        || (path.contains("/user") && (user.role.eq(&Role::Admin) || user.role.eq(&Role::Root)))
+        || (path.contains("/user")
+            && (user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)))
     {
         Ok(true)
     } else {

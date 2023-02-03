@@ -8,7 +8,7 @@ use tracing::info_span;
 use crate::common::json;
 use crate::common::utils::is_local_disk_storage;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::stream::{ListStream, Stats, Stream, StreamProperty, StreamSettings};
+use crate::meta::stream::{ListStream, Stream, StreamProperty, StreamSettings, StreamStats};
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -48,6 +48,15 @@ pub async fn list_streams(
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:streams:list_streams");
     let _guard = loc_span.enter();
+    let indices_res = get_streams(org_id, stream_type, fetch_schema).await;
+    Ok(HttpResponse::Ok().json(ListStream { list: indices_res }))
+}
+
+pub async fn get_streams(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    fetch_schema: bool,
+) -> Vec<Stream> {
     let indices = db::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap();
@@ -60,7 +69,7 @@ pub async fn list_streams(
         )
         .await
         .unwrap();
-        if stats.eq(&Stats::default()) {
+        if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -77,14 +86,14 @@ pub async fn list_streams(
             ));
         }
     }
-    Ok(HttpResponse::Ok().json(ListStream { list: indices_res }))
+    indices_res
 }
 
 fn stream_res(
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
-    stats: Option<Stats>,
+    stats: Option<StreamStats>,
 ) -> Stream {
     let fields = schema.fields();
     let mut meta = schema.metadata().clone();
@@ -124,7 +133,7 @@ fn stream_res(
     let storage_type = if is_local_disk_storage() { LOCAL } else { S3 };
     let stats = match stats {
         Some(v) => v,
-        None => Stats::default(),
+        None => StreamStats::default(),
     };
 
     Stream {
@@ -191,7 +200,7 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
     Ok(full_text_search_keys)
 }
 
-fn transform_stats(stats: &mut Stats) -> Stats {
+fn transform_stats(stats: &mut StreamStats) -> StreamStats {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.storage_size = (stats.storage_size * 100.0).round() / 100.0;
@@ -205,13 +214,13 @@ mod test {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     #[test]
     fn test_transform_stats() {
-        let mut stats = Stats::default();
+        let mut stats = StreamStats::default();
         let res = transform_stats(&mut stats);
         assert_eq!(stats, res);
     }
     #[test]
     fn test_stream_res() {
-        let stats = Stats::default();
+        let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
         let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
         assert_eq!(res.stats, stats);

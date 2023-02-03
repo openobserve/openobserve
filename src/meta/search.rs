@@ -1,7 +1,7 @@
-use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 use crate::common::json::unflatten_json;
 use crate::service::search::datafusion::storage::file_list;
@@ -12,14 +12,17 @@ pub struct Session {
     pub data_type: file_list::SessionType,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[schema(as = SearchRequest)]
 pub struct Request {
+    #[schema(value_type = SearchQuery)]
     pub query: Query,
     #[serde(default)]
-    pub aggs: AHashMap<String, String>,
+    pub aggs: HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[schema(as = SearchQuery)]
 pub struct Query {
     pub sql: String,
     #[serde(default)]
@@ -54,33 +57,21 @@ impl Default for Query {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+#[schema(as = SearchResponse)]
 pub struct Response {
     pub took: usize,
+    #[schema(value_type = Vec<Object>)]
     pub hits: Vec<Value>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub aggs: AHashMap<String, Vec<Value>>,
+    #[schema(value_type = Object)]
+    pub aggs: HashMap<String, Vec<serde_json::Value>>,
     pub total: usize,
     pub from: usize,
     pub size: usize,
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
-}
-
-impl Default for Response {
-    fn default() -> Self {
-        Response {
-            took: 0,
-            total: 0,
-            from: 0,
-            size: 0,
-            file_count: 0,
-            scan_size: 0,
-            hits: Vec::new(),
-            aggs: AHashMap::new(),
-        }
-    }
 }
 
 impl Response {
@@ -93,7 +84,7 @@ impl Response {
             file_count: 0,
             scan_size: 0,
             hits: Vec::new(),
-            aggs: AHashMap::new(),
+            aggs: HashMap::new(),
         }
     }
 

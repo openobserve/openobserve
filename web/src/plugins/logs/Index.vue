@@ -3,7 +3,12 @@
 <template>
   <q-page class="logPage" id="logPage">
     <div id="secondLevel">
-      <search-bar ref="searchBarRef" />
+      <search-bar
+        ref="searchBarRef"
+        v-show="searchObj.data.stream.streamLists.length > 0"
+        :key="searchObj.data.stream.streamLists.length"
+        @searchdata="searchData"
+      />
       <div
         id="thirdLevel"
         class="row scroll"
@@ -43,7 +48,11 @@
                 style="margin: 0 auto; display: block"
               />
             </div>
-            <div v-if="searchObj.data.errorMsg !== ''">
+            <div
+              v-if="
+                searchObj.data.errorMsg !== '' && searchObj.loading == false
+              "
+            >
               <h5 class="text-center">
                 Result not found. {{ searchObj.data.errorMsg }}
               </h5>
@@ -59,7 +68,11 @@
         />
       </div>
       <div v-else>
-        <h5 class="text-center">No stream found in selected organization!</h5>
+        <h5 class="text-center">
+          <q-icon name="warning" color="warning" size="10rem" /><br />{{
+            searchObj.data.errorMsg
+          }}
+        </h5>
       </div>
     </div>
   </q-page>
@@ -207,10 +220,25 @@ export default defineComponent({
           .then((res) => {
             searchObj.data.streamResults = res.data;
 
-            getQueryTransform();
+            if (res.data.list.length > 0) {
+              getQueryTransform();
 
-            //extract stream data from response
-            loadStreamLists();
+              //extract stream data from response
+              loadStreamLists();
+            } else {
+              searchObj.loading = false;
+              searchObj.data.errorMsg =
+                "No stream found in selected organization!";
+              searchObj.data.stream.streamLists = [];
+              searchObj.data.stream.selectedStream = {};
+              searchObj.data.queryResults = {};
+              searchObj.data.sortedQueryResults = [];
+              searchObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {},
+              };
+            }
           })
           .catch((e) => {
             searchObj.loading = false;
@@ -758,6 +786,13 @@ export default defineComponent({
 
     onActivated(() => {
       refreshData();
+
+      if (
+        searchObj.organizationIdetifier !=
+        store.state.selectedOrganization.identifier
+      ) {
+        loadPageData();
+      }
     });
 
     const reDrawGrid = () => {

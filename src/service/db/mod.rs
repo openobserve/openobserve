@@ -6,14 +6,14 @@ use crate::infra::cache::stats;
 use crate::infra::config::METRIC_CLUSTER_LEADER;
 use crate::infra::db::Event;
 use crate::meta::prom::ClusterLeader;
-use crate::meta::stream::Stats;
+use crate::meta::stream::StreamStats;
 
 pub mod alerts;
 pub mod compact;
 pub mod dashboard;
 pub mod file_list;
+pub mod functions;
 pub mod schema;
-pub mod transform;
 pub mod triggers;
 pub mod udf;
 pub mod user;
@@ -22,7 +22,7 @@ pub async fn get_stream_stats(
     org_id: &str,
     stream_name: &str,
     stream_type: &str,
-) -> Result<Stats, anyhow::Error> {
+) -> Result<StreamStats, anyhow::Error> {
     match stats::get_stream_stats(org_id, stream_name, stream_type) {
         Some(stats) => Ok(stats),
         None => {
@@ -30,7 +30,7 @@ pub async fn get_stream_stats(
             let db = &crate::infra::db::DEFAULT;
             let value = match db.get(&key).await {
                 Ok(val) => serde_json::from_slice(&val).unwrap(),
-                Err(_) => Stats::default(),
+                Err(_) => StreamStats::default(),
             };
             Ok(value)
         }
