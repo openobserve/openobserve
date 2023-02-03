@@ -1,4 +1,4 @@
-# zinc-oxide
+# zinc-observe
 
 |          |                                      |
 -----------|---------------------------------------
@@ -13,7 +13,7 @@ ZIOX_USER_NAME = "admin" ZIOX_USER_PASSWORD = "Complexpass#123" cargo run
 
 ## Etcd client
 
-etcd-client which is used by zin-oxide needs protocol buffer compiler, please refer https://grpc.io/docs/protoc-installation/
+etcd-client which is used by zinc-observe needs protocol buffer compiler, please refer https://grpc.io/docs/protoc-installation/
 
 For MacOS,using Homebrew
 
