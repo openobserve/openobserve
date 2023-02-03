@@ -1,5 +1,7 @@
 # zinc-observe
 
+ZincObserve is better log analytics solution.
+
 |          |                                      |
 -----------|---------------------------------------
 | User ID  | admin                                |
