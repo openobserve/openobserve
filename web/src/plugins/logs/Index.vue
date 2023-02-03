@@ -511,8 +511,11 @@ export default defineComponent({
             whereClause = whereClause
               .replaceAll("=", " =")
               .replaceAll(">", " >")
-              .replaceAll("<", " <")
-              .replaceAll("!=", " !=");
+              .replaceAll("<", " <");
+
+            whereClause = whereClause
+              .replaceAll("!=", " !=")
+              .replaceAll("! =", " !=");
 
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
