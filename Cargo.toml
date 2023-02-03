@@ -2,8 +2,11 @@
 name = "zinc-oxide"
 version = "0.1.0"
 edition = "2021"
-# exclude = ["/web"]
-# include = ["/ui"]
+description = "ZincObserve is a search platform built specifically for log search & analytics. One can use it to search & analyze terabytes of logs."
+homepage = "https://zinc.dev/"
+repository = "https://github.com/zinclabs/zinc-observe/"
+keywords = ["search", "log", "metrics", "traces", "analytics"]
+license = "AGPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -73,8 +76,8 @@ ahash = { version = "0.8.3", features = ["serde"] }
 dashmap = { version = "5.4.0", features = ["serde"] }
 argon2 = {version =  "0.4.1" ,features = ["alloc", "password-hash"]}
 snap = "1"
-utoipa = { version = "2", features = ["actix_extras"] }
-utoipa-swagger-ui = { version = "2", features = ["actix-web"] }
+utoipa = { version = "3", features = ["actix_extras","openapi_extensions"] }
+utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 parking_lot = "0.12"
 url = "2.2"
 rsfs = "0.4.1"

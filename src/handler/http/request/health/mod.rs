@@ -28,11 +28,8 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert("LOCAL_NODE_ROLE", json!(&config::CONFIG.common.node_role));
     stats.insert("NODES", json!(cluster::NODES.clone()));
-    stats.insert(
-        "STREAM_TRANSFORMS",
-        json!(config::STREAM_TRANSFORMS.clone()),
-    );
-    stats.insert("QUERY_TRANSFORMS", json!(config::QUERY_TRANSFORMS.clone()));
+    stats.insert("STREAM_TRANSFORMS", json!(config::STREAM_FUNCTIONS.clone()));
+    stats.insert("QUERY_TRANSFORMS", json!(config::QUERY_FUNCTIONS.clone()));
     stats.insert("STREAM_STATS", json!({"stream_num": cache::stats::get_stream_stats_len(), "mem_size": cache::stats::get_stream_stats_in_memory_size()}));
 
     let (max_size, cur_size) = cache::file_data::stats();

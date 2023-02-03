@@ -18,7 +18,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let prefix = "file_list/";
     let files = storage.list(prefix).await?;
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.cpu_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();

@@ -4,7 +4,9 @@
       <q-select
         v-model="searchObj.data.stream.selectedStream"
         :label="
-          searchObj.data.stream.selectedStream ? '' : t('search.selectIndex')
+          searchObj.data.stream.selectedStream.label
+            ? ''
+            : t('search.selectIndex')
         "
         :options="searchObj.data.stream.streamLists"
         data-cy="index-dropdown"
@@ -161,7 +163,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -269,7 +271,7 @@ export default defineComponent({
 
       .field_label {
         pointer-events: none;
-        font-size: 0.875rem;
+        font-size: 0.825rem;
         position: relative;
         display: inline;
         z-index: 2;

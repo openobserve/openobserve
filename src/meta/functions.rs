@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Transform {
     #[serde(default)]
     #[serde(skip_serializing_if = "is_zero")]
@@ -16,6 +17,7 @@ pub struct Transform {
     #[serde(default)]
     pub trans_type: u8,
 }
+
 fn is_zero(b: impl std::borrow::Borrow<u32>) -> bool {
     b.borrow() <= &0
 }
@@ -26,8 +28,8 @@ impl PartialEq for Transform {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransformList {
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct FunctionList {
     pub list: Vec<Transform>,
 }
 
@@ -55,7 +57,7 @@ mod tests {
             trans_type: 1,
         };
 
-        let trans_list = TransformList { list: vec![] };
+        let trans_list = FunctionList { list: vec![] };
         assert_eq!(trns, mod_trns);
         assert!(trans_list.list.is_empty());
     }

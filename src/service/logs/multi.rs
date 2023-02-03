@@ -12,12 +12,12 @@ use std::io::{BufRead, BufReader, Error};
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, STREAM_TRANSFORMS};
+use crate::infra::config::{CONFIG, STREAM_FUNCTIONS};
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
+use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
-use crate::meta::transform::Transform;
 use crate::meta::StreamType;
 use crate::service::logs::StreamMeta;
 use crate::service::schema::{add_stream_schema, stream_schema_exists};
@@ -58,7 +58,7 @@ pub async fn ingest(
     // Start Register Transfoms for stream
     let mut local_tans: Vec<Transform> = vec![];
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    if let Some(transforms) = STREAM_TRANSFORMS.get(&key) {
+    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
         let mut func: Function;

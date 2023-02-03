@@ -5,7 +5,7 @@ use actix_web::{
 use std::io::Error;
 use uuid::Uuid;
 
-use crate::infra::config::USERS;
+use crate::infra::config::{CONFIG, USERS};
 use crate::meta::user::{User, UserList, UserResponse};
 use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
 
@@ -24,12 +24,16 @@ pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Err
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let mut local_org = "";
-    let user_key = match org_id {
-        Some(org) => {
-            local_org = org;
-            format!("{}/{}", org, name)
+    let user_key = if name.eq(&CONFIG.auth.username) {
+        name.to_owned()
+    } else {
+        match org_id {
+            Some(org) => {
+                local_org = org;
+                format!("{}/{}", org, name)
+            }
+            None => name.to_owned(),
         }
-        None => name.to_owned(),
     };
     let user = USERS.get(&user_key);
     match user {

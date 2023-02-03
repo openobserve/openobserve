@@ -70,6 +70,16 @@ impl Sql {
 
         let mut origin_sql = req_query.sql.clone();
 
+        // quick check SQL
+        if origin_sql.is_empty() {
+            return Err(anyhow::anyhow!("Query SQL is empty"));
+        }
+        if !origin_sql.to_lowercase().contains(" from ") {
+            return Err(anyhow::anyhow!(
+                "Query SQL should likes [select * from table]"
+            ));
+        }
+
         // Hack for quote
         origin_sql = add_quote_for_sql(&origin_sql);
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
@@ -115,17 +125,6 @@ impl Sql {
             return Err(anyhow::anyhow!(
                 "Query SQL time_range start_time should be less than end_time",
             ));
-        }
-
-        // check full sql_mode limit
-        if sql_mode.eq(&SqlMode::Full) {
-            let origin_sql = origin_sql.to_lowercase();
-            if !origin_sql.contains(" limit ")
-                && !origin_sql.contains(" group ")
-                && !origin_sql.contains(" count(")
-            {
-                return Err(anyhow::anyhow!("sql_mode=full, Query SQL must limit rows"));
-            }
         }
 
         // check Agg SQL
@@ -268,6 +267,18 @@ impl Sql {
                             .replace(" FROM tbl", &format!(" FROM tbl WHERE {}", time_range_sql));
                     }
                 };
+            }
+        }
+
+        // check full sql_mode limit
+        if sql_mode.eq(&SqlMode::Full) {
+            let origin_sql = origin_sql.to_lowercase();
+            if !origin_sql.contains(" limit ")
+                && !origin_sql.contains(" group ")
+                && !origin_sql.contains(" count(")
+                && !origin_sql.contains(&CONFIG.common.time_stamp_col)
+            {
+                return Err(anyhow::anyhow!("sql_mode=full, Query SQL must limit rows"));
             }
         }
 

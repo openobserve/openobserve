@@ -6,15 +6,16 @@ pub mod alert;
 pub mod common;
 pub mod dashboards;
 pub mod dialect;
+pub mod functions;
 pub mod http;
 pub mod ingestion;
+pub mod organization;
 pub mod prom;
 pub mod search;
 pub mod service;
 pub mod sql;
 pub mod stream;
 pub mod traces;
-pub mod transform;
 pub mod user;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

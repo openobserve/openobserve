@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,
     pub failed: u32,

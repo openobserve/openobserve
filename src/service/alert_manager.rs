@@ -1,3 +1,8 @@
+use chrono::Utc;
+use serde_json::json;
+use std::collections::HashMap;
+use tokio::time;
+
 use crate::common::notification::send_notification;
 use crate::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
 use crate::meta;
@@ -5,10 +10,6 @@ use crate::meta::alert::{Alert, Evaluate, Trigger, TriggerTimer};
 use crate::meta::search::Request;
 use crate::service::search as SearchService;
 use crate::service::triggers;
-use ahash::AHashMap;
-use chrono::Utc;
-use serde_json::json;
-use tokio::time;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     for item in TRIGGERS.iter() {
@@ -75,7 +76,7 @@ pub async fn handle_trigger(alert_name: &str, alert: Alert) {
                 query.start_time = curr_ts - get_micros_from_min(alert.duration);
                 let req: meta::search::Request = Request {
                     query,
-                    aggs: AHashMap::new(),
+                    aggs: HashMap::new(),
                 };
                 //let time_elpased = curr_ts - trigger.clone().last_sent_at;
 

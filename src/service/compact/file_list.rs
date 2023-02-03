@@ -1,6 +1,6 @@
 use ahash::AHashMap as HashMap;
 use bytes::Buf;
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::io::{BufRead, BufReader, Write};
 
 use crate::common::json;
@@ -35,6 +35,18 @@ pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     if offset == 0 {
         return Ok(()); // no stream
     }
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let offset_time_hour = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            offset_time.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
 
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
@@ -53,7 +65,7 @@ pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     merge_file_list(offset).await?;
 
     // write new sync offset
-    offset += Duration::hours(1).num_microseconds().unwrap();
+    offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
     db::compact::file_list::set_offset(offset).await
 }
 
@@ -77,8 +89,13 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let key = format!("file_list{}", offset_prefix);
     let storage = &storage::DEFAULT;
     let file_list = storage.list(&key).await?;
-    if file_list.is_empty() {
-        return Ok(());
+    if file_list.len() <= 1 {
+        if locker.is_some() {
+            // release cluster lock
+            let mut lock = locker.unwrap();
+            lock.unlock().await?;
+        }
+        return Ok(()); // only one file list, no need merge
     }
 
     // filter deleted file keys

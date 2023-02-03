@@ -64,11 +64,23 @@ pub async fn merge_by_stream(
         }
         return Ok(()); // no data
     }
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let offset_time_hour = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            offset_time.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
 
     // check sync offset, if already synced, just set to next hour
     if offset < last_file_list_offset {
         // write new offset
-        offset += Duration::hours(1).num_microseconds().unwrap();
+        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
         db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
         // release cluster lock
         if locker.is_some() {
@@ -86,18 +98,6 @@ pub async fn merge_by_stream(
             time_now.month(),
             time_now.day(),
             time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let offset_time_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
             0,
             0,
         )
@@ -125,9 +125,30 @@ pub async fn merge_by_stream(
     }
 
     // get current hour all files
-    let files =
-        file_list::get_file_list(org_id, stream_name, Some(stream_type), offset, offset + 1)
-            .await?;
+    let files = file_list::get_file_list(
+        org_id,
+        stream_name,
+        Some(stream_type),
+        offset_time_hour,
+        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
+            - Duration::seconds(1).num_microseconds().unwrap(),
+    )
+    .await?;
+
+    if files.is_empty() {
+        // this hour is no data, and check if pass allowed_upto, then just write new offset
+        // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
+        // -- no check it
+        // }
+        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+        if locker.is_some() {
+            // release cluster lock
+            let mut lock = locker.unwrap();
+            lock.unlock().await?;
+        }
+        return Ok(());
+    }
 
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<(String, u64)>> = HashMap::new();
@@ -253,7 +274,7 @@ pub async fn merge_by_stream(
 
     // write new offset
     if merge_success {
-        offset += Duration::hours(1).num_microseconds().unwrap();
+        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
         db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
     }
 

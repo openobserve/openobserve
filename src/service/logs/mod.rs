@@ -1,10 +1,10 @@
 use super::triggers;
 use crate::common;
 use crate::common::notification::send_notification;
-use crate::infra::config::{CONFIG, STREAM_ALERTS, STREAM_TRANSFORMS};
+use crate::infra::config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS};
 use crate::meta::alert::{Alert, Evaluate, Trigger};
+use crate::meta::functions::Transform;
 use crate::meta::ingestion::RecordStatus;
-use crate::meta::transform::Transform;
 use crate::meta::StreamType;
 use crate::service::schema::check_for_schema;
 use ahash::AHashMap;
@@ -74,7 +74,7 @@ async fn get_stream_transforms<'a>(
     if stream_tansform_map.contains_key(&key) {
         return;
     }
-    let transforms = STREAM_TRANSFORMS.get(&key);
+    let transforms = STREAM_FUNCTIONS.get(&key);
     if transforms.is_none() {
         return;
     }
@@ -99,7 +99,7 @@ async fn get_stream_alerts<'a>(key: String, stream_alerts_map: &mut AHashMap<Str
         return;
     }
     let mut alerts = alerts_list.unwrap().list.clone();
-    alerts.retain(|alert| alert.is_ingest_time);
+    alerts.retain(|alert| alert.is_real_time);
     stream_alerts_map.insert(key, alerts);
 }
 
@@ -325,7 +325,7 @@ async fn add_valid_record(
                 let key = format!("{}/{}", &stream_meta.org_id, &stream_meta.stream_name);
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
-                        if alert.is_ingest_time {
+                        if alert.is_real_time {
                             let set_trigger = alert.condition.evaluate(local_val.clone());
                             if set_trigger {
                                 // let _ = triggers::save_trigger(alert.name.clone(), trigger).await;

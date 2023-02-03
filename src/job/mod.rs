@@ -17,20 +17,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
             User {
                 name: CONFIG.auth.username.clone(),
                 password: CONFIG.auth.password.clone(),
-                role: crate::meta::user::Role::Root,
+                role: crate::meta::user::UserRole::Root,
                 salt: String::new(),
             },
         )
         .await;
     }
-    tokio::task::spawn(async move { db::transform::watch().await });
+    tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::user::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });
     tokio::task::spawn(async move { db::watch_prom_cluster_leader().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::triggers::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
-    db::transform::cache().await?;
+    db::functions::cache().await?;
     db::user::cache().await?;
     db::schema::cache().await?;
     db::cache_prom_cluster_leader().await?;
