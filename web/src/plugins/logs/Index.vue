@@ -34,13 +34,6 @@
             />
           </template>
           <template #after>
-            <div v-if="searchObj.data.errorMsg == ''">
-              <search-result
-                ref="searchResultRef"
-                @update:datetime="searchData"
-                @update:scroll="getMoreData"
-              />
-            </div>
             <div v-if="searchObj.loading == true">
               <q-spinner-dots
                 color="primary"
@@ -49,13 +42,34 @@
               />
             </div>
             <div
-              v-if="
+              v-else-if="
                 searchObj.data.errorMsg !== '' && searchObj.loading == false
               "
             >
               <h5 class="text-center">
-                Result not found. {{ searchObj.data.errorMsg }}
+                Result not found. {{ searchObj.data.errorMsg }} <br />
+                <q-item-label>{{
+                  searchObj.data.additionalErrorMsg
+                }}</q-item-label>
               </h5>
+            </div>
+            <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
+              <h5 class="text-center">No stream selected.</h5>
+            </div>
+            <div
+              v-else-if="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.total == 0
+              "
+            >
+              <h5 class="text-center">No result found.</h5>
+            </div>
+            <div v-show="searchObj.data.errorMsg == ''">
+              <search-result
+                ref="searchResultRef"
+                @update:datetime="searchData"
+                @update:scroll="getMoreData"
+              />
             </div>
           </template>
         </q-splitter>
@@ -146,7 +160,7 @@ export default defineComponent({
 
     function ErrorException(message) {
       searchObj.loading = false;
-      searchObj.data.errorMsg = message;
+      // searchObj.data.errorMsg = message;
       $q.notify({
         type: "negative",
         message: message,
@@ -230,7 +244,8 @@ export default defineComponent({
               searchObj.data.errorMsg =
                 "No stream found in selected organization!";
               searchObj.data.stream.streamLists = [];
-              searchObj.data.stream.selectedStream = {};
+              searchObj.data.stream.selectedStream = { label: "", value: "" };
+              searchObj.data.stream.selectedStreamFields = [];
               searchObj.data.queryResults = {};
               searchObj.data.sortedQueryResults = [];
               searchObj.data.histogram = {
@@ -258,7 +273,7 @@ export default defineComponent({
     function loadStreamLists() {
       try {
         searchObj.data.stream.streamLists = [];
-        searchObj.data.stream.selectedStream = {};
+        searchObj.data.stream.selectedStream = { label: "", value: "" };
         if (searchObj.data.streamResults.list.length > 0) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -274,7 +289,21 @@ export default defineComponent({
               selectedStreamItemObj = itemObj;
             }
           });
-          searchObj.data.stream.selectedStream = selectedStreamItemObj;
+
+          if (selectedStreamItemObj.label != undefined) {
+            searchObj.data.stream.selectedStream = selectedStreamItemObj;
+          } else {
+            searchObj.loading = false;
+            searchObj.data.queryResults = {};
+            searchObj.data.sortedQueryResults = [];
+            searchObj.data.stream.selectedStreamFields = [];
+            searchObj.data.histogram = {
+              xData: [],
+              yData: [],
+              chartParams: {},
+            };
+            reDrawGrid();
+          }
         } else {
           searchObj.loading = false;
         }
@@ -464,7 +493,9 @@ export default defineComponent({
         }
 
         if (searchObj.meta.sqlMode == true) {
-          req.query.sql = query;
+          req.query.sql = query + " limit " + req.query.size;
+          req.query["sql_mode"] = "full";
+          delete req.aggs;
         } else {
           let parseQuery = query.split("|");
           let queryFunctions = "";
@@ -579,10 +610,13 @@ export default defineComponent({
           })
           .catch((e) => {
             dismiss();
-            throw new ErrorException(e.message);
+            if (typeof e == "object" && e.response && e.response.data)
+              searchObj.data.additionalErrorMsg = e.response.data.error;
+
+            throw new ErrorException("Request failed.");
           });
       } catch (e) {
-        throw new ErrorException(e.message);
+        throw new ErrorException("Request failed.");
       }
     }
 
@@ -792,6 +826,13 @@ export default defineComponent({
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();
+      }
+
+      reDrawGrid();
+      if (searchObj.meta.showHistogram == true) {
+        setTimeout(() => {
+          searchResultRef.value.reDrawChart();
+        }, 1500);
       }
     });
 

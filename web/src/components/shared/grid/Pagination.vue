@@ -44,11 +44,7 @@
       />
       <div class="q-ml-xs">
         {{ resultTotal }}
-        {{
-          resultTotal <= 1 && pageTitle.slice(-1).toLowerCase() === "s"
-            ? pageTitle.slice(0, -1).toLowerCase()
-            : pageTitle.toLowerCase()
-        }}
+        {{ pageTitle.slice(-1) != "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
     <div class="q-table__control q-ml-auto">

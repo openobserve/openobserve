@@ -41,7 +41,7 @@
         "ingestion": "Ingestion",
         "metrics": "Metrics",
         "slack": "Help",
-        "dashboard": "Dashboard",
+        "dashboard": "Dashboards",
         "alerts": "Alerts"
     },
     "about": {
@@ -203,7 +203,8 @@
         "updateTitle": "Update Function",
         "delete": "Delete",
         "ok": "Ok",
-        "type": "Function Type"
+        "type": "Function Type",
+        "showQuery": "Show Query"
     },
     "confirmDialog": {
         "cancel": "Cancel",
@@ -261,5 +262,19 @@
         "addTitle": "Add Alert",
         "updateTitle": "Update Alert",
         "delete": "Delete"
+    },
+    "home": {
+        "streams": "Streams",
+        "totalDataIngested": "Total data ingested",
+        "view": "View More>>",
+        "queryFunctions": "Query functions",
+        "ingestFunctions": "Ingest functions",
+        "scheduledAlert": "Scheduled alerts",
+        "rtAlert": "Real time alerts",
+        "noData": "No Data Ingested",
+        "findIngestion": "Find how to ingest logs >>",
+        "ingestionMsg": "Looks like you have not ingested any data to selected organization ,there are varoius ways in which data can be ingested like fluentbit.",
+        "inestedInSearch": "Try Logs Search",
+        "searchInDemoOrg": "You can explore search capbilities by switching to demo organization ,to switch to demo organization ,select 'Demo Organization' using organization dropdown on top.We keep ingesting dummy data to Demo Organization."
     }
 }

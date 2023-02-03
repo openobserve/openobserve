@@ -41,7 +41,7 @@
     "ingestion": "Yutulması",
     "metrics": "Metrikler",
     "slack": "Yardım",
-    "dashboard": "Gösterge Tablosu",
+    "dashboard": "Gösterge Tabloları",
     "alerts": "Uyarılar"
   },
   "about": {
@@ -203,7 +203,8 @@
     "updateTitle": "Güncelleme İşlevi",
     "delete": "Sil",
     "ok": "Tamam",
-    "type": "İşlev Türü"
+    "type": "İşlev Türü",
+    "showQuery": "Sorguyu Göster"
   },
   "confirmDialog": {
     "cancel": "İptal",
@@ -261,5 +262,19 @@
     "addTitle": "Uyarı Ekle",
     "updateTitle": "Güncelleme Uyarısı",
     "delete": "Sil"
+  },
+  "home": {
+    "streams": "Akarsular",
+    "totalDataIngested": "Alınan toplam veri",
+    "view": "Daha Fazla Görüntüle >>",
+    "queryFunctions": "Sorgu fonksiyonları",
+    "ingestFunctions": "Yutma fonksiyonları",
+    "scheduledAlert": "Zamanlanmış uyarılar",
+    "rtAlert": "Gerçek zamanlı uyarılar",
+    "noData": "Alınan Veri Yok",
+    "findIngestion": "Günlükleri nasıl alacağınızı öğrenin >>",
+    "ingestionMsg": "Görünüşe göre seçilen kuruluşa herhangi bir veri almadınız, verilerin fluentbit gibi alınabileceği varoius yolları vardır.",
+    "inestedInSearch": "Logs Search'i deneyin",
+    "searchInDemoOrg": "Demo organizasyonuna geçerek, demo organizasyonuna geçmek için arama kapaklarını keşfedebilir, üstteki organizasyon açılır menüsünü kullanarak 'Demo Organizasyon'u seçebilirsiniz.Demo Organizasyon'a kukla verileri yutmaya devam ediyoruz."
   }
 }

@@ -56,7 +56,8 @@ const defaultObject = {
     data: {
         query: "",
         parsedQuery: {},
-        errorMsg:"",
+        errorMsg: "",
+        additionalErrorMsg: "",
         stream: {
             streamLists: [],
             selectedStream: {label: "", value: ""},
