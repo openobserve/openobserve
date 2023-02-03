@@ -32,27 +32,27 @@ phases:
       - docker manifest push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest
 
       # for ecr-public
-      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
-      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64
+      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:latest-arm64
+      - docker tag ziox:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-arm64
 
-      - docker push public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
-      - docker push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64 
+      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-arm64
+      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-arm64 
 
       - echo 'Pull amd64 image'
       - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64
       - docker pull 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64
-      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64 public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64
-      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64 public.ecr.aws/zinclabs/zinc-oxide:latest-amd64
-      - docker push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64
-      - docker push public.ecr.aws/zinclabs/zinc-oxide:latest-amd64
+      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker tag 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64 public.ecr.aws/zinclabs/zinc-observe:latest-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-amd64
        
       - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev --amend public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-amd64 --amend public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev-arm64
-      - docker manifest create public.ecr.aws/zinclabs/zinc-oxide:latest --amend public.ecr.aws/zinclabs/zinc-oxide:latest-amd64 --amend public.ecr.aws/zinclabs/zinc-oxide:latest-arm64
+      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-amd64 --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev-arm64
+      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:latest --amend public.ecr.aws/zinclabs/zinc-observe:latest-amd64 --amend public.ecr.aws/zinclabs/zinc-observe:latest-arm64
       
       - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/zinc-oxide:$GIT_TAG-$GIT_HASH-dev
-      - docker manifest push public.ecr.aws/zinclabs/zinc-oxide:latest
+      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-$GIT_HASH-dev
+      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:latest
 
 # cache:
 #   paths:

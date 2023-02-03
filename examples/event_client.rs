@@ -1,7 +1,7 @@
 use cluster::event_client::EventClient;
 use http_auth_basic::Credentials;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
-use zinc_oxide::infra::config::CONFIG;
+use zinc_observe::infra::config::CONFIG;
 
 pub mod cluster {
     tonic::include_proto!("cluster");

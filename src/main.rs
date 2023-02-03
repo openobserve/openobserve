@@ -16,14 +16,14 @@ use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
-use zinc_oxide::handler::grpc::auth::check_auth;
-use zinc_oxide::handler::grpc::cluster_rpc::event_server::EventServer;
-use zinc_oxide::handler::grpc::cluster_rpc::search_server::SearchServer;
-use zinc_oxide::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
-use zinc_oxide::handler::http::router::get_routes;
-use zinc_oxide::infra::cluster;
-use zinc_oxide::infra::config::CONFIG;
-use zinc_oxide::service::router;
+use zinc_observe::handler::grpc::auth::check_auth;
+use zinc_observe::handler::grpc::cluster_rpc::event_server::EventServer;
+use zinc_observe::handler::grpc::cluster_rpc::search_server::SearchServer;
+use zinc_observe::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
+use zinc_observe::handler::http::router::get_routes;
+use zinc_observe::infra::cluster;
+use zinc_observe::infra::config::CONFIG;
+use zinc_observe::service::router;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -32,7 +32,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     if CONFIG.common.tracing_enabled {
-        let service_name = format!("zinc-oxide/{}", CONFIG.common.instance_name);
+        let service_name = format!("zinc-observe/{}", CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
         let mut headers = HashMap::new();
         headers.insert(
@@ -69,7 +69,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cluster::register_and_keepalive()
             .await
             .unwrap_or_else(|e| panic!("cluster init failed: {}", e));
-        zinc_oxide::job::init()
+        zinc_observe::job::init()
             .await
             .unwrap_or_else(|e| panic!("job init failed: {}", e));
         tx.send(true).unwrap();
@@ -110,13 +110,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut labels = HashMap::new();
     labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
     labels.insert("role".to_string(), CONFIG.common.node_role.clone());
-    let prometheus = PrometheusMetricsBuilder::new("zinc_oxide")
+    let prometheus = PrometheusMetricsBuilder::new("zinc-observe")
         .endpoint("/metrics")
         .const_labels(labels)
         .build()
         .unwrap();
     let stats_opts =
-        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_oxide");
+        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc-observe");
     let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
     prometheus
         .registry

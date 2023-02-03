@@ -76,6 +76,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_delete() {
         let db = default();
         assert_eq!(

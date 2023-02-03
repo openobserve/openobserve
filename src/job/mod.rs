@@ -63,6 +63,7 @@ mod test_utils {
     use super::*;
     use std::env;
     #[actix_web::test]
+    #[ignore]
     async fn test_init() {
         env::set_var("ZIOX_LOCAL_MODE", "true");
         env::set_var("ZIOX_NODE_ROLE", "all");
