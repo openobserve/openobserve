@@ -8,7 +8,7 @@
 ## Quick Start
 
 ```
-ZIOX_USER_NAME = "admin" ZIOX_USER_PASSWORD = "Complexpass#123" cargo run
+ZIOX_USER_NAME="admin" ZIOX_USER_PASSWORD="Complexpass#123" cargo run
 ```
 
 ## Etcd client
