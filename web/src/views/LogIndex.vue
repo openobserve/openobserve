@@ -197,7 +197,7 @@ export default defineComponent({
         indexService
           .nameList(store.state.selectedOrganization.identifier, "logs", false)
           .then((res) => {
-            let counter = 0;
+            let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";

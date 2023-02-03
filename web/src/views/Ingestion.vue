@@ -123,7 +123,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -149,6 +149,17 @@ export default defineComponent({
     );
 
     onMounted(() => {
+      if (router.currentRoute.value.name == "ingestion") {
+        ingestiontab.value = "curl";
+        router.push({ path: "/ingestion/curl" });
+      } else {
+        ingestiontab.value = router.currentRoute.value.name;
+        router.push({ path: "/ingestion/" + router.currentRoute.value.name });
+      }
+      getOrganizationPasscode();
+    });
+
+    onActivated(() => {
       if (router.currentRoute.value.name == "ingestion") {
         ingestiontab.value = "curl";
         router.push({ path: "/ingestion/curl" });
