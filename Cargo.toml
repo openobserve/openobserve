@@ -7,7 +7,6 @@ homepage = "https://zinc.dev/"
 repository = "https://github.com/zinclabs/zinc-observe/"
 keywords = ["search", "log", "metrics", "traces", "analytics"]
 license = "AGPL-3.0"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
