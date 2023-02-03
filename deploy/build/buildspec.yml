@@ -3,22 +3,17 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 058694856476.dkr.ecr.us-west-2.amazonaws.com
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
 
   build:
     commands:
       - pwd
-      # - git config --global --add safe.directory /codebuild/output/srcDownload/src
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
-      - docker build -t ziox:latest-amd64 -f deploy/build/Dockerfile .
+      - docker build -t zinc-observe:latest-amd64 -f deploy/build/Dockerfile .
       
-      - docker tag ziox:latest-amd64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64
-      - docker tag ziox:latest-amd64 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64
+      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64
+      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64
       
-      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:$GIT_TAG-$GIT_HASH-dev-amd64
-      - docker push 058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox-dev:latest-amd64
-
-# cache:
-#   paths:
-#     - ./target
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64
