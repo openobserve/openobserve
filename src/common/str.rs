@@ -15,8 +15,8 @@ mod test_utils {
     use super::*;
     #[test]
     fn test_find() {
-        let haystack = "This is Zinc-oxide";
-        let needle = "oxide";
+        let haystack = "This is search-unitTest";
+        let needle = "unitTest";
         let result = find(haystack, needle);
         assert_eq!(result, true)
     }

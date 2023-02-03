@@ -24,7 +24,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
   RUSTFLAGS='-C target-feature=+aes,+crc,+fhm,+lse,+neon,+jsconv,+sha2'
 RUN cargo build --release --target aarch64-unknown-linux-gnu
-RUN mv /app/target/aarch64-unknown-linux-gnu/release/zinc-oxide /app/target/release/ziox
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/zinc-observe /app/target/release/ziox
 
 FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # FROM public.ecr.aws/debian/debian:bullseye-slim as runtime

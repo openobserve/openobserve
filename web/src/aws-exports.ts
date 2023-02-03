@@ -16,8 +16,8 @@ const config = {
 
   openReplayKey: import.meta.env.VITE_OPENREPLAY_KEY,
   sentryDSN: import.meta.env.VITE_SENTRY_DSN,
-  zincOxideEndPoint: import.meta.env.VITE_ZINC_OXIDE_ENDPOINT,
-  zincOxideIngestion: import.meta.env.VITE_ZINC_OXIDE_INGESTION,
+  zincOxideEndPoint: import.meta.env.VITE_zinc-observe_ENDPOINT,
+  zincOxideIngestion: import.meta.env.VITE_zinc-observe_INGESTION,
   zincQuotaThreshold: import.meta.env.VITE_ZINC_QUOTA_THRESHOLD,
 };
 

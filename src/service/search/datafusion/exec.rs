@@ -287,7 +287,7 @@ pub async fn merge(
 
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
     let work_dir = format!(
-        "/tmp/zinc_oxide_merge/{}/",
+        "/tmp/zinc-observe_merge/{}/",
         chrono::Utc::now().timestamp_micros()
     );
     tmpfs::create_dir_all(&work_dir).unwrap();

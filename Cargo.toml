@@ -1,5 +1,5 @@
 [package]
-name = "zinc-oxide"
+name = "zinc-observe"
 version = "0.1.0"
 edition = "2021"
 description = "ZincObserve is a search platform built specifically for log search & analytics. One can use it to search & analyze terabytes of logs."
