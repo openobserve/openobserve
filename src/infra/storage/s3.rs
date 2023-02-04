@@ -123,7 +123,7 @@ async fn init_s3config() -> Option<Arc<SdkConfig>> {
                 .s3
                 .server_url
                 .parse()
-                .expect("invalid ZIOX_S3_SERVER_URL"),
+                .expect("invalid ZO_S3_SERVER_URL"),
         ));
     }
     if !CONFIG.s3.region_name.is_empty() {

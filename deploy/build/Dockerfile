@@ -23,12 +23,12 @@ COPY --from=webBuilder /web/dist web/dist
 
 # RUN cargo build --release
 RUN RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --target x86_64-unknown-linux-gnu
-RUN mv /app/target/x86_64-unknown-linux-gnu/release/zinc-observe /app/target/release/ziox
+RUN mv /app/target/x86_64-unknown-linux-gnu/release/zinc-observe /app/target/release/zinc-observe
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/ziox /
-CMD ["/ziox"]
+COPY --from=builder /app/target/release/zinc-observe /
+CMD ["/zinc-observe"]
