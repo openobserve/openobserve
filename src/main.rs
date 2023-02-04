@@ -110,13 +110,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut labels = HashMap::new();
     labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
     labels.insert("role".to_string(), CONFIG.common.node_role.clone());
-    let prometheus = PrometheusMetricsBuilder::new("zinc-observe")
+    let prometheus = PrometheusMetricsBuilder::new("zinc_observe")
         .endpoint("/metrics")
         .const_labels(labels)
         .build()
         .unwrap();
     let stats_opts =
-        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc-observe");
+        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
     let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
     prometheus
         .registry
