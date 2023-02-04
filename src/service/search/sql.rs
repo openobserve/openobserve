@@ -331,11 +331,11 @@ impl Sql {
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
                     continue;
                 }
-                let mut func = "STR_MATCH";
+                let mut func = "LIKE";
                 if item.0.to_lowercase().contains("_no_case") {
-                    func = "STR_MATCH_NO_CASE";
+                    func = "ILIKE";
                 }
-                fulltext_search.push(format!("{}(\"{}\", '{}')", func, field.name(), item.1));
+                fulltext_search.push(format!("(\"{}\" {} '%{}%')", field.name(), func, item.1));
             }
             if fulltext_search.is_empty() {
                 return Err(anyhow::anyhow!("No full text search field found"));
