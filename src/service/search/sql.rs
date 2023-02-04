@@ -344,7 +344,7 @@ impl Sql {
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
         }
         // Hack: str_match
-        for key in ["match", "match_no_case"] {
+        for key in ["match", "match_no_case", "str_match", "str_match_no_case"] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{}\b\(([^\)]*)\)", key)).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
                 "LIKE"
