@@ -1,6 +1,8 @@
 # zinc-observe
 
-ZincObserve is better log analytics solution.
+🚀 10x easier, 🚀 10x cheaper, 🚀 petabyte scale - Elasticsearch alternative for 🚀 (logs, metrics, traces).
+
+[zinc.dev](https://zinc.dev/)
 
 |          |                                      |
 -----------|---------------------------------------
