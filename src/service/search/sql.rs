@@ -14,10 +14,10 @@ use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
-const SQL_KEYWORDS: [&str; 31] = [
+const SQL_KEYWORDS: [&str; 32] = [
     "SELECT", "FROM", "WHERE", "TABLE", "LIMIT", "OFFSET", "AND", "OR", "NOT", "IN", "ANY", "IS",
     "NULL", "CASE", "AS", "HAVING", "GROUP", "BY", "ORDER", "ASC", "DESC", "BETWEEN", "LIKE",
-    "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
+    "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
 ];
 const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 4] = ["log", "message", "content", "data"];
 const SQL_PUNCTUATION: [char; 2] = ['"', '\''];
@@ -335,13 +335,37 @@ impl Sql {
                 if item.0.to_lowercase().contains("_no_case") {
                     func = "ILIKE";
                 }
-                fulltext_search.push(format!("(\"{}\" {} '%{}%')", field.name(), func, item.1));
+                fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
             }
             if fulltext_search.is_empty() {
                 return Err(anyhow::anyhow!("No full text search field found"));
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
+        }
+        // Hack: str_match
+        for key in ["str_match_no_case", "str_match", "match_no_case", "match"] {
+            let re_str_match = Regex::new(&format!(r"(?i){}\(([^\)]*)\)", key)).unwrap();
+            let re_fn = if key == "match" || key == "str_match" {
+                "LIKE"
+            } else {
+                "ILIKE"
+            };
+            for cap in re_str_match.captures_iter(origin_sql.clone().as_str()) {
+                let attrs = cap
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .split(',')
+                    .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+                    .collect::<Vec<&str>>();
+                let field = attrs.first().unwrap();
+                let value = attrs.get(1).unwrap();
+                origin_sql = origin_sql.replace(
+                    cap.get(0).unwrap().as_str(),
+                    format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
+                );
+            }
         }
 
         // query support histogram

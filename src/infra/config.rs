@@ -301,22 +301,13 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Ok(());
     }
     if let Err(e) = get_file_meta(&cfg.etcd.ca_file) {
-        return Err(anyhow::anyhow!(
-            "ZO_ETCD_TRUSTED_CA_FILE check err: {}",
-            e
-        ));
+        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
     }
     if let Err(e) = get_file_meta(&cfg.etcd.cert_file) {
-        return Err(anyhow::anyhow!(
-            "ZO_ETCD_TRUSTED_CA_FILE check err: {}",
-            e
-        ));
+        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
     }
     if let Err(e) = get_file_meta(&cfg.etcd.key_file) {
-        return Err(anyhow::anyhow!(
-            "ZO_ETCD_TRUSTED_CA_FILE check err: {}",
-            e
-        ));
+        return Err(anyhow::anyhow!("ZO_ETCD_TRUSTED_CA_FILE check err: {}", e));
     }
 
     // check domain name
