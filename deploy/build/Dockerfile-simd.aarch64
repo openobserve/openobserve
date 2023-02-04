@@ -1,0 +1,39 @@
+FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
+WORKDIR /web
+COPY ./web /web/
+
+RUN npm install
+RUN NODE_OPTIONS="--max-old-space-size=6192" npm run build
+
+FROM public.ecr.aws/docker/library/rust:bullseye as builder
+RUN apt-get update
+RUN apt-get install -y protobuf-compiler
+RUN apt-get install -y cmake curl
+
+RUN rustup toolchain install nightly-2023-01-26
+RUN rustup default nightly-2023-01-26
+RUN rustup target add aarch64-unknown-linux-gnu
+# RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
+RUN rustc --print cfg
+RUN rustc -C target-cpu=native --print cfg
+
+WORKDIR /app
+COPY . /app
+COPY --from=webBuilder /web/dist web/dist
+
+# RUN cargo build --release
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+  CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+  CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+  RUSTFLAGS='-C target-cpu=native'
+RUN cargo build --release --target aarch64-unknown-linux-gnu
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/zinc-observe /app/target/release/zinc-observe
+
+# FROM gcr.io/distroless/cc:latest-arm64 as runtime
+# FROM gcr.io/distroless/cc:latest-arm64 as runtime
+FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
+RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
+RUN update-ca-certificates
+COPY --from=builder /app/target/release/zinc-observe /
+CMD ["/zinc-observe"]

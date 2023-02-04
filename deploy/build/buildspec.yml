@@ -10,6 +10,17 @@ phases:
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
+
+      # simd version
+      - docker build -t zinc-observe:latest-amd64-simd -f deploy/build/Dockerfile-simd .
+      
+      - docker tag zinc-observe:latest-amd64-simd public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64-simd
+      - docker tag zinc-observe:latest-amd64-simd public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64-simd
+      
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64-simd
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64-simd
+
+      # common version
       - docker build -t zinc-observe:latest-amd64 -f deploy/build/Dockerfile .
       
       - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64
