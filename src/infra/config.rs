@@ -78,7 +78,7 @@ pub struct Route {
 
 #[derive(Clone, Debug, EnvConfig)]
 pub struct Common {
-    #[env_config(name = "ZO_LOCAL_MODE", default = false)]
+    #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
