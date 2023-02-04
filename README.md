@@ -10,7 +10,7 @@ ZincObserve is better log analytics solution.
 ## Quick Start
 
 ```
-ZIOX_USER_NAME="admin" ZIOX_USER_PASSWORD="Complexpass#123" cargo run
+ZO_USER_NAME="admin" ZO_USER_PASSWORD="Complexpass#123" cargo run
 ```
 
 ## Etcd client

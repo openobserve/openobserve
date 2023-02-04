@@ -65,8 +65,8 @@ mod test_utils {
     #[actix_web::test]
     #[ignore]
     async fn test_init() {
-        env::set_var("ZIOX_LOCAL_MODE", "true");
-        env::set_var("ZIOX_NODE_ROLE", "all");
+        env::set_var("ZO_LOCAL_MODE", "true");
+        env::set_var("ZO_NODE_ROLE", "all");
         let _ = init().await;
         //assert_eq!(fs::metadata(&CONFIG.common.data_wal_dir).is_ok(), true)
     }
