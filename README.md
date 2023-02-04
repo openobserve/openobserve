@@ -4,10 +4,6 @@
 
 [zinc.dev](https://zinc.dev/)
 
-|          |                                      |
------------|---------------------------------------
-| User ID  | admin                                |
-| Password | Complexpass#123                      |
 
 ## Quick Start
 
