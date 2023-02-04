@@ -9,15 +9,7 @@ phases:
     commands:
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
-      # common version
-      - docker build -t zinc-observe:latest-amd64 -f deploy/build/Dockerfile-tag.amd64 .
-      
-      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64
-      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe:latest-amd64
-      
-      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64
-      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-amd64
-      
+
       # simd version
       - docker build -t zinc-observe:latest-amd64-simd -f deploy/build/Dockerfile-tag-simd.amd64 .
       
@@ -26,3 +18,12 @@ phases:
       
       - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64-simd
       - docker push public.ecr.aws/zinclabs/zinc-observe:latest-amd64-simd
+
+      # common version
+      - docker build -t zinc-observe:latest-amd64 -f deploy/build/Dockerfile-tag.amd64 .
+      
+      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64
+      - docker tag zinc-observe:latest-amd64 public.ecr.aws/zinclabs/zinc-observe:latest-amd64
+      
+      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64
+      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-amd64

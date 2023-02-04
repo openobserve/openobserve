@@ -21,12 +21,12 @@ mod tests {
 
     fn setup() -> (&'static str, &'static str) {
         START.call_once(|| {
-            env::set_var("ZIOX_LOCAL_MODE", "true");
-            env::set_var("ZIOX_MAX_FILE_SIZE_ON_DISK", "1");
-            env::set_var("ZIOX_FILE_PUSH_INTERVAL", "1");
-            env::set_var("ZIOX_PAYLOAD_LIMIT", "209715200");
-            env::set_var("ZIOX_JSON_LIMIT", "209715200");
-            env::set_var("ZIOX_TIME_STAMP_COL", "_timestamp");
+            env::set_var("ZO_LOCAL_MODE", "true");
+            env::set_var("ZO_MAX_FILE_SIZE_ON_DISK", "1");
+            env::set_var("ZO_FILE_PUSH_INTERVAL", "1");
+            env::set_var("ZO_PAYLOAD_LIMIT", "209715200");
+            env::set_var("ZO_JSON_LIMIT", "209715200");
+            env::set_var("ZO_TIME_STAMP_COL", "_timestamp");
             let _db = default();
 
             env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
