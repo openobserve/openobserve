@@ -49,6 +49,9 @@ const organizations = {
   update_organization_passcode: (orgIdentifier: string) => {
     return http().put(`api/organizations/passcode/${orgIdentifier}`, {});
   },
+   get_organization_summary: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/summary`);
+  },
 };
 
 export default organizations;
