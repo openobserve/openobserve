@@ -1,0 +1,712 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'zinc-observe'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "zinc-observe",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'zinc-observe'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=zinc-observe",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "zinc-observe",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'zinc-observe'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=zinc-observe",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "zinc-observe",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'simple_udf_sql'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=simple_udf_sql",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "simple_udf_sql",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'simple_udf_sql'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=simple_udf_sql",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "simple_udf_sql",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'actix-web'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=actix-web",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "actix-web",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'actix-web'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=actix-web",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "actix-web",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'simd-json'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=simd-json",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "simd-json",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'simd-json'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=simd-json",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "simd-json",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'env_config'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=env_config",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "env_config",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'env_config'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=env_config",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "env_config",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'time'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=time",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "time",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'time'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=time",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "time",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'tracing'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=tracing",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "tracing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'tracing'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=tracing",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "tracing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'json'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=json",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "json",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'json'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=json",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "json",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'datafusion'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=datafusion",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "datafusion",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'datafusion'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=datafusion",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "datafusion",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'transform'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=transform",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "transform",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'transform'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=transform",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "transform",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'memchr'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=memchr",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "memchr",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'memchr'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=memchr",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "memchr",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'prometheus'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=prometheus",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "prometheus",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'prometheus'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=prometheus",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "prometheus",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'event_client'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=event_client",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "event_client",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'event_client'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=event_client",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "event_client",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'sqlparser'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=sqlparser",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "sqlparser",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'sqlparser'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=sqlparser",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "sqlparser",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'lock_file'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=lock_file",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "lock_file",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'lock_file'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=lock_file",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "lock_file",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'etcd'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=etcd",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "etcd",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'etcd'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=etcd",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "etcd",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'search_client'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=search_client",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "search_client",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'search_client'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=search_client",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "search_client",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'threads'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=threads",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "threads",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'threads'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=threads",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "threads",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'integration_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=integration_test",
+                    "--package=zinc-observe"
+                ],
+                "filter": {
+                    "name": "integration_test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
