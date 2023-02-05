@@ -12,7 +12,7 @@ phases:
       - GIT_HASH="$(git rev-parse --short HEAD)"
 
       # simd version
-      - docker build -t zinc-observe:latest-arm64-simd -f deploy/build/Dockerfile-simd.aarch64 .
+      - docker build -t zinc-observe:latest-arm64-simd -f deploy/build/Dockerfile.simd.aarch64 .
       
       - docker tag zinc-observe:latest-arm64-simd public.ecr.aws/zinclabs/zinc-observe-dev:latest-arm64-simd
       - docker tag zinc-observe:latest-arm64-simd public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-arm64-simd
