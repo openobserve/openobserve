@@ -152,7 +152,7 @@ async fn upload_file(
     log::info!("[JOB] File upload begin: local: {}", path_str);
 
     let mut schema_reader = BufReader::new(&file);
-    let inferred_schema = infer_json_schema(&mut schema_reader, Some(4096)).unwrap();
+    let inferred_schema = infer_json_schema(&mut schema_reader, Some(8192)).unwrap();
     let arrow_schema = Arc::new(inferred_schema.clone());
     drop(schema_reader);
 
@@ -167,7 +167,7 @@ async fn upload_file(
     let mut buf_parquet = Vec::new();
     let props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(4096)
+        .set_write_batch_size(8192)
         .set_data_pagesize_limit(1024 * 512)
         .set_max_row_group_size(1024 * 1024 * 256);
     let writer_props = props.build();

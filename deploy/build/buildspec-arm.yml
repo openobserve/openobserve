@@ -10,6 +10,29 @@ phases:
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
+
+      # simd version
+      - docker build -t zinc-observe:latest-arm64-simd -f deploy/build/Dockerfile-simd.aarch64 .
+      
+      - docker tag zinc-observe:latest-arm64-simd public.ecr.aws/zinclabs/zinc-observe-dev:latest-arm64-simd
+      - docker tag zinc-observe:latest-arm64-simd public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-arm64-simd
+      
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:latest-arm64-simd
+      - docker push public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-arm64-simd
+
+      - echo 'Pull amd64 image'
+      - docker pull public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64-simd
+      - docker pull public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64-simd
+       
+      - echo 'Create manifests'
+      - docker manifest create public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-simd --amend public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-amd64-simd --amend public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-arm64-simd
+      - docker manifest create public.ecr.aws/zinclabs/zinc-observe-dev:latest-simd --amend public.ecr.aws/zinclabs/zinc-observe-dev:latest-amd64-simd --amend public.ecr.aws/zinclabs/zinc-observe-dev:latest-arm64-simd
+      
+      - echo 'Push manifests'
+      - docker manifest push public.ecr.aws/zinclabs/zinc-observe-dev:$GIT_TAG-$GIT_HASH-simd
+      - docker manifest push public.ecr.aws/zinclabs/zinc-observe-dev:latest-simd
+
+      # common version
       - docker build -t zinc-observe:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
       
       - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe-dev:latest-arm64

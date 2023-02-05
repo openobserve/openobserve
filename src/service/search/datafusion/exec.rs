@@ -51,7 +51,7 @@ pub async fn sql(
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
         .with_information_schema(schema.is_none())
-        .with_batch_size(4096);
+        .with_batch_size(8192);
     let mut ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
     // Configure listing options
@@ -240,7 +240,7 @@ pub async fn merge(
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
         .with_information_schema(true)
-        .with_batch_size(4096);
+        .with_batch_size(8192);
     let mut ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
     // Configure listing options
@@ -496,7 +496,7 @@ pub async fn convert_parquet_file(
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
         .with_information_schema(false)
-        .with_batch_size(4096);
+        .with_batch_size(8192);
     let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
     // Configure listing options
@@ -556,7 +556,7 @@ pub async fn convert_parquet_file(
     let batches = df.collect().await?;
     let props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(4096)
+        .set_write_batch_size(8192)
         .set_data_pagesize_limit(1024 * 512)
         .set_max_row_group_size(1024 * 1024 * 256);
     let writer_props = props.build();
@@ -589,7 +589,7 @@ pub async fn merge_parquet_files(
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
         .with_information_schema(false)
-        .with_batch_size(4096);
+        .with_batch_size(8192);
     let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
     // Configure listing options
@@ -651,7 +651,7 @@ pub async fn merge_parquet_files(
     let sort_column_id = schema.index_of(&CONFIG.common.time_stamp_col).unwrap();
     let props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
-        .set_write_batch_size(4096)
+        .set_write_batch_size(8192)
         .set_data_pagesize_limit(1024 * 512)
         .set_max_row_group_size(1024 * 1024 * 256)
         .set_sorting_columns(Some(
