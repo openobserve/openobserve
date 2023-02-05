@@ -29,7 +29,7 @@
     "moment": "^2.15.2",
     "node-polyfill-webpack-plugin": "^2.0.1",
     "node-sql-parser": "^4.6.4",
-    "plotly.js": "^2.14.0",
+    "plotly.js": "^2.18.1",
     "quasar": "^2.7.5",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "rollup-plugin-polyfill-node": "^0.10.2",
