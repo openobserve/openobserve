@@ -1,4 +1,6 @@
-use chrono::{DateTime, Datelike, Duration, FixedOffset, NaiveDateTime, TimeZone, Timelike, Utc};
+use chrono::{
+    DateTime, Datelike, Duration, FixedOffset, Local, NaiveDateTime, TimeZone, Timelike, Utc,
+};
 use std::ops::Sub;
 
 fn main() {
@@ -59,6 +61,10 @@ fn main() {
         .unwrap();
     println!("{:?}", now);
     println!("{:?}", offset);
+
+    let offset_in_sec = Local::now().offset().local_minus_utc();
+    println!("offset: {:?}", offset_in_sec);
+    println!("offset: {:?}", sys_info::hostname());
 }
 
 fn parse_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error> {

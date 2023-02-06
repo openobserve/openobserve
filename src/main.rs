@@ -23,6 +23,7 @@ use zinc_observe::handler::grpc::request::{event::Eventer, search::Searcher, tra
 use zinc_observe::handler::http::router::get_routes;
 use zinc_observe::infra::cluster;
 use zinc_observe::infra::config::CONFIG;
+use zinc_observe::meta::telemetry::Telemetry;
 use zinc_observe::service::router;
 
 #[cfg(feature = "mimalloc")]
@@ -126,6 +127,9 @@ async fn main() -> Result<(), anyhow::Error> {
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
+    Telemetry::new()
+        .event("Zinc Observe - Starting server", None, false)
+        .await;
     if router::is_router() {
         HttpServer::new(move || {
             log::info!("starting HTTP server at: {}", haddr);
@@ -156,6 +160,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 haddr,
                 local_id
             );
+
             App::new()
                 .configure(get_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -170,7 +175,9 @@ async fn main() -> Result<(), anyhow::Error> {
         .run()
         .await?;
     };
-
+    Telemetry::new()
+        .event("Zinc Observe - Server stopped", None, false)
+        .await;
     // leave the cluster
     let _ = cluster::leave().await;
 
