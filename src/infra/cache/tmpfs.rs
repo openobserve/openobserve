@@ -1,11 +1,11 @@
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use rsfs::mem;
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 use rsfs::*;
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 use rsfs::{DirEntry, Metadata};
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -20,7 +20,7 @@ lazy_static! {
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
     let mut f = FS.write().create_file(path)?;
     f.write_all(data)?;
@@ -28,7 +28,7 @@ pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::E
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
     let mut file = FS.write().open_file(path)?;
     let mut buf = vec![];
@@ -37,19 +37,19 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().create_dir(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().create_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
     let mut values = Vec::with_capacity(2);
     let files = FS.read().read_dir(path)?;
@@ -67,49 +67,49 @@ pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Er
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_dir(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "windows"))]
 pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_file(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
     crate::common::file::put_file_contents(path.as_ref().to_str().unwrap(), data)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
     crate::common::file::get_file_contents(path.as_ref().to_str().unwrap())
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::create_dir(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::create_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
     let mut values = Vec::with_capacity(2);
     let files = std::fs::read_dir(path)?;
@@ -127,19 +127,19 @@ pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Er
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_dir(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_file(path)
 }
