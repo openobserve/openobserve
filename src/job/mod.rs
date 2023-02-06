@@ -1,5 +1,5 @@
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, INSTANCE_ID};
+use crate::infra::{cluster, ider};
 use crate::meta::user::User;
 use crate::service::{db, users};
 
@@ -8,6 +8,7 @@ mod compact;
 mod file_list;
 mod files;
 mod prom;
+mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let res = db::user::get_root_user(&CONFIG.auth.username).await;
@@ -23,6 +24,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
+
+    // telemetry run
+    if CONFIG.common.enable_telemetry {
+        let res = db::get_instance().await;
+        let instance_id;
+        if res.as_ref().is_err() || res.as_ref().unwrap().is_none() {
+            instance_id = ider::generate();
+            let _ = db::set_instance(&instance_id).await;
+        } else {
+            instance_id = res.unwrap().unwrap();
+        }
+        INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
+        tokio::task::spawn(async move { telemetry::run().await });
+    }
+
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::user::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });
