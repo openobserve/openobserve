@@ -101,6 +101,7 @@ impl ObjectStore for InMemory {
                 .to_string()
                 .replace("%5C", "/")
                 .replace("//", "/")
+                .replace('/', "\\")
         } else {
             format!("/{}", prefix.unwrap())
         };
@@ -127,6 +128,7 @@ impl ObjectStore for InMemory {
                 .to_string()
                 .replace("%5C", "/")
                 .replace("//", "/")
+                .replace('/', "\\")
         } else {
             format!("/{}", prefix.unwrap())
         };
@@ -186,7 +188,11 @@ impl InMemory {
 
     async fn get_bytes(&self, location: &Path) -> Result<Bytes> {
         let file = if std::env::consts::OS == "windows" {
-            location.to_string().replace("%5C", "/").replace("//", "/")
+            location
+                .to_string()
+                .replace("%5C", "/")
+                .replace("//", "/")
+                .replace('/', "\\")
         } else {
             format!("/{}", location)
         };
