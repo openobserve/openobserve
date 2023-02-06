@@ -93,6 +93,8 @@ actix-web-rust-embed-responder = { version = "2.1.1", default-features = false, 
 rust-embed-for-web="11.1.0"
 awc = "3.0.1"
 reqwest = "0.11"
+segment = "0.2.2"
+time = "0.3.17"
 
 [build-dependencies]
 tonic-build = { version = "0.8", features = ["prost"] }

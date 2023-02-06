@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use std::sync::Arc;
+use tracing::info_span;
 
 use crate::common::json;
 use crate::infra::cache::stats;
@@ -106,4 +107,26 @@ pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
     }
     log::info!("[TRACE] Prometheus cluster leaders Cached");
     Ok(())
+}
+
+pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
+    let db_span = info_span!("db:get_instance");
+    let _guard = db_span.enter();
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/instance/";
+    let ret = db.get(key).await?;
+    let loc_value = json::from_slice(&ret).unwrap();
+    let value = Some(loc_value);
+    Ok(value)
+}
+
+pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
+    let db_span = info_span!("db:set_instance");
+    let _guard = db_span.enter();
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/instance/";
+    match db.put(key, json::to_vec(&id).unwrap().into()).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!(e)),
+    }
 }

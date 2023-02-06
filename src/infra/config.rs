@@ -2,6 +2,8 @@ use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
 use dotenv::dotenv;
 use dotenv_config::EnvConfig;
+use reqwest::Client;
+use std::time::Duration;
 use sys_info::hostname;
 
 use crate::common::file::get_file_meta;
@@ -13,6 +15,15 @@ use crate::meta::user::User;
 lazy_static! {
     pub static ref CONFIG: Config = init();
     pub static ref LOCKER: DashMap<String, std::sync::Mutex<bool>> = DashMap::new();
+    pub static ref INSTANCE_ID: DashMap<String, String> = DashMap::new();
+    pub static ref VERSION: &'static str = env!("CARGO_PKG_VERSION");
+    pub static ref TELEMETRY_CLIENT: segment::HttpClient = segment::HttpClient::new(
+        Client::builder()
+            .connect_timeout(Duration::new(10, 0))
+            .build()
+            .unwrap(),
+        CONFIG.common.telemetry_url.clone()
+    );
 }
 
 lazy_static! {
@@ -125,6 +136,10 @@ pub struct Common {
         default = "Basic YWRtaW46Q29tcGxleHBhc3MjMTIz"
     )]
     pub tracing_header_value: String,
+    #[env_config(name = "ZO_TELEMETRY", default = true)]
+    pub enable_telemetry: bool,
+    #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
+    pub telemetry_url: String,
 }
 
 #[derive(Clone, Debug, EnvConfig)]
@@ -149,6 +164,8 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
+    pub hb_interval: i64,
     // no need set by environment
     pub cpu_num: usize,
 }
