@@ -303,6 +303,11 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
         tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
     }
 
+    // Hack: for windows
+    if std::env::consts::OS == "windows" {
+        return Ok(format!("/{}", work_dir));
+    }
+
     Ok(work_dir)
 }
 
