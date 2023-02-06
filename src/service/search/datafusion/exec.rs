@@ -293,12 +293,13 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
     tmpfs::create_dir_all(&work_dir).unwrap();
     for (i, item) in batches.iter().enumerate() {
         let file_name = format!("{}{}.parquet", &work_dir, i);
-        let f = tmpfs::create_file(file_name).unwrap();
-        let mut writer = ArrowWriter::try_new(f, item[0].schema().clone(), None)?;
+        let mut buf_parquet = Vec::new();
+        let mut writer = ArrowWriter::try_new(&mut buf_parquet, item[0].schema().clone(), None)?;
         for row in item.iter() {
             writer.write(row)?;
         }
         writer.close().unwrap();
+        tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
     }
 
     Ok(work_dir)

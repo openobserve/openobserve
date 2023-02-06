@@ -4,7 +4,6 @@ use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{path::Path, MultipartId};
 use object_store::{GetResult, ListResult, ObjectMeta, ObjectStore, Result};
-use rsfs::{DirEntry, Metadata};
 use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
@@ -99,13 +98,10 @@ impl ObjectStore for InMemory {
         let key = prefix.unwrap().to_string();
         let objects = tmpfs::read_dir(key).unwrap();
         for file in objects {
-            let file = file.unwrap();
-            let file_path = file.path();
-            let file_metadata = file.metadata().unwrap();
             values.push(Ok(ObjectMeta {
-                location: file_path.to_str().unwrap().into(),
-                last_modified: file_metadata.modified().unwrap().into(),
-                size: file_metadata.len() as usize,
+                location: file.location.into(),
+                last_modified: file.last_modified,
+                size: file.size,
             }));
         }
         Ok(futures::stream::iter(values).boxed())
@@ -120,13 +116,10 @@ impl ObjectStore for InMemory {
         let key = prefix.unwrap().to_string();
         let objects = tmpfs::read_dir(key).unwrap();
         for file in objects {
-            let file = file.unwrap();
-            let file_path = file.path();
-            let file_metadata = file.metadata().unwrap();
             values.push(ObjectMeta {
-                location: file_path.to_str().unwrap().into(),
-                last_modified: file_metadata.modified().unwrap().into(),
-                size: file_metadata.len() as usize,
+                location: file.location.into(),
+                last_modified: file.last_modified,
+                size: file.size,
             });
         }
         Ok(ListResult {
