@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use segment::{message::Track, Client, Message};
 use serde_json::Value;
 
