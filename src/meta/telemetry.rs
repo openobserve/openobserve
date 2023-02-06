@@ -8,7 +8,6 @@ use crate::infra::config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
     pub instance_id: String,
-    pub zo_info: HashMap<String, Value>,
     pub event: Track,
     pub base_info: HashMap<String, Value>,
 }
@@ -17,24 +16,9 @@ impl Telemetry {
     pub fn new() -> Self {
         Telemetry {
             instance_id: "".to_string(),
-            zo_info: HashMap::new(),
             event: Track::default(),
             base_info: get_base_info(&mut HashMap::new()),
         }
-    }
-
-    pub fn add_zo_info(&mut self) {
-        let iter = STREAM_SCHEMAS.iter().clone();
-        let mut num_streams = 0;
-        for item in iter {
-            num_streams += item.value().len()
-        }
-        self.zo_info
-            .insert("num_org".to_string(), STREAM_SCHEMAS.len().into());
-        self.zo_info
-            .insert("num_streams".to_string(), num_streams.into());
-        self.zo_info
-            .insert("num_users".to_string(), USERS.len().into());
     }
 
     pub fn add_event(&mut self, track: Track) {
@@ -58,9 +42,7 @@ impl Telemetry {
             }
         }
         if send_zo_data {
-            for item in &self.zo_info {
-                props.insert(item.0.clone(), item.1.clone());
-            }
+            add_zo_info(&mut props)
         }
         self.add_event(Track {
             user: segment::message::User::UserId {
@@ -71,6 +53,7 @@ impl Telemetry {
             },
             event: event.to_string(),
             properties: serde_json::to_value(props).unwrap(),
+            timestamp: Some(time::OffsetDateTime::now_utc()),
             ..Default::default()
         });
 
@@ -123,13 +106,23 @@ pub fn get_base_info(data: &mut HashMap<String, Value>) -> HashMap<String, Value
     data.clone()
 }
 
+pub fn add_zo_info(data: &mut HashMap<String, Value>) {
+    let iter = STREAM_SCHEMAS.iter().clone();
+    let mut num_streams = 0;
+    for item in iter {
+        num_streams += item.value().len()
+    }
+    data.insert("num_org".to_string(), STREAM_SCHEMAS.len().into());
+    data.insert("num_streams".to_string(), num_streams.into());
+    data.insert("num_users".to_string(), USERS.len().into());
+}
+
 #[cfg(test)]
 mod test_telemetry {
     use super::*;
     #[test]
     fn test_telemetry_new() {
-        let mut tel = Telemetry::new();
-        tel.add_zo_info();
+        let tel = Telemetry::new();
         //println!("{:?}", tel);
         assert!(tel.base_info.len() > 0)
     }

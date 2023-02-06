@@ -1,9 +1,3 @@
-use crate::common::file::get_file_meta;
-use crate::meta::alert::{AlertList, Trigger, TriggerTimer};
-use crate::meta::functions::{FunctionList, Transform};
-use crate::meta::prom::ClusterLeader;
-use crate::meta::user::User;
-
 use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
 use dotenv::dotenv;
@@ -11,6 +5,12 @@ use dotenv_config::EnvConfig;
 use reqwest::Client;
 use std::time::Duration;
 use sys_info::hostname;
+
+use crate::common::file::get_file_meta;
+use crate::meta::alert::{AlertList, Trigger, TriggerTimer};
+use crate::meta::functions::{FunctionList, Transform};
+use crate::meta::prom::ClusterLeader;
+use crate::meta::user::User;
 
 lazy_static! {
     pub static ref CONFIG: Config = init();

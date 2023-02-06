@@ -15,9 +15,9 @@ pub mod search;
 pub mod service;
 pub mod sql;
 pub mod stream;
+pub mod telemetry;
 pub mod traces;
 pub mod user;
-pub mod telemetry;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum StreamType {

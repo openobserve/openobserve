@@ -5748,6 +5748,7 @@ dependencies = [
  "sys-info",
  "thiserror",
  "thrift 0.16.0",
+ "time 0.3.17",
  "tokio",
  "tonic 0.8.3",
  "tonic-build 0.8.4",
