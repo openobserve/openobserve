@@ -87,7 +87,7 @@ async fn get_file_list(
         let file = Path::new(&file).canonicalize().unwrap();
         let file = file.strip_prefix(&data_dir).unwrap();
         let local_file = file.to_str().unwrap();
-        let file_path = file.parent().unwrap().to_str().unwrap();
+        let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
         let source_file = format!("{}/{}", file_path, file_name);

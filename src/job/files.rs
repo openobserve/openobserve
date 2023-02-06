@@ -60,7 +60,8 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             .strip_prefix(&data_dir)
             .unwrap()
             .to_str()
-            .unwrap();
+            .unwrap()
+            .replace('\\', "/");
         let columns = file_path.split('/').collect::<Vec<&str>>();
         // check file is in use
         if columns.len() != 5 {
