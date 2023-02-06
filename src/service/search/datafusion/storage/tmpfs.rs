@@ -96,7 +96,11 @@ impl ObjectStore for InMemory {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
         let key = if std::env::consts::OS == "windows" {
-            prefix.unwrap().to_string()
+            prefix
+                .unwrap()
+                .to_string()
+                .replace("%5C", "/")
+                .replace("//", "/")
         } else {
             format!("/{}", prefix.unwrap())
         };
@@ -118,7 +122,11 @@ impl ObjectStore for InMemory {
         log::info!("list_with_delimiter: {:?}", prefix);
         let mut values = Vec::new();
         let key = if std::env::consts::OS == "windows" {
-            prefix.unwrap().to_string()
+            prefix
+                .unwrap()
+                .to_string()
+                .replace("%5C", "/")
+                .replace("//", "/")
         } else {
             format!("/{}", prefix.unwrap())
         };
@@ -178,7 +186,7 @@ impl InMemory {
 
     async fn get_bytes(&self, location: &Path) -> Result<Bytes> {
         let file = if std::env::consts::OS == "windows" {
-            location.to_string()
+            location.to_string().replace("%5C", "/").replace("//", "/")
         } else {
             format!("/{}", location)
         };
