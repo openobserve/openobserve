@@ -29,7 +29,7 @@ pub fn delete_file(file: &str) -> Result<(), std::io::Error> {
 pub fn scan_files(pattern: &str) -> Vec<String> {
     let files: Vec<String> = glob::glob(pattern)
         .unwrap()
-        .map(|m| m.unwrap().to_str().unwrap().to_string().replace('\\', "/"))
+        .map(|m| m.unwrap().to_str().unwrap().to_string())
         .collect();
     files
 }
