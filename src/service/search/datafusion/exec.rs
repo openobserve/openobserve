@@ -248,12 +248,10 @@ pub async fn merge(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-
-    // Hack: for windows
-    let list_url = if std::env::consts::OS == "windows" {
-        format!("file://{}", work_dir)
-    } else {
+    let list_url = if cfg!(feature = "tmpcache") {
         format!("tmpfs://{}", work_dir)
+    } else {
+        format!("file://{}", work_dir)
     };
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
