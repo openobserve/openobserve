@@ -4,8 +4,6 @@ use parking_lot::RwLock;
 #[cfg(feature = "tmpcache")]
 use rsfs::*;
 #[cfg(feature = "tmpcache")]
-use rsfs::{DirEntry, Metadata};
-#[cfg(feature = "tmpcache")]
 use std::io::{Read, Write};
 use std::path::Path;
 
