@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
-use rsfs::mem;
 #[cfg(not(target_os = "windows"))]
 use rsfs::*;
 #[cfg(not(target_os = "windows"))]
@@ -15,6 +14,7 @@ pub struct TmpDirEntry {
     pub size: usize,
 }
 
+#[cfg(not(target_os = "windows"))]
 lazy_static! {
     pub static ref FS: RwLock<mem::FS> = RwLock::new(mem::FS::new());
 }
