@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
+#[cfg(feature = "tmpcache")]
 use parking_lot::RwLock;
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 use rsfs::*;
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 use rsfs::{DirEntry, Metadata};
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -14,13 +15,13 @@ pub struct TmpDirEntry {
     pub size: usize,
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 lazy_static! {
     pub static ref FS: RwLock<mem::FS> = RwLock::new(mem::FS::new());
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
     let mut f = FS.write().create_file(path)?;
     f.write_all(data)?;
@@ -28,7 +29,7 @@ pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::E
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
     let mut file = FS.write().open_file(path)?;
     let mut buf = vec![];
@@ -37,19 +38,19 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().create_dir(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().create_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
     let mut values = Vec::with_capacity(2);
     let files = FS.read().read_dir(path)?;
@@ -67,49 +68,49 @@ pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Er
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_dir(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "tmpcache")]
 pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     FS.write().remove_file(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
     crate::common::file::put_file_contents(path.as_ref().to_str().unwrap(), data)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
     crate::common::file::get_file_contents(path.as_ref().to_str().unwrap())
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::create_dir(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::create_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
     let mut values = Vec::with_capacity(2);
     let files = std::fs::read_dir(path)?;
@@ -127,19 +128,19 @@ pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Er
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_dir(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_dir_all(path)
 }
 
 #[inline(always)]
-#[cfg(target_os = "windows")]
+#[cfg(not(feature = "tmpcache"))]
 pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_file(path)
 }

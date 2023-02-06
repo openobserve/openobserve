@@ -10,7 +10,8 @@ license = "AGPL-3.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-mimalloc = []
+mimalloc = ["dep:mimalloc"]
+tmpcache = ["dep:rsfs"]
 
 [profile.release]
 debug = false
@@ -68,7 +69,7 @@ regex-syntax = "0.6.27"
 sys-info = "0.9.1"
 get_if_addrs = "0.5.3"
 lru = "0.8.1"
-mimalloc = { version = "0.1", default-features = false }
+mimalloc = { version = "0.1", default-features = false, optional = true }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mlua = { version = "0.8.4", features = ["luajit52", "vendored" ,"serialize"] }
 ahash = { version = "0.8.3", features = ["serde"] }
@@ -79,7 +80,7 @@ utoipa = { version = "3", features = ["actix_extras","openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 parking_lot = "0.12"
 url = "2.2"
-rsfs = "0.4.1"
+rsfs = { version = "0.4.1", optional = true }
 http-auth-basic = "0.3.3"
 opentelemetry = { version = "0.17", features = ["rt-tokio"] }
 tracing = "0.1"
