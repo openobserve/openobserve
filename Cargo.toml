@@ -19,6 +19,7 @@ overflow-checks = false
 strip = true
 
 [dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
 anyhow = "1.0"
 thiserror = "1.0"
 log = "0.4.17"
