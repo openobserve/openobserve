@@ -249,7 +249,13 @@ pub async fn merge(
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
 
-    let prefix = match ListingTableUrl::parse(format!("tmpfs://{}", work_dir)) {
+    // Hack: for windows
+    let list_url = if std::env::consts::OS == "windows" {
+        format!("file://{}", work_dir)
+    } else {
+        format!("tmpfs://{}", work_dir)
+    };
+    let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
@@ -301,11 +307,6 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
         }
         writer.close().unwrap();
         tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
-    }
-
-    // Hack: for windows
-    if std::env::consts::OS == "windows" {
-        return Ok(format!("/{}", work_dir));
     }
 
     Ok(work_dir)
