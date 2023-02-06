@@ -92,7 +92,6 @@ impl ObjectStore for InMemory {
         })
     }
 
-    #[tracing::instrument(name = "service:search:datafusion:storage:memory:list", skip(self))]
     async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
         // log::info!("list: {:?}", prefix);
         let key = prefix.unwrap().to_string();
