@@ -95,7 +95,7 @@ impl ObjectStore for InMemory {
     async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
-        let key = prefix.unwrap().to_string();
+        let key = format!("/{}", prefix.unwrap());
         let objects = tmpfs::read_dir(key).unwrap();
         for file in objects {
             values.push(Ok(ObjectMeta {
@@ -113,7 +113,7 @@ impl ObjectStore for InMemory {
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
         log::info!("list_with_delimiter: {:?}", prefix);
         let mut values = Vec::new();
-        let key = prefix.unwrap().to_string();
+        let key = format!("/{}", prefix.unwrap());
         let objects = tmpfs::read_dir(key).unwrap();
         for file in objects {
             values.push(ObjectMeta {
@@ -169,7 +169,7 @@ impl InMemory {
     }
 
     async fn get_bytes(&self, location: &Path) -> Result<Bytes> {
-        let file = location.to_string();
+        let file = format!("/{}", location);
         //  log::info!("get_bytes: {}", &file);
         match tmpfs::read_file(file) {
             Ok(data) => Ok(Bytes::from(data)),
