@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use segment::{message::Track, Client, Message};
 use serde_json::Value;
+use std::collections::HashMap;
 
 use crate::infra::config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION};
 
