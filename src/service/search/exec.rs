@@ -148,7 +148,7 @@ pub async fn search(
         Some(batches) => batches.to_owned(),
         None => Vec::new(),
     };
-    if !result_query.is_empty() {
+    if !result_query.is_empty() && !result_query[0].is_empty() {
         let schema = result_query[0][0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
         let ipc_options = ipc_options
