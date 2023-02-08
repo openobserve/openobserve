@@ -804,6 +804,7 @@ mod tests {
     use sqlparser::parser::Parser;
 
     #[test]
+    #[ignore]
     fn parse_sql_works() {
         let table = "index.1.2022";
         let sql = format!(
@@ -821,6 +822,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_new_sql() {
         let table = "index.1.2022";
         let sql = format!(

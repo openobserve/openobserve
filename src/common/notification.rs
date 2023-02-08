@@ -13,3 +13,15 @@ pub async fn send_notification(
     let _ = req.send().await.unwrap();
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[actix_web::test]
+    async fn test_send_notification() {
+        let obj = json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}});
+        let res = send_notification("https://httpbin.org/post", obj).await;
+        assert!(res.is_ok());
+    }
+}

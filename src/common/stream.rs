@@ -12,3 +12,14 @@ pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
         "only 'type' query param with value 'logs' or 'metrics' allowed",
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stream_type_query_param_error() {
+        let res = stream_type_query_param_error();
+        assert!(res.is_err());
+    }
+}

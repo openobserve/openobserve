@@ -307,27 +307,27 @@ mod test {
     }
     #[test]
     fn test_try_merge() {
-        // let merged = try_merge(vec![
-        //     Schema::new(vec![
-        //         Field::new("c1", DataType::Int64, false),
-        //         Field::new("c2", DataType::Int64, false),
-        //     ]),
-        //     Schema::new(vec![
-        //         Field::new("c1", DataType::Int64, true),
-        //         Field::new("c2", DataType::Utf8, false),
-        //         Field::new("c3", DataType::Utf8, false),
-        //     ]),
-        // ])
-        // .unwrap();
+        let merged = try_merge(vec![
+            Schema::new(vec![
+                Field::new("c1", DataType::Int64, false),
+                Field::new("c2", DataType::Utf8, false),
+            ]),
+            Schema::new(vec![
+                Field::new("c1", DataType::Int64, true),
+                Field::new("c2", DataType::Utf8, false),
+                Field::new("c3", DataType::Utf8, false),
+            ]),
+        ])
+        .unwrap();
 
-        // assert_eq!(
-        //     merged,
-        //     Schema::new(vec![
-        //         Field::new("c1", DataType::Int64, true),
-        //         Field::new("c2", DataType::Utf8, false),
-        //         Field::new("c3", DataType::Utf8, false),
-        //     ]),
-        // );
+        assert_eq!(
+            merged,
+            Schema::new(vec![
+                Field::new("c1", DataType::Int64, true),
+                Field::new("c2", DataType::Utf8, false),
+                Field::new("c3", DataType::Utf8, false),
+            ]),
+        );
     }
 
     #[actix_web::test]
