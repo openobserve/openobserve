@@ -5,7 +5,6 @@ use utoipa::ToSchema;
 pub mod alert;
 pub mod common;
 pub mod dashboards;
-pub mod dialect;
 pub mod functions;
 pub mod http;
 pub mod ingestion;
