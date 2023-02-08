@@ -76,3 +76,20 @@ pub async fn dispatch(
 
     Ok(new_resp)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_is_router() {
+        let is_router = is_router();
+        assert_eq!(is_router, false);
+    }
+    #[test]
+    fn test_check_search_route() {
+        let is_search_route = check_search_route("/api/_search");
+        assert_eq!(is_search_route, true);
+        let is_search_route = check_search_route("/api/_bulk");
+        assert_eq!(is_search_route, false);
+    }
+}
