@@ -585,8 +585,7 @@ fn add_quote_for_sql(text: &str) -> String {
         caps.push(cap.get(0).unwrap());
     }
     let mut append_num = 0;
-    for i in 0..caps.len() {
-        let cap = caps[i];
+    for cap in &caps {
         let cap_str = cap.as_str();
         let cap_str_upper = cap_str.to_uppercase();
         let cap_str_upper = cap_str_upper.as_str();
@@ -602,9 +601,6 @@ fn add_quote_for_sql(text: &str) -> String {
         if text_len > cap.end() && text.chars().nth(cap.end()).unwrap() == '(' {
             continue;
         }
-        // if i > 0 && caps[i - 1].as_str().to_uppercase() == "FROM" {
-        //     continue;
-        // }
         // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
         if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
             continue;
