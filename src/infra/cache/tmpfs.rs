@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn create_read_file() {
-        let path = "/test.txt";
+        let path = "/tmp/test.txt";
         let _ = write_file(path, b"hello world").unwrap();
         let data = read_file(path).unwrap();
         assert_eq!(data, b"hello world");
@@ -158,9 +158,9 @@ mod tests {
 
     #[test]
     fn create_read_directory() {
-        let path = "/test_dir/abc/";
+        let path = "/tmp/test_dir/abc/";
         assert_eq!(true, create_dir_all(path).is_ok());
-        assert_eq!(false, remove_dir("/test_dir/").is_ok());
-        assert_eq!(true, remove_dir_all("/test_dir/").is_ok());
+        assert_eq!(false, remove_dir("/tmp/test_dir/").is_ok());
+        assert_eq!(true, remove_dir_all("/tmp/test_dir/").is_ok());
     }
 }
