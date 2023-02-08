@@ -1,0 +1,11 @@
+{
+    "LABEL": {
+      "name": "Invalid PR Title",
+      "color": "B60205"
+    },
+    "CHECKS": {
+      "regexp": "^(feat|fix|test|refactor|chore|style|docs|perf|build|ci|revert)(\\(.*\\))?:.*",
+      "ignoreLabels" : ["ignore-title"]
+    }
+  }
+  

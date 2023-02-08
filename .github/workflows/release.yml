@@ -1,0 +1,172 @@
+on:
+  push:
+    tags:
+      - "v*.*.*"
+name: Release
+env:
+  RUST_TOOLCHAIN: nightly-2023-01-26
+jobs:
+  build:
+    name: Build binary
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64-unknown-linux-gnu
+            os: ubuntu-2004-8-cores
+            file: zinc-observe-linux-amd64
+          - arch: aarch64-unknown-linux-gnu
+            os: ubuntu-2004-8-cores
+            file: zinc-observe-linux-arm64
+          - arch: x86_64-pc-windows-msvc
+            os: windows-latest-8-cores
+            file: zinc-observe-windows-amd64
+          - arch: x86_64-apple-darwin
+            os: macos-latest
+            file: zinc-observe-darwin-amd64
+          # - arch: aarch64-apple-darwin
+          #   os: macos-latest
+          #   file: zinc-observe-darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Cache cargo assets
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      - name: Build UI
+        env: 
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: |
+            cd web/
+            npm install
+            npm run build
+
+      - name: Install Protoc for linux
+        if: contains(matrix.arch, 'linux') && endsWith(matrix.arch, '-gnu')
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
+
+      - name: Setup Git for Windows' minimal SDK
+        if: contains(matrix.arch, 'windows')
+        uses: git-for-windows/setup-git-for-windows-sdk@v1
+      - name: Install Protoc for windows
+        if: contains(matrix.arch, 'windows')
+        shell: bash
+        run: |
+          curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
+          unzip protoc-21.12-win64.zip -d protoc
+          cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
+          cp -r protoc/include/google C:/windows/system32/
+
+      - name: Install Protoc for macos
+        if: contains(matrix.arch, 'darwin')
+        run: |
+          brew install protobuf
+
+      - name: Install dependencies for linux
+        if: contains(matrix.arch, 'linux') && endsWith(matrix.arch, '-gnu')
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+
+      - name: Install dependencies for linux ARM
+        if: contains(matrix.arch, 'linux') && contains(matrix.arch, 'aarch64') && endsWith(matrix.arch, '-gnu')
+        run: |
+          wget http://ports.ubuntu.com/ubuntu-ports/pool/main/o/openssl/libssl-dev_3.0.2-0ubuntu1_arm64.deb
+          dpkg -x libssl-dev_3.0.2-0ubuntu1_arm64.deb /opt/openssl
+          cp /opt/openssl/usr/include/openssl/* /opt/openssl/usr/include/aarch64-linux-gnu/openssl/
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.arch }}
+          override: true
+
+      - name: Output package versions
+        run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
+
+      - name: Run cargo build
+        if: contains(matrix.arch, 'aarch64') == false
+        run: cargo build --release --target ${{ matrix.arch }}
+
+      - name: Run cargo build for linux ARM
+        if: contains(matrix.arch, 'aarch64') && contains(matrix.arch, 'linux')
+        env:
+          OPENSSL_LIB_DIR: /opt/openssl/usr/lib/aarch64-linux-gnu/
+          OPENSSL_INCLUDE_DIR: /opt/openssl/usr/include/aarch64-linux-gnu/
+        run: cargo build --release --target ${{ matrix.arch }}
+
+      - name: Run cargo build for macos ARM
+        if: contains(matrix.arch, 'aarch64') && contains(matrix.arch, 'darwin')
+        env:
+          OPENSSL_LIB_DIR: /opt/openssl/usr/lib/aarch64-linux-gnu/
+          OPENSSL_INCLUDE_DIR: /opt/openssl/usr/include/aarch64-linux-gnu/
+        run: cargo build --release --target ${{ matrix.arch }}
+
+      - name: Calculate checksum and rename binary
+        if: contains(matrix.arch, 'windows') == false
+        shell: bash
+        run: |
+          cd target/${{ matrix.arch }}/release
+          chmod +x zinc-observe
+          tar -zcvf ${{ matrix.file }}.tar.gz zinc-observe
+          echo $(shasum -a 256 ${{ matrix.file }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file }}.sha256sum
+
+      - name: Calculate checksum and rename binary for windows
+        if: contains(matrix.arch, 'windows')
+        shell: bash
+        run: |
+          cd target/${{ matrix.arch }}/release
+          chmod +x zinc-observe
+          zip ${{ matrix.file }}.zip zinc-observe
+          certutil.exe -hashfile ${{ matrix.file }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file }}.sha256sum
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.file }}
+          path: target/${{ matrix.arch }}/release/${{ matrix.file }}.(tar.gz|zip)
+
+      - name: Upload checksum of artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.file }}.sha256sum
+          path: target/${{ matrix.arch }}/release/${{ matrix.file }}.sha256sum
+  release:
+    name: Release artifacts
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Release ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: |
+            **/zinc-observe-*
