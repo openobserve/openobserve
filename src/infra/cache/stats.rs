@@ -88,3 +88,14 @@ pub fn get_stream_stats_in_memory_size() -> usize {
         .map(|v| v.key().len() + STREAM_STATS_MEM_SIZE)
         .sum()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_get_stream_stats_len() {
+        let stats = get_stats();
+        let data = get_stream_stats_len();
+        assert_eq!(data, stats.len());
+    }
+}
