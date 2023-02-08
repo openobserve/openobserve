@@ -602,9 +602,9 @@ fn add_quote_for_sql(text: &str) -> String {
         if text_len > cap.end() && text.chars().nth(cap.end()).unwrap() == '(' {
             continue;
         }
-        if i > 0 && caps[i - 1].as_str().to_uppercase() == "FROM" {
-            continue;
-        }
+        // if i > 0 && caps[i - 1].as_str().to_uppercase() == "FROM" {
+        //     continue;
+        // }
         // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
         if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
             continue;
