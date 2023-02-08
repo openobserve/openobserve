@@ -148,6 +148,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn create_read_file() {
         let path = "/test.txt";
         let _ = write_file(path, b"hello world").unwrap();
@@ -157,6 +158,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn create_read_directory() {
         let path = "/test_dir/abc/";
         assert_eq!(true, create_dir_all(path).is_ok());

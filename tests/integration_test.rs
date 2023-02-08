@@ -47,7 +47,7 @@ mod tests {
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
-
+        e2e_post_json().await;
         e2e_post_multi().await;
         e2e_get_stream().await;
         e2e_post_query_transform().await;
@@ -65,7 +65,15 @@ mod tests {
         e2e_get_dashboard().await;
         e2e_delete_dashboard().await;
         e2e_post_trace().await;
-        //e2e_post_metrics().await;
+
+        //_e2e_post_metrics().await;
+        e2e_get_org_summary().await;
+        e2e_post_alert().await;
+        e2e_delete_alert().await;
+        e2e_list_alerts().await;
+        e2e_list_real_time_alerts().await;
+        e2e_health_check().await;
+        e2e_cache_status().await;
         e2e_100_tear_down().await;
     }
 
@@ -90,6 +98,34 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/_bulk", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_json() {
+        let auth = setup();
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
+        // metrics
+        let stats_opts =
+            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
+        let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
+        // app
+        let thread_id: usize = 1;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .app_data(web::Data::new(stats.clone()))
+                .app_data(web::Data::new(thread_id))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -539,6 +575,151 @@ mod tests {
             .set_payload(body)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_get_org_summary() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/summary", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        log::info!("{:?}", resp.status());
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_alert() {
+        let auth = setup();
+        let body_str = r#"{                              
+                                "condition": {
+                                    "column": "Country",
+                                    "operator": "=",
+                                    "value": "USA"
+                                },
+                                "duration": 5,
+                                "frequency": 1,
+                                "time_between_alerts": 10,
+                                "destination": "https://dummy/alert"
+                            }"#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!(
+                "/api/{}/{}/alerts/{}",
+                "e2e", "olympics_schema", "alertChk"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_delete_alert() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::delete()
+            .uri(&format!(
+                "/api/{}/{}/alerts/{}",
+                "e2e", "olympics_schema", "alertChk"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        log::info!("{:?}", resp.status());
+        assert!(resp.status().is_success());
+    }
+    async fn e2e_list_alerts() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/alerts", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+    async fn e2e_list_real_time_alerts() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_health_check() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/healthz")
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp);
+        assert!(resp.status().is_success());
+    }
+    async fn e2e_cache_status() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/cache/status")
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 }

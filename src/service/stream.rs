@@ -225,4 +225,10 @@ mod test {
         let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
         assert_eq!(res.stats, stats);
     }
+    #[test]
+    fn test_get_stream_setting_fts_fields() {
+        let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
+        let res = get_stream_setting_fts_fields(&sch);
+        assert!(res.is_ok());
+    }
 }
