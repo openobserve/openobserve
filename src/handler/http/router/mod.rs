@@ -8,6 +8,7 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 use super::auth::validator;
 use super::request::alerts::*;
 use super::request::dashboards::*;
+#[cfg(feature = "zo_functions")]
 use super::request::functions;
 use super::request::health::{cache_status, healthz};
 use super::request::ingest;
@@ -23,7 +24,6 @@ pub mod openapi;
 pub mod ui;
 
 pub fn get_routes(cfg: &mut web::ServiceConfig) {
-    let auth = HttpAuthentication::basic(validator);
     cfg.service(healthz);
 
     let cors = Cors::default()
@@ -44,6 +44,30 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(organizarions_by_username)
             .service(users::authentication),
     );
+
+    #[cfg(feature = "zo_functions")]
+    zo_apis_with_functions(cfg, cors);
+    #[cfg(feature = "zo_functions")]
+    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
+        Url::new("api", "/api-doc/openapi.json"),
+        openapi::ZoFnApiDoc::openapi(),
+    )]));
+
+    #[cfg(not(feature = "zo_functions"))]
+    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
+        Url::new("api", "/api-doc/openapi.json"),
+        openapi::ApiDoc::openapi(),
+    )]));
+    #[cfg(not(feature = "zo_functions"))]
+    zo_apis(cfg, cors);
+
+    if CONFIG.common.ui_enabled {
+        cfg.service(ui::serve);
+    }
+}
+
+fn zo_apis(cfg: &mut web::ServiceConfig, cors: Arc<Cors>) {
+    let auth = HttpAuthentication::basic(validator);
     cfg.service(
         web::scope("/api")
             .wrap(auth)
@@ -58,12 +82,6 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(stream::settings)
             .service(stream::list)
             .service(stream::org_index)
-            .service(functions::save_function)
-            .service(functions::list_functions)
-            .service(functions::delete_function)
-            .service(functions::save_stream_function)
-            .service(functions::list_stream_function)
-            .service(functions::delete_stream_function)
             .service(users::list)
             .service(users::save)
             .service(users::delete)
@@ -81,13 +99,46 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary),
     );
+}
 
-    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
-        Url::new("api", "/api-doc/openapi.json"),
-        openapi::ApiDoc::openapi(),
-    )]));
-
-    if CONFIG.common.ui_enabled {
-        cfg.service(ui::serve);
-    }
+#[cfg(feature = "zo_functions")]
+fn zo_apis_with_functions(cfg: &mut web::ServiceConfig, cors: Arc<Cors>) {
+    let auth = HttpAuthentication::basic(validator);
+    cfg.service(
+        web::scope("/api")
+            .wrap(auth)
+            .wrap(cors)
+            .service(cache_status)
+            .service(ingest::bulk)
+            .service(ingest::multi)
+            .service(ingest::json)
+            .service(search::search)
+            .service(search::around)
+            .service(stream::schema)
+            .service(stream::settings)
+            .service(stream::list)
+            .service(stream::org_index)
+            .service(users::list)
+            .service(users::save)
+            .service(users::delete)
+            .service(prometheus_write)
+            .service(save_dashboard)
+            .service(get_dashboard)
+            .service(list_dashboards)
+            .service(delete_dashboard)
+            .service(traces_write)
+            .service(organizations)
+            .service(save_alert)
+            .service(get_alert)
+            .service(list_alerts)
+            .service(list_stream_alerts)
+            .service(delete_alert)
+            .service(org_summary)
+            .service(functions::save_function)
+            .service(functions::list_functions)
+            .service(functions::delete_function)
+            .service(functions::save_stream_function)
+            .service(functions::list_stream_function)
+            .service(functions::delete_stream_function),
+    );
 }

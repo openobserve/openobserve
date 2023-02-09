@@ -1,5 +1,6 @@
 pub mod alerts;
 pub mod dashboards;
+#[cfg(feature = "zo_functions")]
 pub mod functions;
 pub mod health;
 pub mod ingest;

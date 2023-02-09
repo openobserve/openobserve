@@ -5,7 +5,7 @@ use crate::{meta::functions::Transform, service::functions};
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionSave",
     security(
         ("Authorization"= [])
@@ -32,7 +32,7 @@ pub async fn save_function(
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionList",
     security(
         ("Authorization"= [])
@@ -51,7 +51,7 @@ async fn list_functions(org_id: web::Path<String>) -> impl Responder {
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionDelete",
     security(
         ("Authorization"= [])
@@ -73,7 +73,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> impl Responder {
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionSaveForStream",
     security(
         ("Authorization"= [])
@@ -101,7 +101,7 @@ pub async fn save_stream_function(
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionListForStream",
     security(
         ("Authorization"= [])
@@ -122,7 +122,7 @@ async fn list_stream_function(path: web::Path<(String, String)>) -> impl Respond
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Function",
+    tag = "Functions",
     operation_id = "FunctionDeleteForStream",
     security(
         ("Authorization"= [])

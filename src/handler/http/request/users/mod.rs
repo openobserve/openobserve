@@ -10,7 +10,7 @@ use std::io::Error;
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "User",
+    tag = "Users",
     operation_id = "UserList",
     security(
         ("Authorization"= [])
@@ -30,7 +30,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "User",
+    tag = "Users",
     operation_id = "UserSave",
     security(
         ("Authorization"= [])
@@ -52,7 +52,7 @@ pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<Ht
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "User",
+    tag = "Users",
     operation_id = "UserDelete",
     security(
         ("Authorization"= [])

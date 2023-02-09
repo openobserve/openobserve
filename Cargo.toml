@@ -12,6 +12,7 @@ license = "AGPL-3.0"
 [features]
 mimalloc = ["dep:mimalloc"]
 tmpcache = ["dep:rsfs"]
+zo_functions = ["dep:mlua"]
 
 [profile.release]
 debug = false
@@ -71,7 +72,7 @@ get_if_addrs = "0.5.3"
 lru = "0.8.1"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-mlua = { version = "0.8.4", features = ["luajit52", "vendored" ,"serialize"] }
+mlua = { version = "0.8.4", features = ["luajit52", "vendored" ,"serialize"] , optional = true }
 ahash = { version = "0.8.3", features = ["serde"] }
 dashmap = { version = "5.4.0", features = ["serde"] }
 argon2 = {version =  "0.4.1" ,features = ["alloc", "password-hash"]}

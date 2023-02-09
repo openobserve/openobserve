@@ -1,8 +1,11 @@
 use super::triggers;
 use crate::common;
 use crate::common::notification::send_notification;
-use crate::infra::config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS};
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::STREAM_FUNCTIONS;
+use crate::infra::config::{CONFIG, STREAM_ALERTS};
 use crate::meta::alert::{Alert, Evaluate, Trigger};
+#[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
 use crate::meta::ingestion::RecordStatus;
 use crate::meta::StreamType;
@@ -11,6 +14,7 @@ use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
 use serde_json::json;
 use serde_json::{Map, Value};
@@ -48,10 +52,11 @@ fn get_stream_name(v: &Value) -> String {
     }
 }
 
+#[cfg(feature = "zo_functions")]
 fn load_lua_transform(lua: &Lua, js_func: String) -> Function {
     lua.load(&js_func).eval().unwrap()
 }
-
+#[cfg(feature = "zo_functions")]
 fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
     let input = lua.to_value(&row).unwrap();
     let _res = func.call::<_, LuaValue>(input);
@@ -63,7 +68,7 @@ fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
         }
     }
 }
-
+#[cfg(feature = "zo_functions")]
 async fn get_stream_transforms<'a>(
     key: String,
     stream_name: String,

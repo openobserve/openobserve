@@ -23,6 +23,7 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use super::storage::file_list;
+#[cfg(feature = "zo_functions")]
 use super::transform_udf::get_all_transform;
 use crate::infra::cache::tmpfs;
 use crate::infra::config::{get_parquet_compression, CONFIG};
@@ -698,16 +699,18 @@ fn create_runtime_env() -> Result<RuntimeEnv> {
     RuntimeEnv::new(rn_config)
 }
 
-async fn register_udf(ctx: &mut SessionContext, org_id: &str) {
+async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::match_udf::MATCH_UDF.clone());
     ctx.register_udf(super::match_udf::MATCH_NO_CASE_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
-
-    let udf_list = get_all_transform(org_id).await;
-    for udf in udf_list {
-        ctx.register_udf(udf.clone());
+    #[cfg(feature = "zo_functions")]
+    {
+        let udf_list = get_all_transform(_org_id).await;
+        for udf in udf_list {
+            ctx.register_udf(udf.clone());
+        }
     }
 }
 
