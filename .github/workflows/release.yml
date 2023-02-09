@@ -13,19 +13,24 @@ jobs:
         include:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            file: zinc-observe-linux-amd64
+            file_name: zinc-observe-linux-amd64
+            file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            file: zinc-observe-linux-arm64
+            file_name: zinc-observe-linux-arm64
+            file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-latest-8-cores
-            file: zinc-observe-windows-amd64
+            file_name: zinc-observe-windows-amd64
+            file_ext: .zip
           - arch: x86_64-apple-darwin
             os: macos-latest
-            file: zinc-observe-darwin-amd64
+            file_name: zinc-observe-darwin-amd64
+            file_ext: .tar.gz
           # - arch: aarch64-apple-darwin
           #   os: macos-latest
-          #   file: zinc-observe-darwin-arm64
+          #   file_name: zinc-observe-darwin-arm64
+          #   file_ext: .tar.gz
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -65,9 +70,6 @@ jobs:
           sudo cp protoc/bin/protoc /usr/local/bin/
           sudo cp -r protoc/include/google /usr/local/include/
 
-      - name: Setup Git for Windows' minimal SDK
-        if: contains(matrix.arch, 'windows')
-        uses: git-for-windows/setup-git-for-windows-sdk@v1
       - name: Install Protoc for windows
         if: contains(matrix.arch, 'windows')
         shell: bash
@@ -129,29 +131,28 @@ jobs:
         run: |
           cd target/${{ matrix.arch }}/release
           chmod +x zinc-observe
-          tar -zcvf ${{ matrix.file }}.tar.gz zinc-observe
-          echo $(shasum -a 256 ${{ matrix.file }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file }}.sha256sum
+          tar -zcvf ${{ matrix.file_name }}.tar.gz zinc-observe
+          echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.sha256sum
 
       - name: Calculate checksum and rename binary for windows
         if: contains(matrix.arch, 'windows')
         shell: bash
         run: |
           cd target/${{ matrix.arch }}/release
-          chmod +x zinc-observe
-          zip ${{ matrix.file }}.zip zinc-observe
-          certutil.exe -hashfile ${{ matrix.file }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file }}.sha256sum
+          7z a -tzip ${{ matrix.file_name }}.zip zinc-observe.exe
+          certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.sha256sum
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.file }}
-          path: target/${{ matrix.arch }}/release/${{ matrix.file }}.(tar.gz|zip)
+          name: ${{ matrix.file_name }}
+          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}${{ matrix.file_ext }}
 
       - name: Upload checksum of artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.file }}.sha256sum
-          path: target/${{ matrix.arch }}/release/${{ matrix.file }}.sha256sum
+          name: ${{ matrix.file_name }}.sha256sum
+          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}.sha256sum
   release:
     name: Release artifacts
     needs: [build]
