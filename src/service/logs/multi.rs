@@ -3,6 +3,7 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
 use prometheus::GaugeVec;
 use serde_json::Value;
@@ -12,9 +13,12 @@ use std::io::{BufRead, BufReader, Error};
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, STREAM_FUNCTIONS};
+use crate::infra::config::CONFIG;
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
+#[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
@@ -41,9 +45,12 @@ pub async fn ingest(
     }
 
     let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    #[cfg(feature = "zo_functions")]
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_status = StreamStatus {
         name: stream_name.to_owned(),
@@ -56,8 +63,11 @@ pub async fn ingest(
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transfoms for stream
+    #[cfg(feature = "zo_functions")]
     let mut local_tans: Vec<Transform> = vec![];
+    #[cfg(feature = "zo_functions")]
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+    #[cfg(feature = "zo_functions")]
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
@@ -95,8 +105,12 @@ pub async fn ingest(
         if line.is_empty() {
             continue;
         }
+        #[cfg(feature = "zo_functions")]
         let mut value: Value = json::from_slice(line.as_bytes())?;
+        #[cfg(not(feature = "zo_functions"))]
+        let value: Value = json::from_slice(line.as_bytes())?;
 
+        #[cfg(feature = "zo_functions")]
         // Start row based transform
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);

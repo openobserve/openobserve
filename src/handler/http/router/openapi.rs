@@ -55,9 +55,8 @@ use crate::meta;
         (name = "Stream"),
         (name = "Ingestion"),
         (name = "Search"),
-        (name = "Function"),
-        (name = "User"),
-
+        (name = "Functions"),
+        (name = "Users"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
