@@ -66,3 +66,7 @@ cargo clippy -- -A clippy::uninlined_format_args
 ```
 diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 ```
+
+# How to develop & contribute to Zinc
+
+Check the [contributing guide](./CONTRIBUTING.md)
