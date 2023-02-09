@@ -7,6 +7,7 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
+
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 

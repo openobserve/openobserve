@@ -50,11 +50,16 @@ mod tests {
         e2e_post_json().await;
         e2e_post_multi().await;
         e2e_get_stream().await;
-        e2e_post_query_transform().await;
-        e2e_post_stream_transform().await;
+        #[cfg(feature = "zo_functions")]
+        e2e_post_query_functions().await;
+        #[cfg(feature = "zo_functions")]
+        e2e_post_stream_functions().await;
+        #[cfg(feature = "zo_functions")]
         e2e_list_transforms().await;
-        e2e_delete_query_transform().await;
-        e2e_delete_stream_transform().await;
+        #[cfg(feature = "zo_functions")]
+        e2e_delete_query_functions().await;
+        #[cfg(feature = "zo_functions")]
+        e2e_delete_stream_functions().await;
         //e2e_get_stream_schema().await;
         //e2e_search().await;
         e2e_post_user().await;
@@ -200,8 +205,8 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
-
-    async fn e2e_post_query_transform() {
+    #[cfg(feature = "zo_functions")]
+    async fn e2e_post_query_functions() {
         let auth = setup();
         let body_str = "{\"function\": \"function square(row){const obj = JSON.parse(row);obj['square'] = obj.Year*obj.Year;  return JSON.stringify(obj);}\"  }";
         let app = test::init_service(
@@ -220,8 +225,8 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
-
-    async fn e2e_post_stream_transform() {
+    #[cfg(feature = "zo_functions")]
+    async fn e2e_post_stream_functions() {
         let auth = setup();
         let body_str = "{
                                 \"function\": \"function square(row){const obj = JSON.parse(row);obj['square'] = obj.Year*obj.Year;  return JSON.stringify(obj);}\",
@@ -247,6 +252,7 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
+    #[cfg(feature = "zo_functions")]
     async fn e2e_list_transforms() {
         let auth = setup();
         let app = test::init_service(
@@ -264,8 +270,8 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
-
-    async fn e2e_delete_query_transform() {
+    #[cfg(feature = "zo_functions")]
+    async fn e2e_delete_query_functions() {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -283,8 +289,8 @@ mod tests {
         log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
-
-    async fn e2e_delete_stream_transform() {
+    #[cfg(feature = "zo_functions")]
+    async fn e2e_delete_stream_functions() {
         let auth = setup();
         let app = test::init_service(
             App::new()

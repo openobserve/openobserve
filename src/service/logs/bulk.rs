@@ -4,6 +4,7 @@ use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::alert::Alert;
+#[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{
@@ -17,6 +18,7 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
 use prometheus::GaugeVec;
 use serde_json::Value;
@@ -40,15 +42,20 @@ pub async fn ingest(
         );
     }
     let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
+    #[cfg(feature = "zo_functions")]
+    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+
     let mut stream_file_map: AHashMap<String, String> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_data_map = AHashMap::new();
+    #[cfg(feature = "zo_functions")]
     let mut stream_tansform_map: AHashMap<String, Vec<Transform>> = AHashMap::new();
     let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, Vec<String>)> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+
     let mut stream_name = String::from("");
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
 
@@ -59,7 +66,10 @@ pub async fn ingest(
         if line.is_empty() {
             continue;
         }
+        #[cfg(feature = "zo_functions")]
         let mut value: Value = json::from_slice(line.as_bytes())?;
+        #[cfg(not(feature = "zo_functions"))]
+        let value: Value = json::from_slice(line.as_bytes())?;
         if !next_line_is_data {
             // check bulk operate
             if value.get("delete").is_some() {
@@ -69,7 +79,9 @@ pub async fn ingest(
             stream_name = super::get_stream_name(&value);
 
             // Start Register Transfoms for stream
+            #[cfg(feature = "zo_functions")]
             let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+            #[cfg(feature = "zo_functions")]
             super::get_stream_transforms(
                 key,
                 stream_name.clone(),
@@ -128,7 +140,9 @@ pub async fn ingest(
             let status = &mut stream_data.status;
 
             //Start row based transform
+            #[cfg(feature = "zo_functions")]
             let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+            #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
                 for trans in transforms {
                     let func_key = format!("{}/{}", &stream_name, trans.name);
