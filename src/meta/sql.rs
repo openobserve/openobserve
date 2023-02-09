@@ -804,11 +804,10 @@ mod tests {
     use sqlparser::parser::Parser;
 
     #[test]
-    #[ignore]
     fn parse_sql_works() {
         let table = "index.1.2022";
         let sql = format!(
-            "select a, b, c from {} where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
+            "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
             table
         );
         let dialect = sqlparser::dialect::GenericDialect {};
@@ -822,11 +821,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_new_sql() {
         let table = "index.1.2022";
         let sql = format!(
-            "select a, b, c from {} where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
+            "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
             table
         );
         let local_sql: Sql = Sql::new(sql.as_str()).unwrap();
