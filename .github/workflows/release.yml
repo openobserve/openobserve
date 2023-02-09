@@ -19,18 +19,18 @@ jobs:
             os: ubuntu-2004-8-cores
             file_name: zinc-observe-linux-arm64
             file_ext: .tar.gz
-          - arch: x86_64-pc-windows-msvc
-            os: windows-latest-8-cores
-            file_name: zinc-observe-windows-amd64
-            file_ext: .zip
           - arch: x86_64-apple-darwin
             os: macos-latest
             file_name: zinc-observe-darwin-amd64
             file_ext: .tar.gz
-          # - arch: aarch64-apple-darwin
-          #   os: macos-latest
-          #   file_name: zinc-observe-darwin-arm64
-          #   file_ext: .tar.gz
+          - arch: aarch64-apple-darwin
+            os: macos-latest
+            file_name: zinc-observe-darwin-arm64
+            file_ext: .tar.gz
+          - arch: x86_64-pc-windows-msvc
+            os: windows-latest-8-cores
+            file_name: zinc-observe-windows-amd64
+            file_ext: .zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -88,7 +88,7 @@ jobs:
         if: contains(matrix.arch, 'linux') && endsWith(matrix.arch, '-gnu')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
       - name: Install dependencies for linux ARM
         if: contains(matrix.arch, 'linux') && contains(matrix.arch, 'aarch64') && endsWith(matrix.arch, '-gnu')
@@ -120,9 +120,6 @@ jobs:
 
       - name: Run cargo build for macos ARM
         if: contains(matrix.arch, 'aarch64') && contains(matrix.arch, 'darwin')
-        env:
-          OPENSSL_LIB_DIR: /opt/openssl/usr/lib/aarch64-linux-gnu/
-          OPENSSL_INCLUDE_DIR: /opt/openssl/usr/include/aarch64-linux-gnu/
         run: cargo build --release --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
