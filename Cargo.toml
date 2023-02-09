@@ -91,22 +91,11 @@ opentelemetry-otlp  = { version = "0.10", features = ["http-proto", "serialize" 
 actix-web-opentelemetry = { version = "0.12", features = ["metrics"] }
 actix-web-rust-embed-responder = { version = "2.1.1", default-features = false, features = ["support-rust-embed-for-web", "base64"] }
 rust-embed-for-web="11.1.0"
-awc = "3.0.1"
-reqwest = "0.11"
+awc = "3.1.0"
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 segment = "0.2.2"
 time = "0.3.17"
 
 [build-dependencies]
 tonic-build = { version = "0.8", features = ["prost"] }
 prost-build = { version = "0.11.2" }
-
-[dev-dependencies]
-boa_engine = { version = "0.15.0", features = ["console"] }
-coverage-helper = "0.1"
-v8 = "0.53.1"
-serde_v8 = "0.66.0"
-cluFlock = "1.2.7"
-thrift = "0.16"
-opentelemetry-prometheus = "0.10"
-opentelemetry-proto = { version = "0.1",  features = ["build-client"]  }
-opentelemetry-jaeger = { version = "0.16",features = ["reqwest_collector_client","collector_client", "rt-tokio-current-thread" , "isahc"] }
