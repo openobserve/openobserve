@@ -18,37 +18,12 @@ phases:
       - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64-simd
       - docker push public.ecr.aws/zinclabs/zinc-observe:latest-arm64-simd
 
-      - echo 'Pull amd64 image'
-      - docker pull public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64-simd
-      - docker pull public.ecr.aws/zinclabs/zinc-observe:latest-amd64-simd
-       
-      - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-simd --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64-simd --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64-simd
-      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:latest-simd --amend public.ecr.aws/zinclabs/zinc-observe:latest-amd64-simd --amend public.ecr.aws/zinclabs/zinc-observe:latest-arm64-simd
-      
-      - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-simd
-      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:latest-simd
-
       # common version
       # ARM version default enable NEON feature, so don't need build again
-      # - docker build -t zinc-observe:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
+      # - docker build -t zinc-observe:latest-arm64-simd -f deploy/build/Dockerfile.tag.aarch64 .
       
       - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64
       - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:latest-arm64
       
       - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64
       - docker push public.ecr.aws/zinclabs/zinc-observe:latest-arm64
-
-      - echo 'Pull amd64 image'
-      - docker pull public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64
-      - docker pull public.ecr.aws/zinclabs/zinc-observe:latest-amd64
-       
-      - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-amd64 --amend public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64
-      - docker manifest create public.ecr.aws/zinclabs/zinc-observe:latest --amend public.ecr.aws/zinclabs/zinc-observe:latest-amd64 --amend public.ecr.aws/zinclabs/zinc-observe:latest-arm64
-      
-      - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG
-      - docker manifest push public.ecr.aws/zinclabs/zinc-observe:latest
-
