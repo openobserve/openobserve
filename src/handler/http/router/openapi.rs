@@ -6,7 +6,6 @@ use utoipa::{Modify, OpenApi};
 use crate::handler::http::request;
 use crate::meta;
 
-#[cfg(feature = "zo_functions")]
 #[derive(OpenApi)]
 #[openapi(
     paths(
@@ -57,58 +56,6 @@ use crate::meta;
         (name = "Ingestion"),
         (name = "Search"),
         (name = "Functions"),
-        (name = "Users"),
-
-    ),
-    info(
-        description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
-        contact(name = "ZincObserve", email = "hello@zinclabs.io", url = "https://zinc.dev/"),
-    ),
-)]
-pub struct ZoFnApiDoc;
-
-#[cfg(not(feature = "zo_functions"))]
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        request::stream::list,
-        request::stream::schema,
-        request::stream::settings,
-        request::ingest::bulk,
-        request::ingest::multi,
-        request::ingest::json,
-        request::search::search,
-        request::search::around,
-        request::users::list,
-        request::users::save,
-        request::users::delete,
-    ),
-    components(
-        schemas(
-            meta::http::HttpResponse,
-            meta::StreamType,
-            meta::stream::Stream,
-            meta::stream::StreamStats,
-            meta::stream::StreamProperty,
-            meta::stream::StreamSettings,
-            meta::stream::ListStream,
-            meta::ingestion::RecordStatus,
-            meta::ingestion::StreamStatus,
-            meta::ingestion::IngestionResponse,
-            meta::user::User,
-            meta::user::UserRole,
-            meta::user::UserList,
-            meta::user::UserResponse,
-            meta::search::Query,
-            meta::search::Request,
-            meta::search::Response,
-        ),
-    ),
-    modifiers(&SecurityAddon),
-    tags(
-        (name = "Stream"),
-        (name = "Ingestion"),
-        (name = "Search"),
         (name = "Users"),
     ),
     info(
