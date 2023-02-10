@@ -200,7 +200,7 @@ export default defineComponent({
             });
 
             if (streamFound == false) {
-              searchObj.data.stream.selectedStream = {};
+              searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
               $q.notify({
                 message: "Stream not found",
