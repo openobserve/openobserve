@@ -25,7 +25,7 @@
     </div>
     <div class="index-table q-mt-xs">
       <q-table
-        v-model:selected="searchObj.data.stream.selectedFields"
+        v-model:selected="searchObj.data.stream.selectedFields.value"
         :rows="searchObj.data.stream.selectedStreamFields"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
