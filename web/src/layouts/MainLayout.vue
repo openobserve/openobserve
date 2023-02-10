@@ -225,11 +225,11 @@ export default {
         icon: "img:/assets/images/left_nav/index_icon.svg",
         link: "/logstream",
       },
-      {
-        title: t("menu.function"),
-        icon: "transform",
-        link: "/function",
-      },
+      // {
+      //   title: t("menu.function"),
+      //   icon: "transform",
+      //   link: "/function",
+      // },
       {
         title: t("menu.ingestion"),
         icon: "filter_alt",
