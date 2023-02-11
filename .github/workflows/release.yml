@@ -13,23 +13,23 @@ jobs:
         include:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            file_name: zinc-observe-linux-amd64
+            file_name: zinc-observe-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            file_name: zinc-observe-linux-arm64
+            file_name: zinc-observe-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
-            file_name: zinc-observe-darwin-amd64
+            file_name: zinc-observe-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
-            file_name: zinc-observe-darwin-arm64
+            file_name: zinc-observe-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-latest-8-cores
-            file_name: zinc-observe-windows-amd64
+            file_name: zinc-observe-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -90,13 +90,6 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
-      - name: Install dependencies for linux ARM
-        if: contains(matrix.arch, 'linux') && contains(matrix.arch, 'aarch64') && endsWith(matrix.arch, '-gnu')
-        run: |
-          wget http://ports.ubuntu.com/ubuntu-ports/pool/main/o/openssl/libssl-dev_3.0.2-0ubuntu1_arm64.deb
-          dpkg -x libssl-dev_3.0.2-0ubuntu1_arm64.deb /opt/openssl
-          cp /opt/openssl/usr/include/openssl/* /opt/openssl/usr/include/aarch64-linux-gnu/openssl/
-
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -108,18 +101,6 @@ jobs:
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
 
       - name: Run cargo build
-        if: contains(matrix.arch, 'aarch64') == false
-        run: cargo build --release --target ${{ matrix.arch }}
-
-      - name: Run cargo build for linux ARM
-        if: contains(matrix.arch, 'aarch64') && contains(matrix.arch, 'linux')
-        env:
-          OPENSSL_LIB_DIR: /opt/openssl/usr/lib/aarch64-linux-gnu/
-          OPENSSL_INCLUDE_DIR: /opt/openssl/usr/include/aarch64-linux-gnu/
-        run: cargo build --release --target ${{ matrix.arch }}
-
-      - name: Run cargo build for macos ARM
-        if: contains(matrix.arch, 'aarch64') && contains(matrix.arch, 'darwin')
         run: cargo build --release --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
@@ -129,7 +110,7 @@ jobs:
           cd target/${{ matrix.arch }}/release
           chmod +x zinc-observe
           tar -zcvf ${{ matrix.file_name }}.tar.gz zinc-observe
-          echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.sha256sum
+          echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.tar.gz.sha256sum
 
       - name: Calculate checksum and rename binary for windows
         if: contains(matrix.arch, 'windows')
@@ -137,7 +118,7 @@ jobs:
         run: |
           cd target/${{ matrix.arch }}/release
           7z a -tzip ${{ matrix.file_name }}.zip zinc-observe.exe
-          certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.sha256sum
+          certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -149,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.file_name }}.sha256sum
-          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}.sha256sum
+          path: target/${{ matrix.arch }}/release/${{ matrix.file_name }}${{ matrix.file_ext }}.sha256sum
   release:
     name: Release artifacts
     needs: [build]
