@@ -2,7 +2,7 @@
   <div class="column index-menu">
     <div>
       <q-select
-        v-model="searchObj.data.stream.selectedStream.value"
+        v-model="searchObj.data.stream.selectedStream"
         :label="
           searchObj.data.stream.selectedStream.label
             ? ''

@@ -357,42 +357,10 @@ export default {
       store.state.selectedOrganization = selectedOrg;
     };
 
-    const getRefreshToken = () => {
-      userService
-        .getRefreshToken()
-        .then((res) => {
-          useLocalToken(res.data.data.id_token);
-          const sessionUserInfo: any = getUserInfo(
-            "#id_token=" + res.data.data.id_token
-          );
-
-          const userInfo = sessionUserInfo !== null ? sessionUserInfo : null;
-          if (userInfo !== null) {
-            store.dispatch("login", {
-              loginState: true,
-              userInfo: userInfo,
-            });
-          }
-          const d = new Date();
-          const timeoutinterval = Math.floor(d.getTime() / 1000);
-          const timeout =
-            (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-          setTimeout(() => {
-            getRefreshToken();
-          }, timeout);
-        })
-        .catch((e) => {
-          console.log("Error while fetching refresh token:", e);
-        });
-    };
-
     if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
       const d = new Date();
       const timeoutinterval = Math.floor(d.getTime() / 1000);
       const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-      setTimeout(() => {
-        getRefreshToken();
-      }, timeout);
     }
 
     const link: any = ref("inbox");

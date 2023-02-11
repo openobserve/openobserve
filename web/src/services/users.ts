@@ -34,9 +34,6 @@ const users = {
       `/api/org_users/${org_identifier}?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
   },
-  getRefreshToken: () => {
-    return http().get(`/api/auth/refresh_token`);
-  },
 };
 
 export default users;
