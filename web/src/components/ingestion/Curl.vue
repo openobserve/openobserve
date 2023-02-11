@@ -14,21 +14,20 @@
       </div>
     </div>
     <pre ref="content">
-  curl 
-  -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} 
-  -k {{ config.zincENLIngestion }}/api/{{ currOrgIdentifier }}/default/_json
-  -d [JSON-DATA]</pre
+  curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
+        config.zincENLIngestion
+      }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]</pre
     >
   </div>
 </template>
 
 <script>
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "Curl",
+  name: "curl-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
