@@ -125,7 +125,7 @@ pub async fn ingest(
                     status: RecordStatus {
                         successful: 0,
                         failed: 0,
-                        msg: "".to_string(),
+                        error: "".to_string(),
                     },
                 });
 
@@ -176,7 +176,7 @@ pub async fn ingest(
                     Ok(t) => t,
                     Err(e) => {
                         status.failed += 1;
-                        status.msg = e.to_string();
+                        status.error = e.to_string();
                         continue;
                     }
                 },
@@ -186,6 +186,10 @@ pub async fn ingest(
             let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.allowed_upto);
             if timestamp < earlest_time.timestamp_micros() {
                 status.failed += 1; // to old data, just discard
+                status.error = format!(
+                    "to old data, only allow upto last {} hours, discard",
+                    CONFIG.limit.allowed_upto
+                );
                 continue;
             }
             if timestamp < min_ts {
