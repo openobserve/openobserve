@@ -137,7 +137,11 @@ export default defineComponent({
       }
     },
     getMoreData() {
-      if (this.searchObj.meta.refreshInterval == 0) {
+      if (
+        this.searchObj.meta.refreshInterval == 0 &&
+        this.searchObj.data.queryResults.total <
+          this.searchObj.data.queryResults.from
+      ) {
         this.searchObj.loading = true;
         this.getQueryData();
       }
