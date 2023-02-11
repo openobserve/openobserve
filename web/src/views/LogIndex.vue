@@ -180,6 +180,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "compressed_size",
+        field: "compressed_size",
+        label: t("logindex.compressedSize"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("user.actions"),
