@@ -18,15 +18,16 @@ const dataPlaneUrl = "https://e1.zinclabs.dev";
 //   },
 // });
 
+if (config.enableAnalytics == "true") {
+  rudderanalytics.ready(() => {
+    console.log("we are all set!!!");
+  });
 
-rudderanalytics.ready(() => {
-  console.log("we are all set!!!");
-});
-
-// opt = rudderanalytics.
-rudderanalytics.load(writeKey, dataPlaneUrl, {
-  configUrl: "https://e1.zinclabs.dev/v1/config",
-});
+  // opt = rudderanalytics.
+  rudderanalytics.load(writeKey, dataPlaneUrl, {
+    configUrl: "https://e1.zinclabs.dev/v1/config",
+  });
+}
 export default rudderanalytics ;
 
 

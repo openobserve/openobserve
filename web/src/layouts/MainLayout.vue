@@ -365,12 +365,14 @@ export default {
 
     const link: any = ref("inbox");
 
-    const tracker = new Tracker({
-      projectKey: config.openReplayKey,
-    });
+    if (config.enableAnalytics == "true") {
+      const tracker = new Tracker({
+        projectKey: config.openReplayKey,
+      });
 
-    tracker.start();
-    tracker.setUserID(store.state.userInfo.email);
+      tracker.start();
+      tracker.setUserID(store.state.userInfo.email);
+    }
 
     const goToHome = () => {
       router.push("/");
