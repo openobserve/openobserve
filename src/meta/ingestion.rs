@@ -8,7 +8,7 @@ pub struct RecordStatus {
     pub failed: u32,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub msg: String,
+    pub error: String,
 }
 
 #[derive(Debug)]
