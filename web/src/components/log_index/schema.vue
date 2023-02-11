@@ -35,6 +35,7 @@
                 <tr>
                   <th>{{ t("logindex.docsCount") }}</th>
                   <th>{{ t("logindex.storageSize") }}</th>
+                  <th>{{ t("logindex.compressedSize") }}</th>
                   <th>{{ t("logindex.time") }}</th>
                 </tr>
               </thead>
@@ -47,9 +48,13 @@
                   </td>
                   <td>
                     {{
-                      parseInt(indexData.stats.storage_size).toLocaleString(
-                        "en-US"
-                      )
+                      parseInt(indexData.stats.storage_size).toLocaleString("en-US")
+                    }}
+                    MB
+                  </td>
+                  <td>
+                    {{
+                      parseInt(indexData.stats.compressed_size).toLocaleString("en-US")
                     }}
                     MB
                   </td>
