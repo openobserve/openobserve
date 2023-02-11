@@ -235,7 +235,7 @@ export default defineComponent({
             searchObj.data.streamResults = res.data;
 
             if (res.data.list.length > 0) {
-              getQueryTransform();
+              // getQueryTransform();
 
               //extract stream data from response
               loadStreamLists();

@@ -1,7 +1,11 @@
 <template>
   <q-page class="aboutPage">
     <div class="about_head">
-      <img src="/assets/images/common/app_logo.png" class="logo" width="177" />
+      <img
+        src="/src/assets/images/common/app_logo.png"
+        class="logo"
+        width="177"
+      />
       <div class="para">The modern open source search engine.</div>
     </div>
 

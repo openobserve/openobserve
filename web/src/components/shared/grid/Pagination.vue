@@ -23,7 +23,7 @@
           collapsibleIcon === 'show' &&
           seachCollapseImage == 'collapse_sidebar_icon'
         "
-        icon="img:/assets/images/common/collapse_sidebar_icon.svg"
+        icon="img:/src/assets/images/common/collapse_sidebar_icon.svg"
         class="q-mr-sm"
         size="sm"
         round
@@ -35,7 +35,7 @@
           collapsibleIcon === 'show' &&
           seachCollapseImage == 'expand_sidebar_icon'
         "
-        icon="img:/assets/images/common/expand_sidebar_icon.svg"
+        icon="img:/src/assets/images/common/expand_sidebar_icon.svg"
         class="q-mr-sm"
         size="sm"
         round

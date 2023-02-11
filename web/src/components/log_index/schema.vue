@@ -12,91 +12,102 @@
             v-close-popup
             round
             flat
-            icon="img:/assets/images/common/close_icon.svg"
+            icon="img:/src/assets/images/common/close_icon.svg"
           />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <q-card-section>
-       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
-      <div
-        v-if="indexData.schema.length == 0"
-        class="q-pt-md text-center q-w-md q-mx-lg"
-        style="max-width: 450px"
-      >
-        No data available.
-      </div>
-      <div v-else class="indexDetailsContainer">
-        <div class="title">{{ indexData.name }}</div>
-        <div class="q-table__container q-table--cell-separator">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th>{{ t("logindex.docsCount") }}</th>
-                <th>{{ t("logindex.storageSize") }}</th>
-                <th>{{ t("logindex.time") }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  {{
-                    parseInt(indexData.stats.doc_num).toLocaleString("en-US")
-                  }}
-                </td>
-                <td>
-                  {{
-                    parseInt(indexData.stats.storage_size).toLocaleString(
-                      "en-US"
-                    )
-                  }}
-                  MB
-                </td>
-                <td class="text-center">
-                  {{ indexData.stats.doc_time_min }}
-                  <br />
-                  to
-                  <br />
-                  {{ indexData.stats.doc_time_max }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
+        <div
+          v-if="indexData.schema.length == 0"
+          class="q-pt-md text-center q-w-md q-mx-lg"
+          style="max-width: 450px"
+        >
+          No data available.
+        </div>
+        <div v-else class="indexDetailsContainer">
+          <div class="title">{{ indexData.name }}</div>
+          <div class="q-table__container q-table--cell-separator">
+            <table class="q-table">
+              <thead>
+                <tr>
+                  <th>{{ t("logindex.docsCount") }}</th>
+                  <th>{{ t("logindex.storageSize") }}</th>
+                  <th>{{ t("logindex.time") }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    {{
+                      parseInt(indexData.stats.doc_num).toLocaleString("en-US")
+                    }}
+                  </td>
+                  <td>
+                    {{
+                      parseInt(indexData.stats.storage_size).toLocaleString(
+                        "en-US"
+                      )
+                    }}
+                    MB
+                  </td>
+                  <td class="text-center">
+                    {{ indexData.stats.doc_time_min }}
+                    <br />
+                    to
+                    <br />
+                    {{ indexData.stats.doc_time_max }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <q-separator class="q-mt-xl q-mb-lg" />
+
+          <div class="title">{{ t("logindex.mapping") }}</div>
+          <!-- Note: Drawer max-height to be dynamically calculated with JS -->
+          <div
+            class="q-table__container q-table--cell-separator"
+            style="height: calc(100vh - 460px); overflow: auto"
+          >
+            <table class="q-table">
+              <thead>
+                <tr>
+                  <th>{{ t("logindex.propertyName") }}</th>
+                  <th>{{ t("logindex.propertyType") }}</th>
+                  <th>{{ t("logindex.streamftsKey") }}</th>
+                  <th>{{ t("logindex.streamPartitionKey") }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(schema, index) in indexData.schema"
+                  :key="index + '_' + schema.name"
+                  class="list-item"
+                >
+                  <td>{{ schema.name }}</td>
+                  <td>{{ schema.type }}</td>
+                  <td class="text-center">
+                    <q-checkbox v-model="schema.ftsKey" size="sm" />
+                  </td>
+                  <td class="text-center">
+                    <q-checkbox v-model="schema.partitionKey" size="sm">
+                      {{ schema.level }}</q-checkbox
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <q-separator class="q-mt-xl q-mb-lg" />
-
-        <div class="title">{{ t("logindex.mapping") }}</div>
-        <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-        <div class="q-table__container q-table--cell-separator" style="height: calc(100vh - 460px); overflow: auto">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th>{{ t("logindex.propertyName") }}</th>
-                <th>{{ t("logindex.propertyType") }}</th>
-                <th>{{ t("logindex.streamftsKey") }}</th>
-                <th>{{ t("logindex.streamPartitionKey") }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(schema, index) in indexData.schema"
-                :key="index + '_' + schema.name"
-                class="list-item"
-              >
-                <td>{{ schema.name }}</td>
-                <td>{{ schema.type }}</td>
-                <td class="text-center"><q-checkbox v-model="schema.ftsKey" size="sm" /></td>
-                <td class="text-center"><q-checkbox v-model="schema.partitionKey" size="sm"> {{schema.level}}</q-checkbox></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      </div>
-
-      <div v-if="indexData.schema.length > 0" class="flex justify-center q-mt-sm">
+        <div
+          v-if="indexData.schema.length > 0"
+          class="flex justify-center q-mt-sm"
+        >
           <q-btn
             v-close-popup
             class="q-mb-md text-bold no-border"
@@ -111,13 +122,12 @@
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
-            type="submit"          
+            type="submit"
             no-caps
           />
         </div>
       </q-form>
     </q-card-section>
-     
   </q-card>
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
@@ -182,62 +192,76 @@ export default defineComponent({
           indexData.value.stats = res.data.stats;
 
           for (var property of res.data.schema) {
-            if (res.data.settings.full_text_search_keys.length > 0 && res.data.settings.full_text_search_keys.includes(property.name)){
+            if (
+              res.data.settings.full_text_search_keys.length > 0 &&
+              res.data.settings.full_text_search_keys.includes(property.name)
+            ) {
               property.ftsKey = true;
             } else {
               property.ftsKey = false;
-            } 
+            }
 
-            if (res.data.settings.partition_keys && Object.values(res.data.settings.partition_keys).includes(property.name)){
-              let index = Object.values(res.data.settings.partition_keys).indexOf(property.name);
+            if (
+              res.data.settings.partition_keys &&
+              Object.values(res.data.settings.partition_keys).includes(
+                property.name
+              )
+            ) {
+              let index = Object.values(
+                res.data.settings.partition_keys
+              ).indexOf(property.name);
               property.partitionKey = true;
-              property.level = Object.keys(res.data.settings.partition_keys).find(key => res.data.settings.partition_keys[key] === property.name)     
+              property.level = Object.keys(
+                res.data.settings.partition_keys
+              ).find(
+                (key) => res.data.settings.partition_keys[key] === property.name
+              );
             } else {
               property.partitionKey = false;
-            }     
-          }       
-          
+            }
+          }
+
           dismiss();
         });
     };
 
     const onSubmit = async () => {
-     /*  this.updateSettingsForm.validate().then((valid: any) => {
+      /*  this.updateSettingsForm.validate().then((valid: any) => {
       if (!valid) {
           return false;
         } */
-        
-      let settings = { "partition_keys": [], "full_text_search_keys": [] };
+
+      let settings = { partition_keys: [], full_text_search_keys: [] };
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
         if (property.ftsKey) {
-          settings.full_text_search_keys.push(property.name)
+          settings.full_text_search_keys.push(property.name);
         }
         if (property.level && property.partitionKey) {
-          settings.partition_keys.push(property.name)
+          settings.partition_keys.push(property.name);
         } else if (property.partitionKey) {
-          added_part_keys.push(property.name)
+          added_part_keys.push(property.name);
         }
       }
       if (added_part_keys.length > 0) {
-        settings.partition_keys = settings.partition_keys.concat(added_part_keys)
+        settings.partition_keys =
+          settings.partition_keys.concat(added_part_keys);
       }
 
-       await  indexService
-          .updateSettings(
-            store.state.selectedOrganization.identifier,
-            indexData.value.name,
-            indexData.value.stream_type,
-            settings
-          ).then((res) => {
+      await indexService
+        .updateSettings(
+          store.state.selectedOrganization.identifier,
+          indexData.value.name,
+          indexData.value.stream_type,
+          settings
+        )
+        .then((res) => {
           getSchema();
           dismiss();
         });
+    };
 
-    };   
-    
-
-    return { t, q, indexData, getSchema, onSubmit,updateSettingsForm, format };
+    return { t, q, indexData, getSchema, onSubmit, updateSettingsForm, format };
   },
   created() {
     if (this.modelValue && this.modelValue.name) {
@@ -248,7 +272,6 @@ export default defineComponent({
       this.getSchema();
     }
   },
- 
 });
 </script>
 

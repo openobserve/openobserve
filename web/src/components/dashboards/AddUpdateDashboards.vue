@@ -11,28 +11,69 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="img:/assets/images/common/close_icon.svg" />
+          <q-btn
+            v-close-popup
+            round
+            flat
+            icon="img:/src/assets/images/common/close_icon.svg"
+          />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="adddashboardForm" @submit="onSubmit">
-        <q-input v-if="beingUpdated" v-model="dashboardData.id" :readonly="beingUpdated" :disabled="beingUpdated"
-          :label="t('dashboard.id')" />
+        <q-input
+          v-if="beingUpdated"
+          v-model="dashboardData.id"
+          :readonly="beingUpdated"
+          :disabled="beingUpdated"
+          :label="t('dashboard.id')"
+        />
 
-        <q-input v-model="dashboardData.name" :placeholder="t('dashboard.nameHolder')"
-          :label="t('dashboard.name') + '*'" color="input-border" bg-color="input-bg" class="q-py-md showLabelOnTop"
-          stack-label outlined filled dense />
-        <q-input v-model="dashboardData.type" :placeholder="t('dashboard.typeHolder')"
-          :label="t('dashboard.typeDesc') + '*'" color="input-border" bg-color="input-bg" class="q-py-md showLabelOnTop"
-          stack-label outlined filled dense />
+        <q-input
+          v-model="dashboardData.name"
+          :placeholder="t('dashboard.nameHolder')"
+          :label="t('dashboard.name') + '*'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+        />
+        <q-input
+          v-model="dashboardData.type"
+          :placeholder="t('dashboard.typeHolder')"
+          :label="t('dashboard.typeDesc') + '*'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+        />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('dashboard.cancel')"
-            text-color="light-text" padding="sm md" color="accent" no-caps />
-          <q-btn :label="t('dashboard.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary"
-            padding="sm xl" type="submit" no-caps />
+          <q-btn
+            v-close-popup
+            class="q-mb-md text-bold no-border"
+            :label="t('dashboard.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+          />
+          <q-btn
+            :label="t('dashboard.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </q-card-section>
@@ -44,8 +85,7 @@ import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isProxy, toRaw } from 'vue';
-
+import { isProxy, toRaw } from "vue";
 
 const defaultValue = () => {
   return {
@@ -75,8 +115,8 @@ export default defineComponent({
     const { t } = useI18n();
 
     function getRandInteger() {
-          return Math.floor(Math.random() * (9999999999 - 100 + 1) ) + 100;
-      }
+      return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
+    }
 
     return {
       t,
@@ -124,27 +164,33 @@ export default defineComponent({
 
         if (dashboardId == "") {
           const baseObj = {
-            "title": "Experimental Dashboard 1",
-            "dashboardId": "Dash_ID1",
-            "description": "Monitoring Performance",
-            "role": "User Dashboard",
-            "owner": "abhattacharya",
-            "created": "2022-11-26T18:46:19Z",
-            "panels": []
-          }
-          const obj = toRaw(this.dashboardData)
-          baseObj.title=obj.name
-          baseObj.description=obj.type
-          baseObj.dashboardId="DashID_"+ this.getRandInteger()
-          baseObj.created = new Date().toISOString()
-          baseObj.owner = (toRaw(this.store.state.currentuser.first_name)+ " " + toRaw(this.store.state.currentuser.last_name))
+            title: "Experimental Dashboard 1",
+            dashboardId: "Dash_ID1",
+            description: "Monitoring Performance",
+            role: "User Dashboard",
+            owner: "abhattacharya",
+            created: "2022-11-26T18:46:19Z",
+            panels: [],
+          };
+          const obj = toRaw(this.dashboardData);
+          baseObj.title = obj.name;
+          baseObj.description = obj.type;
+          baseObj.dashboardId = "DashID_" + this.getRandInteger();
+          baseObj.created = new Date().toISOString();
+          baseObj.owner =
+            toRaw(this.store.state.currentuser.first_name) +
+            " " +
+            toRaw(this.store.state.currentuser.last_name);
 
-
-          calldashboard = dashboardService.create(this.store.state.selectedOrganization.identifier,baseObj.dashboardId,JSON.stringify(JSON.stringify(baseObj)));
+          calldashboard = dashboardService.create(
+            this.store.state.selectedOrganization.identifier,
+            baseObj.dashboardId,
+            JSON.stringify(JSON.stringify(baseObj))
+          );
         }
         calldashboard.then((res: { data: any }) => {
           this.$emit("updated");
-          console.log('Done saving')
+          console.log("Done saving");
         });
       });
     },

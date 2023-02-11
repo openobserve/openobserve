@@ -31,7 +31,7 @@
               >
                 <q-chip
                   v-if="col.closable"
-                  icon-remove="img:/assets/images/common/close_icon.svg"
+                  icon-remove="img:/src/assets/images/common/close_icon.svg"
                   class="q-ma-none table-head-chip"
                   removable
                   square
