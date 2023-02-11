@@ -164,7 +164,7 @@
         "name": "Name",
         "docNum": "Doc Num",
         "storageSize": "Ingested Data",
-        "compressedSize": "Compressed Size",
+        "compressedSize": "Storage used",
         "time": "Time",
         "storageType": "Storage Type",
         "shardNum": "Shard Number",
@@ -275,6 +275,6 @@
         "findIngestion": "Find how to ingest logs >>",
         "ingestionMsg": "Looks like you have not ingested any data to selected organization ,there are varoius ways in which data can be ingested like fluentbit.",
         "inestedInSearch": "Try Logs Search",
-        "searchInDemoOrg": "You can explore search capbilities by switching to demo organization ,to switch to demo organization ,select 'Demo Organization' using organization dropdown on top.We keep ingesting dummy data to Demo Organization."
+        "searchInDemoOrg": "You can explore search capbilities by switching to demo organization. To switch to demo organization, select 'Demo Organization' using organization dropdown on top."
     }
 }
