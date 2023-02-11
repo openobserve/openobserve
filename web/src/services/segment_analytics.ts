@@ -1,5 +1,6 @@
 // import { AnalyticsBrowser, Analytics } from "@segment/analytics-next";
 import * as rudderanalytics from "rudder-sdk-js";
+import config from "../aws-exports";
 // add segment analytics
 
 const writeKey = "ziox-cloud-browser";
