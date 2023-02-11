@@ -2,7 +2,7 @@
   <div class="column index-menu">
     <div>
       <q-select
-        v-model="searchObj.data.stream.selectedStream.value"
+        v-model="searchObj.data.stream.selectedStream"
         :label="
           searchObj.data.stream.selectedStream.label
             ? ''
@@ -54,7 +54,7 @@
                 </div>
                 <div class="field_icons">
                   <q-icon
-                    name="img:/assets/images/common/search_icon.svg"
+                    name="img:/src/assets/images/common/search_icon.svg"
                     style="margin-right: 0.375rem"
                     size="1rem"
                     @click="addToFilter(props.row.name)"
@@ -65,7 +65,7 @@
                         props.row.name
                       )
                     "
-                    name="img:/assets/images/common/add_icon.svg"
+                    name="img:/src/assets/images/common/add_icon.svg"
                     size="1rem"
                     @click="clickFieldFn(props.row, props.pageIndex)"
                   />
@@ -75,7 +75,7 @@
                         props.row.name
                       )
                     "
-                    name="img:/assets/images/common/remove_icon.svg"
+                    name="img:/src/assets/images/common/remove_icon.svg"
                     size="1rem"
                     @click="clickFieldFn(props.row, props.pageIndex)"
                   />

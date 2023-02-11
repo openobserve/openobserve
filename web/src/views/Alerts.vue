@@ -3,17 +3,43 @@
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showAddAlertDialog">
-      <q-table ref="qTable" :rows="alerts" :columns="columns" row-key="id" :pagination="pagination"
-        :filter="filterQuery" :filter-method="filterData" style="width: 100%">
+      <q-table
+        ref="qTable"
+        :rows="alerts"
+        :columns="columns"
+        row-key="id"
+        :pagination="pagination"
+        :filter="filterQuery"
+        :filter-method="filterData"
+        style="width: 100%"
+      >
         <template #no-data>
           <NoData />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn icon="transform" class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
-              :title="t('alerts.add')" @click="showAddUpdateFn(props)"></q-btn>
-            <q-btn icon="img:/assets/images/common/delete_icon.svg" class="q-ml-xs iconHoverBtn" padding="sm" unelevated
-              size="sm" round flat :title="t('alerts.delete')" @click="showDeleteDialogFn(props)"></q-btn>
+            <q-btn
+              icon="transform"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.add')"
+              @click="showAddUpdateFn(props)"
+            ></q-btn>
+            <q-btn
+              icon="img:/src/assets/images/common/delete_icon.svg"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.delete')"
+              @click="showDeleteDialogFn(props)"
+            ></q-btn>
           </q-td>
         </template>
 
@@ -22,39 +48,70 @@
             <q-tooltip>
               <pre>{{ props.row.sql }}</pre>
             </q-tooltip>
-            <pre style="white-space: break-spaces">{{
-              props.row.sql
-            }}</pre>
+            <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
           </q-td>
         </template>
         <template #top="scope">
           <div class="q-table__title">
             {{ t("alerts.header") }}
           </div>
-          <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alerts.search')"
+          >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
             </template>
           </q-input>
-          <q-btn class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg" color="secondary" no-caps
-            :label="t(`alerts.add`)" @click="showAddUpdateFn({})" />
+          <q-btn
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`alerts.add`)"
+            @click="showAddUpdateFn({})"
+          />
 
-          <QTablePagination :scope="scope" :pageTitle="t('alerts.header')" :position="'top'" :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
+          <QTablePagination
+            :scope="scope"
+            :pageTitle="t('alerts.header')"
+            :position="'top'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
 
         <template #bottom="scope">
-          <QTablePagination :scope="scope" :position="'bottom'" :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
       </q-table>
     </div>
     <div v-else>
-      <AddTransform v-model="formData" :isUpdated="isUpdated" @update:list="refreshList" @cancel:hideform="hideForm" />
+      <AddTransform
+        v-model="formData"
+        :isUpdated="isUpdated"
+        @update:list="refreshList"
+        @cancel:hideform="hideForm"
+      />
     </div>
-    <ConfirmDialog title="Delete Alert" message="Are you sure you want to delete alert?" @update:ok="deleteFn"
-      @update:cancel="confirmDelete = false" v-model="confirmDelete" />
+    <ConfirmDialog
+      title="Delete Alert"
+      message="Are you sure you want to delete alert?"
+      @update:ok="deleteFn"
+      @update:cancel="confirmDelete = false"
+      v-model="confirmDelete"
+    />
   </q-page>
 </template>
 

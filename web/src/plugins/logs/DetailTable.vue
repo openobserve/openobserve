@@ -12,7 +12,7 @@
             v-close-popup
             round
             flat
-            icon="img:/assets/images/common/close_icon.svg"
+            icon="img:/src/assets/images/common/close_icon.svg"
           />
         </div>
       </div>
@@ -63,7 +63,7 @@
                     filled
                     dense
                     class="q-mr-sm pointer"
-                    name="img:/assets/images/common/add_icon.svg"
+                    name="img:/src/assets/images/common/add_icon.svg"
                   >
                     <q-list>
                       <q-item clickable v-close-popup>
@@ -74,7 +74,7 @@
                             "
                             ><q-icon
                               title="Add to search query"
-                              name="img:/assets/images/common/add_icon.svg"
+                              name="img:/src/assets/images/common/add_icon.svg"
                               size="1rem"
                               outlined
                               filled
@@ -94,7 +94,7 @@
                             "
                             ><q-icon
                               title="Add to search query"
-                              name="img:/assets/images/common/add_icon.svg"
+                              name="img:/src/assets/images/common/add_icon.svg"
                               size="1rem"
                               outlined
                               filled

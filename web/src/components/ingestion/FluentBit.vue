@@ -8,7 +8,7 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          icon="img:/assets/images/common/copy_icon.svg"
+          icon="img:/src/assets/images/common/copy_icon.svg"
           @click="$emit('copy-to-clipboard-fn', fluentbitContent)"
         />
       </div>

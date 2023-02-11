@@ -47,21 +47,21 @@
             default
             name="fluentbit"
             :to="'/ingestion/fluentbit'"
-            icon="img:/assets/images/ingestion/fluentbit_icon.png"
+            icon="img:/src/assets/images/ingestion/fluentbit_icon.png"
             label="FluentBit"
             content-class="tab_content"
           />
           <q-route-tab
             name="fluentd"
             :to="'/ingestion/fluentd'"
-            icon="img:/assets/images/ingestion/fluentd_icon.svg"
+            icon="img:/src/assets/images/ingestion/fluentd_icon.svg"
             label="Fluentd"
             content-class="tab_content"
           />
           <q-route-tab
             name="vector"
             :to="'/ingestion/vector'"
-            icon="img:/assets/images/ingestion/vector_icon.png"
+            icon="img:/src/assets/images/ingestion/vector_icon.png"
             label="Vector"
             content-class="tab_content"
           />

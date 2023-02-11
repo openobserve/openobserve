@@ -6,7 +6,7 @@
     "build": "run-p type-check build-only",
     "postbuild": "run-p copy",
     "preview": "vite preview",
-    "copy": "cp -r src/assets/* dist/assets/",
+    "copy": "mkdir -p dist/src/assets/ && cp -r src/assets/* dist/src/assets/",
     "test:unit": "vitest --environment jsdom --root src/",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' :4173 'cypress open --e2e'",

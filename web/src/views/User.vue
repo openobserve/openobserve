@@ -55,7 +55,7 @@
         <q-td :props="props" side>
           <q-btn
             v-if="props.row.email != store.state.userInfo.email"
-            icon="img:/assets/images/common/view_icon.svg"
+            icon="img:/src/assets/images/common/view_icon.svg"
             :title="t('user.update')"
             class="iconHoverBtn"
             padding="sm"
@@ -67,7 +67,7 @@
           />
           <q-btn
             :title="t('user.updatenotallowed')"
-            icon="img:/assets/images/common/view_icon.svg"
+            icon="img:/src/assets/images/common/view_icon.svg"
             flat
             size="sm"
             disable
@@ -75,7 +75,7 @@
           />
           <q-btn
             v-if="props.row.email == `false_condition_to_hide_delete_button`"
-            icon="img:/assets/images/common/delete_icon.svg"
+            icon="img:/src/assets/images/common/delete_icon.svg"
             :title="t('user.delete')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
