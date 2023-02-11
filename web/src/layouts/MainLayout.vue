@@ -161,16 +161,18 @@ import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
 import { getLocale } from "../locales";
 import { setLanguage } from "../utils/cookies";
-import { useLocalCurrentUser, useLocalOrganization } from "../utils/zincutils";
+import {
+  useLocalCurrentUser,
+  useLocalOrganization,
+  useLocalUserInfo,
+  useLocalToken,
+  getUserInfo,
+} from "../utils/zincutils";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import organizationService from "../services/organizations";
-import billingService from "../services/billings";
-import userService from "../services/users";
-import { useLocalToken, getUserInfo } from "../utils/zincutils";
-// import { config } from "../constants/config";
 import config from "../aws-exports";
 import Tracker from "@openreplay/tracker";
 
@@ -211,7 +213,7 @@ export default {
       {
         title: t("menu.index"),
         icon: "img:/src/assets/images/left_nav/index_icon.svg",
-        link: "/logstream",
+        link: "/logstreams",
       },
       // {
       //   title: t("menu.function"),
@@ -286,8 +288,9 @@ export default {
     };
     const signout = () => {
       store.dispatch("logout");
-      //window.location.href = getLogoutURL()
-      //localStorage.setItem("token", "");
+      useLocalToken("", true);
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
       router.push("/logout");
     };
     const miniMode = ref(false);

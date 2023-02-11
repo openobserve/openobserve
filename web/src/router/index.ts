@@ -17,8 +17,6 @@ import Alerts from "../views/Alerts.vue";
 import Ingestion from "../views/Ingestion.vue";
 import Error404 from "../views/Error404.vue";
 import {
-  getLoginURL,
-  getLogoutURL,
   useLocalUserInfo,
   getDecodedUserInfo,
   useLocalToken,
@@ -44,7 +42,7 @@ export default function (store: any) {
         useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
-        window.location.href = getLogoutURL();
+        window.location.href = "/login";
       },
     },
     {
@@ -73,8 +71,8 @@ export default function (store: any) {
           },
         },
         {
-          path: "logstream",
-          name: "logstream",
+          path: "logstreams",
+          name: "logstreams",
           component: LogIndex,
           meta: {
             keepAlive: true,
@@ -139,8 +137,8 @@ export default function (store: any) {
           },
         },
         {
-          path: "function",
-          name: "function",
+          path: "functions",
+          name: "functions",
           component: JSTransform,
           meta: {
             keepAlive: true,
