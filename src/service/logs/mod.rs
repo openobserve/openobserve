@@ -23,6 +23,13 @@ pub mod bulk;
 pub mod json;
 pub mod multi;
 
+pub(crate) fn get_upto_discard_error() -> String {
+    format!(
+        "too old data, by default only last {} hours data can be ingested. Data dscarded.",
+        CONFIG.limit.allowed_upto
+    )
+}
+
 fn get_stream_name(v: &Value) -> String {
     let local_val = v.as_object().unwrap();
     if local_val.contains_key("index") {

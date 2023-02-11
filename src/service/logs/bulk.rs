@@ -186,10 +186,7 @@ pub async fn ingest(
             let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.allowed_upto);
             if timestamp < earlest_time.timestamp_micros() {
                 status.failed += 1; // to old data, just discard
-                status.error = format!(
-                    "to old data, only allow upto last {} hours, discard",
-                    CONFIG.limit.allowed_upto
-                );
+                status.error = super::get_upto_discard_error();
                 continue;
             }
             if timestamp < min_ts {
