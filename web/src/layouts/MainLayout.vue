@@ -166,17 +166,13 @@ import {
   useLocalOrganization,
   useLocalUserInfo,
   useLocalToken,
-  useLocalCurrentUser,
+  getUserInfo,
 } from "../utils/zincutils";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import organizationService from "../services/organizations";
-import billingService from "../services/billings";
-import userService from "../services/users";
-import { useLocalToken, getUserInfo } from "../utils/zincutils";
-// import { config } from "../constants/config";
 import config from "../aws-exports";
 import Tracker from "@openreplay/tracker";
 
@@ -295,8 +291,6 @@ export default {
       useLocalToken("", true);
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-      //window.location.href = getLogoutURL()
-      //localStorage.setItem("token", "");
       router.push("/logout");
     };
     const miniMode = ref(false);
