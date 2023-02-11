@@ -38,12 +38,12 @@
 </template>
 
 <script>
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "Fluentbit",
+  name: "fluentd-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
