@@ -20,7 +20,7 @@
         <q-td :props="props">
           <q-btn
             v-if="props.row.actions == 'true'"
-            icon="img:/assets/images/common/remove_icon.svg"
+            icon="img:/src/assets/images/common/remove_icon.svg"
             :title="t('organization.invite')"
             class="iconHoverBtn"
             padding="sm"

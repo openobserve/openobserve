@@ -21,26 +21,27 @@ const app = createApp(App);
 
 const router = createRouter(store);
 
-Sentry.init({
-  app,
-  dsn: config.sentryDSN,
-  integrations: [
-    new BrowserTracing({
-      routingInstrumentation: Sentry.vueRouterInstrumentation(router),
-      tracingOrigins: [
-        "localhost",
-        "alpha1.cloud.zinclabs.dev",
-        "cloud.zincsearch.com",
-        /^\//,
-      ],
-    }),
-  ],
-  // Set tracesSampleRate to 1.0 to capture 100%
-  // of transactions for performance monitoring.
-  // We recommend adjusting this value in production
-  tracesSampleRate: 1.0,
-});
-
+if (config.enableAnalytics == "true") {
+  Sentry.init({
+    app,
+    dsn: config.sentryDSN,
+    integrations: [
+      new BrowserTracing({
+        routingInstrumentation: Sentry.vueRouterInstrumentation(router),
+        tracingOrigins: [
+          "localhost",
+          "alpha1.cloud.zinclabs.dev",
+          "cloud.zincsearch.com",
+          /^\//,
+        ],
+      }),
+    ],
+    // Set tracesSampleRate to 1.0 to capture 100%
+    // of transactions for performance monitoring.
+    // We recommend adjusting this value in production
+    tracesSampleRate: 1.0,
+  });
+}
 app
   .use(Quasar, {
     plugins: [Dialog, Notify], // import Quasar plugins and add here

@@ -13,7 +13,7 @@
             v-close-popup
             round
             flat
-            icon="img:/assets/images/common/close_icon.svg"
+            icon="img:/src/assets/images/common/close_icon.svg"
           />
         </div>
       </div>

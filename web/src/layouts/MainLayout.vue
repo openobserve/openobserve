@@ -5,30 +5,23 @@
         <img
           v-if="!miniMode"
           class="appLogo"
-          src="../assets/images/common/app_logo.png"
+          src="/src/assets/images/common/app_logo.png"
           @click="goToHome"
         />
         <img
           v-else
           class="appLogo__mini"
-          src="../assets/images/common/mini_logo.svg"
+          src="/src/assets/images/common/mini_logo.svg"
         />
         <q-btn
           dense
           flat
           round
-          icon="img:/assets/images/common/menu_icon.svg"
+          icon="img:/src/assets/images/common/menu_icon.svg"
           @click="toggleLeftDrawer"
         />
 
         <q-toolbar-title></q-toolbar-title>
-        <div class="headerMenu float-left" v-if="quotaThresholdMsg">
-          <div type="warning" icon="cloud" class="warning-msg">
-            <q-icon name="warning" size="xs" class="warning" />{{
-              quotaThresholdMsg
-            }}
-          </div>
-        </div>
         <div class="languageWrapper">
           <q-btn-dropdown
             unelevated
@@ -36,7 +29,7 @@
             flat
             class="languageDdl"
             :icon="languageFlag"
-            dropdown-icon="img:/assets/images/common/language_menu_arrow.svg"
+            dropdown-icon="img:/src/assets/images/common/language_menu_arrow.svg"
           >
             <template #label>
               <div class="row no-wrap">
@@ -82,7 +75,7 @@
             unelevated
             no-caps
             padding="xs sm"
-            dropdown-icon="img:/assets/images/common/user_menu_arrow.svg"
+            dropdown-icon="img:/src/assets/images/common/user_menu_arrow.svg"
           >
             <template #label>
               <div class="row items-center no-wrap">
@@ -91,7 +84,7 @@
                     :src="
                       user.picture
                         ? user.picture
-                        : `/assets/images/common/profile.svg`
+                        : `/src/assets/images/common/profile.svg`
                     "
                   />
                 </q-avatar>
@@ -195,7 +188,7 @@ export default {
     const quotaThresholdMsg = ref();
     let quotaAlertClass = "warning";
     let user = store.state.userInfo;
-    const languageFlag = ref("img:/assets/images/language_flags/en-gb.svg");
+    const languageFlag = ref("img:/src/assets/images/language_flags/en-gb.svg");
 
     const linksList = [
       {
@@ -206,23 +199,18 @@ export default {
       },
       {
         title: t("menu.search"),
-        icon: "img:/assets/images/left_nav/search_icon.svg",
+        icon: "img:/src/assets/images/left_nav/search_icon.svg",
         link: "/logs",
       },
       {
-        title: t("menu.organizations"),
-        icon: "img:/assets/images/left_nav/organization_icon.svg",
-        link: "/organizations",
-      },
-      {
         title: t("menu.user"),
-        icon: "img:/assets/images/left_nav/user_icon.svg",
+        icon: "img:/src/assets/images/left_nav/user_icon.svg",
         link: "/users",
         display: store.state.currentuser.role == "Admin" ? true : false,
       },
       {
         title: t("menu.index"),
-        icon: "img:/assets/images/left_nav/index_icon.svg",
+        icon: "img:/src/assets/images/left_nav/index_icon.svg",
         link: "/logstream",
       },
       // {
@@ -237,22 +225,17 @@ export default {
       },
       {
         title: t("menu.alerts"),
-        icon: "img:/assets/images/left_nav/warning_icon.svg",
+        icon: "img:/src/assets/images/left_nav/warning_icon.svg",
         link: "/alerts",
       },
-      // {
-      //   title: t("menu.tickets"),
-      //   icon: "img:/assets/images/left_nav/ticket_icon.svg",
-      //   link: "/tickets",
-      // },
       {
         title: t("menu.about"),
-        icon: "img:/assets/images/left_nav/about_icon.svg",
+        icon: "img:/src/assets/images/left_nav/about_icon.svg",
         link: "/about",
       },
       {
         title: t("menu.slack"),
-        icon: "img:/assets/images/common/slack.svg",
+        icon: "img:/src/assets/images/common/slack.svg",
         link: "https://join.slack.com/t/zincsearch/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
@@ -263,17 +246,17 @@ export default {
       {
         label: "English",
         code: "en-gb",
-        icon: "img:/assets/images/language_flags/en-gb.svg",
+        icon: "img:/src/assets/images/language_flags/en-gb.svg",
       },
       {
         label: "Türkçe",
         code: "tr-turk",
-        icon: "img:/assets/images/language_flags/tr-turk.svg",
+        icon: "img:/src/assets/images/language_flags/tr-turk.svg",
       },
       {
         label: "简体中文",
         code: "zh-cn",
-        icon: "img:/assets/images/language_flags/zh-cn.svg",
+        icon: "img:/src/assets/images/language_flags/zh-cn.svg",
       },
     ];
 
@@ -281,24 +264,24 @@ export default {
     const selectedLanguage = ref(langList.find((l) => l.code == local.value));
 
     if (user.picture == "") {
-      user.picture = "/assets/images/common/profile.svg";
+      user.picture = "/src/assets/images/common/profile.svg";
     }
 
     if (!selectedLanguage.value && langList.length > 0) {
       selectedLanguage.value = langList[0];
       languageFlag.value =
-        "img:/assets/images/language_flags/" + langList[0].code + ".svg";
+        "img:/src/assets/images/language_flags/" + langList[0].code + ".svg";
     } else {
       const langDetail = selectedLanguage.value;
       languageFlag.value =
-        "img:/assets/images/language_flags/" + langDetail?.code + ".svg";
+        "img:/src/assets/images/language_flags/" + langDetail?.code + ".svg";
     }
 
     const changeLanguage = (item: any) => {
       setLanguage(item.code);
       selectedLanguage.value = item;
       languageFlag.value =
-        "img:/assets/images/language_flags/" + item.code + ".svg";
+        "img:/src/assets/images/language_flags/" + item.code + ".svg";
       router.go(0);
     };
     const signout = () => {
@@ -372,120 +355,24 @@ export default {
     const updateOrganization = () => {
       useLocalOrganization(selectedOrg.value);
       store.state.selectedOrganization = selectedOrg;
-      getOrganizationThreshold();
-    };
-
-    const getOrganizationThreshold = async () => {
-      const organization: { identifier: "" } = store.state.selectedOrganization;
-      await billingService
-        .get_quota_threshold(organization.identifier)
-        .then((res: any) => {
-          const searchNearThreshold = Math.floor(
-            (store.state.selectedOrganization.search_threshold *
-              parseInt(config.zincQuotaThreshold)) /
-              100
-          );
-
-          const ingestNearThreshold = Math.floor(
-            (store.state.selectedOrganization.ingest_threshold *
-              parseInt(config.zincQuotaThreshold)) /
-              100
-          );
-
-          let usageMessage = "";
-          if (
-            parseInt(res.data.data.search) > searchNearThreshold ||
-            parseInt(res.data.data.ingest) > ingestNearThreshold
-          ) {
-            if (searchNearThreshold >= 100 || ingestNearThreshold >= 100) {
-              usageMessage =
-                "You’ve exceeded monthly free limit. Search: [SEARCH_USAGE]%, Ingestion: [INGEST_USAGE]%";
-              quotaAlertClass = "alert";
-            } else {
-              usageMessage =
-                "You’re approaching monthly free limit. Search: [SEARCH_USAGE]%, Ingestion: [INGEST_USAGE]%";
-              quotaAlertClass = "warning";
-            }
-
-            const percentageSearchQuota: any =
-              store.state.selectedOrganization.search_threshold > 0
-                ? (
-                    (res.data.data.search /
-                      store.state.selectedOrganization.search_threshold) *
-                    100
-                  ).toFixed(2)
-                : 0;
-
-            const percentageIngestQuota: any =
-              store.state.selectedOrganization.ingest_threshold > 0
-                ? (
-                    (res.data.data.ingest /
-                      store.state.selectedOrganization.ingest_threshold) *
-                    100
-                  ).toFixed(2)
-                : 0;
-
-            usageMessage = usageMessage.replace(
-              "[SEARCH_USAGE]",
-              percentageSearchQuota <= 100 ? percentageSearchQuota : 100
-            );
-            usageMessage = usageMessage.replace(
-              "[INGEST_USAGE]",
-              percentageIngestQuota <= 100 ? percentageIngestQuota : 100
-            );
-          }
-          quotaThresholdMsg.value = usageMessage;
-        });
-    };
-
-    getOrganizationThreshold();
-
-    const getRefreshToken = () => {
-      userService
-        .getRefreshToken()
-        .then((res) => {
-          useLocalToken(res.data.data.id_token);
-          const sessionUserInfo: any = getUserInfo(
-            "#id_token=" + res.data.data.id_token
-          );
-
-          const userInfo = sessionUserInfo !== null ? sessionUserInfo : null;
-          if (userInfo !== null) {
-            store.dispatch("login", {
-              loginState: true,
-              userInfo: userInfo,
-            });
-          }
-          const d = new Date();
-          const timeoutinterval = Math.floor(d.getTime() / 1000);
-          const timeout =
-            (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-          setTimeout(() => {
-            getRefreshToken();
-          }, timeout);
-        })
-        .catch((e) => {
-          console.log("Error while fetching refresh token:", e);
-        });
     };
 
     if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
       const d = new Date();
       const timeoutinterval = Math.floor(d.getTime() / 1000);
       const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-      setTimeout(() => {
-        getRefreshToken();
-      }, timeout);
     }
 
     const link: any = ref("inbox");
 
-    const tracker = new Tracker({
-      projectKey: config.openReplayKey,
-    });
+    if (config.enableAnalytics == "true") {
+      const tracker = new Tracker({
+        projectKey: config.openReplayKey,
+      });
 
-    tracker.start();
-    tracker.setUserID(store.state.userInfo.email);
+      tracker.start();
+      tracker.setUserID(store.state.userInfo.email);
+    }
 
     const goToHome = () => {
       router.push("/");
@@ -518,7 +405,6 @@ export default {
       signout,
       orgOptions,
       updateOrganization,
-      getOrganizationThreshold,
       selectedOrg,
     };
   },

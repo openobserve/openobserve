@@ -7,7 +7,7 @@
       outline
       no-caps
       :label="displayValue"
-      icon="img:/assets/images/common/time_icon.png"
+      icon="img:/src/assets/images/common/time_icon.png"
       icon-right="arrow_drop_down"
       class="date-time-button"
       color="grey-9"

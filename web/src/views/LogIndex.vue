@@ -23,7 +23,7 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            icon="img:/assets/images/common/list_icon.svg"
+            icon="img:/src/assets/images/common/list_icon.svg"
             :title="t('logindex.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"

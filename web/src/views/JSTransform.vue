@@ -28,7 +28,7 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-              icon="img:/assets/images/common/delete_icon.svg"
+              icon="img:/src/assets/images/common/delete_icon.svg"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
               unelevated

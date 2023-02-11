@@ -4,7 +4,7 @@
     style="font-size: 1.5rem"
   >
     <q-img
-      src="../../../assets/images/common/clipboard_icon.svg"
+      src="/src/assets/images/common/clipboard_icon.svg"
       style="width: 230px; margin: 20vh auto 2rem"
     />
     <div class="q-ma-none">{{ t("ticket.noDataErrorMsg") }}</div>
