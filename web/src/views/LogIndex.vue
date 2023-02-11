@@ -327,7 +327,7 @@ export default defineComponent({
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.logindex.values == undefined) &&
-        this.router.currentRoute.value.name == "logstream"
+        this.router.currentRoute.value.name == "logstreams"
       ) {
         this.logindex = [];
         this.resultTotal = 0;
