@@ -57,7 +57,7 @@ pub async fn ingest(
         status: RecordStatus {
             successful: 0,
             failed: 0,
-            msg: "".to_string(),
+            error: "".to_string(),
         },
     };
     let mut trigger: Option<Trigger> = None;
@@ -142,7 +142,7 @@ pub async fn ingest(
                 Ok(t) => t,
                 Err(e) => {
                     stream_status.status.failed += 1;
-                    stream_status.status.msg = e.to_string();
+                    stream_status.status.error = e.to_string();
                     continue;
                 }
             },
@@ -152,6 +152,7 @@ pub async fn ingest(
         let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.allowed_upto);
         if timestamp < earlest_time.timestamp_micros() {
             stream_status.status.failed += 1; // to old data, just discard
+            stream_status.status.error = super::get_upto_discard_error();
             continue;
         }
         if timestamp < min_ts {
