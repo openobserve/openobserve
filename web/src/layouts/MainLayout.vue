@@ -161,7 +161,13 @@ import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
 import { getLocale } from "../locales";
 import { setLanguage } from "../utils/cookies";
-import { useLocalCurrentUser, useLocalOrganization } from "../utils/zincutils";
+import {
+  useLocalCurrentUser,
+  useLocalOrganization,
+  useLocalUserInfo,
+  useLocalToken,
+  useLocalCurrentUser,
+} from "../utils/zincutils";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
@@ -211,7 +217,7 @@ export default {
       {
         title: t("menu.index"),
         icon: "img:/src/assets/images/left_nav/index_icon.svg",
-        link: "/logstream",
+        link: "/logstreams",
       },
       // {
       //   title: t("menu.function"),
@@ -286,6 +292,9 @@ export default {
     };
     const signout = () => {
       store.dispatch("logout");
+      useLocalToken("", true);
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
       //window.location.href = getLogoutURL()
       //localStorage.setItem("token", "");
       router.push("/logout");
