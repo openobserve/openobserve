@@ -4,7 +4,7 @@
       <q-page class="fullscreen bg-grey-7 flex flex-center">
         <q-card square class="my-card shadow-24 bg-white text-white">
           <q-card-section class="bg-primary">
-            <div class="text-h5 q-my-md">Zinc Oxide</div>
+            <div class="text-h5 q-my-md">Zinc Oserve</div>
           </q-card-section>
           <q-card>
             <q-card-section class="bg-white">

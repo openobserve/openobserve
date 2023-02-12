@@ -5,7 +5,7 @@
     <q-table
       ref="qTable"
       v-model:selected="selected"
-      :rows="logindex"
+      :rows="logStream"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
@@ -24,7 +24,7 @@
         <q-td :props="props">
           <q-btn
             icon="img:/src/assets/images/common/list_icon.svg"
-            :title="t('logindex.schemaHeader')"
+            :title="t('logStream.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
             unelevated
@@ -37,14 +37,14 @@
       </template>
 
       <template #top="scope">
-        <div class="q-table__title">{{ t("logindex.header") }}</div>
+        <div class="q-table__title">{{ t("logStream.header") }}</div>
         <q-input
           v-model="filterQuery"
           borderless
           filled
           dense
           class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('logindex.search')"
+          :placeholder="t('logStream.search')"
         >
           <template #prepend>
             <q-icon name="search" />
@@ -56,13 +56,13 @@
           color="secondary"
           no-caps
           icon="refresh"
-          :label="t(`logindex.refreshStats`)"
-          @click="getLogIndex"
+          :label="t(`logStream.refreshStats`)"
+          @click="getLogStream"
         />
 
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('logindex.header')"
+          :pageTitle="t('logStream.header')"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
           position="top"
@@ -92,13 +92,13 @@
     <q-dialog v-model="confirmDelete">
       <q-card style="width: 240px">
         <q-card-section class="confirmBody">
-          <div class="head">{{ t("logindex.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("logindex.confirmDeleteMsg") }}</div>
+          <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
+          <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
         </q-card-section>
 
         <q-card-actions class="confirmActions">
           <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
-            {{ t("logindex.cancel") }}
+            {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup
@@ -107,7 +107,7 @@
             class="no-border"
             color="primary"
           >
-            {{ t("logindex.ok") }}
+            {{ t("logStream.ok") }}
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -124,11 +124,11 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import indexService from "../services/index";
-import SchemaIndex from "../components/log_index/schema.vue";
+import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 
 export default defineComponent({
-  name: "PageLogIndex",
+  name: "PageLogStream",
   components: { QTablePagination, SchemaIndex, NoData },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
@@ -136,7 +136,7 @@ export default defineComponent({
     const { t } = useI18n();
     const q = useQuasar();
     const router = useRouter();
-    const logindex = ref([]);
+    const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
     const confirmDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
@@ -154,35 +154,35 @@ export default defineComponent({
       {
         name: "name",
         field: "name",
-        label: t("logindex.name"),
+        label: t("logStream.name"),
         align: "left",
         sortable: true,
       },
       {
         name: "stream_type",
         field: "stream_type",
-        label: t("logindex.type"),
+        label: t("logStream.type"),
         align: "left",
         sortable: true,
       },
       {
         name: "doc_num",
         field: "doc_num",
-        label: t("logindex.docNum"),
+        label: t("logStream.docNum"),
         align: "left",
         sortable: true,
       },
       {
         name: "storage_size",
         field: "storage_size",
-        label: t("logindex.storageSize"),
+        label: t("logStream.storageSize"),
         align: "left",
         sortable: true,
       },
       {
         name: "compressed_size",
         field: "compressed_size",
-        label: t("logindex.compressedSize"),
+        label: t("logStream.compressedSize"),
         align: "left",
         sortable: true,
       },
@@ -194,7 +194,7 @@ export default defineComponent({
       },
     ]);
 
-    const getLogIndex = () => {
+    const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
         const dismiss = q.notify({
           spinner: true,
@@ -209,7 +209,7 @@ export default defineComponent({
             let storage_size = "";
             let compressed_size = "";
             resultTotal.value = res.data.list.length;
-            logindex.value = res.data.list.map((data: any) => {
+            logStream.value = res.data.list.map((data: any) => {
               doc_num = "--";
               storage_size = "--";
               if (data.stats) {
@@ -243,7 +243,7 @@ export default defineComponent({
       }
     };
 
-    getLogIndex();
+    getLogStream();
 
     const listSchema = (props: any) => {
       console.log(props.row.schema);
@@ -284,11 +284,11 @@ export default defineComponent({
       qTable,
       router,
       store,
-      logindex,
+      logStream: logStream,
       columns,
       selected,
       orgData,
-      getLogIndex,
+      getLogStream: getLogStream,
       pagination,
       resultTotal,
       listSchema,
@@ -326,12 +326,12 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.orgData = newVal;
       if (
-        (newVal != oldVal || this.logindex.values == undefined) &&
+        (newVal != oldVal || this.logStream.values == undefined) &&
         this.router.currentRoute.value.name == "logstreams"
       ) {
-        this.logindex = [];
+        this.logStream = [];
         this.resultTotal = 0;
-        this.getLogIndex();
+        this.getLogStream();
       }
     },
   },

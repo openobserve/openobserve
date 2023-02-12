@@ -11,7 +11,7 @@ import EditPanel     from "../views/EditPanel.vue";
 import LoginCallback from "../views/LoginCallback.vue";
 import MemberSubscription from "../views/MemberSubscription.vue";
 import Search from "../views/Search.vue";
-import LogIndex from "../views/LogIndex.vue";
+import LogStream from "../views/LogStream.vue";
 import JSTransform from "../views/JSTransform.vue";
 import Alerts from "../views/Alerts.vue";
 import Ingestion from "../views/Ingestion.vue";
@@ -73,7 +73,7 @@ export default function (store: any) {
         {
           path: "logstreams",
           name: "logstreams",
-          component: LogIndex,
+          component: LogStream,
           meta: {
             keepAlive: true,
           },

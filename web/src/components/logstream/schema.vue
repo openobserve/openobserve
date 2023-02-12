@@ -4,7 +4,7 @@
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold text-dark">
-            {{ t("logindex.schemaHeader") }}
+            {{ t("logStream.schemaHeader") }}
           </div>
         </div>
         <div class="col-auto">
@@ -33,10 +33,10 @@
             <table class="q-table">
               <thead>
                 <tr>
-                  <th>{{ t("logindex.docsCount") }}</th>
-                  <th>{{ t("logindex.storageSize") }}</th>
-                  <th>{{ t("logindex.compressedSize") }}</th>
-                  <th>{{ t("logindex.time") }}</th>
+                  <th>{{ t("logStream.docsCount") }}</th>
+                  <th>{{ t("logStream.storageSize") }}</th>
+                  <th>{{ t("logStream.compressedSize") }}</th>
+                  <th>{{ t("logStream.time") }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -72,7 +72,7 @@
 
           <q-separator class="q-mt-xl q-mb-lg" />
 
-          <div class="title">{{ t("logindex.mapping") }}</div>
+          <div class="title">{{ t("logStream.mapping") }}</div>
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
           <div
             class="q-table__container q-table--cell-separator"
@@ -81,10 +81,10 @@
             <table class="q-table">
               <thead>
                 <tr>
-                  <th>{{ t("logindex.propertyName") }}</th>
-                  <th>{{ t("logindex.propertyType") }}</th>
-                  <th>{{ t("logindex.streamftsKey") }}</th>
-                  <th>{{ t("logindex.streamPartitionKey") }}</th>
+                  <th>{{ t("logStream.propertyName") }}</th>
+                  <th>{{ t("logStream.propertyType") }}</th>
+                  <th>{{ t("logStream.streamftsKey") }}</th>
+                  <th>{{ t("logStream.streamPartitionKey") }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,14 +116,14 @@
           <q-btn
             v-close-popup
             class="q-mb-md text-bold no-border"
-            :label="t('logindex.cancel')"
+            :label="t('logStream.cancel')"
             text-color="light-text"
             padding="sm md"
             color="accent"
             no-caps
           />
           <q-btn
-            :label="t('logindex.updateSettings')"
+            :label="t('logStream.updateSettings')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
