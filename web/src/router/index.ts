@@ -6,7 +6,7 @@ import Users from "../views/User.vue";
 import About from "../views/About.vue";
 import Dashboard from "../views/Dashboard.vue";
 import ViewDashboard from "../views/ViewDashboard.vue";
-import EditPanel     from "../views/EditPanel.vue";
+import EditPanel from "../views/EditPanel.vue";
 
 import LoginCallback from "../views/LoginCallback.vue";
 import MemberSubscription from "../views/MemberSubscription.vue";
@@ -23,10 +23,10 @@ import {
   useLocalCurrentUser,
 } from "../utils/zincutils";
 import type { cp } from "fs";
-import FluentBit from '../components/ingestion/FluentBit.vue'
-import Fluentd from '../components/ingestion/Fluentd.vue'
-import Vector from '../components/ingestion/Vector.vue'
-import Curl from '../components/ingestion/Curl.vue'
+import FluentBit from "../components/ingestion/FluentBit.vue";
+import Fluentd from "../components/ingestion/Fluentd.vue";
+import Vector from "../components/ingestion/Vector.vue";
+import Curl from "../components/ingestion/Curl.vue";
 
 import segment from "@/services/segment_analytics";
 
@@ -177,7 +177,7 @@ export default function (store: any) {
               name: "vector",
               component: Vector,
             },
-          ]
+          ],
         },
         {
           path: "alerts",
