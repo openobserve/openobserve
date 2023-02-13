@@ -158,7 +158,7 @@
     "add": "添加模板",
     "search": "搜索模板"
   },
-  "logindex": {
+  "logStream": {
     "header": "数据流",
     "search": "搜索数据流",
     "name": "名称",
