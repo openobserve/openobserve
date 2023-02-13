@@ -212,7 +212,7 @@
   },
   "ingestion": {
     "header": "摄入",
-    "passwordLabel": "重置密码"
+    "passwordLabel": "重置摄取令牌"
   },
   "dashboard": {
     "header": "仪表板",
