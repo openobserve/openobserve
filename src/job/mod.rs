@@ -14,8 +14,10 @@
 
 use crate::infra::config::{CONFIG, INSTANCE_ID};
 use crate::infra::{cluster, ider};
+use crate::meta::organization::DEFAULT_ORG;
 use crate::meta::user::User;
 use crate::service::{db, users};
+use rand::distributions::{Alphanumeric, DistString};
 
 mod alert_manager;
 mod compact;
@@ -27,13 +29,15 @@ mod telemetry;
 pub async fn init() -> Result<(), anyhow::Error> {
     let res = db::user::get_root_user(&CONFIG.auth.username).await;
     if res.is_err() || res.unwrap().is_none() {
+        let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let _ = users::post_user(
-            "dummy",
+            DEFAULT_ORG,
             User {
                 name: CONFIG.auth.username.clone(),
                 password: CONFIG.auth.password.clone(),
                 role: crate::meta::user::UserRole::Root,
                 salt: String::new(),
+                ingestion_token: token,
             },
         )
         .await;

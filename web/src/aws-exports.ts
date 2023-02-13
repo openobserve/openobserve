@@ -20,6 +20,7 @@ const config = {
   zincOxideIngestion: import.meta.env.VITE_ZINC_OXIDE_INGESTION,
   zincQuotaThreshold: import.meta.env.VITE_ZINC_QUOTA_THRESHOLD,
   enableAnalytics: import.meta.env.VITE_ZINC_ANALYTICS_ENABLED,
+  isZincObserveCloud: import.meta.env.VITE_ZINC_OBSERVE_CLOUD,
 };
 
 export default config;

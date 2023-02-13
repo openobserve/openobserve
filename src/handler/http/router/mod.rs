@@ -49,7 +49,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
         .max_age(3600);
     let cors = Arc::new(cors);
 
-    cfg.service(status::healthz).service(status::versions);
+    cfg.service(status::healthz);
     cfg.service(
         web::scope("/auth")
             .wrap(cors)
@@ -116,6 +116,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(list_alerts)
             .service(list_stream_alerts)
             .service(delete_alert)
-            .service(org_summary),
+            .service(org_summary)
+            .service(get_user_passcode)
+            .service(update_user_passcode)
+            .service(status::zo_config),
     );
 }
