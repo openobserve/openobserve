@@ -139,8 +139,13 @@ export default defineComponent({
     getMoreData() {
       if (
         this.searchObj.meta.refreshInterval == 0 &&
-        this.searchObj.data.queryResults.total <
-          this.searchObj.data.queryResults.from
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.from &&
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.size &&
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.size +
+            this.searchObj.data.queryResults.from
       ) {
         this.searchObj.loading = true;
         this.getQueryData();
@@ -596,7 +601,7 @@ export default defineComponent({
           .then((res) => {
             searchObj.loading = false;
             if (res.data.from > 0) {
-              searchObj.data.queryResults.from += res.data.from;
+              searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
               searchObj.data.queryResults.hits.push(...res.data.hits);
@@ -1075,6 +1080,7 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
+      this.searchObj.meta.showHistogram = false;
     },
   },
 });
