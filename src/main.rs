@@ -34,7 +34,7 @@ use zinc_observe::handler::grpc::auth::check_auth;
 use zinc_observe::handler::grpc::cluster_rpc::event_server::EventServer;
 use zinc_observe::handler::grpc::cluster_rpc::search_server::SearchServer;
 use zinc_observe::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
-use zinc_observe::handler::http::router::get_routes;
+use zinc_observe::handler::http::router::{get_basic_routes, get_service_routes};
 use zinc_observe::infra::cluster;
 use zinc_observe::infra::config::CONFIG;
 use zinc_observe::meta::telemetry::Telemetry;
@@ -148,7 +148,8 @@ async fn main() -> Result<(), anyhow::Error> {
         HttpServer::new(move || {
             log::info!("starting HTTP server at: {}", haddr);
             App::new()
-                .default_service(web::route().to(router::dispatch))
+                .service(router::dispatch)
+                .configure(get_basic_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
                 .app_data(web::Data::new(
@@ -156,6 +157,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .timeout(Duration::from_secs(CONFIG.route.timeout))
                         .finish(),
                 ))
+                .wrap(middleware::Compress::default())
                 .wrap(middleware::Logger::default())
                 .wrap(RequestTracing::new())
                 .wrap(prometheus.clone())
@@ -176,11 +178,13 @@ async fn main() -> Result<(), anyhow::Error> {
             );
 
             App::new()
-                .configure(get_routes)
+                .configure(get_service_routes)
+                .configure(get_basic_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(local_id))
+                .wrap(middleware::Compress::default())
                 .wrap(middleware::Logger::default())
                 .wrap(RequestTracing::new())
                 .wrap(prometheus.clone())

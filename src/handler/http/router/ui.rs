@@ -22,13 +22,17 @@ use rust_embed_for_web::RustEmbed;
 #[folder = "web/dist/"]
 struct WebAssets;
 
-pub const UI_PAGES: [&str; 9] = [
+pub const UI_PAGES: [&str; 13] = [
     "login",
+    "logout",
     "about",
     "users",
     "logs",
     "logstream",
+    "functions",
+    "alerts",
     "ingestion",
+    "ingestion/curl",
     "ingestion/fluentbit",
     "ingestion/fluentd",
     "ingestion/vector",
