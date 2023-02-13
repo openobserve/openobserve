@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use actix_web::{route, web};
-use actix_web_rust_embed_responder::{EmbedResponse, EmbedableFileResponse, IntoResponse};
+use actix_web_rust_embed_responder::{
+    Compress, EmbedResponse, EmbedableFileResponse, IntoResponse,
+};
 use rust_embed_for_web::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -48,5 +50,7 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
         path = "index.html";
     }
 
-    WebAssets::get(path).into_response()
+    WebAssets::get(path)
+        .into_response()
+        .use_compression(Compress::Never)
 }
