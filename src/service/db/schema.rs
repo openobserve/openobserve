@@ -1,12 +1,27 @@
+// Copyright 2022 Zinc Labs Inc. and Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use chrono::Utc;
+use datafusion::arrow::datatypes::Schema;
+use serde_json::Value;
+use std::sync::Arc;
+
 use crate::common::json;
 use crate::infra::config::STREAM_SCHEMAS;
 use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
 use crate::meta::StreamType;
-use chrono::Utc;
-use datafusion::arrow::datatypes::Schema;
-use serde_json::Value;
-use std::sync::Arc;
 
 pub async fn get(
     org_id: &str,
