@@ -211,7 +211,7 @@
     },
     "ingestion": {
         "header": "Ingestion",
-        "passwordLabel": "Reset Ingestion Token"
+        "passwordLabel": "Reset Token"
     },
     "dashboard": {
         "header": "Dashboards",

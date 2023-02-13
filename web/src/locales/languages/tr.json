@@ -212,7 +212,7 @@
   },
   "ingestion": {
     "header": "Yutulması",
-    "passwordLabel": "Besleme Jetonunu Sıfırla"
+    "passwordLabel": "Besleme Sıfırla"
   },
   "dashboard": {
     "header": "Gösterge Tabloları",
