@@ -24,7 +24,7 @@ mod tests {
     use std::sync::Once;
     use std::{env, fs};
     use std::{str, thread};
-    use zinc_observe::handler::http::router::get_routes;
+    use zinc_observe::handler::http::router::{get_basic_routes, get_service_routes};
     use zinc_observe::infra::config::CONFIG;
     use zinc_observe::infra::db::default;
 
@@ -112,7 +112,8 @@ mod tests {
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -140,7 +141,8 @@ mod tests {
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -168,7 +170,8 @@ mod tests {
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -187,7 +190,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -207,7 +211,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let auth = ("Authorization", "Basic YWRtaW46Q29tcGxleHBhc3MjMTIz");
@@ -227,7 +232,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -250,7 +256,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -273,7 +280,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -291,7 +299,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::delete()
@@ -310,7 +319,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::delete()
@@ -336,7 +346,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -355,7 +366,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -372,7 +384,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -394,7 +407,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -413,7 +427,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::delete()
@@ -432,7 +447,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -453,7 +469,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -473,7 +490,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::delete()
@@ -501,7 +519,8 @@ mod tests {
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
                 .app_data(web::Data::new(thread_id))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -582,7 +601,8 @@ mod tests {
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
                 .app_data(web::Data::new(thread_id))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -604,7 +624,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -634,7 +655,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::post()
@@ -656,7 +678,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::delete()
@@ -677,7 +700,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -694,7 +718,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -712,7 +737,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
@@ -730,7 +756,8 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_routes),
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
         )
         .await;
         let req = test::TestRequest::get()
