@@ -31,6 +31,9 @@ fn check_search_route(path: &str) -> bool {
     if path.contains("/_search") {
         return true;
     }
+    if path.contains("/_around") {
+        return true;
+    }
     if path.eq("/api/cache/status") {
         return true;
     }

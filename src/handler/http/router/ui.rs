@@ -13,22 +13,24 @@
 // limitations under the License.
 
 use actix_web::{route, web};
-use actix_web_rust_embed_responder::{
-    Compress, EmbedResponse, EmbedableFileResponse, IntoResponse,
-};
+use actix_web_rust_embed_responder::{EmbedResponse, EmbedableFileResponse, IntoResponse};
 use rust_embed_for_web::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "web/dist/"]
 struct WebAssets;
 
-pub const UI_PAGES: [&str; 9] = [
+pub const UI_PAGES: [&str; 13] = [
     "login",
+    "logout",
     "about",
     "users",
     "logs",
     "logstream",
+    "functions",
+    "alerts",
     "ingestion",
+    "ingestion/curl",
     "ingestion/fluentbit",
     "ingestion/fluentd",
     "ingestion/vector",
@@ -46,7 +48,5 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
         path = "index.html";
     }
 
-    WebAssets::get(path)
-        .into_response()
-        .use_compression(Compress::Never)
+    WebAssets::get(path).into_response()
 }
