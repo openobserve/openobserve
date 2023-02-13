@@ -62,7 +62,12 @@
                 {{
                   column.name == "source"
                     ? column.prop(row)
-                    : column.prop(row, column.name)
+                    : column.prop(
+                        row,
+                        column.name.length > 100
+                          ? column.name.substr(0, 100)
+                          : column.name
+                      )
                 }}
               </div>
             </q-td>

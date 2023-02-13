@@ -14,18 +14,14 @@
     <div class="about_data">
       <div class="row head">
         <div class="col-1">Version</div>
-        <div class="col-1">Build</div>
         <div class="col-6 col-md-5 col-lg-4">Commit Hash</div>
-        <div class="col-1">Branch</div>
         <div class="col-3 col-md-3 col-lg-2">Build Date</div>
       </div>
       <div class="row body">
         <div class="col-1">1.0.0</div>
-        <div class="col-1">0</div>
         <div class="col-6 col-md-5 col-lg-4">
           3376c248bade163430f9347742428f0a82cd322d
         </div>
-        <div class="col-1">0</div>
         <div class="col-3 col-md-3 col-lg-2">2022-11-16T11:51:51Z</div>
       </div>
     </div>
