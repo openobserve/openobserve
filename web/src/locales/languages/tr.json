@@ -212,7 +212,7 @@
   },
   "ingestion": {
     "header": "Yutulması",
-    "passwordLabel": "Şifreyi sıfırla"
+    "passwordLabel": "Besleme Sıfırla"
   },
   "dashboard": {
     "header": "Gösterge Tabloları",
