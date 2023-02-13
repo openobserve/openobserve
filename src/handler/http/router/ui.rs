@@ -28,7 +28,7 @@ pub const UI_PAGES: [&str; 13] = [
     "about",
     "users",
     "logs",
-    "logstream",
+    "logstreams",
     "functions",
     "alerts",
     "ingestion",
