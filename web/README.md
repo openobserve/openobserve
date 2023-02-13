@@ -32,7 +32,7 @@ npm install
 For stand-alone UI development environment, create .env file and which contains below environment variable
 
 ```sh
-VITE_ZINC_ENL_ENDPOINT=http://localhost:5080/
+VITE_ZINC_OBSERVE_ENDPOINT=http://localhost:5080/
 ```
 
 ```sh
