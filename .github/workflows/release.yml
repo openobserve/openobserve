@@ -13,22 +13,27 @@ jobs:
         include:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
+            features: "--features tmpcache,zo_functions"
             file_name: zinc-observe-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
+            features: "--features tmpcache,zo_functions"
             file_name: zinc-observe-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
+            features: "--features tmpcache,zo_functions"
             file_name: zinc-observe-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
+            features: "--features tmpcache"
             file_name: zinc-observe-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-latest-8-cores
+            features: "--features zo_functions"
             file_name: zinc-observe-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}
@@ -101,7 +106,7 @@ jobs:
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
 
       - name: Run cargo build
-        run: cargo build --release --target ${{ matrix.arch }}
+        run: cargo build ${{ matrix.features }} --release --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
         if: contains(matrix.arch, 'windows') == false
