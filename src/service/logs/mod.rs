@@ -1,3 +1,26 @@
+// Copyright 2022 Zinc Labs Inc. and Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use ahash::AHashMap;
+use arrow_schema::{DataType, Field};
+use chrono::{TimeZone, Utc};
+use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
+use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
+use serde_json::json;
+use serde_json::{Map, Value};
+
 use super::triggers;
 use crate::common;
 use crate::common::notification::send_notification;
@@ -10,14 +33,6 @@ use crate::meta::functions::Transform;
 use crate::meta::ingestion::RecordStatus;
 use crate::meta::StreamType;
 use crate::service::schema::check_for_schema;
-use ahash::AHashMap;
-use arrow_schema::{DataType, Field};
-use chrono::{TimeZone, Utc};
-use datafusion::arrow::datatypes::Schema;
-#[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-use serde_json::json;
-use serde_json::{Map, Value};
 
 pub mod bulk;
 pub mod json;
