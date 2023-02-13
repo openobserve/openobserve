@@ -36,10 +36,7 @@ use crate::infra::config::CONFIG;
 pub mod openapi;
 pub mod ui;
 
-pub fn get_routes(cfg: &mut web::ServiceConfig) {
-    let auth = HttpAuthentication::basic(validator);
-    cfg.service(status::healthz).service(status::versions);
-
+pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -52,12 +49,38 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
         .max_age(3600);
     let cors = Arc::new(cors);
 
+    cfg.service(status::healthz).service(status::versions);
     cfg.service(
         web::scope("/auth")
-            .wrap(cors.clone())
+            .wrap(cors)
             .service(organizarions_by_username)
             .service(users::authentication),
     );
+
+    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
+        Url::new("api", "/api-doc/openapi.json"),
+        openapi::ApiDoc::openapi(),
+    )]));
+
+    if CONFIG.common.ui_enabled {
+        cfg.service(ui::serve);
+    }
+}
+
+pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
+    let auth = HttpAuthentication::basic(validator);
+    let cors = Cors::default()
+        .send_wildcard()
+        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::CONTENT_TYPE,
+        ])
+        .allow_any_origin()
+        .max_age(3600);
+    let cors = Arc::new(cors);
+
     cfg.service(
         web::scope("/api")
             .wrap(auth)
@@ -95,13 +118,4 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary),
     );
-
-    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
-        Url::new("api", "/api-doc/openapi.json"),
-        openapi::ApiDoc::openapi(),
-    )]));
-
-    if CONFIG.common.ui_enabled {
-        cfg.service(ui::serve);
-    }
 }

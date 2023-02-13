@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use actix_web::http::Error;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{route, web, HttpRequest, HttpResponse};
 use awc::Client;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -40,6 +40,13 @@ fn check_search_route(path: &str) -> bool {
     false
 }
 
+#[route(
+    "/api/{path:.*}",
+    method = "GET",
+    method = "POST",
+    method = "PUT",
+    method = "DELETE"
+)]
 pub async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
@@ -81,6 +88,9 @@ pub async fn dispatch(
 
     // copy headers
     for (key, value) in resp.headers() {
+        if key.eq("content-encoding") {
+            continue;
+        }
         new_resp.insert_header((key.clone(), value.clone()));
     }
     // set body
