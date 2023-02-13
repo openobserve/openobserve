@@ -16,10 +16,23 @@ use serde::{Deserialize, Serialize};
 
 use super::{alert::Alert, functions::Transform, stream::Stream};
 
+pub const DEFAULT_ORG: &str = "default";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 
 pub struct OrgSummary {
     pub streams: Vec<Stream>,
     pub functions: Vec<Transform>,
     pub alerts: Vec<Alert>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IngestionPasscode {
+    pub passcode: String,
+    pub user: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PasscodeResponse {
+    pub data: IngestionPasscode,
 }

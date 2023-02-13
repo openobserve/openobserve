@@ -14,6 +14,7 @@
 
 use actix_web::{delete, get, post, web, HttpResponse};
 use ahash::AHashMap;
+use rand::distributions::{Alphanumeric, DistString};
 use serde_json::Value;
 use std::io::Error;
 
@@ -61,7 +62,10 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 #[post("/{org_id}/users")]
 pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user = user.into_inner();
+    let mut user = user.into_inner();
+    if user.ingestion_token.is_empty() {
+        user.ingestion_token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    }
     users::post_user(&org_id, user).await
 }
 

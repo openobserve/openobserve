@@ -3,34 +3,36 @@ import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
 export default createStore({
   state: {
-    API_ENDPOINT: import.meta.env.VITE_ZINC_ENL_ENDPOINT,
+    API_ENDPOINT: import.meta.env.VITE_ZINC_OBSERVE_ENDPOINT,
     userInfo: {},
     loggedIn: false,
     loadingState: true,
     errorLoadingState: false,
     indexData: [],
-    selectedOrganization: (useLocalOrganization()) ? useLocalOrganization():{},
+    selectedOrganization: (useLocalOrganization()) ? useLocalOrganization() : {},
     organizations: [],
     currentuser: (useLocalCurrentUser()) ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     organizationPasscode: "",
-    allCurrentDashboards:{},
-    currentSelectedDashboard:{},
+    allCurrentDashboards: {},
+    currentSelectedDashboard: {},
     currentPanelsData: [],
     search: {
       query: {
-      dateVal:{
-        tab: "relative",
-        startDate: new Date().toLocaleDateString("en-ZA"),
-        startTime: "00:00",
-        endDate: new Date().toLocaleDateString("en-ZA"),
-        endTime: "23:59",
-        selectedRelativePeriod: "Minutes",
-        selectedRelativeValue: 15,
-        selectedFullTime: false,
+        dateVal: {
+          tab: "relative",
+          startDate: new Date().toLocaleDateString("en-ZA"),
+          startTime: "00:00",
+          endDate: new Date().toLocaleDateString("en-ZA"),
+          endTime: "23:59",
+          selectedRelativePeriod: "Minutes",
+          selectedRelativeValue: 15,
+          selectedFullTime: false,
+        }
       }
-    }},
+    },
     streamFields: [],
+    zoConfig: {},
   },
   mutations: {
     login(state, payload) {
@@ -78,6 +80,9 @@ export default createStore({
     },
     setCurrentPanelsData(state, payload) {
       state.currentPanelsData = payload
+    },
+    setConfig(state, payload) {
+      state.zoConfig = payload
     }
   },
   actions: {
@@ -120,8 +125,11 @@ export default createStore({
     setStreamFields(context, payload) {
       context.commit("setStreamFields", payload);
     },
-    setCurrentPanelsData(context, payload) {      
+    setCurrentPanelsData(context, payload) {
       context.commit('setCurrentPanelsData', payload);
+    },
+    setConfig(context, payload) {
+      context.commit('setConfig', payload);
     }
   },
   modules: {},

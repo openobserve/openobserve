@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
+import config from "../aws-exports";
 
 const organizations = {
   os_list: (
@@ -44,12 +45,21 @@ const organizations = {
     return http().get(`api/organizations/verify_identifier/${name}`);
   },
   get_organization_passcode: (orgIdentifier: string) => {
-    return http().get(`/api/organizations/passcode/${orgIdentifier}`);
+    if (config.isZincObserveCloud) {
+      return http().get(`/api/organizations/passcode/${orgIdentifier}`);
+    }
+    else {
+      return http().get(`api/${orgIdentifier}/organizations/passcode`);
+    }
   },
   update_organization_passcode: (orgIdentifier: string) => {
-    return http().put(`api/organizations/passcode/${orgIdentifier}`, {});
+    if (config.isZincObserveCloud) {
+      return http().put(`api/organizations/passcode/${orgIdentifier}`, {});
+    } else {
+      return http().put(`api/${orgIdentifier}/organizations/passcode`, {});
+    }
   },
-   get_organization_summary: (orgIdentifier: string) => {
+  get_organization_summary: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/summary`);
   },
 };
