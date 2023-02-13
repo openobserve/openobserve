@@ -109,7 +109,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(org_summary))
 }
 
-#[get("/organizations/passcode/{org_id}")]
+#[get("/{org_id}/organizations/passcode")]
 async fn get_user_passcode(
     credentials: BasicAuth,
     org_id: web::Path<String>,
@@ -124,7 +124,7 @@ async fn get_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
-#[put("/organizations/passcode/{org_id}")]
+#[put("/{org_id}/organizations/passcode")]
 async fn update_user_passcode(
     credentials: BasicAuth,
     org_id: web::Path<String>,

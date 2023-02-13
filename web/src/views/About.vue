@@ -1,11 +1,7 @@
 <template>
   <q-page class="aboutPage">
     <div class="about_head">
-      <img
-        src="/src/assets/images/common/app_logo.png"
-        class="logo"
-        width="177"
-      />
+      <img src="/src/assets/images/common/app_logo.png" class="logo" width="177" />
       <div class="para">The modern open source search engine.</div>
     </div>
 
@@ -14,19 +10,15 @@
     <div class="about_data">
       <div class="row head">
         <div class="col-1">Version</div>
-        <div class="col-1">Build</div>
         <div class="col-6 col-md-5 col-lg-4">Commit Hash</div>
-        <div class="col-1">Branch</div>
         <div class="col-3 col-md-3 col-lg-2">Build Date</div>
       </div>
       <div class="row body">
-        <div class="col-1">1.0.0</div>
-        <div class="col-1">0</div>
+        <div class="col-1">{{ zoConfig.version }}</div>
         <div class="col-6 col-md-5 col-lg-4">
-          3376c248bade163430f9347742428f0a82cd322d
+          {{ zoConfig.commit }}
         </div>
-        <div class="col-1">0</div>
-        <div class="col-3 col-md-3 col-lg-2">2022-11-16T11:51:51Z</div>
+        <div class="col-3 col-md-3 col-lg-2">{{ zoConfig.date }}</div>
       </div>
     </div>
   </q-page>
@@ -34,13 +26,18 @@
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
+import { useStore } from "vuex";
+
 export default defineComponent({
   name: "PageAbout",
   // components: {},
   setup() {
+    const store = useStore();
     const pageData = ref("Page Data");
+    var zoConfig = store.state.zoConfig;
     return {
       pageData,
+      zoConfig,
     };
   },
   // methods: {},
@@ -55,23 +52,28 @@ export default defineComponent({
   .about_data {
     padding: 0 1.5rem;
   }
+
   .logo {
     margin-bottom: 0.5rem;
     display: block;
   }
+
   .para {
     color: $light-text;
     font-weight: 600;
   }
+
   .q-separator {
     margin: 1.5rem 0;
   }
+
   .about_data {
     .head {
       margin-bottom: 0.5rem;
       font-weight: 700;
       color: $dark;
     }
+
     .body {
       color: $light-text;
       font-weight: 600;

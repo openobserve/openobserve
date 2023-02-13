@@ -38,7 +38,7 @@ pub mod ui;
 
 pub fn get_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
-    cfg.service(status::healthz).service(status::zo_config);
+    cfg.service(status::healthz);
 
     let cors = Cors::default()
         .send_wildcard()
@@ -95,7 +95,8 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary)
             .service(get_user_passcode)
-            .service(update_user_passcode),
+            .service(update_user_passcode)
+            .service(status::zo_config),
     );
 
     cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
