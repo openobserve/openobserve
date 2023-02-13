@@ -89,10 +89,10 @@ tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["tracing-log" ,"env-filter"] }
 opentelemetry-proto = { version = "0.1",  features = ["gen-tonic","traces","with-serde","build-server"]  }
 opentelemetry-otlp  = { version = "0.10", features = ["http-proto", "serialize" , "reqwest-client"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 actix-web-opentelemetry = { version = "0.12", features = ["metrics"] }
 actix-web-rust-embed-responder = { version = "2.2.0", default-features = false, features = ["support-rust-embed-for-web", "base64"] }
-rust-embed-for-web = { version = "11.1.0" }
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+rust-embed-for-web = "11.1.0"
 awc = "3.1.0"
 segment = "0.2.2"
 time = "0.3.17"
