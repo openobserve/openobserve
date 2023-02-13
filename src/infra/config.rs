@@ -26,11 +26,14 @@ use crate::meta::functions::{FunctionList, Transform};
 use crate::meta::prom::ClusterLeader;
 use crate::meta::user::User;
 
+pub static VERSION: &str = env!("GIT_VERSION");
+pub static COMMIT_HASH: &str = env!("GIT_COMMIT");
+pub static BUILD_DATE: &str = env!("GIT_DATE");
+
 lazy_static! {
     pub static ref CONFIG: Config = init();
     pub static ref LOCKER: DashMap<String, std::sync::Mutex<bool>> = DashMap::new();
     pub static ref INSTANCE_ID: DashMap<String, String> = DashMap::new();
-    pub static ref VERSION: &'static str = env!("CARGO_PKG_VERSION");
     pub static ref TELEMETRY_CLIENT: segment::HttpClient = segment::HttpClient::new(
         Client::builder()
             .connect_timeout(Duration::new(10, 0))

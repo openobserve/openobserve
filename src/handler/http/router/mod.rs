@@ -23,11 +23,11 @@ use super::auth::validator;
 use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
-use super::request::health::{cache_status, healthz};
 use super::request::ingest;
 use super::request::organization::*;
 use super::request::prom::*;
 use super::request::search;
+use super::request::status;
 use super::request::stream;
 use super::request::traces::*;
 use super::request::users;
@@ -38,7 +38,7 @@ pub mod ui;
 
 pub fn get_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
-    cfg.service(healthz);
+    cfg.service(status::healthz).service(status::versions);
 
     let cors = Cors::default()
         .send_wildcard()
@@ -62,7 +62,7 @@ pub fn get_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .wrap(auth)
             .wrap(cors)
-            .service(cache_status)
+            .service(status::cache_status)
             .service(ingest::bulk)
             .service(ingest::multi)
             .service(ingest::json)
