@@ -101,11 +101,11 @@ jobs:
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
 
       - name: Run cargo build
-        if: contains(matrix.arch, 'darwin-arm64') == false
+        if: contains(matrix.arch, 'aarch64-apple') == false
         run: cargo build --features zo_functions --release --target ${{ matrix.arch }}
 
       - name: Run cargo build for macos ARM
-        if: contains(matrix.arch, 'darwin-arm64')
+        if: contains(matrix.arch, 'aarch64-apple')
         run: cargo build --release --target ${{ matrix.arch }}
 
       - name: Calculate checksum and rename binary
