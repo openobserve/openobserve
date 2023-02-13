@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, web, HttpResponse, Result};
+use actix_web::{get, put, web, HttpResponse, Result};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use serde::Serialize;
 use std::io::Error;
 
 use crate::handler::http::auth::is_admin_user;
 use crate::infra::config::USERS;
-use crate::service::organization;
+use crate::meta::organization::PasscodeResponse;
+use crate::service::organization::get_passcode;
+use crate::service::organization::{self, update_passcode};
 
 #[derive(Serialize)]
 struct Organization {
@@ -104,4 +107,34 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
     let org_summary = organization::get_summary(&org).await;
     Ok(HttpResponse::Ok().json(org_summary))
+}
+
+#[get("/organizations/passcode/{org_id}")]
+async fn get_user_passcode(
+    credentials: BasicAuth,
+    org_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut org_id = Some(org.as_str());
+    if is_admin_user(user_id).await {
+        org_id = None;
+    }
+    let passcode = get_passcode(org_id, user_id).await;
+    Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
+}
+
+#[put("/organizations/passcode/{org_id}")]
+async fn update_user_passcode(
+    credentials: BasicAuth,
+    org_id: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut org_id = Some(org.as_str());
+    if is_admin_user(user_id).await {
+        org_id = None;
+    }
+    let passcode = update_passcode(org_id, user_id).await;
+    Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }

@@ -26,10 +26,11 @@ struct HealthzResponse {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct VersionResponse {
+struct ConfigResponse {
     version: String,
     commit: String,
     date: String,
+    functions_enabled: bool,
 }
 
 #[get("/healthz")]
@@ -39,12 +40,13 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     }))
 }
 
-#[get("/versions")]
-pub async fn versions() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Ok().json(VersionResponse {
+#[get("/config")]
+pub async fn zo_config() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
         commit: config::COMMIT_HASH.to_string(),
         date: config::BUILD_DATE.to_string(),
+        functions_enabled: config::HAS_FUNCTIONS,
     }))
 }
 

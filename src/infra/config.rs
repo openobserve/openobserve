@@ -29,6 +29,10 @@ use crate::meta::user::User;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT");
 pub static BUILD_DATE: &str = env!("GIT_DATE");
+#[cfg(feature = "zo_functions")]
+pub static HAS_FUNCTIONS: bool = true;
+#[cfg(not(feature = "zo_functions"))]
+pub static HAS_FUNCTIONS: bool = false;
 
 lazy_static! {
     pub static ref CONFIG: Config = init();

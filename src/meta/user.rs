@@ -22,6 +22,8 @@ pub struct User {
     pub role: UserRole,
     #[serde(default)]
     pub salt: String,
+    #[serde(default)]
+    pub ingestion_token: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
