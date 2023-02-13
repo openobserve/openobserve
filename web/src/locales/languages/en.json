@@ -158,7 +158,7 @@
         "add": "Add Template",
         "search": "Search Template"
     },
-    "logindex": {
+    "logStream": {
         "header": "Streams",
         "search": "Search Stream",
         "name": "Name",

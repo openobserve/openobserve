@@ -158,7 +158,7 @@
     "add": "Şablon Ekle",
     "search": "Arama Şablonu"
   },
-  "logindex": {
+  "logStream": {
     "header": "Akarsular",
     "search": "Arama Akışı",
     "name": "İsim",
