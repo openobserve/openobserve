@@ -206,7 +206,7 @@ impl Locker {
         let key = columns[1..columns.len() - 1].join("_");
         if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, &key) {
             if file.name() == file_name {
-                file.sync();
+                file.sync_once();
             }
         }
     }
@@ -242,7 +242,7 @@ impl RwFile {
             true => (
                 None,
                 Some(RwLock::new(BytesMut::with_capacity(
-                    CONFIG.limit.max_file_size_on_disk as usize,
+                    CONFIG.limit.max_file_size_on_disk as usize / 16,
                 ))),
             ),
             false => {
@@ -303,6 +303,33 @@ impl RwFile {
                 // file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
                 //     .unwrap();
                 // file.sync_all().unwrap();
+            }
+            false => self
+                .file
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .sync_all()
+                .unwrap(),
+        };
+    }
+
+    #[inline]
+    pub fn sync_once(&self) {
+        println!("sync file: {}", self.full_name());
+        match self.use_cache {
+            true => {
+                let file_path = format!("{}{}", self.dir, self.name);
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(true)
+                    .open(file_path)
+                    .unwrap();
+                file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
+                    .unwrap();
+                file.sync_all().unwrap();
             }
             false => self
                 .file
