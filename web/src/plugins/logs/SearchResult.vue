@@ -73,16 +73,19 @@
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
             >
-              <div>
+              <div
+                :title="
+                  column.prop(row, column.name).length > 100
+                    ? column.prop(row, column.name)
+                    : ''
+                "
+              >
                 {{
                   column.name == "source"
                     ? column.prop(row)
-                    : column.prop(
-                        row,
-                        column.name.length > 100
-                          ? column.name.substr(0, 100)
-                          : column.name
-                      )
+                    : column.prop(row, column.name).length > 100
+                    ? column.prop(row, column.name).substr(0, 100) + "..."
+                    : column.prop(row, column.name)
                 }}
               </div>
             </q-td>
