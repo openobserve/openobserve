@@ -82,6 +82,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = Arc::new(cors);
 
     cfg.service(
+        web::scope("/config")
+            .wrap(cors.clone())
+            .service(status::zo_config),
+    );
+
+    cfg.service(
         web::scope("/api")
             .wrap(auth)
             .wrap(cors)
@@ -118,7 +124,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary)
             .service(get_user_passcode)
-            .service(update_user_passcode)
-            .service(status::zo_config),
+            .service(update_user_passcode),
     );
 }
