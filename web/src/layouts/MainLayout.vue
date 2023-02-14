@@ -20,7 +20,7 @@
         <img
           v-if="!miniMode"
           class="appLogo"
-          src="/src/assets/images/common/app_logo.png"
+          src="/src/assets/images/common/app_logo_zo.png"
           @click="goToHome"
         />
         <img
