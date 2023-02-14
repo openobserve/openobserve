@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "run-p size type-check build-only",
-    "size": "--max-old-space-size=40096",
+    "build": "NODE_OPTIONS=--max_old_space_size=40096 run-p type-check build-only",
     "postbuild": "run-p copy",
     "preview": "vite preview",
     "copy": "mkdir -p dist/src/assets/ && cp -r src/assets/* dist/src/assets/",
