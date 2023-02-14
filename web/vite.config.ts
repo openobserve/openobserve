@@ -21,6 +21,7 @@ import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from 'path'
 
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
