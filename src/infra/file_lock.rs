@@ -293,16 +293,16 @@ impl RwFile {
         println!("sync file: {}", self.full_name());
         match self.use_cache {
             true => {
-                let file_path = format!("{}{}", self.dir, self.name);
-                let mut file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(true)
-                    .open(file_path)
-                    .unwrap();
-                file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
-                    .unwrap();
-                file.sync_all().unwrap();
+                // let file_path = format!("{}{}", self.dir, self.name);
+                // let mut file = OpenOptions::new()
+                //     .write(true)
+                //     .create(true)
+                //     .append(true)
+                //     .open(file_path)
+                //     .unwrap();
+                // file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
+                //     .unwrap();
+                // file.sync_all().unwrap();
             }
             false => self
                 .file
