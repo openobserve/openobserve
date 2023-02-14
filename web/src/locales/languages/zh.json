@@ -42,7 +42,8 @@
     "metrics": "指标",
     "slack": "Slack",
     "dashboard": "仪表板",
-    "alerts": "告警"
+    "alerts": "告警",
+    "docs": "文档"
   },
   "about": {
     "name": "ZincObserve",
