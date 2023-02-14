@@ -1,3 +1,18 @@
+<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
 <template>
   <div class="plotlycontainer">
     <div
@@ -44,7 +59,7 @@
         :dashboardId="getDashboardId()"
         @clicked="onClickChild"
       />
-      <ReactiveTableChart ref="plotChart" :data="plotData"/>
+      <ReactiveTableChart ref="plotChart" :data="plotData" />
     </div>
     <div v-else>
       <h2>{{ getVizualizationSelector() }}</h2>
@@ -66,7 +81,7 @@ import * as Plotly from "plotly.js";
 import { computed, defineComponent, onMounted, onUpdated, ref } from "vue";
 import { toRaw, unref, watch } from "vue";
 import { useStore } from "vuex";
-import {modifySQLQuery} from '../../../utils/commons'
+import { modifySQLQuery } from "../../../utils/commons";
 
 export default defineComponent({
   name: "PanelContainer",
@@ -93,14 +108,14 @@ export default defineComponent({
 
     watch(selectedTimeObj, () => {
       if (toRaw(unref(selectedTimeObj))) {
-        renderPanel(props.panelDataElement, false)
+        renderPanel(props.panelDataElement, false);
       }
     });
 
     const renderPanel = async (panelDataElement: any, onMounted: boolean) => {
       const chartParams = {
         title: "Found " + "2" + " hits in " + "10" + " ms",
-      };      
+      };
       const sqlQueryModified = modifySQLQuery(
         toRaw(unref(selectedTimeObj)),
         panelDataElement.query[0]
@@ -111,11 +126,11 @@ export default defineComponent({
 
       const panelData = toRaw(store.state.currentPanelsData);
       const existingPanel = panelData.find(
-        (panel:any) => panel.id == panelDataElement.id
+        (panel: any) => panel.id == panelDataElement.id
       );
 
       if (existingPanel && onMounted) {
-          plotData.value = existingPanel;
+        plotData.value = existingPanel;
       } else {
         await queryService
           .runquery(query, store.state.selectedOrganization.identifier)
@@ -140,14 +155,16 @@ export default defineComponent({
                 data_vals.map((row) => row[colIndex])
               );
 
-              const styledHeader = header_vals.map(header => "<b>" + header + "</b>")
-              const columnColor = output[0].map((col:any, index:any) => {
-                if(index % 2 == 0){
-                  return '#FFF'
-                }else{
-                  return '#C9CCE6'
+              const styledHeader = header_vals.map(
+                (header) => "<b>" + header + "</b>"
+              );
+              const columnColor = output[0].map((col: any, index: any) => {
+                if (index % 2 == 0) {
+                  return "#FFF";
+                } else {
+                  return "#C9CCE6";
                 }
-              })
+              });
 
               plotData.value = {
                 id: panelDataElement.id,
