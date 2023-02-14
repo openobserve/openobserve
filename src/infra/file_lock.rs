@@ -239,7 +239,12 @@ impl RwFile {
         std::fs::create_dir_all(&dir_path).unwrap();
 
         let (file, cache) = match use_cache {
-            true => (None, Some(RwLock::new(BytesMut::new()))),
+            true => (
+                None,
+                Some(RwLock::new(BytesMut::with_capacity(
+                    CONFIG.limit.max_file_size_on_disk as usize,
+                ))),
+            ),
             false => {
                 let f = OpenOptions::new()
                     .write(true)
