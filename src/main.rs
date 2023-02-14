@@ -37,6 +37,7 @@ use zinc_observe::handler::grpc::request::{event::Eventer, search::Searcher, tra
 use zinc_observe::handler::http::router::{get_basic_routes, get_service_routes};
 use zinc_observe::infra::cluster;
 use zinc_observe::infra::config::CONFIG;
+use zinc_observe::infra::file_lock;
 use zinc_observe::meta::telemetry::Telemetry;
 use zinc_observe::service::router;
 
@@ -198,6 +199,8 @@ async fn main() -> Result<(), anyhow::Error> {
         .await;
     // leave the cluster
     let _ = cluster::leave().await;
+    // flush WAL cache to disk
+    file_lock::flush_all();
 
     log::info!("server stopped");
 

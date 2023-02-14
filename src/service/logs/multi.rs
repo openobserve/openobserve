@@ -196,7 +196,7 @@ pub async fn ingest(
     }
 
     // write to file
-    let mut index_file_name = "".to_string();
+    let mut stream_file_name = "".to_string();
     let mut write_buf = BytesMut::new();
     for (key, entry) in buf {
         if entry.is_empty() {
@@ -213,9 +213,10 @@ pub async fn ingest(
             stream_name,
             StreamType::Logs,
             &key,
+            CONFIG.common.wal_memory_mode_enabled,
         );
-        if index_file_name.is_empty() {
-            index_file_name = file.full_name();
+        if stream_file_name.is_empty() {
+            stream_file_name = file.full_name();
         }
         file.write(write_buf.as_ref());
 
@@ -228,7 +229,7 @@ pub async fn ingest(
             .add(write_buf.len() as f64);
     }
 
-    if index_file_name.is_empty() {
+    if stream_file_name.is_empty() {
         return Ok(HttpResponse::Ok().json(IngestionResponse::new(
             http::StatusCode::OK.into(),
             vec![stream_status],
@@ -254,7 +255,12 @@ pub async fn ingest(
         .inc();
 
     if !stream_schema.has_fields {
-        let file = OpenOptions::new().read(true).open(index_file_name).unwrap();
+        let file_name = stream_file_name[stream_file_name.rfind('/').unwrap() + 1..].to_string();
+        file_lock::sync_file(org_id, stream_name, StreamType::Logs, &file_name);
+        let file = OpenOptions::new()
+            .read(true)
+            .open(stream_file_name)
+            .unwrap();
         add_stream_schema(
             org_id,
             stream_name,

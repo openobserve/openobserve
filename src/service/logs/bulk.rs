@@ -255,6 +255,7 @@ pub async fn ingest(
                 &stream_name,
                 StreamType::Logs,
                 &key,
+                CONFIG.common.wal_memory_mode_enabled,
             );
             if stream_file_name.is_empty() {
                 stream_file_name = file.full_name();
@@ -282,6 +283,9 @@ pub async fn ingest(
 
         let schema_exists = stream_partition_keys_map.get(&stream_name).unwrap();
         if !schema_exists.0.has_fields {
+            let file_name =
+                stream_file_name[stream_file_name.rfind('/').unwrap() + 1..].to_string();
+            file_lock::sync_file(org_id, &stream_name, StreamType::Logs, &file_name);
             let file = OpenOptions::new()
                 .read(true)
                 .open(&stream_file_name)
