@@ -235,7 +235,7 @@ export default function (store: any) {
         to.path !== "/cb" &&
         (localStorageToken.value === "" || sessionUserInfo === null)
       ) {
-        window.sessionStorage.setItem("redirectURI", to.fullPath);
+        if (to.path !== "/logout") { window.sessionStorage.setItem("redirectURI", to.fullPath); }
         next({ path: "/login" });
       } else {
         if (sessionUserInfo !== null) {

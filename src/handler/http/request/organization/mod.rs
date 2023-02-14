@@ -18,25 +18,25 @@ use serde::Serialize;
 use std::io::Error;
 
 use crate::handler::http::auth::is_admin_user;
-use crate::infra::config::USERS;
+use crate::infra::config::{CONFIG, USERS};
 use crate::meta::organization::PasscodeResponse;
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct Organization {
     identifier: String,
     label: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct User {
     first_name: String,
     last_name: String,
     email: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
@@ -50,7 +50,7 @@ struct OrganizationDetails {
 
 #[derive(Serialize)]
 struct OrganizationResponse {
-    data: [OrganizationDetails; 1],
+    data: Vec<OrganizationDetails>,
 }
 
 #[get("/organizarions_by_username/{user_name}")]
@@ -62,8 +62,21 @@ pub async fn organizarions_by_username(
     if is_admin_user(&user_name).await {
         let obj = Organization {
             identifier: "default".to_string(),
-            label: "Default".to_string(),
+            label: "default".to_string(),
         };
+
+        for user in USERS.iter() {
+            if !user
+                .key()
+                .contains(format!("{}", &CONFIG.auth.username).as_str())
+            {
+                orgs.push(Organization {
+                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                    label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                });
+            }
+        }
+
         orgs.push(obj);
     } else {
         for user in USERS.iter() {
@@ -80,25 +93,69 @@ pub async fn organizarions_by_username(
 }
 
 #[get("/{org_id}/organizations")]
-pub async fn organizations() -> Result<HttpResponse, Error> {
-    println!("Inside organizations");
+pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
+    //let org = org_id.into_inner();
+    let user_id = credentials.user_id();
+    let mut id = 0;
+
+    let mut orgs: Vec<OrganizationDetails> = vec![];
     let user_detail = User {
-        first_name: "admin".to_string(),
-        last_name: "admin".to_string(),
-        email: "admin".to_string(),
-    };
-    let obj = OrganizationDetails {
-        id: 1,
-        identifier: "default".to_string(),
-        name: "Default".to_string(),
-        user_email: "admin".to_string(),
-        ingest_threshold: 9383939382,
-        search_threshold: 9383939382,
-        org_type: "default".to_string(),
-        user_obj: user_detail,
+        first_name: user_id.to_string(),
+        last_name: user_id.to_string(),
+        email: user_id.to_string(),
     };
 
-    let org_response = OrganizationResponse { data: [obj] };
+    if is_admin_user(user_id).await {
+        id += 1;
+        orgs.push(OrganizationDetails {
+            id: id,
+            identifier: "default".to_string(),
+            name: "default".to_string(),
+            user_email: user_id.to_string(),
+            ingest_threshold: 9383939382,
+            search_threshold: 9383939382,
+            org_type: "default".to_string(),
+            user_obj: user_detail.clone(),
+        });
+
+        for user in USERS.iter() {
+            if !user
+                .key()
+                .contains(format!("{}", &CONFIG.auth.username).as_str())
+            {
+                id += 1;
+                orgs.push(OrganizationDetails {
+                    id: id,
+                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                    name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                    user_email: user_id.to_string(),
+                    ingest_threshold: 9383939382,
+                    search_threshold: 9383939382,
+                    org_type: "custom".to_string(),
+                    user_obj: user_detail.clone(),
+                });
+            }
+        }
+    } else {
+        for user in USERS.iter() {
+            if user.key().contains(format!("/{}", user_id).as_str()) {
+                id += 1;
+
+                orgs.push(OrganizationDetails {
+                    id: id,
+                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                    name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                    user_email: user_id.to_string(),
+                    ingest_threshold: 9383939382,
+                    search_threshold: 9383939382,
+                    org_type: "default".to_string(),
+                    user_obj: user_detail.clone(),
+                });
+            }
+        }
+    }
+
+    let org_response = OrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))
 }

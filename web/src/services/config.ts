@@ -16,7 +16,7 @@ import http from "./http";
 
 const zo_config = {
   get_config: () => {
-    return http().get(`/api/config`);
+    return http().get(`/config`);
   },
 
 };
