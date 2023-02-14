@@ -588,6 +588,10 @@ export default defineComponent({
 
     function getQueryData() {
       try {
+        if (searchObj.data.stream.selectedStream.value == "") {
+          return false;
+        }
+
         searchObj.data.errorMsg = "";
         if (searchObj.data.resultGrid.currentPage == 0) {
           // searchObj.data.stream.selectedFields = [];
@@ -634,13 +638,6 @@ export default defineComponent({
             //update grid columns
             updateGridColumns();
             dismiss();
-          })
-          .catch((e) => {
-            dismiss();
-            if (typeof e == "object" && e.response && e.response.data)
-              searchObj.data.additionalErrorMsg = e.response.data.error;
-
-            throw new ErrorException("Request failed.");
           });
       } catch (e) {
         throw new ErrorException("Request failed.");
