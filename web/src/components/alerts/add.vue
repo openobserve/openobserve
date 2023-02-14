@@ -1,3 +1,18 @@
+<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
 <template>
   <div class="q-mx-md q-my-md">
     <div class="row items-center no-wrap">
@@ -12,92 +27,235 @@
     <q-separator />
     <div>
       <q-form ref="addAlertForm" @submit="onSubmit">
-        <q-input v-model="formData.name" :label="t('alerts.name')" color="input-border" bg-color="input-bg"
-          class="q-py-sm showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
+        <q-input
+          v-model="formData.name"
+          :label="t('alerts.name')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          :rules="[(val: any) => !!val || 'Field is required!']"
+          tabindex="0"
+        />
 
-        <q-select v-model="formData.stream_name" :options="indexOptions" :label="t('alerts.stream_name')"
-          color="input-border" bg-color="input-bg" class="q-py-sm showLabelOnTop" stack-label outlined filled dense
+        <q-select
+          v-model="formData.stream_name"
+          :options="indexOptions"
+          :label="t('alerts.stream_name')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
           @update:model-value="updateAlert(formData.stream_name)"
-          :rules="[(val: any) => !!val || 'Field is required!']" />
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
 
         <div class="q-gutter-sm">
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.isScheduled" :checked=formData.isScheduled val=true :label="t('alerts.scheduled')" />
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.isScheduled"  :checked=!formData.isScheduled val=false :label="t('alerts.realTime')" />
-        </div>  
-        
-          <!--<q-toggle v-model="formData.isScheduled" :label="t('alerts.isScheduled')" color="input-border" bg-color="input-bg"
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.isScheduled"
+            :checked="formData.isScheduled"
+            val="true"
+            :label="t('alerts.scheduled')"
+          />
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.isScheduled"
+            :checked="!formData.isScheduled"
+            val="false"
+            :label="t('alerts.realTime')"
+          />
+        </div>
+
+        <!--<q-toggle v-model="formData.isScheduled" :label="t('alerts.isScheduled')" color="input-border" bg-color="input-bg"
           class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
 
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="q-py-sm showLabelOnTop text-bold text-h7"
+        >
+          {{ t("alerts.sql") }}:
+        </div>
+        <div
+          v-if="formData.isScheduled === 'true'"
+          ref="editorRef"
+          id="editor"
+          :label="t('alerts.sql')"
+          stack-label
+          style="border: 1px solid #dbdbdb; border-radius: 5px"
+          @keyup="editorUpdate"
+          @Focusout="updateCondtions"
+          class="q-py-sm showLabelOnTop"
+          resize
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        ></div>
 
-
-        <div v-if="formData.isScheduled ==='true' " class="q-py-sm showLabelOnTop text-bold text-h7">{{ t('alerts.sql') }}:</div>
-        <div v-if="formData.isScheduled === 'true' " ref="editorRef" id="editor" :label="t('alerts.sql')" stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px" @keyup="editorUpdate" @Focusout="updateCondtions"
-          class="q-py-sm showLabelOnTop" resize :rules="[(val: any) => !!val || 'Field is required!']"></div>
-
-
-        <div class="q-py-sm showLabelOnTop text-bold text-h7">{{ t('alerts.condition') }}:</div>
+        <div class="q-py-sm showLabelOnTop text-bold text-h7">
+          {{ t("alerts.condition") }}:
+        </div>
         <div class="col-8 row justify-left align-center q-gutter-sm">
           <div class="" style="minwidth: 100px">
-            <q-select v-model="formData.condition.column" :options="triggerCols" dense filled
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
+            <q-select
+              v-model="formData.condition.column"
+              :options="triggerCols"
+              dense
+              filled
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-select>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select v-model="formData.condition.operator" :options="triggerOperators" dense filled
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
+            <q-select
+              v-model="formData.condition.operator"
+              :options="triggerOperators"
+              dense
+              filled
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-select>
           </div>
           <div class="" style="width: 80px">
-            <q-input v-model="formData.condition.value" dense filled
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
-          </div>
-
-        </div>
-
-        <div v-if="formData.isScheduled ==='true' " class="q-py-sm showLabelOnTop text-bold text-h7">{{ t('alerts.duration') }}:</div>
-        <div v-if="formData.isScheduled ==='true' " class="col-8 row justify-left align-center q-gutter-sm">
-          <div class="" style="width: 80px">
-            <q-input v-model="formData.duration.value" type="number" dense filled min="0"
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
-          </div>
-          <div class="" style="minwidth: 100px">
-            <q-select v-model="formData.duration.unit" :options="relativePeriods" dense filled
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
-          </div>
-        </div>
-
-        <div v-if="formData.isScheduled ==='true' " class="q-py-sm showLabelOnTop text-bold text-h7">{{ t('alerts.interval') }}:</div>
-        <div v-if="formData.isScheduled ==='true' " class="col-8 row justify-left align-center q-gutter-sm">
-          <div class="" style="width: 80px">
-            <q-input v-model="formData.frequency.value" type="number" dense filled min="0"
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
-          </div>
-          <div class="" style="minwidth: 100px">
-            <q-select v-model="formData.frequency.unit" :options="relativePeriods" dense filled
-              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
+            <q-input
+              v-model="formData.condition.value"
+              dense
+              filled
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-input>
           </div>
         </div>
 
-        <div v-if="formData.isScheduled ==='true' " class="q-py-sm showLabelOnTop text-bold text-h7">{{ t('alerts.delayNotificationUntil') }}:</div>
-        <div v-if="formData.isScheduled ==='true' " class="col-8 row justify-left align-center q-gutter-sm">
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="q-py-sm showLabelOnTop text-bold text-h7"
+        >
+          {{ t("alerts.duration") }}:
+        </div>
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="col-8 row justify-left align-center q-gutter-sm"
+        >
           <div class="" style="width: 80px">
-            <q-input v-model="formData.time_between_alerts.value" type="number" dense filled min="0"></q-input>
+            <q-input
+              v-model="formData.duration.value"
+              type="number"
+              dense
+              filled
+              min="0"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-input>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select v-model="formData.time_between_alerts.unit" :options="relativePeriods" dense filled></q-select>
+            <q-select
+              v-model="formData.duration.unit"
+              :options="relativePeriods"
+              dense
+              filled
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-select>
           </div>
         </div>
 
-        <q-input v-model="formData.destination" :label="t('alerts.destination')" color="input-border"
-          bg-color="input-bg" class="q-py-sm showLabelOnTop" stack-label outlined filled dense
-          :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="q-py-sm showLabelOnTop text-bold text-h7"
+        >
+          {{ t("alerts.interval") }}:
+        </div>
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="col-8 row justify-left align-center q-gutter-sm"
+        >
+          <div class="" style="width: 80px">
+            <q-input
+              v-model="formData.frequency.value"
+              type="number"
+              dense
+              filled
+              min="0"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-input>
+          </div>
+          <div class="" style="minwidth: 100px">
+            <q-select
+              v-model="formData.frequency.unit"
+              :options="relativePeriods"
+              dense
+              filled
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            ></q-select>
+          </div>
+        </div>
 
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="q-py-sm showLabelOnTop text-bold text-h7"
+        >
+          {{ t("alerts.delayNotificationUntil") }}:
+        </div>
+        <div
+          v-if="formData.isScheduled === 'true'"
+          class="col-8 row justify-left align-center q-gutter-sm"
+        >
+          <div class="" style="width: 80px">
+            <q-input
+              v-model="formData.time_between_alerts.value"
+              type="number"
+              dense
+              filled
+              min="0"
+            ></q-input>
+          </div>
+          <div class="" style="minwidth: 100px">
+            <q-select
+              v-model="formData.time_between_alerts.unit"
+              :options="relativePeriods"
+              dense
+              filled
+            ></q-select>
+          </div>
+        </div>
+
+        <q-input
+          v-model="formData.destination"
+          :label="t('alerts.destination')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+          tabindex="0"
+        />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('alerts.cancel')" text-color="light-text"
-            padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
-          <q-btn :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-            type="submit" no-caps />
+          <q-btn
+            v-close-popup
+            class="q-mb-md text-bold no-border"
+            :label="t('alerts.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            :label="t('alerts.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </div>
@@ -124,19 +282,19 @@ const defaultValue: any = () => {
     condition: {
       column: "",
       operator: "",
-      value: ""
+      value: "",
     },
     duration: {
       value: 0,
-      unit: ""
+      unit: "",
     },
     frequency: {
       value: 0,
-      unit: ""
+      unit: "",
     },
     time_between_alerts: {
       value: 0,
-      unit: ""
+      unit: "",
     },
     destination: "",
   };
@@ -176,24 +334,33 @@ export default defineComponent({
     const selectedRelativePeriod = ref("Minutes");
     const relativePeriods: any = ref(["Minutes"]);
     var triggerCols: any = ref([]);
-    var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains",]);
+    var triggerOperators: any = ref([
+      "=",
+      "!=",
+      ">=",
+      "<=",
+      ">",
+      "<",
+      "Contains",
+      "NotContains",
+    ]);
 
     const editorUpdate = (e: any) => {
       formData.sql = e.target.value;
     };
 
     const updateCondtions = (e: any) => {
-      const ast = parser.astify(e.target.value)
+      const ast = parser.astify(e.target.value);
       sqlAST = ast;
       sqlAST.columns.forEach(function (item: any, index: any) {
         let val;
-        if (item['as'] === undefined || item['as'] === null) {
-          val = item['expr']['column']
+        if (item["as"] === undefined || item["as"] === null) {
+          val = item["expr"]["column"];
         } else {
-          val = item['as']
+          val = item["as"];
         }
         if (!triggerCols.value.includes(val)) {
-          triggerCols.value.push(val)
+          triggerCols.value.push(val);
         }
       });
     };
@@ -260,9 +427,11 @@ export default defineComponent({
       const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
       editorobj.setValue(someCode);
       formData.value.sql = editorobj.getValue();
-      const selected_stream: any = schemaList.value.filter(stream => stream["name"] === stream_name);
+      const selected_stream: any = schemaList.value.filter(
+        (stream) => stream["name"] === stream_name
+      );
       selected_stream[0].schema.forEach(function (item: any, index: any) {
-        triggerCols.value.push(item.name)
+        triggerCols.value.push(item.name);
       });
     };
 
@@ -290,7 +459,7 @@ export default defineComponent({
       triggerCols,
       triggerOperators,
       sqlAST,
-      schemaList
+      schemaList,
     };
   },
 
@@ -349,31 +518,38 @@ export default defineComponent({
         }
 
         let submitData = {};
-        if (this.formData.isScheduled === "false" || !this.formData.isScheduled) {
+        if (
+          this.formData.isScheduled === "false" ||
+          !this.formData.isScheduled
+        ) {
           submitData = {
             name: this.formData.name,
             stream_name: this.formData.stream_name,
             condition: this.formData.condition,
             duration: Number(this.formData.duration.value),
             frequency: Number(this.formData.frequency.value),
-            time_between_alerts: Number(this.formData.time_between_alerts.value),
-            destination: this.formData.destination
+            time_between_alerts: Number(
+              this.formData.time_between_alerts.value
+            ),
+            destination: this.formData.destination,
           };
         } else {
           submitData = {
             name: this.formData.name,
             query: {
-              "sql": this.formData.sql,
-              "from": 0,
-              "size": 100,
-              "sql_mode": "full"
+              sql: this.formData.sql,
+              from: 0,
+              size: 100,
+              sql_mode: "full",
             },
             stream_name: this.formData.stream_name,
             condition: this.formData.condition,
             duration: Number(this.formData.duration.value),
             frequency: Number(this.formData.frequency.value),
-            time_between_alerts: Number(this.formData.time_between_alerts.value),
-            destination: this.formData.destination
+            time_between_alerts: Number(
+              this.formData.time_between_alerts.value
+            ),
+            destination: this.formData.destination,
           };
         }
 
