@@ -23,6 +23,10 @@ use crate::meta::organization::PasscodeResponse;
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
 
+const DEFAULT: &str = "default";
+const CUSTOM: &str = "custom";
+const THRESHOLD: i64 = 9383939382;
+
 #[derive(Serialize, Clone)]
 struct Organization {
     identifier: String,
@@ -44,7 +48,9 @@ struct OrganizationDetails {
     user_email: String,
     ingest_threshold: i64,
     search_threshold: i64,
+    #[serde(rename = "type")]
     org_type: String,
+    #[serde(rename = "UserObj")]
     user_obj: User,
 }
 
@@ -61,8 +67,8 @@ pub async fn organizarions_by_username(
     let user_name = user_name.to_string();
     if is_admin_user(&user_name).await {
         let obj = Organization {
-            identifier: "default".to_string(),
-            label: "default".to_string(),
+            identifier: DEFAULT.to_string(),
+            label: DEFAULT.to_string(),
         };
 
         for user in USERS.iter() {
@@ -80,7 +86,7 @@ pub async fn organizarions_by_username(
         orgs.push(obj);
     } else {
         for user in USERS.iter() {
-            if user.key().contains(format!("/{}", user_name).as_str()) {
+            if user.key().ends_with(format!("/{}", user_name).as_str()) {
                 orgs.push(Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -109,19 +115,19 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         id += 1;
         orgs.push(OrganizationDetails {
             id: id,
-            identifier: "default".to_string(),
-            name: "default".to_string(),
+            identifier: DEFAULT.to_string(),
+            name: DEFAULT.to_string(),
             user_email: user_id.to_string(),
-            ingest_threshold: 9383939382,
-            search_threshold: 9383939382,
-            org_type: "default".to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: DEFAULT.to_string(),
             user_obj: user_detail.clone(),
         });
 
         for user in USERS.iter() {
             if !user
                 .key()
-                .contains(format!("{}", &CONFIG.auth.username).as_str())
+                .ends_with(format!("{}", &CONFIG.auth.username).as_str())
             {
                 id += 1;
                 orgs.push(OrganizationDetails {
@@ -129,16 +135,16 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     user_email: user_id.to_string(),
-                    ingest_threshold: 9383939382,
-                    search_threshold: 9383939382,
-                    org_type: "custom".to_string(),
+                    ingest_threshold: THRESHOLD,
+                    search_threshold: THRESHOLD,
+                    org_type: CUSTOM.to_string(),
                     user_obj: user_detail.clone(),
                 });
             }
         }
     } else {
         for user in USERS.iter() {
-            if user.key().contains(format!("/{}", user_id).as_str()) {
+            if user.key().ends_with(format!("/{}", user_id).as_str()) {
                 id += 1;
 
                 orgs.push(OrganizationDetails {
@@ -146,9 +152,9 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     user_email: user_id.to_string(),
-                    ingest_threshold: 9383939382,
-                    search_threshold: 9383939382,
-                    org_type: "default".to_string(),
+                    ingest_threshold: THRESHOLD,
+                    search_threshold: THRESHOLD,
+                    org_type: DEFAULT.to_string(),
                     user_obj: user_detail.clone(),
                 });
             }
