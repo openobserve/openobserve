@@ -15,11 +15,12 @@
 
 <template>
   <q-item
-    v-if="display == true"
     v-ripple
-    :to="{ path: link, exact: false }"
+    :to="!external ? { path: link, exact: false } : ''"
     clickable
     :class="{ 'ql-item-mini': mini }"
+    :target="target"
+    @click="external ? openWebPage(link) : ''"
   >
     <q-tooltip
       v-if="mini"
@@ -70,10 +71,24 @@ export default defineComponent({
       default: false,
     },
 
-    display: {
-      type: Boolean,
-      default: true,
+    target: {
+      type: String,
+      default: "_self",
     },
+
+    external: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup() {
+    const openWebPage = (url: string) => {
+      window.open(url, "_blank");
+    };
+
+    return {
+      openWebPage,
+    };
   },
 });
 </script>

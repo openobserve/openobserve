@@ -42,7 +42,8 @@
     "metrics": "Metrikler",
     "slack": "Yardım",
     "dashboard": "Gösterge Tabloları",
-    "alerts": "Uyarılar"
+    "alerts": "Uyarılar",
+    "docs": "Dokümanlar"
   },
   "about": {
     "name": "Çinko",
