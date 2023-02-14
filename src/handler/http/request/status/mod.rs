@@ -40,7 +40,7 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     }))
 }
 
-#[get("/config")]
+#[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),

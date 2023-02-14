@@ -24,54 +24,28 @@
           <q-card>
             <q-card-section class="bg-white">
               <q-form class="q-gutter-md" @submit.prevent="">
-                <q-input
-                  v-model="name"
-                  data-cy="login-user-id"
-                  label="User Name"
-                  @blur="getOrganizations"
-                >
+                <q-input v-model="name" data-cy="login-user-id" label="User Name" @blur="getOrganizations">
                   <template #prepend>
                     <q-icon name="perm_identity" />
                   </template>
                 </q-input>
 
-                <q-input
-                  v-model="password"
-                  data-cy="login-password"
-                  type="password"
-                  :label="t('login.password')"
-                >
+                <q-input v-model="password" data-cy="login-password" type="password" :label="t('login.password')">
                   <template #prepend>
                     <q-icon name="lock" />
                   </template>
                 </q-input>
 
-                <q-select
-                  v-model="org_identifier"
-                  :options="organizations"
-                  label="Select Organization"
-                  :display-value="`${
-                    org_identifier ? org_identifier.label : '-- Select --'
-                  }`"
-                >
+                <q-select v-model="org_identifier" :options="organizations" label="Select Organization" :display-value="`${org_identifier ? org_identifier.label : '-- Select --'
+                }`">
                   <template #prepend>
                     <q-icon name="corporate_fare" />
                   </template>
                 </q-select>
 
                 <q-card-actions class="q-px-lg q-mt-md q-mb-xl">
-                  <q-btn
-                    data-cy="login-sign-in"
-                    unelevated
-                    size="lg"
-                    class="full-width"
-                    color="primary"
-                    type="submit"
-                    :label="t('login.signIn')"
-                    :loading="submitting"
-                    no-caps
-                    @click="onSignIn()"
-                  />
+                  <q-btn data-cy="login-sign-in" unelevated size="lg" class="full-width" color="primary" type="submit"
+                    :label="t('login.signIn')" :loading="submitting" no-caps @click="onSignIn()" />
                 </q-card-actions>
               </q-form>
             </q-card-section>
@@ -162,15 +136,16 @@ export default defineComponent({
 
               const organizations = await getDefaultOrganization(
                 userInfo,
-                org_identifier.value
+                org_identifier.value.identifier
               );
               store.dispatch("setOrganizations", organizations);
-
-              const selectedOrgs = useLocalOrganization();
+              
+              const selectedOrgs = useLocalOrganization(org_identifier.value);
               store.dispatch("setSelectedOrganization", selectedOrgs);
 
               const redirectURI = window.sessionStorage.getItem("redirectURI");
               window.sessionStorage.removeItem("redirectURI");
+
               redirectUser(redirectURI);
             } else {
               $q.notify(res.data.message);
