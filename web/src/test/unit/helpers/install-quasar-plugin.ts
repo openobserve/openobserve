@@ -13,7 +13,7 @@
 //  limitations under the License. 
 
 import { config } from "@vue/test-utils";
-import { cloneDeep } from "lodash-es";
+import cloneDeep from "lodash-es/cloneDeep";
 import { Quasar } from "quasar";
 import { qLayoutInjections } from "./layout-injections";
 import { beforeAll, afterAll } from "vitest";

@@ -64,9 +64,16 @@ export default defineConfig({
   },
   build: {
     target: "es2020",
-    sourcemap: true,
     rollupOptions: {
       plugins: [nodePolyfills()],
+      output: {
+          sourcemap: true,
+          manualChunks: (id) => {
+           if (id.includes('node_modules')) {
+              return 'vendor';
+            }
+          },
+        },
     },
     outDir: path.resolve(__dirname, "dist"),
   },
