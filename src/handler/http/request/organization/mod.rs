@@ -74,7 +74,7 @@ pub async fn organizarions_by_username(
         for user in USERS.iter() {
             if !user
                 .key()
-                .contains(format!("{}", &CONFIG.auth.username).as_str())
+                .ends_with(format!("{}", &CONFIG.auth.username).as_str())
             {
                 orgs.push(Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
