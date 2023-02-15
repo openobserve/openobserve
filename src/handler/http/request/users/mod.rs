@@ -130,17 +130,17 @@ pub async fn update(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_name" = String, Path, description = "User name"),
+        ("email_id" = String, Path, description = "User name"),
       ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/users/{user_name}")]
+#[delete("/{org_id}/users/{email_id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    users::delete_user(&org_id, &name).await
+    let (org_id, email_id) = path.into_inner();
+    users::delete_user(&org_id, &email_id).await
 }
 
 #[post("/{org_id}/authentication")]

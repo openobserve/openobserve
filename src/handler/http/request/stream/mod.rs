@@ -23,7 +23,7 @@ use crate::service::stream;
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Stream",
+    tag = "Streams",
     operation_id = "StreamSchema",
     security(
         ("Authorization"= [])
@@ -74,7 +74,7 @@ async fn schema(
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Stream",
+    tag = "Streams",
     operation_id = "StreamSettings",
     security(
         ("Authorization"= [])
@@ -133,7 +133,7 @@ async fn settings(
 
 #[utoipa::path(
     context_path = "/api",
-    tag = "Stream",
+    tag = "Streams",
     operation_id = "StreamList",
     security(
         ("Authorization"= [])
