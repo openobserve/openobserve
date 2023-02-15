@@ -73,6 +73,17 @@ pub fn flush_all() {
             file.sync();
         }
     }
+
+    for (file, data) in FILES.read().unwrap().iter() {
+        let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open(file_path)
+            .unwrap();
+        f.write_all(data).unwrap();
+    }
 }
 
 impl Default for Locker {
