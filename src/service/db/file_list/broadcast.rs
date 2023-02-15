@@ -61,8 +61,8 @@ async fn send_to_node(
         if cluster::ge_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
-        let user = USERS.get(&CONFIG.auth.username).unwrap();
-        let credentials = Credentials::new(&CONFIG.auth.username, &user.password);
+        let user = USERS.get(&CONFIG.auth.useremail).unwrap();
+        let credentials = Credentials::new(&CONFIG.auth.useremail, &user.password);
         let credentials = credentials.as_http_header();
         let token: MetadataValue<_> = credentials.parse()?;
         let channel = Channel::from_shared(node.grpc_addr)

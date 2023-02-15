@@ -17,12 +17,19 @@ use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct User {
-    pub name: String,
+    pub email: String,
+    #[serde(default)]
+    #[serde(rename = "firstName")]
+    pub first_name: String,
+    #[serde(default)]
+    #[serde(rename = "lastName")]
+    pub last_name: String,
     pub password: String,
     pub role: UserRole,
     #[serde(default)]
     pub salt: String,
     #[serde(default)]
+    #[serde(rename = "ingestionToken")]
     pub ingestion_token: String,
 }
 
@@ -36,7 +43,7 @@ pub struct SignInUser {
 pub enum UserRole {
     #[serde(rename = "admin")]
     Admin,
-    #[serde(rename = "user")]
+    #[serde(rename = "member")]
     User,
     #[serde(rename = "root")]
     Root,
@@ -44,11 +51,17 @@ pub enum UserRole {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
-    pub name: String,
+    pub email: String,
+    #[serde(default)]
+    #[serde(rename = "firstName")]
+    pub first_name: String,
+    #[serde(default)]
+    #[serde(rename = "lastName")]
+    pub last_name: String,
     pub role: UserRole,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserList {
-    pub list: Vec<UserResponse>,
+    pub data: Vec<UserResponse>,
 }

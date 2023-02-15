@@ -17,15 +17,8 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table
-      ref="qTable"
-      :rows="orgMembers"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-    >
+    <q-table ref="qTable" :rows="orgMembers" :columns="columns" row-key="id" :pagination="pagination"
+      :filter="filterQuery" :filter-method="filterData">
       <!-- 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props">
@@ -47,20 +40,11 @@
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
-        <q-td
-          :props="props"
-          v-if="currentUserRole == 'admin' && !props.row.isLoggedinUser"
-        >
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            style="width: 70px"
+        <q-td :props="props" v-if="currentUserRole == 'admin' && !props.row.isLoggedinUser">
+          <q-select dense borderless v-model="props.row.role" :options="options" style="width: 70px"
             @update:model-value="
               updateUserRole(props.row.role, props.row.org_member_id)
-            "
-          />
+            " />
         </q-td>
         <q-td :props="props" v-else>
           {{ props.row.role }}
@@ -68,63 +52,31 @@
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.email != store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="updateUser(props)"
-          />
+          <<<<<<< HEAD <q-btn v-if="props.row.email != store.state.userInfo.email"
+            icon="img:/src/assets/images/common/view_icon.svg" :title="t('user.update')" class="iconHoverBtn"
+            padding="sm" unelevated size="sm" round flat @click="updateUser(props)" />
 
-          <q-btn
-            v-if="props.row.email == store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addUser(props, false)"
-          />
-          <q-btn
-            :title="t('user.updatenotallowed')"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            flat
-            size="sm"
-            disable
-            v-else
-          />
-          <q-btn
-            v-if="props.row.email == `false_condition_to_hide_delete_button`"
-            icon="img:/src/assets/images/common/delete_icon.svg"
-            :title="t('user.delete')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="deleteUser(props)"
-          />
-          <q-btn
-            v-if="props.row.isLoggedinUser"
-            icon="img:/src/assets/images/common/update_icon.svg"
-            :title="t('user.update')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addUser(props, true)"
-          />
+          <q-btn v-if="props.row.email == store.state.userInfo.email" icon="img:/src/assets/images/common/view_icon.svg"
+            :title="t('user.update')" class="iconHoverBtn" padding="sm" unelevated size="sm" round flat
+            @click="addUser(props, false)" />
+          <q-btn :title="t('user.updatenotallowed')" icon="img:/src/assets/images/common/view_icon.svg" flat size="sm"
+            disable v-else />
+          <q-btn v-if="props.row.email == `false_condition_to_hide_delete_button`"
+            icon="img:/src/assets/images/common/delete_icon.svg" :title="t('user.delete')" class="q-ml-xs iconHoverBtn"
+            padding="sm" unelevated size="sm" round flat @click="deleteUser(props)" />
+          <q-btn v-if="props.row.isLoggedinUser" icon="img:/src/assets/images/common/update_icon.svg"
+            :title="t('user.update')" class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
+            @click="addUser(props, true)" />
+          =======
+          <q-btn v-if="props.row.email != store.state.userInfo.email" icon="img:/src/assets/images/common/view_icon.svg"
+            :title="t('user.update')" class="iconHoverBtn" padding="sm" unelevated size="sm" round flat
+            @click="updateUser(props)" />
+          <q-btn :title="t('user.updatenotallowed')" icon="img:/src/assets/images/common/view_icon.svg" flat size="sm"
+            disable v-else />
+          <q-btn v-if="props.row.email == `false_condition_to_hide_delete_button`"
+            icon="img:/src/assets/images/common/delete_icon.svg" :title="t('user.delete')" class="q-ml-xs iconHoverBtn"
+            padding="sm" unelevated size="sm" round flat @click="deleteUser(props)" />
+          >>>>>>> 56f1bfa (user management fixes)
         </q-td>
       </template>
       <template #top="scope">
@@ -132,113 +84,55 @@
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
-          <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6 q-pr-sm"
-            :placeholder="t('user.search')"
-          >
+          <q-input v-model="filterQuery" filled dense class="col-6 q-pr-sm" :placeholder="t('user.search')">
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
 
-          <div
-            class="col-5 q-pr-sm"
-            v-if="
-              currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
-            "
-          >
+          <div class="col-5 q-pr-sm" v-if="
+            currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
+          ">
             <div class="row invite-user">
-              <q-input
-                v-model="userEmail"
-                class="col-9 q-pl-md"
-                borderless
-                dense
-                :placeholder="t('user.inviteByEmail')"
-              >
+              <q-input v-model="userEmail" class="col-9 q-pl-md" borderless dense
+                :placeholder="t('user.inviteByEmail')">
               </q-input>
               <q-separator vertical class="col-1 q-mx-md separator" />
               <div class="col-2 flex justify-center">
-                <q-select
-                  dense
-                  borderless
-                  v-model="selectedRole"
-                  :options="options"
-                  style="width: 70px"
-                />
+                <q-select dense borderless v-model="selectedRole" :options="options" style="width: 70px" />
               </div>
             </div>
             <label class="inputHint">{{ t("user.inviteByEmailHint") }}</label>
-            <q-btn
-              v-if="currentUserRole == 'admin'"
-              class="col-1 text-bold no-border"
-              padding="sm 0"
-              color="secondary"
-              no-caps
-              :label="t(`user.sendInvite`)"
-              @click="inviteUser()"
-              :disable="userEmail == ''"
-            />
+            <q-btn v-if="currentUserRole == 'admin'" class="col-1 text-bold no-border" padding="sm 0" color="secondary"
+              no-caps :label="t(`user.sendInvite`)" @click="inviteUser()" :disable="userEmail == ''" />
           </div>
 
-          <div v-else class="col-6">
-            <q-btn
-              class="q-ml-md q-mb-xs text-bold no-border"
-              style="float: right; cursor: pointer !important"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              icon="add"
-              dense
-              :label="t(`user.add`)"
-              @click="addUser({}, false)"
-            />
-          </div>
+          <<<<<<< HEAD <div v-else class="col-6">
+            <q-btn class="q-ml-md q-mb-xs text-bold no-border" style="float: right; cursor: pointer !important"
+              padding="sm lg" color="secondary" no-caps icon="add" dense :label="t(`user.add`)"
+              @click="addUser({}, false)" />
+        </div>
+        =======
+        <q-btn v-if="currentUserRole == 'admin'" class="col-1 text-bold no-border" padding="sm 0" color="secondary"
+          no-caps :label="t(`user.sendInvite`)" @click="inviteUser()" :disable="userEmail == ''" />
+        >>>>>>> 56f1bfa (user management fixes)
         </div>
 
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('user.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :pageTitle="t('user.header')" :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions" position="top" @update:changeRecordPerPage="changePagination" />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="bottom"
+          @update:changeRecordPerPage="changePagination" />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
+    <q-dialog v-model="showUpdateUserDialog" position="right" full-height maximized>
       <update-user-role v-model="selectedUser" @updated="updateMember" />
     </q-dialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-user
-        style="width: 35vw"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        @updated="addMember"
-      />
+    <q-dialog v-model="showAddUserDialog" position="right" full-height maximized>
+      <add-user style="width: 35vw" v-model="selectedUser" :isUpdated="isUpdated" @updated="addMember" />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -252,13 +146,7 @@
           <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-          >
+          <q-btn v-close-popup unelevated no-caps class="no-border" color="primary">
             {{ t("user.ok") }}
           </q-btn>
         </q-card-actions>
@@ -273,14 +161,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
 import { useI18n } from "vue-i18n";
-
+import config from "../aws-exports";
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import usersService from "../services/users";
 import UpdateUserRole from "../components/users/UpdateRole.vue"
 import AddUser from "../components/users/add.vue"
 import NoData from "../components/shared/grid/NoData.vue";
 import { validateEmail } from "../utils/zincutils";
-import config from "../aws-exports";
 import organizationsService from "../services/organizations";
 
 export default defineComponent({
@@ -355,50 +242,50 @@ export default defineComponent({
     const selectedRole = ref(options[0]);
     const currentUserRole = ref('')
 
-    const getOrgMembers = (orgId: string) => {
-      if (orgId != "") {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading users...",
+    const getOrgMembers = () => {
+
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading users...",
+      });
+
+      usersService.orgUsers(0, 1000, "email", false, "", store.state.selectedOrganization.identifier).then((res) => {
+        resultTotal.value = res.data.data.length;
+        columns.value = columns.value.filter((v: any) => v.name !== "actions");
+        let counter = 1;
+        orgMembers.value = res.data.data.map((data: any) => {
+          if (store.state.userInfo.email == data.email) {
+            currentUserRole.value = data.role
+          }
+          if (store.state.userInfo.email == data.email && data.role == "admin") {
+            columns.value.push({
+              name: "actions",
+              field: "actions",
+              label: t("user.actions"),
+              align: "center",
+            });
+
+          }
+          return {
+            "#": counter <= 9 ? `0${counter++}` : counter++,
+            email: data.email,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            role: data.role,
+            member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
+            member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
+            org_member_id: data.org_member_id,
+            isLoggedinUser: store.state.userInfo.email == data.email
+          };
         });
 
-        usersService.orgUsers(0, 1000, "email", false, "", store.state.selectedOrganization.identifier).then((res) => {
-          resultTotal.value = res.data.data.length;
-          columns.value = columns.value.filter((v: any) => v.name !== "actions");
-          let counter = 1;
-          orgMembers.value = res.data.data.map((data: any) => {
-            if (store.state.userInfo.email == data.email) {
-              currentUserRole.value = data.role
-            }
-            if (store.state.userInfo.email == data.email && data.role == "admin") {
-              columns.value.push({
-                name: "actions",
-                field: "actions",
-                label: t("user.actions"),
-                align: "center",
-              });
+        dismiss();
+      });
 
-            }
-            return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: data.email,
-              first_name: data.first_name,
-              last_name: data.last_name,
-              role: data.role,
-              member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
-              member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
-              org_member_id: data.org_member_id,
-              isLoggedinUser: store.state.userInfo.email == data.email
-            };
-          });
-
-          dismiss();
-        });
-      }
     };
 
     if (orgMembers.value.length == 0) {
-      getOrgMembers(store.state.selectedOrganization.identifier);
+      getOrgMembers();
     }
 
     interface OptionType {
@@ -435,11 +322,11 @@ export default defineComponent({
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       if (props.row != undefined) {
-        selectedUser.value = props.row;  
+        selectedUser.value = props.row;
       } else {
         selectedUser.value = {};
       }
-      
+
       showAddUserDialog.value = true;
     }
 
@@ -473,10 +360,10 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
-    const inviteUser = () => {      
+    const inviteUser = () => {
       const emailArray = userEmail.value.split(';').filter((email: any) => email).map((email: any) => email.trim())
       const validationArray = emailArray.map((email: any) => validateEmail(email))
-      
+
       if (!validationArray.includes(false)) {
         const dismiss = $q.notify({
           spinner: true,
@@ -512,10 +399,10 @@ export default defineComponent({
           }).catch(error => {
             dismiss();
             $q.notify({
-                type: "negative",
-                message: error.message,
-                timeout: 5000,
-              });
+              type: "negative",
+              message: error.message,
+              timeout: 5000,
+            });
           })
 
         userEmail.value = "";
@@ -617,7 +504,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.orgData = newVal;
       if ((newVal != oldVal || this.orgMembers.value == undefined) && this.router.currentRoute.value.name == "users") {
-        this.getOrgMembers(this.store.state.selectedOrganization.identifier);
+        this.getOrgMembers();
       }
     }
   }
@@ -643,10 +530,12 @@ export default defineComponent({
     margin-bottom: 0.5rem;
     color: $dark-page;
   }
+
   .para {
     color: $light-text;
   }
 }
+
 .confirmActions {
   justify-content: center;
   padding: 1.25rem 1.375rem 1.625rem;

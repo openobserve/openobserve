@@ -72,7 +72,7 @@ pub async fn organizarions_by_username(
         };
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.username) {
+            if !user.key().ends_with(&CONFIG.auth.useremail) {
                 orgs.push(Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -122,7 +122,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         });
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.username) {
+            if !user.key().ends_with(&CONFIG.auth.useremail) {
                 id += 1;
                 orgs.push(OrganizationDetails {
                     id,
