@@ -30,15 +30,15 @@ use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
-use zinc_observe::handler::grpc::auth::check_auth;
-use zinc_observe::handler::grpc::cluster_rpc::event_server::EventServer;
-use zinc_observe::handler::grpc::cluster_rpc::search_server::SearchServer;
-use zinc_observe::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
-use zinc_observe::handler::http::router::{get_basic_routes, get_service_routes};
-use zinc_observe::infra::cluster;
-use zinc_observe::infra::config::CONFIG;
-use zinc_observe::meta::telemetry::Telemetry;
-use zinc_observe::service::router;
+use zincobserve::handler::grpc::auth::check_auth;
+use zincobserve::handler::grpc::cluster_rpc::event_server::EventServer;
+use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
+use zincobserve::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
+use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
+use zincobserve::infra::cluster;
+use zincobserve::infra::config::CONFIG;
+use zincobserve::meta::telemetry::Telemetry;
+use zincobserve::service::router;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -47,7 +47,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     if CONFIG.common.tracing_enabled {
-        let service_name = format!("zinc-observe/{}", CONFIG.common.instance_name);
+        let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
         let mut headers = HashMap::new();
         headers.insert(
@@ -84,7 +84,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cluster::register_and_keepalive()
             .await
             .unwrap_or_else(|e| panic!("cluster init failed: {}", e));
-        zinc_observe::job::init()
+        zincobserve::job::init()
             .await
             .unwrap_or_else(|e| panic!("job init failed: {}", e));
         tx.send(true).unwrap();
@@ -125,13 +125,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut labels = HashMap::new();
     labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
     labels.insert("role".to_string(), CONFIG.common.node_role.clone());
-    let prometheus = PrometheusMetricsBuilder::new("zinc_observe")
+    let prometheus = PrometheusMetricsBuilder::new("zincobserve")
         .endpoint("/metrics")
         .const_labels(labels)
         .build()
         .unwrap();
     let stats_opts =
-        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
+        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
     let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
     prometheus
         .registry

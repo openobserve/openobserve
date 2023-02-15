@@ -17,11 +17,11 @@
   <q-page class="aboutPage">
     <div class="about_head">
       <img
-        src="/src/assets/images/common/app_logo.png"
+        src="/src/assets/images/common/app_logo_zo.png"
         class="logo"
         width="177"
       />
-      <div class="para">The modern open source search engine.</div>
+      <div class="para">Observability simplified.</div>
     </div>
 
     <q-separator class="separator" />
