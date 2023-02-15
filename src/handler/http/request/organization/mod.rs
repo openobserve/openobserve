@@ -27,20 +27,20 @@ const DEFAULT: &str = "default";
 const CUSTOM: &str = "custom";
 const THRESHOLD: i64 = 9383939382;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq, Eq)]
 struct Organization {
     identifier: String,
     label: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq, Eq)]
 struct User {
     first_name: String,
     last_name: String,
     email: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Eq)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
@@ -52,6 +52,15 @@ struct OrganizationDetails {
     org_type: String,
     #[serde(rename = "UserObj")]
     user_obj: User,
+}
+
+impl PartialEq for OrganizationDetails {
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier.eq(&other.identifier)
+            && self.name.eq(&other.name)
+            && self.user_email.eq(&other.user_email)
+            && self.org_type.eq(&other.org_type)
+    }
 }
 
 #[derive(Serialize)]
@@ -73,10 +82,13 @@ pub async fn organizarions_by_username(
 
         for user in USERS.iter() {
             if !user.key().ends_with(&CONFIG.auth.useremail) {
-                orgs.push(Organization {
+                let org = Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                });
+                };
+                if !orgs.contains(&org) {
+                    orgs.push(org);
+                }
             }
         }
 
@@ -124,7 +136,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         for user in USERS.iter() {
             if !user.key().ends_with(&CONFIG.auth.useremail) {
                 id += 1;
-                orgs.push(OrganizationDetails {
+                let org = OrganizationDetails {
                     id,
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -133,7 +145,12 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
                     search_threshold: THRESHOLD,
                     org_type: CUSTOM.to_string(),
                     user_obj: user_detail.clone(),
-                });
+                };
+                if !orgs.contains(&org) {
+                    orgs.push(org)
+                } else {
+                    id -= 1;
+                }
             }
         }
     } else {

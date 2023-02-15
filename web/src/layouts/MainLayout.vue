@@ -23,7 +23,7 @@
 
         <q-toolbar-title></q-toolbar-title>
         <q-btn class="q-ml-xs text-bold no-border" size="13px" no-caps :label="t(`menu.openapi`)"
-          @click="navigateToOpenAPI()" />
+          @click="navigateToOpenAPI(zoBackendUrl)" />
         <q-btn class="q-ml-xs text-bold no-border" size="13px" no-caps :label="t(`menu.docs`)"
           @click="navigateToDocs()" />
         <div class="languageWrapper">
@@ -142,8 +142,8 @@ export default {
     navigateToDocs() {
       window.open("https://docs.zinc.dev", "_blank");
     },
-    navigateToOpenAPI() {
-      window.open("/swagger/index.html", "_blank");
+    navigateToOpenAPI(zoBackendUrl: string) {
+      window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
   },
   setup() {
@@ -154,7 +154,7 @@ export default {
     let quotaAlertClass = "warning";
     let user = store.state.userInfo;
     const languageFlag = ref("img:/src/assets/images/language_flags/en-gb.svg");
-
+    const zoBackendUrl = store.state.API_ENDPOINT
     var linksList = [
       {
         title: t("menu.home"),
@@ -389,6 +389,7 @@ export default {
       orgOptions,
       updateOrganization,
       selectedOrg,
+      zoBackendUrl
     };
   },
 };

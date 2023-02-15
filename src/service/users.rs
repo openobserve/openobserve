@@ -155,8 +155,8 @@ pub async fn list_user(org_id: &str) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
-pub async fn delete_user(org_id: &str, name: &str) -> Result<HttpResponse, Error> {
-    let result = db::user::delete(org_id, name).await;
+pub async fn delete_user(org_id: &str, email_id: &str) -> Result<HttpResponse, Error> {
+    let result = db::user::delete(org_id, email_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),

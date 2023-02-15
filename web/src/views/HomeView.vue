@@ -27,13 +27,8 @@
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'logstreams' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'logstreams' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -47,13 +42,8 @@
         </q-card-section>
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'functions' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'functions' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -67,13 +57,8 @@
         </q-card-section>
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'alerts' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'alerts' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -89,17 +74,14 @@
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn
-            no-caps
-            color="primary"
-            @click="() => $router.push('/ingestion/fluentbit')"
-            flat
-            >{{ t("home.findIngestion") }}
+          <q-btn no-caps color="primary" @click="() => $router.push('/ingestion/fluentbit')" flat>{{
+            t("home.findIngestion")
+          }}
           </q-btn>
         </q-card-actions>
       </q-card>
 
-      <q-card class="my-card">
+      <q-card v-if="isZincObserveCloud === 'true'" class="my-card">
         <q-card-section align="center" flat bordered class="my-card bg-grey-3">
           <div class="text-h6">{{ t("home.inestedInSearch") }}</div>
           <div class="text-subtitle1">{{ t("home.searchInDemoOrg") }}</div>
@@ -128,6 +110,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
+import config from "../aws-exports";
 export default defineComponent({
   name: "PageHome",
 
@@ -137,7 +120,7 @@ export default defineComponent({
     const summary: any = ref([]);
     const $q = useQuasar();
     const no_data_ingest = ref(false);
-
+    const isZincObserveCloud = config.isZincObserveCloud;
     const getSummary = (org_id: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -225,6 +208,7 @@ export default defineComponent({
       summary,
       no_data_ingest,
       getSummary,
+      isZincObserveCloud
     };
   },
   computed: {
