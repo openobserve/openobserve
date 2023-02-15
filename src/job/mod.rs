@@ -27,17 +27,19 @@ mod prom;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let res = db::user::get_root_user(&CONFIG.auth.username).await;
+    let res = db::user::get_root_user(&CONFIG.auth.useremail).await;
     if res.is_err() || res.unwrap().is_none() {
         let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let _ = users::post_user(
             DEFAULT_ORG,
             User {
-                name: CONFIG.auth.username.clone(),
+                email: CONFIG.auth.useremail.clone(),
                 password: CONFIG.auth.password.clone(),
                 role: crate::meta::user::UserRole::Root,
                 salt: String::new(),
                 ingestion_token: token,
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
             },
         )
         .await;

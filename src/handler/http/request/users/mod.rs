@@ -107,7 +107,7 @@ pub async fn authentication(
     {
         Ok(v) => {
             if v {
-                if user.name == CONFIG.auth.username {
+                if user.name == CONFIG.auth.useremail {
                     ret.insert("role", Value::String(format!("{:?}", &UserRole::Admin)));
                 } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
                     // println!("{:?}", format!("{:?}", user.role));

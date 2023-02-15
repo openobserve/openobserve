@@ -40,9 +40,9 @@ pub async fn set(org_id: &str, user: User) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
 
     let key = match user.role {
-        crate::meta::user::UserRole::Admin => format!("/user/{}/{}", org_id, user.name),
-        crate::meta::user::UserRole::User => format!("/user/{}/{}", org_id, user.name),
-        crate::meta::user::UserRole::Root => format!("/user/{}", user.name),
+        crate::meta::user::UserRole::Admin => format!("/user/{}/{}", org_id, user.email),
+        crate::meta::user::UserRole::User => format!("/user/{}/{}", org_id, user.email),
+        crate::meta::user::UserRole::Root => format!("/user/{}", user.email),
     };
     db.put(&key, json::to_vec(&user).unwrap().into()).await?;
     Ok(())

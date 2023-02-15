@@ -39,7 +39,7 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
     let user = db::user::get(org_id, user_id).await.unwrap().unwrap();
 
     IngestionPasscode {
-        user: user.name,
+        user: user.email,
         passcode: user.ingestion_token,
     }
 }
@@ -55,7 +55,7 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
     }
     let _ = db::user::set(loca_org_id, user.clone()).await;
     IngestionPasscode {
-        user: user.name,
+        user: user.email,
         passcode: user.ingestion_token,
     }
 }

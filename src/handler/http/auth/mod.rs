@@ -88,7 +88,7 @@ pub async fn validate_credentials(
 }
 
 pub async fn is_admin_user(user_id: &str) -> bool {
-    user_id.eq(&CONFIG.auth.username)
+    user_id.eq(&CONFIG.auth.useremail)
 }
 
 #[cfg(test)]
@@ -96,7 +96,8 @@ mod test_utils {
     use super::*;
     #[actix_web::test]
     async fn test_validate_credentials() {
-        let res = validate_credentials(&CONFIG.auth.username, &CONFIG.auth.password, "index").await;
+        let res =
+            validate_credentials(&CONFIG.auth.useremail, &CONFIG.auth.password, "index").await;
         assert_eq!(res.is_ok(), true)
     }
 }

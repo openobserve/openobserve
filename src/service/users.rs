@@ -38,7 +38,7 @@ pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Err
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let mut local_org = "";
-    let user_key = if name.eq(&CONFIG.auth.username) {
+    let user_key = if name.eq(&CONFIG.auth.useremail) {
         name.to_owned()
     } else {
         match org_id {
@@ -68,12 +68,14 @@ pub async fn list_user(org_id: &str) -> Result<HttpResponse, Error> {
     for user in USERS.iter() {
         if user.key().contains(org_id) {
             user_list.push(UserResponse {
-                name: user.value().name.clone(),
+                email: user.value().email.clone(),
                 role: user.value().role.clone(),
+                first_name: user.value().first_name.clone(),
+                last_name: user.value().last_name.clone(),
             })
         }
     }
-    Ok(HttpResponse::Ok().json(UserList { list: user_list }))
+    Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
 pub async fn delete_user(org_id: &str, name: &str) -> Result<HttpResponse, Error> {
