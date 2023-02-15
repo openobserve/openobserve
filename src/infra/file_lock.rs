@@ -272,8 +272,9 @@ impl RwFile {
         match self.use_cache {
             true => {
                 let file_path = format!("{}{}", self.dir, self.name);
+                let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
                 FILES.write().unwrap().insert(
-                    file_path,
+                    file_path.to_string(),
                     self.cache
                         .as_ref()
                         .unwrap()

@@ -17,7 +17,7 @@ use datafusion::arrow;
 use datafusion::arrow::json::reader::infer_json_schema;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use std::io::BufReader;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::utils::populate_file_meta;
@@ -53,10 +53,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
  * upload compressed files to storage & delete moved files from local
  */
 async fn move_files_to_storage() -> Result<(), anyhow::Error> {
-    let data_dir = Path::new(&CONFIG.common.data_wal_dir)
-        .canonicalize()
-        .unwrap();
-
     let files = file_lock::FILES.read().unwrap().clone();
 
     // use multiple threads to upload files
@@ -65,14 +61,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for (file, data) in files {
         let local_file = file.to_owned();
-        let local_path = Path::new(&file).canonicalize().unwrap();
-        let file_path = local_path
-            .strip_prefix(&data_dir)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .replace('\\', "/");
-        let columns = file_path.split('/').collect::<Vec<&str>>();
+        let columns = local_file.split('/').collect::<Vec<&str>>();
         if columns.len() != 5 {
             continue;
         }
@@ -100,7 +89,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     &stream_name,
                     stream_type,
                     &local_file,
-                    &data,
+                    data,
                     partition_key,
                 )
                 .await;
@@ -146,7 +135,7 @@ async fn upload_file(
     stream_name: &str,
     stream_type: StreamType,
     path_str: &str,
-    buf: &Bytes,
+    buf: Bytes,
     partition_key: String,
 ) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
     let file_size = buf.len() as u64;
