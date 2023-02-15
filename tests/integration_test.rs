@@ -24,9 +24,9 @@ mod tests {
     use std::sync::Once;
     use std::{env, fs};
     use std::{str, thread};
-    use zinc_observe::handler::http::router::{get_basic_routes, get_service_routes};
-    use zinc_observe::infra::config::CONFIG;
-    use zinc_observe::infra::db::default;
+    use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
+    use zincobserve::infra::config::CONFIG;
+    use zincobserve::infra::db::default;
 
     static START: Once = Once::new();
     pub mod prometheus_prot {
@@ -56,7 +56,7 @@ mod tests {
     }
     #[test]
     async fn e2e_test() {
-        let _ = zinc_observe::job::init().await;
+        let _ = zincobserve::job::init().await;
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;
@@ -102,7 +102,7 @@ mod tests {
         let body_str = fs::read_to_string(path).expect("Unable to read file");
         // metrics
         let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
+            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
         let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
         // app
         let thread_id: usize = 1;
@@ -131,7 +131,7 @@ mod tests {
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
         // metrics
         let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
+            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
         let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
         // app
         let thread_id: usize = 1;
@@ -160,7 +160,7 @@ mod tests {
         let body_str = "{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}";
         // metrics
         let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zinc_observe");
+            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
         let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
         // app
         let thread_id: usize = 1;

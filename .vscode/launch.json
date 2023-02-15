@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'zinc-observe'",
+            "name": "Debug unit tests in library 'zincobserve'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=zinc-observe"
+                    "--package=zincobserve"
                 ],
                 "filter": {
-                    "name": "zinc-observe",
+                    "name": "zincobserve",
                     "kind": "lib"
                 }
             },
@@ -26,15 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'zinc-observe'",
+            "name": "Debug executable 'zincobserve'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=zinc-observe",
-                    "--package=zinc-observe"
+                    "--bin=zincobserve",
+                    "--package=zincobserve"
                 ],
                 "filter": {
-                    "name": "zinc-observe",
+                    "name": "zincobserve",
                     "kind": "bin"
                 }
             },
@@ -44,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'zinc-observe'",
+            "name": "Debug unit tests in executable 'zincobserve'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=zinc-observe",
-                    "--package=zinc-observe"
+                    "--bin=zincobserve",
+                    "--package=zincobserve"
                 ],
                 "filter": {
-                    "name": "zinc-observe",
+                    "name": "zincobserve",
                     "kind": "bin"
                 }
             },

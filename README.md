@@ -1,9 +1,8 @@
-# zinc-observe
+# zincobserve
 
 🚀 10x easier, 🚀 10x cheaper, 🚀 petabyte scale - Elasticsearch alternative for 🚀 (logs, metrics, traces).
 
 [zinc.dev](https://zinc.dev/)
-
 
 ## Quick Start
 
@@ -13,7 +12,7 @@ ZO_USER_NAME="admin" ZO_USER_PASSWORD="Complexpass#123" cargo run
 
 ## Etcd client
 
-etcd-client which is used by zinc-observe needs protocol buffer compiler, please refer https://grpc.io/docs/protoc-installation/
+etcd-client which is used by zincobserve needs protocol buffer compiler, please refer https://grpc.io/docs/protoc-installation/
 
 For MacOS,using Homebrew
 
@@ -23,7 +22,7 @@ protoc --version
 
 ## Application structure
 
-User -> API Interface -> Protocol{http|grpc|job} -> Services{logs|metrics|traces|users} -> Infra{db|storage|config} -> meta | common{thirdparty|function utils} 
+User -> API Interface -> Protocol{http|grpc|job} -> Services{logs|metrics|traces|users} -> Infra{db|storage|config} -> meta | common{thirdparty|function utils}
 
 ## init
 
