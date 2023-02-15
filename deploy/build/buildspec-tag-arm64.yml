@@ -11,19 +11,19 @@ phases:
       - GIT_TAG="$(git describe --tags --abbrev=0)"
 
       # simd version
-      - docker build -t zinc-observe:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
-      - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64-simd
-      - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:latest-arm64-simd
+      - docker build -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
+      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve:$GIT_TAG-arm64-simd
+      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve:latest-arm64-simd
       
-      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64-simd
-      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-arm64-simd
+      - docker push public.ecr.aws/zinclabs/zincobserve:$GIT_TAG-arm64-simd
+      - docker push public.ecr.aws/zinclabs/zincobserve:latest-arm64-simd
 
       # common version
       # ARM version default enable NEON feature, so don't need build again
-      # - docker build -t zinc-observe:latest-arm64-simd -f deploy/build/Dockerfile.tag.aarch64 .
+      # - docker build -t zincobserve:latest-arm64-simd -f deploy/build/Dockerfile.tag.aarch64 .
       
-      - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64
-      - docker tag zinc-observe:latest-arm64 public.ecr.aws/zinclabs/zinc-observe:latest-arm64
+      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve:$GIT_TAG-arm64
+      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve:latest-arm64
       
-      - docker push public.ecr.aws/zinclabs/zinc-observe:$GIT_TAG-arm64
-      - docker push public.ecr.aws/zinclabs/zinc-observe:latest-arm64
+      - docker push public.ecr.aws/zinclabs/zincobserve:$GIT_TAG-arm64
+      - docker push public.ecr.aws/zinclabs/zincobserve:latest-arm64

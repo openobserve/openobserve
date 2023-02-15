@@ -17,7 +17,7 @@ import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
 export default createStore({
   state: {
-    API_ENDPOINT: import.meta.env.VITE_ZINC_OBSERVE_ENDPOINT,
+    API_ENDPOINT: import.meta.env.VITE_ZINCOBSERVE_ENDPOINT,
     userInfo: {},
     loggedIn: false,
     loadingState: true,

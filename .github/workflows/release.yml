@@ -14,27 +14,27 @@ jobs:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
             features: "--features tmpcache,zo_functions"
-            file_name: zinc-observe-${{ github.ref_name }}-linux-amd64
+            file_name: zincobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
             features: "--features tmpcache,zo_functions"
-            file_name: zinc-observe-${{ github.ref_name }}-linux-arm64
+            file_name: zincobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
             features: "--features tmpcache,zo_functions"
-            file_name: zinc-observe-${{ github.ref_name }}-darwin-amd64
+            file_name: zincobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
             features: "--features tmpcache"
-            file_name: zinc-observe-${{ github.ref_name }}-darwin-arm64
+            file_name: zincobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-latest-8-cores
             features: "--features zo_functions"
-            file_name: zinc-observe-${{ github.ref_name }}-windows-amd64
+            file_name: zincobserve-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -113,8 +113,8 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.arch }}/release
-          chmod +x zinc-observe
-          tar -zcvf ${{ matrix.file_name }}.tar.gz zinc-observe
+          chmod +x zincobserve
+          tar -zcvf ${{ matrix.file_name }}.tar.gz zincobserve
           echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.tar.gz.sha256sum
 
       - name: Calculate checksum and rename binary for windows
@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.arch }}/release
-          7z a -tzip ${{ matrix.file_name }}.zip zinc-observe.exe
+          7z a -tzip ${{ matrix.file_name }}.zip zincobserve.exe
           certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
       - name: Upload artifacts
@@ -153,4 +153,4 @@ jobs:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
-            **/zinc-observe-*
+            **/zincobserve-*
