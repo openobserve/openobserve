@@ -52,10 +52,9 @@
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <<<<<<< HEAD <q-btn v-if="props.row.email != store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg" :title="t('user.update')" class="iconHoverBtn"
-            padding="sm" unelevated size="sm" round flat @click="updateUser(props)" />
-
+          <q-btn v-if="props.row.email != store.state.userInfo.email" icon="img:/src/assets/images/common/view_icon.svg"
+            :title="t('user.update')" class="iconHoverBtn" padding="sm" unelevated size="sm" round flat
+            @click="updateUser(props)" />
           <q-btn v-if="props.row.email == store.state.userInfo.email" icon="img:/src/assets/images/common/view_icon.svg"
             :title="t('user.update')" class="iconHoverBtn" padding="sm" unelevated size="sm" round flat
             @click="addUser(props, false)" />
@@ -67,16 +66,6 @@
           <q-btn v-if="props.row.isLoggedinUser" icon="img:/src/assets/images/common/update_icon.svg"
             :title="t('user.update')" class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
             @click="addUser(props, true)" />
-          =======
-          <q-btn v-if="props.row.email != store.state.userInfo.email" icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')" class="iconHoverBtn" padding="sm" unelevated size="sm" round flat
-            @click="updateUser(props)" />
-          <q-btn :title="t('user.updatenotallowed')" icon="img:/src/assets/images/common/view_icon.svg" flat size="sm"
-            disable v-else />
-          <q-btn v-if="props.row.email == `false_condition_to_hide_delete_button`"
-            icon="img:/src/assets/images/common/delete_icon.svg" :title="t('user.delete')" class="q-ml-xs iconHoverBtn"
-            padding="sm" unelevated size="sm" round flat @click="deleteUser(props)" />
-          >>>>>>> 56f1bfa (user management fixes)
         </q-td>
       </template>
       <template #top="scope">
@@ -106,18 +95,12 @@
             <q-btn v-if="currentUserRole == 'admin'" class="col-1 text-bold no-border" padding="sm 0" color="secondary"
               no-caps :label="t(`user.sendInvite`)" @click="inviteUser()" :disable="userEmail == ''" />
           </div>
-
-          <<<<<<< HEAD <div v-else class="col-6">
+          <div v-else class="col-6">
             <q-btn class="q-ml-md q-mb-xs text-bold no-border" style="float: right; cursor: pointer !important"
               padding="sm lg" color="secondary" no-caps icon="add" dense :label="t(`user.add`)"
               @click="addUser({}, false)" />
+          </div>
         </div>
-        =======
-        <q-btn v-if="currentUserRole == 'admin'" class="col-1 text-bold no-border" padding="sm 0" color="secondary"
-          no-caps :label="t(`user.sendInvite`)" @click="inviteUser()" :disable="userEmail == ''" />
-        >>>>>>> 56f1bfa (user management fixes)
-        </div>
-
         <QTablePagination :scope="scope" :pageTitle="t('user.header')" :resultTotal="resultTotal"
           :perPageOptions="perPageOptions" position="top" @update:changeRecordPerPage="changePagination" />
       </template>
