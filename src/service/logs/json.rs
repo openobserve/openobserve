@@ -21,7 +21,7 @@ use datafusion::arrow::datatypes::Schema;
 use mlua::{Function, Lua};
 use prometheus::GaugeVec;
 use serde_json::Value;
-use std::{fs::OpenOptions, io::Error};
+use std::io::Error;
 
 use super::StreamMeta;
 use crate::common::json;
@@ -37,7 +37,7 @@ use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
 use crate::meta::StreamType;
-use crate::service::schema::{add_stream_schema, stream_schema_exists};
+use crate::service::schema::stream_schema_exists;
 
 pub async fn ingest(
     org_id: &str,
@@ -250,24 +250,6 @@ pub async fn ingest(
     ingest_stats
         .with_label_values(&[org_id, stream_name, "req_num"])
         .inc();
-
-    if !stream_schema.has_fields {
-        let file_name = stream_file_name[stream_file_name.rfind('/').unwrap() + 1..].to_string();
-        file_lock::sync_file(org_id, stream_name, StreamType::Logs, &file_name);
-        let file = OpenOptions::new()
-            .read(true)
-            .open(stream_file_name)
-            .unwrap();
-        add_stream_schema(
-            org_id,
-            stream_name,
-            StreamType::Logs,
-            &file,
-            &mut stream_schema_map,
-            min_ts,
-        )
-        .await;
-    }
 
     //Ok(HttpResponse::Ok().json(stream_status))
     Ok(HttpResponse::Ok().json(IngestionResponse::new(

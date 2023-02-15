@@ -91,7 +91,7 @@ pub async fn ingest(
             stream_name,
             StreamType::Metadata,
             &key,
-            CONFIG.common.wal_memory_mode_enabled,
+            false,
         );
         if meta_file_name.is_empty() {
             meta_file_name = file.full_name();

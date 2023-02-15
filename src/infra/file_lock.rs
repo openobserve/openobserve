@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -24,6 +24,7 @@ use crate::meta::StreamType;
 
 lazy_static! {
     pub static ref LOCKER: Locker = Locker::new();
+    pub static ref FILES: RwLock<HashMap<String, Bytes>> = RwLock::new(HashMap::with_capacity(16));
 }
 
 pub struct Locker {
@@ -62,11 +63,6 @@ pub fn check_in_use(
     file_name: &str,
 ) -> bool {
     LOCKER.check_in_use(org_id, stream_name, stream_type, file_name)
-}
-
-#[inline]
-pub fn sync_file(org_id: &str, stream_name: &str, stream_type: StreamType, file_name: &str) {
-    LOCKER.sync_file(org_id, stream_name, stream_type, file_name)
 }
 
 #[inline]
@@ -193,23 +189,6 @@ impl Locker {
         }
         false
     }
-
-    pub fn sync_file(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        file_name: &str,
-    ) {
-        let columns = file_name.split('_').collect::<Vec<&str>>();
-        let thread_id: usize = columns[0].parse().unwrap();
-        let key = columns[1..columns.len() - 1].join("_");
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, &key) {
-            if file.name() == file_name {
-                file.sync_once();
-            }
-        }
-    }
 }
 
 impl RwFile {
@@ -290,46 +269,19 @@ impl RwFile {
 
     #[inline]
     pub fn sync(&self) {
-        println!("sync file: {}", self.full_name());
-        match self.use_cache {
-            true => {
-                // let file_path = format!("{}{}", self.dir, self.name);
-                // let mut file = OpenOptions::new()
-                //     .write(true)
-                //     .create(true)
-                //     .append(true)
-                //     .open(file_path)
-                //     .unwrap();
-                // file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
-                //     .unwrap();
-                // file.sync_all().unwrap();
-            }
-            false => self
-                .file
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
-                .sync_all()
-                .unwrap(),
-        };
-    }
-
-    #[inline]
-    pub fn sync_once(&self) {
-        println!("sync file: {}", self.full_name());
         match self.use_cache {
             true => {
                 let file_path = format!("{}{}", self.dir, self.name);
-                let mut file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(true)
-                    .open(file_path)
-                    .unwrap();
-                file.write_all(&self.cache.as_ref().unwrap().write().unwrap())
-                    .unwrap();
-                file.sync_all().unwrap();
+                FILES.write().unwrap().insert(
+                    file_path,
+                    self.cache
+                        .as_ref()
+                        .unwrap()
+                        .read()
+                        .unwrap()
+                        .to_owned()
+                        .freeze(),
+                );
             }
             false => self
                 .file

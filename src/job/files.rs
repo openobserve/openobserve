@@ -46,7 +46,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = move_files_to_storage().await {
+        if let Err(e) = move_disk_files_to_storage().await {
             log::error!("Error moving files to remote: {}", e);
         }
     }
@@ -55,7 +55,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /*
  * upload compressed files to storage & delete moved files from local
  */
-async fn move_files_to_storage() -> Result<(), anyhow::Error> {
+async fn move_disk_files_to_storage() -> Result<(), anyhow::Error> {
     let data_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
@@ -167,7 +167,7 @@ async fn upload_file(
     log::info!("[JOB] File upload begin: local: {}", path_str);
 
     let mut schema_reader = BufReader::new(&file);
-    let inferred_schema = infer_json_schema(&mut schema_reader, Some(8192)).unwrap();
+    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
     let arrow_schema = Arc::new(inferred_schema.clone());
     drop(schema_reader);
 

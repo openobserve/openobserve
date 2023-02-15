@@ -213,7 +213,7 @@ pub async fn handle_trace_request(
             traces_stream_name,
             StreamType::Traces,
             &key,
-            CONFIG.common.wal_memory_mode_enabled,
+            false,
         );
         let traces_file_name = file.full_name();
 
