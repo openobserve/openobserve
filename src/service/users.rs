@@ -19,9 +19,12 @@ use actix_web::{
 use std::io::Error;
 use uuid::Uuid;
 
-use crate::infra::config::{CONFIG, USERS};
-use crate::meta::user::{User, UserList, UserResponse};
+use crate::meta::user::{User, UserList, UserResponse, UserRole};
 use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
+use crate::{
+    infra::config::{CONFIG, USERS},
+    meta::user::UpdateUser,
+};
 
 use super::db;
 
@@ -34,6 +37,80 @@ pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Err
         http::StatusCode::OK.into(),
         "User saved successfully".to_string(),
     )))
+}
+
+pub async fn update_user(
+    org_id: &str,
+    email: &str,
+    self_update: bool,
+    user: UpdateUser,
+) -> Result<HttpResponse, Error> {
+    let existing_user = db::user::get(Some(org_id), email).await;
+    if existing_user.is_ok() {
+        let mut new_user;
+        let mut is_updated = false;
+        let mut message = "";
+        match existing_user.unwrap() {
+            Some(local_user) => {
+                new_user = local_user.clone();
+                if self_update && user.old_password.is_some() && user.new_password.is_some() {
+                    if local_user
+                        .password
+                        .eq(&get_hash(&user.old_password.unwrap(), &local_user.salt))
+                    {
+                        new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                        is_updated = true;
+                    } else {
+                        message = "Existing/old password mismatch , please provide valid existing password"
+                    }
+                }
+                if user.first_name.is_some() {
+                    new_user.first_name = user.first_name.unwrap();
+                    is_updated = true;
+                }
+                if user.last_name.is_some() {
+                    new_user.last_name = user.last_name.unwrap();
+                    is_updated = true;
+                }
+                if user.role.is_some()
+                    && (!self_update
+                        || (local_user.role.eq(&UserRole::Admin)
+                            || local_user.role.eq(&UserRole::Root)))
+                {
+                    new_user.role = user.role.unwrap();
+                    is_updated = true;
+                }
+                if self_update && user.ingestion_token.is_some() {
+                    new_user.ingestion_token = user.ingestion_token.unwrap();
+                    is_updated = true;
+                }
+                if is_updated {
+                    db::user::set(org_id, new_user).await.unwrap();
+                    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                        http::StatusCode::OK.into(),
+                        "User updated successfully".to_string(),
+                    )))
+                } else {
+                    if message.is_empty() {
+                        message = "Not allowed to update";
+                    }
+                    Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        message.to_string(),
+                    )))
+                }
+            }
+            None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                Some("User not found".to_string()),
+            ))),
+        }
+    } else {
+        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            Some("User not found".to_string()),
+        )))
+    }
 }
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{http, patch};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use ahash::AHashMap;
 use rand::distributions::{Alphanumeric, DistString};
 use serde_json::Value;
@@ -20,7 +22,9 @@ use std::io::Error;
 
 use crate::handler::http::auth::validate_credentials;
 use crate::infra::config::CONFIG;
+use crate::meta;
 use crate::meta::user::SignInUser;
+use crate::meta::user::UpdateUser;
 use crate::meta::user::UserRole;
 use crate::{meta::user::User, service::users};
 
@@ -67,6 +71,54 @@ pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<Ht
         user.ingestion_token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
     }
     users::post_user(&org_id, user).await
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserUpdate",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User's email id"),
+    ),
+    request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[patch("/{org_id}/users/{email_id}")]
+pub async fn update(
+    params: web::Path<(String, String)>,
+    user: web::Json<UpdateUser>,
+    credentials: BasicAuth,
+) -> Result<HttpResponse, Error> {
+    let (org_id, email_id) = params.into_inner();
+    let user = user.into_inner();
+    if user.eq(&UpdateUser::default()) {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                Some("Please specify appropriate fields to update user".to_string()),
+            )),
+        );
+    } else if user.new_password.is_some() && user.old_password.is_none() {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                Some("Please provide old password for password change".to_string()),
+            )),
+        );
+    }
+    let self_update: bool;
+    if credentials.user_id().eq(&email_id) {
+        self_update = true;
+    } else {
+        self_update = false
+    }
+    users::update_user(&org_id, &email_id, self_update, user).await
 }
 
 #[utoipa::path(
