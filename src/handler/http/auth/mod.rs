@@ -79,7 +79,9 @@ pub async fn validate_credentials(
     }
     if !path.contains("/user")
         || (path.contains("/user")
-            && (user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)))
+            && (user.role.eq(&UserRole::Admin)
+                || user.role.eq(&UserRole::Root)
+                || user.email.eq(user_id)))
     {
         Ok(true)
     } else {

@@ -43,7 +43,7 @@
         <q-td :props="props" v-if="currentUserRole == 'admin' && !props.row.isLoggedinUser">
           <q-select dense borderless v-model="props.row.role" :options="options" style="width: 70px"
             @update:model-value="
-              updateUserRole(props.row.role, props.row.org_member_id)
+              updateUserRole(props.row)
             " />
         </q-td>
         <q-td :props="props" v-else>
@@ -413,7 +413,7 @@ export default defineComponent({
         });
       }
     }
-    const updateUserRole = (userRole: any, orgMemberId: any) => {
+    const updateUserRole = (row: any) => {
 
       const dismiss = $q.notify({
         spinner: true,
@@ -423,8 +423,9 @@ export default defineComponent({
 
       organizationsService.update_member_role(
         {
-          id: parseInt(orgMemberId),
-          role: userRole,
+          id: parseInt(row.orgMemberId),
+          role: row.role,
+          email: row.email,
           organization_id: parseInt(store.state.selectedOrganization.id),
         },
         store.state.selectedOrganization.identifier

@@ -33,6 +33,26 @@ pub struct User {
     pub ingestion_token: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
+pub struct UpdateUser {
+    #[serde(rename = "firstName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_name: Option<String>,
+    #[serde(rename = "lastName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_name: Option<String>,
+    #[serde(rename = "oldPassword")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_password: Option<String>,
+    #[serde(rename = "newPassword")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_password: Option<String>,
+    pub role: Option<UserRole>,
+    #[serde(rename = "ingestionToken")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ingestion_token: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SignInUser {
     pub name: String,
