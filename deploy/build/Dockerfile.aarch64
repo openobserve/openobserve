@@ -3,7 +3,7 @@ WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
-RUN NODE_OPTIONS="--max-old-space-size=6192" npm run build
+RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 FROM public.ecr.aws/docker/library/rust:bullseye as builder
 RUN apt-get update
@@ -27,7 +27,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
   RUSTFLAGS='-C target-feature=+aes,+crc,+lse,+neon'
 RUN cargo build --release --features tmpcache,zo_functions --target aarch64-unknown-linux-gnu
-RUN mv /app/target/aarch64-unknown-linux-gnu/release/zinc-observe /app/target/release/zinc-observe
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
 
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
@@ -35,5 +35,5 @@ FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/zinc-observe /
-CMD ["/zinc-observe"]
+COPY --from=builder /app/target/release/zincobserve /
+CMD ["/zincobserve"]

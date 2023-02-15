@@ -34,7 +34,6 @@
         "feedback": "Feedback",
         "zincSearch": "ZincSearch",
         "documentation": "Docs",
-        "openapi": "OpenAPI",
         "tickets": "Ticket",
         "organizations": "Organizations",
         "function": "Functions",
@@ -42,11 +41,13 @@
         "metrics": "Metrics",
         "slack": "Help",
         "dashboard": "Dashboards",
-        "alerts": "Alerts"
+        "alerts": "Alerts",
+        "openapi": "OpenAPI",
+        "docs": "Docs"
     },
     "about": {
         "name": "Zinc",
-        "introduction": "The modern open source search engine."
+        "introduction": "Observability simplified."
     },
     "login": {
         "userid": "User ID",

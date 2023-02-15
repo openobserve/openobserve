@@ -20,7 +20,7 @@
         <img
           v-if="!miniMode"
           class="appLogo"
-          src="/src/assets/images/common/app_logo.png"
+          src="/src/assets/images/common/app_logo_zo.png"
           @click="goToHome"
         />
         <img
@@ -37,6 +37,20 @@
         />
 
         <q-toolbar-title></q-toolbar-title>
+        <q-btn
+          class="q-ml-xs text-bold no-border"
+          size="13px"
+          no-caps
+          :label="t(`menu.openapi`)"
+          @click="navigateToOpenAPI()"
+        />
+        <q-btn
+          class="q-ml-xs text-bold no-border"
+          size="13px"
+          no-caps
+          :label="t(`menu.docs`)"
+          @click="navigateToDocs()"
+        />
         <div class="languageWrapper">
           <q-btn-dropdown
             unelevated
@@ -198,7 +212,14 @@ export default {
   components: {
     MenuLink,
   },
-
+  methods: {
+    navigateToDocs() {
+      window.open("https://docs.zinc.dev", "_blank");
+    },
+    navigateToOpenAPI() {
+      window.open("/swagger/index.html", "_blank");
+    },
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -516,9 +537,6 @@ export default {
 }
 
 .languageWrapper {
-  margin-right: 0.75rem;
-  margin-left: 1rem;
-
   .q-btn__content {
     color: #646464;
   }

@@ -59,7 +59,7 @@ const organizations = {
     return http().get(`api/organizations/verify_identifier/${name}`);
   },
   get_organization_passcode: (orgIdentifier: string) => {
-    if (config.isZincObserveCloud) {
+    if (config.isZincObserveCloud === "true") {
       return http().get(`/api/organizations/passcode/${orgIdentifier}`);
     }
     else {
@@ -67,7 +67,7 @@ const organizations = {
     }
   },
   update_organization_passcode: (orgIdentifier: string) => {
-    if (config.isZincObserveCloud) {
+    if (config.isZincObserveCloud === "true") {
       return http().put(`api/organizations/passcode/${orgIdentifier}`, {});
     } else {
       return http().put(`api/${orgIdentifier}/organizations/passcode`, {});
