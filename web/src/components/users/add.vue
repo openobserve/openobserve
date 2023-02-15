@@ -55,7 +55,7 @@
 
           <div v-if="!beingUpdated">
             <q-input
-              type="password"
+              :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
               :label="t('user.password') + ' *'"
               color="input-border"
@@ -71,7 +71,15 @@
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
-            />
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isPwd = !isPwd"
+                />
+              </template>
+            </q-input>
           </div>
 
           <q-input
@@ -126,7 +134,7 @@
 
             <q-input
               v-if="formData.change_password"
-              type="password"
+              :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.oldPassword"
               :label="t('user.oldPassword') + ' *'"
               color="input-border"
@@ -142,11 +150,19 @@
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
-            />
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isOldPwd = !isOldPwd"
+                />
+              </template>
+            </q-input>
 
             <q-input
               v-if="formData.change_password"
-              type="password"
+              :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.newPassword"
               :label="t('user.newPassword') + ' *'"
               color="input-border"
@@ -162,7 +178,15 @@
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
-            />
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isNewPwd = !isNewPwd"
+                />
+              </template>
+            </q-input>
           </div>
 
           <div class="flex justify-center q-mt-lg">
@@ -231,6 +255,9 @@ export default defineComponent({
     const roleOptions = ["admin", "user"];
     const beingUpdated: any = ref(false);
     const userForm: any = ref(null);
+    const isPwd: any = ref(true);
+    const isNewPwd: any = ref(true);
+    const isOldPwd: any = ref(true);
 
     return {
       t,
@@ -240,6 +267,9 @@ export default defineComponent({
       beingUpdated,
       userForm,
       roleOptions,
+      isPwd,
+      isNewPwd,
+      isOldPwd,
     };
   },
   created() {
