@@ -49,7 +49,10 @@
       <template #body-cell-role="props">
         <q-td
           :props="props"
-          v-if="currentUserRole == 'admin' && !props.row.isLoggedinUser"
+          v-if="
+            (currentUserRole == 'admin' || currentUserRole == 'root') &&
+            !props.row.isLoggedinUser
+          "
         >
           <q-select
             dense
@@ -113,9 +116,9 @@
             flat
             @click="deleteUser(props)"
           />
-
+          {{ currentUserRole }}
           <q-btn
-            v-if="props.row.isLoggedinUser"
+            v-if="props.row.isLoggedinUser || currentUserRole == 'root'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs iconHoverBtn"
@@ -185,6 +188,7 @@
           </div>
           <div v-else class="col-6">
             <q-btn
+              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"

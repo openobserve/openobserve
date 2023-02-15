@@ -24,82 +24,190 @@
           <div v-else class="text-h6">{{ t("user.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="img:/src/assets/images/common/close_icon.svg" />
+          <q-btn
+            v-close-popup
+            round
+            flat
+            icon="img:/src/assets/images/common/close_icon.svg"
+          />
         </div>
       </div>
 
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-input v-if="!beingUpdated" v-model="formData.email" :label="t('user.email') + ' *'" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
+          <q-input
+            v-if="!beingUpdated"
+            v-model="formData.email"
+            :label="t('user.email') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[
               (val, rules) =>
                 rules.email(val) || 'Please enter a valid email address',
-            ]" />
+            ]"
+          />
 
           <div v-if="!beingUpdated">
-            <q-input :type="isPwd ? 'password' : 'text'" v-model="formData.password" :label="t('user.password') + ' *'"
-              color="input-border" bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense
+            <q-input
+              :type="isPwd ? 'password' : 'text'"
+              v-model="formData.password"
+              :label="t('user.password') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
               :rules="[
                 (val) => !!val || 'Field is required',
                 (val) =>
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
-              ]">
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isPwd = !isPwd" />
+                <q-icon
+                  :name="isPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isPwd = !isPwd"
+                />
               </template>
             </q-input>
           </div>
 
-          <q-input v-model="formData.firstName" :label="t('user.firstName')" color="input-border" bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm" stack-label outlined filled dense />
+          <q-input
+            v-model="formData.firstName"
+            :label="t('user.firstName')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop q-mt-sm"
+            stack-label
+            outlined
+            filled
+            dense
+          />
 
-          <q-input v-model="formData.lastName" :label="t('user.lastName')" color="input-border" bg-color="input-bg"
-            class="q-py-md showLabelOnTop" stack-label outlined filled dense />
+          <q-input
+            v-model="formData.lastName"
+            :label="t('user.lastName')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+          />
 
-          <q-select v-model="formData.role" :label="t('user.role') + ' *'" :options="roleOptions" color="input-border"
-            bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
+          <q-select
+            v-if="formData.role !== 'member'"
+            v-model="formData.role"
+            :label="t('user.role') + ' *'"
+            :options="roleOptions"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+          />
 
           <div v-if="beingUpdated">
-            <q-toggle v-model="formData.change_password" :label="t('user.changePassword')" color="input-border"
-              bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
+            <q-toggle
+              v-model="formData.change_password"
+              :label="t('user.changePassword')"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-pt-md q-pb-sm showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+            />
 
-            <q-input v-if="formData.change_password" :type="isOldPwd ? 'password' : 'text'"
-              v-model="formData.oldPassword" :label="t('user.oldPassword') + ' *'" color="input-border"
-              bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
+            <q-input
+              v-if="formData.change_password"
+              :type="isOldPwd ? 'password' : 'text'"
+              v-model="formData.oldPassword"
+              :label="t('user.oldPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
                 (val) => !!val || 'Field is required',
                 (val) =>
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
-              ]">
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isOldPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isOldPwd = !isOldPwd" />
+                <q-icon
+                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isOldPwd = !isOldPwd"
+                />
               </template>
             </q-input>
 
-            <q-input v-if="formData.change_password" :type="isNewPwd ? 'password' : 'text'"
-              v-model="formData.newPassword" :label="t('user.newPassword') + ' *'" color="input-border"
-              bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
+            <q-input
+              v-if="formData.change_password"
+              :type="isNewPwd ? 'password' : 'text'"
+              v-model="formData.newPassword"
+              :label="t('user.newPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
                 (val) => !!val || 'Field is required',
                 (val) =>
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
-              ]">
+              ]"
+            >
               <template v-slot:append>
-                <q-icon :name="isNewPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer"
-                  @click="isNewPwd = !isNewPwd" />
+                <q-icon
+                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isNewPwd = !isNewPwd"
+                />
               </template>
             </q-input>
           </div>
 
           <div class="flex justify-center q-mt-lg">
-            <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('user.cancel')" text-color="light-text"
-              padding="sm md" color="accent" no-caps />
-            <q-btn :label="t('user.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-              type="submit" no-caps />
+            <q-btn
+              v-close-popup
+              class="q-mb-md text-bold no-border"
+              :label="t('user.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              color="accent"
+              no-caps
+            />
+            <q-btn
+              :label="t('user.save')"
+              class="q-mb-md text-bold no-border q-ml-md"
+              color="secondary"
+              padding="sm xl"
+              type="submit"
+              no-caps
+            />
           </div>
         </q-form>
       </div>
