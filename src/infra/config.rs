@@ -14,7 +14,7 @@
 
 use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use dotenv_config::EnvConfig;
 use reqwest::Client;
 use std::time::Duration;

@@ -1781,6 +1781,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03d8c417d7a8cb362e0c37e5d815f5eb7c37f79ff93707329d5a194e42e54ca0"
+
+[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5155,8 +5161,8 @@ dependencies = [
  "dashmap 5.4.0",
  "datafusion",
  "datafusion-common",
- "dotenv",
  "dotenv_config",
+ "dotenvy",
  "env_logger",
  "etcd-client",
  "flatten-json-object",
