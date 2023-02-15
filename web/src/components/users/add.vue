@@ -70,17 +70,12 @@
                 (val) =>
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
-                (val) =>
-                  /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/.test(
-                    val
-                  ) ||
-                  'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
               ]"
             />
           </div>
 
           <q-input
-            v-model="formData.first_name"
+            v-model="formData.firstName"
             :label="t('user.firstName')"
             color="input-border"
             bg-color="input-bg"
@@ -92,7 +87,7 @@
           />
 
           <q-input
-            v-model="formData.last_name"
+            v-model="formData.lastName"
             :label="t('user.lastName')"
             color="input-border"
             bg-color="input-bg"
@@ -132,8 +127,8 @@
             <q-input
               v-if="formData.change_password"
               type="password"
-              v-model="formData.password"
-              :label="t('user.password')"
+              v-model="formData.oldPassword"
+              :label="t('user.oldPassword') + ' *'"
               color="input-border"
               bg-color="input-bg"
               class="q-py-md showLabelOnTop"
@@ -141,6 +136,32 @@
               outlined
               filled
               dense
+              :rules="[
+                (val) => !!val || 'Field is required',
+                (val) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            />
+
+            <q-input
+              v-if="formData.change_password"
+              type="password"
+              v-model="formData.newPassword"
+              :label="t('user.newPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val) => !!val || 'Field is required',
+                (val) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
             />
           </div>
 
@@ -180,10 +201,11 @@ const defaultValue: any = () => {
   return {
     org_member_id: "",
     role: "admin",
-    first_name: "",
-    last_name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    password: "",
+    oldPassword: "",
+    newPassword: "",
     change_password: false,
   };
 };
@@ -244,16 +266,40 @@ export default defineComponent({
       });
 
       this.formData.name =
-        this.formData.first_name.trim() + this.formData.last_name.trim() != ""
-          ? this.formData.first_name + " " + this.formData.last_name
+        this.formData.firstName.trim() + this.formData.lastName.trim() != ""
+          ? this.formData.firstName + " " + this.formData.lastName
           : "";
 
-      userServiece
-        .create(this.formData, this.store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          dismiss();
-          this.$emit("updated", res.data);
-        });
+      if (this.beingUpdated) {
+        const userEmail = this.formData.email;
+        delete this.formData.email;
+
+        if (this.formData.change_password == false) {
+          delete this.formData.oldPassword;
+          delete this.formData.newPassword;
+        }
+        userServiece
+          .update(
+            this.formData,
+            this.store.state.selectedOrganization.identifier,
+            userEmail
+          )
+          .then((res: any) => {
+            dismiss();
+            this.formData.email = userEmail;
+            this.$emit("updated", res.data, this.formData, "updated");
+          });
+      } else {
+        userServiece
+          .create(
+            this.formData,
+            this.store.state.selectedOrganization.identifier
+          )
+          .then((res: any) => {
+            dismiss();
+            this.$emit("updated", res.data, this.formData, "created");
+          });
+      }
     },
   },
 });

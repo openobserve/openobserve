@@ -98,7 +98,9 @@
         "inviteByEmailHint": "You'll be charged a prorated amount for adding a member.",
         "admin": "admin",
         "member": "member",
-        "changePassword": "Change Password"
+        "changePassword": "Change Password",
+        "oldPassword": "Old Password",
+        "newPassword": "New Password"
     },
     "ticket": {
         "header": "Support Tickets",
