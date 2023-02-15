@@ -71,7 +71,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
     let cors = Cors::default()
         .send_wildcard()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_methods(vec![
+            "HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE", "PATCH",
+        ])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::ACCEPT,
