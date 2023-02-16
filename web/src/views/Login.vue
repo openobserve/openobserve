@@ -38,8 +38,8 @@
                 <q-input
                   v-model="password"
                   data-cy="login-password"
-                  type="password *"
-                  :label="t('login.password')"
+                  type="password"
+                  :label="t('login.password') + ' *'"
                 >
                   <template #prepend>
                     <q-icon name="lock" />
