@@ -50,7 +50,8 @@
         <q-td
           :props="props"
           v-if="
-            (currentUserRole == 'admin' || currentUserRole == 'root') &&
+            ((currentUserRole == 'admin' && props.row.role !== 'root') ||
+              currentUserRole == 'root') &&
             !props.row.isLoggedinUser
           "
         >
@@ -85,7 +86,7 @@
             v-if="
               props.row.isLoggedinUser ||
               currentUserRole == 'root' ||
-              currentUserRole == 'admin'
+              (currentUserRole == 'admin' && props.row.role !== 'root')
             "
             icon="edit"
             :title="t('user.update')"
