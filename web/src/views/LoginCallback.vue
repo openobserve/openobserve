@@ -175,8 +175,8 @@ export default defineComponent({
             segment.identify(userId, {
               email: this.userInfo.email,
               name: this.userInfo.given_name + " " + this.userInfo.family_name,
-              firstName: this.userInfo.given_name,
-              lastName: this.userInfo.family_name,
+              first_name: this.userInfo.given_name,
+              last_name: this.userInfo.family_name,
             });
             //amalytics
           });
@@ -192,8 +192,8 @@ export default defineComponent({
           // segment.identify(userId, {
           //   email: userId,
           //   name: this.userInfo.given_name + " " + this.userInfo.family_name,
-          //   firstName: this.userInfo.given_name,
-          //   lastName: this.userInfo.family_name,
+          //   first_name: this.userInfo.given_name,
+          //   last_name: this.userInfo.family_name,
           // });
           //amalytics
 

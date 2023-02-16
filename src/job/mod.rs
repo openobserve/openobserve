@@ -48,7 +48,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 password: CONFIG.auth.password.clone(),
                 role: crate::meta::user::UserRole::Root,
                 salt: String::new(),
-                ingestion_token: token,
+                token,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },

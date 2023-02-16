@@ -74,7 +74,7 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
-    if user.ingestion_token.eq(&user_password) {
+    if user.token.eq(&user_password) {
         return Ok(true);
     }
 

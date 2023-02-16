@@ -117,8 +117,8 @@ pub async fn update_user(
                     new_user.role = user.role.unwrap();
                     is_updated = true;
                 }
-                if user.ingestion_token.is_some() {
-                    new_user.ingestion_token = user.ingestion_token.unwrap();
+                if user.token.is_some() {
+                    new_user.token = user.token.unwrap();
                     is_updated = true;
                 }
                 if is_updated {

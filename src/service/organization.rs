@@ -40,7 +40,7 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
 
     IngestionPasscode {
         user: user.email,
-        passcode: user.ingestion_token,
+        passcode: user.token,
     }
 }
 
@@ -49,13 +49,13 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
     let _guard = loc_span.enter();
     let mut loca_org_id = "dummy";
     let mut user = users::get_user(org_id, user_id).await.unwrap();
-    user.ingestion_token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    user.token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
     if org_id.is_some() {
         loca_org_id = org_id.unwrap();
     }
     let _ = db::user::set(loca_org_id, user.clone()).await;
     IngestionPasscode {
         user: user.email,
-        passcode: user.ingestion_token,
+        passcode: user.token,
     }
 }

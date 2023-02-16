@@ -83,7 +83,7 @@
           </div>
 
           <q-input
-            v-model="formData.firstName"
+            v-model="formData.first_name"
             :label="t('user.firstName')"
             color="input-border"
             bg-color="input-bg"
@@ -95,7 +95,7 @@
           />
 
           <q-input
-            v-model="formData.lastName"
+            v-model="formData.last_name"
             :label="t('user.lastName')"
             color="input-border"
             bg-color="input-bg"
@@ -144,7 +144,7 @@
                   store.state.userInfo.email == formData.email)
               "
               :type="isOldPwd ? 'password' : 'text'"
-              v-model="formData.oldPassword"
+              v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
               color="input-border"
               bg-color="input-bg"
@@ -172,7 +172,7 @@
             <q-input
               v-if="formData.change_password"
               :type="isNewPwd ? 'password' : 'text'"
-              v-model="formData.newPassword"
+              v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
               color="input-border"
               bg-color="input-bg"
@@ -234,11 +234,11 @@ const defaultValue: any = () => {
   return {
     org_member_id: "",
     role: "admin",
-    firstName: "",
-    lastName: "",
+    first_name: "",
+    last_name: "",
     email: "",
-    oldPassword: "",
-    newPassword: "",
+    old_password: "",
+    new_password: "",
     change_password: false,
   };
 };
@@ -313,8 +313,8 @@ export default defineComponent({
         delete this.formData.email;
 
         if (this.formData.change_password == false) {
-          delete this.formData.oldPassword;
-          delete this.formData.newPassword;
+          delete this.formData.old_password;
+          delete this.formData.new_password;
         }
         userServiece
           .update(
