@@ -26,7 +26,7 @@ use crate::{meta::alert::Alert, service::alerts};
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name for which alert is being created"),
+        ("stream_name" = String, Path, description = "Stream name"),
         ("alert_name" = String, Path, description = "Alert name"),
       ),
     responses(
