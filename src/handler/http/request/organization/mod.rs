@@ -17,7 +17,7 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use serde::Serialize;
 use std::io::Error;
 
-use crate::handler::http::auth::is_admin_user;
+use crate::handler::http::auth::is_root_user;
 use crate::infra::config::{CONFIG, USERS};
 use crate::meta::organization::PasscodeResponse;
 use crate::service::organization::get_passcode;
@@ -74,7 +74,7 @@ pub async fn organizarions_by_username(
 ) -> Result<HttpResponse, Error> {
     let mut orgs = Vec::new();
     let user_name = user_name.to_string();
-    if is_admin_user(&user_name).await {
+    if is_root_user(&user_name).await {
         let obj = Organization {
             identifier: DEFAULT.to_string(),
             label: DEFAULT.to_string(),
@@ -120,7 +120,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         email: user_id.to_string(),
     };
 
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         id += 1;
         orgs.push(OrganizationDetails {
             id,
@@ -191,7 +191,7 @@ async fn get_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         org_id = None;
     }
     let passcode = get_passcode(org_id, user_id).await;
@@ -206,7 +206,7 @@ async fn update_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         org_id = None;
     }
     let passcode = update_passcode(org_id, user_id).await;

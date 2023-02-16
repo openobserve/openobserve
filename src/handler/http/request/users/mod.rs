@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, web, HttpResponse};
-use actix_web::{http, patch};
+use actix_web::{delete, get, http, post, put, web, HttpResponse};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use ahash::AHashMap;
 use rand::distributions::{Alphanumeric, DistString};
@@ -45,7 +44,7 @@ use crate::{meta::user::User, service::users};
 #[get("/{org_id}/users")]
 pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_user(&org_id).await
+    users::list_users(&org_id).await
 }
 
 #[utoipa::path(
@@ -89,7 +88,7 @@ pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<Ht
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[patch("/{org_id}/users/{email_id}")]
+#[put("/{org_id}/users/{email_id}")]
 pub async fn update(
     params: web::Path<(String, String)>,
     user: web::Json<UpdateUser>,
@@ -104,21 +103,10 @@ pub async fn update(
                 Some("Please specify appropriate fields to update user".to_string()),
             )),
         );
-    } else if user.new_password.is_some() && user.old_password.is_none() {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                Some("Please provide old password for password change".to_string()),
-            )),
-        );
     }
-    let self_update: bool;
-    if credentials.user_id().eq(&email_id) {
-        self_update = true;
-    } else {
-        self_update = false
-    }
-    users::update_user(&org_id, &email_id, self_update, user).await
+    let initiator_id = credentials.user_id();
+    let self_update = credentials.user_id().eq(&email_id);
+    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
 #[utoipa::path(
