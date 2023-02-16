@@ -139,7 +139,6 @@ export const setCurrentPanelToDashboardList = (
   let found = 0;
   for (const dashboard of dashboardList) {
     if (dashboardId === dashboard.name) {
-      console.log("Inside " + counter);
       let modDashboardObject = JSON.parse(toRaw(dashboard.details));
       if (modDashboardObject.layouts && modDashboardObject.layouts.length > 0) {
         modDashboardObject.layouts.push(newLayoutObj);
@@ -148,8 +147,6 @@ export const setCurrentPanelToDashboardList = (
       }
       for (const panel of modDashboardObject.panels) {
         if (panelId === panel.id) {
-          console.log("Inside Panel match  -- " + panelId);
-          console.log("Panel Replace  --- " + JSON.stringify(panel));
           modDashboardObject.panels[counter] = panelObject;
           found++;
         }
@@ -166,7 +163,6 @@ export const setCurrentPanelToDashboardList = (
     }
     dashboardPos++;
   }
-  console.log(dashboardList);
   store.dispatch("setAllCurrentDashboards", dashboardList);
 };
 
@@ -221,8 +217,7 @@ export const getDateConsumableDateTime = function (dateVal: {
       start_time: start,
       end_time: end,
     };
-    console.log(rVal);
-    
+
     return rVal;
   }
 };

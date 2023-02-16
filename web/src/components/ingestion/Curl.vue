@@ -29,10 +29,8 @@
       </div>
     </div>
     <pre ref="content">
-  curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
-        config.zincENLIngestion
-      }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]</pre
-    >
+curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
+    </pre>
   </div>
 </template>
 
@@ -53,11 +51,22 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const endpoint = ref(""); 
+ 
+    const url = new URL(store.state.API_ENDPOINT); 
+    endpoint.value = {
+      url: store.state.API_ENDPOINT,
+      host: url.hostname,
+      port: url.port,
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+    };
 
     const content = ref(null);
     return {
       store,
       config,
+      endpoint,
       content,
     };
   },

@@ -51,7 +51,6 @@ export default defineComponent({
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
     const getDefaultOrganization = () => {
-      console.log($store.state.userInfo);
       organizationsService.list(0, 1000, "id", false, "").then((res: any) => {
         const localOrg: any = useLocalOrganization();
         if (
@@ -126,22 +125,18 @@ export default defineComponent({
     };
   },
   created() {
-    // console.log(this.$route.hash.replace("#", ""));
     const token = getUserInfo(this.$route.hash);
     if (token !== null && token.email != null) {
       this.user.email = token.email;
       this.user.cognito_sub = token.sub;
       this.user.first_name = token.given_name ? token.given_name : "";
       this.user.last_name = token.family_name ? token.family_name : "";
-      console.log("user assignment", JSON.stringify(this.user));
     } else {
       //redirect to error page
     }
 
     const sessionUserInfo = getDecodedUserInfo();
-    console.log(sessionUserInfo);
     const d = new Date();
-    console.log(d.getTime() / 1000);
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
     if (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) {
@@ -155,11 +150,6 @@ export default defineComponent({
   },
   methods: {
     VerifyAndCreateUser() {
-      console.log(
-        "before verify",
-        JSON.stringify(this.user),
-        JSON.stringify(this.userInfo)
-      );
       usersService.verifyUser(this.userInfo.email).then((res) => {
         useLocalCurrentUser(res.data.data);
         this.$store.dispatch("setCurrentUser", res.data.data);
@@ -198,7 +188,6 @@ export default defineComponent({
           });
 
           //analytics
-          console.log("this.userInfo: ", this.userInfo);
           const userId = this.userInfo.email;
           // segment.identify(userId, {
           //   email: userId,

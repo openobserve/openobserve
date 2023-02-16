@@ -277,7 +277,7 @@
     "rtAlert": "实时警报",
     "noData": "没有数据",
     "findIngestion": "了解如何采集日志 >>",
-    "ingestionMsg": "看来你没有向选定的组织发生任何数据，有多种方式可以采集数据，比如 fluentbit。",
+    "ingestionMsg": "看来你没有向选定的组织发送任何数据，有多种方式可以采集数据，比如 fluentbit。",
     "inestedInSearch": "尝试搜索日志",
     "searchInDemoOrg": "你可以通过切换到演示组织来探索搜索功能，要切换到演示组织，请使用顶部的组织下拉列表选择 “演示组织”。我们一直在向演示组织发生演示数据。"
   }

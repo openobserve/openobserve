@@ -44,37 +44,37 @@ const organizations = {
     return http().post("/api/organizations", data);
   },
   add_members: (data: any, orgIdentifier: string) => {
-    return http().post(`api/organizations/${orgIdentifier}/members`, data);
+    return http().post(`/api/organizations/${orgIdentifier}/members`, data);
   },
   process_subscription: (s: string) => {
-    return http().get(`api/organizations/member_subscription/${s}`);
+    return http().get(`/api/organizations/member_subscription/${s}`);
   },
   get_associated_members: (orgIdentifier: string) => {
-    return http().get(`api/organizations/associated_members/${orgIdentifier}`);
+    return http().get(`/api/organizations/associated_members/${orgIdentifier}`);
   },
   update_member_role: (data: any, orgIdentifier: string) => {
     if (config.isZincObserveCloud === "true") {
-      return http().put(`api/organizations/${orgIdentifier}/member`, data);
+      return http().put(`/api/organizations/${orgIdentifier}/member`, data);
     } else {
-      return http().patch(`api/${orgIdentifier}/users/${encodeURIComponent(data.email)}`, { role: data.role });
+      return http().patch(`/api/${orgIdentifier}/users/${encodeURIComponent(data.email)}`, { role: data.role });
     }
   },
   verify_identifier: (name: string) => {
-    return http().get(`api/organizations/verify_identifier/${name}`);
+    return http().get(`/api/organizations/verify_identifier/${name}`);
   },
   get_organization_passcode: (orgIdentifier: string) => {
     if (config.isZincObserveCloud === "true") {
       return http().get(`/api/organizations/passcode/${orgIdentifier}`);
     }
     else {
-      return http().get(`api/${orgIdentifier}/organizations/passcode`);
+      return http().get(`/api/${orgIdentifier}/organizations/passcode`);
     }
   },
   update_organization_passcode: (orgIdentifier: string) => {
     if (config.isZincObserveCloud === "true") {
-      return http().put(`api/organizations/passcode/${orgIdentifier}`, {});
+      return http().put(`/api/organizations/passcode/${orgIdentifier}`, {});
     } else {
-      return http().put(`api/${orgIdentifier}/organizations/passcode`, {});
+      return http().put(`/api/${orgIdentifier}/organizations/passcode`, {});
     }
   },
   get_organization_summary: (orgIdentifier: string) => {
