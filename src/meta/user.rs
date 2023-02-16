@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -60,6 +61,16 @@ pub enum UserRole {
     User,
     #[serde(rename = "root")]
     Root,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UserRole::Admin => write!(f, "admin"),
+            UserRole::User => write!(f, "member"),
+            UserRole::Root => write!(f, "root"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

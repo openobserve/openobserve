@@ -35,9 +35,9 @@
       <div class="row body">
         <div class="col-1">{{ zoConfig.version }}</div>
         <div class="col-6 col-md-5 col-lg-4">
-          {{ zoConfig.commit }}
+          {{ zoConfig.commit_hash }}
         </div>
-        <div class="col-3 col-md-3 col-lg-2">{{ zoConfig.date }}</div>
+        <div class="col-3 col-md-3 col-lg-2">{{ zoConfig.build_date }}</div>
       </div>
     </div>
   </q-page>
