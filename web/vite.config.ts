@@ -39,9 +39,9 @@ export default defineConfig({
     // testNamePattern: "DateTime",
     // ...
   },
-  // server: {
-  //   port: 8081,
-  // },
+  server: {
+    port: 8081,
+  },
   base: "/",
   plugins: [
     vue({

@@ -38,14 +38,14 @@
 
         <q-toolbar-title></q-toolbar-title>
         <q-btn
-          class="q-ml-xs text-bold no-border"
+          class="q-ml-xs no-border"
           size="13px"
           no-caps
           :label="t(`menu.openapi`)"
           @click="navigateToOpenAPI(zoBackendUrl)"
         />
         <q-btn
-          class="q-ml-xs text-bold no-border"
+          class="q-ml-xs no-border"
           size="13px"
           no-caps
           :label="t(`menu.docs`)"
