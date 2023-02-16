@@ -7,7 +7,7 @@
 ## Quick Start
 
 ```
-ZO_USER_EMAIL="admin@zo.com" ZO_USER_PASSWORD="Complexpass#123" cargo run
+ZO_ROOT_USER_EMAIL="admin@zinc.dev" ZO_ROOT_USER_PASSWORD="Complexpass#123" cargo run
 ```
 
 ## Etcd client

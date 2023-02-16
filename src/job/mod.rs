@@ -38,7 +38,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             || !email_regex.is_match(&CONFIG.auth.root_user_email)
             || CONFIG.auth.root_user_password.is_empty()
         {
-            panic!("Please set root user email-id & password using ZO_USER_EMAIL & ZO_USER_PASSWORD enviornment variables");
+            panic!("Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD enviornment variables");
         }
         let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let _ = users::post_user(
