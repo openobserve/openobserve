@@ -165,7 +165,7 @@
               icon="add"
               dense
               :label="t(`user.add`)"
-              @click="addUser({}, false, currentUserRole)"
+              @click="addUser({}, false)"
             />
           </div>
         </div>
