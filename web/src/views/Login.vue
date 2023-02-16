@@ -19,7 +19,7 @@
       <q-page class="fullscreen bg-grey-7 flex flex-center">
         <q-card square class="my-card shadow-24 bg-white text-white">
           <q-card-section class="bg-primary">
-            <div class="text-h5 q-my-md">Zinc Oserve</div>
+            <div class="text-h5 q-my-md">Zinc Observe</div>
           </q-card-section>
           <q-card>
             <q-card-section class="bg-white">
@@ -27,11 +27,11 @@
                 <q-input
                   v-model="name"
                   data-cy="login-user-id"
-                  label="User Name"
+                  label="Email *"
                   @blur="getOrganizations"
                 >
                   <template #prepend>
-                    <q-icon name="perm_identity" />
+                    <q-icon name="email" />
                   </template>
                 </q-input>
 
@@ -39,7 +39,7 @@
                   v-model="password"
                   data-cy="login-password"
                   type="password"
-                  :label="t('login.password')"
+                  :label="t('login.password') + ' *'"
                 >
                   <template #prepend>
                     <q-icon name="lock" />
@@ -49,7 +49,7 @@
                 <q-select
                   v-model="org_identifier"
                   :options="organizations"
-                  label="Select Organization"
+                  label="Select Organization *"
                   :display-value="`${
                     org_identifier ? org_identifier.label : '-- Select --'
                   }`"
@@ -119,6 +119,13 @@ export default defineComponent({
     const submitting = ref(false);
 
     const onSignIn = () => {
+      if (org_identifier.value == undefined) {
+        $q.notify({
+          color: "negative",
+          message: "Organization is required",
+        });
+        return false;
+      }
       if (name.value == "" || password.value == "") {
         $q.notify({
           position: "top",
@@ -129,63 +136,79 @@ export default defineComponent({
         });
       } else {
         submitting.value = true;
-        console.log(name.value, password.value);
-        authService
-          .sign_in_user(org_identifier.value.identifier, {
-            name: name.value,
-            password: password.value,
-          })
-          .then(async (res: any) => {
-            console.log(res.data.role);
-            if (res.data.status == true) {
-              const authToken = getBasicAuth(name.value, password.value);
-              useLocalToken(authToken);
-              const userInfo = {
-                given_name: name.value,
-                auth_time: Math.floor(Date.now() / 1000),
-                name: name.value,
-                exp: Math.floor(
-                  (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000
-                ),
-                family_name: "",
-                email: name.value,
-                role: res.data.role,
-              };
-              const encodedUserInfo = b64EncodeUnicode(
-                JSON.stringify(userInfo)
-              );
+        try {
+          authService
+            .sign_in_user(org_identifier.value.identifier, {
+              name: name.value,
+              password: password.value,
+            })
+            .then(async (res: any) => {
+              console.log(res.data.role);
+              if (res.data.status == true) {
+                const authToken = getBasicAuth(name.value, password.value);
+                useLocalToken(authToken);
+                const userInfo = {
+                  given_name: name.value,
+                  auth_time: Math.floor(Date.now() / 1000),
+                  name: name.value,
+                  exp: Math.floor(
+                    (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000
+                  ),
+                  family_name: "",
+                  email: name.value,
+                  role: res.data.role,
+                };
+                const encodedUserInfo = b64EncodeUnicode(
+                  JSON.stringify(userInfo)
+                );
 
-              useLocalUserInfo(encodedUserInfo);
-              store.dispatch("setUserInfo", encodedUserInfo);
+                useLocalUserInfo(encodedUserInfo);
+                store.dispatch("setUserInfo", encodedUserInfo);
 
-              useLocalCurrentUser(JSON.stringify(userInfo));
-              store.dispatch("setCurrentUser", userInfo);
+                useLocalCurrentUser(JSON.stringify(userInfo));
+                store.dispatch("setCurrentUser", userInfo);
 
-              const organizations = await getDefaultOrganization(
-                userInfo,
-                org_identifier.value.identifier
-              );
-              store.dispatch("setOrganizations", organizations);
+                const organizations = await getDefaultOrganization(
+                  userInfo,
+                  org_identifier.value.identifier
+                );
+                store.dispatch("setOrganizations", organizations);
 
-              const selectedOrgs = useLocalOrganization(org_identifier.value);
-              store.dispatch("setSelectedOrganization", selectedOrgs);
+                const selectedOrgs = useLocalOrganization(org_identifier.value);
+                store.dispatch("setSelectedOrganization", selectedOrgs);
 
-              const redirectURI = window.sessionStorage.getItem("redirectURI");
-              window.sessionStorage.removeItem("redirectURI");
+                const redirectURI =
+                  window.sessionStorage.getItem("redirectURI");
+                window.sessionStorage.removeItem("redirectURI");
 
-              redirectUser(redirectURI);
-            } else {
+                redirectUser(redirectURI);
+              } else {
+                submitting.value = false;
+                loginform.value.resetValidation();
+                $q.notify({
+                  color: "negative",
+                  message: res.data.message,
+                });
+              }
+            })
+            .catch((e: Error) => {
               submitting.value = false;
               loginform.value.resetValidation();
               $q.notify({
                 color: "negative",
-                message: res.data.message,
+                message: "Invalid username or password",
               });
-            }
-          })
-          .catch((e: Error) => {
-            console.log(e);
+              console.log(e);
+            });
+        } catch (e) {
+          submitting.value = false;
+          loginform.value.resetValidation();
+          $q.notify({
+            color: "negative",
+            message: "Please fill all the fields and try again.",
           });
+          console.log(e);
+        }
       }
     };
 
