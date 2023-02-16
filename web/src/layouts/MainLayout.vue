@@ -17,65 +17,26 @@
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
     <q-header>
       <q-toolbar>
-        <img
-          v-if="!miniMode"
-          class="appLogo"
-          src="/src/assets/images/common/app_logo_zo.png"
-          @click="goToHome"
-        />
-        <img
-          v-else
-          class="appLogo__mini"
-          src="/src/assets/images/common/mini_logo.svg"
-        />
-        <q-btn
-          dense
-          flat
-          round
-          icon="img:/src/assets/images/common/menu_icon.svg"
-          @click="toggleLeftDrawer"
-        />
+        <img v-if="!miniMode" class="appLogo" src="/src/assets/images/common/app_logo_zo.png" @click="goToHome" />
+        <img v-else class="appLogo__mini" src="/src/assets/images/common/mini_logo.svg" />
+        <q-btn dense flat round icon="img:/src/assets/images/common/menu_icon.svg" @click="toggleLeftDrawer" />
 
         <q-toolbar-title></q-toolbar-title>
-        <q-btn
-          class="q-ml-xs text-bold no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.openapi`)"
-          @click="navigateToOpenAPI()"
-        />
-        <q-btn
-          class="q-ml-xs text-bold no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.docs`)"
-          @click="navigateToDocs()"
-        />
+        <q-btn class="q-ml-xs text-bold no-border" size="13px" no-caps :label="t(`menu.openapi`)"
+          @click="navigateToOpenAPI(zoBackendUrl)" />
+        <q-btn class="q-ml-xs text-bold no-border" size="13px" no-caps :label="t(`menu.docs`)"
+          @click="navigateToDocs()" />
         <div class="languageWrapper">
-          <q-btn-dropdown
-            unelevated
-            no-caps
-            flat
-            class="languageDdl"
-            :icon="languageFlag"
-            dropdown-icon="img:/src/assets/images/common/language_menu_arrow.svg"
-          >
+          <q-btn-dropdown unelevated no-caps flat class="languageDdl" :icon="languageFlag"
+            dropdown-icon="img:/src/assets/images/common/language_menu_arrow.svg">
             <template #label>
               <div class="row no-wrap">
                 {{ selectedLanguage.label }}
               </div>
             </template>
             <q-list>
-              <q-item
-                v-for="lang in langList"
-                :key="lang.code"
-                v-ripple
-                v-close-popup
-                clickable
-                v-bind="lang"
-                active-class="activeLang"
-                @click="changeLanguage(lang)"
-              >
+              <q-item v-for="lang in langList" :key="lang.code" v-ripple v-close-popup clickable v-bind="lang"
+                active-class="activeLang" @click="changeLanguage(lang)">
                 <q-item-section avatar>
                   <q-icon :name="lang.icon" class="flagIcon" />
                 </q-item-section>
@@ -89,33 +50,21 @@
         </div>
 
         <div class="q-ml-md current-organization">
-          <q-select
-            v-model="selectedOrg"
-            borderless
-            :options="orgOptions"
-            class="q-px-none q-py-none q-mx-none q-my-none"
-            @update:model-value="updateOrganization()"
-          />
+          <q-select v-model="selectedOrg" borderless :options="orgOptions"
+            class="q-px-none q-py-none q-mx-none q-my-none" @update:model-value="updateOrganization()" />
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown
-            flat
-            unelevated
-            no-caps
-            padding="xs sm"
-            dropdown-icon="img:/src/assets/images/common/user_menu_arrow.svg"
-          >
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm"
+            dropdown-icon="img:/src/assets/images/common/user_menu_arrow.svg">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md" color="grey" text-color="white">
-                  <img
-                    :src="
-                      user.picture
-                        ? user.picture
-                        : `/src/assets/images/common/profile.svg`
-                    "
-                  />
+                  <img :src="
+                    user.picture
+                      ? user.picture
+                      : `/src/assets/images/common/profile.svg`
+                  " />
                 </q-avatar>
                 <div class="userInfo">
                   <div class="userName">
@@ -133,12 +82,7 @@
 
               <q-item v-ripple v-close-popup clickable @click="signout">
                 <q-item-section avatar>
-                  <q-avatar
-                    size="md"
-                    icon="exit_to_app"
-                    color="red"
-                    text-color="white"
-                  />
+                  <q-avatar size="md" icon="exit_to_app" color="red" text-color="white" />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -150,36 +94,18 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-      v-model="leftDrawerOpen"
-      :mini="miniMode"
-      :width="210"
-      :breakpoint="500"
-      bordered
-    >
+    <q-drawer v-model="leftDrawerOpen" :mini="miniMode" :width="210" :breakpoint="500" bordered>
       <q-list class="leftNavList">
-        <menu-link
-          v-for="nav in essentialLinks"
-          :key="nav.title"
-          v-bind="{ ...nav, mini: miniMode }"
-        />
+        <menu-link v-for="nav in essentialLinks" :key="nav.title" v-bind="{ ...nav, mini: miniMode }" />
       </q-list>
     </q-drawer>
 
     <q-page-container>
       <router-view v-slot="{ Component }">
         <keep-alive>
-          <component
-            :is="Component"
-            v-if="$route.meta.keepAlive"
-            :key="$route.name"
-          />
+          <component :is="Component" v-if="$route.meta.keepAlive" :key="$route.name" />
         </keep-alive>
-        <component
-          :is="Component"
-          v-if="!$route.meta.keepAlive"
-          :key="$route.name"
-        />
+        <component :is="Component" v-if="!$route.meta.keepAlive" :key="$route.name" />
       </router-view>
     </q-page-container>
   </q-layout>
@@ -216,8 +142,8 @@ export default {
     navigateToDocs() {
       window.open("https://docs.zinc.dev", "_blank");
     },
-    navigateToOpenAPI() {
-      window.open("/swagger/index.html", "_blank");
+    navigateToOpenAPI(zoBackendUrl: string) {
+      window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
   },
   setup() {
@@ -228,7 +154,7 @@ export default {
     let quotaAlertClass = "warning";
     let user = store.state.userInfo;
     const languageFlag = ref("img:/src/assets/images/language_flags/en-gb.svg");
-
+    const zoBackendUrl = store.state.API_ENDPOINT
     var linksList = [
       {
         title: t("menu.home"),
@@ -283,7 +209,6 @@ export default {
 
     const getConfig = async () => {
       await configService.get_config().then((res: any) => {
-        console.log(res.data);
         store.dispatch("setConfig", res.data);
         if (res.data.functions_enabled) {
           linksList.splice(4, 0, {
@@ -464,6 +389,7 @@ export default {
       orgOptions,
       updateOrganization,
       selectedOrg,
+      zoBackendUrl
     };
   },
 };
@@ -554,7 +480,7 @@ export default {
         width: 0.875rem;
       }
 
-      & + .row {
+      &+.row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }
@@ -664,7 +590,7 @@ export default {
         width: 0.875rem;
       }
 
-      & + .row {
+      &+.row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }

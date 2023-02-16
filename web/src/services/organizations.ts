@@ -53,7 +53,11 @@ const organizations = {
     return http().get(`api/organizations/associated_members/${orgIdentifier}`);
   },
   update_member_role: (data: any, orgIdentifier: string) => {
-    return http().put(`api/organizations/${orgIdentifier}/member`, data);
+    if (config.isZincObserveCloud === "true") {
+      return http().put(`api/organizations/${orgIdentifier}/member`, data);
+    } else {
+      return http().patch(`api/${orgIdentifier}/users/${encodeURIComponent(data.email)}`, { role: data.role });
+    }
   },
   verify_identifier: (name: string) => {
     return http().get(`api/organizations/verify_identifier/${name}`);

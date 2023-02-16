@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use ahash::AHashMap;
 use rand::distributions::{Alphanumeric, DistString};
 use serde_json::Value;
@@ -20,7 +21,9 @@ use std::io::Error;
 
 use crate::handler::http::auth::validate_credentials;
 use crate::infra::config::CONFIG;
+use crate::meta;
 use crate::meta::user::SignInUser;
+use crate::meta::user::UpdateUser;
 use crate::meta::user::UserRole;
 use crate::{meta::user::User, service::users};
 
@@ -41,7 +44,7 @@ use crate::{meta::user::User, service::users};
 #[get("/{org_id}/users")]
 pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_user(&org_id).await
+    users::list_users(&org_id).await
 }
 
 #[utoipa::path(
@@ -72,23 +75,60 @@ pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<Ht
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
+    operation_id = "UserUpdate",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User's email id"),
+    ),
+    request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/users/{email_id}")]
+pub async fn update(
+    params: web::Path<(String, String)>,
+    user: web::Json<UpdateUser>,
+    credentials: BasicAuth,
+) -> Result<HttpResponse, Error> {
+    let (org_id, email_id) = params.into_inner();
+    let user = user.into_inner();
+    if user.eq(&UpdateUser::default()) {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                Some("Please specify appropriate fields to update user".to_string()),
+            )),
+        );
+    }
+    let initiator_id = credentials.user_id();
+    let self_update = credentials.user_id().eq(&email_id);
+    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
     operation_id = "UserDelete",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("user_name" = String, Path, description = "User name"),
+        ("email_id" = String, Path, description = "User name"),
       ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/users/{user_name}")]
+#[delete("/{org_id}/users/{email_id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    users::delete_user(&org_id, &name).await
+    let (org_id, email_id) = path.into_inner();
+    users::delete_user(&org_id, &email_id).await
 }
 
 #[post("/{org_id}/authentication")]
@@ -107,7 +147,7 @@ pub async fn authentication(
     {
         Ok(v) => {
             if v {
-                if user.name == CONFIG.auth.username {
+                if user.name == CONFIG.auth.useremail {
                     ret.insert("role", Value::String(format!("{:?}", &UserRole::Admin)));
                 } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
                     // println!("{:?}", format!("{:?}", user.role));
