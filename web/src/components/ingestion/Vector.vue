@@ -49,7 +49,7 @@ import config from "../../aws-exports";
 import { useStore } from "vuex";
 
 export default defineComponent({
-  name: "Fluentbit",
+  name: "vector-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -66,7 +66,7 @@ export default defineComponent({
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
-      port: url.port,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
