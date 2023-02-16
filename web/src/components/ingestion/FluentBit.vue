@@ -32,7 +32,7 @@
 [OUTPUT]
   Name http
   Match *
-  Path /api/{{ currOrgIdentifier }}/default/_json
+  URI /api/{{ currOrgIdentifier }}/default/_json
   Host {{ endpoint.host }}
   Port {{ endpoint.port }}
   tls {{ endpoint.tls }}
@@ -67,7 +67,7 @@ export default defineComponent({
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
-      port: url.port,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };

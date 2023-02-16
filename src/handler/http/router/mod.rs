@@ -52,9 +52,15 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(status::healthz);
     cfg.service(
         web::scope("/auth")
-            .wrap(cors)
+            .wrap(cors.clone())
             .service(organizarions_by_username)
             .service(users::authentication),
+    );
+
+    cfg.service(
+        web::scope("/config")
+            .wrap(cors)
+            .service(status::zo_config),
     );
 
     cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
@@ -81,12 +87,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .allow_any_origin()
         .max_age(3600);
     let cors = Arc::new(cors);
-
-    cfg.service(
-        web::scope("/config")
-            .wrap(cors.clone())
-            .service(status::zo_config),
-    );
 
     cfg.service(
         web::scope("/api")
