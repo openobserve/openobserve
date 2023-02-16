@@ -25,6 +25,7 @@ pub struct Condition {
     pub operator: AllOperator,
     #[serde(default)]
     pub ignore_case: Option<bool>,
+    #[schema(value_type = Object)]
     pub value: serde_json::Value,
     pub is_numeric: Option<bool>,
 }
@@ -125,6 +126,7 @@ pub struct Alert {
     pub name: String,
     #[serde(default)]
     pub stream: String,
+    #[schema(value_type = Option<SearchQuery>)]
     pub query: Option<Query>,
     pub condition: Condition,
     pub duration: i64,
