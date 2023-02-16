@@ -51,7 +51,7 @@ pub async fn save_alert(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name for which alert is being created"),
+        ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = AlertList),
