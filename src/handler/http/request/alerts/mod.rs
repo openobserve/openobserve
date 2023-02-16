@@ -42,6 +42,21 @@ pub async fn save_alert(
     alerts::save_alert(org_id, stream_name, name, alert.into_inner()).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListStreamAlerts",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = AlertList),
+    )
+)]
 #[get("/{org_id}/{stream_name}/alerts")]
 async fn list_stream_alerts(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, stream_name) = path.into_inner();
