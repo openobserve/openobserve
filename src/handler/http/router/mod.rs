@@ -93,7 +93,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .wrap(auth)
             .wrap(cors)
             .service(status::cache_status)
-            .service(users::update)
             .service(ingest::bulk)
             .service(ingest::multi)
             .service(ingest::json)
@@ -126,6 +125,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary)
             .service(get_user_passcode)
-            .service(update_user_passcode),
+            .service(update_user_passcode)
+            .service(users::update),
     );
 }
