@@ -143,7 +143,6 @@ export default defineComponent({
               password: password.value,
             })
             .then(async (res: any) => {
-              console.log(res.data.role);
               if (res.data.status == true) {
                 const authToken = getBasicAuth(name.value, password.value);
                 useLocalToken(authToken);
@@ -216,10 +215,8 @@ export default defineComponent({
       authService
         .get_organization_by_username(name.value)
         .then((res) => {
-          console.log(res);
           organizations.value = res.data;
           org_identifier.value = res.data[0];
-          console.log(organizations);
         })
         .catch((e) => {
           console.log(e);

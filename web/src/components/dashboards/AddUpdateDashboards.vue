@@ -205,7 +205,6 @@ export default defineComponent({
         }
         calldashboard.then((res: { data: any }) => {
           this.$emit("updated");
-          console.log("Done saving");
         });
       });
     },

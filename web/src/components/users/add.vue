@@ -108,8 +108,9 @@
 
           <q-select
             v-if="
-              userRole !== 'member' &&
-              store.state.userInfo.email !== formData.email
+              (userRole !== 'member' &&
+                store.state.userInfo.email !== formData.email) ||
+              !beingUpdated
             "
             v-model="formData.role"
             :label="t('user.role') + ' *'"
@@ -306,11 +307,6 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
-
-      this.formData.name =
-        this.formData.firstName.trim() + this.formData.lastName.trim() != ""
-          ? this.formData.firstName + " " + this.formData.lastName
-          : "";
 
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
