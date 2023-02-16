@@ -19,6 +19,7 @@ use actix_web::{
 use std::io::Error;
 use uuid::Uuid;
 
+use super::db;
 use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
 use crate::{
     handler::http::auth::is_root_user,
@@ -28,8 +29,6 @@ use crate::{
     infra::config::{CONFIG, USERS},
     meta::user::UpdateUser,
 };
-
-use super::db;
 
 pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Error> {
     let salt = Uuid::new_v4().to_string();
@@ -50,21 +49,12 @@ pub async fn update_user(
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
-    let existing_user = db::user::get(Some(org_id), email).await;
-    if !self_update {
-        if is_root_user(initiator_id).await {
-            allow_password_update = true
-        } else {
-            let initiating_user = db::user::get(Some(org_id), initiator_id)
-                .await
-                .unwrap()
-                .unwrap();
-            if initiating_user.role.eq(&UserRole::Admin) || initiating_user.role.eq(&UserRole::Root)
-            {
-                allow_password_update = true
-            }
-        }
-    }
+
+    let existing_user = if is_root_user(email).await {
+        db::user::get(None, email).await
+    } else {
+        db::user::get(Some(org_id), email).await
+    };
 
     if existing_user.is_ok() {
         let mut new_user;

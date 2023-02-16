@@ -27,22 +27,22 @@
       :filter-method="filterData"
     >
       <!-- 
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn
-            v-if="props.row.email != store.state.userInfo.email"
-            icon="perm_identity"
-            class="iconHoverBtn"
-            dense
-            unelevated
-            size="sm"
-            color="blue-5"
-            @click="updateUser(props)"
-            :title="t('organization.invite')"
-          ></q-btn>
-        </q-td>
-      </template>
-       -->
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn
+              v-if="props.row.email != store.state.userInfo.email"
+              icon="perm_identity"
+              class="iconHoverBtn"
+              dense
+              unelevated
+              size="sm"
+              color="blue-5"
+              @click="updateUser(props)"
+              :title="t('organization.invite')"
+            ></q-btn>
+          </q-td>
+        </template>
+         -->
       <template #no-data>
         <NoData></NoData>
       </template>
@@ -341,7 +341,7 @@ export default defineComponent({
           if (store.state.userInfo.email == data.email) {
             currentUserRole.value = data.role
           }
-          
+
           return {
             "#": counter <= 9 ? `0${counter++}` : counter++,
             email: data.email,
@@ -417,7 +417,7 @@ export default defineComponent({
       }
     }
 
-    const addMember = (res:any, data: any, operationType: string) => {
+    const addMember = (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       alert(JSON.stringify(data))
       if (res.code == 200) {
@@ -425,7 +425,7 @@ export default defineComponent({
           color: "positive",
           message: "User added successfully.",
         });
-        
+
         if (operationType == "created") {
           orgMembers.value.push({
             "#": orgMembers.value.length + 1,
