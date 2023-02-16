@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, USERS};
+use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::infra::db::etcd;
 use crate::meta;
 use crate::meta::search::Response;
@@ -290,8 +290,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
-    let user = USERS.get(&CONFIG.auth.root_user_email).unwrap();
-    let credentials = Credentials::new(&CONFIG.auth.root_user_email, &user.password);
+    let user = ROOT_USER.get("root").unwrap();
+    let credentials = Credentials::new(&user.email, &user.password);
     let credentials = credentials.as_http_header();
 
     // make cluster request

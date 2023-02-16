@@ -52,6 +52,7 @@ lazy_static! {
     pub static ref STREAM_SCHEMAS: DashMap<String, Vec<Schema>> = DashMap::new();
     pub static ref QUERY_FUNCTIONS: DashMap<String, Transform> = DashMap::new();
     pub static ref USERS: DashMap<String, User> = DashMap::new();
+    pub static ref ROOT_USER: DashMap<String, User> = DashMap::new();
     pub static ref PASSWORD_HASH: DashMap<String, String> = DashMap::new();
     #[derive(Debug)]
     pub static ref METRIC_CLUSTER_MAP: DashMap<String, Vec<String>> = DashMap::new();

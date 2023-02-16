@@ -17,8 +17,8 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use serde::Serialize;
 use std::io::Error;
 
-use crate::handler::http::auth::is_root_user;
-use crate::infra::config::{CONFIG, USERS};
+use crate::common::auth::is_root_user;
+use crate::infra::config::USERS;
 use crate::meta::organization::PasscodeResponse;
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
@@ -81,7 +81,7 @@ pub async fn organizarions_by_username(
         };
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.root_user_email) {
+            if !user.key().ends_with(&user_name) {
                 let org = Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -134,7 +134,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         });
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.root_user_email) {
+            if !user.key().ends_with(&user_id) {
                 id += 1;
                 let org = OrganizationDetails {
                     id,

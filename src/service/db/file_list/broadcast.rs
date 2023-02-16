@@ -20,7 +20,7 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, USERS};
+use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::meta::common::FileKey;
 
 lazy_static! {
@@ -61,8 +61,8 @@ async fn send_to_node(
         if cluster::ge_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
-        let user = USERS.get(&CONFIG.auth.root_user_email).unwrap();
-        let credentials = Credentials::new(&CONFIG.auth.root_user_password, &user.password);
+        let user = ROOT_USER.get("root").unwrap();
+        let credentials = Credentials::new(&user.email, &user.password);
         let credentials = credentials.as_http_header();
         let token: MetadataValue<_> = credentials.parse()?;
         let channel = Channel::from_shared(node.grpc_addr)
