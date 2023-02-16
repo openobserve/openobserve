@@ -419,7 +419,6 @@ export default defineComponent({
 
     const addMember = (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
-      alert(JSON.stringify(data))
       if (res.code == 200) {
         $q.notify({
           color: "positive",
