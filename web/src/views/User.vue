@@ -70,41 +70,6 @@
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-            v-if="
-              props.row.email != store.state.userInfo.email &&
-              config.isZincObserveCloud == 'true'
-            "
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="updateUser(props)"
-          />
-          <q-btn
-            v-if="props.row.email == store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addUser(props, false)"
-          />
-          <q-btn
-            :title="t('user.updatenotallowed')"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            flat
-            class="iconHoverBtn"
-            size="sm"
-            v-else
-          />
-          <q-btn
             v-if="props.row.email == `false_condition_to_hide_delete_button`"
             icon="img:/src/assets/images/common/delete_icon.svg"
             :title="t('user.delete')"
@@ -116,9 +81,12 @@
             flat
             @click="deleteUser(props)"
           />
-          {{ currentUserRole }}
           <q-btn
-            v-if="props.row.isLoggedinUser || currentUserRole == 'root'"
+            v-if="
+              props.row.isLoggedinUser ||
+              currentUserRole == 'root' ||
+              currentUserRole == 'admin'
+            "
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs iconHoverBtn"
@@ -197,7 +165,7 @@
               icon="add"
               dense
               :label="t(`user.add`)"
-              @click="addUser({}, false)"
+              @click="addUser({}, false, currentUserRole)"
             />
           </div>
         </div>
@@ -240,6 +208,7 @@
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
+        :userRole="currentUserRole"
         @updated="addMember"
       />
     </q-dialog>

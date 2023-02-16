@@ -107,7 +107,7 @@
           />
 
           <q-select
-            v-if="formData.role !== 'member'"
+            v-if="userRole !== 'member'"
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roleOptions"
@@ -134,7 +134,11 @@
             />
 
             <q-input
-              v-if="formData.change_password"
+              v-if="
+                formData.change_password &&
+                (userRole == 'member' ||
+                  store.state.userInfo.email == formData.email)
+              "
               :type="isOldPwd ? 'password' : 'text'"
               v-model="formData.oldPassword"
               :label="t('user.oldPassword') + ' *'"
@@ -245,6 +249,10 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
+    },
+    userRole: {
+      type: String,
+      default: "member",
     },
   },
   emits: ["update:modelValue", "updated"],
