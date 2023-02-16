@@ -99,7 +99,7 @@ pub async fn update_user(
                     new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
                     is_updated = true;
                 } else {
-                    message = "Only admins or user(self) can update password"
+                    message = "You are not authorised to change the password"
                 }
                 if user.first_name.is_some() {
                     new_user.first_name = user.first_name.unwrap();
