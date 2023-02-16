@@ -107,7 +107,10 @@
           />
 
           <q-select
-            v-if="userRole !== 'member'"
+            v-if="
+              userRole !== 'member' &&
+              store.state.userInfo.email !== formData.email
+            "
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roleOptions"
