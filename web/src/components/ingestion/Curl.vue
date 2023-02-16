@@ -57,7 +57,7 @@ export default defineComponent({
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
-      port: url.port,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
