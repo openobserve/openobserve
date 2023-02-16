@@ -32,15 +32,14 @@
 [sinks.zinc]
 type = "http"
 inputs = [ source or transform id ]
-endpoint = "{{ config.zincENLEndPoint }}/api/{{ currOrgIdentifier }}/"
-mode = "bulk"
+endpoint = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
 auth.strategy = "basic"
 auth.user = "{{ currUserEmail }}"
 auth.password = "{{ store.state.organizationPasscode }}"
-bulk.index = "default"
 compression = "none"
-healthcheck.enabled = false</pre
-    >
+encoding.codec = "json"
+encoding.timestamp_format = "rfc3339"
+healthcheck.enabled = false</pre>
   </div>
 </template>
 
@@ -61,11 +60,22 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const endpoint = ref(""); 
+ 
+    const url = new URL(store.state.API_ENDPOINT); 
+    endpoint.value = {
+      url: store.state.API_ENDPOINT,
+      host: url.hostname,
+      port: url.port,
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+    };
 
     const vectorContent = ref(null);
     return {
       store,
       config,
+      endpoint,
       vectorContent,
     };
   },

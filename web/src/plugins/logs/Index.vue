@@ -409,7 +409,7 @@ export default defineComponent({
       }
     }
 
-    function buildZincENLSearch() {
+    function buildSearch() {
       try {
         let query = searchObj.data.editorValue;
 
@@ -609,7 +609,7 @@ export default defineComponent({
         }
         dismiss = Notify();
 
-        const queryReq = buildZincENLSearch();
+        const queryReq = buildSearch();
 
         searchService
           .search({

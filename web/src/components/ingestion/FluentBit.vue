@@ -33,15 +33,14 @@
   Name http
   Match *
   Path /api/{{ currOrgIdentifier }}/default/_json
-  Host {{ config.zincENLIngestion }}
-  index default
-  Port 443
-  tls On
-  Suppress_Type_Name On
-  Generate_ID On
+  Host {{ endpoint.host }}
+  Port {{ endpoint.port }}
+  tls {{ endpoint.tls }}
+  Format json
+  Json_date_key    _timestamp
+  Json_date_format iso8601
   HTTP_User {{ currUserEmail }}
-  HTTP_Passwd {{ store.state.organizationPasscode }}</pre
-    >
+  HTTP_Passwd {{ store.state.organizationPasscode }}</pre>
   </div>
 </template>
 
@@ -62,11 +61,22 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const endpoint = ref(""); 
+ 
+    const url = new URL(store.state.API_ENDPOINT); 
+    endpoint.value = {
+      url: store.state.API_ENDPOINT,
+      host: url.hostname,
+      port: url.port,
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+    };
 
     const fluentbitContent = ref(null);
     return {
       store,
       config,
+      endpoint,
       fluentbitContent,
     };
   },

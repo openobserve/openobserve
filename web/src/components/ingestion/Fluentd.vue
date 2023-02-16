@@ -36,19 +36,16 @@
 &lt;/source&gt;
 
 &lt;match **&gt;
-  @type copy
-  &lt;store&gt;
-    @type http
-    host {{ config.zincENLIngestion }}
-    port 443
-    scheme https
-    path /api/{{ currOrgIdentifier }}/default/_json
-    user {{ currUserEmail }}
+  @type http
+  endpoint {{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json
+  content_type json
+  json_array true
+  &lt;auth&gt;
+    method basic
+    username {{ currUserEmail }}
     password {{ store.state.organizationPasscode }}
-    index_name default
-  &lt;/store&gt;
-&lt;/match&gt;</pre
-    >
+  &lt;/auth&gt;
+&lt;/match&gt;</pre>
   </div>
 </template>
 
@@ -69,11 +66,22 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const endpoint = ref(""); 
+ 
+    const url = new URL(store.state.API_ENDPOINT); 
+    endpoint.value = {
+      url: store.state.API_ENDPOINT,
+      host: url.hostname,
+      port: url.port,
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+    };
 
     const fluentdContent = ref(null);
     return {
       store,
       config,
+      endpoint,
       fluentdContent,
     };
   },
