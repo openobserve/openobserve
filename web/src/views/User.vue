@@ -17,51 +17,40 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table
-      ref="qTable"
-      :rows="orgMembers"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-    >
+    <q-table ref="qTable" :rows="orgMembers" :columns="columns" row-key="id" :pagination="pagination"
+      :filter="filterQuery" :filter-method="filterData">
       <!-- 
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn
-            v-if="props.row.email != store.state.userInfo.email"
-            icon="perm_identity"
-            class="iconHoverBtn"
-            dense
-            unelevated
-            size="sm"
-            color="blue-5"
-            @click="updateUser(props)"
-            :title="t('organization.invite')"
-          ></q-btn>
-        </q-td>
-      </template>
-       -->
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn
+              v-if="props.row.email != store.state.userInfo.email"
+              icon="perm_identity"
+              class="iconHoverBtn"
+              dense
+              unelevated
+              size="sm"
+              color="blue-5"
+              @click="updateUser(props)"
+              :title="t('organization.invite')"
+            ></q-btn>
+          </q-td>
+        </template>
+         -->
       <template #no-data>
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
-        <q-td
-          :props="props"
-          v-if="
-            (currentUserRole == 'admin' || currentUserRole == 'root') &&
-            !props.row.isLoggedinUser
-          "
-        >
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            style="width: 70px"
-            @update:model-value="updateUserRole(props.row)"
-          />
+        <q-td :props="props" v-if="
+          <<<<<< <HEAD
+                      (currentUserRole == 'admin' || currentUserRole == 'root') &&
+          =======
+          ((currentUserRole == 'admin' && props.row.role !== 'root') ||
+            currentUserRole == 'root') &&
+          >>>>>>> 7d993592b47a3e5c1f0198566f4c50ac5a3454e0
+        !props.row.isLoggedinUser
+                    ">
+          <q-select dense borderless v-model="props.row.role" :options="options" style="width: 70px"
+            @update:model-value="updateUserRole(props.row)" />
         </q-td>
         <q-td :props="props" v-else>
           {{ props.row.role }}
@@ -69,34 +58,15 @@
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.email == `false_condition_to_hide_delete_button`"
-            icon="img:/src/assets/images/common/delete_icon.svg"
-            :title="t('user.delete')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="deleteUser(props)"
-          />
-          <q-btn
-            v-if="
-              props.row.isLoggedinUser ||
-              currentUserRole == 'root' ||
-              currentUserRole == 'admin'
-            "
-            icon="edit"
-            :title="t('user.update')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addUser(props, true)"
-          />
+          <q-btn v-if="props.row.email == `false_condition_to_hide_delete_button`"
+            icon="img:/src/assets/images/common/delete_icon.svg" :title="t('user.delete')" class="q-ml-xs iconHoverBtn"
+            padding="sm" unelevated size="sm" round flat @click="deleteUser(props)" />
+          <q-btn v-if="
+            props.row.isLoggedinUser ||
+            currentUserRole == 'root' ||
+            (currentUserRole == 'admin' && props.row.role !== 'root')
+          " icon="edit" :title="t('user.update')" class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm"
+            round flat @click="addUser(props, true)" />
         </q-td>
       </template>
       <template #top="scope">
@@ -104,113 +74,49 @@
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
-          <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6 q-pr-sm"
-            :placeholder="t('user.search')"
-          >
+          <q-input v-model="filterQuery" filled dense class="col-6 q-pr-sm" :placeholder="t('user.search')">
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
 
-          <div
-            class="col-5 q-pr-sm"
-            v-if="
-              currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
-            "
-          >
+          <div class="col-5 q-pr-sm" v-if="
+            currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
+          ">
             <div class="row invite-user">
-              <q-input
-                v-model="userEmail"
-                class="col-9 q-pl-md"
-                borderless
-                dense
-                :placeholder="t('user.inviteByEmail')"
-              >
+              <q-input v-model="userEmail" class="col-9 q-pl-md" borderless dense :placeholder="t('user.inviteByEmail')">
               </q-input>
               <q-separator vertical class="col-1 q-mx-md separator" />
               <div class="col-2 flex justify-center">
-                <q-select
-                  dense
-                  borderless
-                  v-model="selectedRole"
-                  :options="options"
-                  style="width: 70px"
-                />
+                <q-select dense borderless v-model="selectedRole" :options="options" style="width: 70px" />
               </div>
             </div>
             <label class="inputHint">{{ t("user.inviteByEmailHint") }}</label>
-            <q-btn
-              v-if="currentUserRole == 'admin'"
-              class="col-1 text-bold no-border"
-              padding="sm 0"
-              color="secondary"
-              no-caps
-              :label="t(`user.sendInvite`)"
-              @click="inviteUser()"
-              :disable="userEmail == ''"
-            />
+            <q-btn v-if="currentUserRole == 'admin'" class="col-1 text-bold no-border" padding="sm 0" color="secondary"
+              no-caps :label="t(`user.sendInvite`)" @click="inviteUser()" :disable="userEmail == ''" />
           </div>
           <div v-else class="col-6">
-            <q-btn
-              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
-              class="q-ml-md q-mb-xs text-bold no-border"
-              style="float: right; cursor: pointer !important"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              icon="add"
-              dense
-              :label="t(`user.add`)"
-              @click="addUser({}, false)"
-            />
+            <q-btn v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
+              class="q-ml-md q-mb-xs text-bold no-border" style="float: right; cursor: pointer !important" padding="sm lg"
+              color="secondary" no-caps icon="add" dense :label="t(`user.add`)" @click="addUser({}, false)" />
           </div>
         </div>
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('user.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :pageTitle="t('user.header')" :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions" position="top" @update:changeRecordPerPage="changePagination" />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="bottom"
+          @update:changeRecordPerPage="changePagination" />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
+    <q-dialog v-model="showUpdateUserDialog" position="right" full-height maximized>
       <update-user-role v-model="selectedUser" @updated="updateMember" />
     </q-dialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-user
-        style="width: 35vw"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        @updated="addMember"
-      />
+    <q-dialog v-model="showAddUserDialog" position="right" full-height maximized>
+      <add-user style="width: 35vw" v-model="selectedUser" :isUpdated="isUpdated" :userRole="currentUserRole"
+        @updated="addMember" />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -224,19 +130,13 @@
           <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-          >
+          <q-btn v-close-popup unelevated no-caps class="no-border" color="primary">
             {{ t("user.ok") }}
           </q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </q-page>
+</q-page>
 </template>
 
 <script lang="ts">
@@ -340,7 +240,7 @@ export default defineComponent({
           if (store.state.userInfo.email == data.email) {
             currentUserRole.value = data.role
           }
-          
+
           return {
             "#": counter <= 9 ? `0${counter++}` : counter++,
             email: data.email,
@@ -416,7 +316,7 @@ export default defineComponent({
       }
     }
 
-    const addMember = (res:any, data: any, operationType: string) => {
+    const addMember = (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       alert(JSON.stringify(data))
       if (res.code == 200) {
@@ -424,7 +324,7 @@ export default defineComponent({
           color: "positive",
           message: "User added successfully.",
         });
-        
+
         if (operationType == "created") {
           orgMembers.value.push({
             "#": orgMembers.value.length + 1,

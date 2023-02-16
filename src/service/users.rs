@@ -62,25 +62,6 @@ pub async fn update_user(
         let mut message = "";
         match existing_user.unwrap() {
             Some(local_user) => {
-                if !self_update {
-                    if is_root_user(initiator_id).await {
-                        allow_password_update = true
-                    } else {
-                        let initiating_user = db::user::get(Some(org_id), initiator_id)
-                            .await
-                            .unwrap()
-                            .unwrap();
-                        if (local_user.role.eq(&UserRole::Root)
-                            && initiating_user.role.eq(&UserRole::Root))
-                            || (!local_user.role.eq(&UserRole::Root)
-                                && (initiating_user.role.eq(&UserRole::Admin)
-                                    || initiating_user.role.eq(&UserRole::Root)))
-                        {
-                            allow_password_update = true
-                        }
-                    }
-                }
-
                 new_user = local_user.clone();
                 if self_update && user.old_password.is_some() && user.new_password.is_some() {
                     if local_user.password.eq(&get_hash(
