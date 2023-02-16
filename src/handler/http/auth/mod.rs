@@ -73,6 +73,11 @@ pub async fn validate_credentials(
         return Ok(false);
     }
     let user = user.unwrap();
+
+    if user.token.eq(&user_password) {
+        return Ok(true);
+    }
+
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass) {
         return Ok(false);
@@ -90,7 +95,7 @@ pub async fn validate_credentials(
 }
 
 pub async fn is_root_user(user_id: &str) -> bool {
-    user_id.eq(&CONFIG.auth.useremail)
+    user_id.eq(&CONFIG.auth.root_user_email)
 }
 
 #[cfg(test)]
@@ -98,8 +103,12 @@ mod test_utils {
     use super::*;
     #[actix_web::test]
     async fn test_validate_credentials() {
-        let res =
-            validate_credentials(&CONFIG.auth.useremail, &CONFIG.auth.password, "index").await;
+        let res = validate_credentials(
+            &CONFIG.auth.root_user_email,
+            &CONFIG.auth.root_user_password,
+            "index",
+        )
+        .await;
         assert_eq!(res.is_ok(), true)
     }
 }

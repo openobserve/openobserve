@@ -294,15 +294,15 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "firstName",
-        field: "firstName",
+        name: "first_name",
+        field: "first_name",
         label: t("user.firstName"),
         align: "left",
         sortable: true,
       },
       {
-        name: "lastName",
-        field: "lastName",
+        name: "last_name",
+        field: "last_name",
         label: t("user.lastName"),
         align: "left",
         sortable: true,
@@ -345,8 +345,8 @@ export default defineComponent({
           return {
             "#": counter <= 9 ? `0${counter++}` : counter++,
             email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
+            first_name: data.first_name,
+            last_name: data.last_name,
             role: data.role,
             member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
             member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
@@ -429,8 +429,8 @@ export default defineComponent({
           orgMembers.value.push({
             "#": orgMembers.value.length + 1,
             email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
+            first_name: data.first_name,
+            last_name: data.last_name,
             role: data.role,
           });
         } else {
@@ -572,7 +572,7 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["firstName"]?.toLowerCase().includes(terms) || rows[i]["lastName"]?.toLowerCase().includes(terms) || rows[i]["email"]?.toLowerCase().includes(terms) || rows[i]["role"].toLowerCase().includes(terms)) {
+          if (rows[i]["first_name"]?.toLowerCase().includes(terms) || rows[i]["last_name"]?.toLowerCase().includes(terms) || rows[i]["email"]?.toLowerCase().includes(terms) || rows[i]["role"].toLowerCase().includes(terms)) {
             filtered.push(rows[i]);
           }
         }

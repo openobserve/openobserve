@@ -29,8 +29,8 @@
         @click="showUpdateDialogFn"
       />
       <ConfirmDialog
-        title="Update Password"
-        message="Are you sure you want to update organization password?"
+        title="Reset Token"
+        message="Are you sure you want to update token for this organization?"
         @update:ok="updatePasscode"
         @update:cancel="confirmUpdate = false"
         v-model="confirmUpdate"
@@ -236,7 +236,7 @@ export default defineComponent({
           } else {
             q.notify({
               type: "positive",
-              message: "Password updated successfully.",
+              message: "Token reset successfully.",
               timeout: 5000,
             });
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
@@ -247,7 +247,7 @@ export default defineComponent({
         .catch((e) => {
           q.notify({
             type: "negative",
-            message: "Error while updating passcode." + e.error,
+            message: "Error while updating Token." + e.error,
             timeout: 5000,
           });
         });

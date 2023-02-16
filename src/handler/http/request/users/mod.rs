@@ -66,8 +66,8 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
 pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let mut user = user.into_inner();
-    if user.ingestion_token.is_empty() {
-        user.ingestion_token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    if user.token.is_empty() {
+        user.token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
     }
     users::post_user(&org_id, user).await
 }
@@ -147,7 +147,7 @@ pub async fn authentication(
     {
         Ok(v) => {
             if v {
-                if user.name == CONFIG.auth.useremail {
+                if user.name == CONFIG.auth.root_user_email {
                     ret.insert("role", Value::String(format!("{:?}", &UserRole::Admin)));
                 } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
                     // println!("{:?}", format!("{:?}", user.role));
