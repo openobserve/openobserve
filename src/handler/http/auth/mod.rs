@@ -54,7 +54,7 @@ pub async fn validate_credentials(
 ) -> Result<bool, Error> {
     let user;
     //this is only applicable for super admin user
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
             return Ok(false);
@@ -89,7 +89,7 @@ pub async fn validate_credentials(
     }
 }
 
-pub async fn is_admin_user(user_id: &str) -> bool {
+pub async fn is_root_user(user_id: &str) -> bool {
     user_id.eq(&CONFIG.auth.useremail)
 }
 

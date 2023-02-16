@@ -19,8 +19,11 @@ use actix_web::{
 use std::io::Error;
 use uuid::Uuid;
 
-use crate::meta::user::{User, UserList, UserResponse, UserRole};
 use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
+use crate::{
+    handler::http::auth::is_root_user,
+    meta::user::{User, UserList, UserResponse, UserRole},
+};
 use crate::{
     infra::config::{CONFIG, USERS},
     meta::user::UpdateUser,
@@ -43,9 +46,26 @@ pub async fn update_user(
     org_id: &str,
     email: &str,
     self_update: bool,
+    initiator_id: &str,
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
+    let mut allow_password_update = false;
     let existing_user = db::user::get(Some(org_id), email).await;
+    if !self_update {
+        if is_root_user(initiator_id).await {
+            allow_password_update = true
+        } else {
+            let initiating_user = db::user::get(Some(org_id), initiator_id)
+                .await
+                .unwrap()
+                .unwrap();
+            if initiating_user.role.eq(&UserRole::Admin) || initiating_user.role.eq(&UserRole::Root)
+            {
+                allow_password_update = true
+            }
+        }
+    }
+
     if existing_user.is_ok() {
         let mut new_user;
         let mut is_updated = false;
@@ -54,15 +74,23 @@ pub async fn update_user(
             Some(local_user) => {
                 new_user = local_user.clone();
                 if self_update && user.old_password.is_some() && user.new_password.is_some() {
-                    if local_user
-                        .password
-                        .eq(&get_hash(&user.old_password.unwrap(), &local_user.salt))
-                    {
+                    if local_user.password.eq(&get_hash(
+                        &user.clone().old_password.unwrap(),
+                        &local_user.salt,
+                    )) {
                         new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
                         is_updated = true;
                     } else {
-                        message = "Existing/old password mismatch , please provide valid existing password"
+                        message =
+                        "Existing/old password mismatch , please provide valid existing password"
                     }
+                } else if self_update && user.old_password.is_none() {
+                    message = "Please provide existing password"
+                } else if !self_update && allow_password_update && user.new_password.is_some() {
+                    new_user.password = get_hash(&user.new_password.unwrap(), &local_user.salt);
+                    is_updated = true;
+                } else {
+                    message = "Only admins or user(self) can update password"
                 }
                 if user.first_name.is_some() {
                     new_user.first_name = user.first_name.unwrap();
@@ -80,7 +108,7 @@ pub async fn update_user(
                     new_user.role = user.role.unwrap();
                     is_updated = true;
                 }
-                if self_update && user.ingestion_token.is_some() {
+                if user.ingestion_token.is_some() {
                     new_user.ingestion_token = user.ingestion_token.unwrap();
                     is_updated = true;
                 }
@@ -140,7 +168,7 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     }
 }
 
-pub async fn list_user(org_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
         if user.key().contains(org_id) {
@@ -152,6 +180,14 @@ pub async fn list_user(org_id: &str) -> Result<HttpResponse, Error> {
             })
         }
     }
+    //add root user to all the orgs
+    user_list.push(UserResponse {
+        email: CONFIG.auth.useremail.clone(),
+        first_name: "".to_string(),
+        last_name: "".to_string(),
+        role: UserRole::Root,
+    });
+
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 

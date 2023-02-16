@@ -32,7 +32,7 @@ const users = {
     return http().post(`/api/${org_identifier}/users`, data);
   },
   update: (data: any, org_identifier: string, user_email: string) => {
-    return http().patch(`/api/${org_identifier}/users/${user_email}`, data);
+    return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
   verifyUser: (email: string) => {
     return http().get(`/api/users/verifyuser/${email}`);
