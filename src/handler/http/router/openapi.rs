@@ -41,6 +41,12 @@ use crate::meta;
         request::functions::list_stream_function,
         request::functions::save_stream_function,
         request::functions::delete_stream_function,
+        request::alerts::save_alert,
+        request::alerts::list_stream_alerts,
+        request::alerts::list_alerts,
+        request::alerts::get_alert,
+        request::alerts::delete_alert,
+
     ),
     components(
         schemas(
@@ -64,6 +70,10 @@ use crate::meta;
             meta::search::Query,
             meta::search::Request,
             meta::search::Response,
+            meta::alert::Alert,
+            meta::alert::AlertList,
+            meta::alert::Condition,
+            meta::alert::AllOperator,
         ),
     ),
     modifiers(&SecurityAddon),
@@ -73,6 +83,7 @@ use crate::meta;
         (name = "Search"),
         (name = "Functions"),
         (name = "Users"),
+        (name = "Alerts"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",

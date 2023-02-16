@@ -14,10 +14,11 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use utoipa::ToSchema;
 
 use super::search::Query;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Condition {
     pub column: String,
@@ -94,7 +95,7 @@ impl Evaluate for Condition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum AllOperator {
     #[serde(alias = "=")]
     EqualTo,
@@ -118,7 +119,7 @@ impl Default for AllOperator {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
     #[serde(default)]
     pub name: String,
@@ -140,7 +141,7 @@ impl PartialEq for Alert {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AlertList {
     pub list: Vec<Alert>,
 }

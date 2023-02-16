@@ -17,6 +17,22 @@ use std::io::Error;
 
 use crate::{meta::alert::Alert, service::alerts};
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "SaveAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name for which alert is being created"),
+        ("alert_name" = String, Path, description = "Alert name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/{stream_name}/alerts/{alert_name}")]
 pub async fn save_alert(
     path: web::Path<(String, String, String)>,
@@ -26,24 +42,87 @@ pub async fn save_alert(
     alerts::save_alert(org_id, stream_name, name, alert.into_inner()).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListStreamAlerts",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name for which alert is being created"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = AlertList),
+    )
+)]
 #[get("/{org_id}/{stream_name}/alerts")]
 async fn list_stream_alerts(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, stream_name) = path.into_inner();
     alerts::list_alert(org_id, Some(stream_name.as_str())).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlerts",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = AlertList),
+    )
+)]
 #[get("/{org_id}/alerts")]
 async fn list_alerts(path: web::Path<String>) -> impl Responder {
     let org_id = path.into_inner();
     alerts::list_alert(org_id, None).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = Alert),
+        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
 async fn get_alert(path: web::Path<(String, String, String)>) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
     alerts::get_alert(org_id, stream_name, name).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "DeleteAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
 async fn delete_alert(path: web::Path<(String, String, String)>) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
