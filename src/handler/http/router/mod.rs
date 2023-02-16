@@ -69,6 +69,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
+    //let ingestion_auth = HttpAuthentication::basic(passcode_validator);
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -92,9 +93,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .wrap(auth)
             .wrap(cors)
             .service(status::cache_status)
-            .service(ingest::bulk)
-            .service(ingest::multi)
-            .service(ingest::json)
             .service(search::search)
             .service(search::around)
             .service(stream::schema)
@@ -125,6 +123,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(org_summary)
             .service(get_user_passcode)
             .service(update_user_passcode)
-            .service(users::update),
+            .service(users::update)
+            .service(ingest::bulk)
+            .service(ingest::multi)
+            .service(ingest::json),
     );
 }

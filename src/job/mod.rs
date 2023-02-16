@@ -18,6 +18,7 @@ use crate::meta::organization::DEFAULT_ORG;
 use crate::meta::user::User;
 use crate::service::{db, users};
 use rand::distributions::{Alphanumeric, DistString};
+use regex::Regex;
 
 mod alert_manager;
 mod compact;
@@ -27,8 +28,18 @@ mod prom;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    let res = db::user::get_root_user(&CONFIG.auth.useremail).await;
-    if res.is_err() || res.unwrap().is_none() {
+    let email_regex = Regex::new(
+        r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+    )
+    .unwrap();
+
+    if !db::user::root_user_exists().await {
+        if CONFIG.auth.useremail.is_empty()
+            || !email_regex.is_match(&CONFIG.auth.useremail)
+            || CONFIG.auth.password.is_empty()
+        {
+            panic!("Please set root user email-id & password using ZO_USER_EMAIL & ZO_USER_PASSWORD enviornment variables");
+        }
         let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let _ = users::post_user(
             DEFAULT_ORG,
