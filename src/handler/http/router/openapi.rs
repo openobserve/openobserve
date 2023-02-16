@@ -78,12 +78,12 @@ use crate::meta;
     ),
     modifiers(&SecurityAddon),
     tags(
-        (name = "Streams"),
-        (name = "Ingestion"),
-        (name = "Search"),
-        (name = "Functions"),
-        (name = "Users"),
-        (name = "Alerts"),
+        (name = "Streams" , description = "Stream retrieval & management operations"),
+        (name = "Ingestion" , description = "Data ingestion operations"),
+        (name = "Search", description = "Search/Query operations"),
+        (name = "Functions", description = "Functions retrieval & management operations"),
+        (name = "Users", description = "Users retrieval & management operations"),
+        (name = "Alerts", description = "Alerts retrieval & management operations"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
