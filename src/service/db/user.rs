@@ -101,13 +101,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn get_root_user(name: &str) -> Result<Option<User>, anyhow::Error> {
-    let db_span = info_span!("db:user:get_root");
+pub async fn root_user_exists() -> bool {
+    let db_span = info_span!("db:user:root_user_exists");
     let _guard = db_span.enter();
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/user/{}", name);
-    let ret = db.get(&key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
+    let key = "/user/";
+    let mut ret = db.list_values(key).await.unwrap();
+    ret.retain(|item| {
+        let user: User = json::from_slice(item).unwrap();
+        user.role.eq(&crate::meta::user::UserRole::Root)
+    });
+    !ret.is_empty()
 }

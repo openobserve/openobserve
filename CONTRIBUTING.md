@@ -63,7 +63,7 @@ Please note by default user 'admin' with password 'Complexpass#123' is created
 
 This will start the zincobserve API server on port 5080
 
-environment variables ZO_USER_NAME and ZO_USER_PASSWORD can be used first time to configure default admin user when zincobserve is started.
+environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when zincobserve is started.
 
 ### UI
 

@@ -117,8 +117,8 @@ pub async fn update_user(
                     new_user.role = user.role.unwrap();
                     is_updated = true;
                 }
-                if user.ingestion_token.is_some() {
-                    new_user.ingestion_token = user.ingestion_token.unwrap();
+                if user.token.is_some() {
+                    new_user.token = user.token.unwrap();
                     is_updated = true;
                 }
                 if is_updated {
@@ -152,7 +152,7 @@ pub async fn update_user(
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let mut local_org = "";
-    let user_key = if name.eq(&CONFIG.auth.useremail) {
+    let user_key = if name.eq(&CONFIG.auth.root_user_email) {
         name.to_owned()
     } else {
         match org_id {
@@ -180,7 +180,7 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
-        if user.key().contains(org_id) {
+        if user.key().contains(org_id) || !user.key().contains('/') {
             user_list.push(UserResponse {
                 email: user.value().email.clone(),
                 role: user.value().role.clone(),
@@ -189,13 +189,6 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
             })
         }
     }
-    //add root user to all the orgs
-    user_list.push(UserResponse {
-        email: CONFIG.auth.useremail.clone(),
-        first_name: "".to_string(),
-        last_name: "".to_string(),
-        role: UserRole::Root,
-    });
 
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
@@ -211,5 +204,15 @@ pub async fn delete_user(org_id: &str, email_id: &str) -> Result<HttpResponse, E
             StatusCode::NOT_FOUND.into(),
             Some(err.to_string()),
         ))),
+    }
+}
+
+pub async fn root_user_exists() -> bool {
+    let local_users = USERS.clone();
+    if !local_users.is_empty() {
+        local_users.retain(|k, v| k.contains('/') && v.role.eq(&UserRole::Root));
+        local_users.is_empty()
+    } else {
+        db::user::root_user_exists().await
     }
 }

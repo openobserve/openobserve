@@ -80,10 +80,10 @@ pub struct Config {
 
 #[derive(Clone, Debug, EnvConfig)]
 pub struct Auth {
-    #[env_config(name = "ZO_USER_EMAIL", default = "admin@zo.com")]
-    pub useremail: String,
-    #[env_config(name = "ZO_USER_PASSWORD", default = "Complexpass#123")]
-    pub password: String,
+    #[env_config(name = "ZO_ROOT_USER_EMAIL")]
+    pub root_user_email: String,
+    #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
+    pub root_user_password: String,
 }
 
 #[derive(Clone, Debug, EnvConfig)]

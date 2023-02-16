@@ -38,10 +38,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         Err(_) => return Err(Status::unauthenticated("No valid auth token")),
     };
 
-    let user = USERS.get(&CONFIG.auth.useremail).unwrap();
+    let user = USERS.get(&CONFIG.auth.root_user_email).unwrap();
     let in_pass = get_hash(&credentials.password, &user.salt);
 
-    if credentials.user_id.eq(&CONFIG.auth.useremail)
+    if credentials.user_id.eq(&CONFIG.auth.root_user_email)
         && (user.password.eq(&credentials.password) || user.password.eq(&in_pass))
     {
         Ok(req)
