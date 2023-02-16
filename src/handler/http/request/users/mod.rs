@@ -148,9 +148,9 @@ pub async fn authentication(
         Ok(v) => {
             if v {
                 if is_root_user(&user.name).await {
-                    ret.insert("role", Value::String(format!("{:?}", &UserRole::Admin)));
+                    ret.insert("role", Value::String(UserRole::Admin.to_string()));
                 } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
-                    ret.insert("role", Value::String(format!("{:?}", user.role)));
+                    ret.insert("role", Value::String(user.role.to_string()));
                 }
                 ret.insert("status", Value::Bool(true));
             } else {
