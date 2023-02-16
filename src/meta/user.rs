@@ -40,6 +40,7 @@ pub struct UpdateUser {
     pub old_password: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<UserRole>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,

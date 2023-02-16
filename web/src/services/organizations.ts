@@ -56,7 +56,7 @@ const organizations = {
     if (config.isZincObserveCloud === "true") {
       return http().put(`/api/organizations/${orgIdentifier}/member`, data);
     } else {
-      return http().patch(`/api/${orgIdentifier}/users/${encodeURIComponent(data.email)}`, { role: data.role });
+      return http().put(`/api/${orgIdentifier}/users/${encodeURIComponent(data.email)}`, { role: data.role });
     }
   },
   verify_identifier: (name: string) => {
