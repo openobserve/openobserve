@@ -261,7 +261,6 @@ export default defineComponent({
     getLogStream();
 
     const listSchema = (props: any) => {
-      console.log(props.row.schema);
       schemaData.value.name = props.row.name;
       schemaData.value.schema = props.row.schema;
       schemaData.value.stream_type = props.row.stream_type;

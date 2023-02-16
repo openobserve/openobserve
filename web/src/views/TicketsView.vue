@@ -201,7 +201,6 @@ export default defineComponent({
       },
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
-        console.log(rows);
         const filtered = [];
         terms = terms.toLowerCase();
         for (let i = 0; i < rows.length; i++) {

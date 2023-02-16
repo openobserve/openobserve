@@ -308,7 +308,7 @@ export default defineComponent({
             };
             searchObj.data.stream.streamLists.push(itemObj);
 
-            if (item.stats.doc_time_max > lastUpdatedStreamTime) {
+            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
               lastUpdatedStreamTime = item.stats.doc_time_max;
               selectedStreamItemObj = itemObj;
             }
@@ -326,7 +326,7 @@ export default defineComponent({
               yData: [],
               chartParams: {},
             };
-            reDrawGrid();
+            // reDrawGrid();
           }
         } else {
           searchObj.loading = false;
@@ -638,6 +638,19 @@ export default defineComponent({
             //update grid columns
             updateGridColumns();
             dismiss();
+          })
+          .catch((err) => {
+            searchObj.loading = false;
+            dismiss();
+            if (err.response != undefined) {
+              searchObj.data.errorMsg = err.response.data.error;
+            } else {
+              searchObj.data.errorMsg = err.message;
+            }
+            $q.notify({
+              message: searchObj.data.errorMsg,
+              color: "negative",
+            });
           });
       } catch (e) {
         throw new ErrorException("Request failed.");
