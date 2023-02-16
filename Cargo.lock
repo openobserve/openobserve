@@ -1763,21 +1763,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
 name = "dotenv_config"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "850c634409912953e23d6ef00eef1b09367a4ca7429eb34f937a88116bb9a60b"
+checksum = "cc8db7cd099cfe5d7b33f170b3d19054045425fe6d0d876defb7912c31d2fb67"
 dependencies = [
  "anyhow",
  "askama",
  "convert_case 0.6.0",
- "dotenv",
 ]
 
 [[package]]
