@@ -34,9 +34,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .unwrap();
 
     if !db::user::root_user_exists().await {
-        if CONFIG.auth.useremail.is_empty()
-            || !email_regex.is_match(&CONFIG.auth.useremail)
-            || CONFIG.auth.password.is_empty()
+        if CONFIG.auth.root_user_email.is_empty()
+            || !email_regex.is_match(&CONFIG.auth.root_user_email)
+            || CONFIG.auth.root_user_password.is_empty()
         {
             panic!("Please set root user email-id & password using ZO_USER_EMAIL & ZO_USER_PASSWORD enviornment variables");
         }
@@ -44,8 +44,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let _ = users::post_user(
             DEFAULT_ORG,
             User {
-                email: CONFIG.auth.useremail.clone(),
-                password: CONFIG.auth.password.clone(),
+                email: CONFIG.auth.root_user_email.clone(),
+                password: CONFIG.auth.root_user_password.clone(),
                 role: crate::meta::user::UserRole::Root,
                 salt: String::new(),
                 token,

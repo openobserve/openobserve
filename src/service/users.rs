@@ -152,7 +152,7 @@ pub async fn update_user(
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let mut local_org = "";
-    let user_key = if name.eq(&CONFIG.auth.useremail) {
+    let user_key = if name.eq(&CONFIG.auth.root_user_email) {
         name.to_owned()
     } else {
         match org_id {

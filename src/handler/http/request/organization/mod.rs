@@ -81,7 +81,7 @@ pub async fn organizarions_by_username(
         };
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.useremail) {
+            if !user.key().ends_with(&CONFIG.auth.root_user_email) {
                 let org = Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -134,7 +134,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         });
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.useremail) {
+            if !user.key().ends_with(&CONFIG.auth.root_user_email) {
                 id += 1;
                 let org = OrganizationDetails {
                     id,
