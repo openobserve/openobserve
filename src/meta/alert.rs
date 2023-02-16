@@ -14,16 +14,18 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use utoipa::ToSchema;
 
 use super::search::Query;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Condition {
     pub column: String,
     pub operator: AllOperator,
     #[serde(default)]
     pub ignore_case: Option<bool>,
+    #[schema(value_type = Object)]
     pub value: serde_json::Value,
     pub is_numeric: Option<bool>,
 }
@@ -94,7 +96,7 @@ impl Evaluate for Condition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum AllOperator {
     #[serde(alias = "=")]
     EqualTo,
@@ -118,12 +120,13 @@ impl Default for AllOperator {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
     #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub stream: String,
+    #[schema(value_type = Option<SearchQuery>)]
     pub query: Option<Query>,
     pub condition: Condition,
     pub duration: i64,
@@ -140,7 +143,7 @@ impl PartialEq for Alert {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AlertList {
     pub list: Vec<Alert>,
 }
