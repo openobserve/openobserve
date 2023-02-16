@@ -20,7 +20,7 @@ const auth = {
     return http().post(`/auth/${orgIdentifier}/authentication`, payload);
   },
   get_organization_by_username: (userName: string) => {
-    return http().get(`/auth/organizarions_by_username/${userName}`);
+    return http().get(`/auth/organizarions_by_username/${encodeURIComponent(userName)}`);
   }
 };
 

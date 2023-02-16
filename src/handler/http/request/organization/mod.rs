@@ -17,7 +17,7 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use serde::Serialize;
 use std::io::Error;
 
-use crate::handler::http::auth::is_admin_user;
+use crate::handler::http::auth::is_root_user;
 use crate::infra::config::{CONFIG, USERS};
 use crate::meta::organization::PasscodeResponse;
 use crate::service::organization::get_passcode;
@@ -27,20 +27,20 @@ const DEFAULT: &str = "default";
 const CUSTOM: &str = "custom";
 const THRESHOLD: i64 = 9383939382;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq, Eq)]
 struct Organization {
     identifier: String,
     label: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq, Eq)]
 struct User {
     first_name: String,
     last_name: String,
     email: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Eq)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
@@ -54,6 +54,15 @@ struct OrganizationDetails {
     user_obj: User,
 }
 
+impl PartialEq for OrganizationDetails {
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier.eq(&other.identifier)
+            && self.name.eq(&other.name)
+            && self.user_email.eq(&other.user_email)
+            && self.org_type.eq(&other.org_type)
+    }
+}
+
 #[derive(Serialize)]
 struct OrganizationResponse {
     data: Vec<OrganizationDetails>,
@@ -65,18 +74,21 @@ pub async fn organizarions_by_username(
 ) -> Result<HttpResponse, Error> {
     let mut orgs = Vec::new();
     let user_name = user_name.to_string();
-    if is_admin_user(&user_name).await {
+    if is_root_user(&user_name).await {
         let obj = Organization {
             identifier: DEFAULT.to_string(),
             label: DEFAULT.to_string(),
         };
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.username) {
-                orgs.push(Organization {
+            if !user.key().ends_with(&CONFIG.auth.useremail) {
+                let org = Organization {
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                });
+                };
+                if !orgs.contains(&org) {
+                    orgs.push(org);
+                }
             }
         }
 
@@ -108,7 +120,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         email: user_id.to_string(),
     };
 
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         id += 1;
         orgs.push(OrganizationDetails {
             id,
@@ -122,9 +134,9 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         });
 
         for user in USERS.iter() {
-            if !user.key().ends_with(&CONFIG.auth.username) {
+            if !user.key().ends_with(&CONFIG.auth.useremail) {
                 id += 1;
-                orgs.push(OrganizationDetails {
+                let org = OrganizationDetails {
                     id,
                     identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
                     name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -133,7 +145,12 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
                     search_threshold: THRESHOLD,
                     org_type: CUSTOM.to_string(),
                     user_obj: user_detail.clone(),
-                });
+                };
+                if !orgs.contains(&org) {
+                    orgs.push(org)
+                } else {
+                    id -= 1;
+                }
             }
         }
     } else {
@@ -174,7 +191,7 @@ async fn get_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         org_id = None;
     }
     let passcode = get_passcode(org_id, user_id).await;
@@ -189,7 +206,7 @@ async fn update_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         org_id = None;
     }
     let passcode = update_passcode(org_id, user_id).await;

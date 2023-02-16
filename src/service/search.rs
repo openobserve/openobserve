@@ -290,8 +290,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
-    let user = USERS.get(&CONFIG.auth.username).unwrap();
-    let credentials = Credentials::new(&CONFIG.auth.username, &user.password);
+    let user = USERS.get(&CONFIG.auth.useremail).unwrap();
+    let credentials = Credentials::new(&CONFIG.auth.useremail, &user.password);
     let credentials = credentials.as_http_header();
 
     // make cluster request

@@ -54,7 +54,7 @@ pub async fn validate_credentials(
 ) -> Result<bool, Error> {
     let user;
     //this is only applicable for super admin user
-    if is_admin_user(user_id).await {
+    if is_root_user(user_id).await {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
             return Ok(false);
@@ -79,7 +79,9 @@ pub async fn validate_credentials(
     }
     if !path.contains("/user")
         || (path.contains("/user")
-            && (user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)))
+            && (user.role.eq(&UserRole::Admin)
+                || user.role.eq(&UserRole::Root)
+                || user.email.eq(user_id)))
     {
         Ok(true)
     } else {
@@ -87,8 +89,8 @@ pub async fn validate_credentials(
     }
 }
 
-pub async fn is_admin_user(user_id: &str) -> bool {
-    user_id.eq(&CONFIG.auth.username)
+pub async fn is_root_user(user_id: &str) -> bool {
+    user_id.eq(&CONFIG.auth.useremail)
 }
 
 #[cfg(test)]
@@ -96,7 +98,8 @@ mod test_utils {
     use super::*;
     #[actix_web::test]
     async fn test_validate_credentials() {
-        let res = validate_credentials(&CONFIG.auth.username, &CONFIG.auth.password, "index").await;
+        let res =
+            validate_credentials(&CONFIG.auth.useremail, &CONFIG.auth.password, "index").await;
         assert_eq!(res.is_ok(), true)
     }
 }

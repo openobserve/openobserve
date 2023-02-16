@@ -55,7 +55,7 @@
 
           <div v-if="!beingUpdated">
             <q-input
-              type="password"
+              :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
               :label="t('user.password') + ' *'"
               color="input-border"
@@ -70,17 +70,20 @@
                 (val) =>
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
-                (val) =>
-                  /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/.test(
-                    val
-                  ) ||
-                  'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
               ]"
-            />
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isPwd = !isPwd"
+                />
+              </template>
+            </q-input>
           </div>
 
           <q-input
-            v-model="formData.first_name"
+            v-model="formData.firstName"
             :label="t('user.firstName')"
             color="input-border"
             bg-color="input-bg"
@@ -92,7 +95,7 @@
           />
 
           <q-input
-            v-model="formData.last_name"
+            v-model="formData.lastName"
             :label="t('user.lastName')"
             color="input-border"
             bg-color="input-bg"
@@ -104,6 +107,10 @@
           />
 
           <q-select
+            v-if="
+              userRole !== 'member' &&
+              store.state.userInfo.email !== formData.email
+            "
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roleOptions"
@@ -130,10 +137,14 @@
             />
 
             <q-input
-              v-if="formData.change_password"
-              type="password"
-              v-model="formData.password"
-              :label="t('user.password')"
+              v-if="
+                formData.change_password &&
+                (userRole == 'member' ||
+                  store.state.userInfo.email == formData.email)
+              "
+              :type="isOldPwd ? 'password' : 'text'"
+              v-model="formData.oldPassword"
+              :label="t('user.oldPassword') + ' *'"
               color="input-border"
               bg-color="input-bg"
               class="q-py-md showLabelOnTop"
@@ -141,7 +152,49 @@
               outlined
               filled
               dense
-            />
+              :rules="[
+                (val) => !!val || 'Field is required',
+                (val) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isOldPwd = !isOldPwd"
+                />
+              </template>
+            </q-input>
+
+            <q-input
+              v-if="formData.change_password"
+              :type="isNewPwd ? 'password' : 'text'"
+              v-model="formData.newPassword"
+              :label="t('user.newPassword') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[
+                (val) => !!val || 'Field is required',
+                (val) =>
+                  (val && val.length >= 8) ||
+                  'Password must be at least 8 characters long',
+              ]"
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="isNewPwd = !isNewPwd"
+                />
+              </template>
+            </q-input>
           </div>
 
           <div class="flex justify-center q-mt-lg">
@@ -180,10 +233,11 @@ const defaultValue: any = () => {
   return {
     org_member_id: "",
     role: "admin",
-    first_name: "",
-    last_name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    password: "",
+    oldPassword: "",
+    newPassword: "",
     change_password: false,
   };
 };
@@ -199,6 +253,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    userRole: {
+      type: String,
+      default: "member",
+    },
   },
   emits: ["update:modelValue", "updated"],
   setup() {
@@ -206,9 +264,12 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
-    const roleOptions = ["admin", "user"];
+    const roleOptions = ["admin", "member"];
     const beingUpdated: any = ref(false);
     const userForm: any = ref(null);
+    const isPwd: any = ref(true);
+    const isNewPwd: any = ref(true);
+    const isOldPwd: any = ref(true);
 
     return {
       t,
@@ -218,6 +279,9 @@ export default defineComponent({
       beingUpdated,
       userForm,
       roleOptions,
+      isPwd,
+      isNewPwd,
+      isOldPwd,
     };
   },
   created() {
@@ -244,16 +308,40 @@ export default defineComponent({
       });
 
       this.formData.name =
-        this.formData.first_name.trim() + this.formData.last_name.trim() != ""
-          ? this.formData.first_name + " " + this.formData.last_name
+        this.formData.firstName.trim() + this.formData.lastName.trim() != ""
+          ? this.formData.firstName + " " + this.formData.lastName
           : "";
 
-      userServiece
-        .create(this.formData, this.store.state.selectedOrganization.identifier)
-        .then((res: any) => {
-          dismiss();
-          this.$emit("updated", res.data);
-        });
+      if (this.beingUpdated) {
+        const userEmail = this.formData.email;
+        delete this.formData.email;
+
+        if (this.formData.change_password == false) {
+          delete this.formData.oldPassword;
+          delete this.formData.newPassword;
+        }
+        userServiece
+          .update(
+            this.formData,
+            this.store.state.selectedOrganization.identifier,
+            userEmail
+          )
+          .then((res: any) => {
+            dismiss();
+            this.formData.email = userEmail;
+            this.$emit("updated", res.data, this.formData, "updated");
+          });
+      } else {
+        userServiece
+          .create(
+            this.formData,
+            this.store.state.selectedOrganization.identifier
+          )
+          .then((res: any) => {
+            dismiss();
+            this.$emit("updated", res.data, this.formData, "created");
+          });
+      }
     },
   },
 });

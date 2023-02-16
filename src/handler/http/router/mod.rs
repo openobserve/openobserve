@@ -124,6 +124,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_alert)
             .service(org_summary)
             .service(get_user_passcode)
-            .service(update_user_passcode),
+            .service(update_user_passcode)
+            .service(users::update),
     );
 }

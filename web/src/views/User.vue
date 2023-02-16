@@ -27,29 +27,33 @@
       :filter-method="filterData"
     >
       <!-- 
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn
-            v-if="props.row.email != store.state.userInfo.email"
-            icon="perm_identity"
-            class="iconHoverBtn"
-            dense
-            unelevated
-            size="sm"
-            color="blue-5"
-            @click="updateUser(props)"
-            :title="t('organization.invite')"
-          ></q-btn>
-        </q-td>
-      </template>
-       -->
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn
+              v-if="props.row.email != store.state.userInfo.email"
+              icon="perm_identity"
+              class="iconHoverBtn"
+              dense
+              unelevated
+              size="sm"
+              color="blue-5"
+              @click="updateUser(props)"
+              :title="t('organization.invite')"
+            ></q-btn>
+          </q-td>
+        </template>
+         -->
       <template #no-data>
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
         <q-td
           :props="props"
-          v-if="currentUserRole == 'admin' && !props.row.isLoggedinUser"
+          v-if="
+            ((currentUserRole == 'admin' && props.row.role !== 'root') ||
+              currentUserRole == 'root') &&
+            !props.row.isLoggedinUser
+          "
         >
           <q-select
             dense
@@ -57,9 +61,7 @@
             v-model="props.row.role"
             :options="options"
             style="width: 70px"
-            @update:model-value="
-              updateUserRole(props.row.role, props.row.org_member_id)
-            "
+            @update:model-value="updateUserRole(props.row)"
           />
         </q-td>
         <q-td :props="props" v-else>
@@ -68,39 +70,6 @@
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.email != store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="updateUser(props)"
-          />
-
-          <q-btn
-            v-if="props.row.email == store.state.userInfo.email"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            :title="t('user.update')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addUser(props, false)"
-          />
-          <q-btn
-            :title="t('user.updatenotallowed')"
-            icon="img:/src/assets/images/common/view_icon.svg"
-            flat
-            size="sm"
-            disable
-            v-else
-          />
           <q-btn
             v-if="props.row.email == `false_condition_to_hide_delete_button`"
             icon="img:/src/assets/images/common/delete_icon.svg"
@@ -114,8 +83,12 @@
             @click="deleteUser(props)"
           />
           <q-btn
-            v-if="props.row.isLoggedinUser"
-            icon="img:/src/assets/images/common/update_icon.svg"
+            v-if="
+              props.row.isLoggedinUser ||
+              currentUserRole == 'root' ||
+              (currentUserRole == 'admin' && props.row.role !== 'root')
+            "
+            icon="edit"
             :title="t('user.update')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
@@ -182,9 +155,9 @@
               :disable="userEmail == ''"
             />
           </div>
-
           <div v-else class="col-6">
             <q-btn
+              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"
@@ -197,7 +170,6 @@
             />
           </div>
         </div>
-
         <QTablePagination
           :scope="scope"
           :pageTitle="t('user.header')"
@@ -237,6 +209,7 @@
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
+        :userRole="currentUserRole"
         @updated="addMember"
       />
     </q-dialog>
@@ -273,14 +246,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
 import { useI18n } from "vue-i18n";
-
+import config from "../aws-exports";
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import usersService from "../services/users";
 import UpdateUserRole from "../components/users/UpdateRole.vue"
 import AddUser from "../components/users/add.vue"
 import NoData from "../components/shared/grid/NoData.vue";
 import { validateEmail } from "../utils/zincutils";
-import config from "../aws-exports";
 import organizationsService from "../services/organizations";
 
 export default defineComponent({
@@ -322,15 +294,15 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "first_name",
-        field: "first_name",
+        name: "firstName",
+        field: "firstName",
         label: t("user.firstName"),
         align: "left",
         sortable: true,
       },
       {
-        name: "last_name",
-        field: "last_name",
+        name: "lastName",
+        field: "lastName",
         label: t("user.lastName"),
         align: "left",
         sortable: true,
@@ -343,11 +315,10 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "member_created",
-        field: "member_created",
-        label: t("user.memberCreated"),
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
         align: "left",
-        sortable: true,
       },
     ]);
     const userEmail: any = ref('');
@@ -355,50 +326,42 @@ export default defineComponent({
     const selectedRole = ref(options[0]);
     const currentUserRole = ref('')
 
-    const getOrgMembers = (orgId: string) => {
-      if (orgId != "") {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading users...",
+    const getOrgMembers = () => {
+
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading users...",
+      });
+
+      usersService.orgUsers(0, 1000, "email", false, "", store.state.selectedOrganization.identifier).then((res) => {
+        resultTotal.value = res.data.data.length;
+        // columns.value = columns.value.filter((v: any) => v.name !== "actions");
+        let counter = 1;
+        orgMembers.value = res.data.data.map((data: any) => {
+          if (store.state.userInfo.email == data.email) {
+            currentUserRole.value = data.role
+          }
+
+          return {
+            "#": counter <= 9 ? `0${counter++}` : counter++,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+            member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
+            member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
+            org_member_id: data.org_member_id,
+            isLoggedinUser: store.state.userInfo.email == data.email
+          };
         });
 
-        usersService.orgUsers(0, 1000, "email", false, "", store.state.selectedOrganization.identifier).then((res) => {
-          resultTotal.value = res.data.data.length;
-          columns.value = columns.value.filter((v: any) => v.name !== "actions");
-          let counter = 1;
-          orgMembers.value = res.data.data.map((data: any) => {
-            if (store.state.userInfo.email == data.email) {
-              currentUserRole.value = data.role
-            }
-            if (store.state.userInfo.email == data.email && data.role == "admin") {
-              columns.value.push({
-                name: "actions",
-                field: "actions",
-                label: t("user.actions"),
-                align: "center",
-              });
+        dismiss();
+      });
 
-            }
-            return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: data.email,
-              first_name: data.first_name,
-              last_name: data.last_name,
-              role: data.role,
-              member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
-              member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
-              org_member_id: data.org_member_id,
-              isLoggedinUser: store.state.userInfo.email == data.email
-            };
-          });
-
-          dismiss();
-        });
-      }
     };
 
     if (orgMembers.value.length == 0) {
-      getOrgMembers(store.state.selectedOrganization.identifier);
+      getOrgMembers();
     }
 
     interface OptionType {
@@ -435,11 +398,11 @@ export default defineComponent({
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       if (props.row != undefined) {
-        selectedUser.value = props.row;  
+        selectedUser.value = props.row;
       } else {
         selectedUser.value = {};
       }
-      
+
       showAddUserDialog.value = true;
     }
 
@@ -454,18 +417,32 @@ export default defineComponent({
       }
     }
 
-    const addMember = (data: any) => {
-      alert("addMember")
-      if (data.data != undefined) {
-        alert(JSON.stringify(data.data))
-        orgMembers.value.push({
-          "#": orgMembers.value.length + 1,
-          email: data.data.email,
-          first_name: data.data.first_name,
-          last_name: data.data.last_name,
-          role: data.data.role,
+    const addMember = (res: any, data: any, operationType: string) => {
+      showAddUserDialog.value = false;
+      if (res.code == 200) {
+        $q.notify({
+          color: "positive",
+          message: "User added successfully.",
         });
-        showAddUserDialog.value = false;
+
+        if (operationType == "created") {
+          orgMembers.value.push({
+            "#": orgMembers.value.length + 1,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+          });
+        } else {
+          orgMembers.value.forEach((member: any, key: number) => {
+            if (member.email == data.email) {
+              orgMembers.value[key] = {
+                ...orgMembers.value[key],
+                ...data,
+              };
+            }
+          });
+        }
       }
     }
 
@@ -473,10 +450,10 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
-    const inviteUser = () => {      
+    const inviteUser = () => {
       const emailArray = userEmail.value.split(';').filter((email: any) => email).map((email: any) => email.trim())
       const validationArray = emailArray.map((email: any) => validateEmail(email))
-      
+
       if (!validationArray.includes(false)) {
         const dismiss = $q.notify({
           spinner: true,
@@ -512,10 +489,10 @@ export default defineComponent({
           }).catch(error => {
             dismiss();
             $q.notify({
-                type: "negative",
-                message: error.message,
-                timeout: 5000,
-              });
+              type: "negative",
+              message: error.message,
+              timeout: 5000,
+            });
           })
 
         userEmail.value = "";
@@ -526,7 +503,7 @@ export default defineComponent({
         });
       }
     }
-    const updateUserRole = (userRole: any, orgMemberId: any) => {
+    const updateUserRole = (row: any) => {
 
       const dismiss = $q.notify({
         spinner: true,
@@ -536,8 +513,9 @@ export default defineComponent({
 
       organizationsService.update_member_role(
         {
-          id: parseInt(orgMemberId),
-          role: userRole,
+          id: parseInt(row.orgMemberId),
+          role: row.role,
+          email: row.email,
           organization_id: parseInt(store.state.selectedOrganization.id),
         },
         store.state.selectedOrganization.identifier
@@ -594,7 +572,7 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["first_name"]?.toLowerCase().includes(terms) || rows[i]["last_name"]?.toLowerCase().includes(terms) || rows[i]["email"]?.toLowerCase().includes(terms) || rows[i]["role"].toLowerCase().includes(terms)) {
+          if (rows[i]["firstName"]?.toLowerCase().includes(terms) || rows[i]["lastName"]?.toLowerCase().includes(terms) || rows[i]["email"]?.toLowerCase().includes(terms) || rows[i]["role"].toLowerCase().includes(terms)) {
             filtered.push(rows[i]);
           }
         }
@@ -617,7 +595,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.orgData = newVal;
       if ((newVal != oldVal || this.orgMembers.value == undefined) && this.router.currentRoute.value.name == "users") {
-        this.getOrgMembers(this.store.state.selectedOrganization.identifier);
+        this.getOrgMembers();
       }
     }
   }
@@ -632,6 +610,10 @@ export default defineComponent({
   }
 }
 
+.iconHoverBtn {
+  cursor: pointer !important;
+}
+
 .confirmBody {
   padding: 11px 1.375rem 0;
   font-size: 0.875rem;
@@ -643,10 +625,12 @@ export default defineComponent({
     margin-bottom: 0.5rem;
     color: $dark-page;
   }
+
   .para {
     color: $light-text;
   }
 }
+
 .confirmActions {
   justify-content: center;
   padding: 1.25rem 1.375rem 1.625rem;

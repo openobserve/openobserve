@@ -97,7 +97,10 @@
     "inviteByEmail": "E-posta ile davet et. Noktalı virgül ile ayrı birden fazla e-posta (;)",
     "inviteByEmailHint": "Üye eklemek için orantılı bir miktar tahsil edilecektir.",
     "admin": "yönetici",
-    "member": "üye"
+    "member": "üye",
+    "changePassword": "Şifre Değiştir",
+    "oldPassword": "Eski Şifre",
+    "newPassword": "Yeni Şifre"
   },
   "ticket": {
     "header": "Destek Talepleri",

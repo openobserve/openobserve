@@ -97,7 +97,10 @@
     "inviteByEmail": "通过电子邮件邀请。用分号 (;) 分隔的多封电子邮件",
     "inviteByEmailHint": "添加成员将按比例向您收取一定的费用。",
     "admin": "管理员",
-    "member": "用户"
+    "member": "用户",
+    "changePassword": "更改密码",
+    "oldPassword": "旧密码",
+    "newPassword": "新密码"
   },
   "ticket": {
     "header": "工单",
