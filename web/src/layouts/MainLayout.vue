@@ -285,7 +285,7 @@ export default {
       await configService.get_config().then((res: any) => {
         store.dispatch("setConfig", res.data);
         if (res.data.functions_enabled) {
-          linksList.splice(4, 0, {
+          linksList.value.splice(4, 0, {
             title: t("menu.function"),
             icon: "transform",
             link: "/functions",
