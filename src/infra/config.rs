@@ -14,8 +14,8 @@
 
 use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
-use dotenv::dotenv;
 use dotenv_config::EnvConfig;
+use dotenvy::dotenv;
 use reqwest::Client;
 use std::time::Duration;
 use sys_info::hostname;
@@ -27,8 +27,8 @@ use crate::meta::prom::ClusterLeader;
 use crate::meta::user::User;
 
 pub static VERSION: &str = env!("GIT_VERSION");
-pub static COMMIT_HASH: &str = env!("GIT_COMMIT");
-pub static BUILD_DATE: &str = env!("GIT_DATE");
+pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
+pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 #[cfg(feature = "zo_functions")]
 pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
