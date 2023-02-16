@@ -245,7 +245,7 @@ export default {
         title: t("menu.user"),
         icon: "img:/src/assets/images/left_nav/user_icon.svg",
         link: "/users",
-        display: store.state.currentuser.role == "Admin" ? true : false,
+        display: store.state.currentuser.role == "admin" ? true : false,
       },
       {
         title: t("menu.index"),

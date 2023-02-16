@@ -28,8 +28,8 @@ struct HealthzResponse {
 #[derive(Clone, Debug, Serialize)]
 struct ConfigResponse {
     version: String,
-    commit: String,
-    date: String,
+    commit_hash: String,
+    build_date: String,
     functions_enabled: bool,
 }
 
@@ -44,8 +44,8 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
-        commit: config::COMMIT_HASH.to_string(),
-        date: config::BUILD_DATE.to_string(),
+        commit_hash: config::COMMIT_HASH.to_string(),
+        build_date: config::BUILD_DATE.to_string(),
         functions_enabled: config::HAS_FUNCTIONS,
     }))
 }
