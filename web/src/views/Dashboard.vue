@@ -264,7 +264,6 @@ export default defineComponent({
       showAddDashboardDialog.value = true;
     };
     const routeToViewD = (row) => {
-      console.log("row");
       //return router.push( '/viewDashboard' )
       return router.push({
         path: "/viewDashboard",
@@ -316,7 +315,6 @@ export default defineComponent({
         role: props.row.role,
         member_lists: [],
       };
-      console.log("dashboard", organization);
       showJoinOrganizationDialog.value = true;
     };
     const removeDashboard = async (props: any) => {

@@ -34,14 +34,12 @@ export default defineComponent({
     ]);
 
     const addFiles = (files: []) => {
-      console.log(files);
       if (files.length > 0) {
         allFiles.value.push(...files);
       }
     };
 
     const removeFiles = (files: any[]) => {
-      console.log(files);
       if (files.length > 0) {
         files.forEach((v) => {
           const idx = allFiles.value.findIndex((f: any) => f.name === v.name);
@@ -61,8 +59,6 @@ export default defineComponent({
 
       for (var pair of formData.entries())
         console.log(pair[0] + ", " + pair[1]);
-
-      console.log(documentList.value);
 
       // Axios POST request here...
     };

@@ -273,7 +273,6 @@ export default defineComponent({
           return false;
         }
         // console.log("Form is valid");
-        console.log(this.ticketData);
         this.ticketData.user_id = this.store.state.userInfo.user_id;
 
         delete this.ticketData.created_at;
