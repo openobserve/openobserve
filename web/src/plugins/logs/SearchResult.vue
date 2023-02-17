@@ -20,7 +20,7 @@
     <div class="search-list" style="width: 100%">
       <BarChart
         ref="plotChart"
-        v-if="searchObj.meta.showHistogram"
+        v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
         @updated:chart="onChartUpdate"
       ></BarChart>
 
