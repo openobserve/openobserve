@@ -1,5 +1,5 @@
 name: 'Docs or https://docs.zinc.dev/ Bug Report'
-description: Report an issue in Zinc Observe's documentation
+description: Report an issue in ZincObserve's documentation
 
 body:
   - type: textarea

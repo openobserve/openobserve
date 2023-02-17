@@ -1,11 +1,11 @@
 name: Bug Report
-description: Report a bug in the Zinc Observe
+description: Report a bug in the ZincObserve
 
 body:
   - type: dropdown
     id: affected-functionalities
     attributes:
-      label: Which Zinc Observe functionalities are the source of the bug?
+      label: Which ZincObserve functionalities are the source of the bug?
       options:
         - login
         - home

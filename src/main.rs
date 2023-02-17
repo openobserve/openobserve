@@ -143,7 +143,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
     Telemetry::new()
-        .event("Zinc Observe - Starting server", None, false)
+        .event("ZincObserve - Starting server", None, false)
         .await;
     if router::is_router() {
         HttpServer::new(move || {
@@ -195,7 +195,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .await?;
     };
     Telemetry::new()
-        .event("Zinc Observe - Server stopped", None, false)
+        .event("ZincObserve - Server stopped", None, false)
         .await;
     // leave the cluster
     let _ = cluster::leave().await;
