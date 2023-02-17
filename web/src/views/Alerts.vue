@@ -210,8 +210,8 @@ export default defineComponent({
       },
     ]);
 
-    const getAlerts = (orgId: number) => {
-      if (orgId > 0) {
+    const getAlerts = () => {
+      
         const dismiss = $q.notify({
           spinner: true,
           message: "Please wait while loading alerts...",
@@ -221,7 +221,7 @@ export default defineComponent({
           var counter = 1;
           resultTotal.value = res.data.list.length;
           alerts.value = res.data.list.map((data: any) => {
-            if (data.is_ingest_time){
+            if (data.is_real_time){
               data.query.sql= "--"
             }
             return {
@@ -245,7 +245,7 @@ export default defineComponent({
               },
               destination: data.destination,
               condition: data.condition,
-              isScheduled: (!data.is_ingest_time).toString(),
+              isScheduled: (!data.is_real_time).toString(),
             };
           });
 
@@ -259,11 +259,11 @@ export default defineComponent({
               timeout: 2000,
             });
           });
-      }
+
     };
 
     if (alerts.value == "" || alerts.value == undefined) {
-      getAlerts(store.state.selectedOrganization.id);
+      getAlerts();
     }
 
     interface OptionType {
@@ -309,7 +309,7 @@ export default defineComponent({
 
     const refreshList = () => {
       showAddAlertDialog.value = false;
-      getAlerts(store.state.selectedOrganization.id);
+      getAlerts();
     }
 
     const hideForm = () => {
@@ -325,7 +325,7 @@ export default defineComponent({
             message: res.data.message,
             timeout: 2000,
           });
-          getAlerts(store.state.selectedOrganization.id);
+          getAlerts();
         } else {
           $q.notify({
             type: "negative",
@@ -390,7 +390,7 @@ export default defineComponent({
       if ((newVal != oldVal || this.alerts.value == undefined) && this.router.currentRoute.value.name == "transform") {
         this.resultTotal = 0
         this.alerts = [];
-        this.getAlerts(this.store.state.selectedOrganization.id);
+        this.getAlerts();
       }
     }
   }
