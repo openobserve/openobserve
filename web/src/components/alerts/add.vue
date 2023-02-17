@@ -87,7 +87,7 @@
           {{ t("alerts.sql") }}:
         </div>
         <div
-          v-if="formData.isScheduled === 'true'"
+          v-show="formData.isScheduled === 'true'"
           ref="editorRef"
           id="editor"
           :label="t('alerts.sql')"
