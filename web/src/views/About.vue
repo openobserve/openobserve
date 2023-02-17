@@ -33,11 +33,13 @@
         <div class="col-3 col-md-3 col-lg-2">Build Date</div>
       </div>
       <div class="row body">
-        <div class="col-1">{{ zoConfig.version }}</div>
+        <div class="col-1">{{ store.state.zoConfig.version }}</div>
         <div class="col-6 col-md-5 col-lg-4">
-          {{ zoConfig.commit_hash }}
+          {{ store.state.zoConfig.commit_hash }}
         </div>
-        <div class="col-3 col-md-3 col-lg-2">{{ zoConfig.build_date }}</div>
+        <div class="col-3 col-md-3 col-lg-2">
+          {{ store.state.zoConfig.build_date }}
+        </div>
       </div>
     </div>
   </q-page>
@@ -49,14 +51,13 @@ import { useStore } from "vuex";
 
 export default defineComponent({
   name: "PageAbout",
-  // components: {},
   setup() {
     const store = useStore();
     const pageData = ref("Page Data");
-    var zoConfig = store.state.zoConfig;
+
     return {
+      store,
       pageData,
-      zoConfig,
     };
   },
   // methods: {},
