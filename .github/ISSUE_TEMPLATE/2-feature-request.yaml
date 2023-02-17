@@ -1,11 +1,11 @@
 name: 'Feature Request'
-description: Suggest a feature for Zinc Observe
+description: Suggest a feature for ZincObserve
 
 body:
   - type: dropdown
     id: affected-packages
     attributes:
-      label: Which Zinc Observe functionalities are relevant/related to the feature request?
+      label: Which ZincObserve functionalities are relevant/related to the feature request?
       options:
         - login
         - home
