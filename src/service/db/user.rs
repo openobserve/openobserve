@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tracing::info_span;
 
 use crate::common::json;
-use crate::infra::config::USERS;
+use crate::infra::config::{ROOT_USER, USERS};
 use crate::infra::db::Event;
 use crate::meta::user::User;
 
@@ -95,6 +95,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: User = json::from_slice(&item_value).unwrap();
+        if !item_key.contains('/') {
+            ROOT_USER.insert("root".to_string(), json_val.clone());
+        }
         USERS.insert(item_key.to_string(), json_val);
     }
     log::info!("[TRACE] Users Cached");

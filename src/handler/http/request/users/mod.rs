@@ -19,8 +19,8 @@ use rand::distributions::{Alphanumeric, DistString};
 use serde_json::Value;
 use std::io::Error;
 
+use crate::common::auth::is_root_user;
 use crate::handler::http::auth::validate_credentials;
-use crate::infra::config::CONFIG;
 use crate::meta;
 use crate::meta::user::SignInUser;
 use crate::meta::user::UpdateUser;
@@ -147,7 +147,7 @@ pub async fn authentication(
     {
         Ok(v) => {
             if v {
-                if user.name == CONFIG.auth.root_user_email {
+                if is_root_user(&user.name).await {
                     ret.insert("role", Value::String(UserRole::Admin.to_string()));
                 } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
                     ret.insert("role", Value::String(user.role.to_string()));

@@ -14,7 +14,10 @@
 
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 
-use crate::infra::config::PASSWORD_HASH;
+use crate::{
+    infra::config::{PASSWORD_HASH, USERS},
+    meta::user::UserRole,
+};
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{}{}", pass, salt);
@@ -36,5 +39,22 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
             PASSWORD_HASH.insert(key, password_hash.clone());
             password_hash
         }
+    }
+}
+
+pub async fn is_root_user(user_id: &str) -> bool {
+    match USERS.get(user_id) {
+        Some(user) => user.role.eq(&UserRole::Root),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod test_utils {
+    use super::*;
+    #[actix_web::test]
+    async fn test_is_root_user() {
+        let res = is_root_user("dummy").await;
+        assert_eq!(res, false)
     }
 }
