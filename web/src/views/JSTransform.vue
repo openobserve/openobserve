@@ -209,8 +209,7 @@ export default defineComponent({
       },
     ]);
 
-    const getJSTransforms = (orgId: number) => {
-      if (orgId > 0) {
+    const getJSTransforms = () => {
         const dismiss = $q.notify({
           spinner: true,
           message: "Please wait while loading functions...",
@@ -241,11 +240,10 @@ export default defineComponent({
             timeout: 2000,
           });
         });
-      }
     };
 
     if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms(store.state.selectedOrganization.id);
+      getJSTransforms();
     }
  
     interface OptionType {
@@ -291,7 +289,7 @@ export default defineComponent({
 
     const refreshList = () => {
       showAddJSTransformDialog.value = false;
-      getJSTransforms(store.state.selectedOrganization.id);
+      getJSTransforms();
     }
 
     const hideForm = () => {
@@ -307,7 +305,7 @@ export default defineComponent({
               message: res.data.message,
               timeout: 2000,
             });
-            getJSTransforms(store.state.selectedOrganization.id);
+            getJSTransforms();
           } else {
             $q.notify({
               type: "negative",
@@ -325,7 +323,7 @@ export default defineComponent({
               message: res.data.message,
               timeout: 2000,
             });
-            getJSTransforms(store.state.selectedOrganization.id);
+            getJSTransforms();
           } else {
             $q.notify({
               type: "negative",
@@ -391,7 +389,7 @@ export default defineComponent({
       if ((newVal != oldVal || this.jsTransforms.value == undefined) && this.router.currentRoute.value.name=="function") {
         this.resultTotal=0
         this.jsTransforms = [];
-        this.getJSTransforms(this.store.state.selectedOrganization.id);
+        this.getJSTransforms();
       }
     }
   }

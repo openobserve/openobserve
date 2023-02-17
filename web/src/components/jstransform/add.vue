@@ -369,7 +369,7 @@ end`;
           dismiss();
           this.$q.notify({
             type: "positive",
-            message: `Javasctipt function saved successfully.`,
+            message: res.data.message,
           });
         });
       });
