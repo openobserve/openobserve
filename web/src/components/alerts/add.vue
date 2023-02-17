@@ -553,6 +553,20 @@ export default defineComponent({
           };
         }
 
+        this.schemaList.forEach((stream: any) => {
+          if (stream.name == this.formData.stream_name) {
+            stream.schema.forEach((field: any) => {
+              if (field.name == this.formData.condition.column) {
+                if (field.type != "Utf8") {
+                  this.formData.condition.value = parseInt(
+                    this.formData.condition.value
+                  );
+                }
+              }
+            });
+          }
+        });
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,

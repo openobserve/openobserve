@@ -221,7 +221,7 @@ export default defineComponent({
           var counter = 1;
           resultTotal.value = res.data.list.length;
           alerts.value = res.data.list.map((data: any) => {
-            if (data.is_ingest_time){
+            if (data.is_real_time){
               data.query.sql= "--"
             }
             return {
@@ -245,7 +245,7 @@ export default defineComponent({
               },
               destination: data.destination,
               condition: data.condition,
-              isScheduled: (!data.is_ingest_time).toString(),
+              isScheduled: (!data.is_real_time).toString(),
             };
           });
 
