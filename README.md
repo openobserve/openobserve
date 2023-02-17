@@ -19,7 +19,7 @@ ZincObserve is a search engine built specifically for logs , metrics & traces se
 
 
 ## Installation
-You would need ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables when you start ZincObserve for the first time. You don't need them on subsequent runs of ZincSearch.
+You would need ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables when you start ZincObserve for the first time. You don't need them on subsequent runs of ZincObserve.
 
 Binaries can be downloaded from [releases page](https://github.com/zinclabs/zincobserve/releases) for appropriate platform.
 
@@ -34,7 +34,7 @@ Binaries can be downloaded from [releases page](https://github.com/zinclabs/zinc
         ZO_ROOT_USER_EMAIL=admin@zinc.dev ZO_ROOT_USER_PASSWORD=Complexpass#123 ./zincobserve 
    
 
-Now point your browser to [http://localhost:5080](http://localhost:5080) and login
+Now point your browser to [http://localhost:5080](http://localhost:5080) and login using user ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD
 
 
 ## How to get support
