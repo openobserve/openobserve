@@ -553,24 +553,46 @@ export default defineComponent({
           };
         }
 
+        this.schemaList.forEach((stream: any) => {
+          if (stream.name == this.formData.stream_name) {
+            stream.schema.forEach((field: any) => {
+              if (field.name == this.formData.condition.column) {
+                if (field.type != "Utf8") {
+                  this.formData.condition.value = parseInt(
+                    this.formData.condition.value
+                  );
+                }
+              }
+            });
+          }
+        });
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,
           submitData
         );
 
-        callAlert.then((res: { data: any }) => {
-          const data = res.data;
-          this.formData = { ...defaultValue };
+        callAlert
+          .then((res: { data: any }) => {
+            const data = res.data;
+            this.formData = { ...defaultValue };
 
-          this.$emit("update:list");
-          this.addAlertForm.resetValidation();
-          dismiss();
-          this.$q.notify({
-            type: "positive",
-            message: `Alert saved successfully.`,
+            this.$emit("update:list");
+            this.addAlertForm.resetValidation();
+            dismiss();
+            this.$q.notify({
+              type: "positive",
+              message: `Alert saved successfully.`,
+            });
+          })
+          .catch((err: any) => {
+            dismiss();
+            this.$q.notify({
+              type: "negative",
+              message: err.response.data.error,
+            });
           });
-        });
       });
     },
   },
