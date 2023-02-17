@@ -74,7 +74,7 @@
             <div
               v-else-if="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults.total == 0
+                searchObj.data.queryResults.hits.length == 0
               "
             >
               <h5 class="text-center">No result found.</h5>
@@ -132,8 +132,6 @@ import { Parser } from "node-sql-parser";
 import indexService from "../../services/index";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import QueryEditor from "./QueryEditor.vue";
-import DateTime from "./DateTime.vue";
 import { useLocalLogsObj } from "../../utils/zincutils";
 
 export default defineComponent({
@@ -142,8 +140,6 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
-    QueryEditor,
-    DateTime,
   },
   methods: {
     searchData() {
@@ -153,6 +149,7 @@ export default defineComponent({
     },
     getMoreData() {
       if (
+        this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
           this.searchObj.data.queryResults.from &&
@@ -768,7 +765,7 @@ export default defineComponent({
         }
 
         searchObj.loading = false;
-        reDrawGrid();
+        if (searchObj.data.queryResults.aggs) reDrawGrid();
       } catch (e) {
         throw new ErrorException(e.message);
       }
@@ -811,7 +808,10 @@ export default defineComponent({
         unparsed_x_data: unparsed_x_data,
       };
       searchObj.data.histogram = { xData, yData, chartParams };
-      if (searchObj.meta.showHistogram == true) {
+      if (
+        searchObj.meta.showHistogram == true &&
+        searchObj.meta.sqlMode == false
+      ) {
         searchResultRef.value.reDrawChart();
       }
     }
@@ -866,7 +866,10 @@ export default defineComponent({
       }
 
       reDrawGrid();
-      if (searchObj.meta.showHistogram == true) {
+      if (
+        searchObj.meta.showHistogram == true &&
+        searchObj.meta.sqlMode == false
+      ) {
         setTimeout(() => {
           searchResultRef.value.reDrawChart();
         }, 1500);
@@ -952,9 +955,13 @@ export default defineComponent({
         currentQuery = currentQuery.split("|");
         if (currentQuery.length > 1) {
           selectFields = "," + currentQuery[0].trim();
-          whereClause = "WHERE " + currentQuery[1].trim();
+          if (currentQuery[1].trim() != "") {
+            whereClause = "WHERE " + currentQuery[1].trim();
+          }
         } else if (currentQuery[0].trim() != "") {
-          whereClause = "WHERE " + currentQuery[0].trim();
+          if (currentQuery[0].trim() != "") {
+            whereClause = "WHERE " + currentQuery[0].trim();
+          }
         }
         searchObj.data.query =
           `SELECT *${selectFields} FROM "` +
@@ -1027,7 +1034,10 @@ export default defineComponent({
   },
   watch: {
     showFields() {
-      if (this.searchObj.meta.showHistogram == true) {
+      if (
+        this.searchObj.meta.showHistogram == true &&
+        this.searchObj.meta.sqlMode == false
+      ) {
         setTimeout(() => {
           this.searchResultRef.reDrawChart();
         }, 100);
@@ -1045,7 +1055,10 @@ export default defineComponent({
       setTimeout(() => {
         this.reDrawGrid();
       }, 100);
-      if (this.searchObj.meta.showHistogram == true) {
+      if (
+        this.searchObj.meta.showHistogram == true &&
+        this.searchObj.meta.sqlMode == false
+      ) {
         setTimeout(() => {
           this.searchResultRef.reDrawChart();
         }, 100);
@@ -1105,7 +1118,6 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
-      this.searchObj.meta.showHistogram = false;
     },
   },
 });
