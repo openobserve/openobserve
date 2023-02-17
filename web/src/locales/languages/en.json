@@ -207,7 +207,8 @@
         "updateTitle": "Update Function",
         "delete": "Delete",
         "ok": "Ok",
-        "type": "Function Type"
+        "type": "Function Type",
+        "showQuery": "Is Ingest Time Function?"
     },
     "confirmDialog": {
         "cancel": "Cancel",
