@@ -447,9 +447,10 @@ export default {
       toggleLeftDrawer() {
         miniMode.value = !miniMode.value;
         const leftDrawer = miniMode.value;
-        store.state.currentuser.miniMode = leftDrawer;
-        store.dispatch("setCurrentUser", store.state.currentuser);
-        useLocalCurrentUser(store.state.currentuser);
+        const currentUser: any = useLocalCurrentUser();
+        currentUser.miniMode = leftDrawer;
+        store.dispatch("setCurrentUser", currentUser);
+        useLocalCurrentUser(currentUser);
         window.dispatchEvent(new Event("resize"));
       },
       user,
