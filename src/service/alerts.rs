@@ -75,6 +75,11 @@ pub async fn save_alert(
                 .unwrap()
                 .data_type()
                 .eq(&DataType::Utf8)
+                || local_fields
+                    .first()
+                    .unwrap()
+                    .data_type()
+                    .eq(&DataType::Boolean)
             {
                 alert.condition.is_numeric = Some(false);
             } else {
