@@ -45,7 +45,8 @@
     username {{ currUserEmail }}
     password {{ store.state.organizationPasscode }}
   &lt;/auth&gt;
-&lt;/match&gt;</pre>
+&lt;/match&gt;</pre
+    >
   </div>
 </template>
 
@@ -66,9 +67,9 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint = ref(""); 
- 
-    const url = new URL(store.state.API_ENDPOINT); 
+    const endpoint = ref("");
+
+    const url = new URL(store.state.API_ENDPOINT);
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,

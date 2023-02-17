@@ -39,7 +39,8 @@ auth.password = "{{ store.state.organizationPasscode }}"
 compression = "none"
 encoding.codec = "json"
 encoding.timestamp_format = "rfc3339"
-healthcheck.enabled = false</pre>
+healthcheck.enabled = false</pre
+    >
   </div>
 </template>
 
@@ -60,9 +61,9 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint = ref(""); 
- 
-    const url = new URL(store.state.API_ENDPOINT); 
+    const endpoint = ref("");
+
+    const url = new URL(store.state.API_ENDPOINT);
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
