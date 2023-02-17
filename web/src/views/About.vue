@@ -35,10 +35,10 @@
       <div class="row body">
         <div class="col-1">{{ store.state.zoConfig.version }}</div>
         <div class="col-6 col-md-5 col-lg-4">
-          {{ store.state.zoConfig.commit }}
+          {{ store.state.zoConfig.commit_hash }}
         </div>
         <div class="col-3 col-md-3 col-lg-2">
-          {{ store.state.zoConfig.date }}
+          {{ store.state.zoConfig.build_date }}
         </div>
       </div>
     </div>
