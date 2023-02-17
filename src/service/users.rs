@@ -22,13 +22,10 @@ use uuid::Uuid;
 use super::db;
 use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
 use crate::{
-    handler::http::auth::is_root_user,
+    common::auth::is_root_user,
     meta::user::{User, UserList, UserResponse, UserRole},
 };
-use crate::{
-    infra::config::{CONFIG, USERS},
-    meta::user::UpdateUser,
-};
+use crate::{infra::config::USERS, meta::user::UpdateUser};
 
 pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Error> {
     let salt = Uuid::new_v4().to_string();
@@ -152,7 +149,7 @@ pub async fn update_user(
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let mut local_org = "";
-    let user_key = if name.eq(&CONFIG.auth.root_user_email) {
+    let user_key = if is_root_user(name).await {
         name.to_owned()
     } else {
         match org_id {

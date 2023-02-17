@@ -19,8 +19,7 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
-use crate::common::auth::get_hash;
-use crate::infra::config::CONFIG;
+use crate::common::auth::{get_hash, is_root_user};
 use crate::meta::user::UserRole;
 use crate::service::users;
 
@@ -91,24 +90,5 @@ pub async fn validate_credentials(
         Ok(true)
     } else {
         Err(ErrorForbidden("Not allowed"))
-    }
-}
-
-pub async fn is_root_user(user_id: &str) -> bool {
-    user_id.eq(&CONFIG.auth.root_user_email)
-}
-
-#[cfg(test)]
-mod test_utils {
-    use super::*;
-    #[actix_web::test]
-    async fn test_validate_credentials() {
-        let res = validate_credentials(
-            &CONFIG.auth.root_user_email,
-            &CONFIG.auth.root_user_password,
-            "index",
-        )
-        .await;
-        assert_eq!(res.is_ok(), true)
     }
 }

@@ -14,7 +14,7 @@
 
 use crate::{
     common::auth::get_hash,
-    infra::config::{CONFIG, USERS},
+    infra::config::{CONFIG, ROOT_USER},
 };
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
@@ -38,10 +38,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         Err(_) => return Err(Status::unauthenticated("No valid auth token")),
     };
 
-    let user = USERS.get(&CONFIG.auth.root_user_email).unwrap();
+    let user = ROOT_USER.get("root").unwrap();
     let in_pass = get_hash(&credentials.password, &user.salt);
 
-    if credentials.user_id.eq(&CONFIG.auth.root_user_email)
+    if credentials.user_id.eq(&user.email)
         && (user.password.eq(&credentials.password) || user.password.eq(&in_pass))
     {
         Ok(req)
