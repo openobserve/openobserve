@@ -258,14 +258,14 @@ export default {
       //   link: "/function",
       // },
       {
-        title: t("menu.ingestion"),
-        icon: "filter_alt",
-        link: "/ingestion/",
-      },
-      {
         title: t("menu.alerts"),
         icon: "img:/src/assets/images/left_nav/warning_icon.svg",
         link: "/alerts",
+      },
+      {
+        title: t("menu.ingestion"),
+        icon: "filter_alt",
+        link: "/ingestion/",
       },
       {
         title: t("menu.about"),
