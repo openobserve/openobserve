@@ -42,6 +42,12 @@ impl Evaluate for Condition {
             matches!(row.get(&self.column).unwrap(), serde_json::Value::Number(_))
         };
 
+        /* let evaluate_numeric = match row.get(&self.column).expect("column exists") {
+            serde_json::Value::Number(number) => number.as_f64().unwrap() > 0.0,
+            serde_json::Value::String(s) => s.is_empty(),
+            _ => false,
+        }; */
+
         if evaluate_numeric {
             let number = match row.get(&self.column).expect("column exists") {
                 serde_json::Value::Number(number) => number,
@@ -49,15 +55,15 @@ impl Evaluate for Condition {
             };
 
             match self.operator {
-                AllOperator::EqualTo => number.as_f64().unwrap() == self.value.as_f64().unwrap(),
-                AllOperator::NotEqualTo => number.as_f64().unwrap() != self.value.as_f64().unwrap(),
-                AllOperator::GreaterThan => number.as_f64().unwrap() > self.value.as_f64().unwrap(),
+                AllOperator::EqualTo => number.as_f64().unwrap() == get_numeric_val(&self.value),
+                AllOperator::NotEqualTo => number.as_f64().unwrap() != get_numeric_val(&self.value),
+                AllOperator::GreaterThan => number.as_f64().unwrap() > get_numeric_val(&self.value),
                 AllOperator::GreaterThanEquals => {
-                    number.as_f64().unwrap() >= self.value.as_f64().unwrap()
+                    number.as_f64().unwrap() >= get_numeric_val(&self.value)
                 }
-                AllOperator::LessThan => number.as_f64().unwrap() < self.value.as_f64().unwrap(),
+                AllOperator::LessThan => number.as_f64().unwrap() < get_numeric_val(&self.value),
                 AllOperator::LessThanEquals => {
-                    number.as_f64().unwrap() <= self.value.as_f64().unwrap()
+                    number.as_f64().unwrap() <= get_numeric_val(&self.value)
                 }
                 _ => false,
             }
@@ -93,6 +99,25 @@ impl Evaluate for Condition {
                 }
             }
         }
+    }
+}
+
+fn get_numeric_val(value: &Value) -> f64 {
+    if value.is_boolean() {
+        f64::INFINITY
+    } else if value.is_f64() {
+        value.as_f64().unwrap()
+    } else if value.is_i64() {
+        value.as_i64().unwrap() as f64
+    } else if value.is_u64() {
+        value.as_u64().unwrap() as f64
+    } else if value.is_string() {
+        match value.as_str().unwrap().to_string().parse::<f64>() {
+            Ok(val) => val,
+            Err(_) => f64::INFINITY,
+        }
+    } else {
+        f64::INFINITY
     }
 }
 
@@ -205,7 +230,7 @@ mod tests {
             column: "occurance".to_owned(),
             operator: AllOperator::GreaterThanEquals,
             ignore_case: None,
-            value: serde_json::json!(5),
+            value: serde_json::json!("5"),
             is_numeric: None,
         };
         let row = serde_json::json!({"Country":"USA","occurance": 10});

@@ -19,13 +19,17 @@ pub async fn send_notification(
     payload: serde_json::Value,
 ) -> Result<(), Box<dyn StdError>> {
     let client = reqwest::Client::new();
-    let loc_url = url::Url::parse(url).unwrap();
-    let req = client
-        .post(loc_url)
-        .header("Content-type", "application/json")
-        .json(&payload);
+    match url::Url::parse(url) {
+        Ok(dest_url) => {
+            let req = client
+                .post(dest_url)
+                .header("Content-type", "application/json")
+                .json(&payload);
 
-    let _ = req.send().await.unwrap();
+            let _ = req.send().await.unwrap();
+        }
+        Err(_) => log::info!("Error parsing notification url"),
+    }
     Ok(())
 }
 
