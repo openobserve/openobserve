@@ -35,6 +35,7 @@ const SQL_KEYWORDS: [&str; 32] = [
 ];
 const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 4] = ["log", "message", "content", "data"];
 const SQL_PUNCTUATION: [char; 2] = ['"', '\''];
+const SQL_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -310,6 +311,10 @@ impl Sql {
             } else {
                 format!("{} LIMIT {}", origin_sql, meta.offset + meta.limit)
             };
+        }
+        // for full sql_mode
+        if sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
+            origin_sql = format!("{} LIMIT {}", origin_sql, SQL_FULL_MODE_LIMIT);
         }
 
         // HACK full text search

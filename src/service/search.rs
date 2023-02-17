@@ -142,7 +142,7 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, an
     // handle count
     let total = match response.aggs.get("_count") {
         Some(v) => v.get(0).unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => 0,
+        None => response.hits.len(),
     };
     response.aggs.remove("_count");
 
@@ -519,7 +519,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     // total
     let total = match result.aggs.get("_count") {
         Some(v) => v.get(0).unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => 0,
+        None => result.hits.len(),
     };
     result.aggs.remove("_count");
 
