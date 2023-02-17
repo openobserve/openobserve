@@ -208,7 +208,7 @@
     "delete": "删除",
     "ok": "确定",
     "type": "函数类型",
-    "showQuery": "显示查询"
+    "showQuery": "摄取时间函数吗？"
   },
   "confirmDialog": {
     "cancel": "取消",
