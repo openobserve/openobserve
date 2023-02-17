@@ -27,6 +27,7 @@
           :label="t('search.showFieldLabel')"
         />
         <q-toggle
+          v-show="!searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
