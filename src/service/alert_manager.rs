@@ -66,7 +66,7 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
                     handle_trigger(alert_name, alert.clone()).await;
                 }
             }
-            None => log::error!("[ALERT MANAGER] no alert found for trigger",),
+            None => {}
         },
         Err(_) => log::error!("[ALERT MANAGER] Error fectching alert",),
     }
