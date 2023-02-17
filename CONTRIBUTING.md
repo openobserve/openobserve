@@ -1,10 +1,10 @@
-# Contributing to Zinc Observe
+# Contributing to ZincObserve
 
 ## Setting up development environment
 
 ### Prerequisite
 
-Zinc Observe uses Rust & embded sled db (For server) & VueJS (For Web UI)
+ZincObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
 
 You must have follwing installed:
 
