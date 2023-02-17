@@ -22,31 +22,17 @@
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
-import { useQuasar } from "quasar";
-import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import {
-  getUserInfo,
-  getDecodedUserInfo,
-  getSessionStorageVal,
-  useLocalToken,
-} from "../utils/zincutils";
+import { getUserInfo, getDecodedUserInfo } from "../utils/zincutils";
 
 import usersService from "../services/users";
 import organizationsService from "../services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "../utils/zincutils";
-import MainLayout from "../layouts/MainLayout.vue";
-import { Redirect } from "@aws-sdk/client-s3";
-
-// import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "PageLoginCallback",
-  components: { MainLayout },
   setup() {
     const $store = useStore();
-    const $q = useQuasar();
-    const $router = useRouter();
 
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
