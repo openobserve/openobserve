@@ -132,8 +132,6 @@ import { Parser } from "node-sql-parser";
 import indexService from "../../services/index";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import QueryEditor from "./QueryEditor.vue";
-import DateTime from "./DateTime.vue";
 import { useLocalLogsObj } from "../../utils/zincutils";
 
 export default defineComponent({
@@ -142,8 +140,6 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
-    QueryEditor,
-    DateTime,
   },
   methods: {
     searchData() {
@@ -153,6 +149,7 @@ export default defineComponent({
     },
     getMoreData() {
       if (
+        this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
           this.searchObj.data.queryResults.from &&
