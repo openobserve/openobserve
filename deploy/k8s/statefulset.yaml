@@ -23,7 +23,7 @@ metadata:
   labels:
     name: zincobserve
 spec:
-  serviceName: z
+  serviceName: zincobserve
   replicas: 1
   selector:
     matchLabels:
