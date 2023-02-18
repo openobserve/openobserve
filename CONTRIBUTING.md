@@ -126,3 +126,16 @@ We check for following in CI pipeline for any pull requests.
 1. Push the code to your repo.
 1. Create a PR
 1. Make sure that the automatic CI checks pass for your PR.
+
+
+## PR title should meet following criteria:
+
+1. build: Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm)
+1. ci: Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs)
+1. docs: Documentation only changes
+1. feat: A new feature
+1. fix: A bug fix
+1. perf: A code change that improves performance
+1. refactor: A code change that neither fixes a bug nor adds a feature
+1. style: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+1. test: Adding missing tests or correcting existing tests
