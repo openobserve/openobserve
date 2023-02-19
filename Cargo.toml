@@ -2,8 +2,8 @@
 description = "ZincObserve is an observability platfom that allows you to capture, search, and analyze your logs, metrics, and traces."
 edition = "2021"
 homepage = "https://zinc.dev/"
-keywords = ["search", "log", "metrics", "traces", "analytics"]
-license = "AGPL-3.0"
+keywords = ["search", "log", "metrics", "traces", "analytics", "observability", "open source", "open-source", "opensource"]
+license = "Apache 2.0"
 name = "zincobserve"
 repository = "https://github.com/zinclabs/zincobserve/"
 version = "0.1.0"
