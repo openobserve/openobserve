@@ -185,3 +185,69 @@ pub async fn get_alert(
         ))),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::meta::alert::{AllOperator, Condition};
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_alerts() {
+        let alert = Alert {
+            name: "500error".to_string(),
+            stream: "olympics".to_string(),
+            query: Some(Query {
+                sql: format!("select count(*) as occurance from olympics"),
+                start_time: 0,
+                end_time: 0,
+                sql_mode: "full".to_owned(),
+                track_total_hits: false,
+                from: 0,
+                size: 0,
+            }),
+            condition: Condition {
+                column: "occurance".to_owned(),
+                operator: AllOperator::GreaterThanEquals,
+                ignore_case: None,
+                value: serde_json::json!("5"),
+                is_numeric: None,
+            },
+            duration: 1,
+            frequency: 1,
+            time_between_alerts: 10,
+            destination: "dummy".to_string(),
+            is_real_time: false,
+        };
+        let res = save_alert(
+            "nexus".to_string(),
+            "olympics".to_string(),
+            "500error".to_string(),
+            alert,
+        )
+        .await;
+        assert!(res.is_ok());
+
+        let list_res = list_alert("nexus".to_string(), Some("olympics")).await;
+        assert!(list_res.is_ok());
+
+        let list_res = list_alert("nexus".to_string(), None).await;
+        assert!(list_res.is_ok());
+
+        let get_res = get_alert(
+            "nexus".to_string(),
+            "olympics".to_string(),
+            "500error".to_string(),
+        )
+        .await;
+        assert!(get_res.is_ok());
+
+        let del_res = delete_alert(
+            "nexus".to_string(),
+            "olympics".to_string(),
+            "500error".to_string(),
+        )
+        .await;
+        assert!(del_res.is_ok());
+    }
+}

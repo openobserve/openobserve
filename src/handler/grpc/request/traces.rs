@@ -31,7 +31,7 @@ impl TraceService for TraceServer {
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
         let metadata = request.metadata().clone();
         let msg = format!(
-            "Please specify orgnization id with header key '{}' ",
+            "Please specify organization id with header key '{}' ",
             &CONFIG.grpc.org_header_key
         );
         if !metadata.contains_key(&CONFIG.grpc.org_header_key) {

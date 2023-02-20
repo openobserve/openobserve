@@ -59,3 +59,37 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
         passcode: user.token,
     }
 }
+
+#[cfg(test)]
+mod test_utils {
+
+    use super::*;
+    use crate::meta::user::User;
+
+    #[actix_web::test]
+    async fn test_organization() {
+        let org_id = "dummy";
+        let user_id = "userone@example.com";
+        let passcode = "samplePassCode";
+        let resp = users::post_user(
+            org_id,
+            User {
+                email: user_id.to_string(),
+                password: "pass".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: "salt".to_string(),
+                token: passcode.to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        let resp = get_passcode(Some(org_id), user_id).await;
+        assert_eq!(resp.passcode, passcode);
+
+        let resp = update_passcode(Some(org_id), user_id).await;
+        assert_ne!(resp.passcode, passcode);
+    }
+}

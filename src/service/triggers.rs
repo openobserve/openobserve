@@ -65,3 +65,42 @@ pub async fn get_alert(
         ))),
     }
 }
+
+#[cfg(test)]
+mod test_utils {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_triggers() {
+        let resp = save_trigger(
+            "dummy_trigger".to_string(),
+            Trigger {
+                timestamp: 0,
+                is_valid: true,
+                alert_name: "TestAlert".to_string(),
+                stream: "TestStream".to_string(),
+                org: "dummy".to_string(),
+                last_sent_at: 0,
+                count: 0,
+                is_ingest_time: false,
+            },
+        )
+        .await;
+
+        assert!(resp.is_ok());
+
+        let resp = get_alert(
+            "dummy".to_string(),
+            "TestStream".to_string(),
+            "TestAlert".to_string(),
+        )
+        .await;
+
+        assert!(resp.is_ok());
+
+        let resp = delete_trigger("TestAlert".to_string()).await;
+
+        assert!(resp.is_ok());
+    }
+}

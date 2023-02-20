@@ -24,7 +24,7 @@ use crate::meta::functions::Transform;
 use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
 
-const SUCESS: &str = "Function saved successfully";
+const SUCCESS: &str = "Function saved successfully";
 const SPECIFY: &str = "Please specify ";
 const STREAM: &str = "stream name ";
 const ORDER: &str = "function order ";
@@ -78,7 +78,7 @@ pub async fn register_function(
                 .unwrap();
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
-                    SUCESS.to_string(),
+                    SUCCESS.to_string(),
                 )))
             }
         }
@@ -96,7 +96,7 @@ pub async fn register_function(
                     .unwrap();
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
-                    SUCESS.to_string(),
+                    SUCCESS.to_string(),
                 )))
             } else {
                 Ok(
@@ -156,19 +156,36 @@ fn extract_num_args(trans: &mut Transform) {
     }
 }
 
-/* #[cfg(test)]
+#[cfg(test)]
 mod test {
     use super::*;
 
-    //#[actix_web::test]
-    async fn test_register_transform() {
-        let trans = Transform{
-            function: "function square(row){const obj = JSON.parse(row);obj['square'] = obj.Year*obj.Year;  return JSON.stringify(obj);}".to_owned(),
-            name: "concat".to_owned(),
+    #[actix_web::test]
+    async fn test_functions() {
+        let trans = Transform {
+            function: "function (row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
+                .to_owned(),
+            name: "dummyfn".to_owned(),
             order: 1,
             stream_name: "Test".to_owned(),
+            num_args: 0,
+            trans_type: 1,
         };
-        let res = register_transform("nexus".to_owned(),None,trans.name.to_owned(),trans).await;
-        //assert!(res.is_ok());
+        let res = register_function("nexus".to_owned(), None, trans.name.to_owned(), trans).await;
+        assert!(res.is_ok());
+
+        let list_resp = list_functions("nexus".to_string(), Some("Test".to_string())).await;
+        assert!(list_resp.is_ok());
+
+        let list_resp = list_functions("nexus".to_string(), None).await;
+        assert!(list_resp.is_ok());
+
+        let del_resp = delete_function(
+            "nexus".to_string(),
+            Some("Test".to_string()),
+            "dummyfn".to_owned(),
+        )
+        .await;
+        assert!(del_resp.is_ok());
     }
-} */
+}

@@ -35,7 +35,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_string();
     let credentials = match Credentials::from_header(token) {
         Ok(c) => c,
-        Err(_) => return Err(Status::unauthenticated("No valid auth token")),
+        Err(err) => {
+            log::info!("Err authenticating {}", err);
+            return Err(Status::unauthenticated("No valid auth token"));
+        }
     };
 
     let user = ROOT_USER.get("root").unwrap();
@@ -47,5 +50,40 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         Ok(req)
     } else {
         Err(Status::unauthenticated("No valid auth token"))
+    }
+}
+
+#[cfg(test)]
+mod test_utils {
+
+    use crate::meta::user::User;
+    use tonic::metadata::MetadataValue;
+
+    use super::*;
+    #[actix_web::test]
+    async fn test_check_auth() {
+        ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "admin@example.com".to_string(),
+                password: "Complexpass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                salt: "Complexpass#123".to_string(),
+                token: "token".to_string(),
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+            },
+        );
+        let mut request = tonic::Request::new(());
+
+        let token: MetadataValue<_> = "basic YWRtaW5AZXhhbXBsZS5jb206Q29tcGxleHBhc3MjMTIz"
+            .parse()
+            .unwrap();
+        let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
+        meta.insert("authorization", token.clone());
+
+        let res = check_auth(request);
+
+        assert!(res.is_ok())
     }
 }
