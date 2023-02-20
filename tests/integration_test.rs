@@ -35,6 +35,8 @@ mod tests {
 
     fn setup() -> (&'static str, &'static str) {
         START.call_once(|| {
+            env::set_var("ZO_ROOT_USER_EMAIL", "admin@example.com");
+            env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
             env::set_var("ZO_LOCAL_MODE", "true");
             env::set_var("ZO_MAX_FILE_SIZE_ON_DISK", "1");
             env::set_var("ZO_FILE_PUSH_INTERVAL", "1");
@@ -47,15 +49,19 @@ mod tests {
 
             log::info!("setup Invoked");
         });
-        ("Authorization", "Basic YWRtaW46Q29tcGxleHBhc3MjMTIz")
+        (
+            "Authorization",
+            "Basic YWRtaW5AZXhhbXBsZS5jb206Q29tcGxleHBhc3MjMTIz",
+        )
     }
 
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
-        fs::remove_dir_all("./data").unwrap_or_else(|e| panic!("Error deletting local dir: {}", e))
+        fs::remove_dir_all("./data").unwrap_or_else(|e| panic!("Error deleting local dir: {}", e))
     }
     #[test]
     async fn e2e_test() {
+        setup();
         let _ = zincobserve::job::init().await;
 
         for _i in 0..3 {
@@ -84,7 +90,6 @@ mod tests {
         e2e_get_dashboard().await;
         e2e_delete_dashboard().await;
         e2e_post_trace().await;
-
         //_e2e_post_metrics().await;
         e2e_get_org_summary().await;
         e2e_post_alert().await;
@@ -309,7 +314,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
     #[cfg(feature = "zo_functions")]
@@ -399,7 +403,7 @@ mod tests {
     async fn e2e_post_user() {
         let auth = setup();
         let body_str = r#"{
-                                "name": "nonadmin",
+                                "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
                                 "role": "admin"
                             }"#;
@@ -432,12 +436,11 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin"))
+            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
     async fn e2e_post_dashboard() {
@@ -503,7 +506,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
 

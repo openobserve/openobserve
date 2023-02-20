@@ -213,3 +213,115 @@ pub async fn root_user_exists() -> bool {
         db::user::root_user_exists().await
     }
 }
+
+#[cfg(test)]
+mod test_utils {
+
+    use super::*;
+    async fn set_up() {
+        USERS.insert(
+            "dummy/admin".to_string(),
+            User {
+                email: "admin@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+            },
+        );
+
+        USERS.insert(
+            "root".to_string(),
+            User {
+                email: "root@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+            },
+        );
+    }
+    #[actix_web::test]
+    async fn test_list_users() {
+        set_up().await;
+        let resp = list_users("dummy").await;
+        assert!(resp.is_ok())
+    }
+    #[actix_web::test]
+    async fn test_root_user_exists() {
+        set_up().await;
+        let resp = root_user_exists().await;
+        assert_eq!(resp, true)
+    }
+
+    #[actix_web::test]
+    async fn test_get_user() {
+        set_up().await;
+        let resp = get_user(None, "root").await;
+        assert_eq!(resp.is_some(), true);
+
+        let resp = get_user(Some("dummy"), "admin").await;
+        assert_eq!(resp.is_some(), true)
+    }
+
+    #[actix_web::test]
+    async fn test_post_user() {
+        let resp = post_user(
+            "dummy",
+            User {
+                email: "admin@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+    }
+
+    #[actix_web::test]
+    async fn test_user() {
+        let _ = post_user(
+            "dummy",
+            User {
+                email: "admin@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+
+        let resp = update_user(
+            "dummy",
+            "user@example.com",
+            true,
+            "user@example.com",
+            UpdateUser {
+                token: Some("new_token".to_string()),
+                first_name: Some("first_name".to_string()),
+                last_name: Some("last_name".to_string()),
+                old_password: Some("pass".to_string()),
+                new_password: Some("new_pass".to_string()),
+                role: Some(crate::meta::user::UserRole::User),
+            },
+        )
+        .await;
+
+        assert!(resp.is_ok());
+
+        let resp = delete_user("dummy", "user@example.com").await;
+
+        assert!(resp.is_ok());
+    }
+}
