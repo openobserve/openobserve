@@ -116,3 +116,35 @@ pub async fn root_user_exists() -> bool {
     });
     !ret.is_empty()
 }
+
+#[cfg(test)]
+mod test_utils {
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_user() {
+        let org_id = "dummy";
+        let email = "user@example.com";
+        let resp = set(
+            org_id,
+            User {
+                email: email.to_string(),
+                password: "pass".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+        assert!(resp.is_ok());
+        let _ = cache().await;
+
+        let resp = get(Some(org_id), email).await;
+        assert!(resp.unwrap().is_some());
+
+        let resp = delete(org_id, email).await;
+        assert!(resp.is_ok());
+    }
+}

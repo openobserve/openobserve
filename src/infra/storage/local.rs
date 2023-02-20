@@ -68,3 +68,26 @@ impl FileStorage for Local {
         }
     }
 }
+
+#[cfg(test)]
+mod test_util {
+    use super::*;
+    #[actix_web::test]
+    async fn test_local_storage() {
+        let local = Local {};
+        let file_text = "Some text";
+        let file_name = "new_file.parquet";
+
+        let resp = local.put(file_name, bytes::Bytes::from(file_text)).await;
+        assert!(resp.is_ok());
+
+        let resp = local.get(file_name).await;
+        assert_eq!(resp.unwrap(), bytes::Bytes::from(file_text));
+
+        let resp = local.list("").await;
+        assert!(resp.unwrap().contains(&file_name.to_string()));
+
+        let resp = local.del(file_name).await;
+        assert!(resp.is_ok());
+    }
+}
