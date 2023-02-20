@@ -612,6 +612,7 @@ fn add_quote_for_sql(text: &str) -> String {
             continue;
         }
         if SQL_PUNCTUATION.contains(&text.chars().nth(cap.start() - 1).unwrap())
+            || SQL_PUNCTUATION.contains(&text.chars().nth(cap.start() - 2).unwrap())
             || (text_len > cap.end()
                 && SQL_PUNCTUATION.contains(&text.chars().nth(cap.end()).unwrap()))
         {
