@@ -80,7 +80,7 @@ export default defineComponent({
         {
           label: "between",
           kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: "between('${1:params}','${1:params}') ",
+          insertText: "between '${1:params}' and '${1:params}' ",
           range: range,
           insertTextRules:
             monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
@@ -88,7 +88,7 @@ export default defineComponent({
         {
           label: "not between",
           kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: "not between('${1:params}','${1:params}') ",
+          insertText: "not between '${1:params}' and '${1:params}' ",
           range: range,
           insertTextRules:
             monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
