@@ -102,12 +102,12 @@
           </q-input>
 
           <div
-            class="col-5 q-pr-sm"
+            class="col-6 q-pr-sm"
             v-if="
               currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
             "
           >
-            <div class="row invite-user">
+            <div class="row invite-user" style="width: 82%; display:inline-flex;">
               <q-input
                 v-model="userEmail"
                 class="col-9 q-pl-md"
@@ -127,7 +127,6 @@
                 />
               </div>
             </div>
-            <label class="inputHint">{{ t("user.inviteByEmailHint") }}</label>
             <q-btn
               v-if="
                 currentUserRole == 'admin' &&
@@ -140,7 +139,11 @@
               :label="t(`user.sendInvite`)"
               @click="inviteUser()"
               :disable="userEmail == ''"
+              style="padding: 7px 9px;min-width: 0px;min-height: 0px;display: block;float: right;top: 1px;"
             />
+            <label class="inputHint" style="display: block">{{
+              t("user.inviteByEmailHint")
+            }}</label>
           </div>
           <div v-else-if="config.isZincObserveCloud !== 'true'" class="col-6">
             <q-btn
@@ -332,7 +335,9 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.data.length;
-          // columns.value = columns.value.filter((v: any) => v.name !== "actions");
+          if (config.isZincObserveCloud == 'true') {
+            columns.value = columns.value.filter((v: any) => v.name !== "actions");
+          }
           let counter = 1;
           orgMembers.value = res.data.data.map((data: any) => {
             if (store.state.userInfo.email == data.email) {
