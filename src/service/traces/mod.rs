@@ -31,7 +31,6 @@ use tracing::info_span;
 
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
-use crate::infra::storage::generate_partioned_file_key;
 use crate::meta::traces::Event;
 use crate::service::schema::{add_stream_schema, stream_schema_exists};
 use crate::{
@@ -241,6 +240,7 @@ pub async fn handle_trace_request(
             )
             .await;
         }
+        /*
         let mut hour_meta_buf: Vec<serde_json::Map<String, Value>> =
             trace_meta_coll.get(&key).unwrap().to_vec();
 
@@ -252,7 +252,7 @@ pub async fn handle_trace_request(
             );
         }
 
-        //metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await;
+        metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await; */
     }
 
     let res = ExportTraceServiceResponse {};
@@ -307,7 +307,7 @@ fn get_val(attr_val: Option<AnyValue>) -> Value {
     }
 }
 
-fn get_storage_file_name(local_path: &str) -> String {
+/* fn _get_storage_file_name(local_path: &str) -> String {
     let file_path = local_path
         .strip_prefix(&CONFIG.common.data_wal_dir)
         .unwrap();
@@ -339,4 +339,4 @@ fn get_storage_file_name(local_path: &str) -> String {
     } else {
         format!("{}{}{}", new_file.0, partition_key, new_file.1)
     }
-}
+}*/

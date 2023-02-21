@@ -28,6 +28,7 @@ use crate::{
     meta::StreamType,
 };
 
+#[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn ingest(
     org_id: &str,
     stream_name: &str,
