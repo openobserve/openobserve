@@ -16,6 +16,18 @@
 import http from "./http";
 
 const organizations = {
+  os_list: (
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    name: string,
+    org_identifier: string
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+    );
+  },
   list: (
     page_num: number,
     page_size: number,
