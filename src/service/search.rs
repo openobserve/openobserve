@@ -291,7 +291,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
-    let credentials = Credentials::new(&user.email, &user.password);
+    let credentials = Credentials::new(&user.email, &user.token);
     let credentials = credentials.as_http_header();
 
     // make cluster request
@@ -388,7 +388,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     for task in tasks {
-        let result = task.await.unwrap();
+        let result = task.await?;
         match result {
             Ok(res) => {
                 results.push(res);
