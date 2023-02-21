@@ -9,6 +9,8 @@ It is a drop-in replacement for Elasticsearch if you are just ingesting data usi
 
 You can reduce your log storage costs by ~140x compared to Elasticsearch by using ZincObserve.
 
+[![ZincObserve Introduction](./screenshots/zo_intro_youtube.png)](https://www.youtube.com/watch?v=cPMH1Am2_zM)
+
 ## Features:
 
 Some of the features are:
