@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::auth::get_hash,
-    infra::config::{CONFIG, ROOT_USER},
-};
+use crate::infra::config::{CONFIG, ROOT_USER};
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
 
@@ -42,11 +39,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     };
 
     let user = ROOT_USER.get("root").unwrap();
-    let in_pass = get_hash(&credentials.password, &user.salt);
-
-    if credentials.user_id.eq(&user.email)
-        && (user.password.eq(&credentials.password) || user.password.eq(&in_pass))
-    {
+    if credentials.user_id.eq(&user.email) && credentials.password.eq(&user.token) {
         Ok(req)
     } else {
         Err(Status::unauthenticated("No valid auth token"))

@@ -15,6 +15,7 @@
 use dashmap::DashMap;
 use etcd_client::PutOptions;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -488,6 +489,13 @@ pub fn get_node_ip() -> String {
         if adapter.is_loopback() {
             continue;
         }
+        let ip = adapter.ip();
+        match ip {
+            IpAddr::V4(_) => {}
+            IpAddr::V6(_) => {
+                continue;
+            }
+        };
         node_ip = adapter.ip().to_string();
         break;
     }

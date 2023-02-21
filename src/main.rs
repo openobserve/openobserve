@@ -84,15 +84,13 @@ async fn main() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move {
         cluster::register_and_keepalive()
             .await
-            .unwrap_or_else(|e| panic!("cluster init failed: {}", e));
-        zincobserve::job::init()
-            .await
-            .unwrap_or_else(|e| panic!("job init failed: {}", e));
+            .expect("cluster init failed");
+        zincobserve::job::init().await.expect("job init failed");
         tx.send(true).unwrap();
     });
 
     // gRPC server
-    rx.await.unwrap();
+    rx.await?;
     if !router::is_router() {
         let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
         let searcher = Searcher::default();
@@ -115,7 +113,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .add_service(trace_svc)
                 .serve(gaddr)
                 .await
-                .unwrap_or_else(|e| panic!("gRPC server failed: {}", e));
+                .expect("gRPC server failed");
         });
     }
 
