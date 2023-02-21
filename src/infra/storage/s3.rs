@@ -14,8 +14,9 @@
 
 use async_once::AsyncOnce;
 use async_trait::async_trait;
-use aws_config::{default_provider::credentials::DefaultCredentialsChain, SdkConfig};
-use aws_sdk_s3::{Client, Credentials, Endpoint, Region};
+use aws_config::default_provider::credentials::DefaultCredentialsChain;
+use aws_config::{timeout::TimeoutConfig, SdkConfig};
+use aws_sdk_s3::{Client, Credentials, Region};
 use std::{sync::Arc, time::Duration};
 
 use super::FileStorage;
@@ -132,13 +133,7 @@ async fn init_s3config() -> Option<Arc<SdkConfig>> {
     let mut s3config = aws_config::from_env();
 
     if !CONFIG.s3.server_url.is_empty() {
-        s3config = s3config.endpoint_resolver(Endpoint::immutable(
-            CONFIG
-                .s3
-                .server_url
-                .parse()
-                .expect("invalid ZO_S3_SERVER_URL"),
-        ));
+        s3config = s3config.endpoint_url(&CONFIG.s3.server_url);
     }
     if !CONFIG.s3.region_name.is_empty() {
         s3config = s3config.region(Region::new(&CONFIG.s3.region_name));
@@ -153,13 +148,15 @@ async fn init_s3config() -> Option<Arc<SdkConfig>> {
         );
         s3config = s3config.credentials_provider(creds);
     } else {
-        let creds = DefaultCredentialsChain::builder()
-            .load_timeout(Duration::from_secs(10))
-            .build()
-            .await;
+        let creds = DefaultCredentialsChain::builder().build().await;
         s3config = s3config.credentials_provider(creds);
     }
 
+    s3config = s3config.timeout_config(
+        TimeoutConfig::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .build(),
+    );
     let s3config = s3config.load().await;
     Some(Arc::new(s3config))
 }
