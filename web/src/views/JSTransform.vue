@@ -139,9 +139,11 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import jsTransformService from "../services/jstransform";
-import AddTransform from "../components/jstransform/add.vue"
-import NoData from "../components/shared/grid/NoData.vue"
+import AddTransform from "../components/jstransform/add.vue";
+import NoData from "../components/shared/grid/NoData.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
+import segment from "../services/segment_analytics";
+import config from "../aws-exports";
 
 export default defineComponent({
   name: "PageJSTransform",
@@ -279,12 +281,24 @@ export default defineComponent({
 
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
+      let action;
       if (!props.row) {
         isUpdated.value = false;
+        action = "Add Function";
       } else {
         isUpdated.value = true;
+        action = "Update Function";
       }
       addTransform();
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+        button: action,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Functions"
+      });
+      }
     }
 
     const refreshList = () => {
@@ -332,6 +346,17 @@ export default defineComponent({
             });
           }
         })
+      }
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+        button: "Delete Function",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        function_name: selectedDelete.value.name,
+        is_ingest_func: selectedDelete.value.ingest,
+        page: "Functions"
+      });
       }
     }
 

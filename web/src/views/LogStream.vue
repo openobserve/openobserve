@@ -141,6 +141,8 @@ import QTablePagination from "../components/shared/grid/Pagination.vue";
 import indexService from "../services/index";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
+import segment from "../services/segment_analytics";
+import config from "../aws-exports";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -256,6 +258,15 @@ export default defineComponent({
             });
           });
       }
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+          button: "Refresh Streams",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Streams"
+        });
+      }
     };
 
     getLogStream();
@@ -265,6 +276,16 @@ export default defineComponent({
       schemaData.value.schema = props.row.schema;
       schemaData.value.stream_type = props.row.stream_type;
       showIndexSchemaDialog.value = true;
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+          button: "Actions",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          stream_name: props.row.name,
+          page: "Streams"
+        });
+      }
     };
 
     const perPageOptions: any = [

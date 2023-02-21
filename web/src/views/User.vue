@@ -26,23 +26,6 @@
       :filter="filterQuery"
       :filter-method="filterData"
     >
-      <!-- 
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              v-if="props.row.email != store.state.userInfo.email"
-              icon="perm_identity"
-              class="iconHoverBtn"
-              dense
-              unelevated
-              size="sm"
-              color="blue-5"
-              @click="updateUser(props)"
-              :title="t('organization.invite')"
-            ></q-btn>
-          </q-td>
-        </template>
-         -->
       <template #no-data>
         <NoData></NoData>
       </template>
@@ -84,7 +67,8 @@
           />
           <q-btn
             v-if="
-              props.row.isLoggedinUser ||
+              (config.isZincObserveCloud == 'true' &&
+                props.row.isLoggedinUser) ||
               currentUserRole == 'root' ||
               (currentUserRole == 'admin' && props.row.role !== 'root')
             "
@@ -145,7 +129,10 @@
             </div>
             <label class="inputHint">{{ t("user.inviteByEmailHint") }}</label>
             <q-btn
-              v-if="currentUserRole == 'admin'"
+              v-if="
+                currentUserRole == 'admin' &&
+                config.isZincObserveCloud == 'true'
+              "
               class="col-1 text-bold no-border"
               padding="sm 0"
               color="secondary"
@@ -155,7 +142,7 @@
               :disable="userEmail == ''"
             />
           </div>
-          <div v-else class="col-6">
+          <div v-else-if="config.isZincObserveCloud !== 'true'" class="col-6">
             <q-btn
               v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
               class="q-ml-md q-mb-xs text-bold no-border"
@@ -200,6 +187,7 @@
     </q-dialog>
 
     <q-dialog
+      v-if="config.isZincObserveCloud !== 'true'"
       v-model="showAddUserDialog"
       position="right"
       full-height
@@ -254,6 +242,7 @@ import AddUser from "../components/users/add.vue"
 import NoData from "../components/shared/grid/NoData.vue";
 import { validateEmail } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
+import segment from "../services/segment_analytics";
 
 export default defineComponent({
   name: "PageUser",
@@ -404,6 +393,16 @@ export default defineComponent({
       }
 
       showAddUserDialog.value = true;
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+        button: "Actions",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        update_user: props.row.email,
+        page: "Users"
+      });
+      }
     }
 
     const updateMember = (data: any) => {
@@ -496,6 +495,15 @@ export default defineComponent({
           })
 
         userEmail.value = "";
+
+        if (config.isZincObserveCloud == "true") {
+          segment.track("Button Click", {
+            button: "Invite User",
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Users"
+          });
+        }
       } else {
         $q.notify({
           type: "negative",
@@ -513,7 +521,7 @@ export default defineComponent({
 
       organizationsService.update_member_role(
         {
-          id: parseInt(row.orgMemberId),
+          id: parseInt(row.orgMemberId?row.orgMemberId:row.org_member_id),
           role: row.role,
           email: row.email,
           organization_id: parseInt(store.state.selectedOrganization.id),
@@ -539,6 +547,16 @@ export default defineComponent({
         dismiss();
         console.log(error);
       });
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+        button: "Update Role",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        update_user: row.email,
+        page: "Users"
+      });
+      }
     }
     return {
       t,

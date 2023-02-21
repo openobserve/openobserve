@@ -139,9 +139,11 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import alertsService from "../services/alerts";
-import AddTransform from "../components/alerts/add.vue"
-import NoData from "../components/shared/grid/NoData.vue"
+import AddTransform from "../components/alerts/add.vue";
+import NoData from "../components/shared/grid/NoData.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
+import segment from "../services/segment_analytics";
+import config from "../aws-exports";
 
 export default defineComponent({
   name: "PageJSTransform",
@@ -200,7 +202,7 @@ export default defineComponent({
         sortable: true,
         style: "width: 10vw;word-break: break-all;",
       },
-     
+
       {
         name: "actions",
         field: "actions",
@@ -211,37 +213,50 @@ export default defineComponent({
     ]);
 
     const getAlerts = () => {
-      
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading alerts...",
-        });
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading alerts...",
+      });
 
-        alertsService.list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier).then((res) => {
+      alertsService
+        .list(
+          1,
+          100000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier
+        )
+        .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
           alerts.value = res.data.list.map((data: any) => {
-            if (data.is_real_time){
-              data.query.sql= "--"
+            if (data.is_real_time) {
+              data.query.sql = "--";
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
               sql: data.query.sql,
-              stream_name: (data.stream) ? data.stream : "--",
-              condition_str: data.condition.column + " " + data.condition.operator + " "+data.condition.value,
+              stream_name: data.stream ? data.stream : "--",
+              condition_str:
+                data.condition.column +
+                " " +
+                data.condition.operator +
+                " " +
+                data.condition.value,
               actions: "",
               duration: {
                 value: data.duration,
-                unit: "Minutes"
+                unit: "Minutes",
               },
               frequency: {
                 value: data.frequency,
-                unit: "Minutes"
+                unit: "Minutes",
               },
               time_between_alerts: {
                 value: data.time_between_alerts,
-                unit: "Minutes"
+                unit: "Minutes",
               },
               destination: data.destination,
               condition: data.condition,
@@ -251,15 +266,14 @@ export default defineComponent({
 
           dismiss();
         })
-          .catch((err) => {
-            dismiss();
-            $q.notify({
-              type: "negative",
-              message: "Error while pulling alerts.",
-              timeout: 2000,
-            });
+        .catch((err) => {
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: "Error while pulling alerts.",
+            timeout: 2000,
           });
-
+        });
     };
 
     if (alerts.value == "" || alerts.value == undefined) {
@@ -295,51 +309,78 @@ export default defineComponent({
 
     const addTransform = () => {
       showAddAlertDialog.value = true;
-    }
+    };
 
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
+      let action;
       if (!props.row) {
         isUpdated.value = false;
+        action = "Add Alert";
       } else {
         isUpdated.value = true;
+        action = "Update Alert";
       }
       addTransform();
-    }
+
+      if (config.enableAnalytics == "true") {
+        segment.track("Button Click", {
+          button: action,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
+      }
+    };
 
     const refreshList = () => {
       showAddAlertDialog.value = false;
       getAlerts();
-    }
+    };
 
     const hideForm = () => {
       showAddAlertDialog.value = false;
-    }
+    };
 
     const deleteFn = () => {
-      alertsService.delete(store.state.selectedOrganization.identifier, selectedDelete.value.stream_name
-, selectedDelete.value.name).then((res: any) => {
-        if (res.data.code == 200) {
-          $q.notify({
-            type: "positive",
-            message: res.data.message,
-            timeout: 2000,
-          });
-          getAlerts();
-        } else {
-          $q.notify({
-            type: "negative",
-            message: res.data.message,
-            timeout: 2000,
-          });
-        }
-      })
-    }
+      alertsService
+        .delete(
+          store.state.selectedOrganization.identifier,
+          selectedDelete.value.stream_name,
+          selectedDelete.value.name
+        )
+        .then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+              timeout: 2000,
+            });
+            getAlerts();
+          } else {
+            $q.notify({
+              type: "negative",
+              message: res.data.message,
+              timeout: 2000,
+            });
+          }
+        });
+
+      if (config.enableAnalytics == "true") {
+        segment.track("Button Click", {
+          button: "Delete Alert",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          alert_name: selectedDelete.value.name,
+          page: "Alerts",
+        });
+      }
+    };
 
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
-    }
+    };
 
     return {
       t,
@@ -382,18 +423,21 @@ export default defineComponent({
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier
-    }
+      return this.store.state.selectedOrganization.identifier;
+    },
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      if ((newVal != oldVal || this.alerts.value == undefined) && this.router.currentRoute.value.name == "transform") {
-        this.resultTotal = 0
+      if (
+        (newVal != oldVal || this.alerts.value == undefined) &&
+        this.router.currentRoute.value.name == "transform"
+      ) {
+        this.resultTotal = 0;
         this.alerts = [];
         this.getAlerts();
       }
-    }
-  }
+    },
+  },
 });
 </script>
 

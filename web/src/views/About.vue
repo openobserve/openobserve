@@ -60,7 +60,6 @@ export default defineComponent({
       pageData,
     };
   },
-  // methods: {},
 });
 </script>
 
