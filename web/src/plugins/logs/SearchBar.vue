@@ -146,6 +146,8 @@ import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser";
+import segment from "../../services/segment_analytics";
+import config from "../../aws-exports";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -232,6 +234,25 @@ export default defineComponent({
 
     const updateDateTime = (value: object) => {
       searchObj.data.datetime = value;
+
+      if (config.isZincObserveCloud == "true" && value.userChangedValue) {
+        let dateTimeVal;
+        if (value.tab === "relative") {
+          dateTimeVal = value.relative;
+        } else {
+          dateTimeVal = value.absolute;
+        }
+
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: dateTimeVal,
+          //user_org: this.store.state.selectedOrganization.identifier,
+          //user_id: this.store.state.userInfo.email,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
+        });
+      }
     };
 
     const udpateQuery = () => {

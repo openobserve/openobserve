@@ -237,6 +237,7 @@ export default defineComponent({
           startTime: "00:00",
           endTime: "23:59",
         },
+        userChangedValue: false,
       },
     };
   },

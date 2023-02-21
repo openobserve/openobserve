@@ -101,15 +101,6 @@
       <add-update-organization @updated="updateDashboardList" />
     </q-dialog>
 
-    <q-dialog
-      v-model="showJoinOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      Organization not available
-      <!-- <join-organization v-model="organization" @updated="joinOrganization" /> -->
-    </q-dialog>
     <q-dialog v-model="showOrgAPIKeyDialog">
       <q-card>
         <q-card-section>
@@ -171,7 +162,6 @@ export default defineComponent({
     const $q = useQuasar();
     const organization = ref({});
     const showAddDashboardDialog = ref(false);
-    const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
@@ -315,7 +305,6 @@ export default defineComponent({
         role: props.row.role,
         member_lists: [],
       };
-      showJoinOrganizationDialog.value = true;
     };
     const removeDashboard = async (props: any) => {
       const dashboardId = props.key;
@@ -348,7 +337,6 @@ export default defineComponent({
       organization,
       columns,
       showAddDashboardDialog,
-      showJoinOrganizationDialog,
       showOrgAPIKeyDialog,
       organizationAPIKey,
       addDashboard,
@@ -389,14 +377,6 @@ export default defineComponent({
     },
     onRowClick(evt, row) {
       this.routeToViewD(row);
-    },
-    joinOrganization() {
-      this.$q.notify({
-        type: "positive",
-        message: "Request completed successfully.",
-        timeout: 5000,
-      });
-      this.showJoinOrganizationDialog = false;
     },
     getAPIKey(org_identifier: string) {
       const dismiss: any = this.$q.notify({

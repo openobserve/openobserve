@@ -165,6 +165,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import indexService from "../../services/index";
+import segment from "../../services/segment_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -281,6 +282,13 @@ export default defineComponent({
         )
         .then((res) => {
           getSchema();
+          segment.track("Button Click", {
+            button: "Update Settings",
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            stream_name: indexData.value.name,
+            page: "Schema Details",
+          });
           dismiss();
         });
     };

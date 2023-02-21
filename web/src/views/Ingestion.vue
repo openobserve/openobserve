@@ -147,6 +147,7 @@ import organizationsService from "../services/organizations";
 // import { config } from "../constants/config";
 import config from "../aws-exports";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
+import segment from "../services/segment_analytics";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -182,6 +183,14 @@ export default defineComponent({
         ingestiontab.value = router.currentRoute.value.name;
         router.push({ path: "/ingestion/" + router.currentRoute.value.name });
       }
+
+      segment.track("Button Click", {
+        button: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
+
       getOrganizationPasscode();
     });
 
@@ -219,6 +228,14 @@ export default defineComponent({
             timeout: 5000,
           });
         });
+
+      segment.track("Button Click", {
+        button: "Copy to Clipboard",
+        ingestion: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
     };
 
     const updatePasscode = () => {
@@ -251,6 +268,13 @@ export default defineComponent({
             timeout: 5000,
           });
         });
+
+      segment.track("Button Click", {
+        button: "Update Passcode",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
     };
 
     const showUpdateDialogFn = () => {

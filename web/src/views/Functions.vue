@@ -39,7 +39,7 @@
               size="sm"
               round
               flat
-              :title="t('jstransform.add')"
+              :title="t('function.add')"
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
@@ -50,7 +50,7 @@
               size="sm"
               round
               flat
-              :title="t('jstransform.delete')"
+              :title="t('function.delete')"
               @click="showDeleteDialogFn(props)"
             ></q-btn>
           </q-td>
@@ -68,7 +68,7 @@
         </template>
         <template #top="scope">
           <div class="q-table__title">
-            {{ t("jstransform.header") }}
+            {{ t("function.header") }}
           </div>
           <q-input
             v-model="filterQuery"
@@ -76,7 +76,7 @@
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('jstransform.search')"
+            :placeholder="t('function.search')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -87,13 +87,13 @@
             padding="sm lg"
             color="secondary"
             no-caps
-            :label="t(`jstransform.add`)"
+            :label="t(`function.add`)"
             @click="showAddUpdateFn({})"
           />
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('jstransform.header')"
+            :pageTitle="t('function.header')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -139,12 +139,14 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import jsTransformService from "../services/jstransform";
-import AddTransform from "../components/jstransform/add.vue"
-import NoData from "../components/shared/grid/NoData.vue"
+import AddTransform from "../components/functions/add.vue";
+import NoData from "../components/shared/grid/NoData.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
+import segment from "../services/segment_analytics";
+import config from "../aws-exports";
 
 export default defineComponent({
-  name: "PageJSTransform",
+  name: "PageFunctions",
   components: { QTablePagination, AddTransform, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
@@ -157,13 +159,13 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
-    const formData:any = ref({});
+    const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
-    const columns:any = ref<QTableProps["columns"]>([
+    const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
         label: "#",
@@ -173,14 +175,14 @@ export default defineComponent({
       {
         name: "name",
         field: "name",
-        label: t("jstransform.name"),
+        label: t("function.name"),
         align: "left",
         sortable: true,
       },
       {
         name: "stream_name",
         field: "stream_name",
-        label: t("jstransform.stream_name"),
+        label: t("function.stream_name"),
         align: "left",
         sortable: true,
       },
@@ -189,33 +191,42 @@ export default defineComponent({
         field: (row: any) => {
           return row.ingest ? "Ingest" : "Query";
         },
-        label: t("jstransform.type"),
+        label: t("function.type"),
         align: "left",
         sortable: true,
       },
       {
         name: "order",
         field: "order",
-        label: t("jstransform.order"),
+        label: t("function.order"),
         align: "left",
         sortable: true,
       },
       {
         name: "actions",
         field: "actions",
-        label: t("jstransform.actions"),
+        label: t("function.actions"),
         align: "center",
         sortable: false,
       },
     ]);
 
     const getJSTransforms = () => {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading functions...",
-        });
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading functions...",
+      });
 
-        jsTransformService.list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier).then((res) => {
+      jsTransformService
+        .list(
+          1,
+          100000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier
+        )
+        .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
           jsTransforms.value = res.data.list.map((data: any) => {
@@ -223,9 +234,9 @@ export default defineComponent({
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
               function: data.function,
-              order: (data.order) ? data.order : 1,
-              stream_name: (data.stream_name) ? data.stream_name : "--",
-              ingest: (data.stream_name) ? true : false,
+              order: data.order ? data.order : 1,
+              stream_name: data.stream_name ? data.stream_name : "--",
+              ingest: data.stream_name ? true : false,
               actions: "",
             };
           });
@@ -245,7 +256,7 @@ export default defineComponent({
     if (jsTransforms.value == "" || jsTransforms.value == undefined) {
       getJSTransforms();
     }
- 
+
     interface OptionType {
       label: String;
       value: number | String;
@@ -275,70 +286,99 @@ export default defineComponent({
 
     const addTransform = () => {
       showAddJSTransformDialog.value = true;
-    }    
+    };
 
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
+      let action;
       if (!props.row) {
         isUpdated.value = false;
+        action = "Add Function";
       } else {
         isUpdated.value = true;
+        action = "Update Function";
       }
       addTransform();
-    }
+
+      segment.track("Button Click", {
+        button: action,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Functions",
+      });
+    };
 
     const refreshList = () => {
       showAddJSTransformDialog.value = false;
       getJSTransforms();
-    }
+    };
 
     const hideForm = () => {
       showAddJSTransformDialog.value = false;
-    }
+    };
 
     const deleteFn = () => {
       if (selectedDelete.value.ingest) {
-        jsTransformService.delete_stream_function(store.state.selectedOrganization.identifier, selectedDelete.value.stream_name, selectedDelete.value.name).then((res: any) => {
-          if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
-              message: res.data.message,
-              timeout: 2000,
-            });
-            getJSTransforms();
-          } else {
-            $q.notify({
-              type: "negative",
-              message: res.data.message,
-              timeout: 2000,
-            });
-          }
-        })
+        jsTransformService
+          .delete_stream_function(
+            store.state.selectedOrganization.identifier,
+            selectedDelete.value.stream_name,
+            selectedDelete.value.name
+          )
+          .then((res: any) => {
+            if (res.data.code == 200) {
+              $q.notify({
+                type: "positive",
+                message: res.data.message,
+                timeout: 2000,
+              });
+              getJSTransforms();
+            } else {
+              $q.notify({
+                type: "negative",
+                message: res.data.message,
+                timeout: 2000,
+              });
+            }
+          });
+      } else {
+        jsTransformService
+          .delete(
+            store.state.selectedOrganization.identifier,
+            selectedDelete.value.name
+          )
+          .then((res: any) => {
+            if (res.data.code == 200) {
+              $q.notify({
+                type: "positive",
+                message: res.data.message,
+                timeout: 2000,
+              });
+              getJSTransforms();
+            } else {
+              $q.notify({
+                type: "negative",
+                message: res.data.message,
+                timeout: 2000,
+              });
+            }
+          });
       }
-      else {
-        jsTransformService.delete(store.state.selectedOrganization.identifier, selectedDelete.value.name).then((res: any) => {
-          if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
-              message: res.data.message,
-              timeout: 2000,
-            });
-            getJSTransforms();
-          } else {
-            $q.notify({
-              type: "negative",
-              message: res.data.message,
-              timeout: 2000,
-            });
-          }
-        })
-      }
-    }
+
+      segment.track("Button Click", {
+        button: "Delete Function",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        function_name: selectedDelete.value.name,
+        is_ingest_func: selectedDelete.value.ingest,
+        page: "Functions",
+      });
+    };
 
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
-    }
+    };
 
     return {
       t,
@@ -381,18 +421,21 @@ export default defineComponent({
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier
-    }
+      return this.store.state.selectedOrganization.identifier;
+    },
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      if ((newVal != oldVal || this.jsTransforms.value == undefined) && this.router.currentRoute.value.name=="function") {
-        this.resultTotal=0
+      if (
+        (newVal != oldVal || this.jsTransforms.value == undefined) &&
+        this.router.currentRoute.value.name == "function"
+      ) {
+        this.resultTotal = 0;
         this.jsTransforms = [];
         this.getJSTransforms();
       }
-    }
-  }
+    },
+  },
 });
 </script>
 

@@ -46,6 +46,7 @@ export default createStore({
       }
     },
     streamFields: [],
+    quotaThresholdMsg: "",
     zoConfig: {},
   },
   mutations: {
@@ -95,6 +96,9 @@ export default createStore({
     setCurrentPanelsData(state, payload) {
       state.currentPanelsData = payload
     },
+    setQuotaThresholdMsg(state, payload) {
+      state.quotaThresholdMsg = payload;
+    },
     setConfig(state, payload) {
       state.zoConfig = payload
     }
@@ -141,6 +145,9 @@ export default createStore({
     },
     setCurrentPanelsData(context, payload) {
       context.commit('setCurrentPanelsData', payload);
+    },
+    setQuotaThresholdMsg(context, payload) {
+      context.commit('setQuotaThresholdMsg', payload);
     },
     setConfig(context, payload) {
       context.commit('setConfig', payload);
