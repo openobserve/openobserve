@@ -56,3 +56,30 @@ pub async fn clear(session_id: &str) -> Result<(), anyhow::Error> {
     FILES.remove(session_id);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_storage_file_list() {
+        let meta = crate::meta::common::FileMeta {
+            min_ts: 100,
+            max_ts: 200,
+            records: 10000,
+            original_size: 1024,
+            compressed_size: 1,
+        };
+        let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let _ret = crate::infra::cache::file_list::set_file_to_cache(file_name, Some(meta), false)
+            .unwrap();
+        let session_id = "1234";
+
+        let res = set(session_id, &[file_name.to_string()]).await;
+        assert!(res.is_ok());
+
+        let get_resp = get(session_id).await;
+        assert!(get_resp.unwrap().len() > 0);
+    }
+}
