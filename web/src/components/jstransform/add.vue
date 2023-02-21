@@ -147,6 +147,7 @@ import { useQuasar } from "quasar";
 
 import IndexService from "../../services/index";
 import { update } from "plotly.js";
+import segment from "../../services/segment_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -161,7 +162,7 @@ const defaultValue: any = () => {
 let callTransform: Promise<{ data: any }>;
 
 export default defineComponent({
-  name: "ComponentAddUpdateUser",
+  name: "ComponentAddUpdateFunction",
   props: {
     modelValue: {
       type: Object,
@@ -371,6 +372,16 @@ end`;
             type: "positive",
             message: res.data.message,
           });
+        });
+
+        segment.track("Button Click", {
+          button: "Save Alert",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.formData.stream_name,
+          function_name: this.formData.name,
+          is_ingest_fn: this.formData.ingest,
+          page: "Add/Update Alert",
         });
       });
     },

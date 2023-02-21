@@ -133,6 +133,8 @@ import indexService from "../../services/index";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
 import { useLocalLogsObj } from "../../utils/zincutils";
+import segment from "../../services/segment_analytics";
+import config from "../../aws-exports";
 
 export default defineComponent({
   name: "PageSearch",
@@ -145,6 +147,20 @@ export default defineComponent({
     searchData() {
       if (this.searchObj.loading == false) {
         this.searchObj.runQuery = true;
+      }
+
+      if (config.isZincObserveCloud == "true") {
+        segment.track("Button Click", {
+          button: "Search Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.value,
+          show_query: this.searchObj.meta.showQuery,
+          show_histogram: this.searchObj.meta.showHistogram,
+          sqlMode: this.searchObj.meta.sqlMode,
+          showFields: this.searchObj.meta.showFields,
+          page: "Search Logs",
+        });
       }
     },
     getMoreData() {
@@ -161,6 +177,16 @@ export default defineComponent({
       ) {
         this.searchObj.loading = true;
         this.getQueryData();
+
+        if (config.isZincObserveCloud == "true") {
+          segment.track("Button Click", {
+            button: "Get More Data",
+            user_org: this.store.state.selectedOrganization.identifier,
+            user_id: this.store.state.userInfo.email,
+            stream_name: this.searchObj.data.stream.selectedStream.value,
+            page: "Search Logs",
+          });
+        }
       }
     },
   },

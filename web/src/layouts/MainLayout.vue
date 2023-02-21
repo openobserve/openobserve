@@ -198,7 +198,7 @@ import {
   getUserInfo,
 } from "../utils/zincutils";
 
-import { ref } from "vue";
+import { ref, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import organizationService from "../services/organizations";
@@ -206,7 +206,7 @@ import config from "../aws-exports";
 import Tracker from "@openreplay/tracker";
 import configService from "../services/config";
 
-export default {
+export default defineComponent({
   name: "MainLayout",
 
   components: {
@@ -467,7 +467,7 @@ export default {
       zoBackendUrl,
     };
   },
-};
+});
 </script>
 
 <style lang="scss">
