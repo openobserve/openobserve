@@ -57,4 +57,12 @@ mod test_utils {
         let res = is_root_user("dummy").await;
         assert_eq!(res, false)
     }
+
+    #[actix_web::test]
+    async fn test_get_hash() {
+        let hash =
+            "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk";
+        let res = get_hash("Pass#123", "TestSalt");
+        assert_eq!(res, hash);
+    }
 }

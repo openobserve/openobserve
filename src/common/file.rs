@@ -47,3 +47,28 @@ pub fn scan_files(pattern: &str) -> Vec<String> {
         .collect();
     files
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file() {
+        let content = b"Some Text";
+        let file_name = "sample.parquet";
+        let resp = put_file_contents(file_name, content);
+        assert!(resp.is_ok());
+
+        let resp = get_file_contents(file_name);
+        assert_eq!(resp.unwrap(), content);
+
+        let resp = get_file_meta(file_name);
+        assert_eq!(resp.unwrap().is_file(), true);
+
+        let resp = scan_files(file_name);
+        assert!(resp.len() > 0);
+
+        let resp = delete_file(file_name);
+        assert!(resp.is_ok());
+    }
+}

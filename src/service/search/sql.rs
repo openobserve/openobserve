@@ -170,7 +170,7 @@ impl Sql {
             }
             if re2.is_match(sql.as_str()) {
                 return Err(anyhow::anyhow!(
-                    "Aggregation SQL is not supportted 'select *' please specify the fields",
+                    "Aggregation SQL is not supported 'select *' please specify the fields",
                 ));
             }
             if re3.is_match(sql.as_str()) {
@@ -648,4 +648,43 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn sql_works() {
+        let org_id = "test_org";
+        let col = "_timestamp";
+        let table = "default";
+        let query = crate::meta::search::Query {
+            sql: format!("select {} from {} ", col, table),
+            from: 0,
+            size: 100,
+            sql_mode: "full".to_owned(),
+            start_time: 1667978895416,
+            end_time: 1667978900217,
+            track_total_hits: false,
+        };
+
+        let req: crate::meta::search::Request = crate::meta::search::Request {
+            query,
+            aggs: HashMap::new(),
+        };
+
+        let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+
+        rpc_req.org_id = org_id.to_string();
+
+        let resp = Sql::new(&rpc_req).await.unwrap();
+
+        assert_eq!(resp.stream_name, table);
+        assert_eq!(resp.org_id, org_id);
+
+        let field_used = check_field_in_use(&resp, col);
+        assert_eq!(field_used, true);
+    }
 }
