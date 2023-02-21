@@ -18,9 +18,9 @@
     <div class="row items-center no-wrap">
       <div class="col">
         <div v-if="beingUpdated" class="text-h6">
-          {{ t("jstransform.updateTitle") }}
+          {{ t("function.updateTitle") }}
         </div>
-        <div v-else class="text-h6">{{ t("jstransform.addTitle") }}</div>
+        <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
       </div>
     </div>
 
@@ -29,7 +29,7 @@
       <q-form ref="addJSTransformForm" @submit="onSubmit">
         <q-toggle
           v-model="formData.ingest"
-          :label="t('jstransform.showQuery')"
+          :label="t('function.showQuery')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -44,7 +44,7 @@
           v-if="formData.ingest"
           v-model="formData.stream_name"
           :options="indexOptions"
-          :label="t('jstransform.stream_name')"
+          :label="t('function.stream_name')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -56,7 +56,7 @@
 
         <q-input
           v-model="formData.name"
-          :label="t('jstransform.name')"
+          :label="t('function.name')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -75,7 +75,7 @@
         <div
           ref="editorRef"
           id="editor"
-          :label="t('jstransform.jsfunction')"
+          :label="t('function.jsfunction')"
           stack-label
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
@@ -93,14 +93,14 @@
           outlined
           filled
           dense
-          :label="t('jstransform.jsfunction')"
+          :label="t('function.jsfunction')"
           :rules="[(val) => !!val || 'Field is required!']"
         /> -->
 
         <q-input
           v-if="formData.ingest"
           v-model="formData.order"
-          :label="t('jstransform.order')"
+          :label="t('function.order')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -116,7 +116,7 @@
           <q-btn
             v-close-popup
             class="q-mb-md text-bold no-border"
-            :label="t('jstransform.cancel')"
+            :label="t('function.cancel')"
             text-color="light-text"
             padding="sm md"
             color="accent"
@@ -124,7 +124,7 @@
             @click="$emit('cancel:hideform')"
           />
           <q-btn
-            :label="t('jstransform.save')"
+            :label="t('function.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
@@ -147,6 +147,7 @@ import { useQuasar } from "quasar";
 
 import IndexService from "../../services/index";
 import { update } from "plotly.js";
+import segment from "../../services/segment_analytics";
 
 const defaultValue: any = () => {
   return {
@@ -161,7 +162,7 @@ const defaultValue: any = () => {
 let callTransform: Promise<{ data: any }>;
 
 export default defineComponent({
-  name: "ComponentAddUpdateUser",
+  name: "ComponentAddUpdateFunction",
   props: {
     modelValue: {
       type: Object,
@@ -371,6 +372,16 @@ end`;
             type: "positive",
             message: res.data.message,
           });
+        });
+
+        segment.track("Button Click", {
+          button: "Save Function",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.formData.stream_name,
+          function_name: this.formData.name,
+          is_ingest_fn: this.formData.ingest,
+          page: "Add/Update Function",
         });
       });
     },

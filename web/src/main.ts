@@ -32,7 +32,6 @@ import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 
 const app = createApp(App);
-
 const router = createRouter(store);
 
 if (config.enableAnalytics == "true") {
@@ -45,7 +44,7 @@ if (config.enableAnalytics == "true") {
         tracingOrigins: [
           "localhost",
           "alpha1.cloud.zinclabs.dev",
-          "cloud.zincsearch.com",
+          "observe.zinc.dev",
           /^\//,
         ],
       }),

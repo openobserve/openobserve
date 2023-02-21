@@ -190,7 +190,7 @@
     "refreshStats": "İstatistikleri Yenile",
     "updateSettings": "Ayarları Güncelle"
   },
-  "jstransform": {
+  "function": {
     "header": "Fonksiyonlar",
     "add": "Yeni işlev oluştur",
     "search": "Arama İşlevi",

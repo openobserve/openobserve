@@ -26,7 +26,7 @@ import LoginCallback from "../views/LoginCallback.vue";
 import MemberSubscription from "../views/MemberSubscription.vue";
 import Search from "../views/Search.vue";
 import LogStream from "../views/LogStream.vue";
-import JSTransform from "../views/JSTransform.vue";
+import Functions from "../views/Functions.vue";
 import Alerts from "../views/Alerts.vue";
 import Ingestion from "../views/Ingestion.vue";
 import Error404 from "../views/Error404.vue";
@@ -153,7 +153,7 @@ export default function (store: any) {
         {
           path: "functions",
           name: "functions",
-          component: JSTransform,
+          component: Functions,
           meta: {
             keepAlive: true,
           },
