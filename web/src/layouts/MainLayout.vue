@@ -315,7 +315,7 @@ export default defineComponent({
     ];
 
     const local = ref(getLocale());
-    const selectedLanguage = ref(langList.find((l) => l.code == local.value));
+    const selectedLanguage:any = ref(langList.find((l) => l.code == local.value));
 
     if (user.picture == "") {
       user.picture = "/src/assets/images/common/profile.svg";
