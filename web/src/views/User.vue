@@ -237,8 +237,8 @@ import { useI18n } from "vue-i18n";
 import config from "../aws-exports";
 import QTablePagination from "../components/shared/grid/Pagination.vue";
 import usersService from "../services/users";
-import UpdateUserRole from "../components/users/UpdateRole.vue"
-import AddUser from "../components/users/add.vue"
+import UpdateUserRole from "../components/users/UpdateRole.vue";
+import AddUser from "../components/users/add.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import { validateEmail } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
@@ -310,43 +310,56 @@ export default defineComponent({
         align: "left",
       },
     ]);
-    const userEmail: any = ref('');
-    const options = [t("user.admin"), t("user.member")]
+    const userEmail: any = ref("");
+    const options = [t("user.admin"), t("user.member")];
     const selectedRole = ref(options[0]);
-    const currentUserRole = ref('')
+    const currentUserRole = ref("");
 
     const getOrgMembers = () => {
-
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading users...",
       });
 
-      usersService.orgUsers(0, 1000, "email", false, "", store.state.selectedOrganization.identifier).then((res) => {
-        resultTotal.value = res.data.data.length;
-        // columns.value = columns.value.filter((v: any) => v.name !== "actions");
-        let counter = 1;
-        orgMembers.value = res.data.data.map((data: any) => {
-          if (store.state.userInfo.email == data.email) {
-            currentUserRole.value = data.role
-          }
+      usersService
+        .orgUsers(
+          0,
+          1000,
+          "email",
+          false,
+          "",
+          store.state.selectedOrganization.identifier
+        )
+        .then((res) => {
+          resultTotal.value = res.data.data.length;
+          // columns.value = columns.value.filter((v: any) => v.name !== "actions");
+          let counter = 1;
+          orgMembers.value = res.data.data.map((data: any) => {
+            if (store.state.userInfo.email == data.email) {
+              currentUserRole.value = data.role;
+            }
 
-          return {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
-            email: data.email,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            role: data.role,
-            member_created: date.formatDate(parseInt(data.member_created), "YYYY-MM-DDTHH:mm:ssZ"),
-            member_updated: date.formatDate(parseInt(data.member_updated), "YYYY-MM-DDTHH:mm:ssZ"),
-            org_member_id: data.org_member_id,
-            isLoggedinUser: store.state.userInfo.email == data.email
-          };
+            return {
+              "#": counter <= 9 ? `0${counter++}` : counter++,
+              email: data.email,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              role: data.role,
+              member_created: date.formatDate(
+                parseInt(data.member_created),
+                "YYYY-MM-DDTHH:mm:ssZ"
+              ),
+              member_updated: date.formatDate(
+                parseInt(data.member_updated),
+                "YYYY-MM-DDTHH:mm:ssZ"
+              ),
+              org_member_id: data.org_member_id,
+              isLoggedinUser: store.state.userInfo.email == data.email,
+            };
+          });
+
+          dismiss();
         });
-
-        dismiss();
-      });
-
     };
 
     if (orgMembers.value.length == 0) {
@@ -382,7 +395,7 @@ export default defineComponent({
     const updateUser = (props: any) => {
       selectedUser.value = props.row;
       showUpdateUserDialog.value = true;
-    }
+    };
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
@@ -394,16 +407,14 @@ export default defineComponent({
 
       showAddUserDialog.value = true;
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
+      segment.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         update_user: props.row.email,
-        page: "Users"
+        page: "Users",
       });
-      }
-    }
+    };
 
     const updateMember = (data: any) => {
       if (data.data != undefined) {
@@ -414,7 +425,7 @@ export default defineComponent({
         });
         showUpdateUserDialog.value = false;
       }
-    }
+    };
 
     const addMember = (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
@@ -443,15 +454,20 @@ export default defineComponent({
           });
         }
       }
-    }
+    };
 
     const deleteUser = (props: any) => {
       confirmDelete.value = true;
     };
 
     const inviteUser = () => {
-      const emailArray = userEmail.value.split(';').filter((email: any) => email).map((email: any) => email.trim())
-      const validationArray = emailArray.map((email: any) => validateEmail(email))
+      const emailArray = userEmail.value
+        .split(";")
+        .filter((email: any) => email)
+        .map((email: any) => email.trim());
+      const validationArray = emailArray.map((email: any) =>
+        validateEmail(email)
+      );
 
       if (!validationArray.includes(false)) {
         const dismiss = $q.notify({
@@ -460,10 +476,11 @@ export default defineComponent({
           timeout: 2000,
         });
 
-        organizationsService.add_members(
-          { member_lists: emailArray, role: selectedRole.value },
-          store.state.selectedOrganization.identifier
-        )
+        organizationsService
+          .add_members(
+            { member_lists: emailArray, role: selectedRole.value },
+            store.state.selectedOrganization.identifier
+          )
           .then((res: { data: any }) => {
             const data = res.data;
 
@@ -485,79 +502,78 @@ export default defineComponent({
 
             // this.$emit("updated");
             dismiss();
-          }).catch(error => {
+          })
+          .catch((error) => {
             dismiss();
             $q.notify({
               type: "negative",
               message: error.message,
               timeout: 5000,
             });
-          })
+          });
 
         userEmail.value = "";
 
-        if (config.isZincObserveCloud == "true") {
-          segment.track("Button Click", {
-            button: "Invite User",
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Users"
-          });
-        }
+        segment.track("Button Click", {
+          button: "Invite User",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Users",
+        });
       } else {
         $q.notify({
           type: "negative",
           message: `Please enter correct email id.`,
         });
       }
-    }
+    };
     const updateUserRole = (row: any) => {
-
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
       });
 
-      organizationsService.update_member_role(
-        {
-          id: parseInt(row.orgMemberId?row.orgMemberId:row.org_member_id),
-          role: row.role,
-          email: row.email,
-          organization_id: parseInt(store.state.selectedOrganization.id),
-        },
-        store.state.selectedOrganization.identifier
-      ).then((res: { data: any }) => {
-        if (res.data.error_members != null) {
-          const message = `Error while updating organization member`;
-          $q.notify({
-            type: "negative",
-            message: message,
-            timeout: 15000,
-          });
-        } else {
-          $q.notify({
-            type: "positive",
-            message: "Organization member updated successfully.",
-            timeout: 3000,
-          });
-        }
-        dismiss();
-      }).catch(error => {
-        dismiss();
-        console.log(error);
-      });
+      organizationsService
+        .update_member_role(
+          {
+            id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
+            role: row.role,
+            email: row.email,
+            organization_id: parseInt(store.state.selectedOrganization.id),
+          },
+          store.state.selectedOrganization.identifier
+        )
+        .then((res: { data: any }) => {
+          if (res.data.error_members != null) {
+            const message = `Error while updating organization member`;
+            $q.notify({
+              type: "negative",
+              message: message,
+              timeout: 15000,
+            });
+          } else {
+            $q.notify({
+              type: "positive",
+              message: "Organization member updated successfully.",
+              timeout: 3000,
+            });
+          }
+          dismiss();
+        })
+        .catch((error) => {
+          dismiss();
+          console.log(error);
+        });
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
+      segment.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         update_user: row.email,
-        page: "Users"
+        page: "Users",
       });
-      }
-    }
+    };
     return {
       t,
       qTable,
@@ -590,7 +606,12 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["first_name"]?.toLowerCase().includes(terms) || rows[i]["last_name"]?.toLowerCase().includes(terms) || rows[i]["email"]?.toLowerCase().includes(terms) || rows[i]["role"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["role"].toLowerCase().includes(terms)
+          ) {
             filtered.push(rows[i]);
           }
         }
@@ -601,22 +622,25 @@ export default defineComponent({
       options,
       inviteUser,
       currentUserRole,
-      updateUserRole
+      updateUserRole,
     };
   },
   computed: {
     selectedOrg() {
-      return this.store.state.selectedOrganization.identifier
-    }
+      return this.store.state.selectedOrganization.identifier;
+    },
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
       this.orgData = newVal;
-      if ((newVal != oldVal || this.orgMembers.value == undefined) && this.router.currentRoute.value.name == "users") {
+      if (
+        (newVal != oldVal || this.orgMembers.value == undefined) &&
+        this.router.currentRoute.value.name == "users"
+      ) {
         this.getOrgMembers();
       }
-    }
-  }
+    },
+  },
 });
 </script>
 

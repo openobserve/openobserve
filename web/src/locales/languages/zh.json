@@ -190,7 +190,7 @@
     "refreshStats": "刷新统计",
     "updateSettings": "更新设置"
   },
-  "jstransform": {
+  "function": {
     "header": "函数",
     "add": "创建新函数",
     "search": "搜索函数",

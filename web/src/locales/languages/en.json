@@ -190,7 +190,7 @@
         "refreshStats": "Refresh Stats",
         "updateSettings": "Update Settings"
     },
-    "jstransform": {
+    "function": {
         "header": "Functions",
         "add": "Create new function",
         "search": "Search Function",

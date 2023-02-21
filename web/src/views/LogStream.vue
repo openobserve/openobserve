@@ -259,14 +259,12 @@ export default defineComponent({
           });
       }
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
-          button: "Refresh Streams",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Streams"
-        });
-      }
+      segment.track("Button Click", {
+        button: "Refresh Streams",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Streams",
+      });
     };
 
     getLogStream();
@@ -277,15 +275,13 @@ export default defineComponent({
       schemaData.value.stream_type = props.row.stream_type;
       showIndexSchemaDialog.value = true;
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
-          button: "Actions",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          stream_name: props.row.name,
-          page: "Streams"
-        });
-      }
+      segment.track("Button Click", {
+        button: "Actions",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        stream_name: props.row.name,
+        page: "Streams",
+      });
     };
 
     const perPageOptions: any = [

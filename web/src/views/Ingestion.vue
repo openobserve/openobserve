@@ -184,14 +184,13 @@ export default defineComponent({
         router.push({ path: "/ingestion/" + router.currentRoute.value.name });
       }
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
-          button: router.currentRoute.value.name,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Ingestion",
-        });
-      }
+      segment.track("Button Click", {
+        button: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
+
       getOrganizationPasscode();
     });
 
@@ -230,15 +229,13 @@ export default defineComponent({
           });
         });
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
-          button: "Copy to Clipboard",
-          ingestion: router.currentRoute.value.name,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Ingestion",
-        });
-      }
+      segment.track("Button Click", {
+        button: "Copy to Clipboard",
+        ingestion: router.currentRoute.value.name,
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
     };
 
     const updatePasscode = () => {
@@ -272,14 +269,12 @@ export default defineComponent({
           });
         });
 
-      if (config.isZincObserveCloud == "true") {
-        segment.track("Button Click", {
-          button: "Update Passcode",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Ingestion",
-        });
-      }
+      segment.track("Button Click", {
+        button: "Update Passcode",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Ingestion",
+      });
     };
 
     const showUpdateDialogFn = () => {

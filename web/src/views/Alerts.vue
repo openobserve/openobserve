@@ -146,7 +146,7 @@ import segment from "../services/segment_analytics";
 import config from "../aws-exports";
 
 export default defineComponent({
-  name: "PageJSTransform",
+  name: "PageAlerts",
   components: { QTablePagination, AddTransform, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
