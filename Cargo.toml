@@ -35,9 +35,8 @@ arrow-schema = {version = "31.0", features = ["serde"]}
 async-trait = "0.1.57"
 async_once = "0.2.6"
 awc = "3.1.0"
-aws-config = "0.51.0"
-aws-sdk-s3 = "0.21.0"
-aws-types = "0.51.0"
+aws-config = "0.54"
+aws-sdk-s3 = "0.24"
 bytes = "1.1"
 chrono = "0.4"
 dashmap = {version = "5.4.0", features = ["serde"]}

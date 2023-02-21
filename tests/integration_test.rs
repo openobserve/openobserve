@@ -57,7 +57,7 @@ mod tests {
 
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
-        fs::remove_dir_all("./data").unwrap_or_else(|e| panic!("Error deleting local dir: {}", e))
+        fs::remove_dir_all("./data").expect("Error deleting local dir")
     }
     #[test]
     async fn e2e_test() {
