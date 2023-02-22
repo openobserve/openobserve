@@ -116,6 +116,10 @@ mod tests {
     fn test_check_search_route() {
         let is_search_route = check_search_route("/api/_search");
         assert_eq!(is_search_route, true);
+        let is_search_route = check_search_route("/api/_around");
+        assert_eq!(is_search_route, true);
+        let is_search_route = check_search_route("/api/cache/status");
+        assert_eq!(is_search_route, true);
         let is_search_route = check_search_route("/api/_bulk");
         assert_eq!(is_search_route, false);
     }

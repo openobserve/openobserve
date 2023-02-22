@@ -61,6 +61,8 @@ mod tests {
     }
     #[test]
     async fn e2e_test() {
+        //make sure data dir is deleted before we run integ tests
+        fs::remove_dir_all("./data").unwrap_or_else(|e| panic!("Error deleting local dir: {}", e));
         setup();
         let _ = zincobserve::job::init().await;
 
@@ -671,6 +673,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        //println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -749,7 +752,7 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp);
+        //println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
     async fn e2e_cache_status() {
@@ -768,7 +771,7 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp);
+        //println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 }
