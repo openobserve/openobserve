@@ -730,11 +730,67 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
 
 #[cfg(test)]
 mod test {
+    use arrow::array::Int32Array;
+    use arrow_schema::Field;
+    use datafusion::from_slice::FromSlice;
+
     use super::*;
     #[actix_web::test]
     async fn test_register_udf() {
         let mut ctx = SessionContext::new();
         let _ = register_udf(&mut ctx, "nexus").await;
         //assert!(res)
+    }
+
+    #[actix_web::test]
+    async fn test_merge_write_recordbatch() {
+        // define a schema.
+        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int32, false)]));
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+        )
+        .unwrap();
+
+        let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
+
+        assert!(!res.is_empty())
+    }
+
+    #[actix_web::test]
+    async fn test_merge() {
+        // define a schema.
+        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int32, false)]));
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+        )
+        .unwrap();
+
+        let res = merge(
+            "dummy",
+            1,
+            100,
+            "select * from tbl limit 10",
+            &vec![vec![batch, batch2]],
+        )
+        .await
+        .unwrap();
+
+        assert!(!res.is_empty())
     }
 }

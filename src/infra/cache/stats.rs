@@ -111,5 +111,36 @@ mod tests {
         let stats = get_stats();
         let data = get_stream_stats_len();
         assert_eq!(data, stats.len());
+
+        let val = StreamStats {
+            doc_time_min: 1667978841102,
+            doc_time_max: 1667978845374,
+            doc_num: 5000,
+            file_num: 1,
+            storage_size: 200.00,
+            compressed_size: 3.00,
+        };
+
+        let _ = set_stream_stats("nexus", "default", "logs", val);
+        let stats = get_stream_stats("nexus", "default", "logs");
+        assert_eq!(stats, Some(val));
+
+        let file_meta = FileMeta {
+            min_ts: 1667978841110,
+            max_ts: 1667978845354,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+
+        let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_1.parquet";
+        let _ = incr_stream_stats(file_key, file_meta);
+
+        let stats = get_stream_stats("nexus", "default", "logs");
+        assert_eq!(stats.unwrap().doc_num, 5300);
+
+        let _ = decr_stream_stats(file_key, file_meta);
+        let stats = get_stream_stats("nexus", "default", "logs");
+        assert_eq!(stats.unwrap().doc_num, 5000);
     }
 }

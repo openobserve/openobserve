@@ -93,3 +93,23 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[actix_web::test]
+    async fn test_get_file_meta() {
+        let file_meta = meta::common::FileMeta {
+            min_ts: 1667978841110,
+            max_ts: 1667978845354,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+
+        let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
+        let resp = meta::common::FileMeta::from(&rpc_meta);
+
+        assert_eq!(file_meta, resp);
+    }
+}
