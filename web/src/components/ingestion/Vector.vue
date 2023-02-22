@@ -32,7 +32,7 @@
 [sinks.zinc]
 type = "http"
 inputs = [ source or transform id ]
-endpoint = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
+uri = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
 auth.strategy = "basic"
 auth.user = "{{ currUserEmail }}"
 auth.password = "{{ store.state.organizationPasscode }}"
