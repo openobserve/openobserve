@@ -24,7 +24,6 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error};
 use tracing::info_span;
 
-use super::get_storage_file_name;
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::traces::Event;
@@ -303,7 +302,7 @@ pub async fn traces_json(
             )
             .await;
         }
-        let mut hour_meta_buf: Vec<serde_json::Map<String, Value>> =
+        /*let mut hour_meta_buf: Vec<serde_json::Map<String, Value>> =
             trace_meta_coll.get(&key).unwrap().to_vec();
 
         let dest_file = get_storage_file_name(&traces_file_name);
@@ -313,7 +312,7 @@ pub async fn traces_json(
                 serde_json::Value::String(dest_file.clone()),
             );
         }
-        //metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await;
+        metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await;*/
     }
 
     Ok(HttpResponse::Ok().json(meta::http::HttpResponse::message(

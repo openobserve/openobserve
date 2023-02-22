@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg_attr(coverage_nightly, feature(no_coverage))]
 pub mod common;
 pub mod handler;
 pub mod infra;

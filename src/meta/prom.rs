@@ -56,3 +56,23 @@ impl Metric {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_response() {
+        let name = "container_sockets";
+        let metric = Metric::new(
+            name.to_string(),
+            4.0,
+            AHashMap::new(),
+            1667978900217,
+            "Gauge".to_string(),
+        );
+
+        assert_eq!(metric.name, name);
+    }
+}

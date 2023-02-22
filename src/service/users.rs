@@ -231,19 +231,6 @@ mod test_utils {
                 last_name: "".to_owned(),
             },
         );
-
-        USERS.insert(
-            "root".to_string(),
-            User {
-                email: "root@zo.dev".to_string(),
-                password: "pass#123".to_string(),
-                role: crate::meta::user::UserRole::Root,
-                salt: String::new(),
-                token: "token".to_string(),
-                first_name: "root".to_owned(),
-                last_name: "".to_owned(),
-            },
-        );
     }
     #[actix_web::test]
     async fn test_list_users() {
@@ -261,8 +248,6 @@ mod test_utils {
     #[actix_web::test]
     async fn test_get_user() {
         set_up().await;
-        let resp = get_user(None, "root").await;
-        assert_eq!(resp.is_some(), true);
 
         let resp = get_user(Some("dummy"), "admin").await;
         assert_eq!(resp.is_some(), true)

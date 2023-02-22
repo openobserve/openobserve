@@ -69,14 +69,11 @@ mod test_utils {
         );
         let mut request = tonic::Request::new(());
 
-        let token: MetadataValue<_> = "basic YWRtaW5AZXhhbXBsZS5jb206Q29tcGxleHBhc3MjMTIz"
-            .parse()
-            .unwrap();
+        let token: MetadataValue<_> = "basic YWRtaW5AZXhhbXBsZS5jb206dG9rZW4=".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
 
         let res = check_auth(request);
-
         assert!(res.is_ok())
     }
 }
