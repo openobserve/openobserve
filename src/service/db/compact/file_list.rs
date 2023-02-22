@@ -29,3 +29,18 @@ pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
     db.put(key, offset.to_string().into()).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_files() {
+        let off_set = 100;
+
+        let _ = set_offset(off_set).await;
+        let resp = get_offset().await;
+        assert_eq!(resp.unwrap(), off_set);
+    }
+}

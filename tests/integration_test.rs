@@ -59,10 +59,12 @@ mod tests {
         log::info!("Tear Down Invoked");
         fs::remove_dir_all("./data").expect("Error deleting local dir")
     }
+
     #[test]
     async fn e2e_test() {
         //make sure data dir is deleted before we run integ tests
-        fs::remove_dir_all("./data").unwrap_or_else(|e| panic!("Error deleting local dir: {}", e));
+        fs::remove_dir_all("./data")
+            .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
         setup();
         let _ = zincobserve::job::init().await;
 
@@ -83,7 +85,8 @@ mod tests {
         #[cfg(feature = "zo_functions")]
         e2e_delete_stream_functions().await;
         //e2e_get_stream_schema().await;
-        //e2e_search().await;
+        e2e_search().await;
+        e2e_search_around().await;
         e2e_post_user().await;
         e2e_list_users().await;
         e2e_delete_user().await;
@@ -92,7 +95,7 @@ mod tests {
         e2e_get_dashboard().await;
         e2e_delete_dashboard().await;
         e2e_post_trace().await;
-        //_e2e_post_metrics().await;
+        e2e_post_metrics().await;
         e2e_get_org_summary().await;
         e2e_post_alert().await;
         e2e_delete_alert().await;
@@ -100,6 +103,8 @@ mod tests {
         e2e_list_real_time_alerts().await;
         e2e_health_check().await;
         e2e_cache_status().await;
+        e2e_post_stream_settings().await;
+        e2e_get_org().await;
         e2e_100_tear_down().await;
     }
 
@@ -341,9 +346,9 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn _e2e_search() {
+    async fn e2e_search() {
         let auth = setup();
-        let body_str = r#"{"query":{"sql":"select * from k8s-logs-2022.10.18",
+        let body_str = r#"{"query":{"sql":"select * from olympics_schema",
                                 "from": 0,
                                 "size": 100
                                         }
@@ -366,6 +371,32 @@ mod tests {
         // println!("{:?}", resp)
         assert!(resp.status().is_success());
     }
+
+    async fn e2e_search_around() {
+        let auth = setup();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let ts = chrono::Utc::now().timestamp_micros();
+
+        let req = test::TestRequest::get()
+            .uri(&format!(
+                "/api/{}/{}/_around?key={}&size=10",
+                "e2e", "olympics_schema", ts
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
     async fn e2e_list_users() {
         let auth = setup();
         let app = test::init_service(
@@ -537,7 +568,7 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn _e2e_post_metrics() {
+    async fn e2e_post_metrics() {
         let auth = setup();
 
         let mut loc_lable: Vec<prometheus_prot::Label> = vec![];
@@ -610,7 +641,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/traces", "e2e"))
+            .uri(&format!("/api/{}/prometheus/write", "e2e"))
             //.insert_header(ContentType::json())
             .insert_header(("X-Prometheus-Remote-Write-Version", "0.1.0"))
             .insert_header(("Content-Encoding", "snappy"))
@@ -772,6 +803,49 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         //println!("{:?}", resp);
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_stream_settings() {
+        let auth = setup();
+        let body_str = r#"{  "partition_keys": ["test_key"], "full_text_search_keys": ["log"]}"#;
+        // app
+        let thread_id: usize = 1;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .app_data(web::Data::new(thread_id))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/settings", "e2e", "olympics"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_get_org() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
 }
