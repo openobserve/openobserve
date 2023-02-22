@@ -16,16 +16,17 @@ use datafusion::arrow;
 use datafusion::arrow::json::reader::infer_json_schema;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use std::io::{BufReader, Seek, SeekFrom};
+use std::sync::atomic::Ordering;
 use std::{fs, path::Path, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::file::scan_files;
 use crate::common::utils::populate_file_meta;
-use crate::infra::cluster;
 use crate::infra::config::{get_parquet_compression, CONFIG};
 use crate::infra::file_lock;
 use crate::infra::storage;
 use crate::infra::storage::generate_partioned_file_key;
+use crate::infra::{cluster, config};
 use crate::meta::common::FileMeta;
 use crate::meta::StreamType;
 use crate::service::db;
@@ -127,16 +128,27 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             Ok(ret) => match ret {
                 Ok((path, key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => match fs::remove_file(&path) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::error!(
-                                    "[JOB] Failed to remove disk file from disk: {}, {}",
-                                    path,
-                                    e.to_string()
-                                )
+                        Ok(_) => {
+                            loop {
+                                let searching = config::SEARCHING_IN_CACHE.load(Ordering::Relaxed);
+                                if searching == 0 {
+                                    break;
+                                } else {
+                                    task::yield_now().await;
+                                    time::sleep(time::Duration::from_millis(100)).await;
+                                }
                             }
-                        },
+                            match fs::remove_file(&path) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    log::error!(
+                                        "[JOB] Failed to remove disk file from disk: {}, {}",
+                                        path,
+                                        e.to_string()
+                                    )
+                                }
+                            }
+                        }
                         Err(e) => log::error!(
                             "[JOB] Failed write disk file meta:{}, error: {}",
                             path,

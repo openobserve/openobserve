@@ -17,6 +17,7 @@ use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use reqwest::Client;
+use std::sync::atomic::AtomicU8;
 use std::time::Duration;
 use sys_info::hostname;
 
@@ -33,6 +34,7 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
+pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 
 lazy_static! {
     pub static ref CONFIG: Config = init();
