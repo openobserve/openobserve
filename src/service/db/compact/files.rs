@@ -56,3 +56,21 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     }
     Ok(items)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_files() {
+        let off_set = 100;
+
+        let _ = set_offset("nexus", "default", "logs".into(), off_set).await;
+        let resp = get_offset("nexus", "default", "logs".into()).await;
+        assert_eq!(resp.unwrap(), off_set);
+
+        let resp = list_offset().await;
+        assert!(resp.unwrap().len() > 0);
+    }
+}

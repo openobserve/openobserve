@@ -136,3 +136,32 @@ pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
     };
     Ok(data)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_get_file_from_cache() {
+        let mut file_data = FileData::default();
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let content = Bytes::from("Some text");
+
+        let resp = file_data.set(file_key, content.clone());
+        assert!(resp.is_ok());
+
+        let resp = file_data.get(file_key);
+        assert_eq!(resp.unwrap(), content);
+
+        let resp = set(file_key, content.clone());
+        assert!(resp.is_ok());
+
+        let resp = exist(file_key);
+        assert_eq!(resp.unwrap(), true);
+
+        let resp = get(file_key);
+        assert_eq!(resp.unwrap(), content);
+
+        let resp = stats();
+        assert!(resp.0 > 0);
+    }
+}

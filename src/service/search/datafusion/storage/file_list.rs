@@ -81,5 +81,8 @@ mod tests {
 
         let get_resp = get(session_id).await;
         assert!(get_resp.unwrap().len() > 0);
+
+        let resp = clear(session_id).await;
+        assert!(resp.is_ok());
     }
 }

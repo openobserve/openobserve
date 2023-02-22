@@ -73,8 +73,7 @@ mod tests {
     use super::default;
     use bytes::Bytes;
 
-    #[tokio::test]
-    #[ignore]
+    #[actix_web::test]
     async fn test_get() {
         let db = default();
         db.put("/foo/bar", Bytes::from("hello")).await.unwrap();
@@ -82,15 +81,13 @@ mod tests {
         assert_eq!(value, Bytes::from("hello"));
     }
 
-    #[tokio::test]
-    #[ignore]
+    #[actix_web::test]
     async fn test_put() {
         let db = default();
         assert_eq!(true, db.put("/foo/bar", Bytes::from("hello")).await.is_ok());
     }
 
-    #[tokio::test]
-    #[ignore]
+    #[actix_web::test]
     async fn test_delete() {
         let db = default();
         assert_eq!(

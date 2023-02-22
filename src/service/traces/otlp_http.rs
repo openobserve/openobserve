@@ -349,3 +349,16 @@ fn get_val_for_attr(attr_val: Value) -> Value {
     };
     ().into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn test_get_val_for_attr() {
+        let in_val = 10.00;
+        let input = json!({ "key": in_val });
+        let resp = get_val_for_attr(input);
+        assert_eq!(resp.as_f64().unwrap(), in_val);
+    }
+}

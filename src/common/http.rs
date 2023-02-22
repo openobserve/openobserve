@@ -38,3 +38,30 @@ pub fn get_stream_type_from_request(
 
     Ok(stream_type)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_get_file_from_cache() {
+        let key = "type".to_string();
+
+        let mut map: HashMap<String, String> = HashMap::new();
+        map.insert(key.clone(), key.clone());
+
+        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        assert!(resp.is_err());
+
+        map.insert(key.clone(), "LOGS".to_string());
+        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        assert_eq!(resp.unwrap(), Some(StreamType::Logs));
+
+        map.insert(key.clone(), "METRICS".to_string());
+        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        assert_eq!(resp.unwrap(), Some(StreamType::Metrics));
+
+        map.insert(key.clone(), "TRACES".to_string());
+        let resp = get_stream_type_from_request(&Query { 0: map.clone() });
+        assert_eq!(resp.unwrap(), Some(StreamType::Traces));
+    }
+}

@@ -3452,11 +3452,11 @@
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "LANE, Francis", "Country": "USA", "Gender": "Men", "Event": "100M", "Medal": "Bronze", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "SZOKOLYI, Alajos", "Country": "HUN", "Gender": "Men", "Event": "100M", "Medal": "Bronze", "Season": "summer"}
-{ "index" : { "_index" : "olympics_schema" } } 
+{ "create" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "BURKE, Thomas", "Country": "USA", "Gender": "Men", "Event": "100M", "Medal": "Gold", "Season": "summer"}
-{ "index" : { "_index" : "olympics_schema" } } 
+{ "create" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "HOFMANN, Fritz", "Country": "GER", "Gender": "Men", "Event": "100M", "Medal": "Silver", "Season": "summer"}
-{ "index" : { "_index" : "olympics_schema" } } 
+{ "create" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "CURTIS, Thomas", "Country": "USA", "Gender": "Men", "Event": "110M Hurdles", "Medal": "Gold", "Season": "summer"}
 { "index" : { "_index" : "olympics_schema" } } 
 {"Year": 1896, "City": "Athens", "Sport": "Athletics", "Discipline": "Athletics", "Athlete": "GOULDING, Grantley", "Country": "GBR", "Gender": "Men", "Event": "110M Hurdles", "Medal": "Silver", "Season": "summer"}

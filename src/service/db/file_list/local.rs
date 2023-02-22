@@ -79,3 +79,27 @@ pub async fn broadcast_cache() -> Result<(), anyhow::Error> {
     }
     super::broadcast::send(&files).await
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_files() {
+        let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_1.parquet";
+
+        let file_meta = FileMeta {
+            min_ts: 1667978841110,
+            max_ts: 1667978845354,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+
+        let resp = set(file_key, file_meta, false).await;
+        //let resp = cache().await;
+
+        assert!(resp.is_ok());
+    }
+}

@@ -261,4 +261,14 @@ mod tests {
         let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
         assert_eq!(count, 2);
     }
+
+    #[test]
+    fn parse_escape() {
+        assert_eq!(is_valid_character_after_escape('0'), true);
+        assert_eq!(is_valid_character_after_escape('8'), true);
+        assert_eq!(is_valid_character_after_escape('x'), true);
+        assert_eq!(is_valid_character_after_escape('p'), true);
+        assert_eq!(is_valid_character_after_escape('d'), true);
+        assert_eq!(is_valid_character_after_escape('a'), false);
+    }
 }
