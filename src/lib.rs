@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#![cfg_attr(coverage_nightly, feature(no_coverage))]
 
+#![cfg_attr(coverage_nightly, feature(no_coverage))]
 pub mod common;
 pub mod handler;
 pub mod infra;
