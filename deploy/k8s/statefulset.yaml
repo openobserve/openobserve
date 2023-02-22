@@ -46,7 +46,7 @@ spec:
           image: public.ecr.aws/zinclabs/zincobserve:latest
           env:
             - name: ZO_ROOT_USER_EMAIL
-              value: admin@example.com
+              value: root@example.com
             - name: ZO_ROOT_USER_PASSWORD
               value: Complexpass#123
             - name: ZO_DATA_DIR

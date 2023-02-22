@@ -35,7 +35,7 @@ mod tests {
 
     fn setup() -> (&'static str, &'static str) {
         START.call_once(|| {
-            env::set_var("ZO_ROOT_USER_EMAIL", "admin@example.com");
+            env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
             env::set_var("ZO_LOCAL_MODE", "true");
             env::set_var("ZO_MAX_FILE_SIZE_ON_DISK", "1");
@@ -51,7 +51,7 @@ mod tests {
         });
         (
             "Authorization",
-            "Basic YWRtaW5AZXhhbXBsZS5jb206Q29tcGxleHBhc3MjMTIz",
+            "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=",
         )
     }
 
