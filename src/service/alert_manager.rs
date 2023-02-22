@@ -38,8 +38,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
     match super::db::alerts::get(&trigger.org, &trigger.stream, &trigger.alert_name).await {
-        Ok(result) => match result {
-            Some(alert) => {
+        Ok(result) => {
+            if let Some(alert) = result {
                 if TRIGGERS_IN_PROCESS.contains_key(alert_name) {
                     let mut curr_time =
                         TRIGGERS_IN_PROCESS.get_mut(&alert_name.to_owned()).unwrap();
@@ -66,8 +66,7 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
                     handle_trigger(alert_name, alert.clone()).await;
                 }
             }
-            None => {}
-        },
+        }
         Err(_) => log::error!("[ALERT MANAGER] Error fectching alert",),
     }
 }
