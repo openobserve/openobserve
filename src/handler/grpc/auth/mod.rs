@@ -58,7 +58,7 @@ mod test_utils {
         ROOT_USER.insert(
             "root".to_string(),
             User {
-                email: "admin@example.com".to_string(),
+                email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
                 role: crate::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
@@ -69,7 +69,7 @@ mod test_utils {
         );
         let mut request = tonic::Request::new(());
 
-        let token: MetadataValue<_> = "basic YWRtaW5AZXhhbXBsZS5jb206dG9rZW4=".parse().unwrap();
+        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
 
