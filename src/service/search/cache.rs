@@ -15,13 +15,14 @@
 use ahash::AHashMap as HashMap;
 use datafusion::datasource::file_format::file_type::FileType;
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::info_span;
 
 use super::datafusion::storage::file_list::SessionType;
 use super::sql::Sql;
 use crate::common::file::scan_files;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{self, CONFIG};
 use crate::meta;
 use crate::service::file_list::calculate_local_files_size;
 
@@ -37,6 +38,9 @@ pub async fn search(
 ) -> super::SearchResult {
     let span1 = info_span!("service:search:cache:get_file_list");
     let guard1 = span1.enter();
+
+    // mark searching in cache
+    let searching = Searching::new();
 
     // get file list
     let files = get_file_list(&sql, stream_type).await?;
@@ -75,6 +79,9 @@ pub async fn search(
     )
     .await?;
 
+    // searching done.
+    drop(searching);
+
     Ok((result, file_count, scan_size as usize))
 }
 
@@ -110,4 +117,20 @@ async fn get_file_list(
         }
     }
     Ok(result)
+}
+
+/// Searching for marking searching in cache
+struct Searching;
+
+impl Searching {
+    pub fn new() -> Self {
+        config::SEARCHING_IN_CACHE.store(1, Ordering::Relaxed);
+        Searching
+    }
+}
+
+impl Drop for Searching {
+    fn drop(&mut self) {
+        config::SEARCHING_IN_CACHE.store(0, Ordering::Relaxed);
+    }
 }

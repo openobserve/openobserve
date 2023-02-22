@@ -33,7 +33,7 @@ const SQL_KEYWORDS: [&str; 32] = [
     "NULL", "CASE", "AS", "HAVING", "GROUP", "BY", "ORDER", "ASC", "DESC", "BETWEEN", "LIKE",
     "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
 ];
-const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 4] = ["log", "message", "content", "data"];
+const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
 const SQL_PUNCTUATION: [char; 2] = ['"', '\''];
 const SQL_FULL_MODE_LIMIT: usize = 1000;
 
