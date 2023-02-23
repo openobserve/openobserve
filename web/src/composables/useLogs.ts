@@ -22,7 +22,7 @@ const defaultObject = {
 
     config: {
         splitterModel: 20,
-        lastSplitterPosition:0,
+        lastSplitterPosition: 0,
         splitterLimit: [0, 40],
         refreshTimes: [
             [
@@ -45,7 +45,7 @@ const defaultObject = {
                 { label: "30 min", value: 1800 },
             ],
         ],
-        
+
     },
     meta: {
         refreshInterval: "0",
@@ -58,14 +58,14 @@ const defaultObject = {
         resultGrid: {
             wrapCells: false,
             manualRemoveFields: false,
-            rowsPerPage: 1000,
+            rowsPerPage: 150,
             chartInterval: "1 second",
             chartKeyFormat: "HH:mm:ss",
             navigation: {
                 currentRowIndex: 0,
             }
         },
-        scrollInfo:{}
+        scrollInfo: {}
     },
     data: {
         query: "",
@@ -74,19 +74,19 @@ const defaultObject = {
         additionalErrorMsg: "",
         stream: {
             streamLists: [],
-            selectedStream: {label: "", value: ""},
+            selectedStream: { label: "", value: "" },
             selectedStreamFields: [],
-            selectedFields:<string[]> [],
+            selectedFields: <string[]>[],
             filterField: "",
             addToFilter: "",
             functions: [],
         },
         resultGrid: {
             currentDateTime: new Date(),
-            currentPage:0,
-            columns:<any> [],
+            currentPage: 0,
+            columns: <any>[],
         },
-        transforms:<any> [],
+        transforms: <any>[],
         queryResults: <any>[],
         sortedQueryResults: <any>[],
         streamResults: <any>[],
@@ -117,9 +117,9 @@ const defaultObject = {
 // let localLogsObj:any = useLocalLogsObj();
 // let searchObj = {};
 // if (typeof localLogsObj === "object") {
-    // searchObj = localLogsObj.value;
+// searchObj = localLogsObj.value;
 // } else {
-    let searchObj = reactive(Object.assign({}, defaultObject));    
+let searchObj = reactive(Object.assign({}, defaultObject));
 // }
 
 const useLogs = () => {
@@ -128,7 +128,7 @@ const useLogs = () => {
         searchObj = reactive(Object.assign({}, defaultObject));
 
     }
-    return { searchObj , resetSearchObj };
+    return { searchObj, resetSearchObj };
 }
 
 export default useLogs;
