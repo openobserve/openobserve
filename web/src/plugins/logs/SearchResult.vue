@@ -73,21 +73,18 @@
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
             >
-              <div
-                :title="
-                  column.prop(row, column.name).length > 100
-                    ? column.prop(row, column.name)
-                    : ''
-                "
-              >
-                {{
-                  column.name == "source"
+              <high-light
+                :content="column.name == 'source'
                     ? column.prop(row)
                     : column.prop(row, column.name).length > 100
-                    ? column.prop(row, column.name).substr(0, 100) + "..."
-                    : column.prop(row, column.name)
-                }}
-              </div>
+                    ? column.prop(row, column.name).substr(0, 100) + '...'
+                    : column.prop(row, column.name)"
+                :query-string="searchObj.data.query"
+                :title="
+                  (column.prop(row, column.name).length > 100 && column.name != 'source')
+                    ? column.prop(row, column.name)
+                    : ''"
+                ></high-light>
             </q-td>
           </q-tr></template
         >
@@ -172,12 +169,6 @@ export default defineComponent({
     },
     onScroll(info: any) {
       this.searchObj.meta.scrollInfo = info;
-      // console.log(
-      //   info.ref.items.length,
-      //   this.searchObj.data.resultGrid.currentPage,
-      //   this.searchObj.data.queryResults.from /
-      //     this.searchObj.meta.resultGrid.rowsPerPage
-      // );
       if (
         info.ref.items.length / info.index <= 2 &&
         this.searchObj.loading == false &&

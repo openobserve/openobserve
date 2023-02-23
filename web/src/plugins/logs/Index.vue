@@ -49,15 +49,8 @@
             />
           </template>
           <template #after>
-            <div v-if="searchObj.loading == true">
-              <q-spinner-dots
-                color="primary"
-                size="40px"
-                style="margin: 0 auto; display: block"
-              />
-            </div>
             <div
-              v-else-if="
+              v-if="
                 searchObj.data.errorMsg !== '' && searchObj.loading == false
               "
             >
@@ -747,21 +740,21 @@ export default defineComponent({
           sortable: true,
         });
         if (searchObj.data.stream.selectedFields.length == 0) {
-          if (searchObj.meta.resultGrid.manualRemoveFields == false) {
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              if (
-                (field.name == "log" &&
-                  searchObj.data.stream.selectedStreamFields.indexOf("log") ==
-                    -1) ||
-                (field.name == "message" &&
-                  searchObj.data.stream.selectedStreamFields.indexOf(
-                    "message"
-                  ) == -1)
-              ) {
-                searchObj.data.stream.selectedFields.push(field.name);
-              }
-            });
-          }
+          // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
+          //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+          //     if (
+          //       (field.name == "log" &&
+          //         searchObj.data.stream.selectedStreamFields.indexOf("log") ==
+          //           -1) ||
+          //       (field.name == "message" &&
+          //         searchObj.data.stream.selectedStreamFields.indexOf(
+          //           "message"
+          //         ) == -1)
+          //     ) {
+          //       searchObj.data.stream.selectedFields.push(field.name);
+          //     }
+          //   });
+          // }
 
           searchObj.meta.resultGrid.manualRemoveFields = false;
           if (searchObj.data.stream.selectedFields.length == 0) {
