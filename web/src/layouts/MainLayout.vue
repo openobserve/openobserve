@@ -739,8 +739,4 @@ export default defineComponent({
     font-weight: 600;
   }
 }
-
-.current-organization {
-  text-transform: capitalize;
-}
 </style>

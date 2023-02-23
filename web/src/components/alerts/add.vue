@@ -49,7 +49,7 @@
           :label="t('alerts.stream_name')"
           color="input-border"
           bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
+          class="q-py-sm showLabelOnTop no-case"
           stack-label
           outlined
           filled
@@ -615,5 +615,10 @@ export default defineComponent({
   min-height: 5rem;
   padding-bottom: 14px;
   resize: both;
+}
+</style>
+<style >
+.no-case .q-field__native span {
+  text-transform: none !important;
 }
 </style>

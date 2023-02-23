@@ -206,10 +206,6 @@ export default defineComponent({
     }
   }
 
-  .q-select {
-    text-transform: capitalize;
-  }
-
   .index-table {
     width: 100%;
     // border: 1px solid rgba(0, 0, 0, 0.02);
