@@ -16,8 +16,8 @@
 <template>
   <div>
     <span v-for="item in list" :key="item.key" v-bind="item">
-      <span v-if="item.isKeyWord" class="highlight">{{ item.text }}</span>
-      <span v-else>{{ item.text }}</span>
+      <span :title="title" v-if="item.isKeyWord" class="highlight">{{ item.text }}</span>
+      <span :title="title" v-else>{{ item.text }}</span>
     </span>
   </div>
 </template>
@@ -37,6 +37,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    title: {
+      type: String,
+      default: "",
+    },
   },
   data() {
     return {
@@ -52,8 +56,12 @@ export default defineComponent({
     },
     queryString: {
       handler() {
-        this.keywords = this.getKeywords(this.queryString);
-        this.init();
+        //added timeout to delay the highlight process to avoid
+        //performance issue while writing query in editor
+        setTimeout(() => {
+          this.keywords = this.getKeywords(this.queryString);
+          this.init();
+        }, 2000);
       },
     },
   },
@@ -126,7 +134,9 @@ export default defineComponent({
         // delete start and end of * and "
         keyword = keyword
           .replace(/(^\**)|(\**$)/g, "")
-          .replace(/(^"*)|("*$)/g, "");
+          .replace(/(^"*)|("*$)/g, "")
+          .replace(/^match_all\('(.*)'\)$/, "$1")
+          .replace(/^match_all_no_case\('(.*)'\)$/, "$1");
         if (keyword.trim().length > 0) {
           // make sure key not empty or not space
           arr.push(keyword);
