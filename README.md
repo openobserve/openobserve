@@ -7,7 +7,7 @@ It is very simple and easy to operate as opposed to Elasticsearch which requires
 
 It is a drop-in replacement for Elasticsearch if you are just ingesting data using APIs and searching using kibana (Kibana is not supported nor required with zinc. ZincObserve provides its own UI which does not require separate installation unlike kibana).
 
-You can reduce your log storage costs by ~140x compared to Elasticsearch by using ZincObserve. Below are the results when we pushed logs from our production kubernetes cluster to Elasticsearch and ZincObserve using fluentbit.
+You can reduce your log storage costs by ~140x compared to Elasticsearch by using ZincObserve. Below are the results when we pushed logs from our production kubernetes cluster to Elasticsearch and ZincObserve using fluentbit. ZincObserve stored data in Amazon s3 and Elasticsearch stored data on Amazon EBS volumes.
 
 ![ZincObserve Vs ElasticSearch](./screenshots/zo_vs_es.png)
 
