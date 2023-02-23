@@ -25,7 +25,6 @@ pub struct RecordStatus {
     pub error: String,
 }
 
-#[derive(Debug)]
 pub struct StreamData {
     pub data: AHashMap<String, Vec<String>>,
     pub status: RecordStatus,

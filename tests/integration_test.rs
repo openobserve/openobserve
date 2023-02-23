@@ -65,6 +65,7 @@ mod tests {
         //make sure data dir is deleted before we run integ tests
         fs::remove_dir_all("./data")
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
+
         setup();
         let _ = zincobserve::job::init().await;
 
@@ -73,6 +74,8 @@ mod tests {
         }
         e2e_post_json().await;
         e2e_post_multi().await;
+        e2e_post_trace().await;
+        e2e_post_metrics().await;
         e2e_get_stream().await;
         #[cfg(feature = "zo_functions")]
         e2e_post_query_functions().await;
@@ -84,7 +87,7 @@ mod tests {
         e2e_delete_query_functions().await;
         #[cfg(feature = "zo_functions")]
         e2e_delete_stream_functions().await;
-        //e2e_get_stream_schema().await;
+        e2e_get_stream_schema().await;
         e2e_search().await;
         e2e_search_around().await;
         e2e_post_user().await;
@@ -94,8 +97,6 @@ mod tests {
         e2e_list_dashboards().await;
         e2e_get_dashboard().await;
         e2e_delete_dashboard().await;
-        e2e_post_trace().await;
-        e2e_post_metrics().await;
         e2e_get_org_summary().await;
         e2e_post_alert().await;
         e2e_delete_alert().await;
@@ -215,8 +216,8 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    async fn _e2e_get_stream_schema() {
-        setup();
+    async fn e2e_get_stream_schema() {
+        let auth = setup();
         let one_sec = time::Duration::from_millis(15000);
         thread::sleep(one_sec);
         let app = test::init_service(
@@ -227,7 +228,6 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
-        let auth = ("Authorization", "Basic YWRtaW46Q29tcGxleHBhc3MjMTIz");
         let req = test::TestRequest::get()
             .uri(&format!("/api/{}/{}/schema", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())

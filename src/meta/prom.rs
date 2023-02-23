@@ -28,12 +28,6 @@ pub struct Metric {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Collection {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClusterLeader {
     pub name: String,
     pub last_received: i64,
@@ -73,6 +67,9 @@ mod test {
             "Gauge".to_string(),
         );
 
-        assert_eq!(metric.name, name);
+        let str_met = serde_json::to_string(&metric).unwrap();
+        let loc_met: Metric = serde_json::from_str(str_met.as_str()).unwrap();
+
+        assert_eq!(loc_met.name, name);
     }
 }

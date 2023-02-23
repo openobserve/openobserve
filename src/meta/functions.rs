@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tarsnform() {
+    fn test_functions() {
         let trns = Transform {
             order: 0,
             function: "function jsconcat(a,b){return a+b}".to_string(),
