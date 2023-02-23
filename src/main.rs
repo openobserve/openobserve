@@ -47,6 +47,11 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let _app = clap::Command::new("zincobserve")
+        .version(env!("GIT_VERSION"))
+        .about(clap::crate_description!())
+        .get_matches();
+
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
