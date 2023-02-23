@@ -175,9 +175,10 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 }
 
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
+    let prefix = format!("{}/", org_id);
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
-        if user.key().contains(org_id) || !user.key().contains('/') {
+        if user.key().starts_with(&prefix) || !user.key().contains('/') {
             user_list.push(UserResponse {
                 email: user.value().email.clone(),
                 role: user.value().role.clone(),

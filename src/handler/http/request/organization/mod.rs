@@ -15,6 +15,7 @@
 use actix_web::{get, put, web, HttpResponse, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
@@ -69,38 +70,35 @@ struct OrganizationResponse {
 }
 
 #[get("/organizarions_by_username/{user_name}")]
-pub async fn organizarions_by_username(
-    user_name: web::Path<String>,
-) -> Result<HttpResponse, Error> {
+pub async fn organizarions_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let mut orgs = Vec::new();
-    let user_name = user_name.to_string();
-    if is_root_user(&user_name).await {
-        let obj = Organization {
+    let mut org_names = HashSet::new();
+    let user_id = user_id.to_string();
+    let user_id = user_id.as_str();
+    let is_root_user = is_root_user(user_id).await;
+    if is_root_user {
+        let org = Organization {
             identifier: DEFAULT.to_string(),
             label: DEFAULT.to_string(),
         };
+        org_names.insert(DEFAULT.to_string());
+        orgs.push(org);
+    }
 
-        for user in USERS.iter() {
-            if !user.key().ends_with(&user_name) {
-                let org = Organization {
-                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                };
-                if !orgs.contains(&org) {
-                    orgs.push(org);
-                }
-            }
+    for user in USERS.iter() {
+        if !user.key().contains('/') {
+            continue;
         }
-
-        orgs.push(obj);
-    } else {
-        for user in USERS.iter() {
-            if user.key().ends_with(format!("/{}", user_name).as_str()) {
-                orgs.push(Organization {
-                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                });
-            }
+        if !is_root_user && !user.key().ends_with(format!("/{}", user_id).as_str()) {
+            continue;
+        }
+        let org = Organization {
+            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+            label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org);
         }
     }
 
@@ -114,14 +112,17 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     let mut id = 0;
 
     let mut orgs: Vec<OrganizationDetails> = vec![];
+    let mut org_names = HashSet::new();
     let user_detail = User {
         first_name: user_id.to_string(),
         last_name: user_id.to_string(),
         email: user_id.to_string(),
     };
 
-    if is_root_user(user_id).await {
+    let is_root_user = is_root_user(user_id).await;
+    if is_root_user {
         id += 1;
+        org_names.insert(DEFAULT.to_string());
         orgs.push(OrganizationDetails {
             id,
             identifier: DEFAULT.to_string(),
@@ -132,43 +133,30 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
             org_type: DEFAULT.to_string(),
             user_obj: user_detail.clone(),
         });
+    }
 
-        for user in USERS.iter() {
-            if !user.key().ends_with(&user_id) {
-                id += 1;
-                let org = OrganizationDetails {
-                    id,
-                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    user_email: user_id.to_string(),
-                    ingest_threshold: THRESHOLD,
-                    search_threshold: THRESHOLD,
-                    org_type: CUSTOM.to_string(),
-                    user_obj: user_detail.clone(),
-                };
-                if !orgs.contains(&org) {
-                    orgs.push(org)
-                } else {
-                    id -= 1;
-                }
-            }
+    for user in USERS.iter() {
+        if !user.key().contains('/') {
+            continue;
         }
-    } else {
-        for user in USERS.iter() {
-            if user.key().ends_with(format!("/{}", user_id).as_str()) {
-                id += 1;
+        if !is_root_user && !user.key().ends_with(format!("/{}", user_id).as_str()) {
+            continue;
+        }
 
-                orgs.push(OrganizationDetails {
-                    id,
-                    identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                    user_email: user_id.to_string(),
-                    ingest_threshold: THRESHOLD,
-                    search_threshold: THRESHOLD,
-                    org_type: DEFAULT.to_string(),
-                    user_obj: user_detail.clone(),
-                });
-            }
+        id += 1;
+        let org = OrganizationDetails {
+            id,
+            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+            name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+            user_email: user_id.to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: CUSTOM.to_string(),
+            user_obj: user_detail.clone(),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org)
         }
     }
 
@@ -176,6 +164,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
 
     Ok(HttpResponse::Ok().json(org_response))
 }
+
 #[get("/{org_id}/summary")]
 async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
