@@ -47,7 +47,7 @@
           :label="t('function.stream_name')"
           color="input-border"
           bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
+          class="q-py-md showLabelOnTop no-case"
           stack-label
           outlined
           filled
@@ -395,5 +395,10 @@ end`;
   min-height: 15rem;
   padding-bottom: 14px;
   resize: both;
+}
+</style>
+<style >
+.no-case .q-field__native span {
+  text-transform: none !important;
 }
 </style>

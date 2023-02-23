@@ -762,7 +762,7 @@ export default defineComponent({
               name: "source",
               field: (row: any) => JSON.stringify(row),
               prop: (row: any) => JSON.stringify(row),
-              label: "Source",
+              label: "source",
               align: "left",
               sortable: true,
             });
