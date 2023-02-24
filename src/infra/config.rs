@@ -124,9 +124,9 @@ pub struct Common {
     pub instance_name: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/")]
     pub data_dir: String,
-    #[env_config(name = "ZO_DATA_WAL_DIR", default = "./data/wal/")]
+    #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/wal/
     pub data_wal_dir: String,
-    #[env_config(name = "ZO_DATA_STREAM_DIR", default = "./data/stream/")]
+    #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/stream/
     pub data_stream_dir: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
@@ -258,7 +258,7 @@ pub struct Etcd {
 
 #[derive(Clone, Debug, EnvConfig)]
 pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "./data/db/")]
+    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/db/
     pub data_dir: String,
     #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
     pub prefix: String,
@@ -327,11 +327,26 @@ pub fn init() -> Config {
 }
 
 fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.data_dir.is_empty() {
+        cfg.common.data_dir = "./data/".to_string();
+    }
+    if !cfg.common.data_dir.ends_with('/') {
+        cfg.common.data_dir = format!("{}/", cfg.common.data_dir);
+    }
+    if cfg.common.data_wal_dir.is_empty() {
+        cfg.common.data_wal_dir = format!("{}wal/", cfg.common.data_dir);
+    }
     if !cfg.common.data_wal_dir.ends_with('/') {
         cfg.common.data_wal_dir = format!("{}/", cfg.common.data_wal_dir);
     }
+    if cfg.common.data_stream_dir.is_empty() {
+        cfg.common.data_stream_dir = format!("{}stream/", cfg.common.data_dir);
+    }
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
+    }
+    if cfg.sled.data_dir.is_empty() {
+        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
     }
     if !cfg.sled.data_dir.ends_with('/') {
         cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
