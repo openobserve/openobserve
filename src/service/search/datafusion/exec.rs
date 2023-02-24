@@ -137,12 +137,19 @@ pub async fn sql(
         now.elapsed().as_secs_f64()
     );
 
+    log::info!("[DEBUG] session: {:?}", session);
+    log::info!("[DEBUG] schema: {:?}", schema);
+    log::info!("[DEBUG] rules: {:?}", rules);
+
     // Debug SQL
     log::info!("Query sql: {}", sql.origin_sql);
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     // query
-    let mut df = ctx.sql(&sql.origin_sql).await?;
+    let mut df = ctx
+        .sql(&sql.origin_sql)
+        .await
+        .expect("query sql execute failed");
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
@@ -168,7 +175,7 @@ pub async fn sql(
     for (name, sql) in sql.aggs.iter() {
         // Debug SQL
         log::info!("Query agg sql: {}", sql.0);
-        let mut df = ctx.sql(&sql.0).await?;
+        let mut df = ctx.sql(&sql.0).await.expect("agg sql execute failed");
         if !rules.is_empty() {
             let fields = df.schema().fields();
             let mut exprs = Vec::with_capacity(fields.len());
@@ -292,7 +299,7 @@ pub async fn merge(
     // Debug SQL
     // log::info!("Merge sql: {}", query_sql);
 
-    let df = ctx.sql(&query_sql).await?;
+    let df = ctx.sql(&query_sql).await.expect("merge sql execute failed");
     let batches = df.collect().await?;
     ctx.deregister_table("tbl")?;
 
@@ -554,7 +561,10 @@ pub async fn convert_parquet_file(
         "SELECT * FROM tbl ORDER BY {} DESC",
         CONFIG.common.time_stamp_col
     );
-    let mut df = ctx.sql(&query_sql).await?;
+    let mut df = ctx
+        .sql(&query_sql)
+        .await
+        .expect("convert sql execute failed");
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
