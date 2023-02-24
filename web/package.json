@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
     "test:unit": "vitest --environment jsdom --root src/",
+    "test:unit:coverage": "vitest --coverage",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' :4173 'cypress open --e2e'",
     "build-only": "vite build",
@@ -70,6 +71,7 @@
     "eslint-plugin-vue": "^9.5.1",
     "happy-dom": "^6.0.4",
     "jsdom": "^20.0.0",
+    "msw": "^0.48.3",
     "npm-run-all": "^4.1.5",
     "prettier": "^2.5.1",
     "sass": "^1.32.0",
@@ -80,6 +82,7 @@
     "vite-plugin-monaco-editor": "^1.1.0",
     "vitest": "^0.18.1",
     "vue": "^3.2.37",
-    "vue-tsc": "^0.38.8"
+    "vue-tsc": "^0.38.8",
+    "whatwg-fetch": "^3.6.2"
   }
 }
