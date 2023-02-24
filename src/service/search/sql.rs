@@ -320,13 +320,13 @@ impl Sql {
         // HACK full text search
         let mut fulltext = Vec::new();
         let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
-        let re2 = Regex::new(r"(?i)match_all_no_case\('([^']*)'\)").unwrap();
+        let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
         for cap in re1.captures_iter(&origin_sql) {
             // println!("match_all: {}, {}", &cap[0], &cap[1]);
             fulltext.push((cap[0].to_string(), cap[1].to_string()));
         }
         for cap in re2.captures_iter(&origin_sql) {
-            // println!("match_all_no_case: {}, {}", &cap[0], &cap[1]);
+            // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
             fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
         }
         // fetch fts fields
@@ -351,7 +351,7 @@ impl Sql {
                     continue;
                 }
                 let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_no_case") {
+                if item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
@@ -363,7 +363,7 @@ impl Sql {
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
         }
         // Hack: str_match
-        for key in ["match", "match_no_case", "str_match", "str_match_no_case"] {
+        for key in ["match", "match_ignore_case", "str_match", "str_match_ignore_case"] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{}\b\(([^\)]*)\)", key)).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
                 "LIKE"

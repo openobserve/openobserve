@@ -34,22 +34,12 @@
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
-                <li>
-                  For full text search of value ‘error’ use match_all(‘error’)
-                  in query editor
-                </li>
-                <li>
-                  For case-insesitive full text search of value ‘error’ use
-                  match_all_no_case(‘error’)
-                </li>
-                <li>To search value 200 for code column use code=200</li>
-                <li>
-                  To search value ‘stderr’ for stream column use stream=‘stderr’
-                </li>
-                <li>
-                  To use query function named extract_ip on cloumn log use
-                  extract_ip(log) | code=200
-                </li>
+                <li>For full text search of value 'error' use <span class="bg-lightgray">match_all('error') in query editor</span></li>
+                <li>For case-insesitive full text search of value 'error' use <span class="bg-lightgray">match_all_ignore_case('error')</span></li>
+                <li>For column search of value 'error' use <span class="bg-lightgray">str_match(<b>FieldName</b>, 'error')</span></li>
+                <li>To search value 200 for code column use <span class="bg-lightgray">code=200</span></li>
+                <li>To search value 'stderr' for stream column use <span class="bg-lightgray">stream='stderr'</span></li>
+                <li>To search and use query function <i>extract_ip</i> on cloumn log use <span class="bg-lightgray">extract_ip(log) | code=200</span></li>
               </ul>
             </div>
           </div>
@@ -64,26 +54,12 @@
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
-                <li>
-                  For full text search of value ‘error’ use SELECT * FROM
-                  [Stream Name] WHERE match_all(‘error’)
-                </li>
-                <li>
-                  For case-insesitive full text search of value ‘error’ use
-                  SELECT * FROM [Stream Name] WHERE match_all_no_case(‘error’)
-                </li>
-                <li>
-                  To search value 200 for code column use SELECT * FROM [Stream
-                  Name] WHERE code=200
-                </li>
-                <li>
-                  To search value ‘stderr’ for stream column use SELECT * FROM
-                  [Stream Name] WHERE stream=‘stderr’
-                </li>
-                <li>
-                  To use query function named extract_ip on cloumn log use
-                  SELECT extract_ip(log) FROM [Stream Name] WHERE code=200
-                </li>
+                <li>For full text search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE match_all('error')</span></li>
+                <li>For case-insesitive full text search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE match_all_ignore_case('error')</span></li>
+                <li>For column search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE str_match(<b>FiledName</b>, 'error')</span></li>
+                <li>To search value 200 for code column use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE code=200</span></li>
+                <li>To search value 'stderr' for stream column use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE stream='stderr'</span></li>
+                <li>To search and use query function <i>extract_ip</i> on cloumn log use <span class="bg-lightgray">SELECT extract_ip(log) FROM <b>Steam</b> WHERE code=200</span></li>
               </ul>
             </div>
           </div>
@@ -167,5 +143,10 @@ export default defineComponent({
 
 .syntax-section {
   margin-bottom: 5px;
+}
+.bg-lightgray {
+  background-color: $selected-list-bg;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 </style>

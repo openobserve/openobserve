@@ -136,7 +136,7 @@ export default defineComponent({
           .replace(/(^\**)|(\**$)/g, "")
           .replace(/(^"*)|("*$)/g, "")
           .replace(/^match_all\('(.*)'\)$/, "$1")
-          .replace(/^match_all_no_case\('(.*)'\)$/, "$1");
+          .replace(/^match_all_ignore_case\('(.*)'\)$/, "$1");
         if (keyword.trim().length > 0) {
           // make sure key not empty or not space
           arr.push(keyword);
