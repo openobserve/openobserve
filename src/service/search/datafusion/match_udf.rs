@@ -31,8 +31,8 @@ use crate::common::str;
 /// The name of the match UDF given to DataFusion.
 pub const MATCH_UDF_NAME: &str = "str_match";
 
-/// The name of the match_no_case UDF given to DataFusion.
-pub const MATCH_UDF_NO_CASE_NAME: &str = "str_match_no_case";
+/// The name of the match_ignore_case UDF given to DataFusion.
+pub const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
 
 /// Implementation of match_range
 pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
@@ -47,10 +47,10 @@ pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-/// Implementation of match_no_case
-pub(crate) static MATCH_NO_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+/// Implementation of match_ignore_case
+pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        MATCH_UDF_NO_CASE_NAME,
+        MATCH_UDF_IGNORE_CASE_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
@@ -121,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_match_udf() {
-        let sql = "select * from t where str_match(log, 'a') and str_match_no_case(city, 'ny')";
+        let sql = "select * from t where str_match(log, 'a') and str_match_ignore_case(city, 'ny')";
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -144,7 +144,7 @@ mod tests {
         // declare a new context. In spark API, this corresponds to a new spark SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(MATCH_UDF.clone());
-        ctx.register_udf(MATCH_NO_CASE_UDF.clone());
+        ctx.register_udf(MATCH_IGNORE_CASE_UDF.clone());
 
         // declare a table in memory. In spark API, this corresponds to createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
