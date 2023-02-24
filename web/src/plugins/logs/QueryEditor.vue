@@ -240,9 +240,9 @@ export default defineComponent({
             range: range,
           });
           filteredSuggestions.push({
-            label: `match_all_no_case('${lastElement}')`,
+            label: `match_all_ignore_case('${lastElement}')`,
             kind: monaco.languages.CompletionItemKind.Text,
-            insertText: `match_all_no_case('${lastElement}')`,
+            insertText: `match_all_ignore_case('${lastElement}')`,
             range: range,
           });
 
