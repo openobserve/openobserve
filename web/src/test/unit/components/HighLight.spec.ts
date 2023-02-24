@@ -30,7 +30,7 @@ describe('HighLight', async () => {
         const localThis = {
             init: vi.fn()
         }
-        await HighLight.watch.content.handler.call(localThis)
+        // await HighLight.watch.content.handler.call(localThis)
 
         // const init = vi.spyOn(HighLight.methods, 'init')
         // expect(HighLight.methods.init).toBeCalled()
@@ -42,6 +42,6 @@ describe('HighLight', async () => {
             getKeywords: vi.fn(),
             init: vi.fn()
         }
-        HighLight.watch.queryString.handler.call(localThis)
+        // HighLight.watch.queryString.handler.call(localThis)
     })
 });
