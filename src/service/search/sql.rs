@@ -352,7 +352,7 @@ impl Sql {
             "match",
             "match_ignore_case",
             "str_match",
-            "str_match_ignore_case",
+            // "str_match_ignore_case",
         ] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{}\b\(([^\)]*)\)", key)).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
