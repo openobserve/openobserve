@@ -163,7 +163,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .finish(),
                 ))
                 .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::default())
+                .wrap(middleware::Logger::new(r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##))
                 .wrap(RequestTracing::new())
         })
         .bind(haddr)?
@@ -190,7 +190,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(local_id))
                 .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::default())
+                .wrap(middleware::Logger::new(r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##))
                 .wrap(RequestTracing::new())
         })
         .bind(haddr)?
