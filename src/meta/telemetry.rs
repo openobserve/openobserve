@@ -46,7 +46,7 @@ impl Telemetry {
         data: Option<HashMap<String, Value>>,
         send_zo_data: bool,
     ) {
-        if !CONFIG.common.enable_telemetry {
+        if !CONFIG.common.telemetry_enabled {
             return;
         }
         log::info!("[TRACE] sending event {}", event);
