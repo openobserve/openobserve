@@ -57,7 +57,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // telemetry run
-    if CONFIG.common.enable_telemetry {
+    if CONFIG.common.telemetry_enabled {
         let res = db::get_instance().await;
         let instance_id;
         if res.as_ref().is_err() || res.as_ref().unwrap().is_none() {
