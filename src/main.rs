@@ -152,6 +152,7 @@ async fn main() -> Result<(), anyhow::Error> {
         HttpServer::new(move || {
             log::info!("starting HTTP server at: {}", haddr);
             App::new()
+                .wrap(prometheus.clone())
                 .service(router::dispatch)
                 .configure(get_basic_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -162,9 +163,10 @@ async fn main() -> Result<(), anyhow::Error> {
                         .finish(),
                 ))
                 .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::default())
+                .wrap(middleware::Logger::new(
+                    r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##,
+                ))
                 .wrap(RequestTracing::new())
-                .wrap(prometheus.clone())
         })
         .bind(haddr)?
         .run()
@@ -182,6 +184,7 @@ async fn main() -> Result<(), anyhow::Error> {
             );
 
             App::new()
+                .wrap(prometheus.clone())
                 .configure(get_service_routes)
                 .configure(get_basic_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -189,9 +192,10 @@ async fn main() -> Result<(), anyhow::Error> {
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(local_id))
                 .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::default())
+                .wrap(middleware::Logger::new(
+                    r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##,
+                ))
                 .wrap(RequestTracing::new())
-                .wrap(prometheus.clone())
         })
         .bind(haddr)?
         .run()

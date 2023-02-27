@@ -142,7 +142,18 @@ pub async fn sql(
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     // query
-    let mut df = ctx.sql(&sql.origin_sql).await?;
+    let mut df = match ctx.sql(&sql.origin_sql).await {
+        Ok(df) => df,
+        Err(e) => {
+            log::error!(
+                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                session,
+                sql.origin_sql,
+                e
+            );
+            return Err(e);
+        }
+    };
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
@@ -168,7 +179,18 @@ pub async fn sql(
     for (name, sql) in sql.aggs.iter() {
         // Debug SQL
         log::info!("Query agg sql: {}", sql.0);
-        let mut df = ctx.sql(&sql.0).await?;
+        let mut df = match ctx.sql(&sql.0).await {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!(
+                    "aggs sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                    session,
+                    sql.0,
+                    e
+                );
+                return Err(e);
+            }
+        };
         if !rules.is_empty() {
             let fields = df.schema().fields();
             let mut exprs = Vec::with_capacity(fields.len());
@@ -292,7 +314,13 @@ pub async fn merge(
     // Debug SQL
     // log::info!("Merge sql: {}", query_sql);
 
-    let df = ctx.sql(&query_sql).await?;
+    let df = match ctx.sql(&query_sql).await {
+        Ok(df) => df,
+        Err(e) => {
+            log::error!("merge sql execute failed, sql: {}, err: {:?}", query_sql, e);
+            return Err(e);
+        }
+    };
     let batches = df.collect().await?;
     ctx.deregister_table("tbl")?;
 
@@ -554,7 +582,17 @@ pub async fn convert_parquet_file(
         "SELECT * FROM tbl ORDER BY {} DESC",
         CONFIG.common.time_stamp_col
     );
-    let mut df = ctx.sql(&query_sql).await?;
+    let mut df = match ctx.sql(&query_sql).await {
+        Ok(df) => df,
+        Err(e) => {
+            log::error!(
+                "convert sql execute failed, sql: {}, err: {:?}",
+                query_sql,
+                e
+            );
+            return Err(e);
+        }
+    };
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
