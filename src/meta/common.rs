@@ -14,7 +14,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::StreamType;
 use crate::common::json;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -22,12 +21,6 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FileDescriptor {
-    pub meta: FileMeta,
-    pub file_type: StreamType,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
