@@ -715,7 +715,7 @@ fn create_runtime_env() -> Result<RuntimeEnv> {
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::match_udf::MATCH_NO_CASE_UDF.clone());
+    ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());

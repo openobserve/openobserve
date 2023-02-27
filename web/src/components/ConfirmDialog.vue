@@ -28,6 +28,7 @@
           no-caps
           class="q-mr-sm"
           @click="onCancel"
+          data-test="cancel-button"
         >
           {{ t("confirmDialog.cancel") }}
         </q-btn>
@@ -38,6 +39,7 @@
           class="no-border"
           color="primary"
           @click="onConfirm"
+          data-test="confirm-button"
         >
           {{ t("confirmDialog.ok") }}
         </q-btn>

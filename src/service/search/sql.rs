@@ -34,7 +34,7 @@ const SQL_KEYWORDS: [&str; 32] = [
     "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
 ];
 const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
-const SQL_PUNCTUATION: [char; 2] = ['"', '\''];
+const SQL_PUNCTUATION: [u8; 2] = [b'"', b'\''];
 const SQL_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
@@ -221,21 +221,6 @@ impl Sql {
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
-        // Hack _timestamp
-        if !sql_mode.eq(&SqlMode::Full)
-            && meta.order_by.is_empty()
-            && !origin_sql.contains('*')
-            && !origin_sql.contains(&CONFIG.common.time_stamp_col)
-        {
-            let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
-            let caps = re.captures(origin_sql.as_str()).unwrap();
-            let cap_str = caps.get(1).unwrap().as_str();
-            origin_sql = origin_sql.replace(
-                cap_str,
-                &format!("{}, {}", &CONFIG.common.time_stamp_col, cap_str),
-            );
-        }
-
         // Hack time range
         if req_time_range.0 > 0 || req_time_range.1 > 0 {
             meta.time_range = Some(req_time_range);
@@ -320,13 +305,13 @@ impl Sql {
         // HACK full text search
         let mut fulltext = Vec::new();
         let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
-        let re2 = Regex::new(r"(?i)match_all_no_case\('([^']*)'\)").unwrap();
+        let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
         for cap in re1.captures_iter(&origin_sql) {
             // println!("match_all: {}, {}", &cap[0], &cap[1]);
             fulltext.push((cap[0].to_string(), cap[1].to_string()));
         }
         for cap in re2.captures_iter(&origin_sql) {
-            // println!("match_all_no_case: {}, {}", &cap[0], &cap[1]);
+            // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
             fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
         }
         // fetch fts fields
@@ -351,7 +336,7 @@ impl Sql {
                     continue;
                 }
                 let mut func = "LIKE";
-                if item.0.to_lowercase().contains("_no_case") {
+                if item.0.to_lowercase().contains("_ignore_case") {
                     func = "ILIKE";
                 }
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
@@ -363,7 +348,12 @@ impl Sql {
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
         }
         // Hack: str_match
-        for key in ["match", "match_no_case", "str_match", "str_match_no_case"] {
+        for key in [
+            "match",
+            "match_ignore_case",
+            "str_match",
+            "str_match_ignore_case",
+        ] {
             let re_str_match = Regex::new(&format!(r"(?i)\b{}\b\(([^\)]*)\)", key)).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
                 "LIKE"
@@ -594,8 +584,9 @@ impl Sql {
 
 // Hack for double quote
 fn add_quote_for_sql(text: &str) -> String {
-    let text_len = text.len();
     let mut new_text = Vec::new();
+    let text_len = text.len();
+    let text_bytes = text.as_bytes();
 
     let re = Regex::new(r##"\b[a-zA-Z0-9\._/:@-]+\b"##).unwrap();
     let re_lower = Regex::new(r##"^[a-z0-9_]+$"##).unwrap();
@@ -611,14 +602,14 @@ fn add_quote_for_sql(text: &str) -> String {
         if SQL_KEYWORDS.contains(&cap_str_upper) {
             continue;
         }
-        if SQL_PUNCTUATION.contains(&text.chars().nth(cap.start() - 1).unwrap())
-            || SQL_PUNCTUATION.contains(&text.chars().nth(cap.start() - 2).unwrap())
+        if SQL_PUNCTUATION.contains(text_bytes.get(cap.start() - 1).unwrap())
+            || SQL_PUNCTUATION.contains(text_bytes.get(cap.start() - 2).unwrap())
             || (text_len > cap.end()
-                && SQL_PUNCTUATION.contains(&text.chars().nth(cap.end()).unwrap()))
+                && SQL_PUNCTUATION.contains(text_bytes.get(cap.end()).unwrap()))
         {
             continue;
         }
-        if text_len > cap.end() && text.chars().nth(cap.end()).unwrap() == '(' {
+        if text_len > cap.end() && *text_bytes.get(cap.end()).unwrap() == b'(' {
             continue;
         }
         // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
@@ -686,5 +677,45 @@ mod tests {
 
         let field_used = check_field_in_use(&resp, col);
         assert_eq!(field_used, true);
+    }
+
+    #[actix_web::test]
+    async fn test_add_quote_for_sql() {
+        let sqls = [
+            "select * from table",
+            "select ab.c from table ",
+            "select * from table where a = 1",
+            "select * from table where a=1",
+            "select * from table where County='中文'",
+            "select * from table match_all(123)",
+            "select * from table match_all('123')",
+            "select * from table match_all('中文')",
+            "select * from table str_match(log,'中文')",
+            "select * from table str_match(log, '中文')",
+            "select * from table str_match(log, 'a=b')",
+            "select * from table str_match(log, 'Sql: select * from table')",
+            "select * from table str_match(log, 'Sql: select * from table where \"a\" = 1')",
+            "select * from table str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+        ];
+        let resqls = [
+            "select * from table",
+            "select \"ab.c\" from table ",
+            "select * from table where a = 1",
+            "select * from table where a=1",
+            "select * from table where \"County\"='中文'",
+            "select * from table match_all(123)",
+            "select * from table match_all('123')",
+            "select * from table match_all('中文')",
+            "select * from table str_match(log,'中文')",
+            "select * from table str_match(log, '中文')",
+            "select * from table str_match(log, 'a=b')",
+            "select * from table str_match(log, 'Sql: select * from table')",
+            "select * from table str_match(log, 'Sql: select * from table where \"a\" = 1')",
+            "select * from table str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+        ];
+        for (i, sql) in sqls.iter().enumerate() {
+            let resql = add_quote_for_sql(*sql);
+            assert_eq!(resql, resqls[i]);
+        }
     }
 }

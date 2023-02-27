@@ -29,6 +29,8 @@ export default defineConfig({
     __INTLIFY_PROD_DEVTOOLS__: false,
   },
   test: {
+    global: true,
+    setupFiles: 'src/test/unit/helpers/setupTests.ts',
     coverage: {
       reporter: ["text", "json", "html"],
     },
