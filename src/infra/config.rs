@@ -163,9 +163,11 @@ pub struct Common {
     )]
     pub tracing_header_value: String,
     #[env_config(name = "ZO_TELEMETRY", default = true)]
-    pub enable_telemetry: bool,
+    pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
     pub telemetry_url: String,
+    #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = false)]
+    pub prometheus_enabled: bool,
 }
 
 #[derive(Clone, Debug, EnvConfig)]
