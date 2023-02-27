@@ -196,6 +196,8 @@ pub struct Limit {
     pub hb_interval: i64,
     // no need set by environment
     pub cpu_num: usize,
+    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT")]
+    pub req_cols_per_record_limit: usize,
 }
 
 #[derive(Clone, Debug, EnvConfig)]
@@ -314,6 +316,10 @@ pub fn init() -> Config {
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {}", e);
+    }
+
+    if cfg.limit.req_cols_per_record_limit == 0 {
+        cfg.limit.req_cols_per_record_limit = 1000;
     }
 
     // check memeory cache
