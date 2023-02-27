@@ -202,6 +202,10 @@ pub async fn check_for_schema(
         return (true, None);
     }
 
+    if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
+        return (false, None);
+    }
+
     if schema == Schema::empty() {
         stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
         db::schema::set(
