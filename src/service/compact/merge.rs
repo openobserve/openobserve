@@ -411,3 +411,16 @@ async fn merge_files(
         Err(e) => Err(e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[actix_web::test]
+    async fn test_compact() {
+        let off_set = Duration::hours(2).num_microseconds().unwrap();
+        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
+        let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
+        let resp = merge_by_stream(off_set_for_run, "nexus", "default", "logs".into()).await;
+        assert!(resp.is_ok());
+    }
+}

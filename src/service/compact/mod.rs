@@ -75,3 +75,28 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_files() {
+        let meta = crate::meta::common::FileMeta {
+            min_ts: 100,
+            max_ts: 200,
+            records: 10000,
+            original_size: 1024,
+            compressed_size: 1,
+        };
+        let _ret = cache::file_list::set_file_to_cache(
+            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
+            Some(meta),
+            false,
+        )
+        .unwrap();
+        let resp = run().await;
+        assert!(resp.is_ok());
+    }
+}

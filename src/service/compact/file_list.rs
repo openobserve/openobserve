@@ -175,3 +175,16 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[actix_web::test]
+    async fn test_compact() {
+        let off_set = Duration::hours(2).num_microseconds().unwrap();
+        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
+        let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
+        let resp = run(off_set_for_run).await;
+        assert!(resp.is_ok());
+    }
+}
