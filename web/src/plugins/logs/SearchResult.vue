@@ -98,7 +98,6 @@
         full-height
         seamless
         maximized
-        @keyup="onCancel"
       >
         <DetailTable
           :key="
