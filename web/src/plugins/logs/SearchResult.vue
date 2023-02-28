@@ -74,20 +74,23 @@
               :key="index + '-' + column.name"
             >
               <high-light
-                :content="column.name == 'source'
+                :content="
+                  column.name == 'source'
                     ? column.prop(row)
                     : column.prop(row, column.name).length > 100
                     ? column.prop(row, column.name).substr(0, 100) + '...'
-                    : column.prop(row, column.name)"
+                    : column.prop(row, column.name)
+                "
                 :query-string="searchObj.data.query"
                 :title="
-                  (column.prop(row, column.name).length > 100 && column.name != 'source')
+                  column.prop(row, column.name).length > 100 &&
+                  column.name != 'source'
                     ? column.prop(row, column.name)
-                    : ''"
-                ></high-light>
-            </q-td>
-          </q-tr></template
-        >
+                    : ''
+                "
+              ></high-light>
+            </q-td> </q-tr
+        ></template>
       </q-virtual-scroll>
       <q-dialog
         v-model="searchObj.meta.showDetailTab"
@@ -113,7 +116,7 @@
           @showPrevDetail="navigateRowDetail"
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
-          @search:timeboxed="onChartUpdate"
+          @search:timeboxed="onTimeBoxed"
         />
       </q-dialog>
     </div>
@@ -139,7 +142,12 @@ export default defineComponent({
     BarChart,
     DetailTable,
   },
-  emits: ["update:scroll", "update:datetime", "remove:searchTerm"],
+  emits: [
+    "update:scroll",
+    "update:datetime",
+    "remove:searchTerm",
+    "search:timeboxed",
+  ],
   methods: {
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
@@ -184,6 +192,10 @@ export default defineComponent({
       if (this.searchObj.meta.showDetailTab) {
         this.searchObj.meta.showDetailTab = false;
       }
+    },
+    onTimeBoxed(obj: any) {
+      this.searchObj.meta.showDetailTab = false;
+      this.$emit("search:timeboxed", obj);
     },
   },
   setup(props, { emit }) {
