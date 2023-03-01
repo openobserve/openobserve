@@ -31,6 +31,7 @@ struct ConfigResponse {
     commit_hash: String,
     build_date: String,
     functions_enabled: bool,
+    default_fts_keys: Vec<String>,
 }
 
 #[get("/healthz")]
@@ -47,6 +48,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         functions_enabled: config::HAS_FUNCTIONS,
+        default_fts_keys: crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
     }))
 }
 
