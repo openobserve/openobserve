@@ -22,6 +22,7 @@ use datafusion::datasource::file_format::parquet::ParquetFormat;
 use datafusion::datasource::listing::{ListingOptions, ListingTable};
 use datafusion::datasource::listing::{ListingTableConfig, ListingTableUrl};
 use datafusion::datasource::object_store::ObjectStoreRegistry;
+use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionConfig;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -117,11 +118,30 @@ pub async fn sql(
 
     let mut config =
         ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
-    if schema.is_none() {
+    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Cache) {
         config = config.infer_schema(&ctx.state()).await.unwrap();
+        let table = ListingTable::try_new(config.clone())?;
+        let infered_schema = table.schema();
+        if schema.is_none() {
+            infered_schema
+        } else {
+            match Schema::try_merge(vec![
+                schema.unwrap().as_ref().to_owned(),
+                infered_schema.as_ref().to_owned(),
+            ]) {
+                Ok(schema) => Arc::new(schema),
+                Err(e) => {
+                    return Err(datafusion::error::DataFusionError::Execution(format!(
+                        "ListingTable Merge schema error: {}",
+                        e
+                    )));
+                }
+            }
+        }
     } else {
-        config = config.with_schema(schema.as_ref().unwrap().clone());
-    }
+        schema.as_ref().unwrap().clone()
+    };
+    config = config.with_schema(schema);
     log::info!(
         "infer schema took {:.3} seconds.",
         now.elapsed().as_secs_f64()

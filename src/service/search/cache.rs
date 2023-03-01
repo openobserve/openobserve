@@ -24,6 +24,7 @@ use super::sql::Sql;
 use crate::common::file::scan_files;
 use crate::infra::config::{self, CONFIG};
 use crate::meta;
+use crate::service::db;
 use crate::service::file_list::calculate_local_files_size;
 
 /// search in local cache, which haven't been sync to object storage
@@ -64,6 +65,16 @@ pub async fn search(
     let span3 = info_span!("service:search:cache:datafusion");
     let _guard3 = span3.enter();
 
+    // fetch all schema versions, get latest schema
+    let schema_versions =
+        db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
+    let schema_latest = schema_versions.last().unwrap();
+    let schema = Arc::new(
+        schema_latest
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+
     let session = meta::search::Session {
         id: session_id.to_string(),
         data_type: SessionType::Cache,
@@ -71,7 +82,7 @@ pub async fn search(
     let result = super::datafusion::exec::sql(
         &session,
         stream_type,
-        None,
+        Some(schema),
         HashMap::new(),
         &sql,
         &files,
