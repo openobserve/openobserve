@@ -33,7 +33,7 @@ const SQL_KEYWORDS: [&str; 32] = [
     "NULL", "CASE", "AS", "HAVING", "GROUP", "BY", "ORDER", "ASC", "DESC", "BETWEEN", "LIKE",
     "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
 ];
-const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
+
 const SQL_PUNCTUATION: [u8; 2] = [b'"', b'\''];
 const SQL_FULL_MODE_LIMIT: usize = 1000;
 
@@ -319,7 +319,7 @@ impl Sql {
         let match_all_fields = if !fts_fiels.is_empty() {
             fts_fiels.iter().map(|v| v.to_lowercase()).collect()
         } else {
-            SQL_FULL_TEXT_SEARCH_FIELDS
+            crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
                 .iter()
                 .map(|v| v.to_string())
                 .collect::<String>()

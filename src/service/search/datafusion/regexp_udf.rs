@@ -26,16 +26,10 @@ use datafusion::{
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 
-/// The name of the regex_match UDF given to DataFusion.
-pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
-
-/// The name of the not_regex_match UDF given to DataFusion.
-pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
-
 /// Implementation of regexp_match
 pub(crate) static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        REGEX_MATCH_UDF_NAME,
+        super::REGEX_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
         vec![DataType::Utf8, DataType::Utf8],
         Arc::new(DataType::Boolean),
@@ -47,7 +41,7 @@ pub(crate) static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 /// Implementation of regexp_not_match
 pub(crate) static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        REGEX_NOT_MATCH_UDF_NAME,
+        super::REGEX_NOT_MATCH_UDF_NAME,
         // takes two arguments: regex, pattern
         vec![DataType::Utf8, DataType::Utf8],
         Arc::new(DataType::Boolean),
