@@ -167,9 +167,15 @@ export default defineComponent({
       this.searchObj.data.datetime.absolute.startTime =
         start.split(" ")[1].split(":")[0] +
         ":" +
-        start.split(" ")[1].split(":")[1];
+        start.split(" ")[1].split(":")[1] +
+        ":" +
+        start.split(" ")[1].split(":")[2];
       this.searchObj.data.datetime.absolute.endTime =
-        end.split(" ")[1].split(":")[0] + ":" + end.split(" ")[1].split(":")[1];
+        end.split(" ")[1].split(":")[0] +
+        ":" +
+        end.split(" ")[1].split(":")[1] +
+        ":" +
+        end.split(" ")[1].split(":")[2];
 
       this.searchObj.runQuery = true;
       this.$emit("update:datetime");
