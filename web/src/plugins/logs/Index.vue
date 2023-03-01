@@ -55,7 +55,27 @@
               "
             >
               <h5 class="text-center">
-                Result not found. {{ searchObj.data.errorMsg }} <br />
+                Result not found.
+                <div v-html="searchObj.data.errorMsg"></div>
+                <div
+                  :v-show="
+                    searchObj.data.errorMsg.indexOf(
+                      'No fullNo full text search field found'
+                    )
+                  "
+                >
+                  <q-btn
+                    no-caps
+                    class="no-border"
+                    :to="
+                      '/logstreams?dialog=' +
+                      searchObj.data.stream.selectedStream.label
+                    "
+                    >Click here</q-btn
+                  >
+                  to configure a full text search field to the stream.
+                </div>
+                <br />
                 <q-item-label>{{
                   searchObj.data.additionalErrorMsg
                 }}</q-item-label>
@@ -666,6 +686,17 @@ export default defineComponent({
             } else {
               searchObj.data.errorMsg = err.message;
             }
+
+            if (
+              searchObj.data.errorMsg.indexOf(
+                "No full text search field found"
+              ) > -1 ||
+              searchObj.data.errorMsg.indexOf("Schema error: No field named") >
+                -1
+            ) {
+              searchObj.data.errorMsg = "No full text search field found.";
+            }
+
             $q.notify({
               message: searchObj.data.errorMsg,
               color: "negative",
@@ -1052,6 +1083,17 @@ export default defineComponent({
             } else {
               searchObj.data.errorMsg = err.message;
             }
+
+            if (
+              searchObj.data.errorMsg.indexOf(
+                "No full text search field found"
+              ) > -1 ||
+              searchObj.data.errorMsg.indexOf("Schema error: No field named") >
+                -1
+            ) {
+              searchObj.data.errorMsg = "No full text search field found.";
+            }
+
             $q.notify({
               message: searchObj.data.errorMsg,
               color: "negative",
