@@ -28,16 +28,10 @@ use std::sync::Arc;
 
 use crate::common::str;
 
-/// The name of the match UDF given to DataFusion.
-pub const MATCH_UDF_NAME: &str = "str_match";
-
-/// The name of the match_ignore_case UDF given to DataFusion.
-pub const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
-
 /// Implementation of match_range
 pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        MATCH_UDF_NAME,
+        super::MATCH_UDF_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
@@ -50,7 +44,7 @@ pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 /// Implementation of match_ignore_case
 pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        MATCH_UDF_IGNORE_CASE_NAME,
+        super::MATCH_UDF_IGNORE_CASE_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean

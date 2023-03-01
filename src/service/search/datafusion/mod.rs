@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::meta::functions::ZoFunction;
+
 pub mod exec;
 mod match_udf;
 mod regexp_udf;
@@ -19,3 +21,39 @@ pub mod storage;
 mod time_range_udf;
 #[cfg(feature = "zo_functions")]
 mod transform_udf;
+
+/// The name of the match UDF given to DataFusion.
+pub const MATCH_UDF_NAME: &str = "str_match";
+/// The name of the match_ignore_case UDF given to DataFusion.
+pub const MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
+/// The name of the regex_match UDF given to DataFusion.
+pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
+/// The name of the not_regex_match UDF given to DataFusion.
+pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
+
+pub const DEFAULT_FUNCTIONS: [ZoFunction; 6] = [
+    ZoFunction {
+        name: "match_all",
+        text: "match_all('v')",
+    },
+    ZoFunction {
+        name: "match_all_ignore_case",
+        text: "match_all_ignore_case('v')",
+    },
+    ZoFunction {
+        name: MATCH_UDF_NAME,
+        text: "match_all('v')",
+    },
+    ZoFunction {
+        name: MATCH_UDF_IGNORE_CASE_NAME,
+        text: "match_all_ignore_case('v')",
+    },
+    ZoFunction {
+        name: REGEX_MATCH_UDF_NAME,
+        text: "re_match(field, 'pattern')",
+    },
+    ZoFunction {
+        name: REGEX_NOT_MATCH_UDF_NAME,
+        text: "re_not_match(field, 'pattern')",
+    },
+];
