@@ -131,7 +131,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -247,6 +247,12 @@ export default defineComponent({
               };
             });
 
+            logStream.value.forEach((element: any) => {
+              if (element.name == router.currentRoute.value.query.dialog) {
+                listSchema({ row: element });
+              }
+            });
+
             dismiss();
           })
           .catch((err) => {
@@ -309,6 +315,16 @@ export default defineComponent({
     const deleteIndex = (props: any) => {
       confirmDelete.value = true;
     };
+
+    onActivated(() => {
+      if (logStream.value.length > 0) {
+        logStream.value.forEach((element: any) => {
+          if (element.name == router.currentRoute.value.query.dialog) {
+            listSchema({ row: element });
+          }
+        });
+      }
+    });
 
     return {
       t,
