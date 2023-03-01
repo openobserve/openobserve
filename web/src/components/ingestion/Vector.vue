@@ -33,6 +33,7 @@
 type = "http"
 inputs = [ source or transform id ]
 uri = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
+method = "post"
 auth.strategy = "basic"
 auth.user = "{{ currUserEmail }}"
 auth.password = "{{ store.state.organizationPasscode }}"
