@@ -15,9 +15,13 @@
 import http from "./http";
 
 var search = {
-  search: ({ org_identifier, query, page_type = "logs" }: { org_identifier: string; query: any; page_type:string }) => {
-    let url = `/api/${org_identifier}/_search?type=${page_type}`;
+  search: ({ org_identifier, query, page_type = "logs" }: { org_identifier: string; query: any; page_type: string }) => {
+    const url = `/api/${org_identifier}/_search?type=${page_type}`;
     return http().post(url, query);
+  },
+  search_around: ({ org_identifier, index, key, size }: { org_identifier: string; index: string; key: string; size: string }) => {
+    const url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}`;
+    return http().get(url);
   },
 };
 

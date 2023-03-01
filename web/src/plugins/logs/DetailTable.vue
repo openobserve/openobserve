@@ -156,19 +156,11 @@
           />
         </div>
         <div class="col-8 row justify-center align-center q-gutter-sm">
-          <div class="" style="width: 80px">
-            <q-input
-              v-model="selectedRelativeValue"
-              type="number"
-              dense
-              filled
-              min="0"
-            ></q-input>
-          </div>
-          <div class="" style="minwidth: 100px">
+          <div style="line-height: 40px; font-weight: bold">No of Records:</div>
+          <div class="" style="minwidth: 150px">
             <q-select
-              v-model="selectedRelativePeriod"
-              :options="relativePeriods"
+              v-model="selectedRelativeValue"
+              :options="recordSizeOptions"
               dense
               filled
             ></q-select>
@@ -181,13 +173,7 @@
               :disabled="currentIndex >= totalLength - 1"
               outline
               label="Search Around"
-              @click="
-                searchTimeBoxed(
-                  Number(selectedRelativeValue),
-                  selectedRelativePeriod,
-                  rowData
-                )
-              "
+              @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
               padding="sm md"
             />
           </div>
@@ -259,31 +245,11 @@ export default defineComponent({
       //   this.$emit("remove:searchterm", term);
       // }
     },
-    searchTimeBoxed(
-      selectedRelativeValue: number,
-      selectedRelativePeriod: string,
-      rowData: any
-    ) {
-      let multiplier = 1;
-      if (selectedRelativePeriod === "Minutes") {
-        multiplier = 60;
-      }
-      let start_time: any =
-        rowData["_timestamp"] - selectedRelativeValue * multiplier * 1000000;
-      let end_time: any =
-        rowData["_timestamp"] + selectedRelativeValue * multiplier * 1000000;
-
-      start_time = date.formatDate(
-        Math.floor(start_time / 1000),
-        "YYYY/MM/DD HH:mm"
-      );
-
-      end_time = date.formatDate(
-        Math.floor(end_time / 1000),
-        "YYYY/MM/DD HH:mm"
-      );
-
-      this.$emit("search:timeboxed", { start: start_time, end: end_time });
+    searchTimeBoxed(rowData: any, size: number) {
+      this.$emit("search:timeboxed", {
+        key: rowData._timestamp,
+        size: size,
+      });
     },
   },
   setup() {
@@ -291,9 +257,8 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const tab = ref("table");
-    const selectedRelativeValue = ref("1");
-    const selectedRelativePeriod = ref("Minutes");
-    const relativePeriods: any = ref(["Minutes"]);
+    const selectedRelativeValue = ref("10");
+    const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
 
     const flattenJSONObject = (obj: any, param: string) => {
       let newObj: any = {};
@@ -319,8 +284,7 @@ export default defineComponent({
       tab,
       flattenJSONObject,
       selectedRelativeValue,
-      selectedRelativePeriod,
-      relativePeriods,
+      recordSizeOptions,
     };
   },
   async created() {
