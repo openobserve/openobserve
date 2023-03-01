@@ -41,6 +41,11 @@ impl PartialEq for Transform {
         self.name == other.name && self.stream_name == other.stream_name
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ZoFunction<'a> {
+    pub name: &'a str,
+    pub text: &'a str,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FunctionList {

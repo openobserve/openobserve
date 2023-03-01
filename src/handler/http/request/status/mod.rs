@@ -18,7 +18,11 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::Error;
 
-use crate::infra::{cache, cluster, config};
+use crate::{
+    infra::{cache, cluster, config},
+    meta::functions::ZoFunction,
+    service::search::datafusion::DEFAULT_FUNCTIONS,
+};
 
 #[derive(Clone, Debug, Serialize)]
 struct HealthzResponse {
@@ -26,12 +30,13 @@ struct HealthzResponse {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct ConfigResponse {
+struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,
     build_date: String,
     functions_enabled: bool,
     default_fts_keys: Vec<String>,
+    default_functions: Vec<ZoFunction<'a>>,
 }
 
 #[get("/healthz")]
@@ -52,6 +57,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        default_functions: DEFAULT_FUNCTIONS.to_vec(),
     }))
 }
 
