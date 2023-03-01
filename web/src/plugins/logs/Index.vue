@@ -77,6 +77,7 @@
                 ref="searchResultRef"
                 @update:datetime="searchData"
                 @update:scroll="getMoreData"
+                @search:timeboxed="searchAroundData"
               />
             </div>
           </template>
@@ -818,7 +819,9 @@ export default defineComponent({
       const chartParams = {
         title:
           "Showing " +
-          totalRecords +
+          (searchObj.data.queryResults.from == 0
+            ? searchObj.data.queryResults.size
+            : totalRecords) +
           " out of " +
           searchObj.data.queryResults.total.toLocaleString() +
           " hits in " +
@@ -999,6 +1002,66 @@ export default defineComponent({
       }
     };
 
+    const searchAroundData = (obj: any) => {
+      try {
+        dismiss = Notify();
+        searchService
+          .search_around({
+            org_identifier: searchObj.organizationIdetifier,
+            index: searchObj.data.stream.selectedStream.value,
+            key: obj.key,
+            size: obj.size,
+          })
+          .then((res) => {
+            searchObj.loading = false;
+            if (res.data.from > 0) {
+              searchObj.data.queryResults.from = res.data.from;
+              searchObj.data.queryResults.scan_size += res.data.scan_size;
+              searchObj.data.queryResults.took += res.data.took;
+              searchObj.data.queryResults.hits.push(...res.data.hits);
+            } else {
+              searchObj.data.queryResults = res.data;
+            }
+            //extract fields from query response
+            extractFields();
+            generateHistogramData();
+            //update grid columns
+            updateGridColumns();
+
+            searchObj.meta.showHistogram = false;
+            segment.track("Button Click", {
+              button: "Search Around Data",
+              user_org: store.state.selectedOrganization.identifier,
+              user_id: store.state.userInfo.email,
+              stream_name: searchObj.data.stream.selectedStream.value,
+              show_timestamp: obj.key,
+              show_size: obj.size,
+              show_histogram: searchObj.meta.showHistogram,
+              sqlMode: searchObj.meta.sqlMode,
+              showFields: searchObj.meta.showFields,
+              page: "Search Logs - Search around data",
+            });
+
+            dismiss();
+          })
+          .catch((err) => {
+            searchObj.loading = false;
+            dismiss();
+            if (err.response != undefined) {
+              searchObj.data.errorMsg = err.response.data.error;
+            } else {
+              searchObj.data.errorMsg = err.message;
+            }
+            $q.notify({
+              message: searchObj.data.errorMsg,
+              color: "negative",
+            });
+          });
+      } catch (e) {
+        throw new ErrorException("Request failed.");
+      }
+    };
+
     return {
       store,
       router,
@@ -1016,6 +1079,7 @@ export default defineComponent({
       refreshData,
       setQuery,
       useLocalLogsObj,
+      searchAroundData,
     };
   },
   computed: {
