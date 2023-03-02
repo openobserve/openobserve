@@ -54,7 +54,11 @@
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-            v-if="props.row.email == `false_condition_to_hide_delete_button`"
+            v-if="
+              (currentUserRole == 'admin' || currentUserRole == 'root') &&
+              !props.row.isLoggedinUser &&
+              props.row.role !== 'root'
+            "
             icon="img:/src/assets/images/common/delete_icon.svg"
             :title="t('user.delete')"
             class="q-ml-xs iconHoverBtn"
@@ -63,7 +67,7 @@
             size="sm"
             round
             flat
-            @click="deleteUser(props)"
+            @click="confirmDeleteAction(props)"
           />
           <q-btn
             v-if="
@@ -107,7 +111,10 @@
               currentUserRole == 'admin' && config.isZincObserveCloud == 'true'
             "
           >
-            <div class="row invite-user" style="width: 82%; display:inline-flex;">
+            <div
+              class="row invite-user"
+              style="width: 82%; display: inline-flex"
+            >
               <q-input
                 v-model="userEmail"
                 class="col-9 q-pl-md"
@@ -139,7 +146,14 @@
               :label="t(`user.sendInvite`)"
               @click="inviteUser()"
               :disable="userEmail == ''"
-              style="padding: 7px 9px;min-width: 0px;min-height: 0px;display: block;float: right;top: 1px;"
+              style="
+                padding: 7px 9px;
+                min-width: 0px;
+                min-height: 0px;
+                display: block;
+                float: right;
+                top: 1px;
+              "
             />
             <label class="inputHint" style="display: block">{{
               t("user.inviteByEmailHint")
@@ -222,6 +236,7 @@
             no-caps
             class="no-border"
             color="primary"
+            @click="deleteUser"
           >
             {{ t("user.ok") }}
           </q-btn>
@@ -317,6 +332,7 @@ export default defineComponent({
     const options = [t("user.admin"), t("user.member")];
     const selectedRole = ref(options[0]);
     const currentUserRole = ref("");
+    let deleteUserEmail = "";
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -335,8 +351,10 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.data.length;
-          if (config.isZincObserveCloud == 'true') {
-            columns.value = columns.value.filter((v: any) => v.name !== "actions");
+          if (config.isZincObserveCloud == "true") {
+            columns.value = columns.value.filter(
+              (v: any) => v.name !== "actions"
+            );
           }
           let counter = 1;
           orgMembers.value = res.data.data.map((data: any) => {
@@ -461,8 +479,30 @@ export default defineComponent({
       }
     };
 
-    const deleteUser = (props: any) => {
+    const confirmDeleteAction = (props: any) => {
       confirmDelete.value = true;
+      deleteUserEmail = props.row.email;
+    };
+
+    const deleteUser = () => {
+      usersService
+        .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
+        .then((res: any) => {
+          alert(res.data.code);
+          if (res.data.code == 200) {
+            $q.notify({
+              color: "positive",
+              message: "User deleted successfully.",
+            });
+            getOrgMembers();
+          }
+        })
+        .catch((err: any) => {
+          $q.notify({
+            color: "negative",
+            message: "Error while deleting user.",
+          });
+        });
     };
 
     const inviteUser = () => {
@@ -590,6 +630,7 @@ export default defineComponent({
       orgData,
       confirmDelete,
       deleteUser,
+      confirmDeleteAction,
       getOrgMembers,
       updateUser,
       updateMember,
