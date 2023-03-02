@@ -488,7 +488,6 @@ export default defineComponent({
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then((res: any) => {
-          alert(res.data.code);
           if (res.data.code == 200) {
             $q.notify({
               color: "positive",
