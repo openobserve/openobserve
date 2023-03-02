@@ -109,6 +109,11 @@ const defaultObject = {
                 startTime: "00:00",
                 endTime: "23:59"
             }
+        },
+        searchAround: {
+            indexTimestamp: 0,
+            size: <number>10,
+            histogramHide: false,
         }
     }
 }

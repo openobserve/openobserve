@@ -631,6 +631,13 @@ export default defineComponent({
           return false;
         }
 
+        searchObj.data.searchAround.indexTimestamp = 0;
+        searchObj.data.searchAround.size = 0;
+        if (searchObj.data.searchAround.histogramHide) {
+          searchObj.data.searchAround.histogramHide = false;
+          searchObj.meta.showHistogram = true;
+        }
+
         searchObj.data.errorMsg = "";
         if (searchObj.data.resultGrid.currentPage == 0) {
           // searchObj.data.stream.selectedFields = [];
@@ -1059,7 +1066,10 @@ export default defineComponent({
             //update grid columns
             updateGridColumns();
 
-            searchObj.meta.showHistogram = false;
+            if (searchObj.meta.showHistogram) {
+              searchObj.meta.showHistogram = false;
+              searchObj.data.searchAround.histogramHide = true;
+            }
             segment.track("Button Click", {
               button: "Search Around Data",
               user_org: store.state.selectedOrganization.identifier,
@@ -1072,6 +1082,15 @@ export default defineComponent({
               showFields: searchObj.meta.showFields,
               page: "Search Logs - Search around data",
             });
+
+            const visibleIndex =
+              obj.size > 30 ? obj.size / 2 - 12 : obj.size / 2;
+            setTimeout(() => {
+              searchResultRef.value.searchTableRef.scrollTo(
+                visibleIndex,
+                "start-force"
+              );
+            }, 500);
 
             dismiss();
           })
