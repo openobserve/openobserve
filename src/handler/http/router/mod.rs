@@ -95,6 +95,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::around)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::delete)
             .service(stream::list)
             .service(stream::org_index)
             .service(functions::save_function)

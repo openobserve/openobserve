@@ -36,6 +36,7 @@ use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
 use crate::meta::StreamType;
+use crate::service::db;
 use crate::service::logs::StreamMeta;
 use crate::service::schema::stream_schema_exists;
 
@@ -53,6 +54,16 @@ pub async fn ingest(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 Some("not an ingester".to_string()),
+            )),
+        );
+    }
+
+    // check if we are allowed to ingest
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs) {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("stream [{}] is being deleted", stream_name)),
             )),
         );
     }

@@ -188,6 +188,8 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_TS_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub allowed_upto: i64,
+    #[env_config(name = "ZO_DATA_LIFECYCLE", default = 0)] // in days
+    pub data_lifecycle: i64,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]

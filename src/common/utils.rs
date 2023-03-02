@@ -119,7 +119,8 @@ mod test_utils {
 
     #[test]
     fn test_get_stream_file_num_v1() {
-        let file_key = get_stream_file_num_v1("./data/zincobserve/WAL/logs/nexus/Olympics/Olympics_2.json");
+        let file_key =
+            get_stream_file_num_v1("./data/zincobserve/WAL/logs/nexus/Olympics/Olympics_2.json");
         assert_eq!(file_key, 2);
     }
 

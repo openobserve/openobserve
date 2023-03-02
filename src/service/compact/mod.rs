@@ -47,7 +47,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
         for stream_type in stream_types {
             let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
             for stream_name in streams {
+                // check if we are allowed to ingest or just skip
+                if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type) {
+                    log::info!(
+                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    );
+                }
                 tokio::task::yield_now().await; // yield to other tasks
+
                 if let Err(e) = merge::merge_by_stream(
                     last_file_list_offset,
                     &org_id,

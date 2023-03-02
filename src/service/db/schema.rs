@@ -60,7 +60,6 @@ pub async fn get(
     Ok(value)
 }
 
-#[tracing::instrument(name = "db:schema:get_versions")]
 pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
@@ -144,6 +143,23 @@ pub async fn set(
             .await;
     }
     Ok(())
+}
+
+pub async fn delete(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: Option<StreamType>,
+) -> Result<(), anyhow::Error> {
+    let stream_type = match stream_type {
+        Some(v) => v,
+        None => StreamType::Logs,
+    };
+    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let db = &crate::infra::db::DEFAULT;
+    match db.delete(&key, false).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!(e)),
+    }
 }
 
 #[tracing::instrument(name = "db:schema:list")]
