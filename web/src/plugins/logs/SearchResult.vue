@@ -68,6 +68,11 @@
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
+            :style="
+              row._timestamp == searchObj.data.searchAround.indexTimestamp
+                ? 'background-color:lightgray'
+                : ''
+            "
           >
             <q-td
               v-for="column in searchObj.data.resultGrid.columns"
@@ -200,6 +205,7 @@ export default defineComponent({
     },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
+      this.searchObj.data.searchAround.indexTimestamp = obj.key;
       this.$emit("search:timeboxed", obj);
     },
   },
