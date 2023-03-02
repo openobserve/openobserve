@@ -39,7 +39,7 @@ pub fn get_stream_file_num_v1(file_name: &str) -> u32 {
 }
 
 pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String {
-    // creates file name like "./data/olympics/olympics#2022#09#13#13_1.json"
+    // creates file name like "./data/zincobserve/olympics/olympics#2022#09#13#13_1.json"
     format!(
         "{}{}/{}/{}/{}_{}{}",
         &CONFIG.common.data_wal_dir,
@@ -101,7 +101,7 @@ mod test_utils {
 
         for i in 0..suffix_nums.len() {
             let suffix = increment_stream_file_num_v1(&format!(
-                "./data/WAL/nexus/logs/olympics/1663064862606912_{}.json",
+                "./data/zincobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
                 suffix_nums[i]
             ));
             assert_eq!(suffix, suffix_nums[i] + 1);
@@ -113,13 +113,13 @@ mod test_utils {
         let file_key = get_file_name_v1(&"nexus".to_owned(), &"Olympics".to_owned(), 2);
         assert_eq!(
             file_key.as_str(),
-            "./data/wal/nexus/logs/Olympics/Olympics_2.json"
+            "./data/zincobserve/wal/nexus/logs/Olympics/Olympics_2.json"
         );
     }
 
     #[test]
     fn test_get_stream_file_num_v1() {
-        let file_key = get_stream_file_num_v1("./data/WAL/logs/nexus/Olympics/Olympics_2.json");
+        let file_key = get_stream_file_num_v1("./data/zincobserve/WAL/logs/nexus/Olympics/Olympics_2.json");
         assert_eq!(file_key, 2);
     }
 
