@@ -230,7 +230,7 @@ impl Sql {
             meta.time_range = Some((partition.time_min, partition.time_max));
         }
         if let Some(time_range) = meta.time_range {
-            let time_range_sql = if req_time_range.0 > 0 && req_time_range.1 > 0 {
+            let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
                     "({} >= {} AND {} < {})",
                     CONFIG.common.time_stamp_col,
@@ -238,9 +238,9 @@ impl Sql {
                     CONFIG.common.time_stamp_col,
                     time_range.1
                 )
-            } else if req_time_range.0 > 0 {
+            } else if time_range.0 > 0 {
                 format!("{} >= {}", CONFIG.common.time_stamp_col, time_range.0)
-            } else if req_time_range.1 > 0 {
+            } else if time_range.1 > 0 {
                 format!("{} < {}", CONFIG.common.time_stamp_col, time_range.1)
             } else {
                 "".to_string()
