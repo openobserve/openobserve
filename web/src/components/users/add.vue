@@ -36,6 +36,12 @@
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
+          <q-toggle
+            v-if="!beingUpdated && userRole == 'root'"
+            v-model="existingUser"
+            :label="t('search.isExistingUser')"
+          />
+
           <q-input
             v-if="!beingUpdated"
             v-model="formData.email"
@@ -53,7 +59,7 @@
             ]"
           />
 
-          <div v-if="!beingUpdated">
+          <div v-if="!beingUpdated && !existingUser">
             <q-input
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
@@ -83,6 +89,7 @@
           </div>
 
           <q-input
+            v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
             color="input-border"
@@ -95,6 +102,7 @@
           />
 
           <q-input
+            v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
             color="input-border"
@@ -198,6 +206,43 @@
             </q-input>
           </div>
 
+          <q-select
+            v-if="!beingUpdated && userRole == 'root'"
+            v-model="formData.organization"
+            :label="t('user.organization') + ' *'"
+            emit-value
+            :options="organizationOptions"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+          />
+
+          <q-input
+            v-if="
+              !beingUpdated &&
+              userRole == 'root' &&
+              formData.organization == 'other'
+            "
+            v-model="formData.other_organization"
+            :label="t('user.otherOrganization')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop q-mt-sm"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[
+              (val) =>
+                /^[a-zA-Z][a-zA-Z0-9]*$/.test(val) ||
+                'Input must start with a letter and be alphanumeric',
+            ]"
+          />
+
           <div class="flex justify-center q-mt-lg">
             <q-btn
               v-close-popup
@@ -240,6 +285,8 @@ const defaultValue: any = () => {
     old_password: "",
     new_password: "",
     change_password: false,
+    organization: "",
+    other_organization: "",
   };
 };
 
@@ -265,12 +312,26 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
+    const existingUser = ref(false);
     const roleOptions = ["admin", "member"];
     const beingUpdated: any = ref(false);
     const userForm: any = ref(null);
     const isPwd: any = ref(true);
     const isNewPwd: any = ref(true);
     const isOldPwd: any = ref(true);
+    const organizationOptions: any = [];
+
+    store.state.organizations.forEach((org: any) => {
+      organizationOptions.push({
+        label: org.name,
+        value: org.identifier,
+      });
+    });
+
+    organizationOptions.push({
+      label: "Other",
+      value: "other",
+    });
 
     return {
       t,
@@ -283,6 +344,8 @@ export default defineComponent({
       isPwd,
       isNewPwd,
       isOldPwd,
+      organizationOptions,
+      existingUser,
     };
   },
   created() {
@@ -308,6 +371,11 @@ export default defineComponent({
         timeout: 2000,
       });
 
+      let selectedOrg = this.formData.organization;
+      if (selectedOrg == "other") {
+        selectedOrg = encodeURIComponent(this.formData.other_organization);
+      }
+
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
         delete this.formData.email;
@@ -316,26 +384,37 @@ export default defineComponent({
           delete this.formData.old_password;
           delete this.formData.new_password;
         }
+
         userServiece
-          .update(
-            this.formData,
-            this.store.state.selectedOrganization.identifier,
-            userEmail
-          )
+          .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
             dismiss();
             this.formData.email = userEmail;
             this.$emit("updated", res.data, this.formData, "updated");
+          })
+          .catch((err: any) => {
+            this.$q.notify({
+              color: "negative",
+              message: err.response.data.message,
+              timeout: 2000,
+            });
+            dismiss();
+            this.formData.email = userEmail;
           });
       } else {
         userServiece
-          .create(
-            this.formData,
-            this.store.state.selectedOrganization.identifier
-          )
+          .create(this.formData, selectedOrg)
           .then((res: any) => {
             dismiss();
             this.$emit("updated", res.data, this.formData, "created");
+          })
+          .catch((err: any) => {
+            this.$q.notify({
+              color: "negative",
+              message: err.response.data.message,
+              timeout: 2000,
+            });
+            dismiss();
           });
       }
     },

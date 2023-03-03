@@ -14,6 +14,7 @@
 
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 
+use crate::meta::organization::DEFAULT_ORG;
 use crate::{
     infra::config::{PASSWORD_HASH, USERS},
     meta::user::UserRole,
@@ -43,7 +44,8 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
 }
 
 pub async fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(user_id) {
+    let key = format!("{}/{}", DEFAULT_ORG, user_id);
+    match USERS.get(&key) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }

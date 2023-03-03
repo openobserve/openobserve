@@ -106,6 +106,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(users::list)
             .service(users::save)
             .service(users::delete)
+            .service(users::add_user_to_org)
             .service(prometheus_write)
             .service(save_dashboard)
             .service(get_dashboard)
