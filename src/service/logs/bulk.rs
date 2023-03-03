@@ -96,7 +96,8 @@ pub async fn ingest(
             stream_name = super::get_stream_name(&value);
 
             // check if we are allowed to ingest
-            if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs) {
+            if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
+            {
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),

@@ -41,7 +41,7 @@ pub async fn get_stream(
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
-    let mut stats = stats::get_stream_stats(org_id, stream_name, &stream_type.to_string()).unwrap();
+    let mut stats = stats::get_stream_stats(org_id, stream_name, &stream_type.to_string());
     stats = transform_stats(&mut stats);
     if schema != Schema::empty() {
         let stream = stream_res(stream_name, stream_type, schema, Some(stats));
@@ -79,8 +79,7 @@ pub async fn get_streams(
             org_id,
             stream_loc.stream_name.as_str(),
             &stream_loc.stream_type.to_string(),
-        )
-        .unwrap();
+        );
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
@@ -171,7 +170,7 @@ pub async fn save_stream_settings(
     let _guard = loc_span.enter();
 
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(org_id, stream_name, stream_type) {
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, stream_type, None) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

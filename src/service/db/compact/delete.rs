@@ -4,72 +4,78 @@ use std::sync::Arc;
 use crate::{infra::db::Event, meta::StreamType};
 
 lazy_static! {
-    static ref DELETING: DashSet<String> = DashSet::new();
+    static ref CACHE: DashSet<String> = DashSet::new();
 }
 
 // delete data from stream
-// if time_range is empty, delete all data
-// time_range is a tuple of (start, end), eg: (20230102, 20230103)
+// if date_range is empty, delete all data
+// date_range is a tuple of (start, end), eg: (20230102, 20230103)
+#[inline]
 pub async fn delete_stream(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    time_range: Option<(&str, &str)>,
+    date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = if time_range.is_none() {
-        format!(
-            "/compact/delete/{}/{}/{}/all",
-            org_id, stream_type, stream_name
-        )
-    } else {
-        let (start, end) = time_range.unwrap();
-        format!(
-            "/compact/delete/{}/{}/{}/{}-{}",
+    let key = match date_range {
+        Some((start, end)) => format!(
+            "{}/{}/{}/{},{}",
             org_id, stream_type, stream_name, start, end
-        )
+        ),
+        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
     };
-    db.put(&key, "OK".into()).await?;
 
     // write in cache
-    if time_range.is_none() {
-        DELETING.insert(format!("{}/{}/{}/all", org_id, stream_type, stream_name));
+    if CACHE.contains(&key) {
+        return Ok(()); // already in cache, just skip
     }
+    CACHE.insert(key.to_string());
+
+    let db_key = format!("/compact/delete/{}", key);
+    db.put(&db_key, "OK".into()).await?;
 
     Ok(())
 }
 
 // check if stream is deleting from cache
 #[inline]
-pub fn is_deleting_stream(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
-    DELETING.contains(&format!("{}/{}/{}/all", org_id, stream_type, stream_name))
+pub fn is_deleting_stream(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    date_range: Option<(&str, &str)>,
+) -> bool {
+    let key = match date_range {
+        Some((start, end)) => format!(
+            "{}/{}/{}/{},{}",
+            org_id, stream_type, stream_name, start, end
+        ),
+        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
+    };
+    CACHE.contains(&key)
 }
 
+#[inline]
 pub async fn delete_stream_done(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    time_range: Option<(&str, &str)>,
+    date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = if time_range.is_none() {
-        format!(
-            "/compact/delete/{}/{}/{}/all",
-            org_id, stream_type, stream_name
-        )
-    } else {
-        let (start, end) = time_range.unwrap();
-        format!(
-            "/compact/delete/{}/{}/{}/{}-{}",
+    let key = match date_range {
+        Some((start, end)) => format!(
+            "{}/{}/{}/{},{}",
             org_id, stream_type, stream_name, start, end
-        )
+        ),
+        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
     };
-    db.delete(&key, false).await?;
+    let db_key = format!("/compact/delete/{}", key);
+    db.delete(&db_key, false).await?;
 
     // remove in cache
-    if time_range.is_none() {
-        DELETING.remove(format!("{}/{}/{}/all", org_id, stream_type, stream_name).as_str());
-    }
+    CACHE.remove(&key);
 
     Ok(())
 }
@@ -103,14 +109,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                if !item_key.ends_with("/all") {
-                    continue;
-                }
-                DELETING.insert(item_key.to_string());
+                CACHE.insert(item_key.to_string());
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                DELETING.remove(item_key);
+                CACHE.remove(item_key);
             }
         }
     }
@@ -122,11 +125,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/compact/delete/";
     let ret = db.list(key).await?;
     for (item_key, _) in ret {
-        if !item_key.ends_with("/all") {
-            continue;
-        }
         let item_key = item_key.strip_prefix(key).unwrap();
-        DELETING.insert(item_key.to_string());
+        CACHE.insert(item_key.to_string());
     }
     Ok(())
 }

@@ -207,7 +207,12 @@ pub async fn prometheus_write_proto(
             }
 
             // check if we are allowed to ingest
-            if db::compact::delete::is_deleting_stream(org_id, &metric_name, StreamType::Metrics) {
+            if db::compact::delete::is_deleting_stream(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                None,
+            ) {
                 return Ok(HttpResponse::InternalServerError().json(
                     meta::http::HttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),

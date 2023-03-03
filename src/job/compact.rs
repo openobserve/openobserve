@@ -22,17 +22,35 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
-    if !CONFIG.compact.enabled {
-        return Ok(());
-    }
-    // should run it every hour
+
+    tokio::task::spawn(async move { run_delete().await });
+    tokio::task::spawn(async move { run_merge().await });
+
+    Ok(())
+}
+
+async fn run_delete() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let ret = service::compact::run().await;
+        let ret = service::compact::run_delete().await;
         if ret.is_err() {
-            log::error!("[COMPACTOR] run error: {}", ret.err().unwrap());
+            log::error!("[COMPACTOR] run data delete error: {}", ret.err().unwrap());
+        }
+    }
+}
+async fn run_merge() -> Result<(), anyhow::Error> {
+    if !CONFIG.compact.enabled {
+        return Ok(());
+    }
+    let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        let ret = service::compact::run_merge().await;
+        if ret.is_err() {
+            log::error!("[COMPACTOR] run data merge error: {}", ret.err().unwrap());
         }
     }
 }

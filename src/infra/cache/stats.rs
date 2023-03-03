@@ -27,9 +27,12 @@ pub fn get_stats() -> DashMap<String, StreamStats> {
     STATS.clone()
 }
 
-pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> Option<StreamStats> {
+pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> StreamStats {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    STATS.get(&key).map(|v| *v.value())
+    match STATS.get(&key).map(|v| *v.value()) {
+        Some(v) => v,
+        None => StreamStats::default(),
+    }
 }
 
 pub fn set_stream_stats(org_id: &str, stream_name: &str, stream_type: &str, val: StreamStats) {
@@ -123,7 +126,7 @@ mod tests {
 
         let _ = set_stream_stats("nexus", "default", "logs", val);
         let stats = get_stream_stats("nexus", "default", "logs");
-        assert_eq!(stats, Some(val));
+        assert_eq!(stats, val);
 
         let file_meta = FileMeta {
             min_ts: 1667978841110,
@@ -137,10 +140,10 @@ mod tests {
         let _ = incr_stream_stats(file_key, file_meta);
 
         let stats = get_stream_stats("nexus", "default", "logs");
-        assert_eq!(stats.unwrap().doc_num, 5300);
+        assert_eq!(stats.doc_num, 5300);
 
         let _ = decr_stream_stats(file_key, file_meta);
         let stats = get_stream_stats("nexus", "default", "logs");
-        assert_eq!(stats.unwrap().doc_num, 5000);
+        assert_eq!(stats.doc_num, 5000);
     }
 }

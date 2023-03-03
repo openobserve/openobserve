@@ -17,62 +17,32 @@ use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
+mod delete;
 mod file_list;
 mod lifecycle;
 mod merge;
 
-/// compactor run steps:
-/// 1. get all organization
-/// 2. range streams by organization & stream_type
-/// 3. get a cluster lock for compactor stream
-/// 4. read last compacted offset: year/month/day/hour
-/// 5. read current hour all files
-/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
-/// 7. write to storage
-/// 8. delete small files keys & write big files keys, use transaction
-/// 9. delete small files from storage
-/// 10. update last compacted offset
-/// 11. release cluster lock
-/// 12. compact file list from storage
-pub async fn run() -> Result<(), anyhow::Error> {
-    // get last file_list compact offset
-    let last_file_list_offset = db::compact::file_list::get_offset().await?;
-
-    // caculate data lifecyle date
-    let data_lifecycle_end = if CONFIG.limit.data_lifecycle > 0 {
+/// compactor delete run steps:
+pub async fn run_delete() -> Result<(), anyhow::Error> {
+    // check data lifecyle date
+    if CONFIG.limit.data_lifecycle > 0 {
         let now = chrono::Utc::now();
-        let date = now - chrono::Duration::days(CONFIG.limit.data_lifecycle as i64);
-        Some(date.format("%Y-%m-%d").to_string())
-    } else {
-        None
-    };
-    let data_lifecycle_end = &data_lifecycle_end;
+        let date = now - chrono::Duration::days(CONFIG.limit.data_lifecycle);
+        let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-    let orgs = cache::file_list::get_all_organization()?;
-    let stream_types = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::Metadata,
-    ];
-    for org_id in orgs {
-        for stream_type in stream_types {
-            let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
-            for stream_name in streams {
-                // check if we are allowed to ingest or just skip
-                if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type) {
-                    log::info!(
-                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                    );
-                }
-
-                // check if this stream need to delete old files
-                if data_lifecycle_end.is_some() {
+        let orgs = cache::file_list::get_all_organization()?;
+        let stream_types = [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Metadata,
+        ];
+        for org_id in orgs {
+            for stream_type in stream_types {
+                let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+                for stream_name in streams {
                     if let Err(e) = lifecycle::delete_by_stream(
-                        data_lifecycle_end.as_ref().unwrap().clone().as_str(),
+                        &data_lifecycle_end,
                         &org_id,
                         &stream_name,
                         stream_type,
@@ -88,9 +58,87 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    // delete files
+    let jobs = db::compact::delete::list().await?;
+    for job in jobs {
+        let columns = job.split('/').collect::<Vec<&str>>();
+        let org_id = columns[0].to_string();
+        let stream_type = StreamType::from(columns[1]);
+        let stream_name = columns[2].to_string();
+        let retention = columns[3].to_string();
+        tokio::task::yield_now().await; // yield to other tasks
+
+        let ret = if retention.eq("all") {
+            delete::delete_all(&org_id, &stream_name, stream_type).await
+        } else {
+            let date_range = retention.split(',').collect::<Vec<&str>>();
+            delete::delete_by_date(
+                &org_id,
+                &stream_name,
+                stream_type,
+                (date_range[0], date_range[1]),
+            )
+            .await
+        };
+
+        if let Err(e) = ret {
+            log::error!(
+                "[COMPACTOR] delete: delete [{}/{}/{}] error: {}",
+                org_id,
+                stream_type,
+                stream_name,
+                e
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// compactor merge run steps:
+/// 1. get all organization
+/// 2. range streams by organization & stream_type
+/// 3. get a cluster lock for compactor stream
+/// 4. read last compacted offset: year/month/day/hour
+/// 5. read current hour all files
+/// 6. compact small files to big files -> COMPACTOR_MAX_FILE_SIZE
+/// 7. write to storage
+/// 8. delete small files keys & write big files keys, use transaction
+/// 9. delete small files from storage
+/// 10. update last compacted offset
+/// 11. release cluster lock
+/// 12. compact file list from storage
+pub async fn run_merge() -> Result<(), anyhow::Error> {
+    // get last file_list compact offset
+    let last_file_list_offset = db::compact::file_list::get_offset().await?;
+
+    let orgs = cache::file_list::get_all_organization()?;
+    let stream_types = [
+        StreamType::Logs,
+        StreamType::Metrics,
+        StreamType::Traces,
+        StreamType::Metadata,
+    ];
+    for org_id in orgs {
+        for stream_type in stream_types {
+            let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+            for stream_name in streams {
+                // check if we are allowed to merge or just skip
+                if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None)
+                {
+                    log::info!(
+                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    );
+                }
 
                 tokio::task::yield_now().await; // yield to other tasks
-
                 if let Err(e) = merge::merge_by_stream(
                     last_file_list_offset,
                     &org_id,
@@ -139,7 +187,7 @@ mod tests {
             false,
         )
         .unwrap();
-        let resp = run().await;
+        let resp = run_merge().await;
         assert!(resp.is_ok());
     }
 }

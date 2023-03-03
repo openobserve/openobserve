@@ -97,8 +97,8 @@ pub async fn set(
     min_ts: Option<i64>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let mut versions: Vec<Schema>;
+    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
         versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
@@ -129,9 +129,12 @@ pub async fn set(
                 metadata.get("created_at").unwrap().clone(),
             );
         } else {
-            let curr_ts = Utc::now().timestamp_micros().to_string();
-            metadata.insert("start_dt".to_string(), curr_ts.clone());
-            metadata.insert("created_at".to_string(), curr_ts);
+            let min_ts = match min_ts {
+                Some(v) => v,
+                None => Utc::now().timestamp_micros(),
+            };
+            metadata.insert("start_dt".to_string(), min_ts.to_string());
+            metadata.insert("created_at".to_string(), min_ts.to_string());
         }
         let _ = db
             .put(
@@ -142,6 +145,26 @@ pub async fn set(
             )
             .await;
     }
+    Ok(())
+}
+
+pub async fn update_created_at(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    create_at: i64,
+) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let ret = db.get(&key).await?;
+    let mut versions: Vec<Schema> = json::from_slice(&ret).unwrap();
+    let latest_version = versions.last().unwrap().clone();
+    let mut metadata = latest_version.metadata().clone();
+    metadata.insert("created_at".to_string(), create_at.to_string());
+    versions.pop().unwrap();
+    versions.push(latest_version.clone().with_metadata(metadata));
+    db.put(&key, json::to_vec(&versions).unwrap().into())
+        .await?;
     Ok(())
 }
 
