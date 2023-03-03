@@ -58,7 +58,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = User, description = "User data", content_type = "application/json"),
+    request_body(content = UserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
@@ -110,6 +110,22 @@ pub async fn update(
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserUpdate",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User's email id"),
+    ),
+    request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
@@ -125,7 +141,7 @@ pub async fn add_user_to_org(
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
-    operation_id = "UserDelete",
+    operation_id = "RemoveUserFromOrg",
     security(
         ("Authorization"= [])
     ),
