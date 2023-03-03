@@ -122,7 +122,7 @@
                       </q-item>
                     </q-list>
                   </q-btn-dropdown>
-                  {{ key }}
+                  <pre class="table-pre">{{ key }}</pre>
                 </q-item-section>
               </q-item>
               <q-item></q-item>
@@ -134,7 +134,7 @@
       <q-tab-panel name="json" class="q-pa-none">
         <q-card-section class="q-pa-none q-mb-lg">
           <div class="indexDetailsContainer">
-            <pre style="height: calc(100vh - 290px)">{{ rowData }}</pre>
+            <pre class="json-pre">{{ rowData }}</pre>
           </div>
         </q-card-section>
       </q-tab-panel>
@@ -309,5 +309,19 @@ export default defineComponent({
 
 .q-icon {
   cursor: pointer;
+}
+
+.table-pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  display: inline;
+  font-weight: normal;
+  font-family: Nunito Sans, sans-serif;
+}
+
+.json-pre {
+  height: calc(100vh - 290px);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 </style>

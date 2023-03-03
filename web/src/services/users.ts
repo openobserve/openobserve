@@ -34,6 +34,9 @@ const users = {
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
+  delete: (org_identifier: string, user_email: string) => {
+    return http().delete(`/api/${org_identifier}/users/${user_email}`);
+  },
   verifyUser: (email: string) => {
     return http().get(`/api/users/verifyuser/${email}`);
   },
