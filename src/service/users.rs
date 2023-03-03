@@ -412,9 +412,9 @@ mod test_utils {
     #[actix_web::test]
     async fn test_user() {
         let _ = post_user(
-            "dummy",
+            "test_org",
             UserRequest {
-                email: "admin@zo.dev".to_string(),
+                email: "user@example.com".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
@@ -422,6 +422,20 @@ mod test_utils {
             },
         )
         .await;
+
+        USERS.insert(
+            "dummy/admin@zo.dev".to_string(),
+            User {
+                email: "admin@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Admin,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+                org: "dummy".to_string(),
+            },
+        );
 
         let resp = update_user(
             "dummy",
@@ -438,6 +452,29 @@ mod test_utils {
             },
         )
         .await;
+
+        assert!(resp.is_ok());
+
+        let resp = update_user(
+            "dummy",
+            "user@example.com",
+            false,
+            "admin@zo.dev",
+            UpdateUser {
+                token: Some("new_token".to_string()),
+                first_name: Some("first_name".to_string()),
+                last_name: Some("last_name".to_string()),
+                old_password: None,
+                new_password: None,
+                role: Some(crate::meta::user::UserRole::Admin),
+            },
+        )
+        .await;
+
+        assert!(resp.is_ok());
+
+        let resp =
+            add_user_to_org("dummy", "user@example.com", UserRole::User, "admin@zo.dev").await;
 
         assert!(resp.is_ok());
 
