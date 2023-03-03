@@ -71,10 +71,10 @@
           />
           <q-btn
             v-if="
-              (config.isZincObserveCloud == 'true' &&
-                props.row.isLoggedinUser) ||
-              currentUserRole == 'root' ||
-              (currentUserRole == 'admin' && props.row.role !== 'root')
+              config.isZincObserveCloud !== 'true' &&
+              (props.row.isLoggedinUser ||
+                currentUserRole == 'root' ||
+                (currentUserRole == 'admin' && props.row.role !== 'root'))
             "
             icon="edit"
             :title="t('user.update')"
