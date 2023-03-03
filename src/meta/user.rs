@@ -17,6 +17,100 @@ use std::fmt;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserRequest {
+    pub email: String,
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+    pub password: String,
+    #[serde(skip_serializing)]
+    pub role: UserRole,
+}
+
+impl UserRequest {
+    pub fn to_new_dbuser(
+        &self,
+        password: String,
+        salt: String,
+        org: String,
+        token: String,
+    ) -> DBUser {
+        DBUser {
+            email: self.email.clone(),
+            first_name: self.first_name.clone(),
+            last_name: self.last_name.clone(),
+            password: password,
+            salt: salt,
+            organizations: vec![UserOrg {
+                name: org,
+                token: token,
+                role: self.role.clone(),
+            }],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct DBUser {
+    pub email: String,
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+    pub password: String,
+    #[serde(default)]
+    pub salt: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub organizations: Vec<UserOrg>,
+}
+
+impl DBUser {
+    pub fn get_user(&self, org_id: String) -> Option<User> {
+        if self.organizations.is_empty() {
+            None
+        } else {
+            let mut local = self.clone();
+            local.organizations.retain(|org| org.name.eq(&org_id));
+            if local.organizations.is_empty() {
+                None
+            } else {
+                let org = local.organizations.first().unwrap();
+                Some(User {
+                    email: local.email,
+                    first_name: local.first_name,
+                    last_name: local.last_name,
+                    password: local.password,
+                    role: org.role.clone(),
+                    org: org.name.clone(),
+                    token: org.token.clone(),
+                    salt: local.salt,
+                })
+            }
+        }
+    }
+    pub fn get_all_users(&self) -> Vec<User> {
+        let mut ret_val = vec![];
+        if self.organizations.is_empty() {
+            ret_val
+        } else {
+            for org in self.organizations.clone() {
+                ret_val.push(User {
+                    email: self.email.clone(),
+                    first_name: self.first_name.clone(),
+                    last_name: self.last_name.clone(),
+                    password: self.password.clone(),
+                    role: org.role,
+                    org: org.name,
+                    token: org.token,
+                    salt: self.salt.clone(),
+                })
+            }
+            ret_val
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub email: String,
     #[serde(default)]
@@ -24,11 +118,32 @@ pub struct User {
     #[serde(default)]
     pub last_name: String,
     pub password: String,
-    pub role: UserRole,
     #[serde(default)]
     pub salt: String,
     #[serde(default)]
     pub token: String,
+    pub role: UserRole,
+    pub org: String,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserOrg {
+    pub name: String,
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub role: UserRole,
+}
+
+impl PartialEq for UserOrg {
+    fn eq(&self, other: &Self) -> bool {
+        !self.name.eq(&other.name)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserOrgRole {
+    pub role: UserRole,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
@@ -53,11 +168,12 @@ pub struct SignInUser {
     pub password: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum UserRole {
     #[serde(rename = "admin")]
     Admin,
     #[serde(rename = "member")]
+    #[default]
     User,
     #[serde(rename = "root")]
     Root,

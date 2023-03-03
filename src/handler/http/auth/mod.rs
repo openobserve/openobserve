@@ -73,9 +73,9 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
-    if user.token.eq(&user_password) {
+    /* if user.token.eq(&user_password) {
         return Ok(true);
-    }
+    } */
 
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass) {

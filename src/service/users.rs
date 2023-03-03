@@ -16,22 +16,31 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
+use rand::distributions::{Alphanumeric, DistString};
 use std::io::Error;
 use uuid::Uuid;
 
 use super::db;
-use crate::{common::auth::get_hash, meta::http::HttpResponse as MetaHttpResponse};
+use crate::{
+    common::auth::get_hash,
+    infra::config::ROOT_USER,
+    meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{UserOrg, UserRequest},
+    },
+};
 use crate::{
     common::auth::is_root_user,
     meta::user::{User, UserList, UserResponse, UserRole},
 };
 use crate::{infra::config::USERS, meta::user::UpdateUser};
 
-pub async fn post_user(org_id: &str, mut user: User) -> Result<HttpResponse, Error> {
+pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
     let salt = Uuid::new_v4().to_string();
-    user.password = get_hash(&user.password, &salt);
-    user.salt = salt;
-    db::user::set(org_id, user).await.unwrap();
+    let password = get_hash(&usr_req.password, &salt);
+    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    let user = usr_req.to_new_dbuser(password, salt, org_id.to_owned(), token);
+    db::user::set(user).await.unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         "User saved successfully".to_string(),
@@ -56,6 +65,7 @@ pub async fn update_user(
     if existing_user.is_ok() {
         let mut new_user;
         let mut is_updated = false;
+        let mut is_org_updated = false;
         let mut message = "";
         match existing_user.unwrap() {
             Some(local_user) => {
@@ -112,18 +122,51 @@ pub async fn update_user(
                             || local_user.role.eq(&UserRole::Root)))
                 {
                     new_user.role = user.role.unwrap();
-                    is_updated = true;
+                    is_org_updated = true;
                 }
                 if user.token.is_some() {
                     new_user.token = user.token.unwrap();
-                    is_updated = true;
+                    is_org_updated = true;
                 }
-                if is_updated {
-                    db::user::set(org_id, new_user).await.unwrap();
-                    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                        http::StatusCode::OK.into(),
-                        "User updated successfully".to_string(),
-                    )))
+                if is_updated || is_org_updated {
+                    let user = db::user::get_db_user(email).await;
+                    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+                    match user {
+                        Ok(mut db_user) => {
+                            db_user.password = new_user.password;
+                            db_user.first_name = new_user.first_name;
+                            db_user.last_name = new_user.last_name;
+                            if is_org_updated {
+                                let mut orgs = db_user.clone().organizations;
+                                let new_orgs = if orgs.is_empty() {
+                                    vec![UserOrg {
+                                        name: org_id.to_string(),
+                                        token,
+                                        role: new_user.role,
+                                    }]
+                                } else {
+                                    orgs.retain(|org| !org.name.eq(org_id));
+                                    orgs.push(UserOrg {
+                                        name: org_id.to_string(),
+                                        token,
+                                        role: new_user.role,
+                                    });
+                                    orgs
+                                };
+                                db_user.organizations = new_orgs;
+                            }
+
+                            db::user::set(db_user).await.unwrap();
+                            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                                http::StatusCode::OK.into(),
+                                "User updated successfully".to_string(),
+                            )))
+                        }
+                        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                            StatusCode::NOT_FOUND.into(),
+                            Some("User not found".to_string()),
+                        ))),
+                    }
                 } else {
                     if message.is_empty() {
                         message = "Not allowed to update";
@@ -147,38 +190,89 @@ pub async fn update_user(
     }
 }
 
-pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
-    let mut local_org = "";
-    let user_key = if is_root_user(name).await {
-        name.to_owned()
-    } else {
-        match org_id {
-            Some(org) => {
-                local_org = org;
-                format!("{}/{}", org, name)
-            }
-            None => name.to_owned(),
+pub async fn add_user_to_org(
+    org_id: &str,
+    email: &str,
+    role: UserRole,
+    initiator_id: &str,
+) -> Result<HttpResponse, Error> {
+    let existing_user = db::user::get_db_user(email).await;
+
+    if existing_user.is_ok() {
+        let mut db_user = existing_user.unwrap();
+        let initiating_user = if is_root_user(initiator_id).await {
+            ROOT_USER.get("root").unwrap().value().clone()
+        } else {
+            db::user::get(Some(org_id), initiator_id)
+                .await
+                .unwrap()
+                .unwrap()
+        };
+        if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
+            let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+            let mut orgs = db_user.clone().organizations;
+            let new_orgs = if orgs.is_empty() {
+                vec![UserOrg {
+                    name: org_id.to_string(),
+                    token,
+                    role: role,
+                }]
+            } else {
+                orgs.retain(|org| !org.name.eq(org_id));
+                orgs.push(UserOrg {
+                    name: org_id.to_string(),
+                    token,
+                    role: role,
+                });
+                orgs
+            };
+            db_user.organizations = new_orgs;
+            db::user::set(db_user).await.unwrap();
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "User added to org successfully".to_string(),
+            )))
+        } else {
+            Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                StatusCode::UNAUTHORIZED.into(),
+                Some("Not Allowed".to_string()),
+            )))
         }
+    } else {
+        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            Some("User not found".to_string()),
+        )))
+    }
+}
+
+pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
+    let key = match org_id {
+        Some(local_org) => format!("{}/{}", local_org, name),
+        None => format!("{}/{}", "dummy", name),
     };
-    let user = USERS.get(&user_key);
+    let user = USERS.get(&key);
     match user {
         Some(loc_user) => Some(loc_user.value().clone()),
         None => {
-            let res = db::user::get(Some(local_org), name).await;
+            let res = db::user::get(org_id, name).await;
             if res.is_err() {
                 None
             } else {
-                res.unwrap()
+                let local_user = res.unwrap();
+                match local_user {
+                    Some(user) => Some(user),
+                    None => None,
+                }
             }
         }
     }
 }
 
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
-    let prefix = format!("{}/", org_id);
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
-        if user.key().starts_with(&prefix) || !user.key().contains('/') {
+        if user.key().starts_with(org_id) {
             user_list.push(UserResponse {
                 email: user.value().email.clone(),
                 role: user.value().role.clone(),
@@ -191,8 +285,39 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
-pub async fn delete_user(org_id: &str, email_id: &str) -> Result<HttpResponse, Error> {
-    let result = db::user::delete(org_id, email_id).await;
+pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpResponse, Error> {
+    let ret_user = db::user::get_db_user(email_id).await;
+    match ret_user {
+        Ok(mut user) => {
+            if !user.organizations.is_empty() {
+                let mut orgs = user.organizations;
+                if orgs.len() == 1 {
+                    user.organizations = vec![];
+                } else {
+                    orgs.retain(|x| !x.name.eq(&org_id.to_string()));
+                    user.organizations = orgs;
+                }
+                let _ = db::user::set(user).await;
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "User removed from organization".to_string(),
+                )))
+            } else {
+                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND.into(),
+                    Some("User for the organization not found".to_owned()),
+                )))
+            }
+        }
+        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            Some("User for the organization not found".to_owned()),
+        ))),
+    }
+}
+
+pub async fn delete_user(email_id: &str) -> Result<HttpResponse, Error> {
+    let result = db::user::delete(email_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -206,12 +331,25 @@ pub async fn delete_user(org_id: &str, email_id: &str) -> Result<HttpResponse, E
 }
 
 pub async fn root_user_exists() -> bool {
-    let local_users = USERS.clone();
+    let local_users = ROOT_USER.clone();
     if !local_users.is_empty() {
-        local_users.retain(|k, v| k.contains('/') && v.role.eq(&UserRole::Root));
         local_users.is_empty()
     } else {
         db::user::root_user_exists().await
+    }
+}
+
+pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
+    if orgs.is_empty() {
+        (false, UserOrg::default())
+    } else {
+        let mut local_orgs = orgs.clone().clone();
+        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
+        if local_orgs.is_empty() {
+            (false, UserOrg::default())
+        } else {
+            (true, local_orgs.first().unwrap().clone())
+        }
     }
 }
 
@@ -221,7 +359,7 @@ mod test_utils {
     use super::*;
     async fn set_up() {
         USERS.insert(
-            "dummy/admin".to_string(),
+            "dummy/admin@zo.dev".to_string(),
             User {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
@@ -230,6 +368,7 @@ mod test_utils {
                 token: "token".to_string(),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
+                org: "dummy".to_string(),
             },
         );
     }
@@ -243,14 +382,14 @@ mod test_utils {
     async fn test_root_user_exists() {
         set_up().await;
         let resp = root_user_exists().await;
-        assert_eq!(resp, true)
+        assert_eq!(resp, false)
     }
 
     #[actix_web::test]
     async fn test_get_user() {
         set_up().await;
 
-        let resp = get_user(Some("dummy"), "admin").await;
+        let resp = get_user(Some("dummy"), "admin@zo.dev").await;
         assert_eq!(resp.is_some(), true)
     }
 
@@ -258,12 +397,10 @@ mod test_utils {
     async fn test_post_user() {
         let resp = post_user(
             "dummy",
-            User {
+            UserRequest {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::meta::user::UserRole::Admin,
-                salt: String::new(),
-                token: "token".to_string(),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },
@@ -276,12 +413,10 @@ mod test_utils {
     async fn test_user() {
         let _ = post_user(
             "dummy",
-            User {
+            UserRequest {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
                 role: crate::meta::user::UserRole::Admin,
-                salt: String::new(),
-                token: "token".to_string(),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },
@@ -306,7 +441,7 @@ mod test_utils {
 
         assert!(resp.is_ok());
 
-        let resp = delete_user("dummy", "user@example.com").await;
+        let resp = remove_user_from_org("dummy", "user@example.com").await;
 
         assert!(resp.is_ok());
     }

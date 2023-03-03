@@ -18,41 +18,54 @@ use tracing::info_span;
 use crate::common::json;
 use crate::infra::config::{ROOT_USER, USERS};
 use crate::infra::db::Event;
-use crate::meta::user::User;
+use crate::meta::user::{DBUser, User, UserRole};
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let db_span = info_span!("db:user:get");
     let _guard = db_span.enter();
+    /*  let User = if org_id.is_some() {
+        let key = format!("{}/{}", org_id.unwrap(), name);
+        USERS.get(&key).unwrap()
+    } else {
+        ROOT_USER.get("root").unwrap()
+    }; */
+
     let db = &crate::infra::db::DEFAULT;
-    let key = match org_id {
-        Some(org) => format!("/user/{}/{}", org, name),
-        None => format!("/user/{}", name),
-    };
+    let key = format!("/user/{}", name);
     let ret = db.get(&key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
+    let loc_value: DBUser = json::from_slice(&ret).unwrap();
+    if org_id.is_some() {
+        Ok(loc_value.get_user(org_id.unwrap().to_string()))
+    } else {
+        Ok(Some(ROOT_USER.get("root").unwrap().value().clone()))
+    }
 }
 
-pub async fn set(org_id: &str, user: User) -> Result<(), anyhow::Error> {
+pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
+    let db_span = info_span!("db:user:get");
+    let _guard = db_span.enter();
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/user/{}", name);
+    let ret = db.get(&key).await?;
+    let loc_value: DBUser = json::from_slice(&ret).unwrap();
+    Ok(loc_value)
+}
+
+pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let db_span = info_span!("db:user:set");
     let _guard = db_span.enter();
     let db = &crate::infra::db::DEFAULT;
-
-    let key = match user.role {
-        crate::meta::user::UserRole::Admin => format!("/user/{}/{}", org_id, user.email),
-        crate::meta::user::UserRole::User => format!("/user/{}/{}", org_id, user.email),
-        crate::meta::user::UserRole::Root => format!("/user/{}", user.email),
-    };
+    let key = format!("/user/{}", user.email);
     db.put(&key, json::to_vec(&user).unwrap().into()).await?;
     Ok(())
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let db_span = info_span!("db:user:delete");
     let _guard = db_span.enter();
+
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/user/{}/{}", org_id, name);
+    let key = format!("/user/{}", name);
     match db.delete(&key, false).await {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!(e)),
@@ -76,8 +89,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: User = json::from_slice(&ev.value.unwrap()).unwrap();
-                USERS.insert(item_key.to_owned(), item_value);
+                let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
+                let users = item_value.get_all_users();
+                for user in users {
+                    if user.role.eq(&UserRole::Root) {
+                        ROOT_USER.insert("root".to_string(), user.clone());
+                    }
+                    USERS.insert(format!("{}/{}", user.org, item_key.to_string()), user);
+                }
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -94,11 +113,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: User = json::from_slice(&item_value).unwrap();
-        if !item_key.contains('/') {
-            ROOT_USER.insert("root".to_string(), json_val.clone());
+        let json_val: DBUser = json::from_slice(&item_value).unwrap();
+        let users = json_val.get_all_users();
+        for user in users {
+            if user.role.eq(&UserRole::Root) {
+                ROOT_USER.insert("root".to_string(), user.clone());
+            }
+            USERS.insert(format!("{}/{}", user.org, item_key.to_string()), user);
         }
-        USERS.insert(item_key.to_string(), json_val);
     }
     log::info!("[TRACE] Users Cached");
     Ok(())
@@ -111,40 +133,47 @@ pub async fn root_user_exists() -> bool {
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
     ret.retain(|item| {
-        let user: User = json::from_slice(item).unwrap();
-        user.role.eq(&crate::meta::user::UserRole::Root)
+        let user: DBUser = json::from_slice(item).unwrap();
+        user.organizations
+            .first()
+            .as_ref()
+            .unwrap()
+            .role
+            .eq(&crate::meta::user::UserRole::Root)
     });
     !ret.is_empty()
 }
 
 #[cfg(test)]
 mod test_utils {
+    use crate::meta::user::UserOrg;
+
     use super::*;
 
     #[actix_web::test]
     async fn test_user() {
-        let org_id = "dummy";
+        let org_id = "dummy".to_string();
         let email = "user@example.com";
-        let resp = set(
-            org_id,
-            User {
-                email: email.to_string(),
-                password: "pass".to_string(),
+        let resp = set(DBUser {
+            email: email.to_string(),
+            password: "pass".to_string(),
+            salt: String::new(),
+            first_name: "admin".to_owned(),
+            last_name: "".to_owned(),
+            organizations: vec![UserOrg {
                 role: crate::meta::user::UserRole::Admin,
-                salt: String::new(),
-                token: "token".to_string(),
-                first_name: "admin".to_owned(),
-                last_name: "".to_owned(),
-            },
-        )
+                name: org_id.clone(),
+                token: "Abcd".to_string(),
+            }],
+        })
         .await;
         assert!(resp.is_ok());
         let _ = cache().await;
 
-        let resp = get(Some(org_id), email).await;
+        let resp = get(Some(&org_id), email).await;
         assert!(resp.unwrap().is_some());
 
-        let resp = delete(org_id, email).await;
+        let resp = delete(email).await;
         assert!(resp.is_ok());
     }
 }

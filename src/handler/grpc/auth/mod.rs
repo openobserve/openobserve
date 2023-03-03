@@ -62,9 +62,10 @@ mod test_utils {
                 password: "Complexpass#123".to_string(),
                 role: crate::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
-                token: "token".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
+                token: "token".to_string(),
+                org: "dummy".to_owned(),
             },
         );
         let mut request = tonic::Request::new(());

@@ -15,7 +15,6 @@
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use ahash::AHashMap;
-use rand::distributions::{Alphanumeric, DistString};
 use serde_json::Value;
 use std::io::Error;
 
@@ -24,8 +23,10 @@ use crate::handler::http::auth::validate_credentials;
 use crate::meta;
 use crate::meta::user::SignInUser;
 use crate::meta::user::UpdateUser;
+use crate::meta::user::UserOrgRole;
+use crate::meta::user::UserRequest;
 use crate::meta::user::UserRole;
-use crate::{meta::user::User, service::users};
+use crate::service::users;
 
 #[utoipa::path(
     context_path = "/api",
@@ -63,12 +64,12 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     )
 )]
 #[post("/{org_id}/users")]
-pub async fn save(org_id: web::Path<String>, user: web::Json<User>) -> Result<HttpResponse, Error> {
+pub async fn save(
+    org_id: web::Path<String>,
+    user: web::Json<UserRequest>,
+) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let mut user = user.into_inner();
-    if user.token.is_empty() {
-        user.token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-    }
+    let user = user.into_inner();
     users::post_user(&org_id, user).await
 }
 
@@ -109,6 +110,18 @@ pub async fn update(
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
+#[post("/{org_id}/users/{email_id}")]
+pub async fn add_user_to_org(
+    params: web::Path<(String, String)>,
+    role: web::Json<UserOrgRole>,
+    credentials: BasicAuth,
+) -> Result<HttpResponse, Error> {
+    let (org_id, email_id) = params.into_inner();
+    let role = role.into_inner().role;
+    let initiator_id = credentials.user_id();
+    users::add_user_to_org(&org_id, &email_id, role, initiator_id).await
+}
+
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -128,7 +141,7 @@ pub async fn update(
 #[delete("/{org_id}/users/{email_id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = path.into_inner();
-    users::delete_user(&org_id, &email_id).await
+    users::remove_user_from_org(&org_id, &email_id).await
 }
 
 #[post("/{org_id}/authentication")]
