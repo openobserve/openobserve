@@ -186,8 +186,8 @@ pub struct Limit {
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
-    #[env_config(name = "ZO_TS_ALLOWED_UPTO", default = 5)] // in hours - in past
-    pub allowed_upto: i64,
+    #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
+    pub ingest_allowed_upto: i64,
     #[env_config(name = "ZO_DATA_LIFECYCLE", default = 0)] // in days
     pub data_lifecycle: i64,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
@@ -301,6 +301,10 @@ pub fn init() -> Config {
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
     }
+    if cfg.limit.data_lifecycle > 0 && cfg.limit.data_lifecycle < 3 {
+        panic!("data lifecyle disallow set period less than 3 days.");
+    }
+
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = hostname().unwrap();

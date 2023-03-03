@@ -57,7 +57,8 @@ pub async fn ingest(
         );
     }
 
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
@@ -209,7 +210,7 @@ pub async fn ingest(
                 None => Utc::now().timestamp_micros(),
             };
             // check ingestion time
-            let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.allowed_upto);
+            let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
             if timestamp < earlest_time.timestamp_micros() {
                 status.failed += 1; // to old data, just discard
                 status.error = super::get_upto_discard_error();

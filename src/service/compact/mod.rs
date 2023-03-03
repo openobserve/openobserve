@@ -13,10 +13,12 @@
 // limitations under the License.
 
 use crate::infra::cache;
+use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
 mod file_list;
+mod lifecycle;
 mod merge;
 
 /// compactor run steps:
@@ -35,6 +37,16 @@ mod merge;
 pub async fn run() -> Result<(), anyhow::Error> {
     // get last file_list compact offset
     let last_file_list_offset = db::compact::file_list::get_offset().await?;
+
+    // caculate data lifecyle date
+    let data_lifecycle_end = if CONFIG.limit.data_lifecycle > 0 {
+        let now = chrono::Utc::now();
+        let date = now - chrono::Duration::days(CONFIG.limit.data_lifecycle as i64);
+        Some(date.format("%Y-%m-%d").to_string())
+    } else {
+        None
+    };
+    let data_lifecycle_end = &data_lifecycle_end;
 
     let orgs = cache::file_list::get_all_organization()?;
     let stream_types = [
@@ -56,6 +68,27 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         &stream_name,
                     );
                 }
+
+                // check if this stream need to delete old files
+                if data_lifecycle_end.is_some() {
+                    if let Err(e) = lifecycle::delete_by_stream(
+                        data_lifecycle_end.as_ref().unwrap().clone().as_str(),
+                        &org_id,
+                        &stream_name,
+                        stream_type,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
+                            org_id,
+                            stream_type,
+                            stream_name,
+                            e
+                        );
+                    }
+                }
+
                 tokio::task::yield_now().await; // yield to other tasks
 
                 if let Err(e) = merge::merge_by_stream(

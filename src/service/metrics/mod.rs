@@ -71,7 +71,8 @@ pub async fn prometheus_write_proto(
         );
     }
 
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;

@@ -41,7 +41,7 @@ pub mod multi;
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
         "too old data, by default only last {} hours data can be ingested. Data dscarded.",
-        CONFIG.limit.allowed_upto
+        CONFIG.limit.ingest_allowed_upto
     )
 }
 
