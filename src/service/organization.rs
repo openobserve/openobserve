@@ -16,8 +16,9 @@ use rand::distributions::{Alphanumeric, DistString};
 use tracing::info_span;
 
 use super::stream::get_streams;
-use super::users;
+use crate::common::auth::is_root_user;
 use crate::meta::organization::{IngestionPasscode, OrgSummary};
+use crate::meta::user::UserOrg;
 use crate::service::db;
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
@@ -37,7 +38,6 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
     let loc_span = info_span!("service:organization:get_user_passcode");
     let _guard = loc_span.enter();
     let user = db::user::get(org_id, user_id).await.unwrap().unwrap();
-
     IngestionPasscode {
         user: user.email,
         passcode: user.token,
@@ -47,16 +47,36 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
 pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPasscode {
     let loc_span = info_span!("service:organization:update_passcode");
     let _guard = loc_span.enter();
-    let mut loca_org_id = "dummy";
-    let mut user = users::get_user(org_id, user_id).await.unwrap();
-    user.token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    let mut local_org_id = "dummy";
+    let mut db_user = db::user::get_db_user(user_id).await.unwrap();
+
     if org_id.is_some() {
-        loca_org_id = org_id.unwrap();
+        local_org_id = org_id.unwrap();
     }
-    let _ = db::user::set(loca_org_id, user.clone()).await;
+    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    let mut orgs = db_user.clone().organizations;
+    let new_orgs = if !is_root_user(user_id).await {
+        let mut existing_org = orgs.clone();
+
+        existing_org.retain(|org| org.name.eq(&local_org_id));
+        orgs.retain(|org| !org.name.eq(&local_org_id));
+
+        orgs.push(UserOrg {
+            name: local_org_id.to_string(),
+            token: token.clone(),
+            role: existing_org.first().unwrap().role.clone(),
+        });
+        orgs
+    } else {
+        let mut existing_org = orgs.first().clone().unwrap().clone();
+        existing_org.token = token.clone();
+        vec![existing_org.clone()]
+    };
+    db_user.organizations = new_orgs;
+    let _ = db::user::set(db_user.clone()).await;
     IngestionPasscode {
-        user: user.email,
-        passcode: user.token,
+        user: db_user.email,
+        passcode: token,
     }
 }
 
@@ -64,30 +84,30 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
 mod test_utils {
 
     use super::*;
-    use crate::meta::user::User;
+    use crate::{meta::user::UserRequest, service::users};
 
     #[actix_web::test]
     async fn test_organization() {
         let org_id = "dummy";
         let user_id = "userone@example.com";
-        let passcode = "samplePassCode";
+        //let passcode = "samplePassCode";
         let resp = users::post_user(
             org_id,
-            User {
+            UserRequest {
                 email: user_id.to_string(),
                 password: "pass".to_string(),
                 role: crate::meta::user::UserRole::Admin,
-                salt: "salt".to_string(),
-                token: passcode.to_string(),
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },
         )
         .await;
+        println!("{:?}", resp);
         assert!(resp.is_ok());
 
         let resp = get_passcode(Some(org_id), user_id).await;
-        assert_eq!(resp.passcode, passcode);
+        let passcode = resp.passcode.clone();
+        assert!(!resp.passcode.is_empty());
 
         let resp = update_passcode(Some(org_id), user_id).await;
         assert_ne!(resp.passcode, passcode);

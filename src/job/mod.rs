@@ -15,9 +15,8 @@
 use crate::infra::config::{CONFIG, INSTANCE_ID};
 use crate::infra::{cluster, ider};
 use crate::meta::organization::DEFAULT_ORG;
-use crate::meta::user::User;
+use crate::meta::user::UserRequest;
 use crate::service::{db, users};
-use rand::distributions::{Alphanumeric, DistString};
 use regex::Regex;
 
 mod alert_manager;
@@ -40,16 +39,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             panic!("Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD enviornment variables");
         }
-        let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let _ = users::post_user(
             DEFAULT_ORG,
-            User {
+            UserRequest {
                 email: CONFIG.auth.root_user_email.clone(),
                 password: CONFIG.auth.root_user_password.clone(),
                 role: crate::meta::user::UserRole::Root,
-                salt: String::new(),
-                token,
-                first_name: "admin".to_owned(),
+                first_name: "root".to_owned(),
                 last_name: "".to_owned(),
             },
         )
