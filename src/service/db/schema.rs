@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::common::json;
+use crate::infra::cache;
 use crate::infra::config::STREAM_SCHEMAS;
 use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
@@ -148,26 +149,6 @@ pub async fn set(
     Ok(())
 }
 
-pub async fn update_created_at(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    create_at: i64,
-) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
-    let ret = db.get(&key).await?;
-    let mut versions: Vec<Schema> = json::from_slice(&ret).unwrap();
-    let latest_version = versions.last().unwrap().clone();
-    let mut metadata = latest_version.metadata().clone();
-    metadata.insert("created_at".to_string(), create_at.to_string());
-    versions.pop().unwrap();
-    versions.push(latest_version.clone().with_metadata(metadata));
-    db.put(&key, json::to_vec(&versions).unwrap().into())
-        .await?;
-    Ok(())
-}
-
 pub async fn delete(
     org_id: &str,
     stream_name: &str,
@@ -292,6 +273,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 STREAM_SCHEMAS.remove(item_key);
+                cache::stats::remove_stream_stats_by_key(item_key);
             }
         }
     }

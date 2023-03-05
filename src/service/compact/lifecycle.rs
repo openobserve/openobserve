@@ -1,5 +1,6 @@
 use chrono::{DateTime, TimeZone, Utc};
 
+use crate::infra::cache;
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -10,13 +11,10 @@ pub async fn delete_by_stream(
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
     // get schema
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type)).await?;
-    let created_at = match schema.metadata.get("created_at") {
-        Some(v) => v.parse::<i64>()?,
-        None => 0,
-    };
+    let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    let created_at = stats.doc_time_min;
     if created_at == 0 {
-        return Ok(()); // no created_at, just skip
+        return Ok(()); // no data, just skip
     }
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
     let lifecycle_start = created_at.format("%Y-%m-%d").to_string();

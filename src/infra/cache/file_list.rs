@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{Datelike, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use dashmap::DashMap;
 
 use crate::meta::{common::FileMeta, StreamType};
@@ -377,73 +377,37 @@ pub async fn get_file_list(
 ) -> Result<Vec<String>, anyhow::Error> {
     let mut files = Vec::new();
     let mut keys = Vec::new();
-    let mut key = "".to_string();
     if time_min > 0 && time_max > 0 {
         let time_min = Utc.timestamp_nanos(time_min * 1000);
         let time_max = Utc.timestamp_nanos(time_max * 1000);
-        if time_min.year() == time_max.year() {
-            key.push_str(&time_min.format("%Y").to_string());
-            key.push('/');
-            if time_min.month() == time_max.month() {
-                key.push_str(&time_min.format("%m").to_string());
-                key.push('/');
-                if time_min.day() == time_max.day() {
-                    key.push_str(&time_min.format("%d").to_string());
-                    key.push('/');
-                    if time_min.hour() == time_max.hour() {
-                        key.push_str(&time_min.format("%H").to_string());
-                        key.push('/');
-                        keys.push(key);
-                    } else {
-                        for i in time_min.hour()..(time_max.hour() + 1) {
-                            let mut k = key.clone();
-                            if i < 10 {
-                                k.push_str(&format!("0{}", i))
-                            } else {
-                                k.push_str(&format!("{}", i))
-                            }
-                            k.push('/');
-                            keys.push(k);
-                        }
-                    }
-                } else {
-                    for i in time_min.day()..(time_max.day() + 1) {
-                        let mut k = key.clone();
-                        if i < 10 {
-                            k.push_str(&format!("0{}", i))
-                        } else {
-                            k.push_str(&format!("{}", i))
-                        }
-                        k.push('/');
-                        keys.push(k);
-                    }
-                }
-            } else {
-                for i in time_min.month()..(time_max.month() + 1) {
-                    let mut k = key.clone();
-                    if i < 10 {
-                        k.push_str(&format!("0{}", i))
-                    } else {
-                        k.push_str(&format!("{}", i))
-                    }
-                    k.push('/');
-                    keys.push(k);
-                }
+        if time_min + Duration::hours(48) >= time_max {
+            // less than 48 hours, generate keys by hours
+            let mut time_min = Utc
+                .with_ymd_and_hms(
+                    time_min.year(),
+                    time_min.month(),
+                    time_min.day(),
+                    time_min.hour(),
+                    0,
+                    0,
+                )
+                .unwrap();
+            while time_min <= time_max {
+                keys.push(time_min.format("%Y/%m/%d/%H/").to_string());
+                time_min += Duration::hours(1);
             }
         } else {
-            for i in time_min.year()..(time_max.year() + 1) {
-                let mut k = key.clone();
-                if i < 10 {
-                    k.push_str(&format!("0{}", i))
-                } else {
-                    k.push_str(&format!("{}", i))
-                }
-                k.push('/');
-                keys.push(k);
+            // more than 48 hours, generate keys by days
+            let mut time_min = Utc
+                .with_ymd_and_hms(time_min.year(), time_min.month(), time_min.day(), 0, 0, 0)
+                .unwrap();
+            while time_min <= time_max {
+                keys.push(time_min.format("%Y/%m/%d/").to_string());
+                time_min += Duration::days(1);
             }
         }
     } else {
-        keys.push(key);
+        keys.push("".to_string());
     }
 
     for key in keys {

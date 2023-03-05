@@ -158,9 +158,9 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         Ok(_) => {
             log::info!("[COMPACT] merge file list success, new file: {}", file_name);
             // delete all small file list keys in this hour from storage
-            for file in file_list {
-                storage.del(&file).await?;
-            }
+            storage
+                .del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
+                .await?;
         }
         Err(err) => {
             log::error!("[COMPACT] upload file list failed: {}", err);

@@ -41,7 +41,7 @@ pub async fn get_stream(
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
-    let mut stats = stats::get_stream_stats(org_id, stream_name, &stream_type.to_string());
+    let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
     stats = transform_stats(&mut stats);
     if schema != Schema::empty() {
         let stream = stream_res(stream_name, stream_type, schema, Some(stats));
@@ -78,7 +78,7 @@ pub async fn get_streams(
         let mut stats = stats::get_stream_stats(
             org_id,
             stream_loc.stream_name.as_str(),
-            &stream_loc.stream_type.to_string(),
+            stream_loc.stream_type,
         );
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(

@@ -16,6 +16,7 @@ use dashmap::DashMap;
 
 use crate::meta::common::FileMeta;
 use crate::meta::stream::StreamStats;
+use crate::meta::StreamType;
 
 lazy_static! {
     static ref STATS: DashMap<String, StreamStats> = DashMap::with_capacity(2);
@@ -23,11 +24,13 @@ lazy_static! {
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 
+#[inline]
 pub fn get_stats() -> DashMap<String, StreamStats> {
     STATS.clone()
 }
 
-pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> StreamStats {
+#[inline]
+pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) -> StreamStats {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     match STATS.get(&key).map(|v| *v.value()) {
         Some(v) => v,
@@ -35,11 +38,32 @@ pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: &str) -> S
     }
 }
 
-pub fn set_stream_stats(org_id: &str, stream_name: &str, stream_type: &str, val: StreamStats) {
+#[inline]
+pub fn remove_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    remove_stream_stats_by_key(&key);
+}
+
+#[inline]
+pub fn remove_stream_stats_by_key(key: &str) {
+    if !STATS.contains_key(key) {
+        return;
+    }
+    STATS.remove(key);
+}
+
+#[inline]
+pub fn set_stream_stats(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    val: StreamStats,
+) {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     STATS.insert(key, val);
 }
 
+#[inline]
 pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     // eg: files/default/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.split('/').collect::<Vec<&str>>();
@@ -72,6 +96,7 @@ pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     Ok(())
 }
 
+#[inline]
 pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     // eg: files/default/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.split('/').collect::<Vec<&str>>();
@@ -86,6 +111,9 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     let stream_type = columns[2].to_string();
     let stream_name = columns[3].to_string();
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    if !STATS.contains_key(&key) {
+        return Ok(());
+    }
     let mut stats = STATS.entry(key).or_default();
     stats.doc_num -= val.records;
     stats.file_num -= 1;
@@ -95,10 +123,34 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     Ok(())
 }
 
+#[inline]
+pub fn reset_stream_stats(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    val: FileMeta,
+) -> Result<(), anyhow::Error> {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    if !STATS.contains_key(&key) {
+        return Ok(());
+    }
+    let mut stats = STATS.entry(key).or_default();
+    if val.min_ts != 0 {
+        stats.doc_time_min = val.min_ts;
+    }
+    if val.max_ts != 0 {
+        stats.doc_time_max = val.max_ts;
+    }
+
+    Ok(())
+}
+
+#[inline]
 pub fn get_stream_stats_len() -> usize {
     STATS.len()
 }
 
+#[inline]
 pub fn get_stream_stats_in_memory_size() -> usize {
     STATS
         .iter()
@@ -124,8 +176,8 @@ mod tests {
             compressed_size: 3.00,
         };
 
-        let _ = set_stream_stats("nexus", "default", "logs", val);
-        let stats = get_stream_stats("nexus", "default", "logs");
+        let _ = set_stream_stats("nexus", "default", StreamType::Logs, val);
+        let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats, val);
 
         let file_meta = FileMeta {
@@ -139,11 +191,11 @@ mod tests {
         let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_1.parquet";
         let _ = incr_stream_stats(file_key, file_meta);
 
-        let stats = get_stream_stats("nexus", "default", "logs");
+        let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats.doc_num, 5300);
 
         let _ = decr_stream_stats(file_key, file_meta);
-        let stats = get_stream_stats("nexus", "default", "logs");
+        let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats.doc_num, 5000);
     }
 }
