@@ -36,6 +36,7 @@ use crate::meta::ingestion::{
     IngestionResponse, RecordStatus, StreamData, StreamSchemaChk, StreamStatus,
 };
 use crate::meta::StreamType;
+use crate::service::db;
 use crate::service::schema::stream_schema_exists;
 use crate::{common::time::parse_timestamp_micro_from_value, meta::alert::Trigger};
 
@@ -55,7 +56,9 @@ pub async fn ingest(
             )),
         );
     }
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
@@ -91,6 +94,17 @@ pub async fn ingest(
             }
             next_line_is_data = true;
             stream_name = super::get_stream_name(&value);
+
+            // check if we are allowed to ingest
+            if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
+            {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        Some(format!("stream [{}] is being deleted", stream_name)),
+                    )),
+                );
+            }
 
             // Start Register Transfoms for stream
             #[cfg(feature = "zo_functions")]
@@ -197,7 +211,7 @@ pub async fn ingest(
                 None => Utc::now().timestamp_micros(),
             };
             // check ingestion time
-            let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.allowed_upto);
+            let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
             if timestamp < earlest_time.timestamp_micros() {
                 status.failed += 1; // to old data, just discard
                 status.error = super::get_upto_discard_error();

@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::common::json;
+use crate::infra::cache;
 use crate::infra::config::STREAM_SCHEMAS;
 use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
@@ -60,7 +61,6 @@ pub async fn get(
     Ok(value)
 }
 
-#[tracing::instrument(name = "db:schema:get_versions")]
 pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
@@ -98,8 +98,8 @@ pub async fn set(
     min_ts: Option<i64>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let mut versions: Vec<Schema>;
+    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
         versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
@@ -130,9 +130,12 @@ pub async fn set(
                 metadata.get("created_at").unwrap().clone(),
             );
         } else {
-            let curr_ts = Utc::now().timestamp_micros().to_string();
-            metadata.insert("start_dt".to_string(), curr_ts.clone());
-            metadata.insert("created_at".to_string(), curr_ts);
+            let min_ts = match min_ts {
+                Some(v) => v,
+                None => Utc::now().timestamp_micros(),
+            };
+            metadata.insert("start_dt".to_string(), min_ts.to_string());
+            metadata.insert("created_at".to_string(), min_ts.to_string());
         }
         let _ = db
             .put(
@@ -144,6 +147,23 @@ pub async fn set(
             .await;
     }
     Ok(())
+}
+
+pub async fn delete(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: Option<StreamType>,
+) -> Result<(), anyhow::Error> {
+    let stream_type = match stream_type {
+        Some(v) => v,
+        None => StreamType::Logs,
+    };
+    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let db = &crate::infra::db::DEFAULT;
+    match db.delete(&key, false).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!(e)),
+    }
 }
 
 #[tracing::instrument(name = "db:schema:list")]
@@ -252,7 +272,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
+                let columns = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = columns[0];
+                let stream_type = StreamType::from(columns[1]);
+                let stream_name = columns[2];
                 STREAM_SCHEMAS.remove(item_key);
+                cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
+                if let Err(e) =
+                    super::compact::files::del_offset(org_id, stream_name, stream_type).await
+                {
+                    log::error!("del_offset: {}", e);
+                }
             }
         }
     }

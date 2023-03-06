@@ -94,6 +94,9 @@ pub async fn search(
     // fetch all schema versions, group files by version
     let schema_versions =
         db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
+    if schema_versions.is_empty() {
+        return Err(anyhow::anyhow!("stream not found"));
+    }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
     let mut files_group: HashMap<usize, Vec<String>> =

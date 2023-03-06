@@ -38,6 +38,17 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
+            icon="img:/src/assets/images/common/delete_icon.svg"
+            :title="t('logStream.delete')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
+          />
+          <q-btn
             icon="img:/src/assets/images/common/list_icon.svg"
             :title="t('logStream.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
@@ -47,7 +58,7 @@
             round
             flat
             @click="listSchema(props)"
-          ></q-btn>
+          />
         </q-td>
       </template>
 
@@ -121,6 +132,7 @@
             no-caps
             class="no-border"
             color="primary"
+            @click="deleteStream"
           >
             {{ t("logStream.ok") }}
           </q-btn>
@@ -138,7 +150,7 @@ import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
-import indexService from "../services/index";
+import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
@@ -151,7 +163,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const q = useQuasar();
+    const $q = useQuasar();
     const router = useRouter();
     const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -210,15 +222,16 @@ export default defineComponent({
         align: "center",
       },
     ]);
+    let deleteStreamName = "";
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
-        const dismiss = q.notify({
+        const dismiss = $q.notify({
           spinner: true,
           message: "Please wait while loading streams...",
         });
 
-        indexService
+        streamService
           .nameList(store.state.selectedOrganization.identifier, "logs", false)
           .then((res) => {
             let counter = 1;
@@ -257,7 +270,7 @@ export default defineComponent({
           })
           .catch((err) => {
             dismiss();
-            q.notify({
+            $q.notify({
               type: "negative",
               message: "Error while pulling stream.",
               timeout: 2000,
@@ -312,8 +325,29 @@ export default defineComponent({
       maxRecordToReturn.value = val;
     };
 
-    const deleteIndex = (props: any) => {
+    const confirmDeleteAction = (props: any) => {
       confirmDelete.value = true;
+      deleteStreamName = props.row.name;
+    };
+
+    const deleteStream = () => {
+      streamService
+        .delete(store.state.selectedOrganization.identifier, deleteStreamName)
+        .then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              color: "positive",
+              message: "Stream deleted successfully.",
+            });
+            getLogStream();
+          }
+        })
+        .catch((err: any) => {
+          $q.notify({
+            color: "negative",
+            message: "Error while deleting stream.",
+          });
+        });
     };
 
     onActivated(() => {
@@ -339,7 +373,8 @@ export default defineComponent({
       pagination,
       resultTotal,
       listSchema,
-      deleteIndex,
+      deleteStream,
+      confirmDeleteAction,
       confirmDelete,
       schemaData,
       perPageOptions,

@@ -60,12 +60,17 @@ impl FileStorage for Local {
         }
     }
 
-    async fn del(&self, file: &str) -> Result<(), anyhow::Error> {
-        let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
-        match fs::remove_file(file) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow::anyhow!(e)),
+    async fn del(&self, files: &[&str]) -> Result<(), anyhow::Error> {
+        if files.is_empty() {
+            return Ok(());
         }
+        for file in files {
+            let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
+            if let Err(e) = fs::remove_file(file) {
+                return Err(anyhow::anyhow!(e));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -87,7 +92,7 @@ mod test_util {
         let resp = local.list("").await;
         assert!(resp.unwrap().contains(&file_name.to_string()));
 
-        let resp = local.del(file_name).await;
+        let resp = local.del(&[file_name]).await;
         assert!(resp.is_ok());
     }
 }

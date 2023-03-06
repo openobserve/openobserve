@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
 use std::collections::HashMap;
 use std::io::Error;
 use std::io::ErrorKind;
@@ -55,21 +55,11 @@ async fn schema(
             )
         }
     };
-    match stream_type {
-        Some(stream_type_loc) => {
-            stream::get_stream(org_id.as_str(), stream_name.as_str(), stream_type_loc).await
-        }
-        /* Some(StreamType::Logs) => {
-            stream::get_stream(org_id.as_str(), stream_name.as_str(), StreamType::Logs).await
-        }
-        Some(StreamType::Metrics) => {
-            stream::get_stream(org_id.as_str(), stream_name.as_str(), StreamType::Metrics).await
-        }
-        Some(StreamType::Traces) => {
-            stream::get_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces).await
-        } */
-        None => stream::get_stream(org_id.as_str(), stream_name.as_str(), StreamType::Logs).await,
-    }
+    let stream_type = match stream_type {
+        Some(v) => v,
+        None => StreamType::Logs,
+    };
+    stream::get_stream(&org_id, &stream_name, stream_type).await
 }
 
 #[utoipa::path(
@@ -109,26 +99,52 @@ async fn settings(
         }
     };
 
-    match stream_type {
-        Some(steam_type_loc) => {
-            stream::save_stream_settings(
-                org_id.as_str(),
-                stream_name.as_str(),
-                steam_type_loc,
-                settings.into_inner(),
+    let stream_type = match stream_type {
+        Some(v) => v,
+        None => StreamType::Logs,
+    };
+    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDelete",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = Stream),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[delete("/{org_id}/{stream_name}")]
+async fn delete(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    Some(e.to_string()),
+                )),
             )
-            .await
         }
-        None => {
-            stream::save_stream_settings(
-                org_id.as_str(),
-                stream_name.as_str(),
-                StreamType::Logs,
-                settings.into_inner(),
-            )
-            .await
-        }
-    }
+    };
+    let stream_type = match stream_type {
+        Some(v) => v,
+        None => StreamType::Logs,
+    };
+    stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
 #[utoipa::path(
@@ -175,21 +191,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         None => false,
     };
 
-    match stream_type {
-        /* Some(StreamType::Logs) => {
-            stream::list_streams(org_id.as_str(), Some(StreamType::Logs), fetch_schema).await
-        }
-        Some(StreamType::Metrics) => {
-            stream::list_streams(org_id.as_str(), Some(StreamType::Metrics), fetch_schema).await
-        }
-        Some(StreamType::Traces) => {
-            stream::list_streams(org_id.as_str(), Some(StreamType::Traces), fetch_schema).await
-        } */
-        Some(stream_type_loc) => {
-            stream::list_streams(org_id.as_str(), Some(stream_type_loc), fetch_schema).await
-        }
-        None => stream::list_streams(org_id.as_str(), None, fetch_schema).await,
-    }
+    stream::list_streams(org_id.as_str(), stream_type, fetch_schema).await
 }
 
 #[get("/{org_id}/")]

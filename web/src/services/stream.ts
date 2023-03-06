@@ -10,11 +10,11 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import http from "./http";
 
-var index = {
+const stream = {
   nameList: (org_identifier: string, type: string, schema: boolean) => {
     let url = `/api/${org_identifier}/streams`;
 
@@ -23,7 +23,10 @@ var index = {
     }
 
     if (schema) {
-      url += url.indexOf("?")>0 ? "&fetchSchema="+schema: "?fetchSchema="+schema;
+      url +=
+        url.indexOf("?") > 0
+          ? "&fetchSchema=" + schema
+          : "?fetchSchema=" + schema;
     }
     return http().get(url);
   },
@@ -35,7 +38,12 @@ var index = {
     }
     return http().get(url);
   },
-   updateSettings: (org_identifier: string, stream_name: string, type: string,data: any) => {
+  updateSettings: (
+    org_identifier: string,
+    stream_name: string,
+    type: string,
+    data: any
+  ) => {
     let url = `/api/${org_identifier}/${stream_name}/settings`;
 
     if (type != "") {
@@ -43,8 +51,9 @@ var index = {
     }
     return http().post(url, data);
   },
+  delete: (org_identifier: string, stream_name: string) => {
+    return http().delete(`/api/${org_identifier}/${stream_name}`);
+  },
 };
 
-
-
-export default index;
+export default stream;

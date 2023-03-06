@@ -41,6 +41,21 @@ pub async fn set_offset(
     Ok(())
 }
 
+pub async fn del_offset(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/compact/files/{}/{}/{}", org_id, stream_type, stream_name);
+    if let Err(e) = db.delete(&key, false).await {
+        if !e.to_string().contains("not exists") {
+            return Err(anyhow::anyhow!(e));
+        }
+    }
+    Ok(())
+}
+
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
     let db = &crate::infra::db::DEFAULT;

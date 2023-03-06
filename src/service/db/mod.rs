@@ -17,11 +17,9 @@ use std::sync::Arc;
 use tracing::info_span;
 
 use crate::common::json;
-use crate::infra::cache::stats;
 use crate::infra::config::METRIC_CLUSTER_LEADER;
 use crate::infra::db::Event;
 use crate::meta::prom::ClusterLeader;
-use crate::meta::stream::StreamStats;
 
 pub mod alerts;
 pub mod compact;
@@ -32,25 +30,6 @@ pub mod schema;
 pub mod triggers;
 pub mod udf;
 pub mod user;
-
-pub async fn get_stream_stats(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: &str,
-) -> Result<StreamStats, anyhow::Error> {
-    match stats::get_stream_stats(org_id, stream_name, stream_type) {
-        Some(stats) => Ok(stats),
-        None => {
-            let key = format!("/stats/{}/{}/{}", org_id, stream_type, stream_name);
-            let db = &crate::infra::db::DEFAULT;
-            let value = match db.get(&key).await {
-                Ok(val) => serde_json::from_slice(&val).unwrap(),
-                Err(_) => StreamStats::default(),
-            };
-            Ok(value)
-        }
-    }
-}
 
 pub async fn set_prom_cluster_info(
     cluster: &str,

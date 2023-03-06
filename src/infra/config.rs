@@ -186,8 +186,10 @@ pub struct Limit {
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
-    #[env_config(name = "ZO_TS_ALLOWED_UPTO", default = 5)] // in hours - in past
-    pub allowed_upto: i64,
+    #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
+    pub ingest_allowed_upto: i64,
+    #[env_config(name = "ZO_DATA_LIFECYCLE", default = 0)] // in days
+    pub data_lifecycle: i64,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
@@ -270,6 +272,8 @@ pub struct Sled {
 
 #[derive(Clone, Debug, EnvConfig)]
 pub struct S3 {
+    #[env_config(name = "ZO_S3_PROVIDER", default = "")]
+    pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
     pub server_url: String,
     #[env_config(name = "ZO_S3_REGION_NAME", default = "")]
@@ -299,6 +303,10 @@ pub fn init() -> Config {
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
     }
+    if cfg.limit.data_lifecycle > 0 && cfg.limit.data_lifecycle < 3 {
+        panic!("data lifecyle disallow set period less than 3 days.");
+    }
+
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = hostname().unwrap();
@@ -330,6 +338,11 @@ pub fn init() -> Config {
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
         panic!("etcd config error: {}", e);
+    }
+
+    // check s3 config
+    if let Err(e) = check_s3_config(&mut cfg) {
+        panic!("s3 config error: {}", e);
     }
     cfg
 }
@@ -404,6 +417,13 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.release_size = cfg.memory_cache.max_size / 100;
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
+    }
+    Ok(())
+}
+
+fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.s3.provider.is_empty() && cfg.s3.server_url.contains(".googleapis.com") {
+        cfg.s3.provider = "gcs".to_string();
     }
     Ok(())
 }

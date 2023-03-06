@@ -145,7 +145,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
-import IndexService from "../../services/index";
+import streamService from "../../services/stream";
 import { update } from "plotly.js";
 import segment from "../../services/segment_analytics";
 
@@ -296,7 +296,7 @@ end`;
       this.formData = this.modelValue;
     }
 
-    IndexService.nameList(
+    streamService.nameList(
       this.store.state.selectedOrganization.identifier,
       "",
       false

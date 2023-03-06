@@ -75,4 +75,3 @@ Check the [contributing guide](./CONTRIBUTING.md)
 ## Ingestion
 
 ![Home](./screenshots/zo_ingestion.png)
-

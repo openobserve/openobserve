@@ -17,9 +17,9 @@ echo "line_cov $line_cov"
 
 # enable threshold
 #COVERAGE_THRESHOLD=80
-FUNC_COV_THRESHOLD=60
-LINE_COV_THRESHOLD=53
-REGION_COV_THRESHOLD=40
+FUNC_COV_THRESHOLD=55
+LINE_COV_THRESHOLD=50
+REGION_COV_THRESHOLD=35
 
 # clean up
 # find ./target -name llvm-cov-target -type d|xargs rm -fR

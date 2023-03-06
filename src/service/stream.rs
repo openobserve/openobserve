@@ -21,6 +21,8 @@ use tracing::info_span;
 
 use crate::common::json;
 use crate::common::utils::is_local_disk_storage;
+use crate::infra::cache::stats;
+use crate::infra::config::STREAM_SCHEMAS;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::stream::{ListStream, Stream, StreamProperty, StreamSettings, StreamStats};
 use crate::meta::StreamType;
@@ -40,9 +42,7 @@ pub async fn get_stream(
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
-    let mut stats = db::get_stream_stats(org_id, stream_name, &stream_type.to_string())
-        .await
-        .unwrap();
+    let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
     stats = transform_stats(&mut stats);
     if schema != Schema::empty() {
         let stream = stream_res(stream_name, stream_type, schema, Some(stats));
@@ -76,13 +76,11 @@ pub async fn get_streams(
         .unwrap();
     let mut indices_res = Vec::new();
     for stream_loc in indices {
-        let mut stats = db::get_stream_stats(
+        let mut stats = stats::get_stream_stats(
             org_id,
             stream_loc.stream_name.as_str(),
-            &stream_loc.stream_type.to_string(),
-        )
-        .await
-        .unwrap();
+            stream_loc.stream_type,
+        );
         if stats.eq(&StreamStats::default()) {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
@@ -171,6 +169,17 @@ pub async fn save_stream_settings(
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:streams:set_partition_keys");
     let _guard = loc_span.enter();
+
+    // check if we are allowed to ingest
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, stream_type, None) {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("stream [{}] is being deleted", stream_name)),
+            )),
+        );
+    }
+
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
@@ -192,6 +201,67 @@ pub async fn save_stream_settings(
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         "".to_string(),
+    )))
+}
+
+pub async fn delete_stream(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<HttpResponse, Error> {
+    let loc_span = info_span!("service:streams:delete_stream");
+    let _guard = loc_span.enter();
+    let schema = db::schema::get_versions(org_id, stream_name, Some(stream_type))
+        .await
+        .unwrap();
+    if schema.is_empty() {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            Some("stream not found".to_owned()),
+        )));
+    }
+
+    // create delete for compactor
+    if let Err(e) = db::compact::delete::delete_stream(org_id, stream_name, stream_type, None).await
+    {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("failed to delete stream: {}", e)),
+            )),
+        );
+    }
+
+    // delete stream schema
+    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("failed to delete stream: {}", e)),
+            )),
+        );
+    }
+
+    // delete stream schema cache
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    STREAM_SCHEMAS.remove(&key);
+
+    // delete stream stats cache
+    stats::remove_stream_stats(org_id, stream_name, stream_type);
+
+    // delete stream compaction offset
+    if let Err(e) = db::compact::files::del_offset(org_id, stream_name, stream_type).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("failed to delete stream: {}", e)),
+            )),
+        );
+    };
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        "stream deleted".to_owned(),
     )))
 }
 
