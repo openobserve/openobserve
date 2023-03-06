@@ -30,8 +30,8 @@ actix-web-rust-embed-responder = {version = "2.2.0", default-features = false, f
 ahash = {version = "0.8.3", features = ["serde"]}
 anyhow = "1.0"
 argon2 = {version = "0.4.1", features = ["alloc", "password-hash"]}
-arrow = {version = "31.0", features = ["simd", "ipc_compression"]}
-arrow-schema = {version = "31.0", features = ["serde"]}
+arrow = {version = "33.0", features = ["simd", "ipc_compression"]}
+arrow-schema = {version = "33.0", features = ["serde"]}
 async-trait = "0.1.57"
 async_once = "0.2.6"
 awc = "3.1.0"
@@ -41,8 +41,8 @@ bytes = "1.1"
 chrono = "0.4"
 clap = { version = "4.1.6", default-features = false, features = ["std", "help", "usage", "suggestions", "cargo"] }
 dashmap = {version = "5.4.0", features = ["serde"]}
-datafusion = {version = "17.0", features = ["simd"]}
-datafusion-common = "17.0"
+datafusion = {version = "19.0", features = ["simd"]}
+datafusion-common = "19.0"
 dotenv_config = "0.1.5"
 dotenvy = "0.15.6"
 env_logger = "0.9"
@@ -65,7 +65,7 @@ opentelemetry = {version = "0.17", features = ["rt-tokio"]}
 opentelemetry-otlp = {version = "0.10", features = ["http-proto", "serialize", "reqwest-client"]}
 opentelemetry-proto = {version = "0.1", features = ["gen-tonic", "traces", "with-serde", "build-server"]}
 parking_lot = "0.12"
-parquet = {version = "31.0", features = ["arrow", "async"]}
+parquet = {version = "33.0", features = ["arrow", "async"]}
 prometheus = "0.13.3"
 prost = "0.11.2"
 rand = "0.8.5"

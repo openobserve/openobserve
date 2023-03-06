@@ -94,6 +94,25 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
         log::info!("[JOB] convert disk file: {}", file);
 
+        // check if we are allowed to ingest or just delete the file
+        if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+            log::info!(
+                "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file
+            );
+            if let Err(e) = fs::remove_file(&local_file) {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e
+                );
+            }
+            continue;
+        }
+
         let mut partitions = file_name.split('_').collect::<Vec<&str>>();
         partitions.retain(|&x| x.contains('='));
         let mut partition_key = String::from("");

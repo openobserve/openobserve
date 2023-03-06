@@ -139,7 +139,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
-import indexService from "../../services/index";
+import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 
 const defaultValue: any = () => {
@@ -173,7 +173,7 @@ export default defineComponent({
         message: "Please wait while loading stats...",
       });
 
-      await indexService
+      await streamService
         .schema(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
@@ -256,7 +256,7 @@ export default defineComponent({
           settings.partition_keys.concat(added_part_keys);
       }
 
-      await indexService
+      await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
           indexData.value.name,

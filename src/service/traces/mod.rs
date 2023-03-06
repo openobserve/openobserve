@@ -74,7 +74,8 @@ pub async fn handle_trace_request(
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     for res_span in res_spans {

@@ -270,7 +270,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
-import IndexService from "../../services/index";
+import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser";
 import segment from "../../services/segment_analytics";
 
@@ -479,7 +479,7 @@ export default defineComponent({
       this.formData = this.modelValue;
     }
 
-    IndexService.nameList(
+    streamService.nameList(
       this.store.state.selectedOrganization.identifier,
       "",
       true

@@ -71,7 +71,8 @@ pub async fn prometheus_write_proto(
         );
     }
 
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -204,6 +205,22 @@ pub async fn prometheus_write_proto(
             if entry.is_empty() {
                 continue;
             }
+
+            // check if we are allowed to ingest
+            if db::compact::delete::is_deleting_stream(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                None,
+            ) {
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        Some(format!("stream [{}] is being deleted", metric_name)),
+                    ),
+                ));
+            }
+
             write_buf.clear();
             for row in &entry {
                 write_buf.put(row.as_bytes());

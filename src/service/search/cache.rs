@@ -66,11 +66,9 @@ pub async fn search(
     let _guard3 = span3.enter();
 
     // fetch all schema versions, get latest schema
-    let schema_versions =
-        db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
-    let schema_latest = schema_versions.last().unwrap();
+    let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
     let schema = Arc::new(
-        schema_latest
+        schema
             .to_owned()
             .with_metadata(std::collections::HashMap::new()),
     );

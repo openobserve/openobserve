@@ -73,6 +73,21 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
         log::info!("[JOB] convert memory file: {}", file);
 
+        // check if we are allowed to ingest or just delete the file
+        if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+            log::info!(
+                "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file
+            );
+            if file_lock::FILES.write().unwrap().remove(&file).is_none() {
+                log::error!("[JOB] Failed to remove memory file: {}", file)
+            }
+            continue;
+        }
+
         let mut partitions = file_name.split('_').collect::<Vec<&str>>();
         partitions.retain(|&x| x.contains('='));
         let mut partition_key = String::from("");
@@ -108,12 +123,11 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             Ok(ret) => match ret {
                 Ok((path, key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
-                        Ok(_) => match file_lock::FILES.write().unwrap().remove(&path) {
-                            Some(_) => {}
-                            None => {
+                        Ok(_) => {
+                            if file_lock::FILES.write().unwrap().remove(&path).is_none() {
                                 log::error!("[JOB] Failed to remove memory file: {}", path)
                             }
-                        },
+                        }
                         Err(e) => log::error!(
                             "[JOB] Failed write memory file meta:{}, error: {}",
                             path,

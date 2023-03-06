@@ -26,6 +26,7 @@ use crate::meta;
         request::stream::list,
         request::stream::schema,
         request::stream::settings,
+        request::stream::delete,
         request::ingest::bulk,
         request::ingest::multi,
         request::ingest::json,

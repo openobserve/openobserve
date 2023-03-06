@@ -26,7 +26,7 @@ pub trait FileStorage: Sync + 'static {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error>;
     async fn get(&self, file: &str) -> Result<Bytes, anyhow::Error>;
     async fn put(&self, file: &str, data: Bytes) -> Result<(), anyhow::Error>;
-    async fn del(&self, file: &str) -> Result<(), anyhow::Error>;
+    async fn del(&self, files: &[&str]) -> Result<(), anyhow::Error>;
 }
 
 lazy_static! {

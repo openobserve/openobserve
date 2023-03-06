@@ -76,7 +76,8 @@ pub async fn traces_json(
 
     let mut trace_meta_coll: AHashMap<String, Vec<serde_json::Map<String, Value>>> =
         AHashMap::new();
-    let mut min_ts = (Utc::now() + Duration::hours(CONFIG.limit.allowed_upto)).timestamp_micros();
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut service_name: String = traces_stream_name.to_string();

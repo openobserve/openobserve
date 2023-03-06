@@ -262,7 +262,7 @@ pub async fn merge_by_stream(
             if !db_success {
                 merge_success = false;
                 // delete the file just upload to storage
-                match storage.del(&new_file_name).await {
+                match storage.del(&[&new_file_name]).await {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("[COMPACT] delete file failed: {}", e);
@@ -272,13 +272,13 @@ pub async fn merge_by_stream(
             }
 
             // delete small files from storage
-            for file in &new_file_list {
-                tokio::task::yield_now().await; // yield to other tasks
-                match storage.del(file).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("[COMPACT] delete file failed: {}", e);
-                    }
+            match storage
+                .del(&new_file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("[COMPACT] delete file failed: {}", e);
                 }
             }
             // delete files from file list
