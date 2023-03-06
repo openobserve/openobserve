@@ -68,9 +68,9 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
         });
         orgs
     } else {
-        let mut existing_org = orgs.first().clone().unwrap().clone();
+        let mut existing_org = orgs.first().unwrap().clone();
         existing_org.token = token.clone();
-        vec![existing_org.clone()]
+        vec![existing_org]
     };
     db_user.organizations = new_orgs;
     let _ = db::user::set(db_user.clone()).await;

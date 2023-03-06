@@ -215,14 +215,14 @@ pub async fn add_user_to_org(
                 vec![UserOrg {
                     name: org_id.to_string(),
                     token,
-                    role: role,
+                    role,
                 }]
             } else {
                 orgs.retain(|org| !org.name.eq(org_id));
                 orgs.push(UserOrg {
                     name: org_id.to_string(),
                     token,
-                    role: role,
+                    role,
                 });
                 orgs
             };
@@ -259,11 +259,12 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
             if res.is_err() {
                 None
             } else {
-                let local_user = res.unwrap();
-                match local_user {
+                res.unwrap()
+                //local_user.map(|user| user)
+                /*  match local_user {
                     Some(user) => Some(user),
                     None => None,
-                }
+                } */
             }
         }
     }
@@ -343,7 +344,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     if orgs.is_empty() {
         (false, UserOrg::default())
     } else {
-        let mut local_orgs = orgs.clone().clone();
+        let mut local_orgs = orgs;
         local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
         if local_orgs.is_empty() {
             (false, UserOrg::default())
