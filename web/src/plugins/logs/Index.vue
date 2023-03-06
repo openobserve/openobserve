@@ -66,6 +66,9 @@
                 >
                   <q-btn
                     no-caps
+                    unelevated
+                    size="sm"
+                    bg-secondary
                     class="no-border"
                     :to="
                       '/logstreams?dialog=' +
