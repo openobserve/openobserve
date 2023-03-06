@@ -26,6 +26,7 @@ use crate::{
     infra::config::ROOT_USER,
     meta::{
         http::HttpResponse as MetaHttpResponse,
+        organization::DEFAULT_ORG,
         user::{UserOrg, UserRequest},
     },
 };
@@ -251,7 +252,7 @@ pub async fn add_user_to_org(
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let key = match org_id {
         Some(local_org) => format!("{}/{}", local_org, name),
-        None => format!("{}/{}", "dummy", name),
+        None => format!("{}/{}", DEFAULT_ORG, name),
     };
     let user = USERS.get(&key);
     match user {
