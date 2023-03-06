@@ -464,13 +464,20 @@ export default defineComponent({
         });
 
         if (operationType == "created") {
-          orgMembers.value.push({
-            "#": orgMembers.value.length + 1,
-            email: data.email,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            role: data.role,
-          });
+          if (
+            store.state.selectedOrganization.identifier == data.organization
+          ) {
+            orgMembers.value.push({
+              "#":
+                orgMembers.value.length + 1 <= 9
+                  ? `0${orgMembers.value.length + 1}`
+                  : orgMembers.value.length + 1,
+              email: data.email,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              role: data.role,
+            });
+          }
         } else {
           orgMembers.value.forEach((member: any, key: number) => {
             if (member.email == data.email) {
