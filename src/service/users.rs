@@ -39,7 +39,7 @@ pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpRespons
     let salt = Uuid::new_v4().to_string();
     let password = get_hash(&usr_req.password, &salt);
     let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-    let user = usr_req.to_new_dbuser(password, salt, org_id.to_owned(), token);
+    let user = usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token);
     db::user::set(user).await.unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
@@ -197,12 +197,14 @@ pub async fn add_user_to_org(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_db_user(email).await;
-
     if existing_user.is_ok() {
         let mut db_user = existing_user.unwrap();
+        let local_org;
         let initiating_user = if is_root_user(initiator_id).await {
+            local_org = org_id.replace(' ', "_");
             ROOT_USER.get("root").unwrap().value().clone()
         } else {
+            local_org = org_id.to_owned();
             db::user::get(Some(org_id), initiator_id)
                 .await
                 .unwrap()
@@ -213,14 +215,14 @@ pub async fn add_user_to_org(
             let mut orgs = db_user.clone().organizations;
             let new_orgs = if orgs.is_empty() {
                 vec![UserOrg {
-                    name: org_id.to_string(),
+                    name: local_org.to_string(),
                     token,
                     role,
                 }]
             } else {
-                orgs.retain(|org| !org.name.eq(org_id));
+                orgs.retain(|org| !org.name.eq(&local_org));
                 orgs.push(UserOrg {
-                    name: org_id.to_string(),
+                    name: local_org.to_string(),
                     token,
                     role,
                 });
@@ -291,14 +293,18 @@ pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpRe
     match ret_user {
         Ok(mut user) => {
             if !user.organizations.is_empty() {
-                let mut orgs = user.organizations;
+                let mut orgs = user.clone().organizations;
                 if orgs.len() == 1 {
-                    user.organizations = vec![];
+                    let _ = db::user::delete(email_id).await;
                 } else {
                     orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                     user.organizations = orgs;
+                    let resp = db::user::set(user).await;
+                    //special case as we cache flattened user struct
+                    if resp.is_ok() {
+                        USERS.remove(&format!("{}/{}", org_id, email_id));
+                    }
                 }
-                let _ = db::user::set(user).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
                     "User removed from organization".to_string(),
