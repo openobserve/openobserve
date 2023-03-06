@@ -422,10 +422,8 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.s3.provider.is_empty() {
-        if cfg.s3.server_url.contains(".googleapis.com") {
-            cfg.s3.provider = "gcs".to_string();
-        }
+    if cfg.s3.provider.is_empty() && cfg.s3.server_url.contains(".googleapis.com") {
+        cfg.s3.provider = "gcs".to_string();
     }
     Ok(())
 }

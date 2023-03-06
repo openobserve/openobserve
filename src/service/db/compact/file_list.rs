@@ -30,6 +30,13 @@ pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/compact/file_list/delete/{}", key);
+    db.put(&key, "OK".into()).await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 

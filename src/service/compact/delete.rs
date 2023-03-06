@@ -1,5 +1,5 @@
 use chrono::{Duration, TimeZone, Utc};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use tokio::time;
 
@@ -192,14 +192,17 @@ async fn delete_from_file_list(
         return Ok(());
     }
 
+    let mut file_list_days: HashSet<String> = HashSet::new();
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
         let columns: Vec<_> = file.split('/').collect();
-        let key = format!(
+        let day_key = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
+        file_list_days.insert(day_key);
+        let hour_key = format!(
             "{}/{}/{}/{}",
             columns[4], columns[5], columns[6], columns[7]
         );
-        let entry = hours_files.entry(key).or_default();
+        let entry = hours_files.entry(hour_key).or_default();
         entry.push(FileKey {
             key: file,
             meta: FileMeta::default(),
@@ -253,6 +256,11 @@ async fn delete_from_file_list(
             }
             break;
         }
+    }
+
+    // mark file list need to do merge again
+    for key in file_list_days {
+        db::compact::file_list::set_delete(&key).await?;
     }
 
     Ok(())
