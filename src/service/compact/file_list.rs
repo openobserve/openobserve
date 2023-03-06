@@ -25,11 +25,17 @@ use crate::infra::storage;
 use crate::meta::common::FileKey;
 use crate::service::db;
 
+pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
+    run_merge(offset).await?;
+    run_delete().await?;
+    Ok(())
+}
+
 /// check all streams done compact in this hour
 /// merge all small file list keys in this hour to a single file and upload to storage
 /// delete all small file list keys in this hour from storage
 /// node should load new file list from storage
-pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
+pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     let mut offset = offset;
     if offset == 0 {
         // get earilest date from schema
@@ -83,6 +89,28 @@ pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     db::compact::file_list::set_offset(offset).await
 }
 
+pub async fn run_delete() -> Result<(), anyhow::Error> {
+    let days = db::compact::file_list::list_delete().await?;
+    if days.is_empty() {
+        return Ok(()); // no delete
+    }
+
+    for day in days {
+        let mut t =
+            Utc.datetime_from_str(format!("{}T00:00:00Z", day).as_str(), "%Y-%m-%dT%H:%M:%SZ")?;
+        for _hour in 0..24 {
+            let offset = t.timestamp_micros();
+            merge_file_list(offset).await?;
+            t += Duration::hours(1);
+        }
+
+        // delete day
+        db::compact::file_list::del_delete(&day).await?;
+    }
+
+    Ok(())
+}
+
 /// merge and delete the small file list keys in this hour from etcd
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
@@ -101,6 +129,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{}", offset_prefix);
+    println!("merge_file_list: key: {}", key);
     let storage = &storage::DEFAULT;
     let file_list = storage.list(&key).await?;
     if file_list.len() <= 1 {
@@ -144,6 +173,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let id = ider::generate();
     let file_name = format!("file_list{}{}.json.zst", offset_prefix, id);
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+    let mut has_content = false;
     for (_, item) in filter_file_keys.iter() {
         if item.deleted {
             continue;
@@ -151,20 +181,29 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         let val = json::to_vec(&item)?;
         buf.write_all(val.as_slice())?;
         buf.write_all(b"\n")?;
+        has_content = true;
     }
     let compressed_bytes = buf.finish().unwrap();
 
-    match storage.put(&file_name, compressed_bytes.into()).await {
-        Ok(_) => {
-            log::info!("[COMPACT] merge file list success, new file: {}", file_name);
-            // delete all small file list keys in this hour from storage
-            storage
-                .del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-                .await?;
+    let new_file_ok = if has_content {
+        match storage.put(&file_name, compressed_bytes.into()).await {
+            Ok(_) => {
+                log::info!("[COMPACT] merge file list success, new file: {}", file_name);
+                true
+            }
+            Err(err) => {
+                log::error!("[COMPACT] upload file list failed: {}", err);
+                false
+            }
         }
-        Err(err) => {
-            log::error!("[COMPACT] upload file list failed: {}", err);
-        }
+    } else {
+        true
+    };
+    if new_file_ok {
+        // delete all small file list keys in this hour from storage
+        storage
+            .del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
+            .await?;
     }
 
     if locker.is_some() {

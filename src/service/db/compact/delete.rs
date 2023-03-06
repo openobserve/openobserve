@@ -72,7 +72,11 @@ pub async fn delete_stream_done(
         None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
     };
     let db_key = format!("/compact/delete/{}", key);
-    db.delete(&db_key, false).await?;
+    if let Err(e) = db.delete(&db_key, false).await {
+        if !e.to_string().contains("not exists") {
+            return Err(anyhow::anyhow!(e));
+        }
+    }
 
     // remove in cache
     CACHE.remove(&key);
