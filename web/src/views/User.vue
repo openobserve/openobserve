@@ -428,6 +428,9 @@ export default defineComponent({
         selectedUser.value = {};
       }
 
+      selectedUser.value.organization =
+        store.state.selectedOrganization.identifier;
+
       showAddUserDialog.value = true;
 
       segment.track("Button Click", {
