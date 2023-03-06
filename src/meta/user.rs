@@ -61,7 +61,7 @@ pub struct DBUser {
     pub password: String,
     #[serde(default)]
     pub salt: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    //#[serde(skip_serializing_if = "Vec::is_empty")]
     pub organizations: Vec<UserOrg>,
 }
 
