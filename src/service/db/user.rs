@@ -100,7 +100,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                USERS.remove(item_key);
+                for user in USERS.clone() {
+                    if user.1.email.eq(item_key) {
+                        USERS.remove(&format!("{}/{}", user.1.org, user.1.email));
+                        break;
+                    }
+                }
             }
         }
     }
