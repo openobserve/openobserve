@@ -22,6 +22,7 @@ use tracing::info_span;
 use crate::common::json;
 use crate::common::utils::is_local_disk_storage;
 use crate::infra::cache::stats;
+use crate::infra::config::STREAM_SCHEMAS;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::stream::{ListStream, Stream, StreamProperty, StreamSettings, StreamStats};
 use crate::meta::StreamType;
@@ -232,18 +233,36 @@ pub async fn delete_stream(
     }
 
     // delete stream schema
-    match db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            StatusCode::OK.into(),
-            "stream deleted".to_owned(),
-        ))),
-        Err(e) => Ok(
+    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+        return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
                 Some(format!("failed to delete stream: {}", e)),
             )),
-        ),
+        );
     }
+
+    // delete stream schema cache
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    STREAM_SCHEMAS.remove(&key);
+
+    // delete stream stats cache
+    stats::remove_stream_stats(org_id, stream_name, stream_type);
+
+    // delete stream compaction offset
+    if let Err(e) = db::compact::files::del_offset(org_id, stream_name, stream_type).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                Some(format!("failed to delete stream: {}", e)),
+            )),
+        );
+    };
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        "stream deleted".to_owned(),
+    )))
 }
 
 pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, anyhow::Error> {

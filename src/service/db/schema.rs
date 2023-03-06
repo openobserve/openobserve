@@ -272,8 +272,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
+                let columns = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = columns[0];
+                let stream_type = StreamType::from(columns[1]);
+                let stream_name = columns[2];
                 STREAM_SCHEMAS.remove(item_key);
-                cache::stats::remove_stream_stats_by_key(item_key);
+                cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
+                if let Err(e) =
+                    super::compact::files::del_offset(org_id, stream_name, stream_type).await
+                {
+                    log::error!("del_offset: {}", e);
+                }
             }
         }
     }

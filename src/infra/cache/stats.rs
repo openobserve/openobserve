@@ -41,15 +41,7 @@ pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType
 #[inline]
 pub fn remove_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    remove_stream_stats_by_key(&key);
-}
-
-#[inline]
-pub fn remove_stream_stats_by_key(key: &str) {
-    if !STATS.contains_key(key) {
-        return;
-    }
-    STATS.remove(key);
+    STATS.remove(&key);
 }
 
 #[inline]

@@ -143,7 +143,7 @@ import useLogs from "../../composables/useLogs";
 import { deepKeys, byString } from "../../utils/json";
 import { Parser } from "node-sql-parser";
 
-import indexService from "../../services/index";
+import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
 import { useLocalLogsObj } from "../../utils/zincutils";
@@ -290,7 +290,7 @@ export default defineComponent({
 
     function getStreamList() {
       try {
-        indexService
+        streamService
           .nameList(store.state.selectedOrganization.identifier, "logs", true)
           .then((res) => {
             searchObj.data.streamResults = res.data;
