@@ -38,7 +38,8 @@ awc = "3.1.0"
 aws-config = "0.54"
 aws-sdk-s3 = "0.24"
 bytes = "1.1"
-chrono = "0.4"
+# chrono = "0.4"
+chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 clap = { version = "4.1.6", default-features = false, features = ["std", "help", "usage", "suggestions", "cargo"] }
 dashmap = {version = "5.4.0", features = ["serde"]}
 datafusion = {version = "19.0", features = ["simd"]}
