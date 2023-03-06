@@ -40,11 +40,11 @@ impl UserRequest {
             email: self.email.clone(),
             first_name: self.first_name.clone(),
             last_name: self.last_name.clone(),
-            password: password,
-            salt: salt,
+            password,
+            salt,
             organizations: vec![UserOrg {
                 name: org,
-                token: token,
+                token,
                 role: self.role.clone(),
             }],
         }
