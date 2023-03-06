@@ -108,10 +108,21 @@ impl FileStorage for S3 {
         if files.is_empty() {
             return Ok(());
         }
+
+        // Hack for GCS
+        if CONFIG.s3.provider.eq("gcs") {
+            for file in files {
+                if let Err(e) = self.del_for_gcs(file).await {
+                    return Err(anyhow::anyhow!(e));
+                }
+                tokio::task::yield_now().await; // yield to other tasks
+            }
+            return Ok(());
+        }
+
         let step = 100;
         let mut start = 0;
         let files_len = files.len();
-
         while start < files_len {
             let s3config = S3CONFIG.get().await.clone().unwrap();
             let client = Client::new(&s3config);
@@ -147,6 +158,29 @@ impl FileStorage for S3 {
             tokio::task::yield_now().await; // yield to other tasks
         }
         Ok(())
+    }
+}
+
+impl S3 {
+    async fn del_for_gcs(&self, file: &str) -> Result<(), anyhow::Error> {
+        let s3config = S3CONFIG.get().await.clone().unwrap();
+        let client = Client::new(&s3config);
+        let result = client
+            .delete_object()
+            .bucket(&CONFIG.s3.bucket_name)
+            .key(file)
+            .send()
+            .await;
+        match result {
+            Ok(_output) => {
+                log::info!("s3[GCS] File delete success: {}", file);
+                Ok(())
+            }
+            Err(err) => {
+                log::error!("s3[GCS] File delete error: {:?}", err);
+                Err(anyhow::anyhow!(err))
+            }
+        }
     }
 }
 

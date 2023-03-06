@@ -272,6 +272,8 @@ pub struct Sled {
 
 #[derive(Clone, Debug, EnvConfig)]
 pub struct S3 {
+    #[env_config(name = "ZO_S3_PROVIDER", default = "")]
+    pub provider: String,
     #[env_config(name = "ZO_S3_SERVER_URL", default = "")]
     pub server_url: String,
     #[env_config(name = "ZO_S3_REGION_NAME", default = "")]
@@ -336,6 +338,11 @@ pub fn init() -> Config {
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
         panic!("etcd config error: {}", e);
+    }
+
+    // check s3 config
+    if let Err(e) = check_s3_config(&mut cfg) {
+        panic!("s3 config error: {}", e);
     }
     cfg
 }
@@ -410,6 +417,15 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.release_size = cfg.memory_cache.max_size / 100;
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
+    }
+    Ok(())
+}
+
+fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.s3.provider.is_empty() {
+        if cfg.s3.server_url.contains(".googleapis.com") {
+            cfg.s3.provider = "gcs".to_string();
+        } 
     }
     Ok(())
 }
