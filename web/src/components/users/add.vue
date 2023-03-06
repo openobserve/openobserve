@@ -125,11 +125,12 @@
             :options="roleOptions"
             color="input-border"
             bg-color="input-bg"
-            class="q-pt-md q-pb-sm showLabelOnTop"
+            class="q-pt-md q-pb-md showLabelOnTop"
             stack-label
             outlined
             filled
             dense
+            :rules="[(val) => !!val || 'Field is required']"
           />
 
           <div v-if="beingUpdated">
@@ -214,11 +215,12 @@
             :options="organizationOptions"
             color="input-border"
             bg-color="input-bg"
-            class="q-pt-md q-pb-sm showLabelOnTop"
+            class="q-pt-md q-pb-md showLabelOnTop q-mt-sm"
             stack-label
             outlined
             filled
             dense
+            :rules="[(val) => !!val || 'Field is required']"
           />
 
           <q-input
@@ -269,7 +271,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -331,6 +333,10 @@ export default defineComponent({
     organizationOptions.push({
       label: "Other",
       value: "other",
+    });
+
+    onActivated(() => {
+      formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
     return {
