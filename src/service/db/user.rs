@@ -95,7 +95,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if user.role.eq(&UserRole::Root) {
                         ROOT_USER.insert("root".to_string(), user.clone());
                     }
-                    USERS.insert(format!("{}/{}", user.org, item_key.to_string()), user);
+                    USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
             }
             Event::Delete(ev) => {
@@ -119,7 +119,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
             }
-            USERS.insert(format!("{}/{}", user.org, item_key.to_string()), user);
+            USERS.insert(format!("{}/{}", user.org, item_key), user);
         }
     }
     log::info!("[TRACE] Users Cached");
