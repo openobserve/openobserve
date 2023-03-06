@@ -17,6 +17,8 @@ body:
         - alerts
         - localization
         - routing
+        - metrics
+        - traces
         - other
       multiple: true
 

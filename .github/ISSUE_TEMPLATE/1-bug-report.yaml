@@ -17,6 +17,8 @@ body:
         - alerts
         - localization
         - routing
+        - metrics
+        - traces
         - Don't known / other
       multiple: true
     validations:
