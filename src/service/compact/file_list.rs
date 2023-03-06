@@ -129,7 +129,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{}", offset_prefix);
-    println!("merge_file_list: key: {}", key);
+    // println!("merge_file_list: key: {}", key);
     let storage = &storage::DEFAULT;
     let file_list = storage.list(&key).await?;
     if file_list.len() <= 1 {

@@ -704,7 +704,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        //println!("{:?}", resp);
+        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -783,7 +783,7 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        //println!("{:?}", resp);
+        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
     async fn e2e_cache_status() {
@@ -802,7 +802,7 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        //println!("{:?}", resp);
+        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
