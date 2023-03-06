@@ -68,6 +68,7 @@
             round
             flat
             @click="confirmDeleteAction(props)"
+            style="cursor: pointer !important"
           />
           <q-btn
             v-if="
@@ -85,6 +86,7 @@
             round
             flat
             @click="addUser(props, true)"
+            style="cursor: pointer !important"
           />
         </q-td>
       </template>
@@ -427,6 +429,9 @@ export default defineComponent({
       } else {
         selectedUser.value = {};
       }
+
+      selectedUser.value.organization =
+        store.state.selectedOrganization.identifier;
 
       showAddUserDialog.value = true;
 
