@@ -26,10 +26,7 @@ pub async fn get_file_list(
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
-    let stream_type_loc = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type_loc = stream_type.unwrap_or(StreamType::Logs);
     file_list::get_file_list(org_id, stream_name, stream_type_loc, time_min, time_max).await
 }
 
