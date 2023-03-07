@@ -55,10 +55,7 @@ async fn schema(
             )
         }
     };
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::get_stream(&org_id, &stream_name, stream_type).await
 }
 
@@ -98,11 +95,7 @@ async fn settings(
             )
         }
     };
-
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
 }
 
@@ -140,10 +133,7 @@ async fn delete(
             )
         }
     };
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 

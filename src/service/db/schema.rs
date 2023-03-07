@@ -30,10 +30,7 @@ pub async fn get(
     stream_type: Option<StreamType>,
 ) -> Result<Schema, anyhow::Error> {
     let mut value = Schema::empty();
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
@@ -67,10 +64,7 @@ pub async fn get_versions(
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Schema>, anyhow::Error> {
     let mut value = vec![];
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
@@ -154,10 +148,7 @@ pub async fn delete(
     stream_name: &str,
     stream_type: Option<StreamType>,
 ) -> Result<(), anyhow::Error> {
-    let stream_type = match stream_type {
-        Some(v) => v,
-        None => StreamType::Logs,
-    };
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
     let db = &crate::infra::db::DEFAULT;
     match db.delete(&key, false).await {
