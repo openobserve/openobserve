@@ -704,7 +704,7 @@ pub async fn merge_parquet_files(
         CONFIG.common.time_stamp_col, CONFIG.common.time_stamp_col
     );
     let df = ctx.sql(&meta_sql).await?;
-    let batches = df.collect().await.unwrap();
+    let batches = df.collect().await?;
     let json_rows = arrowJson::writer::record_batches_to_json_rows(&batches[..]).unwrap();
     let mut result: Vec<serde_json::Value> = json_rows
         .into_iter()
