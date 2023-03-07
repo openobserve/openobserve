@@ -118,7 +118,7 @@ async fn settings(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Stream),
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
