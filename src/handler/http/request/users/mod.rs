@@ -113,7 +113,7 @@ pub async fn update(
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
-    operation_id = "UserUpdate",
+    operation_id = "AddUserToOrg",
     security(
         ("Authorization"= [])
     ),
