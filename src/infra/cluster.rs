@@ -458,7 +458,7 @@ pub fn is_alert_manager(role: &[Role]) -> bool {
 }
 
 #[inline(always)]
-fn is_single_node(role: Vec<Role>) -> bool {
+pub fn is_single_node(role: Vec<Role>) -> bool {
     if role.contains(&Role::All) {
         return true;
     }

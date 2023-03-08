@@ -134,6 +134,29 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
     data.insert("num_org".to_string(), STREAM_SCHEMAS.len().into());
     data.insert("num_streams".to_string(), num_streams.into());
     data.insert("num_users".to_string(), USERS.len().into());
+    data.insert(
+        "is_local_mode".to_string(),
+        serde_json::Value::Bool(CONFIG.common.local_mode.clone()),
+    );
+    if CONFIG.common.local_mode {
+        data.insert(
+            "local_mode_storage".to_string(),
+            CONFIG.common.local_mode_storage.clone().into(),
+        );
+    }
+
+    let nodes = crate::infra::cluster::load_local_node_role();
+    if !crate::infra::cluster::is_single_node(nodes) {
+        match crate::infra::cluster::get_cached_online_nodes() {
+            Some(nodes) => {
+                data.insert("is_HA_mode".to_string(), serde_json::Value::Bool(true));
+                data.insert("number_of_nodes".to_string(), nodes.len().into());
+            }
+            None => {
+                data.insert("is_HA_mode".to_string(), serde_json::Value::Bool(false));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -141,7 +164,22 @@ mod test_telemetry {
     use super::*;
     #[test]
     fn test_telemetry_new() {
+        ROOT_USER.insert(
+            "root".to_string(),
+            crate::meta::user::User {
+                email: "admin@zo.dev".to_string(),
+                password: "pass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                salt: String::new(),
+                token: "token".to_string(),
+                first_name: "admin".to_owned(),
+                last_name: "".to_owned(),
+                org: "default".to_string(),
+            },
+        );
         let tel = Telemetry::new();
+        let mut props = tel.base_info.clone();
+        add_zo_info(&mut props);
         assert!(tel.base_info.len() > 0)
     }
 }
