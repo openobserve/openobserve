@@ -136,7 +136,7 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
     data.insert("num_users".to_string(), USERS.len().into());
     data.insert(
         "is_local_mode".to_string(),
-        serde_json::Value::Bool(CONFIG.common.local_mode.clone()),
+        serde_json::Value::Bool(CONFIG.common.local_mode),
     );
     if CONFIG.common.local_mode {
         data.insert(

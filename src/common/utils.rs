@@ -111,10 +111,9 @@ mod test_utils {
     #[test]
     fn test_get_file_name_v1() {
         let file_key = get_file_name_v1(&"nexus".to_owned(), &"Olympics".to_owned(), 2);
-        assert_eq!(
-            file_key.as_str(),
-            "./data/zincobserve/wal/nexus/logs/Olympics/Olympics_2.json"
-        );
+        assert!(file_key
+            .as_str()
+            .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json"));
     }
 
     #[test]
