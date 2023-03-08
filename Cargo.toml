@@ -37,6 +37,7 @@ async_once = "0.2.6"
 awc = "3.1.0"
 aws-config = "0.54"
 aws-sdk-s3 = "0.24"
+base64 = "0.21.0"
 bytes = "1.1"
 chrono = "0.4"
 clap = { version = "4.1.6", default-features = false, features = ["std", "help", "usage", "suggestions", "cargo"] }

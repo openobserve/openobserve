@@ -14,9 +14,10 @@
 
 use actix_web::http::{self, StatusCode};
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use base64::Engine;
 use chrono::Duration;
 use std::collections::HashMap;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::Mutex;
 
 use crate::common::http::get_stream_type_from_request;
@@ -106,7 +107,32 @@ pub async fn search(
             )))
         }
     };
-    let req: meta::search::Request = serde_json::from_slice(&body)?;
+
+    // handle encoding for query and aggs
+    let mut req: meta::search::Request = serde_json::from_slice(&body)?;
+    if req.encoding.eq(&meta::search::RequestEncoding::Base64) {
+        req.query.sql = match base64_decode(&req.query.sql) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    Some(e.to_string()),
+                )))
+            }
+        };
+        for (_, v) in req.aggs.iter_mut() {
+            *v = match base64_decode(v) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        Some(e.to_string()),
+                    )))
+                }
+            };
+        }
+        req.encoding = meta::search::RequestEncoding::Empty;
+    }
 
     // get a local search queue lock
     let locker = LOCKER
@@ -218,6 +244,7 @@ pub async fn around(
             track_total_hits: false,
         },
         aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
     };
     let resp_forward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
@@ -247,6 +274,7 @@ pub async fn around(
             track_total_hits: false,
         },
         aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
     };
     let resp_backward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
@@ -278,4 +306,27 @@ pub async fn around(
     resp.took = resp_forward.took + resp_backward.took;
 
     Ok(HttpResponse::Ok().json(resp))
+}
+
+fn base64_decode(s: &str) -> Result<String, Error> {
+    let ns = match base64::engine::general_purpose::STANDARD.decode(s.as_bytes()) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("base64 decode error: {}", e),
+            ))
+        }
+    };
+    let s = match String::from_utf8(ns) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("base64 decode error: {}", e),
+            ))
+        }
+    };
+
+    Ok(s)
 }

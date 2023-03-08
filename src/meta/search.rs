@@ -33,6 +33,35 @@ pub struct Request {
     pub query: Query,
     #[serde(default)]
     pub aggs: HashMap<String, String>,
+    #[serde(default)]
+    pub encoding: RequestEncoding,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum RequestEncoding {
+    #[serde(rename = "base64")]
+    Base64,
+    #[default]
+    #[serde(rename = "")]
+    Empty,
+}
+
+impl From<&str> for RequestEncoding {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "base64" => RequestEncoding::Base64,
+            _ => RequestEncoding::Empty,
+        }
+    }
+}
+
+impl std::fmt::Display for RequestEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RequestEncoding::Base64 => write!(f, "base64"),
+            RequestEncoding::Empty => write!(f, ""),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
