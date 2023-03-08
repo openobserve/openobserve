@@ -76,10 +76,10 @@ mod test_utils {
             },
         )
         .await;
-    let res = is_root_user("root@example.com").await;
-    assert_eq!(res, true);
-    let res = is_root_user("root2@example.com").await;
-    assert_eq!(res, false);
+        let res = is_root_user("root@example.com").await;
+        assert_eq!(res, true);
+        let res = is_root_user("root2@example.com").await;
+        assert_eq!(res, false);
     }
 
     #[actix_web::test]

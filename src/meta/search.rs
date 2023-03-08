@@ -101,6 +101,7 @@ impl Default for Query {
 }
 
 impl Request {
+    #[inline]
     pub fn decode(&mut self) -> Result<(), std::io::Error> {
         match self.encoding {
             RequestEncoding::Base64 => {

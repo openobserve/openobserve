@@ -14,6 +14,7 @@
 
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 
+#[inline(always)]
 pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error> {
     if s.contains('T') && !s.contains(' ') {
         if s.len() == 19 {
@@ -32,6 +33,7 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error
     }
 }
 
+#[inline(always)]
 pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
     let n: i64 = match v.parse() {
         Ok(i) => i,
@@ -47,6 +49,7 @@ pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
     parse_i64_to_timestamp_micros(n)
 }
 
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
     if v == 0 {
         return Ok(0);
@@ -68,6 +71,7 @@ pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
     }
 }
 
+#[inline(always)]
 pub fn parse_timestamp_micro_from_value(v: &serde_json::Value) -> Result<i64, anyhow::Error> {
     let n = match v {
         serde_json::Value::String(s) => parse_str_to_timestamp_micros(s)?,

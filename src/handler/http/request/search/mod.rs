@@ -108,8 +108,21 @@ pub async fn search(
     };
 
     // handle encoding for query and aggs
-    let mut req: meta::search::Request = serde_json::from_slice(&body)?;
-    req.decode()?;
+    let mut req: meta::search::Request = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                Some(e.to_string()),
+            )))
+        }
+    };
+    if let Err(e) = req.decode() {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            Some(e.to_string()),
+        )));
+    }
 
     // get a local search queue lock
     let locker = LOCKER

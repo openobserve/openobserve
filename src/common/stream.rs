@@ -17,6 +17,7 @@ use std::io::{Error, ErrorKind};
 
 pub const SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 5] = ["log", "message", "msg", "content", "data"];
 
+#[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
     /*  return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
         http::StatusCode::BAD_REQUEST.into(),

@@ -481,8 +481,13 @@ mod test_utils {
 
         assert!(resp.is_ok());
 
-        let resp =
-            add_user_to_org("dummy", "user@example.com", UserRole::Member, "admin@zo.dev").await;
+        let resp = add_user_to_org(
+            "dummy",
+            "user@example.com",
+            UserRole::Member,
+            "admin@zo.dev",
+        )
+        .await;
 
         assert!(resp.is_ok());
 

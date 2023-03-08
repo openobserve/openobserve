@@ -102,6 +102,7 @@ pub fn flatten_json(obj: &Value) -> Value {
         .unwrap()
 }
 
+#[inline(always)]
 pub fn unflatten_json(obj: &Value) -> Value {
     if !obj.is_object() {
         return obj.to_owned();

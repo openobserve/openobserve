@@ -15,6 +15,7 @@
 use base64::Engine;
 use std::io::{Error, ErrorKind};
 
+#[inline(always)]
 pub fn decode(s: &str) -> Result<String, Error> {
     let ns = match base64::engine::general_purpose::STANDARD.decode(s.as_bytes()) {
         Ok(v) => v,
