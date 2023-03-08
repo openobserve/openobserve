@@ -456,7 +456,7 @@ mod test_utils {
                 last_name: Some("last_name".to_string()),
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
-                role: Some(crate::meta::user::UserRole::User),
+                role: Some(crate::meta::user::UserRole::Member),
             },
         )
         .await;
@@ -482,7 +482,7 @@ mod test_utils {
         assert!(resp.is_ok());
 
         let resp =
-            add_user_to_org("dummy", "user@example.com", UserRole::User, "admin@zo.dev").await;
+            add_user_to_org("dummy", "user@example.com", UserRole::Member, "admin@zo.dev").await;
 
         assert!(resp.is_ok());
 

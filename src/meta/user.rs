@@ -174,7 +174,7 @@ pub enum UserRole {
     Admin,
     #[serde(rename = "member")]
     #[default]
-    User,
+    Member,
     #[serde(rename = "root")]
     Root,
 }
@@ -183,7 +183,7 @@ impl fmt::Display for UserRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             UserRole::Admin => write!(f, "admin"),
-            UserRole::User => write!(f, "member"),
+            UserRole::Member => write!(f, "member"),
             UserRole::Root => write!(f, "root"),
         }
     }
