@@ -36,6 +36,7 @@ use crate::meta;
         request::users::save,
         request::users::update,
         request::users::delete,
+        request::users::add_user_to_org,
         request::functions::list_functions,
         request::functions::save_function,
         request::functions::delete_function,

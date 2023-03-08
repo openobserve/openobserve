@@ -23,21 +23,25 @@ use crate::meta::user::{DBUser, User, UserRole};
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let db_span = info_span!("db:user:get");
     let _guard = db_span.enter();
-    /*  let User = if org_id.is_some() {
+    let user = if org_id.is_some() {
         let key = format!("{}/{}", org_id.unwrap(), name);
-        USERS.get(&key).unwrap()
+        USERS.get(&key)
     } else {
-        ROOT_USER.get("root").unwrap()
-    }; */
+        ROOT_USER.get("root")
+    };
 
-    let db = &crate::infra::db::DEFAULT;
-    let key = format!("/user/{}", name);
-    let ret = db.get(&key).await?;
-    let loc_value: DBUser = json::from_slice(&ret).unwrap();
-    if org_id.is_some() {
-        Ok(loc_value.get_user(org_id.unwrap().to_string()))
+    if user.is_none() {
+        let db = &crate::infra::db::DEFAULT;
+        let key = format!("/user/{}", name);
+        let ret = db.get(&key).await?;
+        let loc_value: DBUser = json::from_slice(&ret).unwrap();
+        if org_id.is_some() {
+            Ok(loc_value.get_user(org_id.unwrap().to_string()))
+        } else {
+            Ok(Some(ROOT_USER.get("root").unwrap().value().clone()))
+        }
     } else {
-        Ok(Some(ROOT_USER.get("root").unwrap().value().clone()))
+        Ok(Some(user.unwrap().clone()))
     }
 }
 
@@ -178,7 +182,7 @@ mod test_utils {
         let resp = set(DBUser {
             email: email.to_string(),
             password: "pass".to_string(),
-            salt: String::new(),
+            salt: String::from("sdfjshdkfshdfkshdfkshdfkjh"),
             first_name: "admin".to_owned(),
             last_name: "".to_owned(),
             organizations: vec![UserOrg {
