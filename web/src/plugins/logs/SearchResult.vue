@@ -86,7 +86,11 @@
                     ? column.prop(row, column.name).substr(0, 100) + '...'
                     : column.prop(row, column.name)
                 "
-                :query-string="searchObj.data.query"
+                :query-string="
+                  searchObj.meta.sqlMode
+                    ? searchObj.data.query.split('where')[1]
+                    : searchObj.data.query
+                "
                 :title="
                   column.prop(row, column.name).length > 100 &&
                   column.name != 'source'
