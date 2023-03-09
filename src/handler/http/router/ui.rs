@@ -38,7 +38,7 @@ pub const UI_PAGES: [&str; 13] = [
     "ingestion/vector",
 ];
 
-#[route("/{path:.*}", method = "GET", method = "HEAD")]
+#[route("/web/{path:.*}", method = "GET", method = "HEAD")]
 pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileResponse> {
     let mut path = if path.is_empty() {
         "index.html"

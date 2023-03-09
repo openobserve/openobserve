@@ -59,7 +59,7 @@
               !props.row.isLoggedinUser &&
               props.row.role !== 'root'
             "
-            icon="img:/src/assets/images/common/delete_icon.svg"
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
             :title="t('user.delete')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
@@ -263,6 +263,7 @@ import NoData from "../components/shared/grid/NoData.vue";
 import { validateEmail } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import segment from "../services/segment_analytics";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageUser",
@@ -680,6 +681,7 @@ export default defineComponent({
       inviteUser,
       currentUserRole,
       updateUserRole,
+      getImageURL,
     };
   },
   computed: {

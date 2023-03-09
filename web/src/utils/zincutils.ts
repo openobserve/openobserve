@@ -32,7 +32,7 @@ const useLocalStorage = (
 
     read();
 
-    window.addEventListener("load", () => { 
+    window.addEventListener("load", () => {
       window.addEventListener("storage", read);
     });
 
@@ -237,4 +237,10 @@ export const getBasicAuth = (username: string, password: string) => {
   const token = username + ":" + password;
   const hash = window.btoa(token);
   return "Basic " + hash;
+};
+
+export const getImageURL = (image_path: string) => {
+  console.log(window.location.origin + "==" + window.location.pathname);
+  const pos = window.location.pathname.indexOf("/web/");
+  return window.location.origin + window.location.pathname.slice(0, pos + 5) + "src/assets/" + image_path;
 };

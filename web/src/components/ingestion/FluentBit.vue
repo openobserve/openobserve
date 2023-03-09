@@ -23,7 +23,7 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          icon="img:/src/assets/images/common/copy_icon.svg"
+          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
           @click="$emit('copy-to-clipboard-fn', fluentbitContent)"
         />
       </div>
@@ -40,7 +40,8 @@
   Json_date_key    _timestamp
   Json_date_format iso8601
   HTTP_User {{ currUserEmail }}
-  HTTP_Passwd {{ store.state.organizationPasscode }}</pre>
+  HTTP_Passwd {{ store.state.organizationPasscode }}</pre
+    >
   </div>
 </template>
 
@@ -48,6 +49,7 @@
 import { defineComponent, ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "fluentbit-mechanism",
@@ -61,9 +63,9 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint = ref(""); 
- 
-    const url = new URL(store.state.API_ENDPOINT); 
+    const endpoint = ref("");
+
+    const url = new URL(store.state.API_ENDPOINT);
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
@@ -78,6 +80,7 @@ export default defineComponent({
       config,
       endpoint,
       fluentbitContent,
+      getImageURL,
     };
   },
 });

@@ -38,7 +38,7 @@
           collapsibleIcon === 'show' &&
           seachCollapseImage == 'collapse_sidebar_icon'
         "
-        icon="img:/src/assets/images/common/collapse_sidebar_icon.svg"
+        :icon="'img:' + getImageURL('images/common/collapse_sidebar_icon.svg')"
         class="q-mr-sm"
         size="sm"
         round
@@ -50,7 +50,7 @@
           collapsibleIcon === 'show' &&
           seachCollapseImage == 'expand_sidebar_icon'
         "
-        icon="img:/src/assets/images/common/expand_sidebar_icon.svg"
+        :icon="'img:' + getImageURL('images/common/expand_sidebar_icon.svg')"
         class="q-mr-sm"
         size="sm"
         round
@@ -129,6 +129,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
@@ -175,6 +176,7 @@ export default defineComponent({
       seachCollapseImage,
       changePagination,
       changeMaxRecordToReturn,
+      getImageURL,
     };
   },
   computed: {

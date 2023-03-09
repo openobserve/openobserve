@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
           />
         </div>
       </div>
@@ -152,6 +152,7 @@ import ticketService from "../../services/tickets";
 import attachmentService from "../../services/attachments";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue = () => {
   return {
@@ -204,6 +205,7 @@ export default defineComponent({
       addTicketForm,
       store,
       isUploading,
+      getImageURL,
     };
   },
   created() {

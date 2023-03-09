@@ -28,7 +28,7 @@
             v-close-popup
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
           />
         </div>
       </div>
@@ -276,6 +276,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import userServiece from "../../services/users";
+import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -352,6 +353,7 @@ export default defineComponent({
       isOldPwd,
       organizationOptions,
       existingUser,
+      getImageURL,
     };
   },
   created() {
