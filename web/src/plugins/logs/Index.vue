@@ -468,6 +468,7 @@ export default defineComponent({
             histogram:
               "select histogram(_timestamp, '[INTERVAL]') AS key, count(*) AS num from query GROUP BY key ORDER BY key",
           },
+          encoding: "base64",
         };
 
         var timestamps: any = getConsumableDateTime();
