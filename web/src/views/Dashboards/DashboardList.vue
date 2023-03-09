@@ -106,7 +106,7 @@ import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
-import { getImageURL } from "../utils/zincutils";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "DashboardList",

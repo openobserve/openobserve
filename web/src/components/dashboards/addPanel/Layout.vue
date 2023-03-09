@@ -45,7 +45,10 @@
                       </div>
                       <div class="field_icons">
                         <q-icon
-                          name="img:/assets/images/layout/remove_icon.svg"
+                          :name="
+                            'img:' +
+                            getImageURL('images/layout/remove_icon.svg')
+                          "
                           size="1rem"
                           @click="removeXAxisItem(props.row.column)"
                         />
@@ -142,7 +145,10 @@
                             :icon="props.expand ? 'remove' : 'add'"
                           />
                           <q-icon
-                            name="img:/assets/images/layout/remove_icon.svg"
+                            :name="
+                              'img:' +
+                              getImageURL('images/layout/remove_icon.svg')
+                            "
                             size="1rem"
                             @click="removeYAxisItem(props.row.column)"
                           />
@@ -277,7 +283,10 @@
                           :icon="props.expand ? 'remove' : 'add'"
                         />
                         <q-icon
-                          name="img:/assets/images/layout/remove_icon.svg"
+                          :name="
+                            'img:' +
+                            getImageURL('images/layout/remove_icon.svg')
+                          "
                           size="1rem"
                           @click="removeFilterItem(props.row.column)"
                         />
@@ -436,6 +445,7 @@ import { defineComponent, ref, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "dashboard-layout",
@@ -470,6 +480,7 @@ export default defineComponent({
       model: ref([]),
       tab: ref("General"),
       options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
+      getImageURL,
     };
   },
 });

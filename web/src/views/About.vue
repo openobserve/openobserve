@@ -17,7 +17,7 @@
   <q-page class="aboutPage">
     <div class="about_head">
       <img
-        src="~@/assets/images/common/app_logo_zo.png"
+        :src="getImageURL('images/common/app_logo_zo.png')"
         class="logo"
         width="177"
       />
@@ -48,6 +48,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageAbout",
@@ -58,6 +59,7 @@ export default defineComponent({
     return {
       store,
       pageData,
+      getImageURL,
     };
   },
 });
