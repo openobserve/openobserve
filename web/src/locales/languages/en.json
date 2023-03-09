@@ -251,6 +251,7 @@
     "alerts": {
         "header": "Alerts",
         "add": "Add alert",
+        "edit": "Edit",
         "search": "Search alert",
         "name": "Name",
         "function": "Alert Details",
@@ -266,6 +267,8 @@
         "stream_name": "Stream Name",
         "actions": "Actions",
         "cancel": "Cancel",
+        "slack": "Slack",
+        "prom_am": "Alert manager",
         "addTitle": "Add Alert",
         "updateTitle": "Update Alert",
         "delete": "Delete"

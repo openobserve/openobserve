@@ -34,14 +34,14 @@
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
-              icon="transform"
+              icon="edit"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
               unelevated
               size="sm"
               round
               flat
-              :title="t('alerts.add')"
+              :title="t('alerts.edit')"
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn

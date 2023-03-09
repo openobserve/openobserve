@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use chrono::Utc;
-use serde_json::json;
 use std::collections::HashMap;
 use tokio::time;
 
@@ -43,7 +42,7 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
     match super::db::alerts::get(&trigger.org, &trigger.stream, &trigger.alert_name).await {
         Ok(result) => {
             if let Some(alert) = result {
-                if TRIGGERS_IN_PROCESS.contains_key(alert_name) {
+                if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
                     let mut curr_time =
                         TRIGGERS_IN_PROCESS.get_mut(&alert_name.to_owned()).unwrap();
                     let delay = trigger.timestamp - curr_time.updated_at;
@@ -70,7 +69,7 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
                 }
             }
         }
-        Err(_) => log::error!("[ALERT MANAGER] Error fectching alert",),
+        Err(_) => log::error!("[ALERT MANAGER] Error fetching alert",),
     }
 }
 
@@ -82,72 +81,67 @@ pub async fn handle_trigger(alert_name: &str, alert: Alert) {
 
     loop {
         interval.tick().await;
-        let curr_ts = Utc::now().timestamp_micros();
-        let trigger = TRIGGERS.get(&alert_name.to_owned()).unwrap();
-        if TRIGGERS_IN_PROCESS.contains_key(alert_name) {
-            let trigger_time = TRIGGERS_IN_PROCESS.get(&alert_name.to_owned()).unwrap();
-            if curr_ts <= trigger_time.expires_at {
-                let mut query = alert.query.clone().unwrap();
-                let curr_ts = Utc::now().timestamp_micros();
-                query.end_time = curr_ts;
-                query.start_time = curr_ts - get_micros_from_min(alert.duration);
-                let req: meta::search::Request = Request {
-                    query,
-                    aggs: HashMap::new(),
-                    encoding: meta::search::RequestEncoding::Empty,
-                };
-                //let time_elpased = curr_ts - trigger.clone().last_sent_at;
+        //let curr_ts = Utc::now().timestamp_micros();
+        let loc_triggers = TRIGGERS.clone();
+        let trigger = loc_triggers.get(&alert_name.to_owned()).unwrap();
+        if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
+            //let proc_triggers = TRIGGERS_IN_PROCESS.clone();
+            //let trigger_time = proc_triggers.get(&alert_name.to_owned()).unwrap();
+            //if curr_ts <= trigger_time.expires_at {
+            let mut query = alert.query.clone().unwrap();
+            let curr_ts = Utc::now().timestamp_micros();
+            query.end_time = curr_ts;
+            query.start_time = curr_ts - get_micros_from_min(alert.duration);
+            let req: meta::search::Request = Request {
+                query,
+                aggs: HashMap::new(),
+                encoding: meta::search::RequestEncoding::Empty,
+            };
+            //let time_elpased = curr_ts - trigger.clone().last_sent_at;
 
-                // do search
-                match SearchService::search(&trigger.org, meta::StreamType::Logs, &req).await {
-                    Ok(res) => {
-                        if !res.hits.is_empty() {
-                            let record = res.hits.first().unwrap().as_object().unwrap();
-                            if alert.condition.clone().evaluate(record.clone()) {
-                                let curr_ts = Utc::now().timestamp_micros();
-                                let mut local_trigger = trigger.clone();
+            // do search
+            match SearchService::search(&trigger.org, meta::StreamType::Logs, &req).await {
+                Ok(res) => {
+                    if !res.hits.is_empty() {
+                        let record = res.hits.first().unwrap().as_object().unwrap();
+                        if alert.condition.clone().evaluate(record.clone()) {
+                            let curr_ts = Utc::now().timestamp_micros();
+                            let mut local_trigger = trigger.clone();
 
-                                if trigger.clone().last_sent_at == 0
-                                    || (trigger.clone().last_sent_at > 0
-                                        && curr_ts - trigger.clone().last_sent_at
-                                            > get_micros_from_min(alert.time_between_alerts))
-                                {
-                                    //Invoke Webhook
-                                    let msg = json!({
-                                        "text":
-                                        format!(
-                                            "For stream {} of organization {} alert {} is active",
-                                            &trigger.stream, &trigger.org, &trigger.alert_name
-                                        )
-                                    });
-                                    let _ = send_notification(&alert.destination, msg).await;
-                                    local_trigger.last_sent_at = curr_ts;
-                                }
-                                //Update trigger for last sent
-
-                                local_trigger.count += 1;
-                                let _ = triggers::save_trigger(
-                                    alert.name.clone(),
-                                    local_trigger.clone(),
-                                )
-                                .await;
+                            if trigger.clone().last_sent_at == 0
+                                || (trigger.clone().last_sent_at > 0
+                                    && curr_ts - trigger.clone().last_sent_at
+                                        > get_micros_from_min(alert.time_between_alerts))
+                            {
+                                let _ =
+                                    send_notification(&alert.destination, &trigger.clone()).await;
+                                local_trigger.last_sent_at = curr_ts;
                             }
-                        }
-                    }
-                    Err(err) => {
-                        log::error!("search error: {:?}", err);
+                            //Update trigger for last sent
+
+                            local_trigger.count += 1;
+                            let _ =
+                                triggers::save_trigger(alert.name.clone(), local_trigger.clone())
+                                    .await;
+                        } /* else {
+                              log::info!(
+                                  "Setting to in-active expired trigger with name {}",
+                                  &alert_name.to_owned()
+                              );
+                              let mut local_trigger = trigger.clone();
+                              local_trigger.is_valid = false;
+                              let _ =
+                                  triggers::save_trigger(alert.name.clone(), local_trigger.clone())
+                                      .await;
+                              break;
+                          } */
                     }
                 }
-            } else {
-                log::info!(
-                    "Setting to in-active expired trigger with name {}",
-                    &alert_name.to_owned()
-                );
-                let mut local_trigger = trigger.clone();
-                local_trigger.is_valid = false;
-                let _ = triggers::save_trigger(alert.name.clone(), local_trigger.clone()).await;
-                break;
+                Err(err) => {
+                    log::error!("search error: {:?}", err);
+                }
             }
+            //}
         }
     }
 }
