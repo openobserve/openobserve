@@ -117,7 +117,7 @@
                     :src="
                       user.picture
                         ? user.picture
-                        : `~@/assets/images/common/profile.svg`
+                        : getImageURL('images/common/profile.svg')
                     "
                   />
                 </q-avatar>
