@@ -84,7 +84,7 @@
         </div>
 
         <!--<q-toggle v-model="formData.isScheduled" :label="t('alerts.isScheduled')" color="input-border" bg-color="input-bg"
-                                                  class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
+                                                        class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
 
         <div
           v-if="formData.isScheduled === 'true'"
@@ -532,6 +532,7 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      this.formData.destination = this.modelValue.destination[0]
     }
 
     streamService
