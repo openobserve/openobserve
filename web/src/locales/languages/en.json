@@ -251,6 +251,7 @@
     "alerts": {
         "header": "Alerts",
         "add": "Add alert",
+        "edit": "Edit",
         "search": "Search alert",
         "name": "Name",
         "function": "Alert Details",
