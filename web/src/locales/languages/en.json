@@ -250,6 +250,7 @@
     },
     "alerts": {
         "header": "Alerts",
+        "preview": "Preview",
         "add": "Add alert",
         "search": "Search alert",
         "name": "Name",
