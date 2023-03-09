@@ -18,10 +18,8 @@ import Home from "../views/HomeView.vue";
 import Tickets from "../views/TicketsView.vue";
 import Users from "../views/User.vue";
 import About from "../views/About.vue";
-import Dashboard from "../views/Dashboard.vue";
-import ViewDashboard from "../views/ViewDashboard.vue";
-import EditPanel from "../views/EditPanel.vue";
-
+import ViewDashboard from "../views/Dashboards/ViewDashboard.vue";
+import AddPanel from "../views/Dashboards/addPanel/AddPanel.vue";
 import LoginCallback from "../views/LoginCallback.vue";
 import MemberSubscription from "../views/MemberSubscription.vue";
 import Search from "../views/Search.vue";
@@ -30,6 +28,7 @@ import Functions from "../views/Functions.vue";
 import Alerts from "../views/Alerts.vue";
 import Ingestion from "../views/Ingestion.vue";
 import Error404 from "../views/Error404.vue";
+import DashboardList from "../views/Dashboards/DashboardList.vue";
 import {
   useLocalUserInfo,
   getDecodedUserInfo,
@@ -109,9 +108,9 @@ export default function (store: any) {
           },
         },
         {
-          path: "dashboard",
-          name: "dashboard",
-          component: Dashboard,
+          path: "dashboardList",
+          name: "dashboardList",
+          component: DashboardList,
           meta: {
             keepAlive: true,
           },
@@ -126,9 +125,9 @@ export default function (store: any) {
           },
         },
         {
-          path: "editPanel",
-          name: "editPanel",
-          component: EditPanel,
+          path: "addPanel",
+          name: "addPanel",
+          component: AddPanel,
           props: true,
           meta: {
             keepAlive: true,

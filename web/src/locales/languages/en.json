@@ -232,7 +232,15 @@
         "typeDesc": "Type Description of Dashboard",
         "createdashboard": "Create a New Dashboard",
         "nameHolder": "Enter Name of New Dashboard",
-        "typeHolder": "Enter Type Description of New Dashboard"
+        "typeHolder": "Enter Type Description of New Dashboard",
+        "identifier": "Identifier",
+        "role": "Role",
+        "description": "Description",
+        "type": "Type",
+        "owner": "Owner",
+        "created": "Created",
+        "actions": "Actions",
+        "nameRequired": "Name is required"
     },
     "panel": {
         "header": "Panel",
@@ -246,7 +254,8 @@
         "createdashboard": "Create a New Panel",
         "nameHolder": "Enter Name of New Panel",
         "typeHolder": "Enter Type Description of New Panel",
-        "editPanel": "Edit Panel"
+        "editPanel": "Edit Panel",
+        "addPanel" : "Add Panel" 
     },
     "alerts": {
         "header": "Alerts",

@@ -1,22 +1,8 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http:www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
--->
-
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none">
+  <!-- add dashboard table -->
     <q-table
       ref="qTable"
       :rows="dashboards"
@@ -28,15 +14,17 @@
       :loading="loading"
       @row-click="onRowClick"
     >
+    <!-- if data not available show nodata component -->
       <template #no-data>
         <NoData />
       </template>
+      <!-- add delete icon in actions column -->
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
             v-if="props.row.actions == 'true'"
             icon="img:/src/assets/images/common/remove_icon.svg"
-            :title="t('organization.invite')"
+            :title="t('dashboard.delete')"
             class="iconHoverBtn"
             padding="sm"
             unelevated
@@ -47,7 +35,7 @@
           ></q-btn>
         </q-td>
       </template>
-
+      <!-- searchBar at top -->
       <template #top="scope">
         <div class="q-table__title">{{ t("dashboard.header") }}</div>
         <q-input
@@ -61,6 +49,7 @@
             <q-icon name="search" />
           </template>
         </q-input>
+        <!-- add dashboard button -->
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
@@ -70,6 +59,7 @@
           @click="addDashboard"
         />
 
+        <!-- table pagination -->
         <QTablePagination
           :scope="scope"
           :pageTitle="t('dashboard.header')"
@@ -92,47 +82,12 @@
         />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showAddDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-update-organization @updated="updateDashboardList" />
-    </q-dialog>
-
-    <q-dialog v-model="showOrgAPIKeyDialog">
-      <q-card>
-        <q-card-section>
-          <div class="text-h6">Organization API Key</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none" wrap>
-          <q-item>
-            <q-item-section>
-              <q-item-label lines="3" style="word-wrap: break-word">{{
-                organizationAPIKey
-              }}</q-item-label>
-            </q-item-section>
-            <q-item-section side>
-              <q-btn
-                unelevated
-                round
-                flat
-                padding="sm"
-                size="sm"
-                icon="content_copy"
-                @click="copyAPIKey"
-                :title="t('organization.copyapikey')"
-              />
-            </q-item-section>
-          </q-item>
-        </q-card-section>
-      </q-card>
+    <q-dialog v-model="showAddDashboardDialog" position="right" full-height maximized>
+    <AddDashboard @updated="updateDashboardList"/>
     </q-dialog>
   </q-page>
 </template>
-  
+
 <script lang="ts">
 // @ts-nocheck
 import { computed, defineComponent, onMounted, ref } from "vue";
@@ -140,19 +95,18 @@ import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import organizationsService from "../services/organizations";
-import dashboardService from "../services/dashboards";
-
-import AddUpdateOrganization from "../components/dashboards/AddUpdateDashboards.vue";
-import QTablePagination from "../components/shared/grid/Pagination.vue";
-import NoData from "../components/shared/grid/NoData.vue";
+import dashboardService from "../../services/dashboards";
+import AddDashboard from "../../components/dashboards/AddDashboard.vue";
+import QTablePagination from "../../components/shared/grid/Pagination.vue";
+import NoData from "../../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
+import { getAllDashboards } from "../../utils/commons";
 
 export default defineComponent({
-  name: "PageOrganization",
+  name: "DashboardList",
   components: {
-    AddUpdateOrganization,
+    AddDashboard,
     QTablePagination,
     NoData,
   },
@@ -160,12 +114,12 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
-    const organization = ref({});
+    const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
-    const showOrgAPIKeyDialog = ref(false);
-    const organizationAPIKey = ref("");
     const qTable: any = ref(null);
     const router = useRouter();
+    const orgData: any = ref(store.state.selectedOrganization);
+
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -176,49 +130,49 @@ export default defineComponent({
       {
         name: "name",
         field: "name",
-        label: t("organization.name"),
+        label: t("dashboard.name"),
         align: "left",
         sortable: true,
       },
       {
         name: "identifier",
         field: "identifier",
-        label: t("organization.identifier"),
+        label: t("dashboard.identifier"),
         align: "left",
         sortable: true,
       },
       {
         name: "role",
         field: "role",
-        label: t("organization.role"),
+        label: t("dashboard.role"),
         align: "left",
         sortable: true,
       },
       {
-        name: "type",
-        field: "type",
-        label: t("organization.type"),
+        name: "description",
+        field: "description",
+        label: t("dashboard.description"),
         align: "left",
         sortable: true,
       },
       {
         name: "owner",
         field: "owner",
-        label: t("organization.owner"),
+        label: t("dashboard.owner"),
         align: "left",
         sortable: true,
       },
       {
         name: "created",
         field: "created",
-        label: t("organization.created"),
+        label: t("dashboard.created"),
         align: "left",
         sortable: true,
       },
       {
         name: "actions",
         field: "actions",
-        label: t("organization.actions"),
+        label: t("dashboard.actions"),
         align: "center",
       },
     ]);
@@ -240,7 +194,7 @@ export default defineComponent({
     onMounted(() => {
       getDashboards();
     });
-
+   
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -254,7 +208,7 @@ export default defineComponent({
       showAddDashboardDialog.value = true;
     };
     const routeToViewD = (row) => {
-      //return router.push( '/viewDashboard' )
+      console.log("row");
       return router.push({
         path: "/viewDashboard",
         query: { dashboard: row.identifier },
@@ -265,29 +219,29 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-
       await dashboardService
-        .list(store.state.selectedOrganization.identifier)
+        .list(0, 1000, "name", false, "",store.state.selectedOrganization.identifier)
         .then((res) => {
-          store.dispatch("setAllCurrentDashboards", res.data.list);
+          resultTotal.value = res.data.list.length;
+            console.log(res);
+          store.dispatch("setAllDashboardList", res.data.list);
+
+          dismiss()
         })
         .catch((error) => {
           console.log(error);
         });
     };
     const dashboards = computed(function () {
-      const dashboardList = toRaw(store.state.allCurrentDashboards);
-      return dashboardList.map((data: any) => {
+      const dashboardList = toRaw(store.state.allDashboardList);
+      return dashboardList.map((data: any, index) => {
         const jsonDataOBj = JSON.parse(data.details);
         return {
-          "#":
-            data.id <= 9
-              ? `0${jsonDataOBj.dashboardID}`
-              : jsonDataOBj.dashboardID,
+          "#": index < 9 ? `0${index + 1}` : index + 1,
           id: jsonDataOBj.dashboardId,
           name: jsonDataOBj.title,
           identifier: jsonDataOBj.dashboardId,
-          type: jsonDataOBj.description,
+          description: jsonDataOBj.description,
           owner: jsonDataOBj.owner,
           created: date.formatDate(jsonDataOBj.created, "YYYY-MM-DDTHH:mm:ssZ"),
           role: jsonDataOBj.role,
@@ -295,29 +249,19 @@ export default defineComponent({
         };
       });
     });
-    const onAddTeam = (props: any) => {
-      console.log(props);
-    };
-    const inviteTeam = (props: any) => {
-      organization.value = {
-        id: props.row.id,
-        name: props.row.name,
-        role: props.row.role,
-        member_lists: [],
-      };
-    };
+   
     const removeDashboard = async (props: any) => {
       const dashboardId = props.key;
       await dashboardService
         .delete(store.state.selectedOrganization.identifier, dashboardId)
         .then((res) => {
           const dashboardList = JSON.parse(
-            JSON.stringify(toRaw(store.state.allCurrentDashboards))
+            JSON.stringify(toRaw(store.state.allDashboardList))
           );
           const newDashboardList = dashboardList.filter(
             (dashboard) => dashboard.name != dashboardId
           );
-          store.dispatch("setAllCurrentDashboards", newDashboardList);
+          store.dispatch("setAllDashboardList", newDashboardList);
           $q.notify({
             type: "positive",
             message: "Dashboard deleted successfully.",
@@ -332,16 +276,15 @@ export default defineComponent({
     return {
       t,
       qTable,
+      store,
+      orgData,
+      router,
       loading: ref(false),
       dashboards,
-      organization,
+      dashboard,
       columns,
       showAddDashboardDialog,
-      showOrgAPIKeyDialog,
-      organizationAPIKey,
       addDashboard,
-      inviteTeam,
-      onAddTeam,
       pagination,
       resultTotal,
       perPageOptions,
@@ -366,6 +309,7 @@ export default defineComponent({
     };
   },
   methods: {
+    //after adding dashboard need to update the dashboard list
     updateDashboardList() {
       this.showAddDashboardDialog = false;
       this.getDashboards();
@@ -378,48 +322,27 @@ export default defineComponent({
     onRowClick(evt, row) {
       this.routeToViewD(row);
     },
-    getAPIKey(org_identifier: string) {
-      const dismiss: any = this.$q.notify({
-        message: "Wait while processing your request...",
-      });
-      this.organizationAPIKey = "";
-      organizationsService
-        .get_organization_passcode(org_identifier)
-        .then((res) => {
-          dismiss();
-          if (res.data.data.token == "") {
-            this.$q.notify({
-              type: "negative",
-              message: "API Key not found.",
-              timeout: 5000,
-            });
-          } else {
-            this.showOrgAPIKeyDialog = true;
-            this.organizationAPIKey = res.data.data.token;
-          }
-        });
-    },
-    copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey)
-        .then(() => {
-          this.$q.notify({
-            type: "positive",
-            message: "API Key Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          this.$q.notify({
-            type: "negative",
-            message: "Error while copy API Key.",
-            timeout: 5000,
-          });
-        });
-    },
+    
   },
+  computed:{
+     selectedOrg() {
+      return this.store.state.selectedOrganization.identifier
+    }
+  },
+  watch:{
+    selectedOrg(newVal: any, oldVal: any) {
+    
+      this.orgData.identifier = newVal;
+      if ((newVal != oldVal || this.dashboards.value == undefined) && this.router.currentRoute.value.name == "dashboardList") {
+        console.log("inside if");
+        
+        this.getDashboards(this.store.state.selectedOrganization.id);
+      }
+    }
+  }
 });
 </script>
-  
+
 <style lang="scss" scoped>
 .q-table {
   &__top {
@@ -428,4 +351,3 @@ export default defineComponent({
   }
 }
 </style>
-  

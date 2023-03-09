@@ -20,7 +20,7 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 
-import { defineComponent, onMounted, ref, onUpdated } from "vue";
+import { defineComponent, onMounted, ref, onUpdated, nextTick } from "vue";
 
 export default defineComponent({
   name: "ReactiveChart",
@@ -34,6 +34,7 @@ export default defineComponent({
       y: [],
       unparsed_x: [],
       name: "barchart",
+      // showlegend: true,
       type: "bar",
       marker: {
         color: "#5960b2",
@@ -51,37 +52,45 @@ export default defineComponent({
       font: { size: 12 },
       autosize: true,
       legend: {
-        bgcolor: "red",
-      },
-      margin: {
-        l: 32,
-        r: 16,
-        t: 38,
-        b: 32,
+        bgcolor: "#f7f7f7",
       },
       xaxis: {
-        ticklen: 5,
-        nticks: 15,
+        tickangle: -20,
+        automargin: true
       },
+      yaxis:{
+        automargin: true,
+      }
     };
 
-    onMounted(async () => {
+    onMounted(async () => { 
+      await nextTick()   
       await Plotly.newPlot(plotref.value, [trace], layout, {
         responsive: true,
         displaylogo: false,
-        displayModeBar: false,
+        displayModeBar: true
       });
     });
 
     onUpdated(async () => {
-      if (props.data) {
+      if (props.data){
         chartID.value = "chart_" + props.data.id;
         reDraw(props.data.x, props.data.y, props.data.chartParams);
       }
     });
 
+    // wrap the text for long x axis names
+    const addBreaksAtLength = 12
+    const textwrapper = function(traces) {
+      traces = traces.map(text => {
+        let rxp = new RegExp(".{1," + addBreaksAtLength + "}", "g");
+        return text.match(rxp).join("<br>");
+      });
+	    return traces;
+    };
+
     onUpdated(async () => {
-      if (props.data) {
+      if (props.data){
         chartID.value = "chart_" + props.data.id;
         reDraw(props.data.x, props.data.y, props.data.chartParams);
       }
@@ -91,7 +100,7 @@ export default defineComponent({
       y: any,
       params: { title: any; unparsed_x_data: any }
     ) => {
-      trace.x = x;
+      trace.x = textwrapper(x);
       trace.y = y;
       // layout.title.text = params.title;
       trace.unparsed_x = params.unparsed_x_data;
@@ -99,42 +108,16 @@ export default defineComponent({
       forceReLayout();
     };
     // created force relayout function to avoid infinite loop
-    const forceReLayout = (flag = true) => {
+    const forceReLayout = async (flag = true) => {
       zoomFlag.value = flag;
       const update: any = {
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
+      await nextTick()
       Plotly.relayout(plotref.value, update);
     };
 
-    const onPlotZoom = () => {
-      if (
-        plotref.value.layout.xaxis.range.length == 2 &&
-        zoomFlag.value == false
-      ) {
-        const start = Math.round(plotref.value.layout.xaxis.range[0]);
-        const end = Math.round(plotref.value.layout.xaxis.range[1]);
-
-        if (
-          start >= 0 &&
-          end >= 0 &&
-          trace.unparsed_x[start] != undefined &&
-          trace.unparsed_x[end] != undefined
-        ) {
-          zoomFlag.value = true;
-          let start_d = new Date(Date.parse(trace.unparsed_x[start] + "Z"));
-          let end_d = new Date(Date.parse(trace.unparsed_x[end] + "Z"));
-
-          emit("updated:chart", {
-            start: start_d.toLocaleString("sv-SE"),
-            end: end_d.toLocaleString("sv-SE"),
-          });
-        }
-      } else {
-        zoomFlag.value = false;
-      }
-    };
 
     return {
       plotref,
