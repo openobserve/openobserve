@@ -229,7 +229,15 @@
     "typeDesc": "仪表板的类型描述",
     "createdashboard": "创建新仪表板",
     "nameHolder": "输入新仪表板的名称",
-    "typeHolder": "输入新仪表板的类型描述"
+    "typeHolder": "输入新仪表板的类型描述",
+    "invite": "Invite Teammate",
+    "identifier": "Identifier",
+    "role": "Role",
+    "description": "Description",
+    "owner": "Owner",
+    "created": "Created",
+    "actions": "Actions",
+    "nameRequired": "Name is required"
   },
   "panel": {
     "header": "小组",

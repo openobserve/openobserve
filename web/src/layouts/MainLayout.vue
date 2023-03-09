@@ -285,6 +285,11 @@ export default defineComponent({
         target: "_blank",
         external: true,
       },
+      {
+        title: t("menu.dashboard"),
+        icon: "img:/src/assets/images/left_nav/dashb2.svg",
+        link: "/dashboardList",
+      },
     ]);
 
     const getConfig = async () => {
