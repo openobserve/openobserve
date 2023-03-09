@@ -19,7 +19,7 @@ import vue from "@vitejs/plugin-vue";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
-import path from 'path'
+import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -44,7 +44,7 @@ export default defineConfig({
   server: {
     port: 8081,
   },
-  base: "/",
+  base: "./",
   plugins: [
     vue({
       template: { transformAssetUrls },

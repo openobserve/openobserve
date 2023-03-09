@@ -60,6 +60,9 @@ export default createStore({
       state.loggedIn = false;
       state.userInfo = {};
     },
+    endpoint(state, payload) {
+      state.API_ENDPOINT = payload;
+    },
     setUserInfo(state, payload) {
       state.userInfo = payload;
     },
@@ -94,14 +97,14 @@ export default createStore({
       state.streamFields = payload;
     },
     setCurrentPanelsData(state, payload) {
-      state.currentPanelsData = payload
+      state.currentPanelsData = payload;
     },
     setQuotaThresholdMsg(state, payload) {
       state.quotaThresholdMsg = payload;
     },
     setConfig(state, payload) {
-      state.zoConfig = payload
-    }
+      state.zoConfig = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -132,10 +135,10 @@ export default createStore({
       context.commit("setOrganizationPasscode", payload);
     },
     setAllCurrentDashboards(context, payload) {
-      context.commit('setAllCurrentDashboards', payload);
+      context.commit("setAllCurrentDashboards", payload);
     },
     setCurrentSelectedDashboard(context, payload) {
-      context.commit('setCurrentSelectedDashboard', payload);
+      context.commit("setCurrentSelectedDashboard", payload);
     },
     setSearch(context, payload) {
       context.commit("setSearch", payload);
@@ -144,14 +147,14 @@ export default createStore({
       context.commit("setStreamFields", payload);
     },
     setCurrentPanelsData(context, payload) {
-      context.commit('setCurrentPanelsData', payload);
+      context.commit("setCurrentPanelsData", payload);
     },
     setQuotaThresholdMsg(context, payload) {
-      context.commit('setQuotaThresholdMsg', payload);
+      context.commit("setQuotaThresholdMsg", payload);
     },
     setConfig(context, payload) {
-      context.commit('setConfig', payload);
-    }
+      context.commit("setConfig", payload);
+    },
   },
   modules: {},
 });

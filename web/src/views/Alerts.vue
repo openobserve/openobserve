@@ -45,7 +45,7 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-              icon="img:/src/assets/images/common/delete_icon.svg"
+              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
               unelevated
@@ -144,6 +144,7 @@ import NoData from "../components/shared/grid/NoData.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import segment from "../services/segment_analytics";
 import config from "../aws-exports";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -419,6 +420,7 @@ export default defineComponent({
         }
         return filtered;
       },
+      getImageURL,
     };
   },
   computed: {

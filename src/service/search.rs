@@ -360,7 +360,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip);
-                let response = match client.search(request).await {
+                let response: cluster_rpc::SearchResponse = match client.search(request).await {
                     Ok(response) => response.into_inner(),
                     Err(error) => {
                         return Err(anyhow::anyhow!(

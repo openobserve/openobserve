@@ -23,14 +23,23 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat icon="img:/src/assets/images/common/close_icon.svg" />
+          <q-btn
+            v-close-popup
+            round
+            flat
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <q-card-section>
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
-        <div v-if="indexData.schema.length == 0" class="q-pt-md text-center q-w-md q-mx-lg" style="max-width: 450px">
+        <div
+          v-if="indexData.schema.length == 0"
+          class="q-pt-md text-center q-w-md q-mx-lg"
+          style="max-width: 450px"
+        >
           No data available.
         </div>
         <div v-else class="indexDetailsContainer">
@@ -82,17 +91,22 @@
 
           <q-separator class="q-mt-xl q-mb-lg" />
 
-          <div class="title">{{ t("logStream.mapping") }} <label v-show="indexData.defaultFts" class="warning-msg"
-              style="font-weight:normal">- Using
-              default fts keys , as no fts
-              keys
-              are
-              set for
-              stream.</label> </div>
-
+          <div class="title">
+            {{ t("logStream.mapping") }}
+            <label
+              v-show="indexData.defaultFts"
+              class="warning-msg"
+              style="font-weight: normal"
+              >- Using default fts keys , as no fts keys are set for
+              stream.</label
+            >
+          </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div class="q-table__container q-table--cell-separator" style="height: calc(100vh - 460px); overflow: auto">
+          <div
+            class="q-table__container q-table--cell-separator"
+            style="height: calc(100vh - 460px); overflow: auto"
+          >
             <table class="q-table">
               <thead>
                 <tr>
@@ -103,7 +117,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(schema, index) in indexData.schema" :key="index + '_' + schema.name" class="list-item">
+                <tr
+                  v-for="(schema, index) in indexData.schema"
+                  :key="index + '_' + schema.name"
+                  class="list-item"
+                >
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
                   <td class="text-center">
@@ -111,7 +129,8 @@
                   </td>
                   <td class="text-center">
                     <q-checkbox v-model="schema.partitionKey" size="sm">
-                      {{ schema.level }}</q-checkbox>
+                      {{ schema.level }}</q-checkbox
+                    >
                   </td>
                 </tr>
               </tbody>
@@ -119,11 +138,27 @@
           </div>
         </div>
 
-        <div v-if="indexData.schema.length > 0" class="flex justify-center q-mt-sm">
-          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('logStream.cancel')" text-color="light-text"
-            padding="sm md" color="accent" no-caps />
-          <q-btn :label="t('logStream.updateSettings')" class="q-mb-md text-bold no-border q-ml-md" color="secondary"
-            padding="sm xl" type="submit" no-caps />
+        <div
+          v-if="indexData.schema.length > 0"
+          class="flex justify-center q-mt-sm"
+        >
+          <q-btn
+            v-close-popup
+            class="q-mb-md text-bold no-border"
+            :label="t('logStream.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+          />
+          <q-btn
+            :label="t('logStream.updateSettings')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </q-card-section>
@@ -141,6 +176,7 @@ import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
+import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -201,8 +237,11 @@ export default defineComponent({
           for (var property of res.data.schema) {
             if (
               (res.data.settings.full_text_search_keys.length > 0 &&
-                res.data.settings.full_text_search_keys.includes(property.name)) || (res.data.settings.full_text_search_keys.length == 0 &&
-                  store.state.zoConfig.default_fts_keys.includes(property.name))
+                res.data.settings.full_text_search_keys.includes(
+                  property.name
+                )) ||
+              (res.data.settings.full_text_search_keys.length == 0 &&
+                store.state.zoConfig.default_fts_keys.includes(property.name))
             ) {
               property.ftsKey = true;
             } else {
@@ -276,7 +315,16 @@ export default defineComponent({
         });
     };
 
-    return { t, q, indexData, getSchema, onSubmit, updateSettingsForm, format };
+    return {
+      t,
+      q,
+      indexData,
+      getSchema,
+      onSubmit,
+      updateSettingsForm,
+      format,
+      getImageURL,
+    };
   },
   created() {
     if (this.modelValue && this.modelValue.name) {

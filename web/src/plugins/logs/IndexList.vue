@@ -69,7 +69,9 @@
                 </div>
                 <div class="field_icons">
                   <q-icon
-                    name="img:/src/assets/images/common/search_icon.svg"
+                    :name="
+                      'img:' + getImageURL('images/common/search_icon.svg')
+                    "
                     style="margin-right: 0.375rem"
                     size="1rem"
                     @click="addToFilter(props.row.name)"
@@ -80,7 +82,7 @@
                         props.row.name
                       )
                     "
-                    name="img:/src/assets/images/common/add_icon.svg"
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
                     size="1rem"
                     @click="clickFieldFn(props.row, props.pageIndex)"
                   />
@@ -90,7 +92,9 @@
                         props.row.name
                       )
                     "
-                    name="img:/src/assets/images/common/remove_icon.svg"
+                    :name="
+                      'img:' + getImageURL('images/common/remove_icon.svg')
+                    "
                     size="1rem"
                     @click="clickFieldFn(props.row, props.pageIndex)"
                   />
@@ -127,6 +131,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -173,6 +178,7 @@ export default defineComponent({
       filterFieldFn,
       addToFilter,
       clickFieldFn,
+      getImageURL,
     };
   },
 });

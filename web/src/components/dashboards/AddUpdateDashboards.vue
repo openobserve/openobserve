@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
           />
         </div>
       </div>
@@ -101,6 +101,7 @@ import dashboardService from "../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { isProxy, toRaw } from "vue";
+import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue = () => {
   return {
@@ -144,6 +145,7 @@ export default defineComponent({
       store,
       getRandInteger,
       isValidIdentifier,
+      getImageURL,
     };
   },
   created() {

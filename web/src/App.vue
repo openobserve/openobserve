@@ -18,14 +18,24 @@
 </template>
 
 <script lang="ts">
-//import { useStore } from "vuex";
+import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 export default {
   setup() {
+    const store = useStore();
+    if (window.location.origin != "http://localhost:8081") {
+      let endpoint = window.location.origin + window.location.pathname;
+      let pos = window.location.pathname.indexOf("/web/");
+      if (pos > -1) {
+        endpoint =
+          window.location.origin + window.location.pathname.slice(0, pos);
+      }
+      store.dispatch("endpoint", endpoint);
+    }
     const router = useRouter();
     const creds = localStorage.getItem("creds");
     if (creds) {
-      const credsInfo = JSON.parse(creds);
+      // const credsInfo = JSON.parse(creds);
       // store.dispatch("login", credsInfo);
       router.push("/logs");
     }
