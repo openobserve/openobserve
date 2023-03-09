@@ -266,6 +266,8 @@
         "stream_name": "Stream Name",
         "actions": "Actions",
         "cancel": "Cancel",
+        "slack": "Slack",
+        "prom_am": "Alert manager",
         "addTitle": "Add Alert",
         "updateTitle": "Update Alert",
         "delete": "Delete"

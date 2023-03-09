@@ -189,7 +189,7 @@ pub async fn get_alert(
 
 #[cfg(test)]
 mod test {
-    use crate::meta::alert::{AllOperator, Condition};
+    use crate::meta::alert::{AlertDestType, AlertDestination, AllOperator, Condition};
 
     use super::*;
 
@@ -217,7 +217,10 @@ mod test {
             duration: 1,
             frequency: 1,
             time_between_alerts: 10,
-            destination: "dummy".to_string(),
+            destination: vec![AlertDestination {
+                url: "dummy".to_string(),
+                dest_type: AlertDestType::Slack,
+            }],
             is_real_time: false,
         };
         let res = save_alert(

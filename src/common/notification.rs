@@ -14,33 +14,106 @@
 
 use std::error::Error as StdError;
 
+use serde_json::json;
+
+use crate::meta::alert::{self, AlertDestination};
+
 pub async fn send_notification(
-    url: &str,
-    payload: serde_json::Value,
+    alert_destinations: &Vec<AlertDestination>,
+    trigger: &alert::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
     let client = reqwest::Client::new();
-    match url::Url::parse(url) {
-        Ok(dest_url) => {
-            let req = client
-                .post(dest_url)
-                .header("Content-type", "application/json")
-                .json(&payload);
 
-            let _ = req.send().await.unwrap();
+    let alert_type = match &trigger.is_ingest_time {
+        true => "Real time",
+        false => "Scheduled",
+    };
+
+    for dest in alert_destinations {
+        let msg = json!({
+            "text":
+                format!(
+                    "For stream {} of organization {} alert {} of type {} is active",
+                    &trigger.stream, &trigger.org, &trigger.alert_name, alert_type
+                )
+        });
+
+        match dest.dest_type {
+            alert::AlertDestType::Slack => match url::Url::parse(&dest.url) {
+                Ok(dest_url) => {
+                    //Invoke Webhook
+
+                    let req = client
+                        .post(dest_url)
+                        .header("Content-type", "application/json")
+                        .json(&msg);
+
+                    let _ = req.send().await.unwrap();
+                }
+                Err(_) => log::info!("Error parsing notification url"),
+            },
+            alert::AlertDestType::AlertManager => match url::Url::parse(&dest.url) {
+                Ok(dest_url) => {
+                    let curr_ts = chrono::Utc::now().timestamp_micros();
+                    let prom_alert = serde_json::json!([{
+                      "labels": {
+                        "alertname": &trigger.alert_name,
+                        "stream": &trigger.stream,
+                        "organization": &trigger.org,
+                        "alerttype":alert_type,
+                        "severity":"critical"
+                        },
+                      "annotations": {
+                        "message": &msg,
+                        "timestamp": curr_ts
+                      }
+                    }]);
+
+                    let req = client
+                        .post(dest_url)
+                        .header("Content-type", "application/json")
+                        .json(&prom_alert);
+
+                    let resp = req.send().await;
+                    match resp {
+                        Ok(_) => log::info!("Notification Sent"),
+                        Err(err) => log::info!("Error sending data to alert manager {:?}", err),
+                    }
+                }
+                Err(_) => log::info!("Error parsing notification url"),
+            },
         }
-        Err(_) => log::info!("Error parsing notification url"),
     }
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::meta::alert::{AlertDestType, Trigger};
+
     use super::*;
-    use serde_json::json;
+
     #[actix_web::test]
     async fn test_send_notification() {
-        let obj = json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}});
-        let res = send_notification("https://httpbin.org/post", obj).await;
+        let obj: Trigger = Trigger {
+            timestamp: chrono::Utc::now().timestamp_micros(),
+            is_valid: true,
+            alert_name: "Test Alert".to_string(),
+            stream: "olympics".to_string(),
+            org: "default".to_string(),
+            last_sent_at: chrono::Utc::now().timestamp_micros(),
+            count: 1,
+            is_ingest_time: true,
+        };
+        let res = send_notification(
+            &vec![AlertDestination {
+                url: "https://httpbin.org/post".to_string(),
+                dest_type: AlertDestType::Slack,
+            }],
+            &obj,
+        )
+        .await;
         assert!(res.is_ok());
     }
 }

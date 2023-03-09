@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use chrono::Utc;
-use serde_json::json;
 use std::collections::HashMap;
 use tokio::time;
 
@@ -112,15 +111,8 @@ pub async fn handle_trigger(alert_name: &str, alert: Alert) {
                                         && curr_ts - trigger.clone().last_sent_at
                                             > get_micros_from_min(alert.time_between_alerts))
                                 {
-                                    //Invoke Webhook
-                                    let msg = json!({
-                                        "text":
-                                        format!(
-                                            "For stream {} of organization {} alert {} is active",
-                                            &trigger.stream, &trigger.org, &trigger.alert_name
-                                        )
-                                    });
-                                    let _ = send_notification(&alert.destination, msg).await;
+                                    let _ = send_notification(&alert.destination, &trigger.clone())
+                                        .await;
                                     local_trigger.last_sent_at = curr_ts;
                                 }
                                 //Update trigger for last sent

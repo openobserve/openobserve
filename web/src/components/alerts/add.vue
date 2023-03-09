@@ -27,235 +27,106 @@
     <q-separator />
     <div>
       <q-form ref="addAlertForm" @submit="onSubmit">
-        <q-input
-          v-model="formData.name"
-          :label="t('alerts.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          tabindex="0"
-        />
+        <q-input v-model="formData.name" :label="t('alerts.name')" color="input-border" bg-color="input-bg"
+          class="q-py-sm showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
+        v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
 
-        <q-select
-          v-model="formData.stream_name"
-          :options="indexOptions"
-          :label="t('alerts.stream_name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop no-case"
-          stack-label
-          outlined
-          filled
-          dense
-          @update:model-value="updateAlert(formData.stream_name)"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-        />
+        <q-select v-model="formData.stream_name" :options="indexOptions" :label="t('alerts.stream_name')"
+          color="input-border" bg-color="input-bg" class="q-py-sm showLabelOnTop no-case" stack-label outlined filled
+          dense @update:model-value="updateAlert(formData.stream_name)"
+          :rules="[(val: any) => !!val || 'Field is required!']" />
 
         <div class="q-gutter-sm">
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.isScheduled"
-            :checked="formData.isScheduled"
-            val="true"
-            :label="t('alerts.scheduled')"
-          />
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.isScheduled"
-            :checked="!formData.isScheduled"
-            val="false"
-            :label="t('alerts.realTime')"
-          />
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.isScheduled"
+            :checked="formData.isScheduled" val="true" :label="t('alerts.scheduled')" />
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.isScheduled"
+            :checked="!formData.isScheduled" val="false" :label="t('alerts.realTime')" />
         </div>
 
         <!--<q-toggle v-model="formData.isScheduled" :label="t('alerts.isScheduled')" color="input-border" bg-color="input-bg"
-            class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
+                                                  class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
 
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7">
           {{ t("alerts.sql") }}:
         </div>
-        <div
-          v-show="formData.isScheduled === 'true'"
-          ref="editorRef"
-          id="editor"
-          :label="t('alerts.sql')"
-          stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px"
-          @keyup="editorUpdate"
-          @focusout="updateCondtions"
-          class="q-py-sm showLabelOnTop"
-          resize
-          :rules="[(val: any) => !!val || 'Field is required!']"
-        ></div>
+        <div v-show="formData.isScheduled === 'true'" ref="editorRef" id="editor" :label="t('alerts.sql')" stack-label
+          style="border: 1px solid #dbdbdb; border-radius: 5px" @keyup="editorUpdate" @focusout="updateCondtions"
+          class="q-py-sm showLabelOnTop" resize :rules="[(val: any) => !!val || 'Field is required!']"></div>
 
         <div class="q-py-sm showLabelOnTop text-bold text-h7">
           {{ t("alerts.condition") }}:
         </div>
         <div class="col-8 row justify-left align-center q-gutter-sm">
           <div class="" style="minwidth: 100px">
-            <q-select
-              v-model="formData.condition.column"
-              :options="triggerCols"
-              dense
-              filled
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-select>
+            <q-select v-model="formData.condition.column" :options="triggerCols" dense filled
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select
-              v-model="formData.condition.operator"
-              :options="triggerOperators"
-              dense
-              filled
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-select>
+            <q-select v-model="formData.condition.operator" :options="triggerOperators" dense filled
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
           </div>
           <div class="" style="width: 80px">
-            <q-input
-              v-model="formData.condition.value"
-              dense
-              filled
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-input>
+            <q-input v-model="formData.condition.value" dense filled
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
           </div>
         </div>
 
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7">
           {{ t("alerts.duration") }}:
         </div>
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="col-8 row justify-left align-center q-gutter-sm"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="col-8 row justify-left align-center q-gutter-sm">
           <div class="" style="width: 80px">
-            <q-input
-              v-model="formData.duration.value"
-              type="number"
-              dense
-              filled
-              min="0"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-input>
+            <q-input v-model="formData.duration.value" type="number" dense filled min="0"
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select
-              v-model="formData.duration.unit"
-              :options="relativePeriods"
-              dense
-              filled
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-select>
+            <q-select v-model="formData.duration.unit" :options="relativePeriods" dense filled
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
           </div>
         </div>
 
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7">
           {{ t("alerts.interval") }}:
         </div>
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="col-8 row justify-left align-center q-gutter-sm"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="col-8 row justify-left align-center q-gutter-sm">
           <div class="" style="width: 80px">
-            <q-input
-              v-model="formData.frequency.value"
-              type="number"
-              dense
-              filled
-              min="0"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-input>
+            <q-input v-model="formData.frequency.value" type="number" dense filled min="0"
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select
-              v-model="formData.frequency.unit"
-              :options="relativePeriods"
-              dense
-              filled
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            ></q-select>
+            <q-select v-model="formData.frequency.unit" :options="relativePeriods" dense filled
+              :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
           </div>
         </div>
 
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7">
           {{ t("alerts.delayNotificationUntil") }}:
         </div>
-        <div
-          v-if="formData.isScheduled === 'true'"
-          class="col-8 row justify-left align-center q-gutter-sm"
-        >
+        <div v-if="formData.isScheduled === 'true'" class="col-8 row justify-left align-center q-gutter-sm">
           <div class="" style="width: 80px">
-            <q-input
-              v-model="formData.time_between_alerts.value"
-              type="number"
-              dense
-              filled
-              min="0"
-            ></q-input>
+            <q-input v-model="formData.time_between_alerts.value" type="number" dense filled min="0"></q-input>
           </div>
           <div class="" style="minwidth: 100px">
-            <q-select
-              v-model="formData.time_between_alerts.unit"
-              :options="relativePeriods"
-              dense
-              filled
-            ></q-select>
+            <q-select v-model="formData.time_between_alerts.unit" :options="relativePeriods" dense filled></q-select>
           </div>
         </div>
 
-        <q-input
-          v-model="formData.destination"
-          :label="t('alerts.destination')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          tabindex="0"
-        />
+        <div class="q-gutter-sm">
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.destination.type"
+            :checked="formData.destination.type == 'slack'" val="slack" :label="t('alerts.slack')" />
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.destination.type"
+            :checked="formData.destination.type == 'alertmanager'" val="alertmanager" :label="t('alerts.prom_am')" />
+        </div>
+
+        <q-input v-model="formData.destination.url" :label="t('alerts.destination')" color="input-border"
+          bg-color="input-bg" class="q-py-sm showLabelOnTop" stack-label outlined filled dense
+          :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup
-            class="q-mb-md text-bold no-border"
-            :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            :label="t('alerts.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('alerts.cancel')" text-color="light-text"
+            padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
+          <q-btn :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+            type="submit" no-caps />
         </div>
       </q-form>
     </div>
@@ -297,7 +168,10 @@ const defaultValue: any = () => {
       value: 0,
       unit: "",
     },
-    destination: "",
+    destination: {
+      url: "",
+      type: "slack"
+    },
   };
 };
 
@@ -532,7 +406,7 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: this.formData.destination,
+            destination: [this.formData.destination],
           };
         } else {
           submitData = {
@@ -550,7 +424,7 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: this.formData.destination,
+            destination: [this.formData.destination],
           };
         }
 
