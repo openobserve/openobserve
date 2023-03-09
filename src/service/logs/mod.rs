@@ -18,7 +18,6 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-use serde_json::json;
 use serde_json::{Map, Value};
 
 use super::triggers;
@@ -416,14 +415,7 @@ struct StreamMeta {
 }
 
 pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
-    let msg = json!({
-        "text":
-            format!(
-                "For stream {} of organization {} alert {} is active",
-                &trigger.stream, &trigger.org, &trigger.alert_name
-            )
-    });
-    let _ = send_notification(&alert.destination, msg).await;
+    let _ = send_notification(&alert.destination, &trigger.clone()).await;
     trigger.last_sent_at = Utc::now().timestamp_micros();
     trigger.count += 1;
     let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
