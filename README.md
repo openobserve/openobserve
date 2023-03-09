@@ -72,7 +72,7 @@ You can also try ZincObserve without installing it in under 2 minutes by trying 
 
 - #### How to develop and contribute to ZincObserve
 
-  Check the [contributing guide](./CONTRIBUTING.md)
+  Check the [contributing guide](./CONTRIBUTING.md) . Also check the [roadmap items](https://github.com/orgs/zinclabs/projects/7)
 
 - #### Join our Slack Channel
 
