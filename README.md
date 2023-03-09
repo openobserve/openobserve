@@ -42,15 +42,6 @@ You can install ZincObserve in under 2 minutes by following the [quickstart](htt
 
 You can also try ZincObserve without installing it in under 2 minutes by trying out ZincObserve Cloud  at [https://observe.zinc.dev](https://observe.zinc.dev)
 
-
-# How to get support
-
-Easiest way to get support is to join the [Slack channel](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg).
-
-# How to develop & contribute to Zinc
-
-Check the [contributing guide](./CONTRIBUTING.md)
-
 # Screenshots
 
 ## Home
@@ -75,3 +66,20 @@ Check the [contributing guide](./CONTRIBUTING.md)
 ## Ingestion
 
 ![Home](./screenshots/zo_ingestion.png)
+
+
+# Community
+
+- #### How to develop and contribute to ZincObserve
+
+  Check the [contributing guide](./CONTRIBUTING.md) . Also check the [roadmap items](https://github.com/orgs/zinclabs/projects/7)
+
+- #### Join our Slack Channel
+
+  [![Slack](./screenshots/slack.png)](https://join.slack.com/t/zinc-nvh4832/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg)
+
+  Easiest way to get support is to join the [Slack channel](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg).
+
+- #### Join our weChat Group
+
+  <img src="./screenshots/wechat_qr.jpg" width="300">
