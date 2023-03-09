@@ -5331,6 +5331,7 @@ dependencies = [
  "awc",
  "aws-config",
  "aws-sdk-s3",
+ "base64 0.21.0",
  "bytes",
  "chrono",
  "clap",

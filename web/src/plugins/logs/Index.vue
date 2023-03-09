@@ -58,10 +58,9 @@
                 Result not found.
                 <div v-html="searchObj.data.errorMsg"></div>
                 <div
-                  :v-show="
-                    searchObj.data.errorMsg.indexOf(
-                      'No fullNo full text search field found'
-                    )
+                  v-show="
+                    searchObj.data.errorMsg ==
+                    'No full text search field found.'
                   "
                 >
                   <q-btn
@@ -69,7 +68,7 @@
                     unelevated
                     size="sm"
                     bg-secondary
-                    class="no-border"
+                    class="no-border bg-secondary text-white"
                     :to="
                       '/logstreams?dialog=' +
                       searchObj.data.stream.selectedStream.label
@@ -149,7 +148,7 @@ import { Parser } from "node-sql-parser";
 import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import { useLocalLogsObj } from "../../utils/zincutils";
+import { useLocalLogsObj, b64EncodeUnicode } from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
 
@@ -469,6 +468,7 @@ export default defineComponent({
             histogram:
               "select histogram(_timestamp, '[INTERVAL]') AS key, count(*) AS num from query GROUP BY key ORDER BY key",
           },
+          encoding: "base64",
         };
 
         var timestamps: any = getConsumableDateTime();
@@ -621,6 +621,9 @@ export default defineComponent({
         if (searchObj.data.resultGrid.currentPage > 0) {
           delete req.aggs;
         }
+
+        req.query.sql = b64EncodeUnicode(req.query.sql);
+        req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
 
         return req;
       } catch (e) {

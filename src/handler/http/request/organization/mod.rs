@@ -41,7 +41,7 @@ struct User {
     email: String,
 }
 
-#[derive(Serialize, Clone, Eq)]
+#[derive(Serialize, Clone)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
@@ -53,15 +53,6 @@ struct OrganizationDetails {
     org_type: String,
     #[serde(rename = "UserObj")]
     user_obj: User,
-}
-
-impl PartialEq for OrganizationDetails {
-    fn eq(&self, other: &Self) -> bool {
-        self.identifier.eq(&other.identifier)
-            && self.name.eq(&other.name)
-            && self.user_email.eq(&other.user_email)
-            && self.org_type.eq(&other.org_type)
-    }
 }
 
 #[derive(Serialize)]
