@@ -53,11 +53,33 @@ pub async fn is_root_user(user_id: &str) -> bool {
 
 #[cfg(test)]
 mod test_utils {
+    use crate::{meta::user::UserRequest, service::users};
+
     use super::*;
+
     #[actix_web::test]
     async fn test_is_root_user() {
         let res = is_root_user("dummy").await;
         assert_eq!(res, false)
+    }
+
+    #[actix_web::test]
+    async fn test_is_root_user2() {
+        let _ = users::post_user(
+            DEFAULT_ORG,
+            UserRequest {
+                email: "root@example.com".to_string(),
+                password: "Complexpass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+        let res = is_root_user("root@example.com").await;
+        assert_eq!(res, true);
+        let res = is_root_user("root2@example.com").await;
+        assert_eq!(res, false);
     }
 
     #[actix_web::test]

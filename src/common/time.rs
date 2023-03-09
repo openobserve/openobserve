@@ -14,8 +14,9 @@
 
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 
+#[inline(always)]
 pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error> {
-    if s.contains('T') {
+    if s.contains('T') && !s.contains(' ') {
         if s.len() == 19 {
             let fmt = "%Y-%m-%dT%H:%M:%S";
             let ret = Utc.datetime_from_str(s, fmt)?;
@@ -23,15 +24,16 @@ pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error
         } else {
             Ok(chrono::DateTime::parse_from_rfc3339(s)?)
         }
-    } else if s.contains(',') {
-        Ok(chrono::DateTime::parse_from_rfc2822(s)?)
-    } else {
+    } else if s.contains(' ') && s.len() == 19 {
         let fmt = "%Y-%m-%d %H:%M:%S";
         let ret = Utc.datetime_from_str(s, fmt)?;
         Ok(ret.into())
+    } else {
+        Ok(chrono::DateTime::parse_from_rfc2822(s)?)
     }
 }
 
+#[inline(always)]
 pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
     let n: i64 = match v.parse() {
         Ok(i) => i,
@@ -47,6 +49,7 @@ pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
     parse_i64_to_timestamp_micros(n)
 }
 
+#[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
     if v == 0 {
         return Ok(0);
@@ -68,6 +71,7 @@ pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
     }
 }
 
+#[inline(always)]
 pub fn parse_timestamp_micro_from_value(v: &serde_json::Value) -> Result<i64, anyhow::Error> {
     let n = match v {
         serde_json::Value::String(s) => parse_str_to_timestamp_micros(s)?,
@@ -85,4 +89,141 @@ pub fn parse_timestamp_micro_from_value(v: &serde_json::Value) -> Result<i64, an
         _ => return Err(anyhow::anyhow!("Invalid time format [type]")),
     };
     parse_i64_to_timestamp_micros(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_str_to_time() {
+        let s = "2021-01-01T00:00:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200000000);
+
+        let s = "2021-01-01T00:00:00Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200000000);
+
+        let s = "2021-01-01T00:00:00+08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609430400000000);
+
+        let s = "2021-01-01T00:00:00-08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609488000000000);
+
+        let s = "2021-01-01 00:00:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200000000);
+
+        let s = "2021-01-01T00:00:00.000000Z";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609459200000000);
+
+        let s = "2021-01-01T00:00:00.000000+08:00";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1609430400000000);
+
+        let s = "Wed, 8 Mar 2023 16:46:51 CST";
+        let t = parse_str_to_time(s).unwrap();
+        assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // let s = "Wed, 8 Mar 2023 16:46:51 GMT+8";
+        // let t = parse_str_to_time(s).unwrap();
+        // assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // let s = "Wed Mar  8 16:46:51 CST 2023";
+        // let t = parse_str_to_time(s).unwrap();
+        // assert_eq!(t.timestamp_micros(), 1678315611000000);
+
+        // let s = "Mar 8, 2023, 2:29 PM GMT+8";
+        // let t = parse_str_to_time(s).unwrap();
+        // assert_eq!(t.timestamp_micros(), 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros() {
+        let s = "2021-01-01T00:00:00";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let s = "2021-01-01T00:00:00Z";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let s = "2021-01-01T00:00:00+08:00";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609430400000000);
+
+        let s = "2021-01-01T00:00:00-08:00";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609488000000000);
+
+        let s = "2021-01-01 00:00:00";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let s = "2021-01-01T00:00:00.000000Z";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let s = "2021-01-01T00:00:00.000000+08:00";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1609430400000000);
+
+        let s = "Wed, 8 Mar 2023 16:46:51 CST";
+        let t = parse_str_to_timestamp_micros(s).unwrap();
+        assert_eq!(t, 1678315611000000);
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros() {
+        let n = 1609459200000000;
+        let t = parse_i64_to_timestamp_micros(n).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let n = 1609459200000;
+        let t = parse_i64_to_timestamp_micros(n).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let n = 1609459200;
+        let t = parse_i64_to_timestamp_micros(n).unwrap();
+        assert_eq!(t, 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value() {
+        let v = serde_json::json!(1609459200000000i64);
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let v = serde_json::json!("2021-01-01T00:00:00");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let v = serde_json::json!("2021-01-01T00:00:00Z");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let v = serde_json::json!("2021-01-01T00:00:00+08:00");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609430400000000);
+
+        let v = serde_json::json!("2021-01-01T00:00:00-08:00");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609488000000000);
+
+        let v = serde_json::json!("2021-01-01 00:00:00");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let v = serde_json::json!("2021-01-01T00:00:00.000000Z");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1609459200000000);
+
+        let v = serde_json::json!("Wed, 8 Mar 2023 16:46:51 CST");
+        let t = parse_timestamp_micro_from_value(&v).unwrap();
+        assert_eq!(t, 1678315611000000);
+    }
 }

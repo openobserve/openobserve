@@ -92,3 +92,55 @@ pub async fn validate_credentials(
         Err(ErrorForbidden("Not allowed"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::meta::user::UserRequest;
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_validate_credentials() {
+        let _ = users::post_user(
+            "default",
+            UserRequest {
+                email: "root@example.com".to_string(),
+                password: "Complexpass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+        let _ = users::post_user(
+            "default",
+            UserRequest {
+                email: "user@example.com".to_string(),
+                password: "Complexpass#123".to_string(),
+                role: crate::meta::user::UserRole::Member,
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+            },
+        )
+        .await;
+
+        let user_password = "Complexpass#123";
+        let res = validate_credentials("root@example.com", user_password, "default/_bulk").await;
+        assert_eq!(res.unwrap(), true);
+
+        let res = validate_credentials("", user_password, "default/_bulk").await;
+        assert_eq!(res.unwrap(), false);
+
+        let res = validate_credentials("", user_password, "/").await;
+        assert_eq!(res.unwrap(), false);
+
+        let res = validate_credentials("user@example.com", user_password, "").await;
+        assert_eq!(res.unwrap(), true);
+
+        let res = validate_credentials("user@example.com", user_password, "default/user").await;
+        assert_eq!(res.unwrap(), true);
+
+        let res = validate_credentials("user@example.com", "x", "default/user").await;
+        assert_eq!(res.unwrap(), false);
+    }
+}

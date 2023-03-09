@@ -17,7 +17,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use crate::common::json::unflatten_json;
+use crate::common;
 use crate::service::search::datafusion::storage::file_list;
 
 #[derive(Clone, Debug)]
@@ -33,6 +33,35 @@ pub struct Request {
     pub query: Query,
     #[serde(default)]
     pub aggs: HashMap<String, String>,
+    #[serde(default)]
+    pub encoding: RequestEncoding,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum RequestEncoding {
+    #[serde(rename = "base64")]
+    Base64,
+    #[default]
+    #[serde(rename = "")]
+    Empty,
+}
+
+impl From<&str> for RequestEncoding {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "base64" => RequestEncoding::Base64,
+            _ => RequestEncoding::Empty,
+        }
+    }
+}
+
+impl std::fmt::Display for RequestEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RequestEncoding::Base64 => write!(f, "base64"),
+            RequestEncoding::Empty => write!(f, ""),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -71,6 +100,33 @@ impl Default for Query {
     }
 }
 
+impl Request {
+    #[inline]
+    pub fn decode(&mut self) -> Result<(), std::io::Error> {
+        match self.encoding {
+            RequestEncoding::Base64 => {
+                self.query.sql = match common::base64::decode(&self.query.sql) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(e);
+                    }
+                };
+                for (_, v) in self.aggs.iter_mut() {
+                    *v = match common::base64::decode(v) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
+                }
+            }
+            RequestEncoding::Empty => {}
+        }
+        self.encoding = RequestEncoding::Empty;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[schema(as = SearchResponse)]
 pub struct Response {
@@ -103,7 +159,7 @@ impl Response {
     }
 
     pub fn add_hit(&mut self, hit: &Value) {
-        let hit = unflatten_json(hit);
+        let hit = common::json::unflatten_json(hit);
         self.hits.push(hit);
         self.total += 1;
     }
@@ -147,5 +203,55 @@ mod test {
         res.add_agg("count", &serde_json::Value::Object(val_map));
         res.add_hit(&hit); // total+1
         assert_eq!(res.total, 11);
+    }
+
+    #[test]
+    fn test_request_encoding() {
+        let req = json!(
+            {
+                "query": {
+                    "sql": "c2VsZWN0ICogZnJvbSB0ZXN0",
+                    "from": 0,
+                    "size": 10,
+                    "start_time": 0,
+                    "end_time": 0,
+                    "sql_mode": "context",
+                    "track_total_hits": false
+                },
+                "aggs": {
+                    "sql": "c2VsZWN0ICogZnJvbSBvbHltcGljcw=="
+                },
+                "encoding": "base64"
+            }
+        );
+        let mut req: Request = serde_json::from_value(req).unwrap();
+        req.decode().unwrap();
+        assert_eq!(req.query.sql, "select * from test");
+        assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");
+    }
+
+    #[test]
+    fn test_request_no_encoding() {
+        let req = json!(
+            {
+                "query": {
+                    "sql": "select * from test",
+                    "from": 0,
+                    "size": 10,
+                    "start_time": 0,
+                    "end_time": 0,
+                    "sql_mode": "context",
+                    "track_total_hits": false
+                },
+                "aggs": {
+                    "sql": "select * from olympics"
+                },
+                "encoding": ""
+            }
+        );
+        let mut req: Request = serde_json::from_value(req).unwrap();
+        req.decode().unwrap();
+        assert_eq!(req.query.sql, "select * from test");
+        assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");
     }
 }

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use utoipa::ToSchema;
 
 pub mod alert;
@@ -60,8 +59,8 @@ impl From<&str> for StreamType {
     }
 }
 
-impl fmt::Display for StreamType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for StreamType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),

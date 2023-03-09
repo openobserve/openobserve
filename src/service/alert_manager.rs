@@ -94,6 +94,7 @@ pub async fn handle_trigger(alert_name: &str, alert: Alert) {
                 let req: meta::search::Request = Request {
                     query,
                     aggs: HashMap::new(),
+                    encoding: meta::search::RequestEncoding::Empty,
                 };
                 //let time_elpased = curr_ts - trigger.clone().last_sent_at;
 

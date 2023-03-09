@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod auth;
+pub mod base64;
 pub mod file;
 pub mod http;
 pub mod json;
