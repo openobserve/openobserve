@@ -46,7 +46,9 @@
               >
                 <q-chip
                   v-if="col.closable"
-                  icon-remove="img:/src/assets/images/common/close_icon.svg"
+                  :icon-remove="
+                    'img:' + getImageURL('images/common/close_icon.svg')
+                  "
                   class="q-ma-none table-head-chip"
                   removable
                   square
@@ -142,6 +144,7 @@ import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
 import useLogs from "../../composables/useLogs";
 import BarChart from "../../components/logBarChart.vue";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "SearchResult",
@@ -286,6 +289,7 @@ export default defineComponent({
       navigateRowDetail,
       totalHeight,
       reDrawChart,
+      getImageURL,
     };
   },
 });

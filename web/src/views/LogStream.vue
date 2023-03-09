@@ -38,7 +38,7 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            icon="img:/src/assets/images/common/delete_icon.svg"
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
             :title="t('logStream.delete')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
@@ -49,7 +49,7 @@
             @click="confirmDeleteAction(props)"
           />
           <q-btn
-            icon="img:/src/assets/images/common/list_icon.svg"
+            :icon="'img:' + getImageURL('images/common/list_icon.svg')"
             :title="t('logStream.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
@@ -154,7 +154,7 @@ import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
-import config from "../aws-exports";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -397,6 +397,7 @@ export default defineComponent({
         }
         return filtered;
       },
+      getImageURL,
     };
   },
   computed: {
