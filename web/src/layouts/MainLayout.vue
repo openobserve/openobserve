@@ -20,19 +20,19 @@
         <img
           v-if="!miniMode"
           class="appLogo"
-          src="~@/assets/images/common/app_logo_zo.png"
+          :src="getImageURL('images/common/app_logo_zo.png')"
           @click="goToHome"
         />
         <img
           v-else
           class="appLogo__mini"
-          src="~@/assets/images/common/mini_logo.svg"
+          :src="getImageURL('images/common/mini_logo.svg')"
         />
         <q-btn
           dense
           flat
           round
-          icon="img:/src/assets/images/common/menu_icon.svg"
+          :icon="'img:' + getImageURL('images/common/menu_icon.svg')"
           @click="toggleLeftDrawer"
         />
 
@@ -58,7 +58,9 @@
             flat
             class="languageDdl"
             :icon="languageFlag"
-            dropdown-icon="img:/src/assets/images/common/language_menu_arrow.svg"
+            :dropdown-icon="
+              'img:' + getImageURL('images/common/language_menu_arrow.svg')
+            "
           >
             <template #label>
               <div class="row no-wrap">
@@ -104,7 +106,9 @@
             unelevated
             no-caps
             padding="xs sm"
-            dropdown-icon="img:/src/assets/images/common/user_menu_arrow.svg"
+            :dropdown-icon="
+              'img:' + getImageURL('images/common/user_menu_arrow.svg')
+            "
           >
             <template #label>
               <div class="row items-center no-wrap">
@@ -113,7 +117,7 @@
                     :src="
                       user.picture
                         ? user.picture
-                        : `/src/assets/images/common/profile.svg`
+                        : `~@/assets/images/common/profile.svg`
                     "
                   />
                 </q-avatar>
@@ -195,7 +199,7 @@ import {
   useLocalOrganization,
   useLocalUserInfo,
   useLocalToken,
-  getUserInfo,
+  getImageURL,
 } from "../utils/zincutils";
 
 import { ref, defineComponent } from "vue";
@@ -227,7 +231,9 @@ export default defineComponent({
     const quotaThresholdMsg = ref();
     let quotaAlertClass = "warning";
     let user = store.state.userInfo;
-    const languageFlag = ref("img:/src/assets/images/language_flags/en-gb.svg");
+    const languageFlag = ref(
+      "img:" + getImageURL("images/language_flags/en-gb.svg")
+    );
     const zoBackendUrl = store.state.API_ENDPOINT;
     var linksList = ref([
       {
@@ -238,18 +244,18 @@ export default defineComponent({
       },
       {
         title: t("menu.search"),
-        icon: "img:/src/assets/images/left_nav/search_icon.svg",
+        icon: "img:" + getImageURL("images/left_nav/search_icon.svg"),
         link: "/logs",
       },
       {
         title: t("menu.user"),
-        icon: "img:/src/assets/images/left_nav/user_icon.svg",
+        icon: "img:" + getImageURL("images/left_nav/user_icon.svg"),
         link: "/users",
         display: store.state.currentuser.role == "admin" ? true : false,
       },
       {
         title: t("menu.index"),
-        icon: "img:/src/assets/images/left_nav/index_icon.svg",
+        icon: "img:" + getImageURL("images/left_nav/index_icon.svg"),
         link: "/logstreams",
       },
       // {
@@ -259,7 +265,7 @@ export default defineComponent({
       // },
       {
         title: t("menu.alerts"),
-        icon: "img:/src/assets/images/left_nav/warning_icon.svg",
+        icon: "img:" + getImageURL("images/left_nav/warning_icon.svg"),
         link: "/alerts",
       },
       {
@@ -269,12 +275,12 @@ export default defineComponent({
       },
       {
         title: t("menu.about"),
-        icon: "img:/src/assets/images/left_nav/about_icon.svg",
+        icon: "img:" + getImageURL("images/left_nav/about_icon.svg"),
         link: "/about",
       },
       {
         title: t("menu.slack"),
-        icon: "img:/src/assets/images/common/slack.svg",
+        icon: "img:" + getImageURL("/images/common/slack.svg"),
         link: "https://join.slack.com/t/zincsearch/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
@@ -300,42 +306,50 @@ export default defineComponent({
       {
         label: "English",
         code: "en-gb",
-        icon: "img:/src/assets/images/language_flags/en-gb.svg",
+        icon: "img:" + getImageURL("images/language_flags/en-gb.svg"),
       },
       {
         label: "Türkçe",
         code: "tr-turk",
-        icon: "img:/src/assets/images/language_flags/tr-turk.svg",
+        icon: "img:" + getImageURL("images/language_flags/tr-turk.svg"),
       },
       {
         label: "简体中文",
         code: "zh-cn",
-        icon: "img:/src/assets/images/language_flags/zh-cn.svg",
+        icon: "img:" + getImageURL("images/language_flags/zh-cn.svg"),
       },
     ];
 
     const local = ref(getLocale());
-    const selectedLanguage:any = ref(langList.find((l) => l.code == local.value));
+    const selectedLanguage: any = ref(
+      langList.find((l) => l.code == local.value)
+    );
 
     if (user.picture == "") {
-      user.picture = "/src/assets/images/common/profile.svg";
+      user.picture = getImageURL("images/common/profile.svg");
     }
 
     if (!selectedLanguage.value && langList.length > 0) {
       selectedLanguage.value = langList[0];
       languageFlag.value =
-        "img:/src/assets/images/language_flags/" + langList[0].code + ".svg";
+        "img:" +
+        getImageURL("images/language_flags/") +
+        langList[0].code +
+        ".svg";
     } else {
       const langDetail = selectedLanguage.value;
       languageFlag.value =
-        "img:/src/assets/images/language_flags/" + langDetail?.code + ".svg";
+        "img:" +
+        getImageURL("images/language_flags/") +
+        langDetail?.code +
+        ".svg";
     }
 
     const changeLanguage = (item: any) => {
       setLanguage(item.code);
       selectedLanguage.value = item;
       languageFlag.value =
-        "img:/src/assets/images/language_flags/" + item.code + ".svg";
+        "img:" + getImageURL("images/language_flags/") + item.code + ".svg";
       router.go(0);
     };
     const signout = () => {
@@ -465,6 +479,7 @@ export default defineComponent({
       updateOrganization,
       selectedOrg,
       zoBackendUrl,
+      getImageURL,
     };
   },
 });

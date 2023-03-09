@@ -22,7 +22,7 @@
       outline
       no-caps
       :label="displayValue"
-      icon="img:/src/assets/images/common/time_icon.png"
+      :icon="'img:' + getImageURL('images/common/time_icon.png')"
       icon-right="arrow_drop_down"
       class="date-time-button"
       color="grey-9"
@@ -205,6 +205,7 @@
 <script lang="ts">
 // @ts-nocheck
 import { ref, defineComponent } from "vue";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   data() {
@@ -264,7 +265,7 @@ export default defineComponent({
 
     const datetimeBtn = ref();
 
-    return { getDate, setDate, datetimeBtn };
+    return { getDate, setDate, datetimeBtn, getImageURL };
   },
   computed: {
     displayValue() {

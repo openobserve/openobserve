@@ -84,12 +84,19 @@ export default defineComponent({
     };
 
     const redirectUser = (redirectURI) => {
+      let pos = window.location.pathname.indexOf("/web/");
       if (redirectURI != null && redirectURI != "") {
         // $router.push({ path: redirectURI });
-        window.location.replace(window.location.origin + redirectURI);
+        window.location.replace(
+          window.location.origin +
+            window.location.pathname.slice(0, pos + 5) +
+            redirectURI
+        );
       } else {
         // $router.push({ path: "/" });
-        window.location.replace(window.location.origin);
+        window.location.replace(
+          window.location.origin + window.location.pathname.slice(0, pos + 5)
+        );
       }
     };
 

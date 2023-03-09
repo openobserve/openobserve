@@ -27,7 +27,7 @@
             v-close-popup
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
           />
         </div>
       </div>
@@ -99,6 +99,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { getImageURL } from "../utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -122,6 +123,7 @@ export default defineComponent({
       t,
       rowData,
       tab: ref("table"),
+      getImageURL,
     };
   },
   created() {

@@ -35,7 +35,7 @@
         <q-td :props="props">
           <q-btn
             v-if="props.row.actions == 'true'"
-            icon="img:/src/assets/images/common/remove_icon.svg"
+            :icon="'img:' + getImageURL('images/common/remove_icon.svg')"
             :title="t('organization.invite')"
             class="iconHoverBtn"
             padding="sm"
@@ -148,6 +148,7 @@ import QTablePagination from "../components/shared/grid/Pagination.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -363,6 +364,7 @@ export default defineComponent({
       },
       removeDashboard,
       getDashboards,
+      getImageURL,
     };
   },
   methods: {

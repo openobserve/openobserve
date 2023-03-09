@@ -23,7 +23,7 @@
           round
           size="0.5rem"
           padding="0.6rem"
-          icon="img:/src/assets/images/common/copy_icon.svg"
+          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
           @click="$emit('copy-to-clipboard-fn', vectorContent)"
         />
       </div>
@@ -49,6 +49,7 @@ healthcheck.enabled = false</pre
 import { defineComponent, ref, onMounted } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "vector-mechanism",
@@ -79,6 +80,7 @@ export default defineComponent({
       config,
       endpoint,
       vectorContent,
+      getImageURL,
     };
   },
 });

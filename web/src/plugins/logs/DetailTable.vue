@@ -27,7 +27,7 @@
             v-close-popup
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
           />
         </div>
       </div>
@@ -78,7 +78,7 @@
                     filled
                     dense
                     class="q-mr-sm pointer"
-                    name="img:/src/assets/images/common/add_icon.svg"
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
                     <q-list>
                       <q-item clickable v-close-popup>
@@ -89,7 +89,10 @@
                             "
                             ><q-icon
                               title="Add to search query"
-                              name="img:/src/assets/images/common/add_icon.svg"
+                              :name="
+                                'img:' +
+                                getImageURL('images/common/add_icon.svg')
+                              "
                               size="1rem"
                               outlined
                               filled
@@ -109,7 +112,10 @@
                             "
                             ><q-icon
                               title="Add to search query"
-                              name="img:/src/assets/images/common/add_icon.svg"
+                              :name="
+                                'img:' +
+                                getImageURL('images/common/add_icon.svg')
+                              "
                               size="1rem"
                               outlined
                               filled
@@ -199,7 +205,7 @@
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { date } from "quasar";
+import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -285,6 +291,7 @@ export default defineComponent({
       flattenJSONObject,
       selectedRelativeValue,
       recordSizeOptions,
+      getImageURL,
     };
   },
   async created() {
