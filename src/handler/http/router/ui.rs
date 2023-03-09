@@ -54,3 +54,28 @@ pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileRespon
         .into_response()
         .use_compression(Compress::Never)
 }
+
+#[cfg(test)]
+mod tests {
+    use actix_web::{test, App};
+
+    use super::*;
+
+    #[actix_web::test]
+    async fn test_index_ok() {
+        let app = test::init_service(App::new().service(serve)).await;
+        let req = test::TestRequest::get().uri("/web/index.html").to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn test_index_not_ok() {
+        let app = test::init_service(App::new().service(serve)).await;
+        let req = test::TestRequest::get().uri("/web/abc.html").to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+}
