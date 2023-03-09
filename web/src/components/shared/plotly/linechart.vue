@@ -74,14 +74,14 @@ export default defineComponent({
       }
     });
 
-     // wrap the text for long x axis names
-    const addBreaksAtLength = 12
-    const textwrapper = function(traces) {
-      traces = traces.map(text => {
+    // wrap the text for long x axis names
+    const addBreaksAtLength = 12;
+    const textwrapper = function (traces: any) {
+      traces = traces.map((text: any) => {
         let rxp = new RegExp(".{1," + addBreaksAtLength + "}", "g");
         return text.match(rxp).join("<br>");
       });
-	    return traces;
+      return traces;
     };
 
     const reDraw: any = (
@@ -105,7 +105,7 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      await nextTick()
+      await nextTick();
       Plotly.relayout(plotref.value, update);
     };
 

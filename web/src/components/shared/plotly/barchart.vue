@@ -56,41 +56,41 @@ export default defineComponent({
       },
       xaxis: {
         tickangle: -20,
-        automargin: true
-      },
-      yaxis:{
         automargin: true,
-      }
+      },
+      yaxis: {
+        automargin: true,
+      },
     };
 
-    onMounted(async () => { 
-      await nextTick()   
+    onMounted(async () => {
+      await nextTick();
       await Plotly.newPlot(plotref.value, [trace], layout, {
         responsive: true,
         displaylogo: false,
-        displayModeBar: true
+        displayModeBar: true,
       });
     });
 
     onUpdated(async () => {
-      if (props.data){
+      if (props.data) {
         chartID.value = "chart_" + props.data.id;
         reDraw(props.data.x, props.data.y, props.data.chartParams);
       }
     });
 
     // wrap the text for long x axis names
-    const addBreaksAtLength = 12
-    const textwrapper = function(traces) {
-      traces = traces.map(text => {
+    const addBreaksAtLength = 12;
+    const textwrapper = function (traces: any) {
+      traces = traces.map((text: any) => {
         let rxp = new RegExp(".{1," + addBreaksAtLength + "}", "g");
         return text.match(rxp).join("<br>");
       });
-	    return traces;
+      return traces;
     };
 
     onUpdated(async () => {
-      if (props.data){
+      if (props.data) {
         chartID.value = "chart_" + props.data.id;
         reDraw(props.data.x, props.data.y, props.data.chartParams);
       }
@@ -114,10 +114,9 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      await nextTick()
+      await nextTick();
       Plotly.relayout(plotref.value, update);
     };
-
 
     return {
       plotref,

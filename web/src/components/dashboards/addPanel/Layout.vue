@@ -8,13 +8,26 @@
       <q-expansion-item
         default-opened
         dense
-        :label="dashboardPanelData.data.type == 'table' ? t(`First Column`) :dashboardPanelData.data.type == 'h-bar' ? t(`Y-Axis (Columns)`) :  t(`X-Axis (Row)`)"
+        :label="
+          dashboardPanelData.data.type == 'table'
+            ? t(`First Column`)
+            : dashboardPanelData.data.type == 'h-bar'
+            ? t(`Y-Axis (Columns)`)
+            : t(`X-Axis (Row)`)
+        "
       >
         <div class="column index-menu q-mb-md">
           <div class="index-table q-mt-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.x"
-              :columns="[{name: 'column', field: 'column', align: 'left'}]"
+              :columns="[
+                {
+                  name: 'column',
+                  field: 'column',
+                  align: 'left',
+                  label: 'Field',
+                },
+              ]"
               :rows="dashboardPanelData.data.fields.x"
               row-key="name"
               class="field-table"
@@ -25,10 +38,7 @@
             >
               <template #body-cell-column="props">
                 <q-tr :props="props">
-                  <q-td
-                  :props="props"
-                  class="field_list"
-                  >
+                  <q-td :props="props" class="field_list">
                     <div class="field_overlay">
                       <div class="field_label">
                         {{ props.row.column }}
@@ -46,20 +56,38 @@
               </template>
             </q-table>
           </div>
-          <div class="text-caption text-weight-bold text-center q-ma-sm" v-if="dashboardPanelData.data.fields.x.length < 1">Please add a field from the list</div>
+          <div
+            class="text-caption text-weight-bold text-center q-ma-sm"
+            v-if="dashboardPanelData.data.fields.x.length < 1"
+          >
+            Please add a field from the list
+          </div>
         </div>
       </q-expansion-item>
       <q-separator />
       <q-expansion-item
         dense
         default-opened
-        :label="dashboardPanelData.data.type == 'table' ? t(`Other Columns`) :dashboardPanelData.data.type == 'h-bar' ? t(`X-Axis (Row)`) : t(`Y-Axis (Columns)`)"
+        :label="
+          dashboardPanelData.data.type == 'table'
+            ? t(`Other Columns`)
+            : dashboardPanelData.data.type == 'h-bar'
+            ? t(`X-Axis (Row)`)
+            : t(`Y-Axis (Columns)`)
+        "
       >
         <div class="column index-menu q-mb-lg">
           <div class="index-table q-mt-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.y"
-              :columns="[{name: 'column', field: 'column', align: 'left'}]"
+              :columns="[
+                {
+                  name: 'column',
+                  field: 'column',
+                  align: 'left',
+                  label: 'Field',
+                },
+              ]"
               :rows="dashboardPanelData.data.fields.y"
               row-key="column"
               class="field-table"
@@ -72,16 +100,13 @@
               hide-header
               hide-bottom
             >
-            <template #body-cell-column="props">
-              <q-tr :props="props">
-                <q-td
-                  :props="props"
-                  class="field_list"
-                >
-                  <div class="field_overlay" :title="props.row.column">
-                    <div class="field_label">
-                      {{ props.row.column }}
-                      <!-- <div>
+              <template #body-cell-column="props">
+                <q-tr :props="props">
+                  <q-td :props="props" class="field_list">
+                    <div class="field_overlay" :title="props.row.column">
+                      <div class="field_label">
+                        {{ props.row.column }}
+                        <!-- <div>
                         <q-expansion-item
                           expand-separator
                           icon="perm_identity"
@@ -102,94 +127,126 @@
                           </div>
                         </q-expansion-item>
                       </div> -->
-                    </div>
-                    
-                    <div class="field_icons">
-                    <!-- TODO: aggregation and color picker and label fields -->
-                    
-                      <div>
-                        <q-btn size="xs" color="red" round dense @click="props.expand = !props.expand" :icon="props.expand ? 'remove' : 'add'" />
-                        <q-icon
-                          name="img:/assets/images/layout/remove_icon.svg"
-                          size="1rem"
-                          @click="removeYAxisItem(props.row.column)"
-                        />
+                      </div>
+
+                      <div class="field_icons">
+                        <!-- TODO: aggregation and color picker and label fields -->
+
+                        <div>
+                          <q-btn
+                            size="xs"
+                            color="red"
+                            round
+                            dense
+                            @click="props.expand = !props.expand"
+                            :icon="props.expand ? 'remove' : 'add'"
+                          />
+                          <q-icon
+                            name="img:/assets/images/layout/remove_icon.svg"
+                            size="1rem"
+                            @click="removeYAxisItem(props.row.column)"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </q-td>
-              </q-tr>
-              <q-tr v-show="props.expand" :props="props" style="height: min-content;">
-                <q-td colspan="100%">
-                  <div>
-                    <div class="flex items-center">
-                      <div class="q-pa-xs" style="width: 180px">
-                        <q-select
-                          v-model="dashboardPanelData.data.fields.y[props.pageIndex].aggregationFunction"
-                          :options="triggerOperators"
-                          dense
-                          filled
-                          label="Aggregation"
-                        ></q-select>
+                  </q-td>
+                </q-tr>
+                <q-tr
+                  v-show="props.expand"
+                  :props="props"
+                  style="height: min-content"
+                >
+                  <q-td colspan="100%">
+                    <div>
+                      <div class="flex items-center">
+                        <div class="q-pa-xs" style="width: 180px">
+                          <q-select
+                            v-model="
+                              dashboardPanelData.data.fields.y[props.pageIndex]
+                                .aggregationFunction
+                            "
+                            :options="triggerOperators"
+                            dense
+                            filled
+                            label="Aggregation"
+                          ></q-select>
+                        </div>
+                        <div class="color-input-wrapper">
+                          <input
+                            type="color"
+                            v-model="
+                              dashboardPanelData.data.fields.y[props.pageIndex]
+                                .color
+                            "
+                          />
+                        </div>
                       </div>
-                      <div class="color-input-wrapper">
-                        <input type="color" v-model="dashboardPanelData.data.fields.y[props.pageIndex].color">
-                      </div>
+                      <q-input
+                        dense
+                        filled
+                        label="Label"
+                        v-model="
+                          dashboardPanelData.data.fields.y[props.pageIndex]
+                            .label
+                        "
+                      />
                     </div>
-                    <q-input dense filled label="Label" v-model="dashboardPanelData.data.fields.y[props.pageIndex].label"/>
-                  </div>
-                </q-td>
-              </q-tr>
-            </template>
+                  </q-td>
+                </q-tr>
+              </template>
             </q-table>
           </div>
-          <div class="text-caption text-weight-bold text-center q-ma-sm" v-if="dashboardPanelData.data.fields.y.length < 1">Please add a field from the list</div>
+          <div
+            class="text-caption text-weight-bold text-center q-ma-sm"
+            v-if="dashboardPanelData.data.fields.y.length < 1"
+          >
+            Please add a field from the list
+          </div>
         </div>
       </q-expansion-item>
       <q-separator />
-      <q-expansion-item
-        default-opened
-        dense
-        :label="t(`Config`)"
-      >
+      <q-expansion-item default-opened dense :label="t(`Config`)">
         <div>
           <q-toggle
-          v-model="dashboardPanelData.data.config.show_legends"
-          label="Show Legends"
+            v-model="dashboardPanelData.data.config.show_legends"
+            label="Show Legends"
           />
           <q-form ref="" class="q-pa-sm">
-          <q-input
-            v-model="dashboardPanelData.data.config.title"
-            :label="t('panel.name')"
-            class="q-py-md showLabelOnTop"
-            stack-label
-            filled
-            dense
-          />
-          <q-input
-            v-model="dashboardPanelData.data.config.description"
-            type="textarea"
-            :label="t('panel.typeDesc')"
-            class="q-py-md showLabelOnTop"
-            stack-label
-            filled
-            dense
-          />
-        </q-form>
-      </div>
+            <q-input
+              v-model="dashboardPanelData.data.config.title"
+              :label="t('panel.name')"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              filled
+              dense
+            />
+            <q-input
+              v-model="dashboardPanelData.data.config.description"
+              type="textarea"
+              :label="t('panel.typeDesc')"
+              class="q-py-md showLabelOnTop"
+              stack-label
+              filled
+              dense
+            />
+          </q-form>
+        </div>
       </q-expansion-item>
     </div>
     <q-separator />
-    <q-expansion-item
-      default-opened
-      dense
-      :label="t(`Filters`)"
-    >
+    <q-expansion-item default-opened dense :label="t(`Filters`)">
       <div class="column index-menu q-mb-lg">
         <div class="index-table q-mt-xs">
           <q-table
             v-model:selected="dashboardPanelData.data.fields.filter"
-            :columns="[{name: 'column', field: 'column', align: 'left'}]"
+            :columns="[
+              {
+                name: 'column',
+                field: 'column',
+                align: 'left',
+                label: 'Filter',
+              },
+            ]"
             :rows="dashboardPanelData.data.fields.filter"
             row-key="column"
             class="field-table"
@@ -204,17 +261,21 @@
           >
             <template #body-cell-column="props">
               <q-tr :props="props">
-                <q-td
-                  :props="props"
-                  class="field_list"
-                >
+                <q-td :props="props" class="field_list">
                   <div class="field_overlay" :title="props.row.column">
                     <div class="field_label">
                       {{ props.row.column }}
                     </div>
                     <div class="field_icons">
                       <div>
-                        <q-btn size="xs" color="red" round dense @click=" props.expand = !props.expand" :icon="props.expand ? 'remove' : 'add'" />
+                        <q-btn
+                          size="xs"
+                          color="red"
+                          round
+                          dense
+                          @click="props.expand = !props.expand"
+                          :icon="props.expand ? 'remove' : 'add'"
+                        />
                         <q-icon
                           name="img:/assets/images/layout/remove_icon.svg"
                           size="1rem"
@@ -225,34 +286,77 @@
                   </div>
                 </q-td>
               </q-tr>
-              <q-tr v-show="props.expand" :props="props" style="height: min-content;" >
-                <q-td colspan="100%"  >
-                  <div class="q-pa-xs" >
+              <q-tr
+                v-show="props.expand"
+                :props="props"
+                style="height: min-content"
+              >
+                <q-td colspan="100%">
+                  <div class="q-pa-xs">
                     <div class="q-gutter-xs">
-                      <q-tabs v-model="dashboardPanelData.data.fields.filter[props.pageIndex].type" >
-                        <q-tab name="list" label="List" style="width: auto;"></q-tab>
-                        <q-tab name="condition" label="Condition" style="width: auto;"></q-tab>
+                      <q-tabs
+                        v-model="
+                          dashboardPanelData.data.fields.filter[props.pageIndex]
+                            .type
+                        "
+                      >
+                        <q-tab
+                          name="list"
+                          label="List"
+                          style="width: auto"
+                        ></q-tab>
+                        <q-tab
+                          name="condition"
+                          label="Condition"
+                          style="width: auto"
+                        ></q-tab>
                       </q-tabs>
                       <q-separator></q-separator>
-                      <q-tab-panels dense v-model="dashboardPanelData.data.fields.filter[props.pageIndex].type" animated style="background-color:#f5f5f5;">
+                      <q-tab-panels
+                        dense
+                        v-model="
+                          dashboardPanelData.data.fields.filter[props.pageIndex]
+                            .type
+                        "
+                        animated
+                        style="background-color: #f5f5f5"
+                      >
                         <q-tab-panel dense name="condition">
-                          <div class="flex justify-between" >
+                          <div class="flex justify-between">
                             <q-select
                               dense
                               filled
-                              v-model="dashboardPanelData.data.fields.filter[props.pageIndex].operator"
+                              v-model="
+                                dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].operator
+                              "
                               :options="options"
                               label="Operator"
                               style="width: 100%"
                             />
-                            <q-input dense filled v-model="dashboardPanelData.data.fields.filter[props.pageIndex].value" label="Value" style="width: 100%; margin-top: 5px" />
+                            <q-input
+                              dense
+                              filled
+                              v-model="
+                                dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].value
+                              "
+                              label="Value"
+                              style="width: 100%; margin-top: 5px"
+                            />
                           </div>
                         </q-tab-panel>
                         <q-tab-panel dense name="list">
                           <q-select
                             dense
                             filled
-                            v-model="dashboardPanelData.data.fields.filter[props.pageIndex].values"
+                            v-model="
+                              dashboardPanelData.data.fields.filter[
+                                props.pageIndex
+                              ].values
+                            "
                             :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == props.row.column)?.value"
                             label="Select Filter"
                             multiple
@@ -260,18 +364,42 @@
                             map-options
                           >
                             <template v-slot:selected>
-                              {{ dashboardPanelData.data.fields.filter[props.pageIndex].values[0]?.length > 15 ?
-                                dashboardPanelData.data.fields.filter[props.pageIndex].values[0]?.substring(0, 15) + "..."
-                                : dashboardPanelData.data.fields.filter[props.pageIndex].values[0] }}
+                              {{
+                                dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].values[0]?.length > 15
+                                  ? dashboardPanelData.data.fields.filter[
+                                      props.pageIndex
+                                    ].values[0]?.substring(0, 15) + "..."
+                                  : dashboardPanelData.data.fields.filter[
+                                      props.pageIndex
+                                    ].values[0]
+                              }}
 
-                              {{ dashboardPanelData.data.fields.filter[props.pageIndex].values?.length > 1 ?
-                              " +" + (dashboardPanelData.data.fields.filter[props.pageIndex].values?.length - 1)
-                              : "" }}
+                              {{
+                                dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].values?.length > 1
+                                  ? " +" +
+                                    (dashboardPanelData.data.fields.filter[
+                                      props.pageIndex
+                                    ].values?.length -
+                                      1)
+                                  : ""
+                              }}
                             </template>
-                            <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+                            <template
+                              v-slot:option="{
+                                itemProps,
+                                opt,
+                                selected,
+                                toggleOption,
+                              }"
+                            >
                               <q-item v-bind="itemProps">
                                 <q-item-section side>
-                                  <q-checkbox dense
+                                  <q-checkbox
+                                    dense
                                     :model-value="selected"
                                     @update:model-value="toggleOption(opt)"
                                   ></q-checkbox>
@@ -283,7 +411,7 @@
                             </template>
                           </q-select>
                         </q-tab-panel>
-                     </q-tab-panels>
+                      </q-tab-panels>
                     </div>
                   </div>
                 </q-td>
@@ -291,12 +419,15 @@
             </template>
           </q-table>
         </div>
-        <div class="text-caption text-weight-bold text-center q-ma-sm" v-if="dashboardPanelData.meta.filterValue.length < 1">Please add a field from the list</div>
+        <div
+          class="text-caption text-weight-bold text-center q-ma-sm"
+          v-if="dashboardPanelData.meta.filterValue.length < 1"
+        >
+          Please add a field from the list
+        </div>
       </div>
-      <div>
-      </div>
+      <div></div>
     </q-expansion-item>
-
   </div>
 </template>
 
@@ -306,44 +437,42 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
-  export default defineComponent({
-    name: "Layout",
-    components: {
-    },
-    setup(){
-        const showXAxis = ref(true)
-        const panelName = ref("")
-        const panelDesc = ref("")
-        const { t } = useI18n();
-        const $q = useQuasar();
-        const {dashboardPanelData, removeXAxisItem, removeYAxisItem, removeFilterItem}= useDashboardPanelData()
-        const triggerOperators: any = ref([
-          "count",
-          "sum",
-          "avg",
-          "min",
-          "max",
-        ]);
+export default defineComponent({
+  name: "dashboard-layout",
+  components: {},
+  setup() {
+    const showXAxis = ref(true);
+    const panelName = ref("");
+    const panelDesc = ref("");
+    const { t } = useI18n();
+    const $q = useQuasar();
+    const {
+      dashboardPanelData,
+      removeXAxisItem,
+      removeYAxisItem,
+      removeFilterItem,
+    } = useDashboardPanelData();
+    const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
 
-        return {
-          showXAxis,
-          t,
-          panelName,
-          panelDesc,
-          dashboardPanelData,
-          removeXAxisItem,
-          removeYAxisItem,
-          triggerOperators,
-          removeFilterItem,
-          pagination: ref({
-            rowsPerPage: 0,
-          }),
-          model: ref([]),
-          tab: ref('General'),
-          options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
-          }  
-        }
-  })
+    return {
+      showXAxis,
+      t,
+      panelName,
+      panelDesc,
+      dashboardPanelData,
+      removeXAxisItem,
+      removeYAxisItem,
+      triggerOperators,
+      removeFilterItem,
+      pagination: ref({
+        rowsPerPage: 0,
+      }),
+      model: ref([]),
+      tab: ref("General"),
+      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
+    };
+  },
+});
 </script>
 
 <style lang="scss" scoped>
@@ -356,18 +485,18 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
   align-items: center;
   position: relative;
 }
-.color-input-wrapper  input[type=color] {
-    position: absolute;
-    height: 4em;
-    width: 4em;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    overflow: hidden;
-    border: none;
-    margin: 0;
-    padding: 0;
-  }
+.color-input-wrapper input[type="color"] {
+  position: absolute;
+  height: 4em;
+  width: 4em;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);

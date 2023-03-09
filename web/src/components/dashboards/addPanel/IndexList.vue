@@ -4,9 +4,7 @@
       <q-select
         v-model="dashboardPanelData.data.fields.stream"
         :label="
-          dashboardPanelData.data.fields.stream
-            ? ''
-            : t('search.selectIndex')
+          dashboardPanelData.data.fields.stream ? '' : t('search.selectIndex')
         "
         :options="data.indexOptions"
         data-cy="index-dropdown"
@@ -25,7 +23,15 @@
     </div>
     <div class="index-table q-mt-xs">
       <q-table
-        :columns="[{name: 'name', field: 'name', align: 'left'}]"
+        :columns="[
+          {
+            name: 'name',
+            field: 'name',
+            align: 'left',
+            label: 'Field',
+            sortable: true,
+          },
+        ]"
         :rows="data.currentFieldsList"
         row-key="name"
         :filter="dashboardPanelData.meta.stream.filterField"
@@ -34,11 +40,10 @@
         hide-header
         hide-bottom
         id="fieldList"
-      >    
-       
-      <template #body-cell-name="props">
+      >
+        <template #body-cell-name="props">
           <q-tr :props="props">
-            <q-td 
+            <q-td
               class="field_list"
               :class="
                 dashboardPanelData.data.fields.x.find((it: any)=>it.column === props.row.name) ||
@@ -46,20 +51,36 @@
                 dashboardPanelData.data.fields.filter.find((it: any)=>it.column === props.row.name)
                 ? 'selected'
                 : ''
-              " 
-              :props="props">
+              "
+              :props="props"
+            >
               <div class="field_overlay">
                 <div class="field_label">
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons">
-                  <q-btn color="white" padding="sm" text-color="black" @click=addXAxisItem(props.row.name)>
+                  <q-btn
+                    color="white"
+                    padding="sm"
+                    text-color="black"
+                    @click="addXAxisItem(props.row.name)"
+                  >
                     <div>+X</div>
                   </q-btn>
-                   <q-btn color="white" padding="sm" text-color="black" @click="addYAxisItem(props.row.name)">
+                  <q-btn
+                    color="white"
+                    padding="sm"
+                    text-color="black"
+                    @click="addYAxisItem(props.row.name)"
+                  >
                     <div>+Y</div>
                   </q-btn>
-                  <q-btn color="white" padding="sm" text-color="black" @click="addFilteredItem(props.row.name)">
+                  <q-btn
+                    color="white"
+                    padding="sm"
+                    text-color="black"
+                    @click="addFilteredItem(props.row.name)"
+                  >
                     <div>+F</div>
                   </q-btn>
                 </div>
@@ -89,81 +110,101 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, onMounted, computed, watch, onActivated } from "vue";
+import {
+  defineComponent,
+  reactive,
+  ref,
+  onMounted,
+  computed,
+  watch,
+  onActivated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import IndexService from "../../../services/index"
-import queryService from "../../../services/nativequery"
+import IndexService from "../../../services/index";
+import queryService from "../../../services/nativequery";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  props:["selectedXAxisValue","selectedYAxisValue"],
-  emits:["update:selectedXAxisValue","update:selectedYAxisValue"],
+  props: ["selectedXAxisValue", "selectedYAxisValue"],
+  emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
     const data = reactive({
-      schemaList:[],
-      indexOptions:[],
-      currentFieldsList: []
-    })
+      schemaList: [],
+      indexOptions: [],
+      currentFieldsList: [],
+    });
     const $q = useQuasar();
-    const {dashboardPanelData, addXAxisItem, addYAxisItem } = useDashboardPanelData()
-    const x = ref()
-    const y = ref()
+    const { dashboardPanelData, addXAxisItem, addYAxisItem } =
+      useDashboardPanelData();
+    const x = ref();
+    const y = ref();
     console.log("schemaList:", data.schemaList);
     // console.log("schemaList name:", schemaList.data  );
     console.log("indexOptions:", data.indexOptions);
-   
-    
+
     onActivated(() => {
       console.log("inside mounted");
-      getStreamList()
-    })
+      getStreamList();
+    });
 
     // update the selected stream fields list
-    watch(() => [data.schemaList, dashboardPanelData.data.fields.stream], () => {
-      const fields = data.schemaList.find(it => it.name == dashboardPanelData.data.fields.stream)
-      dashboardPanelData.meta.stream.selectedStreamFields = fields?.schema || []
-    })
+    watch(
+      () => [data.schemaList, dashboardPanelData.data.fields.stream],
+      () => {
+        const fields: any = data.schemaList.find(
+          (it: any) => it.name == dashboardPanelData.data.fields.stream
+        );
+        dashboardPanelData.meta.stream.selectedStreamFields =
+          fields?.schema || [];
+      }
+    );
 
     // update the current list fields if any of the lists changes
-    watch(() => [
-      dashboardPanelData.meta.stream.selectedStreamFields, 
-      dashboardPanelData.meta.stream.customQueryFields
-    ], () => {
-      console.log('updated custom query fields or selected stream fields');
-      
-      data.currentFieldsList = []
-      data.currentFieldsList = [
-        ...dashboardPanelData.meta.stream.customQueryFields, 
-        ...dashboardPanelData.meta.stream.selectedStreamFields
-      ]
-    })
+    watch(
+      () => [
+        dashboardPanelData.meta.stream.selectedStreamFields,
+        dashboardPanelData.meta.stream.customQueryFields,
+      ],
+      () => {
+        console.log("updated custom query fields or selected stream fields");
+
+        data.currentFieldsList = [];
+        data.currentFieldsList = [
+          ...dashboardPanelData.meta.stream.customQueryFields,
+          ...dashboardPanelData.meta.stream.selectedStreamFields,
+        ];
+      }
+    );
 
     // get the stream list by making an API call
     const getStreamList = () => {
-        IndexService.nameList(
+      IndexService.nameList(
         store.state.selectedOrganization.identifier,
         "",
         true
       ).then((res) => {
-        data.schemaList = res.data.list
-        dashboardPanelData.meta.stream.streamResults = res.data.list
+        data.schemaList = res.data.list;
+        dashboardPanelData.meta.stream.streamResults = res.data.list;
         data.indexOptions = res.data.list.map((data: any) => {
           return data.name;
         });
 
         // set the first stream as the selected stream when the api loads the data
-        if(!dashboardPanelData.data.fields.stream && data.indexOptions.length > 0) {
-          dashboardPanelData.data.fields.stream = data.indexOptions[0]
+        if (
+          !dashboardPanelData.data.fields.stream &&
+          data.indexOptions.length > 0
+        ) {
+          dashboardPanelData.data.fields.stream = data.indexOptions[0];
         }
       });
-    }
+    };
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -178,26 +219,30 @@ export default defineComponent({
       return filtered;
     };
 
-  const addFilteredItem = (name: string) =>{
+    const addFilteredItem = (name: string) => {
       console.log("name=", name);
-      if(!dashboardPanelData.data.fields.filter) {
-        dashboardPanelData.data.fields.filter = []
+      if (!dashboardPanelData.data.fields.filter) {
+        dashboardPanelData.data.fields.filter = [];
       }
 
-      if(!dashboardPanelData.data.fields.filter.find((it:any) => it.column == name)) {
+      if (
+        !dashboardPanelData.data.fields.filter.find(
+          (it: any) => it.column == name
+        )
+      ) {
         console.log("data");
-        
+
         dashboardPanelData.data.fields.filter.push({
-          type: 'list' ,
+          type: "list",
           values: [],
           column: name,
           operator: null,
-          value: null
-        })
+          value: null,
+        });
       }
 
-      if(!dashboardPanelData.meta.filterValue) {
-        dashboardPanelData.meta.filterValue = []
+      if (!dashboardPanelData.meta.filterValue) {
+        dashboardPanelData.meta.filterValue = [];
       }
 
       // dashboardPanelData.meta.filterValue.push({
@@ -205,51 +250,59 @@ export default defineComponent({
       //   value: ["abc", "def"]
       // })
       console.log("filterValue array= ", dashboardPanelData.meta.filterValue);
-      if(!dashboardPanelData.meta.filterValue.find((it:any)=> it.column == name)){
-       
+      if (
+        !dashboardPanelData.meta.filterValue.find(
+          (it: any) => it.column == name
+        )
+      ) {
         let queryData = "SELECT ";
 
         // get unique value of the selected fields
-        queryData += `${name} as value`
+        queryData += `${name} as value`;
 
         //now add the selected stream
-        queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`
+        queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`;
 
-        console.log("queryData= ",queryData);
+        console.log("queryData= ", queryData);
         // add group by statement
-        queryData += ` GROUP BY value`
+        queryData += ` GROUP BY value`;
 
         const query = {
           query: { sql: queryData, sql_mode: "full" },
-        }
+        };
 
         queryService
-        .runquery(query, store.state.selectedOrganization.identifier)
-        .then((res) => {
-          console.log("-distinct vals--", res.data.hits.map((it:any)=>it.value).filter((it:any) => it));
-          
-          dashboardPanelData.meta.filterValue.push({
-            column: name,
-            value: res.data.hits.map((it:any)=>it.value).filter((it:any) => it)
-          })
+          .runquery(query, store.state.selectedOrganization.identifier)
+          .then((res) => {
+            console.log(
+              "-distinct vals--",
+              res.data.hits.map((it: any) => it.value).filter((it: any) => it)
+            );
 
-          // dashboardPanelData.data.fields.filter.find((it:any) => it.column == name).values =  res.data.hits.map((it:any)=>it.value)
+            dashboardPanelData.meta.filterValue.push({
+              column: name,
+              value: res.data.hits
+                .map((it: any) => it.value)
+                .filter((it: any) => it),
+            });
+
+            // dashboardPanelData.data.fields.filter.find((it:any) => it.column == name).values =  res.data.hits.map((it:any)=>it.value)
 
             // $q.notify({
             //     type: "positive",
             //     message: "Query applied successfully.",
             //     timeout: 5000,
             // });
-        })
-        .catch((error) => {
+          })
+          .catch((error) => {
             $q.notify({
-                type: "negative",
-                message: "Something went wrong!",
-                timeout: 5000,
+              type: "negative",
+              message: "Something went wrong!",
+              timeout: 5000,
             });
-        });
+          });
       }
-  }
+    };
 
     return {
       t,

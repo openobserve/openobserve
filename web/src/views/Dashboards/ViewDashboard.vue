@@ -22,7 +22,7 @@
           color="white"
           text-color="black"
           no-caps
-          :label="draggable? t(`Cancel`): t(`Edit`)"
+          :label="draggable ? t(`Cancel`) : t(`Edit`)"
           @click="isDraggableClick"
         />
         <!-- <q-btn
@@ -35,8 +35,7 @@
           :label="t(`Edit Panel`)"
           @click="addNewPanelOnClick"
         /> -->
-       
-        
+
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
@@ -65,10 +64,7 @@
           text-color="black"
           @click="goBackToDashboardList"
         />
-        <date-time
-          ref="refDateTime"
-          @date-change="dateChange"
-        />
+        <date-time ref="refDateTime" @date-change="dateChange" />
         <!-- <q-btn
           class="q-ml-md q-mb-xs text-bold"
           padding="sm lg"
@@ -118,7 +114,11 @@
           drag-allow-from=".drag-allow"
         >
           <div>
-            <PanelContainer  @updated:chart="onUpdatePanel" :data="item" :selectedTimeDate="currentTimeObj" >
+            <PanelContainer
+              @updated:chart="onUpdatePanel"
+              :data="item"
+              :selectedTimeDate="currentTimeObj"
+            >
             </PanelContainer>
           </div>
         </grid-item>
@@ -132,14 +132,17 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, computed, watch, onMounted, onActivated } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onActivated,
+} from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import AddUpdateOrganization from "../../components/organizations/AddUpdateOrganization.vue";
-import JoinOrganization from "../../components/organizations/JoinOrganization.vue";
-import QTablePagination from "../../components/shared/grid/Pagination.vue";
-import NoData from "../../components/shared/grid/NoData.vue";
 import dashboardService from "../../services/dashboards";
 import DateTime from "../../plugins/logs/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
@@ -147,34 +150,29 @@ import { useRouter } from "vue-router";
 import {
   deletePanelFromDashboard,
   getConsumableDateTime,
-  getDashboard
+  getDashboard,
 } from "../../utils/commons.ts";
 import { toRaw, unref, reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
-import {useRoute} from 'vue-router'
+import { useRoute } from "vue-router";
 import { deletePanel, updateDashboard } from "../../utils/commons";
 
 export default defineComponent({
   name: "ViewDashboard",
   components: {
-    AddUpdateOrganization,
-    JoinOrganization,
-    QTablePagination,
-    NoData,
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
     DateTime,
     PanelContainer,
-},
+  },
   setup() {
     const { t } = useI18n();
-    const selectedPerPage = ref<number>(20);
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
     const currentDashboardData = reactive({
-      data:{}
-    })
+      data: {},
+    });
 
     const refDateTime: any = ref(null);
     const $q = useQuasar();
@@ -207,7 +205,7 @@ export default defineComponent({
 
     const goBackToDashboardList = () => {
       goBack();
-    }
+    };
 
     // delete dashboard remove the data from database and update store variable and redirect to dashboardList page
     const deleteDashboard = async (dashboardId: String) => {
@@ -232,15 +230,16 @@ export default defineComponent({
 
     const deleteDashboardOnClick = async () => {
       await deleteDashboard(route.query.dashboard);
-    }
+    };
 
     // save the dashboard value
     const saveDashboard = async (dashboardId: String) => {
       await updateDashboard(
-        store, 
+        store,
         store.state.selectedOrganization.identifier,
         route.query.dashboard,
-        currentDashboardData.data)
+        currentDashboardData.data
+      );
       // const currentDashboard = currentDashboardData.data
       // await dashboardService
       //   .save(
@@ -255,14 +254,17 @@ export default defineComponent({
       //       timeout: 5000,
       //     });
       //   });
-      currentDashboardData.data = await getDashboard(this.store, this.$route.query.dashboard)
-      
+      currentDashboardData.data = await getDashboard(
+        this.store,
+        this.$route.query.dashboard
+      );
+
       //goBack()
     };
 
     const saveDashboardOnClick = async () => {
       await saveDashboard(route.query.dashboard);
-    }
+    };
 
     //get current dashboard Id
     const getDashboard = () => {
@@ -273,13 +275,13 @@ export default defineComponent({
     const addNewPanel = (dashboardId: String) => {
       return router.push({
         path: "/addPanel",
-        query: {  dashboard: dashboardId }
+        query: { dashboard: dashboardId },
       });
     };
 
     const addPanelData = () => {
-      addNewPanel(route.query.dashboard)
-    }
+      addNewPanel(route.query.dashboard);
+    };
 
     const deleteExistingPanel = async (
       panelDataElement: any,
@@ -295,7 +297,7 @@ export default defineComponent({
     };
 
     let list = computed(function () {
-       return [toRaw(currentDashboardData.data)];
+      return [toRaw(currentDashboardData.data)];
     });
 
     initialize();
@@ -340,8 +342,8 @@ export default defineComponent({
     };
   },
   methods: {
-    isDraggableClick(evt, row){
-      this.draggable = !this.draggable
+    isDraggableClick(evt, row) {
+      this.draggable = !this.draggable;
     },
     async onUpdatePanel(panelDataElementValue: any) {
       // let dashboardList = toRaw(this.store.state.allDashboardList);
@@ -350,11 +352,22 @@ export default defineComponent({
       //   this.$route.query.dashboard,
       //   dashboardList
       // );
-      console.log('deleting', this.$route.query.dashboard, panelDataElementValue, panelDataElementValue.id);
-      
-      await deletePanel(this.store, this.$route.query.dashboard, panelDataElementValue.id)
-      this.currentDashboardData.data = await getDashboard(this.store, this.$route.query.dashboard)
+      console.log(
+        "deleting",
+        this.$route.query.dashboard,
+        panelDataElementValue,
+        panelDataElementValue.id
+      );
 
+      await deletePanel(
+        this.store,
+        this.$route.query.dashboard,
+        panelDataElementValue.id
+      );
+      this.currentDashboardData.data = await getDashboard(
+        this.store,
+        this.$route.query.dashboard
+      );
     },
     updateCurrentDateTimeObj() {
       this.computedTimeObj = Date.now();
@@ -382,7 +395,7 @@ export default defineComponent({
       this.eventLog.push(msg);
     },
     resizedEvent: function (i, newX, newY, newHPx, newWPx) {
-      window.dispatchEvent(new Event('resize'))
+      window.dispatchEvent(new Event("resize"));
       const msg =
         "RESIZED i=" +
         i +
@@ -444,8 +457,7 @@ export default defineComponent({
 
       return 0;
     },
-    getMinimumHeight(type){
-
+    getMinimumHeight(type) {
       switch (type) {
         case "area":
         case "bar":
@@ -454,14 +466,13 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 13
+          return 13;
           break;
-      
+
         default:
           break;
       }
-     
-    }
+    },
   },
   async activated() {
     // //get dashboard list from the store
@@ -472,8 +483,11 @@ export default defineComponent({
     //       this.currentDashboardData.data = JSON.parse(dashboard.details)
     //     }
     //   }
-      this.currentDashboardData.data = await getDashboard(this.store, this.$route.query.dashboard)
-    },
+    this.currentDashboardData.data = await getDashboard(
+      this.store,
+      this.$route.query.dashboard
+    );
+  },
 });
 </script>
 
@@ -495,7 +509,7 @@ export default defineComponent({
 // }
 
 .vue-grid-item {
- border: 1px solid black;
+  border: 1px solid black;
 }
 
 .vue-grid-item .resizing {
