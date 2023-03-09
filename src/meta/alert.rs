@@ -14,6 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::fmt;
 use utoipa::ToSchema;
 
 use super::search::Query;
@@ -157,9 +158,34 @@ pub struct Alert {
     pub duration: i64,
     pub frequency: i64,
     pub time_between_alerts: i64,
-    pub destination: String,
+    pub destination: Vec<AlertDestination>,
     #[serde(default)]
     pub is_real_time: bool,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct AlertDestination {
+    pub url: String,
+    #[serde(rename = "type")]
+    pub dest_type: AlertDestType,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum AlertDestType {
+    #[default]
+    #[serde(rename = "slack")]
+    Slack,
+    #[serde(rename = "alertmanager")]
+    AlertManager,
+}
+
+impl fmt::Display for AlertDestType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AlertDestType::Slack => write!(f, "slack"),
+            AlertDestType::AlertManager => write!(f, "alertmanager"),
+        }
+    }
 }
 
 impl PartialEq for Alert {
