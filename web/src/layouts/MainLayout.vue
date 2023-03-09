@@ -20,13 +20,13 @@
         <img
           v-if="!miniMode"
           class="appLogo"
-          src="/src/assets/images/common/app_logo_zo.png"
+          src="~@/assets/images/common/app_logo_zo.png"
           @click="goToHome"
         />
         <img
           v-else
           class="appLogo__mini"
-          src="/src/assets/images/common/mini_logo.svg"
+          src="~@/assets/images/common/mini_logo.svg"
         />
         <q-btn
           dense

@@ -17,7 +17,7 @@
   <q-page class="aboutPage">
     <div class="about_head">
       <img
-        src="/src/assets/images/common/app_logo_zo.png"
+        src="~@/assets/images/common/app_logo_zo.png"
         class="logo"
         width="177"
       />
