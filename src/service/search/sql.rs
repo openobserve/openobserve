@@ -664,6 +664,7 @@ mod tests {
         let req: crate::meta::search::Request = crate::meta::search::Request {
             query,
             aggs: HashMap::new(),
+            encoding: crate::meta::search::RequestEncoding::Empty,
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();

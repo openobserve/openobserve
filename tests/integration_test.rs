@@ -72,40 +72,63 @@ mod tests {
         for _i in 0..3 {
             e2e_1_post_bulk().await;
         }
+
+        // ingest
         e2e_post_json().await;
         e2e_post_multi().await;
         e2e_post_trace().await;
         e2e_post_metrics().await;
+
+        // streams
         e2e_get_stream().await;
+        e2e_get_stream_schema().await;
+        e2e_get_org_summary().await;
+        e2e_post_stream_settings().await;
+        e2e_get_org().await;
+
+        // functions
         #[cfg(feature = "zo_functions")]
         e2e_post_query_functions().await;
         #[cfg(feature = "zo_functions")]
         e2e_post_stream_functions().await;
         #[cfg(feature = "zo_functions")]
-        e2e_list_transforms().await;
+        e2e_list_functions().await;
+        #[cfg(feature = "zo_functions")]
+        e2e_list_stream_functions().await;
         #[cfg(feature = "zo_functions")]
         e2e_delete_query_functions().await;
         #[cfg(feature = "zo_functions")]
         e2e_delete_stream_functions().await;
-        e2e_get_stream_schema().await;
+
+        // search
         e2e_search().await;
         e2e_search_around().await;
+
+        // users
         e2e_post_user().await;
         e2e_list_users().await;
         e2e_delete_user().await;
+        e2e_get_organizations().await;
+        e2e_get_organization_by_username().await;
+        e2e_get_user_passcode().await;
+        e2e_update_user_passcode().await;
+
+        // dashboards
         e2e_post_dashboard().await;
         e2e_list_dashboards().await;
         e2e_get_dashboard().await;
         e2e_delete_dashboard().await;
-        e2e_get_org_summary().await;
+
+        // alert
         e2e_post_alert().await;
+        e2e_get_alert().await;
         e2e_delete_alert().await;
         e2e_list_alerts().await;
         e2e_list_real_time_alerts().await;
+
+        // others
         e2e_health_check().await;
         e2e_cache_status().await;
-        e2e_post_stream_settings().await;
-        e2e_get_org().await;
         e2e_100_tear_down().await;
     }
 
@@ -236,6 +259,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
     #[cfg(feature = "zo_functions")]
     async fn e2e_post_query_functions() {
         let auth = setup();
@@ -257,6 +281,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
     #[cfg(feature = "zo_functions")]
     async fn e2e_post_stream_functions() {
         let auth = setup();
@@ -286,7 +311,7 @@ mod tests {
     }
 
     #[cfg(feature = "zo_functions")]
-    async fn e2e_list_transforms() {
+    async fn e2e_list_functions() {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -304,6 +329,27 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
+    #[cfg(feature = "zo_functions")]
+    async fn e2e_list_stream_functions() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/{}/functions", "e2e", "olympics"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
     #[cfg(feature = "zo_functions")]
     async fn e2e_delete_query_functions() {
         let auth = setup();
@@ -323,6 +369,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
     #[cfg(feature = "zo_functions")]
     async fn e2e_delete_stream_functions() {
         let auth = setup();
@@ -415,6 +462,92 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
+    async fn e2e_get_organizations() {
+        e2e_post_user().await;
+
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/organizations", "e2e",))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_get_organization_by_username() {
+        e2e_post_user().await;
+
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!(
+                "/auth/organizarions_by_username/{}",
+                "root@example.com"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_get_user_passcode() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/organizations/passcode", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_update_user_passcode() {
+        let auth = setup();
+        let body_str = r#""#;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/{}/organizations/passcode", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
     async fn e2e_list_dashboards() {
         let auth = setup();
         let app = test::init_service(
@@ -433,12 +566,13 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
     async fn e2e_post_user() {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
-                                "role": "admin"
+                                "role": "member"
                             }"#;
         let app = test::init_service(
             App::new()
@@ -708,6 +842,29 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
+    async fn e2e_get_alert() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!(
+                "/api/{}/{}/alerts/{}",
+                "e2e", "olympics_schema", "alertChk"
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        log::info!("{:?}", resp.status());
+        assert!(resp.status().is_success());
+    }
+
     async fn e2e_delete_alert() {
         let auth = setup();
         let app = test::init_service(
@@ -730,6 +887,7 @@ mod tests {
         log::info!("{:?}", resp.status());
         assert!(resp.status().is_success());
     }
+
     async fn e2e_list_alerts() {
         let auth = setup();
         let app = test::init_service(
@@ -748,6 +906,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
     async fn e2e_list_real_time_alerts() {
         let auth = setup();
         let app = test::init_service(
@@ -786,6 +945,7 @@ mod tests {
         // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
+
     async fn e2e_cache_status() {
         let auth = setup();
         let app = test::init_service(

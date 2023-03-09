@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # cargo llvm-cov >report.json && ls -l | grep TOTAL report.json | xargs > coverage.txt
-summary="$(RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --ignore-filename-regex job >report.json && ls -l | grep TOTAL report.json | xargs)"
+summary="$(RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --features zo_functions,tmpcache --ignore-filename-regex job >report.json && ls -l | grep TOTAL report.json | xargs)"
 echo "Coverage Summary $summary %"
 
 region_cov="$(cut -d' ' -f4 <<<"$summary")"
@@ -17,9 +17,9 @@ echo "line_cov $line_cov"
 
 # enable threshold
 #COVERAGE_THRESHOLD=80
-FUNC_COV_THRESHOLD=55
-LINE_COV_THRESHOLD=50
-REGION_COV_THRESHOLD=35
+FUNC_COV_THRESHOLD=60
+LINE_COV_THRESHOLD=53
+REGION_COV_THRESHOLD=40
 
 # clean up
 # find ./target -name llvm-cov-target -type d|xargs rm -fR

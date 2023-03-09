@@ -24,6 +24,7 @@ use crate::infra::config::CONFIG;
 use crate::meta::common::FileMeta;
 use crate::meta::StreamType;
 
+#[inline(always)]
 pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {
     let last_file_suffix_stream = &file_name.rfind('_').unwrap() + 1;
     let last_file_suffix =
@@ -31,6 +32,7 @@ pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {
     last_file_suffix.parse::<u32>().unwrap() + 1
 }
 
+#[inline(always)]
 pub fn get_stream_file_num_v1(file_name: &str) -> u32 {
     let last_file_suffix_stream = &file_name.rfind('_').unwrap() + 1;
     let last_file_suffix =
@@ -38,6 +40,7 @@ pub fn get_stream_file_num_v1(file_name: &str) -> u32 {
     last_file_suffix.parse::<u32>().unwrap()
 }
 
+#[inline(always)]
 pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String {
     // creates file name like "./data/zincobserve/olympics/olympics#2022#09#13#13_1.json"
     format!(
@@ -52,6 +55,10 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
     )
 }
 
+#[inline]
+pub fn is_local_disk_storage() -> bool {
+    CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
+}
 pub async fn populate_file_meta(
     schema: Arc<Schema>,
     batch: Vec<Vec<RecordBatch>>,
@@ -77,11 +84,6 @@ pub async fn populate_file_meta(
     file_meta.min_ts = record.get("min").unwrap().as_i64().unwrap();
     file_meta.max_ts = record.get("max").unwrap().as_i64().unwrap();
     file_meta.records = record.get("num_records").unwrap().as_u64().unwrap();
-}
-
-#[inline]
-pub fn is_local_disk_storage() -> bool {
-    CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
 
 #[cfg(test)]

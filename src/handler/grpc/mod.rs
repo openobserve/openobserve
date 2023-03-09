@@ -97,6 +97,8 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections::HashMap;
+
     #[actix_web::test]
     async fn test_get_file_meta() {
         let file_meta = meta::common::FileMeta {
@@ -111,5 +113,29 @@ mod test {
         let resp = meta::common::FileMeta::from(&rpc_meta);
 
         assert_eq!(file_meta, resp);
+    }
+
+    #[actix_web::test]
+    async fn test_search_convert() {
+        let mut req = meta::search::Request {
+            query: meta::search::Query {
+                sql: "SELECT * FROM test".to_string(),
+                sql_mode: "default".to_string(),
+                from: 0,
+                size: 100,
+                start_time: 0,
+                end_time: 0,
+                track_total_hits: false,
+            },
+            aggs: HashMap::new(),
+            encoding: "base64".into(),
+        };
+        req.aggs
+            .insert("test".to_string(), "SELECT * FROM test".to_string());
+
+        let rpc_req = cluster_rpc::SearchRequest::from(req.clone());
+
+        assert_eq!(rpc_req.query.as_ref().unwrap().sql, req.query.sql);
+        assert_eq!(rpc_req.query.as_ref().unwrap().size, req.query.size as i32);
     }
 }

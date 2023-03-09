@@ -53,6 +53,32 @@ mod test_utils {
     use tonic::metadata::MetadataValue;
 
     use super::*;
+
+    #[actix_web::test]
+    async fn test_check_no_auth() {
+        ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "root@example.com".to_string(),
+                password: "Complexpass#123".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                salt: "Complexpass#123".to_string(),
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                token: "token".to_string(),
+                org: "dummy".to_owned(),
+            },
+        );
+        let mut request = tonic::Request::new(());
+
+        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap();
+        let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
+        meta.insert("authorization2", token.clone());
+
+        let res = check_auth(request);
+        assert!(res.is_err())
+    }
+
     #[actix_web::test]
     async fn test_check_auth() {
         ROOT_USER.insert(
@@ -76,5 +102,30 @@ mod test_utils {
 
         let res = check_auth(request);
         assert!(res.is_ok())
+    }
+
+    #[actix_web::test]
+    async fn test_check_err_auth() {
+        ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "root@example.com".to_string(),
+                password: "Complexpass#1234".to_string(),
+                role: crate::meta::user::UserRole::Root,
+                salt: "Complexpass#1234".to_string(),
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                token: "token4".to_string(),
+                org: "dummy".to_owned(),
+            },
+        );
+        let mut request = tonic::Request::new(());
+
+        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap();
+        let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
+        meta.insert("authorization", token.clone());
+
+        let res = check_auth(request);
+        assert!(res.is_err())
     }
 }
