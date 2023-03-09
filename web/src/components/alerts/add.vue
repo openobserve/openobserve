@@ -474,7 +474,6 @@ export default defineComponent({
     );
 
     const filterColumns = (val: String, update: Function) => {
-      console.log(val);
       if (val === "") {
         update(() => {
           filteredColumns.value = [...triggerCols.value];
