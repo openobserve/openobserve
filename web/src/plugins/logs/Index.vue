@@ -58,10 +58,9 @@
                 Result not found.
                 <div v-html="searchObj.data.errorMsg"></div>
                 <div
-                  :v-show="
-                    searchObj.data.errorMsg.indexOf(
-                      'No fullNo full text search field found'
-                    )
+                  v-show="
+                    searchObj.data.errorMsg ==
+                    'No full text search field found.'
                   "
                 >
                   <q-btn
@@ -69,7 +68,7 @@
                     unelevated
                     size="sm"
                     bg-secondary
-                    class="no-border"
+                    class="no-border bg-secondary text-white"
                     :to="
                       '/logstreams?dialog=' +
                       searchObj.data.stream.selectedStream.label
