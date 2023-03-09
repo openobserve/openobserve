@@ -818,7 +818,10 @@ mod tests {
                                 "duration": 5,
                                 "frequency": 1,
                                 "time_between_alerts": 10,
-                                "destination": "https://dummy/alert"
+                                "destination":[{
+                                    "url":"https://dummy/alert",
+                                    "type":"slack"
+                                }] 
                             }"#;
         let app = test::init_service(
             App::new()
