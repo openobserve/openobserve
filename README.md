@@ -68,10 +68,6 @@ You can also try ZincObserve without installing it in under 2 minutes by trying 
 ![Home](./screenshots/zo_ingestion.png)
 
 
-# How to develop & contribute to Zinc
-
-Check the [contributing guide](./CONTRIBUTING.md)
-
 # Community
 
 - #### How to develop and contribute to ZincObserve
