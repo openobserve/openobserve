@@ -148,7 +148,7 @@ import { Parser } from "node-sql-parser";
 import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import { useLocalLogsObj } from "../../utils/zincutils";
+import { useLocalLogsObj, b64EncodeUnicode } from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
 
@@ -620,6 +620,9 @@ export default defineComponent({
         if (searchObj.data.resultGrid.currentPage > 0) {
           delete req.aggs;
         }
+
+        req.query.sql = b64EncodeUnicode(req.query.sql);
+        req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
 
         return req;
       } catch (e) {
