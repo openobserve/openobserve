@@ -28,20 +28,20 @@ const DEFAULT: &str = "default";
 const CUSTOM: &str = "custom";
 const THRESHOLD: i64 = 9383939382;
 
-#[derive(Serialize, Clone, PartialEq, Eq)]
+#[derive(Serialize)]
 struct Organization {
     identifier: String,
     label: String,
 }
 
-#[derive(Serialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Clone)]
 struct User {
     first_name: String,
     last_name: String,
     email: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
