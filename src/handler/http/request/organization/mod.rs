@@ -98,7 +98,7 @@ pub async fn organizarions_by_username(user_id: web::Path<String>) -> Result<Htt
 
 #[get("/{org_id}/organizations")]
 pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
-    //let org = org_id.into_inner();
+    // let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut id = 0;
 
