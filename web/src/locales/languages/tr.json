@@ -32,7 +32,6 @@
     "signOut": "Oturumu Çık",
     "account": "Hesap",
     "feedback": "Geribildirim",
-    "zincSearch": "ÇinkoSearch",
     "documentation": "Dokümanlar",
     "openapi": "OpenAPI",
     "tickets": "Bilet",
@@ -46,8 +45,8 @@
     "docs": "Dokümanlar"
   },
   "about": {
-    "name": "Çinko",
-    "introduction": "Modern açık kaynak arama motoru."
+    "name": "ZincObserve",
+    "introduction": "Observability simplified."
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
