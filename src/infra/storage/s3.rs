@@ -15,9 +15,10 @@
 use async_once::AsyncOnce;
 use async_trait::async_trait;
 use aws_config::default_provider::credentials::DefaultCredentialsChain;
-use aws_config::{timeout::TimeoutConfig, SdkConfig};
+use aws_config::retry::RetryConfig;
+use aws_config::timeout::TimeoutConfig;
 use aws_sdk_s3::model::{Delete, ObjectIdentifier};
-use aws_sdk_s3::{Client, Credentials, Region};
+use aws_sdk_s3::{Client, Config, Credentials, Region};
 use std::{sync::Arc, time::Duration};
 
 use super::FileStorage;
@@ -25,8 +26,8 @@ use crate::common::utils::is_local_disk_storage;
 use crate::infra::config::CONFIG;
 
 lazy_static! {
-    static ref S3CONFIG: AsyncOnce<Option<Arc<SdkConfig>>> =
-        AsyncOnce::new(async { init_s3config().await });
+    static ref S3CLIENT: AsyncOnce<Option<Client>> =
+        AsyncOnce::new(async { init_s3_client().await });
 }
 
 pub struct S3 {}
@@ -35,8 +36,7 @@ pub struct S3 {}
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
         let mut files = Vec::new();
-        let s3config = S3CONFIG.get().await.clone().unwrap().clone();
-        let client = Client::new(&s3config);
+        let client = S3CLIENT.get().await.clone().unwrap();
         let mut start_after: String = "".to_string();
         loop {
             let objects = client
@@ -64,8 +64,7 @@ impl FileStorage for S3 {
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
-        let s3config = S3CONFIG.get().await.clone().unwrap();
-        let client = Client::new(&s3config);
+        let client = S3CLIENT.get().await.clone().unwrap();
         let object = match client
             .get_object()
             .bucket(&CONFIG.s3.bucket_name)
@@ -83,8 +82,7 @@ impl FileStorage for S3 {
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
-        let s3config = S3CONFIG.get().await.clone().unwrap();
-        let client = Client::new(&s3config);
+        let client = S3CLIENT.get().await.clone().unwrap();
         let result = client
             .put_object()
             .bucket(&CONFIG.s3.bucket_name)
@@ -120,12 +118,12 @@ impl FileStorage for S3 {
             return Ok(());
         }
 
+        let client = S3CLIENT.get().await.clone().unwrap();
+
         let step = 100;
         let mut start = 0;
         let files_len = files.len();
         while start < files_len {
-            let s3config = S3CONFIG.get().await.clone().unwrap();
-            let client = Client::new(&s3config);
             let result = client
                 .delete_objects()
                 .bucket(&CONFIG.s3.bucket_name)
@@ -163,8 +161,7 @@ impl FileStorage for S3 {
 
 impl S3 {
     async fn del_for_gcs(&self, file: &str) -> Result<(), anyhow::Error> {
-        let s3config = S3CONFIG.get().await.clone().unwrap();
-        let client = Client::new(&s3config);
+        let client = S3CLIENT.get().await.clone().unwrap();
         let result = client
             .delete_object()
             .bucket(&CONFIG.s3.bucket_name)
@@ -184,15 +181,18 @@ impl S3 {
     }
 }
 
-async fn init_s3config() -> Option<Arc<SdkConfig>> {
+async fn init_s3_config() -> Option<Config> {
     if is_local_disk_storage() {
         return None;
     }
 
-    let mut s3config = aws_config::from_env();
+    let mut s3config = aws_sdk_s3::config::Builder::new();
 
     if !CONFIG.s3.server_url.is_empty() {
         s3config = s3config.endpoint_url(&CONFIG.s3.server_url);
+        if CONFIG.s3.provider.eq("minio") {
+            s3config = s3config.force_path_style(true);
+        }
     }
     if !CONFIG.s3.region_name.is_empty() {
         s3config = s3config.region(Region::new(&CONFIG.s3.region_name));
@@ -211,11 +211,23 @@ async fn init_s3config() -> Option<Arc<SdkConfig>> {
         s3config = s3config.credentials_provider(creds);
     }
 
+    let retry_config = RetryConfig::standard().with_max_attempts(5);
+    let sleep = aws_smithy_async::rt::sleep::TokioSleep::new();
+    s3config = s3config
+        .retry_config(retry_config)
+        .sleep_impl(Arc::new(sleep));
+
     s3config = s3config.timeout_config(
         TimeoutConfig::builder()
             .connect_timeout(Duration::from_secs(10))
             .build(),
     );
-    let s3config = s3config.load().await;
-    Some(Arc::new(s3config))
+    let s3config = s3config.build();
+    Some(s3config)
+}
+
+async fn init_s3_client() -> Option<Client> {
+    let s3config = init_s3_config().await.unwrap();
+    let client = Client::from_conf(s3config);
+    Some(client)
 }
