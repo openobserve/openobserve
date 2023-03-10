@@ -10,20 +10,28 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import http from "./http";
 
 const dashboards = {
-  list: (organization: string) => {
+  list: (
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    name: string,
+    organization: string
+  ) => {
     return http().get(
-      `/api/${organization}/dashboards`
+      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
   },
   create: (organization: string, dashboardID: String, data: any) => {
     return http().post(`/api/${organization}/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   },
   delete: (organization: string, dashboardID: String) => {
+    console.log(dashboardID)
     return http().delete(`/api/${organization}/dashboards/${dashboardID}`);
   },
   get_Dashboard: (org_identifier: string) => {

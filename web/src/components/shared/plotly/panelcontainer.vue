@@ -16,7 +16,6 @@
 <template>
   <div class="plotlycontainer">
     <div
-      class="q-pa-sm q-gutter-sm innerPlotlycontainer"
       v-if="getVizualizationSelector() === 'BarChart'"
     >
       <!-- inside barchart-- {{ plotData }}-- -->
@@ -28,7 +27,6 @@
       <ReactiveBarChart :data="plotData"></ReactiveBarChart>
     </div>
     <div
-      class="q-pa-sm q-gutter-sm innerPlotlycontainer"
       v-else-if="getVizualizationSelector() === 'TimeSeries'"
     >
       <PanelHeader
@@ -39,7 +37,6 @@
       <ReactiveLineChart :data="plotData"></ReactiveLineChart>
     </div>
     <div
-      class="q-pa-sm col-4 q-gutter-sm innerPlotlycontainer"
       :id="panelDataElement.id"
       v-else-if="getVizualizationSelector() === 'Table'"
     >
@@ -51,7 +48,6 @@
       <ReactiveTableChart ref="plotChart" :data="plotData"></ReactiveTableChart>
     </div>
     <div
-      class="q-pa-sm q-gutter-sm innerPlotlycontainer"
       v-else-if="getVizualizationSelector() === 'Stat'"
     >
       <PanelHeader
@@ -59,7 +55,7 @@
         :dashboardId="getDashboardId()"
         @clicked="onClickChild"
       />
-      <ReactiveTableChart ref="plotChart" :data="plotData" />
+      <ReactiveTableChart ref="plotChart" :data="plotData"/>
     </div>
     <div v-else>
       <h2>{{ getVizualizationSelector() }}</h2>
@@ -81,7 +77,7 @@ import * as Plotly from "plotly.js";
 import { computed, defineComponent, onMounted, onUpdated, ref } from "vue";
 import { toRaw, unref, watch } from "vue";
 import { useStore } from "vuex";
-import { modifySQLQuery } from "../../../utils/commons";
+import {modifySQLQuery} from '../../../utils/commons'
 
 export default defineComponent({
   name: "PanelContainer",
@@ -108,14 +104,14 @@ export default defineComponent({
 
     watch(selectedTimeObj, () => {
       if (toRaw(unref(selectedTimeObj))) {
-        renderPanel(props.panelDataElement, false);
+        renderPanel(props.panelDataElement, false)
       }
     });
 
     const renderPanel = async (panelDataElement: any, onMounted: boolean) => {
       const chartParams = {
         title: "Found " + "2" + " hits in " + "10" + " ms",
-      };
+      };      
       const sqlQueryModified = modifySQLQuery(
         toRaw(unref(selectedTimeObj)),
         panelDataElement.query[0]
@@ -124,13 +120,19 @@ export default defineComponent({
         query: { sql: sqlQueryModified, sql_mode: "full" },
       };
 
+      console.log("query===",query);
+      
       const panelData = toRaw(store.state.currentPanelsData);
+      console.log("panelData====",panelData);
+      
       const existingPanel = panelData.find(
-        (panel: any) => panel.id == panelDataElement.id
+        (panel:any) => panel.id == panelDataElement.id
       );
+      console.log("existingPanel---",existingPanel);
+      
 
       if (existingPanel && onMounted) {
-        plotData.value = existingPanel;
+          plotData.value = existingPanel;
       } else {
         await queryService
           .runquery(query, store.state.selectedOrganization.identifier)
@@ -155,14 +157,12 @@ export default defineComponent({
                 data_vals.map((row) => row[colIndex])
               );
 
-              const styledHeader = header_vals.map(
-                (header) => "<b>" + header + "</b>"
-              );
+              const styledHeader = header_vals.map((header) => "<b>" + header + "</b>");
               const columnColor = output[0].map((col: any, index: any) => {
                 if (index % 2 == 0) {
                   return "#FFF";
                 } else {
-                  return "#C9CCE6";
+                  return "#f7f7f7";
                 }
               });
 
@@ -172,18 +172,18 @@ export default defineComponent({
                 header: {
                   values: styledHeader,
                   align: "center",
-                  height: 30,
-                  line: { width: 1, color: "black" },
-                  fill: { color: "#7A80C2" },
-                  font: { family: "Arial", size: 14, color: "white" },
+                  height: 28,
+                  line: { width: 1, color: "#91909091" },
+                  fill: { color: "#B1B5E5" },
+                  font: { family: "Nunito Sans", size: 12, color: "black" },
                 },
                 cells: {
                   values: output,
                   align: "center",
-                  height: 25,
-                  line: { color: "black", width: 1 },
+                  height: 28,
+                  line: { color: "#D4D4D4", width: 1 },
                   fill: { color: [columnColor] },
-                  font: { family: "Arial", size: 11, color: ["black"] },
+                  font: { family: "Nunito Sans", size: 12, color: ["black"] },
                 },
               };
 
@@ -262,8 +262,5 @@ export default defineComponent({
 <style lang="scss" scoped>
 .plotlycontainer {
   height: 100%;
-}
-.innerPlotlycontainer {
-  height: 90%;
 }
 </style>
