@@ -583,8 +583,6 @@ export default defineComponent({
               .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
               .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=");
 
-            alert(whereClause);
-
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
               parsedSQL.forEach((node: any, index: any) => {
