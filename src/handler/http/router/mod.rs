@@ -49,33 +49,36 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
         .max_age(3600);
     let cors = Arc::new(cors);
 
-    cfg.service(status::healthz);
-    cfg.service(
+    let scope = web::scope(&CONFIG.common.base_uri);
+    let scope = scope.service(status::healthz);
+    let scope = scope.service(
         web::scope("/auth")
             .wrap(cors.clone())
             .service(organizarions_by_username)
             .service(users::authentication),
     );
-    cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
+    let scope = scope.service(web::scope("/config").wrap(cors).service(status::zo_config));
 
-    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
+    let scope = scope.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
         Url::new("api", "/api-doc/openapi.json"),
         openapi::ApiDoc::openapi(),
     )]));
 
     if CONFIG.common.ui_enabled {
-        cfg.service(web::redirect("/", "./web/"));
-        cfg.service(web::redirect("/web/ingestion/curl", "../ingestion"));
-        cfg.service(web::redirect("/web/ingestion/fluentbit", "../ingestion"));
-        cfg.service(web::redirect("/web/ingestion/fluentd", "../ingestion"));
-        cfg.service(web::redirect("/web/ingestion/vector", "../ingestion"));
-        cfg.service(ui::serve);
+        let scope = scope.service(web::redirect("/", "./web/"));
+        let scope = scope.service(web::redirect("/web/ingestion/curl", "../ingestion"));
+        let scope = scope.service(web::redirect("/web/ingestion/fluentbit", "../ingestion"));
+        let scope = scope.service(web::redirect("/web/ingestion/fluentd", "../ingestion"));
+        let scope = scope.service(web::redirect("/web/ingestion/vector", "../ingestion"));
+        let scope = scope.service(ui::serve);
+        cfg.service(scope);
+    } else {
+        cfg.service(scope);
     }
 }
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
-    //let ingestion_auth = HttpAuthentication::basic(passcode_validator);
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -89,7 +92,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = Arc::new(cors);
 
     cfg.service(
-        web::scope("/api")
+        web::scope(format!("{}/api", CONFIG.common.base_uri).as_str())
             .wrap(auth)
             .wrap(cors)
             .service(status::cache_status)

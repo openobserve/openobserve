@@ -20,6 +20,7 @@ use actix_web::{
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
 use crate::common::auth::{get_hash, is_root_user};
+use crate::infra::config::CONFIG;
 use crate::meta::user::UserRole;
 use crate::service::users;
 
@@ -27,7 +28,14 @@ pub async fn validator(
     req: ServiceRequest,
     credentials: BasicAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let path = req.request().path().strip_prefix("/api/").unwrap();
+    let path = match req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str())
+    {
+        Some(path) => path,
+        None => req.request().path(),
+    };
     match validate_credentials(
         credentials.user_id(),
         credentials.password().unwrap().trim(),
