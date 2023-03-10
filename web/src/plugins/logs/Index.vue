@@ -623,7 +623,9 @@ export default defineComponent({
         }
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+        if (!searchObj.meta.sqlMode) {
+          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+        }
 
         return req;
       } catch (e) {
