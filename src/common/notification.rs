@@ -107,10 +107,16 @@ mod tests {
             is_ingest_time: true,
         };
         let res = send_notification(
-            &vec![AlertDestination {
-                url: "https://httpbin.org/post".to_string(),
-                dest_type: AlertDestType::Slack,
-            }],
+            &vec![
+                AlertDestination {
+                    url: "https://httpbin.org/post".to_string(),
+                    dest_type: AlertDestType::Slack,
+                },
+                AlertDestination {
+                    url: "https://httpbin.org/post".to_string(),
+                    dest_type: AlertDestType::AlertManager,
+                },
+            ],
             &obj,
         )
         .await;

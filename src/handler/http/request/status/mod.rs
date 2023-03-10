@@ -18,18 +18,16 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::Error;
 
-use crate::{
-    infra::{cache, cluster, config},
-    meta::functions::ZoFunction,
-    service::search::datafusion::DEFAULT_FUNCTIONS,
-};
+use crate::infra::{cache, cluster, config};
+use crate::meta::functions::ZoFunction;
+use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Serialize)]
 struct HealthzResponse {
     status: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
     commit_hash: String,

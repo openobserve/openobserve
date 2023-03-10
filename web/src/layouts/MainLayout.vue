@@ -280,7 +280,7 @@ export default defineComponent({
       },
       {
         title: t("menu.slack"),
-        icon: "img:" + getImageURL("/images/common/slack.svg"),
+        icon: "img:" + getImageURL("images/common/slack.svg"),
         link: "https://join.slack.com/t/zincsearch/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
