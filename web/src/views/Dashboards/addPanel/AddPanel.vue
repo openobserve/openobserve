@@ -185,7 +185,7 @@ export default defineComponent({
 
       await nextTick();
       return router.push({
-        path: "/viewDashboard?dashbpard=" + dashId,
+        path: "/viewDashboard?dashboard=" + dashId,
       });
     };
 
