@@ -434,6 +434,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.s3.provider = "oss".to_string();
         }
     }
+    cfg.s3.provider = cfg.s3.provider.to_lowercase();
     Ok(())
 }
 
