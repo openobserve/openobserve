@@ -60,8 +60,8 @@ struct OrganizationResponse {
     data: Vec<OrganizationDetails>,
 }
 
-#[get("/organizarions_by_username/{user_name}")]
-pub async fn organizarions_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
+#[get("/organizations_by_username/{user_name}")]
+pub async fn organizations_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let mut orgs = Vec::new();
     let mut org_names = HashSet::new();
     let user_id = user_id.to_string();
