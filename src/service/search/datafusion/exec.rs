@@ -397,7 +397,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
                 continue;
             }
             if in_word {
-                let field = sql[start_pos..i].to_string();
+                let field = sql_chars[start_pos..i].iter().collect::<String>();
                 if field.to_lowercase().eq("from") {
                     from_pos = i;
                     break;

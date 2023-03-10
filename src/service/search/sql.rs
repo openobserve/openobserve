@@ -584,48 +584,88 @@ impl Sql {
 
 // Hack for double quote
 fn add_quote_for_sql(text: &str) -> String {
-    let mut new_text = Vec::new();
-    let text_len = text.len();
-    let text_bytes = text.as_bytes();
-
-    let re = Regex::new(r##"\b[a-zA-Z0-9\._/:@-]+\b"##).unwrap();
-    let re_lower = Regex::new(r##"^[a-z0-9_]+$"##).unwrap();
-    let mut caps = Vec::new();
-    for cap in re.captures_iter(text) {
-        caps.push(cap.get(0).unwrap());
+    let mut tokens = Vec::new();
+    let text_chars = text.chars().collect::<Vec<char>>();
+    let text_chars_len = text_chars.len();
+    let mut start_pos = 0;
+    let mut in_word = false;
+    let mut bracket = 0;
+    let mut in_quote = false;
+    let mut quote = ' ';
+    for i in 0..text_chars_len {
+        let c = text_chars.get(i).unwrap();
+        if *c == '(' {
+            bracket += 1;
+            continue;
+        }
+        if *c == ')' {
+            bracket -= 1;
+            continue;
+        }
+        if *c == '\'' || *c == '"' {
+            if in_quote && quote == *c {
+                in_quote = false;
+            } else {
+                in_quote = true;
+                quote = *c;
+            }
+        }
+        if *c == ',' || *c == ' ' || *c == '=' {
+            if bracket > 0 || in_quote {
+                continue;
+            }
+            if in_word {
+                let token = text_chars[start_pos..i].iter().collect::<String>();
+                tokens.push(token);
+            }
+            tokens.push(String::from_utf8(vec![*c as u8]).unwrap());
+            in_word = false;
+            start_pos = i + 1;
+            continue;
+        }
+        if in_word {
+            continue;
+        }
+        in_word = true;
     }
-    let mut append_num = 0;
-    for cap in &caps {
+    if start_pos != text_chars_len {
+        let token = text_chars[start_pos..text_chars_len]
+            .iter()
+            .collect::<String>();
+        tokens.push(token);
+    }
+    // println!("tokens: {:?}", tokens);
+
+    let re_lower = Regex::new(r##"^[a-z0-9_]+$"##).unwrap();
+    for cap in tokens.iter_mut() {
         let cap_str = cap.as_str();
         let cap_str_upper = cap_str.to_uppercase();
         let cap_str_upper = cap_str_upper.as_str();
+        if cap_str.len() <= 2 {
+            continue;
+        }
         if SQL_KEYWORDS.contains(&cap_str_upper) {
             continue;
         }
-        if SQL_PUNCTUATION.contains(text_bytes.get(cap.start() - 1).unwrap())
-            || SQL_PUNCTUATION.contains(text_bytes.get(cap.start() - 2).unwrap())
-            || (text_len > cap.end()
-                && SQL_PUNCTUATION.contains(text_bytes.get(cap.end()).unwrap()))
-        {
+        if SQL_PUNCTUATION.contains(cap_str.as_bytes().first().unwrap()) {
             continue;
         }
-        if text_len > cap.end() && *text_bytes.get(cap.end()).unwrap() == b'(' {
+        if cap_str.as_bytes().last().unwrap().eq(&b')') {
+            // function
             continue;
         }
         // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
         if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
             continue;
         }
-        new_text.push(text[append_num..cap.start()].to_string());
-        new_text.push(format!("\"{}\"", cap_str));
-        append_num = cap.end();
+        if cap_str.parse::<f64>().is_ok() && cap_str.contains('.') {
+            // float number
+            *cap = format!("'{}'", cap_str);
+            continue;
+        }
+        *cap = format!("\"{}\"", cap_str);
     }
-
-    if append_num < text_len {
-        new_text.push(text[append_num..].to_string());
-    }
-
-    new_text.join("")
+    tokens.join("")
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
@@ -688,15 +728,16 @@ mod tests {
             "select * from table where a = 1",
             "select * from table where a=1",
             "select * from table where County='中文'",
-            "select * from table match_all(123)",
-            "select * from table match_all('123')",
-            "select * from table match_all('中文')",
-            "select * from table str_match(log,'中文')",
-            "select * from table str_match(log, '中文')",
-            "select * from table str_match(log, 'a=b')",
-            "select * from table str_match(log, 'Sql: select * from table')",
-            "select * from table str_match(log, 'Sql: select * from table where \"a\" = 1')",
-            "select * from table str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+            "select * from table where match_all(123)",
+            "select * from table where match_all('123')",
+            "select * from table where match_all('中文')",
+            "select * from table where str_match(log,'中文')",
+            "select * from table where str_match(log, '中文')",
+            "select * from table where str_match(log, 'a=b')",
+            "select * from table where str_match(log, 'Sql: select * from table')",
+            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
+            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+            "select * from geaplog WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
         ];
         let resqls = [
             "select * from table",
@@ -704,15 +745,16 @@ mod tests {
             "select * from table where a = 1",
             "select * from table where a=1",
             "select * from table where \"County\"='中文'",
-            "select * from table match_all(123)",
-            "select * from table match_all('123')",
-            "select * from table match_all('中文')",
-            "select * from table str_match(log,'中文')",
-            "select * from table str_match(log, '中文')",
-            "select * from table str_match(log, 'a=b')",
-            "select * from table str_match(log, 'Sql: select * from table')",
-            "select * from table str_match(log, 'Sql: select * from table where \"a\" = 1')",
-            "select * from table str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+            "select * from table where match_all(123)",
+            "select * from table where match_all('123')",
+            "select * from table where match_all('中文')",
+            "select * from table where str_match(log,'中文')",
+            "select * from table where str_match(log, '中文')",
+            "select * from table where str_match(log, 'a=b')",
+            "select * from table where str_match(log, 'Sql: select * from table')",
+            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
+            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
+            "select * from geaplog WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
         ];
         for (i, sql) in sqls.iter().enumerate() {
             let resql = add_quote_for_sql(*sql);
