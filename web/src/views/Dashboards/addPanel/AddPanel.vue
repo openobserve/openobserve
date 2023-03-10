@@ -208,7 +208,8 @@ export default defineComponent({
       this.goBack();
     },
     savePanelOnClick() {
-      this.savePanelChangesToDashboard(this.getDashboard());
+      const dashboardId = this.$route.query.dashboard + ""
+      this.savePanelChangesToDashboard(dashboardId);
     },
   },
 });
