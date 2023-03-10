@@ -70,7 +70,7 @@ export default defineComponent({
     const router = useRouter();
 
     const renderTitle = computed(() => {
-      return props.panelDataElement.title
+      return props.panelDataElement.config?.title
     })
     const addNewPanel = () => {
       // return router.push({
@@ -78,7 +78,7 @@ export default defineComponent({
       //   query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       // });
       return router.push({
-        path: "/editPanel",
+        path: "/addPanel",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }

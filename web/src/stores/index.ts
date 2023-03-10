@@ -28,9 +28,10 @@ export default createStore({
     currentuser: (useLocalCurrentUser()) ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     organizationPasscode: "",
-    allCurrentDashboards: {},
-    currentSelectedDashboard: {},
-    currentPanelsData: [],
+    // allCurrentDashboards: {},
+    // currentSelectedDashboard: {},
+    // currentPanelsData: [],
+    allDashboardList: [],
     search: {
       query: {
         dateVal: {
@@ -84,11 +85,14 @@ export default createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationPasscode = payload;
     },
-    setAllCurrentDashboards(state, payload) {
-      state.allCurrentDashboards = payload;
-    },
-    setCurrentSelectedDashboard(state, payload) {
-      state.currentSelectedDashboard = payload;
+    // setAllCurrentDashboards(state, payload) {
+    //   state.allCurrentDashboards = payload;
+    // },
+    // setCurrentSelectedDashboard(state, payload) {
+    //   state.currentSelectedDashboard = payload;
+    // },
+    setAllDashboardList(state, payload) {
+      state.allDashboardList = payload
     },
     setSearch(state, payload) {
       state.search = payload;
@@ -96,9 +100,9 @@ export default createStore({
     setStreamFields(state, payload) {
       state.streamFields = payload;
     },
-    setCurrentPanelsData(state, payload) {
-      state.currentPanelsData = payload;
-    },
+    // setCurrentPanelsData(state, payload) {
+    //   state.currentPanelsData = payload;
+    // },
     setQuotaThresholdMsg(state, payload) {
       state.quotaThresholdMsg = payload;
     },
@@ -134,11 +138,14 @@ export default createStore({
     setOrganizationPasscode(context, payload) {
       context.commit("setOrganizationPasscode", payload);
     },
-    setAllCurrentDashboards(context, payload) {
-      context.commit("setAllCurrentDashboards", payload);
-    },
-    setCurrentSelectedDashboard(context, payload) {
-      context.commit("setCurrentSelectedDashboard", payload);
+    // setAllCurrentDashboards(context, payload) {
+    //   context.commit('setAllCurrentDashboards', payload);
+    // },
+    // setCurrentSelectedDashboard(context, payload) {
+    //   context.commit('setCurrentSelectedDashboard', payload);
+    // },
+    setAllDashboardList(context, payload) {
+      context.commit('setAllDashboardList', payload)
     },
     setSearch(context, payload) {
       context.commit("setSearch", payload);
@@ -146,9 +153,9 @@ export default createStore({
     setStreamFields(context, payload) {
       context.commit("setStreamFields", payload);
     },
-    setCurrentPanelsData(context, payload) {
-      context.commit("setCurrentPanelsData", payload);
-    },
+    // setCurrentPanelsData(context, payload) {
+    //   context.commit('setCurrentPanelsData', payload);
+    // },
     setQuotaThresholdMsg(context, payload) {
       context.commit("setQuotaThresholdMsg", payload);
     },

@@ -1,24 +1,9 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http:www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
--->
-
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
-      <div class="q-table__title q-mr-md">{{ t("dashboard.header") }}</div>
+      <div class="q-table__title q-mr-md">{{ list[0].title }}</div>
       <div class="flex items-baseline q-gutter-sm">
         <q-btn
           class="q-ml-md q-mb-xs text-bold"
@@ -28,13 +13,35 @@
           text-color="black"
           no-caps
           :label="t(`Add Panel`)"
-          @click="addNewPanelOnClick"
+          @click="addPanelData"
         />
+        <q-btn
+          class="q-ml-md q-mb-xs text-bold"
+          outline
+          padding="sm lg"
+          color="white"
+          text-color="black"
+          no-caps
+          :label="draggable ? t(`Cancel`) : t(`Edit`)"
+          @click="isDraggableClick"
+        />
+        <!-- <q-btn
+          class="q-ml-md q-mb-xs text-bold"
+          outline
+          padding="sm lg"
+          color="white"
+          text-color="black"
+          no-caps
+          :label="t(`Edit Panel`)"
+          @click="addNewPanelOnClick"
+        /> -->
+
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
+          :disable="!draggable"
           :label="t(`Save`)"
           @click="saveDashboardOnClick"
         />
@@ -55,26 +62,33 @@
           :label="t(`Go back to Dashboard`)"
           outline
           text-color="black"
-          @click="goBacToDashboardList"
+          @click="goBackToDashboardList"
         />
-        <date-time
-          ref="refDateTime"
-          v-model="dateVal"
-          @update:date="dateChange"
-        />
+        <date-time ref="refDateTime" @date-change="dateChange" />
+        <!-- <q-btn
+          class="q-ml-md q-mb-xs text-bold"
+          padding="sm lg"
+          color="white"
+          no-caps
+          :label="t(`show New Panel`)"
+          outline
+          text-color="black"
+          @click="showNewPanel= !showNewPanel"
+        /> -->
       </div>
     </div>
     <q-separator></q-separator>
     <div class="displayDiv">
       <grid-layout
-        v-if="list[0].panels.length > 0"
+        v-if="list[0].panels?.length > 0"
         v-model:layout.sync="list[0].layouts"
         :col-num="12"
         :row-height="30"
         :is-draggable="draggable"
-        :isResizable="true"
-        :vertical-compact="false"
+        :is-resizable="draggable"
+        :vertical-compact="true"
         :autoSize="true"
+        :restore-on-drag="true"
         :use-css-transforms="true"
         @layout-created="layoutCreatedEvent"
         @layout-before-mount="layoutBeforeMountEvent"
@@ -82,10 +96,6 @@
         @layout-ready="layoutReadyEvent"
         @layout-updated="layoutUpdatedEvent"
       >
-        <!-- <li v-for="item in list[0]" :key="item">
-        <PanelContainer :key="item.id" ref="{{item}}" :panelDataElement="item" :dashbordId="getDashboard"
-          @updated:chart="onUpdatePanel">
-        </PanelContainer> -->
         <grid-item
           class="plotlyBackground"
           v-for="item in list[0].panels"
@@ -95,26 +105,22 @@
           :w="getPanelLayout(list[0].layouts, item.id, 'w')"
           :h="getPanelLayout(list[0].layouts, item.id, 'h')"
           :i="getPanelLayout(list[0].layouts, item.id, 'i')"
+          :minH="getMinimumHeight(item.type)"
           @resize="resizeEvent"
           @move="moveEvent"
           @resized="resizedEvent"
           @container-resized="containerResizedEvent"
           @moved="movedEvent"
+          drag-allow-from=".drag-allow"
         >
-          <PanelContainer
-            :key="
-              getPanelLayout(list[0].layouts, item.id, 'w') +
-              getPanelLayout(list[0].layouts, item.id, 'h') +
-              getPanelLayout(list[0].layouts, item.id, 'y') +
-              getPanelLayout(list[0].layouts, item.id, 'x')
-            "
-            ref="{{item}}"
-            :panelDataElement="item"
-            :dashboardId="getDashboard"
-            @updated:chart="onUpdatePanel"
-            :selectedTimeDate="currentTimeObj"
-          >
-          </PanelContainer>
+          <div>
+            <PanelContainer
+              @updated:chart="onUpdatePanel"
+              :data="item"
+              :selectedTimeDate="currentTimeObj"
+            >
+            </PanelContainer>
+          </div>
         </grid-item>
       </grid-layout>
     </div>
@@ -126,55 +132,54 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, computed, watch, onMounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onActivated,
+} from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-
-import QTablePagination from "../components/shared/grid/Pagination.vue";
-import NoData from "../components/shared/grid/NoData.vue";
-import ReactiveBarChart from "../components/shared/plotly/barchart.vue";
-import PanelContainer from "../components/shared/plotly/panelcontainer.vue";
-import dashboardService from "../services/dashboards";
-import DateTime from "../plugins/logs/DateTime.vue";
+import dashboardService from "../../services/dashboards";
+import DateTime from "../../plugins/logs/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
-
 import { useRouter } from "vue-router";
-import dashboards from "@/services/dashboards";
 import {
-  getCurrentDashboard,
-  getCurrentPanel,
   deletePanelFromDashboard,
-  setCurrentPanelToDashboardList,
-  getDateConsumableDateTime,
-} from "../utils/commons.ts";
-
-import { isProxy, toRaw, unref } from "vue";
-import { tsImportEqualsDeclaration } from "@babel/types";
+  getConsumableDateTime,
+  getDashboard,
+} from "../../utils/commons.ts";
+import { toRaw, unref, reactive } from "vue";
+import PanelContainer from "../../components/dashboards/PanelContainer.vue";
+import { useRoute } from "vue-router";
+import { deletePanel, updateDashboard } from "../../utils/commons";
 
 export default defineComponent({
-  name: "PageOrganization",
+  name: "ViewDashboard",
   components: {
-    QTablePagination,
-    ReactiveBarChart,
-    PanelContainer,
-    NoData,
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
     DateTime,
+    PanelContainer,
   },
   setup() {
     const { t } = useI18n();
-    const selectedPerPage = ref<number>(20);
+    const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    // let list = ref([])
-    let valueList = [];
+    const currentDashboardData = reactive({
+      data: {},
+    });
+
     const refDateTime: any = ref(null);
     const $q = useQuasar();
     let currentTimeObj: any = ref({});
+    // let showNewPanel = ref(true)
 
-    const dateVal = ref({
+    const initialDateValue = {
       tab: "relative",
       startDate: "",
       startTime: "",
@@ -183,42 +188,37 @@ export default defineComponent({
       selectedRelativePeriod: "Minutes",
       selectedRelativeValue: 15,
       selectedFullTime: false,
-    });
-
-    onMounted(() => {
-      dateChange(dateVal);
-    });
-
-    watch(dateVal.value, () => {
-      if (dateVal.value) {
-        dateChange(dateVal);
-      }
-    });
-    const dateChange = (dateValue: any) => {
-      const c = toRaw(unref(dateValue));
-      currentTimeObj.value = getDateConsumableDateTime(c);
     };
 
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+    // if the date value change, get the Date and time
+    const dateChange = (dateValue: any) => {
+      const c = toRaw(unref(dateValue));
+      currentTimeObj.value = getConsumableDateTime(c);
+    };
 
     const initialize = () => {};
 
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-    };
-
+    // back button to render dashboard List page
     const goBack = () => {
-      return router.push("/dashboard");
+      return router.push("/dashboardList");
     };
 
+    const goBackToDashboardList = () => {
+      goBack();
+    };
+
+    // delete dashboard remove the data from database and update store variable and redirect to dashboardList page
     const deleteDashboard = async (dashboardId: String) => {
-      const baseObj = {};
       await dashboardService
         .delete(store.state.selectedOrganization.identifier, dashboardId)
         .then((res) => {
+          const dashboardList = JSON.parse(
+            JSON.stringify(toRaw(store.state.allDashboardList))
+          );
+          const newDashboardList = dashboardList.filter(
+            (dashboard) => dashboard.name != dashboardId
+          );
+          store.dispatch("setAllDashboardList", newDashboardList);
           $q.notify({
             type: "positive",
             message: "Dashboard deleted successfully.",
@@ -228,41 +228,59 @@ export default defineComponent({
       goBack();
     };
 
-    const saveDashboardOnClick = async (dashboardId: String) => {
-      const currentDashboard = toRaw(store.state.currentSelectedDashboard);
-      await dashboardService
-        .save(
-          store.state.selectedOrganization.identifier,
-          currentDashboard.dashboardId,
-          JSON.stringify(JSON.stringify(currentDashboard))
-        )
-        .then((res) => {
-          $q.notify({
-            type: "positive",
-            message: "Dashboard saved successfully.",
-            timeout: 5000,
-          });
-        });
+    const deleteDashboardOnClick = async () => {
+      await deleteDashboard(route.query.dashboard);
+    };
+
+    // save the dashboard value
+    const saveDashboard = async (dashboardId: String) => {
+      await updateDashboard(
+        store,
+        store.state.selectedOrganization.identifier,
+        route.query.dashboard,
+        currentDashboardData.data
+      );
+      // const currentDashboard = currentDashboardData.data
+      // await dashboardService
+      //   .save(
+      //     store.state.selectedOrganization.identifier,
+      //     currentDashboard.dashboardId,
+      //     JSON.stringify(JSON.stringify(currentDashboard))
+      //   )
+      //   .then((res) => {
+      //     $q.notify({
+      //       type: "positive",
+      //       message: "Dashboard saved successfully.",
+      //       timeout: 5000,
+      //     });
+      //   });
+      currentDashboardData.data = await getDashboard(
+        this.store,
+        this.$route.query.dashboard
+      );
+
       //goBack()
     };
 
-    const getDashboard = () => {
-      return currentDashboard.dashboardId;
-    };
-    const refreshAllDashboardsAndGetCurrentDashboard = async (
-      dashId: String
-    ) => {
-      const a = await getCurrentDashboard(store, dashId);
-      return a;
+    const saveDashboardOnClick = async () => {
+      await saveDashboard(route.query.dashboard);
     };
 
+    //get current dashboard Id
+    const getDashboard = () => {
+      return currentDashboardData.data.dashboardId;
+    };
+
+    //add dashboardId
     const addNewPanel = (dashboardId: String) => {
-      const panelId =
-        "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
       return router.push({
-        path: "/editPanel",
-        query: { dashboard: dashboardId, panelId: panelId },
+        path: "/addPanel",
+        query: { dashboard: dashboardId },
       });
+    };
+
+    const addPanelData = () => {
+      addNewPanel(route.query.dashboard);
     };
 
     const deleteExistingPanel = async (
@@ -270,34 +288,33 @@ export default defineComponent({
       dashboardId: String,
       dashboardList: any
     ) => {
-      //const panelId = 'Panel_ID' + Math.floor(Math.random() * (99999 - 10 + 1)) + 10
       deletePanelFromDashboard(
         store,
         dashboardId,
         panelDataElement.id,
         dashboardList
       );
-      // await saveDashboardOnClick(dashboardId)
-      //router.go(0);
     };
 
     let list = computed(function () {
-      return [toRaw(store.state.currentSelectedDashboard)];
+      return [toRaw(currentDashboardData.data)];
     });
 
     initialize();
     return {
+      currentDashboardData,
+      goBackToDashboardList,
+      deleteDashboardOnClick,
+      addPanelData,
       t,
       list,
       goBack,
       getDashboard,
-      valueList,
-      dateVal,
+      dateVal: initialDateValue,
       deleteDashboard,
       addNewPanel,
       saveDashboardOnClick,
       deleteExistingPanel,
-      refreshAllDashboardsAndGetCurrentDashboard,
       store,
       refDateTime,
       filterQuery: ref(""),
@@ -313,80 +330,43 @@ export default defineComponent({
       },
       dateChange,
       currentTimeObj,
+      // showNewPanel,
     };
   },
   data() {
     return {
       computedTimeObj: Date.now(),
-      // layouts: [
-      //   { x: 0, y: 0, w: 12, h: 12, i: 0, panelId: "Panel_ID607710", static: false },
-      //   { x: 4, y: 4, w: 12, h: 12, i: 1, panelId: "Panel_ID7545110", static: false },
-      // ],
-      // layoutCopy:{
-      //   Panel_ID607710 :{ x: 0, y: 0, w: 2, h: 2, i: "Panel_ID607710", static: false },
-      //   Panel_ID7545110: { x: 20, y: 40, w: 2, h: 4, i: "Panel_ID7545110", static: false },
-
-      // },
-      // mockedData: {
-      //   title: "Time Range Tester Dash",
-      //   dashboardId: "DashID_1262352719",
-      //   layout: [
-      //     { x: 0, y: 0, w: 12, h: 12, i: 0, panelId: "Panel_ID607710", static: false },
-      //     { x: 4, y: 4, w: 12, h: 12, i: 1, panelId: "Panel_ID7545110", static: false },
-      //   ],
-      //   dashboardLayout: {
-      //     Panel_ID607710: { x: 0, y: 0, w: 2, h: 2, i: "0", static: false },
-      //     Panel_ID7545110: { x: 0, y: 0, w: 2, h: 2, i: "0", static: false },
-      //   },
-      //   description: "Time Tester D",
-      //   role: "User Dashboard",
-      //   owner: "Ayon Bhattacharya",
-      //   created: "2022-12-13T02:00:17.720Z",
-      //   panels: [
-      //     {
-      //       id: "Panel_ID607710",
-      //       query: [
-      //         "select count(*) as y_axis, kubernetes.host as x_axis from default WHERE time_range(_timestamp,'2022-12-13T08:06:59+07:00', '2022-12-13T11:06:59+07:00') group by x_axis",
-      //       ],
-      //       title: "This is always a Description Text",
-      //       type: "BarChart",
-      //     },
-      //     {
-      //       id: "Panel_ID7545110",
-      //       query: [
-      //         "select count(*) as y_axis, kubernetes.host as x_axis from default WHERE time_range(_timestamp,'2022-12-13T08:09:33+07:00', '2022-12-13T11:09:33+07:00') group by x_axis",
-      //       ],
-      //       title: "This is always a Description Text",
-      //       type: "Table",
-      //     },
-      //   ],
-      // },
-
-      draggable: true,
-      resizable: true,
+      draggable: false,
       index: 0,
       eventLog: [],
     };
   },
   methods: {
-    goBacToDashboardList(evt, row) {
-      this.goBack();
+    isDraggableClick(evt, row) {
+      this.draggable = !this.draggable;
     },
-    deleteDashboardOnClick(evt, row) {
-      this.deleteDashboard(this.$route.query.dashboard);
-    },
-    saveDashboardOnClick(evt, row) {
-      this.saveDashboard(this.$route.query.dashboard);
-    },
-    addNewPanelOnClick(evt, row) {
-      this.addNewPanel(this.$route.query.dashboard);
-    },
-    onUpdatePanel(panelDataElementValue: any) {
-      let dashboardList = toRaw(this.store.state.allCurrentDashboards);
-      this.deleteExistingPanel(
-        panelDataElementValue,
+    async onUpdatePanel(panelDataElementValue: any) {
+      // let dashboardList = toRaw(this.store.state.allDashboardList);
+      // this.deleteExistingPanel(
+      //   panelDataElementValue,
+      //   this.$route.query.dashboard,
+      //   dashboardList
+      // );
+      console.log(
+        "deleting",
         this.$route.query.dashboard,
-        dashboardList
+        panelDataElementValue,
+        panelDataElementValue.id
+      );
+
+      await deletePanel(
+        this.store,
+        this.$route.query.dashboard,
+        panelDataElementValue.id
+      );
+      this.currentDashboardData.data = await getDashboard(
+        this.store,
+        this.$route.query.dashboard
       );
     },
     updateCurrentDateTimeObj() {
@@ -415,6 +395,7 @@ export default defineComponent({
       this.eventLog.push(msg);
     },
     resizedEvent: function (i, newX, newY, newHPx, newWPx) {
+      window.dispatchEvent(new Event("resize"));
       const msg =
         "RESIZED i=" +
         i +
@@ -476,25 +457,36 @@ export default defineComponent({
 
       return 0;
     },
+    getMinimumHeight(type) {
+      switch (type) {
+        case "area":
+        case "bar":
+        case "h-bar":
+        case "line":
+        case "pie":
+        case "scatter":
+        case "table":
+          return 13;
+          break;
+
+        default:
+          break;
+      }
+    },
   },
   async activated() {
-    let dashboardList = toRaw(this.store.state.allCurrentDashboards);
-    if (Object.keys(dashboardList).length === 0) {
-      await this.refreshAllDashboardsAndGetCurrentDashboard(
-        this.$route.query.dashboard
-      );
-    } else {
-      for (const dashboard of dashboardList) {
-        if (this.$route.query.dashboard === dashboard.name) {
-          this.store.dispatch(
-            "setCurrentSelectedDashboard",
-            JSON.parse(dashboard.details)
-          );
-        }
-      }
-    }
-    //await this.refreshAllDashboardsAndGetCurrentDashboard(this.$route.query.dashboard);
-    //store.dispatch("setCurrentSelectedDashboard", modDashboardObject);
+    // //get dashboard list from the store
+    // let dashboardList = toRaw(this.store.state.allDashboardList);
+    // //find the dashboard details from the dashboard list using dashboardId
+    //   for (const dashboard of dashboardList) {
+    //     if (this.$route.query.dashboard === dashboard.name) {
+    //       this.currentDashboardData.data = JSON.parse(dashboard.details)
+    //     }
+    //   }
+    this.currentDashboardData.data = await getDashboard(
+      this.store,
+      this.$route.query.dashboard
+    );
   },
 });
 </script>
@@ -511,8 +503,12 @@ export default defineComponent({
   // background: #eee;
 }
 
-.vue-grid-item:not(.vue-grid-placeholder) {
-  background: #ccc;
+// .vue-grid-item:not(.vue-grid-placeholder) {
+//   background: #ccc;
+//   border: 1px solid black;
+// }
+
+.vue-grid-item {
   border: 1px solid black;
 }
 
@@ -584,7 +580,7 @@ export default defineComponent({
 
 .displayDiv {
   clear: both;
-  padding: 1.625em 0 0;
+  // padding: 1.625em 0 0;
   // overflow: auto;
 }
 .plotlyBackground {

@@ -39,3 +39,8 @@
 .border-right{
     border-right: 1px solid $border-color;
 }
+
+// For Dashboard draggable color change
+.displayDiv .vue-grid-item.vue-grid-placeholder {
+    background: #B1B5E5 !important;
+}
