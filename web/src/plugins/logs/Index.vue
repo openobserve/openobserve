@@ -575,13 +575,13 @@ export default defineComponent({
 
           if (whereClause.trim() != "") {
             whereClause = whereClause
-              .replace(/=(?=(?:[^"]*"[^"]*")*[^"]*$)/g, " =")
-              .replace(/>(?=(?:[^"]*"[^"]*")*[^"]*$)/g, " >")
-              .replace(/<(?=(?:[^"]*"[^"]*")*[^"]*$)/g, " <");
+              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
 
             whereClause = whereClause
-              .replace(/!=(?=(?:[^"]*"[^"]*")*[^"]*$)/g, " !=")
-              .replace(/! =(?=(?:[^"]*"[^"]*")*[^"]*$)/g, " !=");
+              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=");
 
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
