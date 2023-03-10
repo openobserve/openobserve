@@ -130,7 +130,7 @@ async fn main() -> Result<(), anyhow::Error> {
     labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
     labels.insert("role".to_string(), CONFIG.common.node_role.clone());
     let prometheus = PrometheusMetricsBuilder::new("zincobserve")
-        .endpoint("/metrics")
+        .endpoint(format!("{}/metrics", CONFIG.common.base_uri).as_str())
         .const_labels(labels)
         .build()
         .unwrap();
@@ -151,11 +151,19 @@ async fn main() -> Result<(), anyhow::Error> {
     if router::is_router() {
         HttpServer::new(move || {
             log::info!("starting HTTP server at: {}", haddr);
-            App::new()
-                .wrap(prometheus.clone())
-                .service(router::dispatch)
-                .configure(get_basic_routes)
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+            let app = if CONFIG.common.base_uri.is_empty() {
+                App::new()
+                    .wrap(prometheus.clone())
+                    .service(router::dispatch)
+                    .configure(get_basic_routes)
+            } else {
+                App::new().wrap(prometheus.clone()).service(
+                    web::scope(&CONFIG.common.base_uri)
+                        .service(router::dispatch)
+                        .configure(get_basic_routes),
+                )
+            };
+            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
                 .app_data(web::Data::new(
                     awc::Client::builder()
@@ -183,11 +191,19 @@ async fn main() -> Result<(), anyhow::Error> {
                 local_id
             );
 
-            App::new()
-                .wrap(prometheus.clone())
-                .configure(get_service_routes)
-                .configure(get_basic_routes)
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+            let app = if CONFIG.common.base_uri.is_empty() {
+                App::new()
+                    .wrap(prometheus.clone())
+                    .configure(get_service_routes)
+                    .configure(get_basic_routes)
+            } else {
+                App::new().wrap(prometheus.clone()).service(
+                    web::scope(&CONFIG.common.base_uri)
+                        .configure(get_service_routes)
+                        .configure(get_basic_routes),
+                )
+            };
+            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
                 .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(local_id))

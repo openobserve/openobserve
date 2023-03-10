@@ -603,8 +603,10 @@ fn add_quote_for_sql(text: &str) -> String {
             continue;
         }
         if *c == '\'' || *c == '"' {
-            if in_quote && quote == *c {
-                in_quote = false;
+            if in_quote {
+                if quote == *c {
+                    in_quote = false;
+                }
             } else {
                 in_quote = true;
                 quote = *c;
@@ -734,10 +736,13 @@ mod tests {
             "select * from table where str_match(log,'中文')",
             "select * from table where str_match(log, '中文')",
             "select * from table where str_match(log, 'a=b')",
+            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
+            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
             "select * from table where str_match(log, 'Sql: select * from table')",
             "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
             "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
-            "select * from geaplog WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
+            "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
+            "select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] \"POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0\" 200 111 \"-\" \"go-resty/2.7.0 (https://github.com/go-resty/resty)\" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'",
         ];
         let resqls = [
             "select * from table",
@@ -751,10 +756,13 @@ mod tests {
             "select * from table where str_match(log,'中文')",
             "select * from table where str_match(log, '中文')",
             "select * from table where str_match(log, 'a=b')",
+            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
+            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
             "select * from table where str_match(log, 'Sql: select * from table')",
             "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
             "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
-            "select * from geaplog WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
+            "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
+            "select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] \"POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0\" 200 111 \"-\" \"go-resty/2.7.0 (https://github.com/go-resty/resty)\" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'",
         ];
         for (i, sql) in sqls.iter().enumerate() {
             let resql = add_quote_for_sql(*sql);
