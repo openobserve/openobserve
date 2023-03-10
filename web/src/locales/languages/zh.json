@@ -32,7 +32,6 @@
     "signOut": "退出",
     "account": "账户",
     "feedback": "反馈",
-    "zincSearch": "zincSearch",
     "documentation": "文档",
     "openapi": "OpenAPI",
     "tickets": "工单",
@@ -47,7 +46,7 @@
   },
   "about": {
     "name": "ZincObserve",
-    "introduction": "现代开源搜索引擎。"
+    "introduction": "Observability simplified."
   },
   "login": {
     "userid": "账号",
@@ -215,7 +214,7 @@
     "ok": "确定"
   },
   "ingestion": {
-    "header": "摄入",
+    "header": "采集",
     "passwordLabel": "重置 Token"
   },
   "dashboard": {
@@ -240,13 +239,13 @@
     "nameRequired": "Name is required"
   },
   "panel": {
-    "header": "小组",
+    "header": "组件",
     "add": "添加面板",
     "save": "保存",
     "cancel": "取消",
     "delete": "删除面板",
     "search": "搜索面板",
-    "name": "小组名称",
+    "name": "组件名称",
     "typeDesc": "描述",
     "createdashboard": "创建新面板",
     "nameHolder": "输入新面板的名称",
@@ -263,9 +262,9 @@
     "sql": "查询",
     "realTime": "实时",
     "scheduled": "已计划",
-    "duration": "告警的持续时间",
     "condition": "条件",
-    "interval": "告警的频率",
+    "duration": "监控时间范围",
+    "interval": "扫描频率",
     "delayNotificationUntil": "周期内，仅发送一次通知",
     "destination": "通知目标",
     "stream_name": "数据流名称",
