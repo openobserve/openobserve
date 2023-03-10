@@ -28,6 +28,7 @@ use crate::meta::user::UserRequest;
 use crate::meta::user::UserRole;
 use crate::service::users;
 
+/** List all users of an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -48,6 +49,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     users::list_users(&org_id).await
 }
 
+/** Create new user for an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -73,6 +75,7 @@ pub async fn save(
     users::post_user(&org_id, user).await
 }
 
+/** Update existing user belonging to an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -110,6 +113,7 @@ pub async fn update(
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
+/** Add existing user to an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -138,6 +142,7 @@ pub async fn add_user_to_org(
     users::add_user_to_org(&org_id, &email_id, role, initiator_id).await
 }
 
+/** Remove a user from an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -160,6 +165,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     users::remove_user_from_org(&org_id, &email_id).await
 }
 
+/** Authenticate a user for an organization */
 #[post("/{org_id}/authentication")]
 pub async fn authentication(
     org_id: web::Path<String>,

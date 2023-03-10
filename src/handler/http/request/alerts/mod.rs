@@ -17,6 +17,7 @@ use std::io::Error;
 
 use crate::{meta::alert::Alert, service::alerts};
 
+/** Create new alert for specified stream of an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -41,7 +42,7 @@ pub async fn save_alert(
     let (org_id, stream_name, name) = path.into_inner();
     alerts::save_alert(org_id, stream_name, name, alert.into_inner()).await
 }
-
+/** List all alerts for a specified stream of an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -63,6 +64,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>) -> impl Responder
     alerts::list_alert(org_id, Some(stream_name.as_str())).await
 }
 
+/** List all alerts for an organization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -83,6 +85,7 @@ async fn list_alerts(path: web::Path<String>) -> impl Responder {
     alerts::list_alert(org_id, None).await
 }
 
+/** Get alert by alert name */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -106,6 +109,7 @@ async fn get_alert(path: web::Path<(String, String, String)>) -> impl Responder 
     alerts::get_alert(org_id, stream_name, name).await
 }
 
+/** Delete alert by alert name */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
