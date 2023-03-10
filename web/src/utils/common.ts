@@ -14,7 +14,7 @@
 
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
-import { useLocalOrganization } from "./zincutils";
+import { useLocalOrganization, getPath } from "./zincutils";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
@@ -68,12 +68,12 @@ export const getDefaultOrganization = async (userInfo: any, org_identifier: any)
 };
 
 export const redirectUser = (redirectURI: string | null) => {
-  let pos = window.location.pathname.indexOf("/web/");
+  const path = getPath();
   if (redirectURI != null && redirectURI != "") {
     // $router.push({ path: redirectURI });
-    window.location.replace(window.location.origin + window.location.pathname.slice(0, pos + 5) + redirectURI);
+    window.location.replace(path);
   } else {
     // $router.push({ path: "/" });
-    window.location.replace(window.location.origin + window.location.pathname.slice(0, pos + 5));
+    window.location.replace(path);
   }
 };

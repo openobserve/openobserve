@@ -23,7 +23,7 @@
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { getUserInfo, getDecodedUserInfo } from "../utils/zincutils";
+import { getUserInfo, getDecodedUserInfo, getPath } from "../utils/zincutils";
 
 import usersService from "../services/users";
 import organizationsService from "../services/organizations";
@@ -84,19 +84,13 @@ export default defineComponent({
     };
 
     const redirectUser = (redirectURI) => {
-      let pos = window.location.pathname.indexOf("/web/");
+      const path = getPath();
       if (redirectURI != null && redirectURI != "") {
         // $router.push({ path: redirectURI });
-        window.location.replace(
-          window.location.origin +
-            window.location.pathname.slice(0, pos + 5) +
-            redirectURI
-        );
+        window.location.replace(path);
       } else {
         // $router.push({ path: "/" });
-        window.location.replace(
-          window.location.origin + window.location.pathname.slice(0, pos + 5)
-        );
+        window.location.replace(path);
       }
     };
 
