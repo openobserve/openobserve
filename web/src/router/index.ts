@@ -34,6 +34,7 @@ import {
   getDecodedUserInfo,
   useLocalToken,
   useLocalCurrentUser,
+  getPath,
 } from "../utils/zincutils";
 import type { cp } from "fs";
 import FluentBit from "../components/ingestion/FluentBit.vue";
@@ -216,7 +217,7 @@ export default function (store: any) {
     routes: any;
   }
   const routerMap: RouterMap = {
-    history: createWebHistory(window.location.origin == "http://localhost:8081" ? "/" : (window.location.pathname.indexOf("/web/") > -1 ? window.location.pathname.slice(0, window.location.pathname.indexOf("/web/")+5) : window.location.pathname)),
+    history: createWebHistory(getPath()),
     // history: createWebHistory(window.location.pathname),
     routes: routes,
   };

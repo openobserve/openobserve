@@ -240,7 +240,11 @@ export const getBasicAuth = (username: string, password: string) => {
 };
 
 export const getImageURL = (image_path: string) => {
-  console.log(window.location.origin + "==" + window.location.pathname);
-  const pos = window.location.pathname.indexOf("/web/");
-  return window.location.origin + window.location.pathname.slice(0, pos + 5) + "src/assets/" + image_path;
+  return getPath() + "src/assets/" + image_path;
 };
+
+export const getPath = () => {
+  const pos = window.location.pathname.indexOf("/web/");
+  const path = window.location.origin == "http://localhost:8081" ? "/" : (pos > -1 ? window.location.pathname.slice(0, pos + 5) : window.location.pathname)
+  return path;
+}
