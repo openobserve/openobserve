@@ -28,13 +28,13 @@ pub fn is_router() -> bool {
 
 #[inline]
 fn check_search_route(path: &str) -> bool {
-    if path.contains("/_search") {
+    if path.contains(format!("{}/_search", CONFIG.common.base_uri).as_str()) {
         return true;
     }
-    if path.contains("/_around") {
+    if path.contains(format!("{}/_around", CONFIG.common.base_uri).as_str()) {
         return true;
     }
-    if path.eq("/api/cache/status") {
+    if path.eq(format!("{}/api/cache/status", CONFIG.common.base_uri).as_str()) {
         return true;
     }
     false

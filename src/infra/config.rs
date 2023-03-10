@@ -367,7 +367,7 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
-    } 
+    }
     if cfg.common.base_uri.ends_with('/') {
         cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
     }

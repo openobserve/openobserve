@@ -153,7 +153,7 @@ async fn main() -> Result<(), anyhow::Error> {
             log::info!("starting HTTP server at: {}", haddr);
             App::new()
                 .wrap(prometheus.clone())
-                .service(router::dispatch)
+                .service(web::scope(CONFIG.common.base_uri.as_str()).service(router::dispatch))
                 .configure(get_basic_routes)
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
