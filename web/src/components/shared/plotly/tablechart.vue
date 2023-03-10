@@ -45,7 +45,7 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 
-import { defineComponent, onMounted, ref, onUpdated } from "vue";
+import { defineComponent, onMounted, ref, onUpdated, nextTick } from "vue";
 
 export default defineComponent({
   name: "ReactiveTableChart",
@@ -55,7 +55,7 @@ export default defineComponent({
     const plotref: any = ref(props.data ? props.data.id : 1);
     const zoomFlag: any = ref(false);
     const chartID = ref("");
-    const tableId = ref(props?.data?.id);
+    const tableId = ref(props?.data?.id)
     const trace: any = [
       {
         type: "table",
@@ -122,13 +122,14 @@ export default defineComponent({
     };
 
     // created force relayout function to avoid infinite loop
-    const forceReLayout = (flag = true) => {
+    const forceReLayout = async (flag = true) => {
       zoomFlag.value = flag;
 
       const update: any = {
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
+      await nextTick()
       Plotly.relayout(plotref.value, update);
     };
 
@@ -165,7 +166,7 @@ export default defineComponent({
       reDraw,
       chartID,
       forceReLayout,
-      tableId,
+      tableId
     };
   },
 });
@@ -173,6 +174,6 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .plotlycontainer {
-  height: 100%;
+  height: 90%;
 }
 </style>
