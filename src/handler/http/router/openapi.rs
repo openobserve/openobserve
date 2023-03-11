@@ -71,6 +71,7 @@ use crate::meta;
             meta::functions::FunctionList,
             meta::search::Query,
             meta::search::Request,
+            meta::search::RequestEncoding,
             meta::search::Response,
             meta::alert::Alert,
             meta::alert::AlertList,
