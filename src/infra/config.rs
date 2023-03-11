@@ -433,7 +433,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         } else if cfg.s3.server_url.contains(".aliyuncs.com") {
             cfg.s3.provider = "oss".to_string();
         } else {
-            cfg.s3.provider = "s3".to_string();
+            cfg.s3.provider = "aws".to_string();
         }
     }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
