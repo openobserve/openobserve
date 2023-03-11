@@ -182,10 +182,6 @@ impl S3 {
 }
 
 async fn init_s3_config() -> Option<Config> {
-    if is_local_disk_storage() {
-        return None;
-    }
-
     let mut s3config = aws_sdk_s3::config::Builder::new();
 
     if !CONFIG.s3.server_url.is_empty() {
@@ -227,7 +223,29 @@ async fn init_s3_config() -> Option<Config> {
 }
 
 async fn init_s3_client() -> Option<Client> {
-    let s3config = init_s3_config().await.unwrap();
-    let client = Client::from_conf(s3config);
+    if is_local_disk_storage() {
+        return None;
+    }
+
+    let client = if CONFIG.s3.provider.eq("aws") {
+        let mut s3config = aws_config::from_env();
+        let creds = DefaultCredentialsChain::builder().build().await;
+        s3config = s3config.credentials_provider(creds);
+        let retry_config = RetryConfig::standard().with_max_attempts(5);
+        let sleep = aws_smithy_async::rt::sleep::TokioSleep::new();
+        s3config = s3config
+            .retry_config(retry_config)
+            .sleep_impl(Arc::new(sleep));
+        s3config = s3config.timeout_config(
+            TimeoutConfig::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .build(),
+        );
+        let s3config = s3config.load().await;
+        Client::new(&s3config)
+    } else {
+        let s3config = init_s3_config().await.unwrap();
+        Client::from_conf(s3config)
+    };
     Some(client)
 }
