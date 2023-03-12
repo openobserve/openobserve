@@ -61,6 +61,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_file_key() {
+        let file_key = FileKey::default();
+        let file_key_str = json::to_string(&file_key).unwrap();
+        let file_key2: FileKey = json::from_str(&file_key_str).unwrap();
+        assert_eq!(format!("{:?}", file_key), format!("{:?}", file_key2));
+    }
+
+    #[test]
     fn test_file_meta() {
         let file_meta = FileMeta {
             min_ts: 100,
@@ -71,5 +79,14 @@ mod tests {
         };
         let file_meta_str = json::to_string(&file_meta).unwrap();
         assert_eq!(FileMeta::try_from(file_meta_str.as_str()), Ok(file_meta));
+
+        let file_meta_str: Vec<u8> = file_meta.into();
+        let file_meta_string: String = file_meta.into();
+        let file_meta_bytes: bytes::Bytes = file_meta.into();
+        assert_eq!(
+            String::from_utf8(file_meta_str.clone()).unwrap(),
+            file_meta_string
+        );
+        assert_eq!(file_meta_str, file_meta_bytes.to_vec());
     }
 }

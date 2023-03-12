@@ -81,7 +81,7 @@ mod test_util {
     async fn test_local_storage() {
         let local = Local {};
         let file_text = "Some text";
-        let file_name = "new_file.parquet";
+        let file_name = "a/b/c/new_file.parquet";
 
         let resp = local.put(file_name, bytes::Bytes::from(file_text)).await;
         assert!(resp.is_ok());

@@ -503,8 +503,30 @@ pub fn get_node_ip() -> String {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use super::*;
+
+    #[test]
+    fn test_convert_role() {
+        let val: Role = "all".parse().unwrap();
+        assert_eq!(val, Role::All);
+        let val: Role = "ingester".parse().unwrap();
+        assert_eq!(val, Role::Ingester);
+        let val: Role = "querier".parse().unwrap();
+        assert_eq!(val, Role::Querier);
+        let val: Role = "compactor".parse().unwrap();
+        assert_eq!(val, Role::Compactor);
+        let val: Role = "router".parse().unwrap();
+        assert_eq!(val, Role::Router);
+        let val: Role = "alertmanager".parse().unwrap();
+        assert_eq!(val, Role::AlertManager);
+        let val = "alertManager".parse::<Role>();
+        assert!(val.is_ok());
+        let val = "AlertManager".parse::<Role>();
+        assert!(val.is_ok());
+        let val = "alert_manager".parse::<Role>();
+        assert!(val.is_err());
+    }
 
     #[test]
     fn test_is_querier() {
@@ -527,6 +549,36 @@ mod test_utils {
     }
 
     #[test]
+    fn test_is_compactor() {
+        let val = is_compactor(&[Role::Compactor]);
+        assert_eq!(val, true);
+        let val = is_compactor(&[Role::All]);
+        assert_eq!(val, true);
+        let val = is_compactor(&[Role::Querier]);
+        assert_eq!(val, false);
+    }
+
+    #[test]
+    fn test_is_router() {
+        let val = is_router(&[Role::Router]);
+        assert_eq!(val, true);
+        let val = is_router(&[Role::All]);
+        assert_eq!(val, false);
+        let val = is_router(&[Role::Querier]);
+        assert_eq!(val, false);
+    }
+
+    #[test]
+    fn test_is_alert_manager() {
+        let val = is_alert_manager(&[Role::AlertManager]);
+        assert_eq!(val, true);
+        let val = is_alert_manager(&[Role::All]);
+        assert_eq!(val, true);
+        let val = is_alert_manager(&[Role::Querier]);
+        assert_eq!(val, false);
+    }
+
+    #[test]
     fn test_load_local_node_uuid() {
         let id = load_local_node_uuid();
         assert_ne!(id, "");
@@ -539,9 +591,36 @@ mod test_utils {
         assert_eq!(res.unwrap().len(), 0);
     }
 
-    #[test]
-    fn test_get_cached_online_query_nodes() {
+    #[actix_web::test]
+    async fn test_cluster() {
+        let res = register_and_keepalive().await;
+        assert!(res.is_ok());
+
+        let res = set_online().await;
+        assert!(res.is_ok());
+
+        let res = leave().await;
+        assert!(res.is_ok());
+
+        let res = get_cached_online_nodes();
+        assert!(res.is_none());
+
         let res = get_cached_online_query_nodes();
         assert!(res.is_none());
+
+        let res = get_cached_online_ingester_nodes();
+        assert!(res.is_none());
+
+        let res = get_cached_online_querier_nodes();
+        assert!(res.is_none());
+
+        let res = get_cached_online_querier_nodes();
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_get_node_ip() {
+        let id = get_node_ip();
+        assert_ne!(id, "");
     }
 }

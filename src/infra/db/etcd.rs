@@ -568,3 +568,14 @@ impl Locker {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_etcd() {
+        let client = Etcd::default();
+        assert_eq!(client.prefix, "/zinc/observe".to_string());
+    }
+}

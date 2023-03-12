@@ -362,7 +362,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
 
     use super::*;
     async fn set_up() {

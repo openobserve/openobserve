@@ -43,3 +43,18 @@ pub enum DbError {
     #[error("key:{0} not exists")]
     KeyNotExists(String),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error() {
+        let err = Error::Message("test".to_string());
+        assert_eq!(err.to_string(), "Error# test");
+
+        let err = Error::from(DbError::KeyNotExists("test".to_string()));
+        assert_eq!(err.to_string(), "DbError# key:test not exists");
+        assert_eq!(format!("{:?}", err), "DbError(KeyNotExists(\"test\"))");
+    }
+}
