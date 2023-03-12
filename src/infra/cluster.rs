@@ -503,7 +503,7 @@ pub fn get_node_ip() -> String {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use super::*;
 
     #[test]

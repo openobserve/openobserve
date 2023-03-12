@@ -354,7 +354,7 @@ async fn prom_ha_handler(
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use super::*;
     #[test]
     fn test_get_metric_type() {

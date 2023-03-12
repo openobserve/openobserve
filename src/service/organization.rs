@@ -81,7 +81,7 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
 
     use super::*;
     use crate::{meta::user::UserRequest, service::users};

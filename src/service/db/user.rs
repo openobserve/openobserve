@@ -170,7 +170,7 @@ pub async fn root_user_exists() -> bool {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use crate::meta::user::UserOrg;
 
     use super::*;
