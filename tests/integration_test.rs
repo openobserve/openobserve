@@ -567,7 +567,7 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri(&format!(
-                "/auth/organizarions_by_username/{}",
+                "/auth/organizations_by_username/{}",
                 "root@example.com"
             ))
             .insert_header(ContentType::json())
@@ -769,7 +769,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
+            .uri(&format!("/api/{}/users/{}", "e2e", "root@example.com"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)

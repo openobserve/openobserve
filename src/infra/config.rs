@@ -56,16 +56,14 @@ lazy_static! {
     pub static ref USERS: DashMap<String, User> = DashMap::new();
     pub static ref ROOT_USER: DashMap<String, User> = DashMap::new();
     pub static ref PASSWORD_HASH: DashMap<String, String> = DashMap::new();
-    #[derive(Debug)]
     pub static ref METRIC_CLUSTER_MAP: DashMap<String, Vec<String>> = DashMap::new();
-    #[derive(Debug)]
     pub static ref METRIC_CLUSTER_LEADER: DashMap<String, ClusterLeader> = DashMap::new();
     pub static ref STREAM_ALERTS: DashMap<String, AlertList> = DashMap::new();
     pub static ref TRIGGERS: DashMap<String, Trigger> = DashMap::new();
     pub static ref TRIGGERS_IN_PROCESS: DashMap<String, TriggerTimer> = DashMap::new();
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
     pub http: Http,
@@ -81,7 +79,7 @@ pub struct Config {
     pub s3: S3,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Auth {
     #[env_config(name = "ZO_ROOT_USER_EMAIL")]
     pub root_user_email: String,
@@ -89,13 +87,13 @@ pub struct Auth {
     pub root_user_password: String,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Grpc {
     #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
     pub port: u16,
@@ -105,13 +103,13 @@ pub struct Grpc {
     pub org_header_key: String,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Common {
     #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
@@ -172,7 +170,7 @@ pub struct Common {
     pub prometheus_enabled: bool,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Limit {
     #[env_config(name = "ZO_JSON_LIMIT", default = 209715200)]
     pub req_json_limit: usize,
@@ -204,7 +202,7 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
@@ -214,7 +212,7 @@ pub struct Compact {
     pub max_file_size: u64,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
@@ -228,13 +226,13 @@ pub struct MemoryCache {
     pub release_size: usize,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
     pub addr: String,
@@ -264,7 +262,7 @@ pub struct Etcd {
     pub load_page_size: i64,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct Sled {
     #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/zincobserve/db/
     pub data_dir: String,
@@ -272,7 +270,7 @@ pub struct Sled {
     pub prefix: String,
 }
 
-#[derive(Clone, Debug, EnvConfig)]
+#[derive(EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
@@ -302,34 +300,15 @@ pub fn init() -> Config {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
     }
-    if cfg.limit.file_push_interval == 0 {
-        cfg.limit.file_push_interval = 10;
-    }
-    if cfg.limit.data_lifecycle > 0 && cfg.limit.data_lifecycle < 3 {
-        panic!("data lifecyle disallow set period less than 3 days.");
-    }
 
-    // HACK instance_name
-    if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = hostname().unwrap();
+    // check common config
+    if let Err(e) = check_common_config(&mut cfg) {
+        panic!("common config error: {}", e);
     }
-    // check max_file_size_on_disk to MB
-    cfg.limit.max_file_size_on_disk *= 1024 * 1024;
-    // check compact_max_file_size to MB
-    cfg.compact.max_file_size *= 1024 * 1024;
-    if cfg.compact.interval == 0 {
-        cfg.compact.interval = 600;
-    }
-    // format local_mode_storage
-    cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {}", e);
-    }
-
-    if cfg.limit.req_cols_per_record_limit == 0 {
-        cfg.limit.req_cols_per_record_limit = 1000;
     }
 
     // check memeory cache
@@ -347,6 +326,37 @@ pub fn init() -> Config {
         panic!("s3 config error: {}", e);
     }
     cfg
+}
+
+fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.limit.file_push_interval == 0 {
+        cfg.limit.file_push_interval = 10;
+    }
+    if cfg.limit.data_lifecycle > 0 && cfg.limit.data_lifecycle < 3 {
+        return Err(anyhow::anyhow!(
+            "data lifecyle disallow set period less than 3 days."
+        ));
+    }
+
+    // HACK instance_name
+    if cfg.common.instance_name.is_empty() {
+        cfg.common.instance_name = hostname().unwrap();
+    }
+    // check max_file_size_on_disk to MB
+    cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+    // check compact_max_file_size to MB
+    cfg.compact.max_file_size *= 1024 * 1024;
+    if cfg.compact.interval == 0 {
+        cfg.compact.interval = 600;
+    }
+    // format local_mode_storage
+    cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
+
+    if cfg.limit.req_cols_per_record_limit == 0 {
+        cfg.limit.req_cols_per_record_limit = 1000;
+    }
+
+    Ok(())
 }
 
 fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -449,5 +459,66 @@ pub fn get_parquet_compression() -> parquet::basic::Compression {
         "lz4" => parquet::basic::Compression::LZ4_RAW,
         "zstd" => parquet::basic::Compression::ZSTD,
         _ => parquet::basic::Compression::ZSTD,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_config() {
+        let mut cfg = Config::init().unwrap();
+        cfg.s3.server_url = "https://storage.googleapis.com".to_string();
+        cfg.s3.provider = "".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.provider, "gcs");
+        cfg.s3.server_url = "https://oss-cn-beijing.aliyuncs.com".to_string();
+        cfg.s3.provider = "".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.provider, "oss");
+        cfg.s3.server_url = "".to_string();
+        cfg.s3.provider = "".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.provider, "aws");
+
+        cfg.memory_cache.max_size = 1024;
+        cfg.memory_cache.release_size = 1024;
+        check_memory_cache_config(&mut cfg).unwrap();
+        assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
+        assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
+
+        cfg.common.parquet_compression = "zstd".to_string();
+        assert_eq!(get_parquet_compression(), parquet::basic::Compression::ZSTD);
+
+        cfg.limit.file_push_interval = 0;
+        cfg.limit.req_cols_per_record_limit = 0;
+        cfg.limit.data_lifecycle = 10;
+        cfg.compact.interval = 0;
+        let ret = check_common_config(&mut cfg);
+        assert!(ret.is_ok());
+        assert_eq!(cfg.limit.data_lifecycle, 10);
+        assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
+
+        cfg.limit.data_lifecycle = 2;
+        let ret = check_common_config(&mut cfg);
+        assert!(ret.is_err());
+
+        cfg.common.data_dir = "".to_string();
+        let ret = check_path_config(&mut cfg);
+        assert!(ret.is_ok());
+
+        cfg.common.data_dir = "/abc".to_string();
+        cfg.common.data_wal_dir = "/abc".to_string();
+        cfg.common.data_stream_dir = "/abc".to_string();
+        cfg.sled.data_dir = "/abc/".to_string();
+        cfg.common.base_uri = "/abc/".to_string();
+        let ret = check_path_config(&mut cfg);
+        assert!(ret.is_ok());
+        assert_eq!(cfg.common.data_dir, "/abc/".to_string());
+        assert_eq!(cfg.common.data_wal_dir, "/abc/".to_string());
+        assert_eq!(cfg.common.data_stream_dir, "/abc/".to_string());
+        assert_eq!(cfg.common.data_dir, "/abc/".to_string());
+        assert_eq!(cfg.common.base_uri, "/abc".to_string());
     }
 }

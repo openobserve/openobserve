@@ -87,7 +87,7 @@ pub async fn populate_file_meta(
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use super::*;
     use datafusion::{
         arrow::{

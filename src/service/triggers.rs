@@ -67,7 +67,7 @@ pub async fn get_alert(
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
 
     use super::*;
 

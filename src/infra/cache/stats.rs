@@ -57,9 +57,9 @@ pub fn set_stream_stats(
 
 #[inline]
 pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
-    // eg: files/default/olympics/2022/10/03/10/6982652937134804993_1.parquet
+    // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.split('/').collect::<Vec<&str>>();
-    if columns.len() < 8 {
+    if columns.len() < 9 {
         return Err(anyhow::anyhow!(
             "[TRACE] [incr_stream_stats] Invalid file path: {}",
             key
@@ -90,9 +90,9 @@ pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 
 #[inline]
 pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
-    // eg: files/default/olympics/2022/10/03/10/6982652937134804993_1.parquet
+    // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.split('/').collect::<Vec<&str>>();
-    if columns.len() < 8 {
+    if columns.len() < 9 {
         return Err(anyhow::anyhow!(
             "[TRACE] [decr_stream_stats] Invalid file path: {}",
             key
@@ -153,6 +153,7 @@ pub fn get_stream_stats_in_memory_size() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_get_stream_stats_len() {
         let stats = get_stats();
@@ -168,7 +169,7 @@ mod tests {
             compressed_size: 3.00,
         };
 
-        let _ = set_stream_stats("nexus", "default", StreamType::Logs, val);
+        set_stream_stats("nexus", "default", StreamType::Logs, val);
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats, val);
 
@@ -181,13 +182,56 @@ mod tests {
         };
 
         let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_1.parquet";
-        let _ = incr_stream_stats(file_key, file_meta);
+        let ret = incr_stream_stats(file_key, file_meta);
+        assert!(ret.is_ok());
 
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats.doc_num, 5300);
 
-        let _ = decr_stream_stats(file_key, file_meta);
+        let ret = decr_stream_stats(file_key, file_meta);
+        assert!(ret.is_ok());
+
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats.doc_num, 5000);
+
+        let file_meta = FileMeta {
+            min_ts: 1667978841120,
+            max_ts: 1667978845374,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+        let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_1.parquet";
+        let ret = incr_stream_stats(file_key, file_meta);
+        assert!(ret.is_ok());
+
+        let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_2.parquet";
+        let ret = incr_stream_stats(file_key, file_meta);
+        assert!(ret.is_ok());
+
+        let file_key = "files/nexus/logs/default/2022/10/03/6982652937134804993_2.parquet";
+        let ret = incr_stream_stats(file_key, file_meta);
+        assert!(ret.is_err());
+
+        let file_key = "files/nexus/logs/default/2022/10/03/10/6982652937134804993_2.parquet";
+        let ret = decr_stream_stats(file_key, file_meta);
+        assert!(ret.is_ok());
+
+        let file_key = "files/nexus/logs/default/2022/10/03/6982652937134804993_2.parquet";
+        let ret = decr_stream_stats(file_key, file_meta);
+        assert!(ret.is_err());
+    }
+
+    #[test]
+    fn test_reset_stream_stats() {
+        let file_meta = FileMeta {
+            min_ts: 1667978841130,
+            max_ts: 1667978845384,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+        let ret = reset_stream_stats("default", "olympics", StreamType::Logs, file_meta);
+        assert!(ret.is_ok());
     }
 }
