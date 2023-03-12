@@ -101,5 +101,5 @@ zstd = "0.12.1"
 
 [build-dependencies]
 chrono = "0.4"
-prost-build = {version = "0.11.2"}
+prost-build = "0.11"
 tonic-build = {version = "0.8", features = ["prost"]}

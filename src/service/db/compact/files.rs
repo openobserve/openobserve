@@ -74,18 +74,14 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]
     async fn test_files() {
-        let off_set = 100;
+        const OFFSET: i64 = 100;
 
-        let _ = set_offset("nexus", "default", "logs".into(), off_set).await;
-        let resp = get_offset("nexus", "default", "logs".into()).await;
-        assert_eq!(resp.unwrap(), off_set);
-
-        let resp = list_offset().await;
-        assert!(resp.unwrap().len() > 0);
+        set_offset("nexus", "default", "logs".into(), OFFSET).await.unwrap();
+        assert_eq!(get_offset("nexus", "default", "logs".into()).await.unwrap(), OFFSET);
+        assert!(!list_offset().await.unwrap().is_empty());
     }
 }

@@ -325,11 +325,12 @@ mod test {
     use super::*;
     use ahash::AHashMap;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
     #[test]
     fn test_is_widening_conversion() {
-        let res = is_widening_conversion(&DataType::Int8, &DataType::Int32);
-        assert_eq!(res, true);
+        assert!(is_widening_conversion(&DataType::Int8, &DataType::Int32));
     }
+
     #[test]
     fn test_try_merge() {
         let merged = try_merge(vec![
@@ -377,6 +378,6 @@ mod test {
             1234234234234,
         )
         .await;
-        assert_eq!(result.0, true);
+        assert!(result.0);
     }
 }

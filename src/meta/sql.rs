@@ -862,13 +862,13 @@ mod tests {
 
     #[test]
     fn test_parse_timerange() {
-        let sqls:Vec::<(&str,(i64,i64))> = [
+        let samples = vec![
             ("select * from tbl where ts in (1, 2, 3)", (0,0)),
             ("select * from tbl where _timestamp >= 1666093521151350", (1666093521151350,0)),
             ("select * from tbl where _timestamp >= 1666093521151350 AND _timestamp < 1666093521151351", (1666093521151350,1666093521151351)),
             ("select * from tbl where a=1 AND _timestamp>=1666093521151350 AND _timestamp < 1666093521151351", (1666093521151350,1666093521151351)),
             ("select * from tbl where a=1 AND b = 2 AND _timestamp>=1666093521151350 AND _timestamp < 1666093521151351", (1666093521151350,1666093521151351)),
-            ("select * from tbl where \"a\"=1 AND b = 2 AND (_timestamp>=1666093521151350 AND _timestamp < 1666093521151351)", (1666093521151350,1666093521151351)),
+            (r#"select * from tbl where "a"=1 AND b = 2 AND (_timestamp>=1666093521151350 AND _timestamp < 1666093521151351)"#, (1666093521151350,1666093521151351)),
             ("select * from tbl where b = 2 AND (_timestamp>=1666093521151350 AND _timestamp < 1666093521151351)", (1666093521151350,1666093521151351)),
             ("select * from tbl where b = 2 AND _timestamp>=1666093521151350 AND _timestamp < 1666093521151351", (1666093521151350,1666093521151351)),
             ("select * from tbl where (_timestamp>=1666093521151350 AND _timestamp < 1666093521151351)", (1666093521151350,1666093521151351)),
@@ -877,17 +877,13 @@ mod tests {
             ("select * from tbl where b = 2 AND (_timestamp BETWEEN 1666093521151350 AND 1666093521151351)", (1666093521151350,1666093521151351)),
             ("select * from tbl where (_timestamp BETWEEN 1666093521151350 AND 1666093521151351)", (1666093521151350,1666093521151351)),
             ("select * from tbl where _timestamp BETWEEN 1666093521151350 AND 1666093521151351", (1666093521151350,1666093521151351)),
-            ("select * from tbl where time_range(\"_timestamp\", '2022-10-19T15:19:24.587Z','2022-10-19T15:34:24.587Z')",(1666192764587000,1666193664587000))].to_vec();
-        for sql in sqls {
-            let meta = Sql::new(sql.0);
-            if meta.is_err() {
-                println!("sql: {}, err: {}", sql.0, meta.as_ref().err().unwrap());
-            }
-            assert!(meta.is_ok());
-            let time_range = meta.unwrap().time_range.unwrap();
-            assert_eq!(time_range.0, sql.1 .0);
-            if sql.1 .1 != 0 {
-                assert_eq!(time_range.1, sql.1 .1);
+            (r#"select * from tbl where time_range("_timestamp", '2022-10-19T15:19:24.587Z','2022-10-19T15:34:24.587Z')"#,(1666192764587000,1666193664587000))].to_vec();
+
+        for (sql, (expected_t1, expected_t2)) in samples {
+            let (actual_t1, actual_t2) = Sql::new(sql).unwrap().time_range.unwrap();
+            assert_eq!(actual_t1, expected_t1);
+            if expected_t2 != 0 {
+                assert_eq!(actual_t2, expected_t2);
             }
         }
     }

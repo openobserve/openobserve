@@ -46,11 +46,7 @@ mod tests {
     #[test]
     fn test_decode() {
         let s = "aGVsbG8gd29ybGQ=";
-        let s = decode(s).unwrap();
-        assert_eq!(s, "hello world");
-
-        let s = "aGVsbG8gd29ybGQ";
-        let s = decode(s);
-        assert_eq!(s.is_err(), true);
+        assert_eq!(decode(s).unwrap(), "hello world");
+        assert!(decode(&s[..s.len() - 1]).is_err());
     }
 }

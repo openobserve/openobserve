@@ -100,8 +100,7 @@ mod tests {
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
 
-        let res = check_auth(request);
-        assert!(res.is_ok())
+        assert!(check_auth(request).is_ok())
     }
 
     #[actix_web::test]

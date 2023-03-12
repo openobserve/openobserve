@@ -169,22 +169,12 @@ mod tests {
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
         let content = Bytes::from("Some text");
 
-        let resp = file_data.set(file_key, content.clone());
-        assert!(resp.is_ok());
+        file_data.set(file_key, content.clone()).unwrap();
+        assert_eq!(file_data.get(file_key).unwrap(), content);
 
-        let resp = file_data.get(file_key);
-        assert_eq!(resp.unwrap(), content);
-
-        let resp = set(file_key, content.clone());
-        assert!(resp.is_ok());
-
-        let resp = exist(file_key);
-        assert_eq!(resp.unwrap(), true);
-
-        let resp = get(file_key);
-        assert_eq!(resp.unwrap(), content);
-
-        let resp = stats();
-        assert!(resp.0 > 0);
+        set(file_key, content.clone()).unwrap();
+        assert!(exist(file_key).unwrap());
+        assert_eq!(get(file_key).unwrap(), content);
+        assert!(stats().0 > 0);
     }
 }

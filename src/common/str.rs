@@ -31,7 +31,6 @@ mod tests {
     fn test_find() {
         let haystack = "This is search-unitTest";
         let needle = "unitTest";
-        let result = find(haystack, needle);
-        assert_eq!(result, true)
+        assert!(find(haystack, needle));
     }
 }
