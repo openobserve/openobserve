@@ -575,13 +575,13 @@ export default defineComponent({
 
           if (whereClause.trim() != "") {
             whereClause = whereClause
-              .replaceAll("=", " =")
-              .replaceAll(">", " >")
-              .replaceAll("<", " <");
+              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
 
             whereClause = whereClause
-              .replaceAll("!=", " !=")
-              .replaceAll("! =", " !=");
+              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=");
 
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
@@ -623,7 +623,9 @@ export default defineComponent({
         }
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+        if (!searchObj.meta.sqlMode) {
+          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+        }
 
         return req;
       } catch (e) {

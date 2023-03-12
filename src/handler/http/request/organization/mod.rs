@@ -28,20 +28,20 @@ const DEFAULT: &str = "default";
 const CUSTOM: &str = "custom";
 const THRESHOLD: i64 = 9383939382;
 
-#[derive(Serialize, Clone, PartialEq, Eq)]
+#[derive(Serialize)]
 struct Organization {
     identifier: String,
     label: String,
 }
 
-#[derive(Serialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Clone)]
 struct User {
     first_name: String,
     last_name: String,
     email: String,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 struct OrganizationDetails {
     id: i64,
     identifier: String,
@@ -60,8 +60,8 @@ struct OrganizationResponse {
     data: Vec<OrganizationDetails>,
 }
 
-#[get("/organizarions_by_username/{user_name}")]
-pub async fn organizarions_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
+#[get("/organizations_by_username/{user_name}")]
+pub async fn organizations_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let mut orgs = Vec::new();
     let mut org_names = HashSet::new();
     let user_id = user_id.to_string();
@@ -98,7 +98,7 @@ pub async fn organizarions_by_username(user_id: web::Path<String>) -> Result<Htt
 
 #[get("/{org_id}/organizations")]
 pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
-    //let org = org_id.into_inner();
+    // let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut id = 0;
 

@@ -128,6 +128,8 @@ pub struct Common {
     pub data_wal_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/zincobserve/stream/
     pub data_stream_dir: String,
+    #[env_config(name = "ZO_BASE_URI", default = "")]
+    pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_FILE_EXT_JSON", default = ".json")]
@@ -366,6 +368,9 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.data_stream_dir.ends_with('/') {
         cfg.common.data_stream_dir = format!("{}/", cfg.common.data_stream_dir);
     }
+    if cfg.common.base_uri.ends_with('/') {
+        cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
+    }
     if cfg.sled.data_dir.is_empty() {
         cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
     }
@@ -422,9 +427,16 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.s3.provider.is_empty() && cfg.s3.server_url.contains(".googleapis.com") {
-        cfg.s3.provider = "gcs".to_string();
+    if cfg.s3.provider.is_empty() {
+        if cfg.s3.server_url.contains(".googleapis.com") {
+            cfg.s3.provider = "gcs".to_string();
+        } else if cfg.s3.server_url.contains(".aliyuncs.com") {
+            cfg.s3.provider = "oss".to_string();
+        } else {
+            cfg.s3.provider = "aws".to_string();
+        }
     }
+    cfg.s3.provider = cfg.s3.provider.to_lowercase();
     Ok(())
 }
 

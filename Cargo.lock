@@ -5218,6 +5218,7 @@ dependencies = [
  "awc",
  "aws-config",
  "aws-sdk-s3",
+ "aws-smithy-async",
  "base64 0.21.0",
  "bytes",
  "chrono",

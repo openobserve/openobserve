@@ -44,7 +44,7 @@ pub async fn save_function(
     let transform = js_func.into_inner();
     crate::service::functions::register_function(org_id, None, name, transform).await
 }
-
+/** List all functions for an organization */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -65,6 +65,7 @@ async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error
     crate::service::functions::list_functions(org_id.into_inner(), None).await
 }
 
+/** Delete a query function by name */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -88,6 +89,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     crate::service::functions::delete_function(org_id, None, name).await
 }
 
+/** Create new ingest time function for a stream of an organization */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -117,6 +119,7 @@ pub async fn save_stream_function(
     crate::service::functions::register_function(org_id, Some(stream_name), name, transform).await
 }
 
+/** List all ingest time functions for a stream of an organization */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -139,6 +142,7 @@ async fn list_stream_function(path: web::Path<(String, String)>) -> Result<HttpR
     crate::service::functions::list_functions(org_id, Some(stream_name)).await
 }
 
+/** Delete ingest time function by name for a stream */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -164,7 +168,7 @@ async fn delete_stream_function(
     let (org_id, stream_name, name) = path.into_inner();
     crate::service::functions::delete_function(org_id, Some(stream_name), name).await
 }
-
+/** Create new query function for an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -196,6 +200,7 @@ pub async fn save_function(
     )
 }
 
+/** List all functions for an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -221,6 +226,7 @@ async fn list_functions(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
     )
 }
 
+/** Delete a query function by name */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -248,6 +254,7 @@ async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpRespo
     )
 }
 
+/** Create new ingest time function for a stream of an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -279,7 +286,7 @@ pub async fn save_stream_function(
         )),
     )
 }
-
+/** List all ingest time functions for a stream of an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -306,6 +313,7 @@ async fn list_stream_function(_path: web::Path<(String, String)>) -> Result<Http
     )
 }
 
+/** Delete ingest time function by name for a stream */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",

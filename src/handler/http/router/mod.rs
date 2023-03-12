@@ -53,7 +53,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
-            .service(organizarions_by_username)
+            .service(organizations_by_username)
             .service(users::authentication),
     );
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
@@ -75,7 +75,6 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
 pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
     let auth = HttpAuthentication::basic(validator);
-    //let ingestion_auth = HttpAuthentication::basic(passcode_validator);
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])

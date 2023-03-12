@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use utoipa::openapi::schema::{ObjectBuilder, Schema, SchemaType};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::openapi::{ArrayBuilder, RefOr};
 use utoipa::{Modify, OpenApi};
 
 use crate::handler::http::request;
@@ -73,6 +71,7 @@ use crate::meta;
             meta::functions::FunctionList,
             meta::search::Query,
             meta::search::Request,
+            meta::search::RequestEncoding,
             meta::search::Response,
             meta::alert::Alert,
             meta::alert::AlertList,
@@ -105,45 +104,5 @@ impl Modify for SecurityAddon {
             "Authorization",
             SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Basic).build()),
         );
-    }
-}
-
-pub struct ResponseAddon;
-
-impl Modify for ResponseAddon {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let components = openapi.components.as_mut().unwrap();
-        //aggs
-        let val = &mut components.schemas;
-
-        let hist_array = Schema::Array(
-            ArrayBuilder::new()
-                .items(RefOr::T(Schema::Object(
-                    ObjectBuilder::new()
-                        .property("key", ObjectBuilder::new().schema_type(SchemaType::String))
-                        .property("num", ObjectBuilder::new().schema_type(SchemaType::Integer))
-                        .build(),
-                )))
-                .build(),
-        );
-
-        val.insert(
-            "Aggregates".to_string(),
-            utoipa::openapi::RefOr::T(Schema::from(
-                ObjectBuilder::new().property("histogram", hist_array),
-            )),
-        );
-
-        // let search_response = val.get("SearchResponse").unwrap();
-        // let value_string = serde_json::to_string(&search_response).unwrap().to_string();
-        // let new_str = value_string.replace(
-        //     "\"aggs\":{\"$ref\":\"#/components/schemas/AHashMap\"",
-        //     "\"aggs\":{\"$ref\":\"#/components/schemas/Aggregates\"",
-        // );
-
-        // println!("{}", new_str);
-
-        // let search = utoipa::openapi::schema::RefOr::T(Schema::from
-        // search_response. ("CheckingWhat", Ref::new("#/components/schemas/Aggregates"));
     }
 }

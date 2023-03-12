@@ -32,7 +32,6 @@
     "signOut": "Oturumu Çık",
     "account": "Hesap",
     "feedback": "Geribildirim",
-    "zincSearch": "ÇinkoSearch",
     "documentation": "Dokümanlar",
     "openapi": "OpenAPI",
     "tickets": "Bilet",
@@ -46,8 +45,8 @@
     "docs": "Dokümanlar"
   },
   "about": {
-    "name": "Çinko",
-    "introduction": "Modern açık kaynak arama motoru."
+    "name": "ZincObserve",
+    "introduction": "Observability simplified."
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -229,7 +228,15 @@
     "typeDesc": "Gösterge Tablosunun Tip Açıklaması",
     "createdashboard": "Yeni Bir Gösterge Tablosu Oluşturun",
     "nameHolder": "Yeni Gösterge Tablosunun Adını Girin",
-    "typeHolder": "Yeni Gösterge Tablosunun Tip Açıklamasını Girin"
+    "typeHolder": "Yeni Gösterge Tablosunun Tip Açıklamasını Girin",
+    "invite": "Invite Teammate",
+    "identifier": "Identifier",
+    "role": "Role",
+    "description": "Description",
+    "owner": "Owner",
+    "created": "Created",
+    "actions": "Actions",
+    "nameRequired": "Name is required"
   },
   "panel": {
     "header": "Panel",

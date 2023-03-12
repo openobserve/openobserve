@@ -1,18 +1,3 @@
-<!-- Copyright 2022 Zinc Labs Inc. and Contributors
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http:www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License. 
--->
-
 <template>
   <q-card class="column full-height">
     <q-card-section class="q-px-md q-py-md text-black">
@@ -37,7 +22,7 @@
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="adddashboardForm" @submit="onSubmit">
+      <q-form ref="addDashboardForm" @submit="onSubmit">
         <q-input
           v-if="beingUpdated"
           v-model="dashboardData.id"
@@ -45,11 +30,10 @@
           :disabled="beingUpdated"
           :label="t('dashboard.id')"
         />
-
         <q-input
           v-model="dashboardData.name"
-          :placeholder="t('dashboard.nameHolder')"
           :label="t('dashboard.name') + '*'"
+          :placeholder="t('dashboard.nameHolder')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -57,11 +41,13 @@
           outlined
           filled
           dense
+          :rules="[(val) => !!val || t('dashboard.nameRequired')]"
         />
+        <span>&nbsp;</span>
         <q-input
-          v-model="dashboardData.type"
+          v-model="dashboardData.description"
           :placeholder="t('dashboard.typeHolder')"
-          :label="t('dashboard.typeDesc') + '*'"
+          :label="t('dashboard.typeDesc')"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -82,6 +68,7 @@
             no-caps
           />
           <q-btn
+            :disable="dashboardData.name === ''"
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -107,13 +94,14 @@ const defaultValue = () => {
   return {
     id: "",
     name: "",
+    description: "",
   };
 };
 
-let calldashboard: Promise<{ data: any }>;
+let callDashboard: Promise<{ data: any }>;
 
 export default defineComponent({
-  name: "ComponentAddUpdateUser",
+  name: "ComponentAddDashboard",
   props: {
     modelValue: {
       type: Object,
@@ -124,7 +112,7 @@ export default defineComponent({
   setup() {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
-    const adddashboardForm: any = ref(null);
+    const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
@@ -141,7 +129,7 @@ export default defineComponent({
       beingUpdated,
       status,
       dashboardData,
-      adddashboardForm,
+      addDashboardForm,
       store,
       getRandInteger,
       isValidIdentifier,
@@ -155,6 +143,7 @@ export default defineComponent({
       this.dashboardData = {
         id: this.modelValue.id,
         name: this.modelValue.name,
+        description: this.modelValue.description,
       };
     }
   },
@@ -171,7 +160,7 @@ export default defineComponent({
         message: "Please wait...",
         timeout: 2000,
       });
-      this.adddashboardForm.validate().then((valid: any) => {
+      this.addDashboardForm.validate().then((valid: any) => {
         if (!valid) {
           return false;
         }
@@ -191,7 +180,7 @@ export default defineComponent({
           };
           const obj = toRaw(this.dashboardData);
           baseObj.title = obj.name;
-          baseObj.description = obj.type;
+          baseObj.description = obj.description;
           baseObj.dashboardId = "DashID_" + this.getRandInteger();
           baseObj.created = new Date().toISOString();
           baseObj.owner =
@@ -199,15 +188,37 @@ export default defineComponent({
             " " +
             toRaw(this.store.state.currentuser.last_name);
 
-          calldashboard = dashboardService.create(
+          callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
             baseObj.dashboardId,
             JSON.stringify(JSON.stringify(baseObj))
           );
         }
-        calldashboard.then((res: { data: any }) => {
-          this.$emit("updated");
-        });
+        callDashboard
+          .then((res: { data: any }) => {
+            const data = res.data;
+            this.dashboardData = {
+              id: "",
+              name: "",
+              description: "",
+            };
+
+            this.$emit("update:modelValue", data);
+            this.$emit("updated");
+            console.log("Done saving");
+            this.addDashboardForm.resetValidation();
+            dismiss();
+          })
+          .catch((err: any) => {
+            this.$q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err.response.data["error"] || "Dashboard creation failed."
+              ),
+            });
+            console.log(err);
+            dismiss();
+          });
       });
     },
   },
