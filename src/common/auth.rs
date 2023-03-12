@@ -52,7 +52,7 @@ pub async fn is_root_user(user_id: &str) -> bool {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use crate::{meta::user::UserRequest, service::users};
 
     use super::*;

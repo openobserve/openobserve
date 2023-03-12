@@ -25,7 +25,7 @@ pub fn find(haystack: &str, needle: &str) -> bool {
 }
 
 #[cfg(test)]
-mod test_utils {
+mod tests {
     use super::*;
     #[test]
     fn test_find() {

@@ -45,6 +45,14 @@ impl FileData {
         }
     }
 
+    pub fn with_capacity(max_size: usize) -> FileData {
+        FileData {
+            max_size,
+            cur_size: 0,
+            data: LruCache::unbounded(),
+        }
+    }
+
     pub fn get(&mut self, file: &str) -> Result<Bytes, anyhow::Error> {
         let data = self.data.get(file);
         if data.is_none() {
@@ -140,6 +148,21 @@ pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_set_file_cache() {
+        let mut file_data = FileData::with_capacity(1024);
+        let content = Bytes::from("Some text Need to store in cache");
+        for i in 0..100 {
+            let file_key = format!(
+                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_{}.parquet",
+                i
+            );
+            let resp = file_data.set(&file_key, content.clone());
+            assert!(resp.is_ok());
+        }
+    }
+
     #[test]
     fn test_get_file_from_cache() {
         let mut file_data = FileData::default();

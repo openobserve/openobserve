@@ -172,9 +172,9 @@ mod tests {
 
     #[test]
     fn create_read_directory() {
-        let path = "/tmp/test_dir/abc/";
-        assert_eq!(true, create_dir_all(path).is_ok());
-        assert_eq!(false, remove_dir("/tmp/test_dir/").is_ok());
+        assert_eq!(true, create_dir_all("/tmp/test_dir/abc/").is_ok());
+        assert_eq!(true, create_dir("/tmp/test_dir/abc/cde/").is_ok());
+        assert_eq!(true, remove_dir("/tmp/test_dir/abc/cde/").is_ok());
         assert_eq!(true, remove_dir_all("/tmp/test_dir/").is_ok());
     }
 }
