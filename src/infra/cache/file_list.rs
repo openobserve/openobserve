@@ -478,6 +478,21 @@ pub fn get_all_stream(org_id: &str, stream_type: StreamType) -> Result<Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_set_file_to_cache() {
+        let meta = FileMeta::default();
+        let ret = set_file_to_cache(
+            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
+            Some(meta),
+            false,
+        );
+        assert!(ret.is_ok());
+
+        let ret = set_file_to_cache("files/default/logs/olympics/2022/10/03", Some(meta), false);
+        assert!(ret.is_err());
+    }
+
     #[test]
     fn test_get_file_from_cache() {
         let meta = FileMeta {
@@ -498,5 +513,89 @@ mod tests {
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
         );
         assert_eq!(res.unwrap().records, meta.records);
+
+        let res = get_file_from_cache(
+            "files/defaultx/logs/olympics/2000/10/03/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logsx/olympics/2000/10/03/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logs/olympicsx/2000/10/03/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logs/olympics/2000/10/03/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logs/olympics/2022/00/03/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logs/olympics/2022/10/00/10/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache(
+            "files/default/logs/olympics/2022/10/03/00/6982652937134804993_1.parquet",
+        );
+        assert!(res.is_err());
+
+        let res = get_file_from_cache("files/default/logs/olympics/2022/10/03/10/0.parquet");
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_delete_file_from_cache() {
+        let meta = FileMeta::default();
+        let ret = set_file_to_cache(
+            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
+            Some(meta),
+            false,
+        );
+        assert!(ret.is_ok());
+
+        let meta = FileMeta::default();
+        let ret = set_file_to_cache(
+            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
+            Some(meta),
+            true,
+        );
+        assert!(ret.is_ok());
+    }
+
+    #[actix_web::test]
+    async fn test_get_file_list() {
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0).await;
+        assert!(ret.is_ok());
+
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
+        assert!(ret.is_ok());
+
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "").await;
+        assert!(ret.is_ok());
+
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/").await;
+        assert!(ret.is_ok());
+
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/").await;
+        assert!(ret.is_ok());
+
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/10/").await;
+        assert!(ret.is_ok());
+    }
+
+    #[actix_web::test]
+    async fn test_get_file_num() {
+        let ret = get_file_num();
+        assert!(ret.is_ok());
     }
 }
