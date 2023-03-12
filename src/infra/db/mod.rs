@@ -33,18 +33,18 @@ lazy_static! {
 
 pub fn default() -> Box<dyn Db> {
     match CONFIG.common.local_mode {
-        true => Box::new(sled::Sled::new(&CONFIG.sled.prefix)),
-        false => Box::new(etcd::Etcd::new(&CONFIG.etcd.prefix)),
+        true => Box::<sled::Sled>::default(),
+        false => Box::<etcd::Etcd>::default(),
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Event {
     Put(EventData),
     Delete(EventData),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct EventData {
     pub key: String,
     pub value: Option<Bytes>,
@@ -70,7 +70,7 @@ pub trait Db: Sync + 'static {
 
 #[cfg(test)]
 mod tests {
-    use super::default;
+    use super::*;
     use bytes::Bytes;
 
     #[actix_web::test]
@@ -105,7 +105,29 @@ mod tests {
         assert_eq!(true, db.delete("/foo/bar1", false).await.is_ok());
         assert_eq!(true, db.delete("/foo/bar4", false).await.is_err());
         assert_eq!(true, db.delete("/foo/", true).await.is_ok());
+        db.put("/foo/bar1", Bytes::from("hello")).await.unwrap();
+        db.put("/foo/bar2", Bytes::from("hello")).await.unwrap();
+        db.put("/foo/bar3", Bytes::from("hello")).await.unwrap();
         let value = db.list_keys("/foo/").await.unwrap();
-        assert_eq!(value.len(), 0);
+        assert_eq!(value.len(), 3);
+        let value = db.list_values("/foo/").await.unwrap();
+        assert_eq!(value.len(), 3);
+        let mut events = db.list_use_channel("/foo/").await.unwrap();
+        let events = Arc::get_mut(&mut events).unwrap();
+        let value = events.recv().await.unwrap();
+        assert_eq!(value.0, "/foo/bar1");
+    }
+
+    #[test]
+    fn test_event() {
+        let e1 = Event::Put(EventData {
+            key: "/foo/bar".to_string(),
+            value: Some(Bytes::from("hello")),
+        });
+        let e2 = Event::Put(EventData {
+            key: "/foo/bar".to_string(),
+            value: Some(Bytes::from("hello")),
+        });
+        assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
     }
 }

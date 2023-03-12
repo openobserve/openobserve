@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_functions() {
-        let trns = Transform {
+        let trans = Transform {
             order: 0,
             function: "function jsconcat(a,b){return a+b}".to_string(),
             stream_name: "olympics".to_string(),
@@ -67,7 +67,7 @@ mod tests {
             trans_type: 1,
         };
 
-        let mod_trns = Transform {
+        let mod_trans = Transform {
             order: 0,
             function: "function jsconcat(a,b){return a..b}".to_string(),
             stream_name: "olympics".to_string(),
@@ -75,9 +75,30 @@ mod tests {
             num_args: 2,
             trans_type: 1,
         };
+        assert_eq!(trans, mod_trans);
 
-        let trans_list = FunctionList { list: vec![] };
-        assert_eq!(trns, mod_trns);
-        assert!(trans_list.list.is_empty());
+        let trans_str = serde_json::to_string(&trans).unwrap();
+        let trans2: Transform = serde_json::from_str(&trans_str).unwrap();
+        assert_eq!(format!("{:?}", trans), format!("{:?}", trans2));
+
+        let trans_list = FunctionList {
+            list: vec![trans, trans2],
+        };
+        assert!(!trans_list.list.is_empty());
+        let trans_list_str = serde_json::to_string(&trans_list.clone()).unwrap();
+        let trans_list2: FunctionList = serde_json::from_str(&trans_list_str).unwrap();
+        assert_eq!(trans_list.list.len(), trans_list2.list.len());
+    }
+
+    #[test]
+    fn test_zo_function() {
+        let f1 = ZoFunction {
+            name: "test",
+            text: "test",
+        };
+        let f1_str = serde_json::to_string(&f1).unwrap();
+        let f2: ZoFunction = serde_json::from_str(&f1_str).unwrap();
+        assert_eq!(f1.name, f2.name);
+        assert_eq!(format!("{:?}", f1), format!("{:?}", f2));
     }
 }

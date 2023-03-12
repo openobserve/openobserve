@@ -33,7 +33,6 @@ pub struct Locker {
 
 type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
 
-#[derive(Debug)]
 pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
@@ -344,29 +343,41 @@ mod tests {
 
     #[test]
     fn test_file_loc_with_stream() {
-        let locker = Locker::new();
         let thread_id = 1;
         let org_id = "org1";
         let stream_name = "stream1";
         let stream_type = StreamType::Logs;
         let key = "2022_10_17_10";
-        let file = locker.get_or_create(thread_id, org_id, stream_name, stream_type, key, false);
+        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, false);
         file.write(b"hello world");
         assert_eq!(file.size(), 11);
         assert_eq!(file.name().contains(key), true);
         assert_eq!(file.expired() > 0, true);
-        assert_eq!(
-            locker
-                .get(1, org_id, stream_name, stream_type, key)
-                .unwrap()
-                .name(),
-            file.name()
+        file.sync();
+
+        let key = "2022_10_17_11";
+        let file2 = get_or_create(thread_id, org_id, stream_name, stream_type, key, true);
+        file2.write(b"hello world");
+        assert_eq!(file2.size(), 11);
+        assert_eq!(file2.name().contains(key), true);
+        assert_eq!(file2.expired() > 0, true);
+        file2.sync();
+
+        let ret = check_in_use(
+            org_id,
+            stream_name,
+            stream_type,
+            "1_2022_10_17_10_7040693836556926977.json",
         );
+        assert_eq!(ret, false);
+
+        let ret = flush_all();
+        assert_eq!(ret, ());
     }
 
     #[test]
     fn test_file_loc_without_stream() {
-        let locker = Locker::new();
+        let locker = Locker::default();
         let thread_id = 1;
         let org_id = "";
         let stream_name = "";
