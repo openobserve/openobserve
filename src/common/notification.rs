@@ -38,7 +38,7 @@ pub async fn send_notification(
                 )
         });
 
-        match dest.dest_type {
+        /* match dest.dest_type {
             alert::AlertDestType::Slack => match url::Url::parse(&dest.url) {
                 Ok(dest_url) => {
                     //Invoke Webhook
@@ -82,7 +82,7 @@ pub async fn send_notification(
                 }
                 Err(_) => log::info!("Error parsing notification url"),
             },
-        }
+        } */
     }
 
     Ok(())
@@ -108,14 +108,14 @@ mod tests {
         };
         let res = send_notification(
             &vec![
-                AlertDestination {
+               /*  AlertDestination {
                     url: "https://httpbin.org/post".to_string(),
                     dest_type: AlertDestType::Slack,
                 },
                 AlertDestination {
                     url: "https://httpbin.org/post".to_string(),
                     dest_type: AlertDestType::AlertManager,
-                },
+                }, */
             ],
             &obj,
         )

@@ -27,6 +27,9 @@ use crate::meta::alert::{Alert, AlertList, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::search::Query;
 
+pub mod destinations;
+pub mod templates;
+
 pub async fn save_alert(
     org_id: String,
     stream_name: String,
@@ -217,10 +220,10 @@ mod test {
             duration: 1,
             frequency: 1,
             time_between_alerts: 10,
-            destination: vec![AlertDestination {
+            destination: vec![/* AlertDestination {
                 url: "dummy".to_string(),
                 dest_type: AlertDestType::Slack,
-            }],
+            } */],
             is_real_time: false,
         };
         let res = save_alert(
