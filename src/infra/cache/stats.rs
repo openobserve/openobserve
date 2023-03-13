@@ -157,8 +157,7 @@ mod tests {
     #[test]
     fn test_get_stream_stats_len() {
         let stats = get_stats();
-        let data = get_stream_stats_len();
-        assert_eq!(data, stats.len());
+        assert_eq!(get_stream_stats_len(), stats.len());
 
         let val = StreamStats {
             doc_time_min: 1667978841102,

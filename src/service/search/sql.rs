@@ -685,7 +685,6 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]
@@ -710,65 +709,97 @@ mod tests {
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
-
         rpc_req.org_id = org_id.to_string();
 
         let resp = Sql::new(&rpc_req).await.unwrap();
-
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
-
-        let field_used = check_field_in_use(&resp, col);
-        assert_eq!(field_used, true);
+        assert!(check_field_in_use(&resp, col));
     }
 
     #[actix_web::test]
     async fn test_add_quote_for_sql() {
-        let sqls = [
-            "select * from table",
-            "select ab.c from table ",
-            "select * from table where a = 1",
-            "select * from table where a=1",
-            "select * from table where County='中文'",
-            "select * from table where match_all(123)",
-            "select * from table where match_all('123')",
-            "select * from table where match_all('中文')",
-            "select * from table where str_match(log,'中文')",
-            "select * from table where str_match(log, '中文')",
-            "select * from table where str_match(log, 'a=b')",
-            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-            "select * from table where str_match(log, 'Sql: select * from table')",
-            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
-            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
-            "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
-            "select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] \"POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0\" 200 111 \"-\" \"go-resty/2.7.0 (https://github.com/go-resty/resty)\" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'",
-            "select * from table where kubernetes.labels.pod-template-hash='7d8765890' and time<10 and time>10 and time>=29 and kubernetes.container_name!='controller'",
+        let samples = [
+            (
+                "select * from table",
+                "select * from table",
+            ),
+            (
+                "select ab.c from table ",
+                r#"select "ab.c" from table "#,
+            ),
+            (
+                "select * from table where a = 1",
+                "select * from table where a = 1",
+            ),
+            (
+                "select * from table where a=1",
+                "select * from table where a=1",
+            ),
+            (
+                "select * from table where County='中文'",
+                r#"select * from table where "County"='中文'"#,
+            ),
+            (
+                "select * from table where match_all(123)",
+                "select * from table where match_all(123)",
+            ),
+            (
+                "select * from table where match_all('123')",
+                "select * from table where match_all('123')",
+            ),
+            (
+                "select * from table where match_all('中文')",
+                "select * from table where match_all('中文')",
+            ),
+            (
+                "select * from table where str_match(log,'中文')",
+                "select * from table where str_match(log,'中文')",
+            ),
+            (
+                "select * from table where str_match(log, '中文')",
+                "select * from table where str_match(log, '中文')",
+            ),
+            (
+                "select * from table where str_match(log, 'a=b')",
+                "select * from table where str_match(log, 'a=b')",
+            ),
+            (
+                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
+                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
+            ),
+            (
+                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
+                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
+            ),
+            (
+                "select * from table where str_match(log, 'Sql: select * from table')",
+                "select * from table where str_match(log, 'Sql: select * from table')",
+            ),
+            (
+                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
+                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
+            ),
+            (
+                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
+                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
+            ),
+            (
+                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
+                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
+            ),
+            (
+                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
+                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
+            ),
+            (
+                "select * from table where kubernetes.labels.pod-template-hash='7d8765890' and time<10 and time>10 and time>=29 and kubernetes.container_name!='controller'",
+                r#"select * from table where "kubernetes.labels.pod-template-hash"='7d8765890' and time<10 and time>10 and time>=29 and "kubernetes.container_name"!='controller'"#,
+            ),
         ];
-        let resqls = [
-            "select * from table",
-            "select \"ab.c\" from table ",
-            "select * from table where a = 1",
-            "select * from table where a=1",
-            "select * from table where \"County\"='中文'",
-            "select * from table where match_all(123)",
-            "select * from table where match_all('123')",
-            "select * from table where match_all('中文')",
-            "select * from table where str_match(log,'中文')",
-            "select * from table where str_match(log, '中文')",
-            "select * from table where str_match(log, 'a=b')",
-            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-            "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-            "select * from table where str_match(log, 'Sql: select * from table')",
-            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = 1')",
-            "select * from table where str_match(log, 'Sql: select * from table where \"a\" = \\'1\\'')",
-            "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
-            "select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] \"POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0\" 200 111 \"-\" \"go-resty/2.7.0 (https://github.com/go-resty/resty)\" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'",
-            "select * from table where \"kubernetes.labels.pod-template-hash\"='7d8765890' and time<10 and time>10 and time>=29 and \"kubernetes.container_name\"!='controller'",
-            ];
-        for (i, sql) in sqls.iter().enumerate() {
-            let resql = add_quote_for_sql(*sql);
-            assert_eq!(resql, resqls[i]);
+
+        for (i, (sql, quoted_sql)) in samples.into_iter().enumerate() {
+            assert_eq!(add_quote_for_sql(sql), quoted_sql, "sample #{i}");
         }
     }
 }

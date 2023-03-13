@@ -380,25 +380,23 @@ mod tests {
             },
         );
     }
+
     #[actix_web::test]
     async fn test_list_users() {
         set_up().await;
-        let resp = list_users("dummy").await;
-        assert!(resp.is_ok())
+        assert!(list_users("dummy").await.is_ok())
     }
+
     #[actix_web::test]
     async fn test_root_user_exists() {
         set_up().await;
-        let resp = root_user_exists().await;
-        assert_eq!(resp, false)
+        assert!(!root_user_exists().await);
     }
 
     #[actix_web::test]
     async fn test_get_user() {
         set_up().await;
-
-        let resp = get_user(Some("dummy"), "admin@zo.dev").await;
-        assert_eq!(resp.is_some(), true)
+        assert!(get_user(Some("dummy"), "admin@zo.dev").await.is_some())
     }
 
     #[actix_web::test]

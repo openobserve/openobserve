@@ -132,23 +132,12 @@ mod tests {
         )
         .await;
 
-        let user_password = "Complexpass#123";
-        let res = validate_credentials("root@example.com", user_password, "default/_bulk").await;
-        assert_eq!(res.unwrap(), true);
-
-        let res = validate_credentials("", user_password, "default/_bulk").await;
-        assert_eq!(res.unwrap(), false);
-
-        let res = validate_credentials("", user_password, "/").await;
-        assert_eq!(res.unwrap(), false);
-
-        let res = validate_credentials("user@example.com", user_password, "").await;
-        assert_eq!(res.unwrap(), true);
-
-        let res = validate_credentials("user@example.com", user_password, "default/user").await;
-        assert_eq!(res.unwrap(), true);
-
-        let res = validate_credentials("user@example.com", "x", "default/user").await;
-        assert_eq!(res.unwrap(), false);
+        let pwd = "Complexpass#123";
+        assert!(validate_credentials("root@example.com", pwd, "default/_bulk").await.unwrap());
+        assert!(!validate_credentials("", pwd, "default/_bulk").await.unwrap());
+        assert!(!validate_credentials("", pwd, "/").await.unwrap());
+        assert!(validate_credentials("user@example.com", pwd, "").await.unwrap());
+        assert!(validate_credentials("user@example.com", pwd, "default/user").await.unwrap());
+        assert!(!validate_credentials("user@example.com", "x", "default/user").await.unwrap());
     }
 }

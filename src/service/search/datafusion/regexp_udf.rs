@@ -258,11 +258,11 @@ mod tests {
 
     #[test]
     fn parse_escape() {
-        assert_eq!(is_valid_character_after_escape('0'), true);
-        assert_eq!(is_valid_character_after_escape('8'), true);
-        assert_eq!(is_valid_character_after_escape('x'), true);
-        assert_eq!(is_valid_character_after_escape('p'), true);
-        assert_eq!(is_valid_character_after_escape('d'), true);
-        assert_eq!(is_valid_character_after_escape('a'), false);
+        assert!(is_valid_character_after_escape('0'));
+        assert!(is_valid_character_after_escape('8'));
+        assert!(is_valid_character_after_escape('x'));
+        assert!(is_valid_character_after_escape('p'));
+        assert!(is_valid_character_after_escape('d'));
+        assert!(!is_valid_character_after_escape('a'));
     }
 }

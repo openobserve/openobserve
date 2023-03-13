@@ -111,7 +111,6 @@ mod test {
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
         let resp = meta::common::FileMeta::from(&rpc_meta);
-
         assert_eq!(file_meta, resp);
     }
 

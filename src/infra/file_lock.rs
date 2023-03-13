@@ -227,22 +227,21 @@ impl RwFile {
         let file_path = format!("{}{}", dir_path, file_name);
         std::fs::create_dir_all(&dir_path).unwrap();
 
-        let (file, cache) = match use_cache {
-            true => (
+        let (file, cache) = if use_cache {
+            (
                 None,
                 Some(RwLock::new(BytesMut::with_capacity(
                     CONFIG.limit.max_file_size_on_disk as usize / 16,
                 ))),
-            ),
-            false => {
-                let f = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(true)
-                    .open(file_path)
-                    .unwrap();
-                (Some(RwLock::new(f)), None)
-            }
+            )
+        } else {
+            let f = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(file_path)
+                .unwrap();
+            (Some(RwLock::new(f)), None)
         };
         RwFile {
             use_cache,
@@ -256,68 +255,63 @@ impl RwFile {
 
     #[inline]
     pub fn write(&self, data: &[u8]) {
-        match self.use_cache {
-            true => {
-                self.cache
-                    .as_ref()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .extend_from_slice(data);
-            }
-            false => {
-                self.file
-                    .as_ref()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .write_all(data)
-                    .unwrap();
-            }
+        if self.use_cache {
+            self.cache
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .extend_from_slice(data);
+        } else {
+            self.file
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .write_all(data)
+                .unwrap();
         }
     }
 
     #[inline]
     pub fn sync(&self) {
-        match self.use_cache {
-            true => {
-                let file_path = format!("{}{}", self.dir, self.name);
-                let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-                FILES.write().unwrap().insert(
-                    file_path.to_string(),
-                    self.cache
-                        .as_ref()
-                        .unwrap()
-                        .read()
-                        .unwrap()
-                        .to_owned()
-                        .freeze(),
-                );
-            }
-            false => self
-                .file
+        if self.use_cache {
+            let file_path = format!("{}{}", self.dir, self.name);
+            let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
+            FILES.write().unwrap().insert(
+                file_path.to_string(),
+                self.cache
+                    .as_ref()
+                    .unwrap()
+                    .read()
+                    .unwrap()
+                    .to_owned()
+                    .freeze(),
+            );
+        } else {
+            self.file
                 .as_ref()
                 .unwrap()
                 .write()
                 .unwrap()
                 .sync_all()
-                .unwrap(),
-        };
+                .unwrap()
+        }
     }
 
     #[inline]
     pub fn size(&self) -> i64 {
-        match self.use_cache {
-            true => self.cache.as_ref().unwrap().write().unwrap().len() as i64,
-            false => self
-                .file
+        if self.use_cache {
+            self.cache.as_ref().unwrap().write().unwrap().len() as i64
+        } else {
+            self.file
                 .as_ref()
                 .unwrap()
                 .read()
                 .unwrap()
                 .metadata()
                 .unwrap()
-                .len() as i64,
+                .len() as i64
         }
     }
 
@@ -351,28 +345,25 @@ mod tests {
         let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, false);
         file.write(b"hello world");
         assert_eq!(file.size(), 11);
-        assert_eq!(file.name().contains(key), true);
-        assert_eq!(file.expired() > 0, true);
+        assert!(file.name().contains(key));
+        assert!(file.expired() > 0);
         file.sync();
 
         let key = "2022_10_17_11";
         let file2 = get_or_create(thread_id, org_id, stream_name, stream_type, key, true);
         file2.write(b"hello world");
         assert_eq!(file2.size(), 11);
-        assert_eq!(file2.name().contains(key), true);
-        assert_eq!(file2.expired() > 0, true);
+        assert!(file2.name().contains(key));
+        assert!(file2.expired() > 0);
         file2.sync();
 
-        let ret = check_in_use(
+        assert!(!check_in_use(
             org_id,
             stream_name,
             stream_type,
             "1_2022_10_17_10_7040693836556926977.json",
-        );
-        assert_eq!(ret, false);
-
-        let ret = flush_all();
-        assert_eq!(ret, ());
+        ));
+        flush_all();
     }
 
     #[test]
