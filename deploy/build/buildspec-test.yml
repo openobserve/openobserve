@@ -19,5 +19,5 @@ phases:
       - pwd
       - mkdir -p web/dist 
       - touch web/dist/index.html
-      - cargo clippy -- -A clippy::uninlined_format_args
+      - cargo clippy -- -A clippy::uninlined_format_args --jobs 1
       - ./coverage.sh
