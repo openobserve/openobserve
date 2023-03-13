@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # cargo llvm-cov >report.json && ls -l | grep TOTAL report.json | xargs > coverage.txt
-summary="$(RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --features zo_functions,tmpcache --ignore-filename-regex job >report.json && ls -l | grep TOTAL report.json | xargs)"
+summary="$(RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --features zo_functions,tmpcache --ignore-filename-regex job >report.json && ls -l .| grep TOTAL report.json | xargs)"
 echo "Coverage Summary $summary %"
 
 region_cov="$(cut -d' ' -f4 <<<"$summary")"
