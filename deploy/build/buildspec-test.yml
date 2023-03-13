@@ -17,5 +17,7 @@ phases:
   build:
     commands:
       - pwd
+      - mkdir -p web/dist 
+      - touch web/dist/index.html
       - cargo clippy -- -A clippy::uninlined_format_args
       - ./coverage.sh
