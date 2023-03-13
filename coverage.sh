@@ -1,7 +1,17 @@
 #!/bin/bash
 
+if [ -z $(cargo --list|grep llvm-cov) ]; then
+    cargo install -f cargo-llvm-cov
+fi
+
 # cargo llvm-cov >report.json && ls -l | grep TOTAL report.json | xargs > coverage.txt
-summary="$(RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --features zo_functions,tmpcache --ignore-filename-regex job >report.json && ls -l .| grep TOTAL report.json | xargs)"
+RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --features zo_functions,tmpcache --ignore-filename-regex job >report.json
+if [ $? -ne 0 ]; then
+    echo "Failed to run cargo llvm-cov"
+    exit 1
+fi
+
+summary="$(grep TOTAL report.json | xargs)"
 echo "Coverage Summary $summary %"
 
 region_cov="$(cut -d' ' -f4 <<<"$summary")"

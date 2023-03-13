@@ -61,5 +61,4 @@ jobs:
         run: |
           mkdir -p web/dist
           touch web/dist/index.html
-          cargo install -f cargo-llvm-cov
           ./coverage.sh
