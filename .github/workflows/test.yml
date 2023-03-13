@@ -1,0 +1,66 @@
+on:
+  push:
+name: Test 
+env:
+  RUST_TOOLCHAIN: nightly-2023-01-26
+jobs:
+  build:
+    name: Run test
+    runs-on: ubuntu-2004-8-cores
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Cache cargo assets
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      - name: Build UI
+        env: 
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+            cd web/
+            npm install
+            npm run build
+
+      - name: Install Protoc
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.arch }}
+          override: true
+
+      - name: Output package versions
+        run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
+
+      - name: Run cargo clippy
+        run: cargo clippy -- -A clippy::uninlined_format_args
+
+      - name: Run cargo test
+        run: ./coverage.sh
