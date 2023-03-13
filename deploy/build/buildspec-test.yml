@@ -12,7 +12,7 @@ phases:
       - rustup toolchain list
       - rustup default nightly-2023-01-26  
       - export RUSTFLAGS='-C target-cpu=native'
-      - cargo install cargo-llvm-cov
+      - rustup component add clippy
 
   build:
     commands:
