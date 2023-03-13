@@ -23,12 +23,10 @@ use crate::service::db;
 pub async fn save_template(
     org_id: String,
     name: String,
-    mut template: DestinationTemplate,
+    template: DestinationTemplate,
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:templates:save");
     let _guard = loc_span.enter();
-
-    template.name = Some(name.clone());
 
     db::alerts::templates::set(org_id.as_str(), name.as_str(), template.clone())
         .await
@@ -56,9 +54,9 @@ pub async fn delete_template(org_id: String, name: String) -> Result<HttpRespons
             http::StatusCode::OK.into(),
             "Alert template deleted ".to_string(),
         ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
+            Some(err.to_string()),
         ))),
     }
 }
@@ -71,7 +69,7 @@ pub async fn get_template(org_id: String, name: String) -> Result<HttpResponse, 
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            "Alert template not found".to_string(),
+            Some("Alert template not found".to_string()),
         ))),
     }
 }
