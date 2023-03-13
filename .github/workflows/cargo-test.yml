@@ -9,13 +9,13 @@ on:
       - "docs/**"
       - "**.md"
       - ".github/**"
-name: Test 
+name: "Cargo test"
 env:
   RUST_TOOLCHAIN: nightly-2023-01-26
   RUST_TARGET: x86_64-unknown-linux-gnu
 jobs:
   build:
-    name: Run test
+    name: Cargo test
     runs-on: ubuntu-2004-8-cores
     steps:
       - name: Checkout sources
@@ -32,20 +32,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
-      - name: Install Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.x
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
-      - name: Build UI
-        env: 
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-            cd web/
-            npm install
-            npm run build
 
       - name: Install Protoc
         run: | # Make sure the protoc is >= 3.15
@@ -74,4 +60,8 @@ jobs:
         run: cargo clippy -- -A clippy::uninlined_format_args
 
       - name: Run cargo test
-        run: ./coverage.sh
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+          cargo install cargo-llvm-cov
+          ./coverage.sh
