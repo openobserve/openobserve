@@ -1246,6 +1246,8 @@ export default defineComponent({
     },
     changeRelativeDate() {
       if (this.searchObj.data.datetime.tab == "relative") {
+        this.searchObj.data.datetime.relative.value =
+          this.searchObj.data.datetime.relative.value.replace(/[^\d]/g, "");
         this.runQueryFn();
       }
     },
