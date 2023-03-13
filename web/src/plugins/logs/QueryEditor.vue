@@ -196,11 +196,11 @@ export default defineComponent({
         rules: [{ token: "comment", background: "FFFFFF" }],
         colors: {
           "editor.foreground": "#000000",
-          "editor.background": "#FFFFFF",
+          "editor.background": "#fafafa",
           "editorCursor.foreground": "#000000",
           "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#FFFFFF",
+          "editorLineNumber.foreground": "#ececec",
+          "editor.border": "#ececec",
         },
       });
 

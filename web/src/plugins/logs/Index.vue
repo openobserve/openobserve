@@ -1277,37 +1277,49 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.logPage,
-.index-menu .field_list .field_overlay .field_label,
-.q-field__native,
-.q-field__input,
-.q-table tbody td {
-  font-size: 12px !important;
-}
-.q-splitter__after {
-  overflow: hidden;
-}
+<style lang="scss">
+.logPage {
+  .index-menu .field_list .field_overlay .field_label,
+  .q-field__native,
+  .q-field__input,
+  .q-table tbody td {
+    font-size: 12px !important;
+  }
+  .q-splitter__after {
+    overflow: hidden;
+  }
 
-.q-item__label span {
-  /* text-transform: capitalize; */
-}
+  .q-item__label span {
+    /* text-transform: capitalize; */
+  }
 
-.index-table :hover::-webkit-scrollbar,
-#searchGridComponent:hover::-webkit-scrollbar {
-  height: 13px;
-  width: 13px;
-}
+  .index-table :hover::-webkit-scrollbar,
+  #searchGridComponent:hover::-webkit-scrollbar {
+    height: 13px;
+    width: 13px;
+  }
 
-.index-table ::-webkit-scrollbar-track,
-#searchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-}
+  .index-table ::-webkit-scrollbar-track,
+  #searchGridComponent::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+  }
 
-.index-table ::-webkit-scrollbar-thumb,
-#searchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  .index-table ::-webkit-scrollbar-thumb,
+  #searchGridComponent::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+  }
+
+  .q-table__top {
+    padding: 0px !important;
+  }
+  .q-table__control {
+    width: 100%;
+  }
+
+  .q-field__control-container {
+    padding-top: 0px !important;
+  }
 }
 </style>
