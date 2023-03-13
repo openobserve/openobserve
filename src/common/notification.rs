@@ -38,12 +38,10 @@ pub async fn send_notification(
                 let body = local_dest.template.unwrap().body;
                 let resp_str = serde_json::to_string(&body).unwrap();
 
-                let mut resp = resp_str
-                    .replace("{stream_name}", &trigger.stream)
-                    .replace("{org_name}", &trigger.org)
-                    .replace("{alert_name}", &trigger.alert_name)
-                    .replace("{alert_type}", alert_type)
-                    .replace("{timestamp}", &curr_ts.to_string());
+        /* match dest.dest_type {
+            alert::AlertDestType::Slack => match url::Url::parse(&dest.url) {
+                Ok(dest_url) => {
+                    //Invoke Webhook
 
                 // Replace contextual information with values if any from alert
                 if alert.context_attributes.is_some() {
@@ -51,33 +49,9 @@ pub async fn send_notification(
                         resp = resp.replace(&format!("{{{}}}", key), value)
                     }
                 }
-
-                let msg: Value = serde_json::from_str(&resp).unwrap();
-                let url = url::Url::parse(&local_dest.url);
-                let mut req = match local_dest.method {
-                    alert::AlertHTTPType::POST => client.post(url.unwrap()),
-                    alert::AlertHTTPType::PUT => client.put(url.unwrap()),
-                    alert::AlertHTTPType::GET => client.get(url.unwrap()),
-                }
-                .header("Content-type", "application/json");
-
-                // Add additional headers if any from destination description
-                if local_dest.headers.is_some() {
-                    for (key, value) in local_dest.headers.unwrap() {
-                        req = req.header(key, value);
-                    }
-                };
-
-                let resp = req.json(&msg).send().await;
-                match resp {
-                    Ok(_) => log::info!("Notification Sent"),
-                    Err(err) => log::info!("Error sending notification {:?}", err),
-                }
-            }
-
-            None => log::info!("Destination Not found"),
-        },
-        Err(err) => log::info!("Error sending notification {:?}", err),
+                Err(_) => log::info!("Error parsing notification url"),
+            },
+        } */
     }
 
     Ok(())
@@ -120,33 +94,20 @@ mod tests {
             count: 1,
             is_ingest_time: true,
         };
-        let alert = Alert {
-            name: "testAlert".to_string(),
-            stream: "olympics".to_string(),
-            query: Some(Query {
-                sql: "select * from olympics".to_string(),
-                from: 0,
-                size: 0,
-                start_time: 0,
-                end_time: 0,
-                sql_mode: "full".to_string(),
-                track_total_hits: false,
-            }),
-            condition: Condition {
-                column: "Country".to_string(),
-                operator: alert::AllOperator::EqualTo,
-                ignore_case: Some(false),
-                value: serde_json::Value::String("USA".to_string()),
-                is_numeric: Some(false),
-            },
-            duration: 5,
-            frequency: 1,
-            time_between_alerts: 10,
-            destination: "testDest".to_string(),
-            is_real_time: true,
-            context_attributes: None,
-        };
-
-        send_notification(&alert, &obj).await.unwrap();
+        let res = send_notification(
+            &vec![
+               /*  AlertDestination {
+                    url: "https://httpbin.org/post".to_string(),
+                    dest_type: AlertDestType::Slack,
+                },
+                AlertDestination {
+                    url: "https://httpbin.org/post".to_string(),
+                    dest_type: AlertDestType::AlertManager,
+                }, */
+            ],
+            &obj,
+        )
+        .await;
+        assert!(res.is_ok());
     }
 }

@@ -16,13 +16,7 @@ use segment::{message::Track, Client, Message};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::infra::{
-    cache::stats::STATS,
-    config::{
-        CONFIG, INSTANCE_ID, QUERY_FUNCTIONS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_SCHEMAS,
-        TELEMETRY_CLIENT, USERS, VERSION,
-    },
-};
+use crate::infra::config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION};
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {

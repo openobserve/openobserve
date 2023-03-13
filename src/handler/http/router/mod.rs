@@ -135,10 +135,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(destinations::save_destination)
             .service(destinations::get_destination)
             .service(destinations::list_destinations)
-            .service(destinations::delete_destination)
-            .service(kv::get)
-            .service(kv::set)
-            .service(kv::delete)
-            .service(kv::list),
+            .service(destinations::delete_destination),
     );
 }
