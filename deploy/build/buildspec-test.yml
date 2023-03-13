@@ -11,8 +11,8 @@ phases:
       - rustup toolchain install nightly-2023-01-26
       - rustup toolchain list
       - rustup default nightly-2023-01-26  
-      - export RUSTFLAGS='-C target-cpu=native'
       - rustup component add clippy
+      - export RUSTFLAGS='-C target-cpu=native'
 
   build:
     commands:
