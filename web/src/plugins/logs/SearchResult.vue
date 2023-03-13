@@ -86,6 +86,8 @@
                     ? column.prop(row)
                     : column.prop(row, column.name).length > 100
                     ? column.prop(row, column.name).substr(0, 100) + '...'
+                    : column.name != '@timestamp'
+                    ? row[column.name]
                     : column.prop(row, column.name)
                 "
                 :query-string="
