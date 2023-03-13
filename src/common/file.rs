@@ -39,18 +39,11 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub fn delete_file(file: &str) -> Result<(), std::io::Error> {
-    std::fs::remove_file(file)?;
-    Ok(())
-}
-
-#[inline(always)]
 pub fn scan_files(pattern: &str) -> Vec<String> {
-    let files: Vec<String> = glob::glob(pattern)
+    glob::glob(pattern)
         .unwrap()
         .map(|m| m.unwrap().to_str().unwrap().to_string())
-        .collect();
-    files
+        .collect()
 }
 
 #[cfg(test)]
@@ -61,19 +54,11 @@ mod tests {
     fn test_file() {
         let content = b"Some Text";
         let file_name = "sample.parquet";
-        let resp = put_file_contents(file_name, content);
-        assert!(resp.is_ok());
 
-        let resp = get_file_contents(file_name);
-        assert_eq!(resp.unwrap(), content);
-
-        let resp = get_file_meta(file_name);
-        assert_eq!(resp.unwrap().is_file(), true);
-
-        let resp = scan_files(file_name);
-        assert!(resp.len() > 0);
-
-        let resp = delete_file(file_name);
-        assert!(resp.is_ok());
+        put_file_contents(file_name, content).unwrap();
+        assert_eq!(get_file_contents(file_name).unwrap(), content);
+        assert!(get_file_meta(file_name).unwrap().is_file());
+        assert!(!scan_files(file_name).is_empty());
+        std::fs::remove_file(file_name).unwrap();
     }
 }

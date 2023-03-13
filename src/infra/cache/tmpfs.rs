@@ -165,16 +165,16 @@ mod tests {
     fn create_read_file() {
         let path = "/tmp/test.txt";
         let _ = write_file(path, b"hello world").unwrap();
-        let data = read_file(path).unwrap();
-        assert_eq!(data, b"hello world");
+        assert_eq!(read_file(path).unwrap(), b"hello world");
         remove_file(path).unwrap();
     }
 
     #[test]
     fn create_read_directory() {
-        assert_eq!(true, create_dir_all("/tmp/test_dir/abc/").is_ok());
-        assert_eq!(true, create_dir("/tmp/test_dir/abc/cde/").is_ok());
-        assert_eq!(true, remove_dir("/tmp/test_dir/abc/cde/").is_ok());
-        assert_eq!(true, remove_dir_all("/tmp/test_dir/").is_ok());
+        assert!(create_dir("/tmp/test_dir/abc/cde/").is_err());
+        create_dir_all("/tmp/test_dir/abc/").unwrap();
+        create_dir("/tmp/test_dir/abc/cde/").unwrap();
+        remove_dir("/tmp/test_dir/abc/cde/").unwrap();
+        remove_dir_all("/tmp/test_dir/").unwrap();
     }
 }

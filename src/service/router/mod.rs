@@ -88,39 +88,34 @@ pub async fn dispatch(
 
     // copy headers
     for (key, value) in resp.headers() {
-        if key.eq("content-encoding") {
-            continue;
+        if !key.eq("content-encoding") {
+            new_resp.insert_header((key.clone(), value.clone()));
         }
-        new_resp.insert_header((key.clone(), value.clone()));
     }
+
     // set body
     let body = resp
         .body()
         .limit(CONFIG.limit.req_payload_limit)
         .await
         .unwrap();
-    let new_resp = new_resp.body(body);
-
-    Ok(new_resp)
+    Ok(new_resp.body(body))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_is_router() {
-        let is_router = is_router();
-        assert_eq!(is_router, false);
+        assert!(!is_router());
     }
+
     #[test]
     fn test_check_search_route() {
-        let is_search_route = check_search_route("/api/_search");
-        assert_eq!(is_search_route, true);
-        let is_search_route = check_search_route("/api/_around");
-        assert_eq!(is_search_route, true);
-        let is_search_route = check_search_route("/api/cache/status");
-        assert_eq!(is_search_route, true);
-        let is_search_route = check_search_route("/api/_bulk");
-        assert_eq!(is_search_route, false);
+        assert!(check_search_route("/api/_search"));
+        assert!(check_search_route("/api/_around"));
+        assert!(check_search_route("/api/cache/status"));
+        assert!(!check_search_route("/api/_bulk"));
     }
 }

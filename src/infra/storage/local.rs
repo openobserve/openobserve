@@ -83,16 +83,12 @@ mod test_util {
         let file_text = "Some text";
         let file_name = "a/b/c/new_file.parquet";
 
-        let resp = local.put(file_name, bytes::Bytes::from(file_text)).await;
-        assert!(resp.is_ok());
-
-        let resp = local.get(file_name).await;
-        assert_eq!(resp.unwrap(), bytes::Bytes::from(file_text));
+        local.put(file_name, bytes::Bytes::from(file_text)).await.unwrap();
+        assert_eq!(local.get(file_name).await.unwrap(), bytes::Bytes::from(file_text));
 
         let resp = local.list("").await;
         assert!(resp.unwrap().contains(&file_name.to_string()));
 
-        let resp = local.del(&[file_name]).await;
-        assert!(resp.is_ok());
+        local.del(&[file_name]).await.unwrap();
     }
 }

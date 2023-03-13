@@ -59,8 +59,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_is_root_user() {
-        let res = is_root_user("dummy").await;
-        assert_eq!(res, false)
+        assert!(!is_root_user("dummy").await);
     }
 
     #[actix_web::test]
@@ -76,17 +75,14 @@ mod tests {
             },
         )
         .await;
-        let res = is_root_user("root@example.com").await;
-        assert_eq!(res, true);
-        let res = is_root_user("root2@example.com").await;
-        assert_eq!(res, false);
+        assert!(is_root_user("root@example.com").await);
+        assert!(!is_root_user("root2@example.com").await);
     }
 
     #[actix_web::test]
     async fn test_get_hash() {
         let hash =
             "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk";
-        let res = get_hash("Pass#123", "TestSalt");
-        assert_eq!(res, hash);
+        assert_eq!(get_hash("Pass#123", "TestSalt"), hash);
     }
 }

@@ -32,9 +32,10 @@ lazy_static! {
 }
 
 pub fn default() -> Box<dyn Db> {
-    match CONFIG.common.local_mode {
-        true => Box::<sled::Sled>::default(),
-        false => Box::<etcd::Etcd>::default(),
+    if CONFIG.common.local_mode {
+        Box::<sled::Sled>::default()
+    } else {
+        Box::<etcd::Etcd>::default()
     }
 }
 
@@ -74,60 +75,40 @@ mod tests {
     use bytes::Bytes;
 
     #[actix_web::test]
-    async fn test_get() {
+    async fn test_put() {
         let db = default();
         db.put("/foo/bar", Bytes::from("hello")).await.unwrap();
-        let value = db.get("/foo/bar").await.unwrap();
-        assert_eq!(value, Bytes::from("hello"));
     }
 
     #[actix_web::test]
-    async fn test_put() {
+    async fn test_get() {
         let db = default();
-        assert_eq!(true, db.put("/foo/bar", Bytes::from("hello")).await.is_ok());
+        let hello = Bytes::from("hello");
+
+        db.put("/foo/bar", hello.clone()).await.unwrap();
+        assert_eq!(db.get("/foo/bar").await.unwrap(), hello);
     }
 
     #[actix_web::test]
     async fn test_delete() {
         let db = default();
-        assert_eq!(
-            true,
-            db.put("/foo/bar1", Bytes::from("hello")).await.is_ok()
-        );
-        assert_eq!(
-            true,
-            db.put("/foo/bar2", Bytes::from("hello")).await.is_ok()
-        );
-        assert_eq!(
-            true,
-            db.put("/foo/bar3", Bytes::from("hello")).await.is_ok()
-        );
-        assert_eq!(true, db.delete("/foo/bar1", false).await.is_ok());
-        assert_eq!(true, db.delete("/foo/bar4", false).await.is_err());
-        assert_eq!(true, db.delete("/foo/", true).await.is_ok());
-        db.put("/foo/bar1", Bytes::from("hello")).await.unwrap();
-        db.put("/foo/bar2", Bytes::from("hello")).await.unwrap();
-        db.put("/foo/bar3", Bytes::from("hello")).await.unwrap();
-        let value = db.list_keys("/foo/").await.unwrap();
-        assert_eq!(value.len(), 3);
-        let value = db.list_values("/foo/").await.unwrap();
-        assert_eq!(value.len(), 3);
+        let hello = Bytes::from("hello");
+
+        db.put("/foo/bar1", hello.clone()).await.unwrap();
+        db.put("/foo/bar2", hello.clone()).await.unwrap();
+        db.put("/foo/bar3", hello.clone()).await.unwrap();
+        db.delete("/foo/bar1", false).await.unwrap();
+        assert!(db.delete("/foo/bar4", false).await.is_err());
+        db.delete("/foo/", true).await.unwrap();
+
+        db.put("/foo/bar1", hello.clone()).await.unwrap();
+        db.put("/foo/bar2", hello.clone()).await.unwrap();
+        db.put("/foo/bar3", hello).await.unwrap();
+        assert_eq!(db.list_keys("/foo/").await.unwrap().len(), 3);
+        assert_eq!(db.list_values("/foo/").await.unwrap().len(), 3);
+
         let mut events = db.list_use_channel("/foo/").await.unwrap();
         let events = Arc::get_mut(&mut events).unwrap();
-        let value = events.recv().await.unwrap();
-        assert_eq!(value.0, "/foo/bar1");
-    }
-
-    #[test]
-    fn test_event() {
-        let e1 = Event::Put(EventData {
-            key: "/foo/bar".to_string(),
-            value: Some(Bytes::from("hello")),
-        });
-        let e2 = Event::Put(EventData {
-            key: "/foo/bar".to_string(),
-            value: Some(Bytes::from("hello")),
-        });
-        assert_eq!(format!("{:?}", e1), format!("{:?}", e2));
+        assert_eq!(events.recv().await.unwrap().0, "/foo/bar1");
     }
 }

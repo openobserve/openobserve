@@ -429,50 +429,29 @@ pub fn is_querier(role: &[Role]) -> bool {
 
 #[inline(always)]
 pub fn is_compactor(role: &[Role]) -> bool {
-    if role.contains(&Role::All) {
-        return true;
-    }
-    if role.contains(&Role::Compactor) {
-        return true;
-    }
-    false
+    role.contains(&Role::All) || role.contains(&Role::Compactor)
 }
 
 #[inline(always)]
 pub fn is_router(role: &[Role]) -> bool {
-    if role.contains(&Role::Router) {
-        return true;
-    }
-    false
+    role.contains(&Role::Router)
 }
 
 #[inline(always)]
 pub fn is_alert_manager(role: &[Role]) -> bool {
-    if role.contains(&Role::All) {
-        return true;
-    }
-    if role.contains(&Role::AlertManager) {
-        return true;
-    }
-    false
+    role.contains(&Role::All) || role.contains(&Role::AlertManager)
 }
 
 #[inline(always)]
 pub fn is_single_node(role: Vec<Role>) -> bool {
-    if role.contains(&Role::All) {
-        return true;
-    }
-    false
+    role.contains(&Role::All)
 }
 
 #[inline(always)]
 pub fn is_offline() -> bool {
     unsafe {
-        if LOCAL_NODE_STATUS == NodeStatus::Offline {
-            return true;
-        }
+        LOCAL_NODE_STATUS == NodeStatus::Offline
     }
-    false
 }
 
 #[inline(always)]
@@ -482,24 +461,16 @@ pub fn ge_node_by_uuid(uuid: &str) -> Option<Node> {
 
 #[inline(always)]
 pub fn get_node_ip() -> String {
-    // Print the ip address of all adapters:
-    let mut node_ip: String = "".to_string();
     for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        // println!("Ip addresses: {:#?}", adapter.ip());
         if adapter.is_loopback() {
             continue;
         }
-        let ip = adapter.ip();
-        match ip {
-            IpAddr::V4(_) => {}
-            IpAddr::V6(_) => {
-                continue;
-            }
+        match adapter.ip() {
+            IpAddr::V4(_) => return adapter.ip().to_string(),
+            IpAddr::V6(_) => (),
         };
-        node_ip = adapter.ip().to_string();
-        break;
     }
-    node_ip
+    String::new()
 }
 
 #[cfg(test)]
@@ -508,119 +479,79 @@ mod tests {
 
     #[test]
     fn test_convert_role() {
-        let val: Role = "all".parse().unwrap();
-        assert_eq!(val, Role::All);
-        let val: Role = "ingester".parse().unwrap();
-        assert_eq!(val, Role::Ingester);
-        let val: Role = "querier".parse().unwrap();
-        assert_eq!(val, Role::Querier);
-        let val: Role = "compactor".parse().unwrap();
-        assert_eq!(val, Role::Compactor);
-        let val: Role = "router".parse().unwrap();
-        assert_eq!(val, Role::Router);
-        let val: Role = "alertmanager".parse().unwrap();
-        assert_eq!(val, Role::AlertManager);
-        let val = "alertManager".parse::<Role>();
-        assert!(val.is_ok());
-        let val = "AlertManager".parse::<Role>();
-        assert!(val.is_ok());
-        let val = "alert_manager".parse::<Role>();
-        assert!(val.is_err());
+        let parse = |s: &str| s.parse::<Role>().unwrap();
+
+        assert_eq!(parse("all"), Role::All);
+        assert_eq!(parse("ingester"), Role::Ingester);
+        assert_eq!(parse("querier"), Role::Querier);
+        assert_eq!(parse("compactor"), Role::Compactor);
+        assert_eq!(parse("router"), Role::Router);
+        assert_eq!(parse("alertmanager"), Role::AlertManager);
+        assert_eq!(parse("alertManager"), Role::AlertManager);
+        assert_eq!(parse("AlertManager"), Role::AlertManager);
+        assert!("alert_manager".parse::<Role>().is_err());
     }
 
     #[test]
     fn test_is_querier() {
-        let val = is_querier(&[Role::Querier]);
-        assert_eq!(val, true);
-        let val = is_querier(&[Role::All]);
-        assert_eq!(val, true);
-        let val = is_querier(&[Role::Ingester]);
-        assert_eq!(val, false);
+        assert!(is_querier(&[Role::Querier]));
+        assert!(is_querier(&[Role::All]));
+        assert!(!is_querier(&[Role::Ingester]));
     }
 
     #[test]
     fn test_is_ingester() {
-        let val = is_ingester(&[Role::Ingester]);
-        assert_eq!(val, true);
-        let val = is_ingester(&[Role::All]);
-        assert_eq!(val, true);
-        let val = is_ingester(&[Role::Querier]);
-        assert_eq!(val, false);
+        assert!(is_ingester(&[Role::Ingester]));
+        assert!(is_ingester(&[Role::All]));
+        assert!(!is_ingester(&[Role::Querier]));
     }
 
     #[test]
     fn test_is_compactor() {
-        let val = is_compactor(&[Role::Compactor]);
-        assert_eq!(val, true);
-        let val = is_compactor(&[Role::All]);
-        assert_eq!(val, true);
-        let val = is_compactor(&[Role::Querier]);
-        assert_eq!(val, false);
+        assert!(is_compactor(&[Role::Compactor]));
+        assert!(is_compactor(&[Role::All]));
+        assert!(!is_compactor(&[Role::Querier]));
     }
 
     #[test]
     fn test_is_router() {
-        let val = is_router(&[Role::Router]);
-        assert_eq!(val, true);
-        let val = is_router(&[Role::All]);
-        assert_eq!(val, false);
-        let val = is_router(&[Role::Querier]);
-        assert_eq!(val, false);
+        assert!(is_router(&[Role::Router]));
+        assert!(!is_router(&[Role::All]));
+        assert!(!is_router(&[Role::Querier]));
     }
 
     #[test]
     fn test_is_alert_manager() {
-        let val = is_alert_manager(&[Role::AlertManager]);
-        assert_eq!(val, true);
-        let val = is_alert_manager(&[Role::All]);
-        assert_eq!(val, true);
-        let val = is_alert_manager(&[Role::Querier]);
-        assert_eq!(val, false);
+        assert!(is_alert_manager(&[Role::AlertManager]));
+        assert!(is_alert_manager(&[Role::All]));
+        assert!(!is_alert_manager(&[Role::Querier]));
     }
 
     #[test]
     fn test_load_local_node_uuid() {
-        let id = load_local_node_uuid();
-        assert_ne!(id, "");
+        assert!(!load_local_node_uuid().is_empty());
     }
 
     #[actix_web::test]
     #[ignore]
     async fn test_list_nodes() {
-        let res = list_nodes().await;
-        assert_eq!(res.unwrap().len(), 0);
+        assert!(list_nodes().await.unwrap().is_empty());
     }
 
     #[actix_web::test]
     async fn test_cluster() {
-        let res = register_and_keepalive().await;
-        assert!(res.is_ok());
-
-        let res = set_online().await;
-        assert!(res.is_ok());
-
-        let res = leave().await;
-        assert!(res.is_ok());
-
-        let res = get_cached_online_nodes();
-        assert!(res.is_none());
-
-        let res = get_cached_online_query_nodes();
-        assert!(res.is_none());
-
-        let res = get_cached_online_ingester_nodes();
-        assert!(res.is_none());
-
-        let res = get_cached_online_querier_nodes();
-        assert!(res.is_none());
-
-        let res = get_cached_online_querier_nodes();
-        assert!(res.is_none());
+        register_and_keepalive().await.unwrap();
+        set_online().await.unwrap();
+        leave().await.unwrap();
+        assert!(get_cached_online_nodes().is_none());
+        assert!(get_cached_online_query_nodes().is_none());
+        assert!(get_cached_online_ingester_nodes().is_none());
+        assert!(get_cached_online_querier_nodes().is_none());
+        assert!(get_cached_online_querier_nodes().is_none());
     }
 
     #[test]
     fn test_get_node_ip() {
-        let id = get_node_ip();
-        assert_ne!(id, "");
+        assert!(!get_node_ip().is_empty());
     }
 }

@@ -52,8 +52,7 @@ pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
     let mut items = Vec::new();
     let db = &crate::infra::db::DEFAULT;
     let key = "/compact/file_list/delete/";
-    let ret = db.list(key).await?;
-    for (item_key, _item_value) in ret {
+    for (item_key, _item_value) in db.list(key).await? {
         let item_key = item_key.strip_prefix(key).unwrap();
         items.push(item_key.to_string());
     }
@@ -62,20 +61,17 @@ pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]
     async fn test_files() {
-        let off_set = 100;
+        const OFFSET: i64 = 100;
 
-        let _ = set_offset(off_set).await;
-        let resp = get_offset().await;
-        assert_eq!(resp.unwrap(), off_set);
+        set_offset(OFFSET).await.unwrap();
+        assert_eq!(get_offset().await.unwrap(), OFFSET);
 
         let delete_day = "2023-03-03";
-        let _ = set_delete(delete_day).await;
-        let deletes = list_delete().await.unwrap();
-        assert_eq!([delete_day.to_string()].to_vec(), deletes);
+        set_delete(delete_day).await.unwrap();
+        assert_eq!(list_delete().await.unwrap(), vec![delete_day.to_string()]);
     }
 }
