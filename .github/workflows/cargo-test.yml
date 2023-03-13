@@ -3,12 +3,10 @@ on:
     paths-ignore:
       - "docs/**"
       - "**.md"
-      - ".github/**"
   pull_request:
     paths-ignore:
       - "docs/**"
       - "**.md"
-      - ".github/**"
 name: "Cargo test"
 env:
   RUST_TOOLCHAIN: nightly-2023-01-26
@@ -63,5 +61,5 @@ jobs:
         run: |
           mkdir -p web/dist
           touch web/dist/index.html
-          cargo install cargo-llvm-cov
+          cargo install -f cargo-llvm-cov
           ./coverage.sh
