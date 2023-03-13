@@ -1,8 +1,18 @@
 on:
   push:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/**"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/**"
 name: Test 
 env:
   RUST_TOOLCHAIN: nightly-2023-01-26
+  RUST_TARGET: x86_64-unknown-linux-gnu
 jobs:
   build:
     name: Run test
@@ -53,7 +63,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-          target: ${{ matrix.arch }}
+          target: ${{ env.RUST_TARGET }}
+          components: rustfmt, clippy
           override: true
 
       - name: Output package versions
