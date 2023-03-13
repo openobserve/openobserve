@@ -21,9 +21,9 @@ func_cov=${func_cov//%/}
 line_cov="$(cut -d' ' -f10 <<<"$summary")"
 line_cov=${line_cov//%/}
 
-echo "region_cov $region_cov"
 echo "func_cov $func_cov"
 echo "line_cov $line_cov"
+echo "region_cov $region_cov"
 
 # enable threshold
 #COVERAGE_THRESHOLD=80
