@@ -56,13 +56,13 @@ lazy_static! {
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
     ).expect("Metric created");
-    pub static ref INGEST_WAL_WRITE_BYTES: IntGaugeVec = IntGaugeVec::new(
+    pub static ref INGEST_WAL_WRITE_BYTES: IntCounterVec = IntCounterVec::new(
         Opts::new("ingest_wal_write_bytes", "Ingestor WAL write bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
     ).expect("Metric created");
-    pub static ref INGEST_WAL_READ_BYTES: IntGaugeVec = IntGaugeVec::new(
+    pub static ref INGEST_WAL_READ_BYTES: IntCounterVec = IntCounterVec::new(
         Opts::new("ingest_wal_read_bytes", "Ingestor WAL read bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),

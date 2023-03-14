@@ -24,6 +24,7 @@ use crate::common::file::scan_files;
 use crate::common::utils::populate_file_meta;
 use crate::infra::config::{get_parquet_compression, CONFIG};
 use crate::infra::file_lock;
+use crate::infra::metrics;
 use crate::infra::storage;
 use crate::infra::storage::generate_partioned_file_key;
 use crate::infra::{cluster, config};
@@ -195,6 +196,10 @@ async fn upload_file(
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
     log::info!("[JOB] File upload begin: disk: {}", path_str);
+
+    metrics::INGEST_WAL_READ_BYTES
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .inc_by(file_size);
 
     let mut schema_reader = BufReader::new(&file);
     let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
