@@ -233,10 +233,7 @@ mod test {
             duration: 1,
             frequency: 1,
             time_between_alerts: 10,
-            destination: vec![/* AlertDestination {
-                url: "dummy".to_string(),
-                dest_type: AlertDestType::Slack,
-            } */],
+            destination: "test".to_string(),
             is_real_time: false,
             context_attributes: None,
         };
