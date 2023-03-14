@@ -75,9 +75,9 @@ pub async fn send_notification(
                 }
             }
 
-            None => todo!(),
+            None => log::info!("Destination Not found"),
         },
-        Err(_) => todo!(),
+        Err(err) => log::info!("Error sending notification {:?}", err),
     }
 
     Ok(())
@@ -85,12 +85,30 @@ pub async fn send_notification(
 
 #[cfg(test)]
 mod tests {
-    use crate::meta::alert::{AlertDestType, Trigger};
+    use crate::meta::{
+        alert::{AlertDestination, Condition, DestinationTemplate, Trigger},
+        search::Query,
+    };
 
     use super::*;
 
     #[actix_web::test]
     async fn test_send_notification() {
+        let template = DestinationTemplate {
+            name: Some("testTemplate".to_string()),
+            body: "Test Body".into(),
+            details: None,
+        };
+        let _ = db::alerts::templates::set("default", "testTemplate", template);
+
+        let destination = AlertDestination {
+            url: "http://dummy/alert".to_string(),
+            method: alert::AlertHTTPType::POST,
+            headers: None,
+            template: "testTemplate".to_string(),
+        };
+        let _ = db::alerts::destinations::set("default", "testDest", destination);
+
         let obj: Trigger = Trigger {
             timestamp: chrono::Utc::now().timestamp_micros(),
             is_valid: true,
@@ -101,7 +119,33 @@ mod tests {
             count: 1,
             is_ingest_time: true,
         };
-        //let res = send_notification("test", &obj).await;
-        //assert!(res.is_ok());
+        let alert = Alert {
+            name: "testAlert".to_string(),
+            stream: "olympics".to_string(),
+            query: Some(Query {
+                sql: "select * from olympics".to_string(),
+                from: 0,
+                size: 0,
+                start_time: 0,
+                end_time: 0,
+                sql_mode: "full".to_string(),
+                track_total_hits: false,
+            }),
+            condition: Condition {
+                column: "Country".to_string(),
+                operator: alert::AllOperator::EqualTo,
+                ignore_case: Some(false),
+                value: serde_json::Value::String("USA".to_string()),
+                is_numeric: Some(false),
+            },
+            duration: 5,
+            frequency: 1,
+            time_between_alerts: 10,
+            destination: "testDest".to_string(),
+            is_real_time: true,
+            context_attributes: None,
+        };
+
+        send_notification(&alert, &obj).await.unwrap();
     }
 }
