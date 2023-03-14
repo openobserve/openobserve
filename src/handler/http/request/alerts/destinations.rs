@@ -93,8 +93,8 @@ async fn list_destinations(path: web::Path<String>) -> impl Responder {
         ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Alert),
-        (status = 404, description="NotFound", content_type = "application/json", body = AlertDestinationResponse),
+        (status = 200, description="Success", content_type = "application/json", body = AlertDestinationResponse),
+        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
