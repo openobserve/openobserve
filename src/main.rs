@@ -14,13 +14,11 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use actix_web_prometheus::PrometheusMetricsBuilder;
 use opentelemetry::sdk::propagation::TraceContextPropagator;
 use opentelemetry::sdk::{trace as sdktrace, Resource};
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
-use prometheus::{opts, GaugeVec};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -38,6 +36,7 @@ use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
 use zincobserve::infra::cluster;
 use zincobserve::infra::config::CONFIG;
 use zincobserve::infra::file_lock;
+use zincobserve::infra::metrics;
 use zincobserve::meta::telemetry::Telemetry;
 use zincobserve::service::router;
 
@@ -126,21 +125,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let _ = cluster::set_online().await;
 
     // metrics
-    let mut labels = HashMap::new();
-    labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
-    labels.insert("role".to_string(), CONFIG.common.node_role.clone());
-    let prometheus = PrometheusMetricsBuilder::new("zincobserve")
-        .endpoint(format!("{}/metrics", CONFIG.common.base_uri).as_str())
-        .const_labels(labels)
-        .build()
-        .unwrap();
-    let stats_opts =
-        opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
-    let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
-    prometheus
-        .registry
-        .register(Box::new(stats.clone()))
-        .unwrap();
+    let prometheus = metrics::create_prometheus_handler();
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
@@ -172,7 +157,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 ))
                 .wrap(middleware::Compress::default())
                 .wrap(middleware::Logger::new(
-                    r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##,
+                    r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
                 ))
                 .wrap(RequestTracing::new())
         })
@@ -205,11 +190,10 @@ async fn main() -> Result<(), anyhow::Error> {
             };
             app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-                .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(local_id))
                 .wrap(middleware::Compress::default())
                 .wrap(middleware::Logger::new(
-                    r##"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"##,
+                    r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
                 ))
                 .wrap(RequestTracing::new())
         })

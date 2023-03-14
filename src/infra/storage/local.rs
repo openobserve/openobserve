@@ -83,8 +83,14 @@ mod test_util {
         let file_text = "Some text";
         let file_name = "a/b/c/new_file.parquet";
 
-        local.put(file_name, bytes::Bytes::from(file_text)).await.unwrap();
-        assert_eq!(local.get(file_name).await.unwrap(), bytes::Bytes::from(file_text));
+        local
+            .put(file_name, bytes::Bytes::from(file_text))
+            .await
+            .unwrap();
+        assert_eq!(
+            local.get(file_name).await.unwrap(),
+            bytes::Bytes::from(file_text)
+        );
 
         let resp = local.list("").await;
         assert!(resp.unwrap().contains(&file_name.to_string()));

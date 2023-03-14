@@ -35,6 +35,7 @@ const SQL_KEYWORDS: [&str; 32] = [
 ];
 
 const SQL_PUNCTUATION: [u8; 2] = [b'"', b'\''];
+const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
 const SQL_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
@@ -148,7 +149,7 @@ impl Sql {
         // 3. must select group by field
         let re1 = Regex::new(r"(?i) from[ ]+query").unwrap();
         let re2 = Regex::new(r"(?i)select \*").unwrap();
-        let re3 = Regex::new(r##"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"##).unwrap();
+        let re3 = Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap();
         let re4 = Regex::new(r"(?i)select (.*) from[ ]+query").unwrap();
         let mut req_aggs = HashMap::new();
         for agg in req.aggs.iter() {
@@ -214,7 +215,7 @@ impl Sql {
         // Hack for DataFusion
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
-        let re = Regex::new(&format!(r##"(?i) from[ '"]+{}[ '"]?"##, stream_name)).unwrap();
+        let re = Regex::new(&format!(r#"(?i) from[ '"]+{}[ '"]?"#, stream_name)).unwrap();
         let caps = match re.captures(origin_sql.as_str()) {
             Some(caps) => caps,
             None => return Err(anyhow::anyhow!("SQL should likes [select * from table]")),
@@ -584,6 +585,48 @@ impl Sql {
 
 // Hack for double quote
 fn add_quote_for_sql(text: &str) -> String {
+    let mut tokens = split_token(text);
+    add_quote_for_tokens(&mut tokens);
+    tokens.join("")
+}
+
+fn add_quote_for_tokens(tokens: &mut [String]) {
+    let re_lower = Regex::new(r#"^[a-z0-9_]+$"#).unwrap();
+    for cap in tokens.iter_mut() {
+        let cap_str = cap.as_str();
+        let cap_str_upper = cap_str.to_uppercase();
+        let cap_str_upper = cap_str_upper.as_str();
+        if cap_str.len() == 1 && SQL_DELIMITERS.contains(cap_str.as_bytes().first().unwrap()) {
+            continue;
+        }
+        if SQL_KEYWORDS.contains(&cap_str_upper) {
+            continue;
+        }
+        if SQL_PUNCTUATION.contains(cap_str.as_bytes().first().unwrap()) {
+            continue;
+        }
+        if cap_str.as_bytes().last().unwrap().eq(&b')') {
+            // function
+            let first_bracket = cap_str.find('(').unwrap();
+            let mut tokens = split_token(&cap_str[first_bracket + 1..cap_str.len() - 1]);
+            add_quote_for_tokens(&mut tokens);
+            *cap = format!("{}({})", &cap_str[0..first_bracket], tokens.join(""));
+            continue;
+        }
+        // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
+        if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
+            continue;
+        }
+        if cap_str.parse::<f64>().is_ok() && cap_str.contains('.') {
+            // float number
+            *cap = format!("'{}'", cap_str);
+            continue;
+        }
+        *cap = format!("\"{}\"", cap_str);
+    }
+}
+
+fn split_token(text: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let text_chars = text.chars().collect::<Vec<char>>();
     let text_chars_len = text_chars.len();
@@ -612,7 +655,7 @@ fn add_quote_for_sql(text: &str) -> String {
                 quote = *c;
             }
         }
-        if *c == ',' || *c == ' ' || *c == '=' || *c == '!' || *c == '>' || *c == '<' {
+        if SQL_DELIMITERS.contains(&(*c as u8)) {
             if bracket > 0 || in_quote {
                 continue;
             }
@@ -636,38 +679,9 @@ fn add_quote_for_sql(text: &str) -> String {
             .collect::<String>();
         tokens.push(token);
     }
-    // println!("tokens: {:?}", tokens);
 
-    let re_lower = Regex::new(r##"^[a-z0-9_]+$"##).unwrap();
-    for cap in tokens.iter_mut() {
-        let cap_str = cap.as_str();
-        let cap_str_upper = cap_str.to_uppercase();
-        let cap_str_upper = cap_str_upper.as_str();
-        if cap_str.len() <= 2 {
-            continue;
-        }
-        if SQL_KEYWORDS.contains(&cap_str_upper) {
-            continue;
-        }
-        if SQL_PUNCTUATION.contains(cap_str.as_bytes().first().unwrap()) {
-            continue;
-        }
-        if cap_str.as_bytes().last().unwrap().eq(&b')') {
-            // function
-            continue;
-        }
-        // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
-        if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
-            continue;
-        }
-        if cap_str.parse::<f64>().is_ok() && cap_str.contains('.') {
-            // float number
-            *cap = format!("'{}'", cap_str);
-            continue;
-        }
-        *cap = format!("\"{}\"", cap_str);
-    }
-    tokens.join("")
+    // println!("tokens: {:?}", tokens);
+    tokens
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
@@ -753,6 +767,34 @@ mod tests {
                 "select * from table where match_all('中文')",
             ),
             (
+                "select count(*) from table where match_all('中文')",
+                "select count(*) from table where match_all('中文')",
+            ),
+            (
+                "select count(*) as abc from table where match_all('中文')",
+                "select count(*) as abc from table where match_all('中文')",
+            ),
+            (
+                "select count(abc) as abc from table where match_all('中文')",
+                "select count(abc) as abc from table where match_all('中文')",
+            ),
+            (
+                "select count(Abc) as abc from table where match_all('中文')",
+                r#"select count("Abc") as abc from table where match_all('中文')"#,
+            ),
+            (
+                "select count(_p,stream) as newcol from table",
+                "select count(_p,stream) as newcol from table",
+            ),
+            (
+                "select count(_p,Stream) as newcol from table",
+                r#"select count(_p,"Stream") as newcol from table"#,
+            ),
+            (
+                "select count(_P,Stream) as newcol from table",
+                r#"select count("_P","Stream") as newcol from table"#,
+            ),
+            (
                 "select * from table where str_match(log,'中文')",
                 "select * from table where str_match(log,'中文')",
             ),
@@ -771,6 +813,10 @@ mod tests {
             (
                 "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
                 "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
+            ),
+            (
+                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(Timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
+                r#"select * from table where str_match(log, '中文') AND match_all('abc') AND time_range("Timestamp", '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10"#,
             ),
             (
                 "select * from table where str_match(log, 'Sql: select * from table')",

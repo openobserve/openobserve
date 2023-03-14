@@ -289,10 +289,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         // Hack: compatible for DataFusion 15
         let mut item_value = item_value;
         let value_str = std::str::from_utf8(&item_value).unwrap().to_string();
-        if !value_str.contains(r##","metadata":{}}"##) {
+        if !value_str.contains(r#","metadata":{}}"#) {
             let value_str = value_str.replace(
-                r##","dict_is_ordered":false}"##,
-                r##","dict_is_ordered":false,"metadata":{}}"##,
+                r#","dict_is_ordered":false}"#,
+                r#","dict_is_ordered":false,"metadata":{}}"#,
             );
             item_value = bytes::Bytes::from(value_str);
         }
