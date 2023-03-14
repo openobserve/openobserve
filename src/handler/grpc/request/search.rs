@@ -47,7 +47,7 @@ impl Search for Searcher {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
+                metrics::GRPC_RESPONSE_TIME
                     .with_label_values(&[
                         "/_search",
                         "500",
@@ -56,7 +56,7 @@ impl Search for Searcher {
                         stream_type.to_string().as_str(),
                     ])
                     .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
+                metrics::GRPC_INCOMING_REQUESTS
                     .with_label_values(&[
                         "/_search",
                         "500",
@@ -70,7 +70,7 @@ impl Search for Searcher {
         };
 
         let time = start.elapsed().as_secs_f64();
-        metrics::HTTP_RESPONSE_TIME
+        metrics::GRPC_RESPONSE_TIME
             .with_label_values(&[
                 "/_search",
                 "200",
@@ -79,7 +79,7 @@ impl Search for Searcher {
                 stream_type.to_string().as_str(),
             ])
             .observe(time);
-        metrics::HTTP_INCOMING_REQUESTS
+        metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&[
                 "/_search",
                 "200",
