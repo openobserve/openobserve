@@ -177,7 +177,6 @@ pub async fn merge_by_stream(
     }
 
     let storage = &storage::DEFAULT;
-    let mut merge_success = true;
     for (_, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
         files_with_size.sort_by(|a, b| a.1.cmp(&b.1));
@@ -230,7 +229,6 @@ pub async fn merge_by_stream(
                 .await?;
 
             // set to local cache & send broadcast
-            let mut db_success = false;
             // retry 10 times
             for _ in 0..9 {
                 // set to local cache
@@ -254,21 +252,8 @@ pub async fn merge_by_stream(
                     time::sleep(time::Duration::from_secs(1)).await;
                     continue;
                 }
-                // set to db & broadcast success
-                db_success = true;
+                // broadcast success
                 break;
-            }
-
-            if !db_success {
-                merge_success = false;
-                // delete the file just upload to storage
-                match storage.del(&[&new_file_name]).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("[COMPACT] delete file failed: {}", e);
-                    }
-                }
-                continue;
             }
 
             // delete small files from storage
@@ -287,10 +272,8 @@ pub async fn merge_by_stream(
     }
 
     // write new offset
-    if merge_success {
-        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
-    }
+    offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+    db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     if locker.is_some() {
         // release cluster lock
