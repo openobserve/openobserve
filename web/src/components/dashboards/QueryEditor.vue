@@ -22,8 +22,8 @@ export default defineComponent({
     },
     readOnly: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   emits: ["update-query", "run-query", "update:query"],
   setup(props, { emit }) {
@@ -185,11 +185,11 @@ export default defineComponent({
         rules: [{ token: "comment", background: "FF0000" }],
         colors: {
           "editor.foreground": "#000000",
-          "editor.background": "#F7F7F7",
+          "editor.background": "#fafafa",
           "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#000000",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#000000",
+          "editor.lineHighlightBackground": "#FFFFFF",
+          "editorLineNumber.foreground": "#ececec",
+          "editor.border": "#ececec",
         },
       });
 
@@ -271,7 +271,7 @@ export default defineComponent({
           seedSearchStringFromSelection: "never",
         },
         minimap: { enabled: false },
-        readOnly: props.readOnly
+        readOnly: props.readOnly,
       });
 
       editorObj.onDidChangeModelContent((e: any) => {
@@ -287,7 +287,6 @@ export default defineComponent({
         },
         "ctrlenter"
       );
-
     });
 
     const setValue = (value: string) => {
@@ -295,16 +294,22 @@ export default defineComponent({
     };
 
     // update readonly when prop value changes
-    watch(() => props.readOnly, () => {
-      editorObj.updateOptions({ readOnly: props.readOnly })
-    })
+    watch(
+      () => props.readOnly,
+      () => {
+        editorObj.updateOptions({ readOnly: props.readOnly });
+      }
+    );
 
     // update readonly when prop value changes
-    watch(() => props.query, () => {
-      if(props.readOnly) {
-        editorObj.getModel().setValue(props.query)
+    watch(
+      () => props.query,
+      () => {
+        if (props.readOnly) {
+          editorObj.getModel().setValue(props.query);
+        }
       }
-    })
+    );
 
     return {
       editorRef,

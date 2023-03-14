@@ -408,13 +408,24 @@ export default defineComponent({
           {
             token: "comment",
             foreground: "ffa500",
+            background: "FFFFFF",
             fontStyle: "italic underline",
           },
-          { token: "comment.js", foreground: "008800", fontStyle: "bold" },
-          { token: "comment.css", foreground: "0000ff" }, // will inherit fontStyle from `comment` above
+          {
+            token: "comment.js",
+            foreground: "008800",
+            fontStyle: "bold",
+            background: "FFFFFF",
+          },
+          { token: "comment.css", foreground: "0000ff", background: "FFFFFF" }, // will inherit fontStyle from `comment` above
         ],
         colors: {
           "editor.foreground": "#000000",
+          "editor.background": "#FFFFFF",
+          "editorCursor.foreground": "#000000",
+          "editor.lineHighlightBackground": "#FFFFFF",
+          "editorLineNumber.foreground": "#000000",
+          "editor.border": "#FFFFFF",
         },
       });
       editorobj = monaco.editor.create(editorRef.value, {
@@ -532,7 +543,7 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
-      this.formData.destination = this.modelValue.destination[0]
+      this.formData.destination = this.modelValue.destination[0];
     }
 
     streamService
