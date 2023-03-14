@@ -79,23 +79,6 @@ lazy_static! {
     .expect("Failed to create metric");
 }
 
-pub fn create_prometheus_handler() -> PrometheusMetrics {
-    let registry = prometheus::Registry::new();
-    register_metrics(&registry);
-
-    let mut labels = HashMap::new();
-    labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
-    labels.insert("role".to_string(), CONFIG.common.node_role.clone());
-    let prometheus = PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", CONFIG.common.base_uri).as_str())
-        .const_labels(labels)
-        .registry(registry)
-        .build()
-        .expect("Failed to build prometheus");
-    process_metrics(&prometheus);
-    prometheus
-}
-
 fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(LOGS_HTTP_INGEST_BULK_RESPONSE_TIME.clone()))
@@ -126,14 +109,17 @@ fn register_metrics(registry: &Registry) {
         .expect("Failed to register metric");
 }
 
-#[cfg(target_os = "linux")]
-fn process_metrics(metrics: &PrometheusMetrics) {
-    use prometheus::process_collector::ProcessCollector;
-    metrics
-        .registry
-        .register(Box::new(ProcessCollector::for_self()))
-        .expect("metric can be registered");
-}
+pub fn create_prometheus_handler() -> PrometheusMetrics {
+    let registry = prometheus::Registry::new();
+    register_metrics(&registry);
 
-#[cfg(not(target_os = "linux"))]
-fn process_metrics(_metrics: &PrometheusMetrics) {}
+    let mut labels = HashMap::new();
+    labels.insert("hostname".to_string(), CONFIG.common.instance_name.clone());
+    labels.insert("role".to_string(), CONFIG.common.node_role.clone());
+    PrometheusMetricsBuilder::new(NAMESPACE)
+        .endpoint(format!("{}/metrics", CONFIG.common.base_uri).as_str())
+        .const_labels(labels)
+        .registry(registry)
+        .build()
+        .expect("Failed to build prometheus")
+}
