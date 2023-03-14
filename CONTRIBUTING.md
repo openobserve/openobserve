@@ -12,6 +12,8 @@ You must have follwing installed:
 2. Rust & Cargo 1.61.0 + (We recommend 1.66+),
 3. nodejs v14+ and npm v6+
 
+Alternatively you can use pre-configured devcontainer in VS code to get up and running quickly.
+
 ## Building from source code
 
 ### Lets clone the repo and get started
@@ -56,10 +58,8 @@ There are 2 areas of development.
 ### Server
 
 ```shell
-cargo run
+ZO_ROOT_USER_EMAIL=root@example.com ZO_ROOT_USER_PASSWORD=Complexpass#123 cargo run
 ```
-
-Please note by default user 'admin' with password 'Complexpass#123' is created
 
 This will start the zincobserve API server on port 5080
 
