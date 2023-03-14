@@ -54,7 +54,7 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description="Success", content_type = "application/json", body = Vec<DestinationTemplate>),
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -77,7 +77,7 @@ async fn list_templates(path: web::Path<String>) -> impl Responder {
       ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = Alert),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description="NotFound", content_type = "application/json", body = DestinationTemplate),
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]

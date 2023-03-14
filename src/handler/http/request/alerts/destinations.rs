@@ -71,7 +71,7 @@ pub async fn save_destination(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description="Success", content_type = "application/json", body = Vec<AlertDestinationResponse>),
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
@@ -94,7 +94,7 @@ async fn list_destinations(path: web::Path<String>) -> impl Responder {
       ),
     responses(
         (status = 200, description="Success", content_type = "application/json", body = Alert),
-        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 404, description="NotFound", content_type = "application/json", body = AlertDestinationResponse),
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
