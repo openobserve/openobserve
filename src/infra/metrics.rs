@@ -165,19 +165,19 @@ lazy_static! {
         Opts::new("meta_storage_bytes", "Metadata storage used bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["node"],
+        &[],
     ).expect("Metric created");
     pub static ref META_STORAGE_KEYS: IntGaugeVec = IntGaugeVec::new(
         Opts::new("meta_storage_keys", "Metadata storage item keys")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["node"],
+        &[],
     ).expect("Metric created");
     pub static ref META_NUM_NODES: IntGaugeVec = IntGaugeVec::new(
         Opts::new("meta_num_nodes", "Metadata node nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["role"],
+        &["node_role"],
     ).expect("Metric created");
     pub static ref META_NUM_ORGANIZATIONS: IntGaugeVec = IntGaugeVec::new(
         Opts::new("meta_num_organizations", "Metadata organization nums")
