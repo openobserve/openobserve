@@ -193,14 +193,14 @@ export default defineComponent({
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
-        rules: [{ token: "comment", background: "FF0000" }],
+        rules: [{ token: "comment", background: "FFFFFF" }],
         colors: {
           "editor.foreground": "#000000",
-          "editor.background": "#F7F7F7",
+          "editor.background": "#fafafa",
           "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#000000",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#000000",
+          "editor.lineHighlightBackground": "#FFFFFF",
+          "editorLineNumber.foreground": "#ececec",
+          "editor.border": "#ececec",
         },
       });
 

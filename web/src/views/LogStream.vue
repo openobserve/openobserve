@@ -173,6 +173,7 @@ export default defineComponent({
     const selected = ref<any>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const qTable: any = ref(null);
+    const previousOrgIdentifier = ref("");
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -226,6 +227,8 @@ export default defineComponent({
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
+        previousOrgIdentifier.value =
+          store.state.selectedOrganization.identifier;
         const dismiss = $q.notify({
           spinner: true,
           message: "Please wait while loading streams...",
@@ -357,6 +360,13 @@ export default defineComponent({
             listSchema({ row: element });
           }
         });
+      }
+
+      if (
+        previousOrgIdentifier.value !=
+        store.state.selectedOrganization.identifier
+      ) {
+        getLogStream();
       }
     });
 

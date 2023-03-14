@@ -20,6 +20,14 @@ import { getLanguage } from "../utils/cookies";
 import zhLocale from "./languages/zh.json";
 import enLocale from "./languages/en.json";
 import trLocale from "./languages/tr.json";
+import deLocale from "./languages/de.json";
+import esLocale from "./languages/es.json";
+import frLocale from "./languages/fr.json";
+import itLocale from "./languages/it.json";
+import jaLocale from "./languages/ja.json";
+import koLocale from "./languages/ko.json";
+import nlLocale from "./languages/nl.json";
+import ptLocale from "./languages/pt.json";
 
 
 const messages = {
@@ -31,6 +39,30 @@ const messages = {
   },
   "tr-turk": {
     ...trLocale,
+  },
+  "de": {
+    ...deLocale,
+  },
+  "es": {
+    ...esLocale,
+  },
+  "fr": {
+    ...frLocale,
+  },
+  "it": {
+    ...itLocale,
+  },
+  "ja": {
+    ...jaLocale,
+  },
+  "ko": {
+    ...koLocale,
+  },
+  "nl": {
+    ...nlLocale,
+  },
+  "pt": {
+    ...ptLocale,
   },
 };
 
