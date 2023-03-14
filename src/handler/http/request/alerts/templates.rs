@@ -76,8 +76,8 @@ async fn list_templates(path: web::Path<String>) -> impl Responder {
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = Alert),
-        (status = 404, description="NotFound", content_type = "application/json", body = DestinationTemplate),
+        (status = 200, description="Success", content_type = "application/json", body = DestinationTemplate),
+        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
