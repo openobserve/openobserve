@@ -19,7 +19,7 @@ use aws_config::retry::RetryConfig;
 use aws_config::timeout::TimeoutConfig;
 use aws_sdk_s3::model::{Delete, ObjectIdentifier};
 use aws_sdk_s3::{Client, Config, Credentials, Region};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use super::FileStorage;
 use crate::common::utils::is_local_disk_storage;
@@ -203,21 +203,17 @@ async fn init_s3_config() -> Option<Config> {
         );
         s3config = s3config.credentials_provider(creds);
     } else {
-        let creds = DefaultCredentialsChain::builder().build().await;
-        s3config = s3config.credentials_provider(creds);
+        s3config = s3config.credentials_provider(DefaultCredentialsChain::builder().build().await);
     }
 
-    let retry_config = RetryConfig::standard().with_max_attempts(5);
-    let sleep = aws_smithy_async::rt::sleep::TokioSleep::new();
     s3config = s3config
-        .retry_config(retry_config)
-        .sleep_impl(Arc::new(sleep));
-
-    s3config = s3config.timeout_config(
-        TimeoutConfig::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build(),
-    );
+        .retry_config(RetryConfig::standard().with_max_attempts(5))
+        .sleep_impl(aws_smithy_async::rt::sleep::default_async_sleep().unwrap())
+        .timeout_config(
+            TimeoutConfig::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .build(),
+        );
     let s3config = s3config.build();
     Some(s3config)
 }
@@ -228,20 +224,17 @@ async fn init_s3_client() -> Option<Client> {
     }
 
     let client = if CONFIG.s3.provider.eq("aws") {
-        let mut s3config = aws_config::from_env();
-        let creds = DefaultCredentialsChain::builder().build().await;
-        s3config = s3config.credentials_provider(creds);
-        let retry_config = RetryConfig::standard().with_max_attempts(5);
-        let sleep = aws_smithy_async::rt::sleep::TokioSleep::new();
-        s3config = s3config
-            .retry_config(retry_config)
-            .sleep_impl(Arc::new(sleep));
-        s3config = s3config.timeout_config(
-            TimeoutConfig::builder()
-                .connect_timeout(Duration::from_secs(10))
-                .build(),
-        );
-        let s3config = s3config.load().await;
+        let s3config = aws_config::from_env()
+            .credentials_provider(DefaultCredentialsChain::builder().build().await)
+            .retry_config(RetryConfig::standard().with_max_attempts(5))
+            .sleep_impl(aws_smithy_async::rt::sleep::default_async_sleep().unwrap())
+            .timeout_config(
+                TimeoutConfig::builder()
+                    .connect_timeout(Duration::from_secs(10))
+                    .build(),
+            )
+            .load()
+            .await;
         Client::new(&s3config)
     } else {
         let s3config = init_s3_config().await.unwrap();

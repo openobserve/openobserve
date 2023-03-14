@@ -203,7 +203,7 @@ async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> impl Respond
             None => "8.1.0",
         };
     }
-    let es_info = r##"{"name":"Elasticsearch","cluster_name":"N/A","cluster_uuid":"N/A","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"N/A","minimum_wire_version":"N/A","minimum_index_compatibility":"N/A"},"tagline":"You Know, for Search"}"##;
+    let es_info = r#"{"name":"Elasticsearch","cluster_name":"N/A","cluster_uuid":"N/A","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"N/A","minimum_wire_version":"N/A","minimum_index_compatibility":"N/A"},"tagline":"You Know, for Search"}"#;
     let es_info = es_info.replace("0.0.0", version);
     HttpResponse::Ok()
         .content_type(http::header::ContentType::json())

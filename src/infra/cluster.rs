@@ -449,9 +449,7 @@ pub fn is_single_node(role: Vec<Role>) -> bool {
 
 #[inline(always)]
 pub fn is_offline() -> bool {
-    unsafe {
-        LOCAL_NODE_STATUS == NodeStatus::Offline
-    }
+    unsafe { LOCAL_NODE_STATUS == NodeStatus::Offline }
 }
 
 #[inline(always)]

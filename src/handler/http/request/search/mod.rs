@@ -18,9 +18,11 @@ use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::infra::config::{CONFIG, LOCKER};
+use crate::infra::metrics;
 use crate::meta;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::StreamType;
@@ -96,6 +98,7 @@ pub async fn search(
     in_req: HttpRequest,
     body: actix_web::web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    let start = Instant::now();
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -133,9 +136,49 @@ pub async fn search(
 
     // do search
     match SearchService::search(&org_id, stream_type, &req).await {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(res) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/_search",
+                    "200",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/_search",
+                    "200",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            Ok(HttpResponse::Ok().json(res))
+        }
         Err(err) => {
             log::error!("search error: {:?}", err);
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
             Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -194,6 +237,7 @@ pub async fn around(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let start = Instant::now();
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -242,6 +286,25 @@ pub async fn around(
         Ok(res) => res,
         Err(err) => {
             log::error!("search error: {:?}", err);
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
             return Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -272,6 +335,25 @@ pub async fn around(
         Ok(res) => res,
         Err(err) => {
             log::error!("search error: {:?}", err);
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/_search",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
             return Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -296,6 +378,26 @@ pub async fn around(
     resp.size = around_size;
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_search",
+            "200",
+            &org_id,
+            &stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/_search",
+            "200",
+            &org_id,
+            &stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
 
     Ok(HttpResponse::Ok().json(resp))
 }

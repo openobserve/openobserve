@@ -80,8 +80,13 @@ mod tests {
     async fn test_files() {
         const OFFSET: i64 = 100;
 
-        set_offset("nexus", "default", "logs".into(), OFFSET).await.unwrap();
-        assert_eq!(get_offset("nexus", "default", "logs".into()).await.unwrap(), OFFSET);
+        set_offset("nexus", "default", "logs".into(), OFFSET)
+            .await
+            .unwrap();
+        assert_eq!(
+            get_offset("nexus", "default", "logs".into()).await.unwrap(),
+            OFFSET
+        );
         assert!(!list_offset().await.unwrap().is_empty());
     }
 }
