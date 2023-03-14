@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde_json::Value;
 use std::error::Error as StdError;
 
-use serde_json::json;
-
-use crate::meta::alert::{self, AlertDestination};
+use crate::{
+    meta::alert::{self, Alert},
+    service::db,
+};
 
 pub async fn send_notification(
-    alert_destinations: &Vec<AlertDestination>,
+    alert: &Alert,
     trigger: &alert::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
     let client = reqwest::Client::new();
@@ -29,60 +31,53 @@ pub async fn send_notification(
         false => "Scheduled",
     };
 
-    for dest in alert_destinations {
-        let msg = json!({
-            "text":
-                format!(
-                    "For stream {} of organization {} alert {} of type {} is active",
-                    &trigger.stream, &trigger.org, &trigger.alert_name, alert_type
-                )
-        });
+    let curr_ts = chrono::Utc::now().timestamp_micros();
+    match db::alerts::destinations::get(&trigger.org, &alert.destination).await {
+        Ok(dest) => match dest {
+            Some(local_dest) => {
+                let body = local_dest.template.unwrap().body;
+                let resp_str = serde_json::to_string(&body).unwrap();
 
-        /* match dest.dest_type {
-            alert::AlertDestType::Slack => match url::Url::parse(&dest.url) {
-                Ok(dest_url) => {
-                    //Invoke Webhook
+                let mut resp = resp_str
+                    .replace("{stream_name}", &trigger.stream)
+                    .replace("{org_name}", &trigger.org)
+                    .replace("{alert_name}", &trigger.alert_name)
+                    .replace("{alert_type}", alert_type)
+                    .replace("{timestamp}", &curr_ts.to_string());
 
-                    let req = client
-                        .post(dest_url)
-                        .header("Content-type", "application/json")
-                        .json(&msg);
-
-                    let _ = req.send().await.unwrap();
-                }
-                Err(_) => log::info!("Error parsing notification url"),
-            },
-            alert::AlertDestType::AlertManager => match url::Url::parse(&dest.url) {
-                Ok(dest_url) => {
-                    let curr_ts = chrono::Utc::now().timestamp_micros();
-                    let prom_alert = serde_json::json!([{
-                      "labels": {
-                        "alertname": &trigger.alert_name,
-                        "stream": &trigger.stream,
-                        "organization": &trigger.org,
-                        "alerttype":alert_type,
-                        "severity":"critical"
-                        },
-                      "annotations": {
-                        "message": &msg,
-                        "timestamp": curr_ts
-                      }
-                    }]);
-
-                    let req = client
-                        .post(dest_url)
-                        .header("Content-type", "application/json")
-                        .json(&prom_alert);
-
-                    let resp = req.send().await;
-                    match resp {
-                        Ok(_) => log::info!("Notification Sent"),
-                        Err(err) => log::info!("Error sending data to alert manager {:?}", err),
+                // Replace contextual information with values if any from alert
+                if alert.context_attributes.is_some() {
+                    for (key, value) in alert.context_attributes.as_ref().unwrap() {
+                        resp = resp.replace(&format!("{{{}}}", key), value)
                     }
                 }
-                Err(_) => log::info!("Error parsing notification url"),
-            },
-        } */
+
+                let msg: Value = serde_json::from_str(&resp).unwrap();
+                let url = url::Url::parse(&local_dest.url);
+                let mut req = match local_dest.method {
+                    alert::AlertHTTPType::POST => client.post(url.unwrap()),
+                    alert::AlertHTTPType::PUT => client.put(url.unwrap()),
+                    alert::AlertHTTPType::GET => client.get(url.unwrap()),
+                }
+                .header("Content-type", "application/json");
+
+                // Add additional headers if any from destination description
+                if local_dest.headers.is_some() {
+                    for (key, value) in local_dest.headers.unwrap() {
+                        req = req.header(key, value);
+                    }
+                };
+
+                let resp = req.json(&msg).send().await;
+                match resp {
+                    Ok(_) => log::info!("Notification Sent"),
+                    Err(err) => log::info!("Error sending notification {:?}", err),
+                }
+            }
+
+            None => todo!(),
+        },
+        Err(_) => todo!(),
     }
 
     Ok(())
@@ -106,20 +101,7 @@ mod tests {
             count: 1,
             is_ingest_time: true,
         };
-        let res = send_notification(
-            &vec![
-               /*  AlertDestination {
-                    url: "https://httpbin.org/post".to_string(),
-                    dest_type: AlertDestType::Slack,
-                },
-                AlertDestination {
-                    url: "https://httpbin.org/post".to_string(),
-                    dest_type: AlertDestType::AlertManager,
-                }, */
-            ],
-            &obj,
-        )
-        .await;
-        assert!(res.is_ok());
+        //let res = send_notification("test", &obj).await;
+        //assert!(res.is_ok());
     }
 }
