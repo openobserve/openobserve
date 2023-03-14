@@ -32,19 +32,40 @@ pub struct Alert {
     pub duration: i64,
     pub frequency: i64,
     pub time_between_alerts: i64,
-    pub destination: Vec<AlertDestination>,
+    pub destination: String,
     #[serde(default)]
     pub is_real_time: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_attributes: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestination {
     pub url: String,
     pub method: AlertHTTPType,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub headers: HashMap<String, String>,
-    #[serde(rename = "template")]
-    pub template: DestinationTemplate,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
+    pub template: String,
+}
+
+impl AlertDestination {
+    pub fn to_dest_resp(&self, template: Option<DestinationTemplate>) -> AlertDestinationResponse {
+        AlertDestinationResponse {
+            url: self.url.clone(),
+            method: self.method.clone(),
+            headers: self.headers.clone(),
+            template,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct AlertDestinationResponse {
+    pub url: String,
+    pub method: AlertHTTPType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<HashMap<String, String>>,
+    pub template: Option<DestinationTemplate>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -70,10 +91,10 @@ impl fmt::Display for AlertHTTPType {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct DestinationTemplate {
-    pub name: String,
-    pub body: String,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub details: HashMap<String, String>,
+    pub name: Option<String>,
+    pub body: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
