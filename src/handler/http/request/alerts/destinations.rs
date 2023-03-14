@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::{
-    meta::alert::AlertDestination,
-    service::alerts::{destinations, templates},
-};
+use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::service::db;
+use crate::{meta::alert::AlertDestination, service::alerts::destinations};
 
 /** Create new alert destination for an organization */
 #[utoipa::path(
@@ -36,13 +35,28 @@ use crate::{
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/alerts/templates/{destination_name}")]
+#[post("/{org_id}/alerts/destinations/{destination_name}")]
 pub async fn save_destination(
     path: web::Path<(String, String)>,
     dest: web::Json<AlertDestination>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    destinations::save_destination(org_id, name, dest.into_inner()).await
+
+    let dest = dest.into_inner();
+
+    match db::alerts::templates::get(org_id.as_str(), &dest.clone().template).await {
+        Ok(temp) => match temp {
+            Some(_) => destinations::save_destination(org_id, name, dest).await,
+            None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                Some("Please specify valid template".to_string()),
+            ))),
+        },
+        Err(_) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            Some("Please specify valid template".to_string()),
+        ))),
+    }
 }
 
 /** List all destinations for an organization */
@@ -106,7 +120,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> impl Responder {
         (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/alerts/templates/{template_name}")]
+#[delete("/{org_id}/alerts/destinations/{destination_name}")]
 async fn delete_destination(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, name) = path.into_inner();
     destinations::delete_destination(org_id, name).await
