@@ -498,7 +498,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     let mut need_rewrite = false;
-    let re_field_fn = Regex::new(r##"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"##).unwrap();
+    let re_field_fn = Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"#).unwrap();
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
         if !field.contains('(') {
@@ -530,8 +530,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
         // println!("merge_rewrite_sql B: {}", sql);
         if sql.contains("_PLACEHOLDER_") {
-            sql = sql.replace(r##""_PLACEHOLDER_", "##, "");
-            sql = sql.replace(r##", "_PLACEHOLDER_""##, "");
+            sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
+            sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
         }
         // println!("merge_rewrite_sql C: {}", sql);
     }
