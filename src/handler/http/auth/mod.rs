@@ -133,11 +133,27 @@ mod tests {
         .await;
 
         let pwd = "Complexpass#123";
-        assert!(validate_credentials("root@example.com", pwd, "default/_bulk").await.unwrap());
-        assert!(!validate_credentials("", pwd, "default/_bulk").await.unwrap());
+        assert!(
+            validate_credentials("root@example.com", pwd, "default/_bulk")
+                .await
+                .unwrap()
+        );
+        assert!(!validate_credentials("", pwd, "default/_bulk")
+            .await
+            .unwrap());
         assert!(!validate_credentials("", pwd, "/").await.unwrap());
-        assert!(validate_credentials("user@example.com", pwd, "").await.unwrap());
-        assert!(validate_credentials("user@example.com", pwd, "default/user").await.unwrap());
-        assert!(!validate_credentials("user@example.com", "x", "default/user").await.unwrap());
+        assert!(validate_credentials("user@example.com", pwd, "")
+            .await
+            .unwrap());
+        assert!(
+            validate_credentials("user@example.com", pwd, "default/user")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !validate_credentials("user@example.com", "x", "default/user")
+                .await
+                .unwrap()
+        );
     }
 }

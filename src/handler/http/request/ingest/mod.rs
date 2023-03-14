@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use actix_web::{post, web, HttpResponse};
-use prometheus::GaugeVec;
 use std::io::Error;
 
 use crate::service::logs;
@@ -40,10 +39,9 @@ pub async fn bulk(
     org_id: web::Path<String>,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-    ingest_stats: web::Data<GaugeVec>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    logs::bulk::ingest(&org_id, body, thread_id, ingest_stats).await
+    logs::bulk::ingest(&org_id, body, thread_id).await
 }
 
 /** ndjson (newline delimited json) multi ingestion API */
@@ -69,10 +67,9 @@ pub async fn multi(
     path: web::Path<(String, String)>,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-    ingest_stats: web::Data<GaugeVec>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::multi::ingest(&org_id, &stream_name, body, thread_id, ingest_stats).await
+    logs::multi::ingest(&org_id, &stream_name, body, thread_id).await
 }
 
 /** json ingestion API, accepts array of json records */
@@ -98,8 +95,7 @@ pub async fn json(
     path: web::Path<(String, String)>,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-    ingest_stats: web::Data<GaugeVec>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::json::ingest(&org_id, &stream_name, body, thread_id, ingest_stats).await
+    logs::json::ingest(&org_id, &stream_name, body, thread_id).await
 }

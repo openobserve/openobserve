@@ -19,18 +19,18 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
-use prometheus::GaugeVec;
 use serde_json::Value;
 use std::io::Error;
+use std::time::Instant;
 
 use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
+use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
@@ -45,8 +45,9 @@ pub async fn ingest(
     stream_name: &str,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-    ingest_stats: web::Data<GaugeVec>,
 ) -> Result<HttpResponse, Error> {
+    let start = Instant::now();
+
     // let loc_span = info_span!("service:logs:json:ingest");
     // let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -230,12 +231,12 @@ pub async fn ingest(
         file.write(write_buf.as_ref());
 
         // metrics
-        ingest_stats
-            .with_label_values(&[org_id, stream_name, "records"])
-            .add(entry.len() as f64);
-        ingest_stats
-            .with_label_values(&[org_id, stream_name, "original_size"])
-            .add(write_buf.len() as f64);
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
+            .add(entry.len() as i64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
+            .add(write_buf.len() as i64);
     }
 
     if stream_file_name.is_empty() {
@@ -259,11 +260,11 @@ pub async fn ingest(
         }
     }
 
-    ingest_stats
-        .with_label_values(&[org_id, stream_name, "req_num"])
-        .inc();
+    let time = start.elapsed().as_secs_f64();
+    metrics::LOGS_HTTP_INGEST_JSON_RESPONSE_TIME
+        .with_label_values(&[org_id, stream_name])
+        .observe(time);
 
-    //Ok(HttpResponse::Ok().json(stream_status))
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],
