@@ -270,6 +270,15 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .inc();
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),

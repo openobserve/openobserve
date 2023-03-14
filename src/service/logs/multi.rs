@@ -274,6 +274,15 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(start.elapsed().as_secs_f64());
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/_multi",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .inc();
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
