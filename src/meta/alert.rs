@@ -93,8 +93,6 @@ impl fmt::Display for AlertHTTPType {
 pub struct DestinationTemplate {
     pub name: Option<String>,
     pub body: Value,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
