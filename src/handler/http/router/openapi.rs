@@ -89,7 +89,7 @@ use crate::meta;
             meta::alert::AlertDestinationResponse,
             meta::alert::AlertDestType,
             meta::alert::AlertHTTPType,
-             meta::alert::DestinationTemplate,
+            meta::alert::DestinationTemplate,
         ),
     ),
     modifiers(&SecurityAddon),
