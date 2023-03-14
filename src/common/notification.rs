@@ -97,7 +97,6 @@ mod tests {
         let template = DestinationTemplate {
             name: Some("testTemplate".to_string()),
             body: "Test Body".into(),
-            details: None,
         };
         let _ = db::alerts::templates::set("default", "testTemplate", template);
 
