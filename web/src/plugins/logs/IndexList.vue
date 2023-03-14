@@ -23,13 +23,17 @@
             ? ''
             : t('search.selectIndex')
         "
-        :options="searchObj.data.stream.streamLists"
+        :options="streamOptions"
         data-cy="index-dropdown"
         input-debounce="0"
         behavior="menu"
         filled
         borderless
         dense
+        use-input
+        hide-selected
+        fill-input
+        @filter="filterStreamFn"
       >
         <template #no-option>
           <q-item>
@@ -125,7 +129,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -141,6 +145,17 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const { searchObj } = useLogs();
+    const streamOptions: any = ref(searchObj.data.stream.streamLists);
+
+    const filterStreamFn = (val: string, update: any) => {
+      update(() => {
+        streamOptions.value = searchObj.data.stream.streamLists;
+        const needle = val.toLowerCase();
+        streamOptions.value = streamOptions.value.filter(
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
+        );
+      });
+    };
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];
@@ -175,10 +190,12 @@ export default defineComponent({
       store,
       router,
       searchObj,
+      streamOptions,
       filterFieldFn,
       addToFilter,
       clickFieldFn,
       getImageURL,
+      filterStreamFn,
     };
   },
 });
@@ -215,6 +232,7 @@ export default defineComponent({
   .index-table {
     width: 100%;
     // border: 1px solid rgba(0, 0, 0, 0.02);
+
     .q-table {
       display: block;
     }
@@ -229,9 +247,6 @@ export default defineComponent({
       height: 25px;
     }
 
-    .q-table__top {
-      padding: 0px;
-    }
     .q-table__control,
     label.q-field {
       width: 100%;

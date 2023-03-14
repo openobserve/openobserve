@@ -246,7 +246,7 @@ export default defineComponent({
     setRelativeDate(period, value) {
       this.selectedDate.tab = "relative";
       this.selectedDate.relative.period = period;
-      this.selectedDate.relative.value = value;
+      this.selectedDate.relative.value = value + period.value;
       this.$refs.datetimeBtn.$el.click();
     },
     onCustomPeriodSelect() {

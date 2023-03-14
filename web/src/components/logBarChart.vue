@@ -79,7 +79,7 @@ export default defineComponent({
     ) => {
       trace.x = x;
       trace.y = y;
-      layout.title.text = params.title;
+      layout.title.text = params.title || "";
       trace.unparsed_x = params.unparsed_x_data;
       Plotly.redraw("plotly_chart");
     };

@@ -323,6 +323,46 @@ export default defineComponent({
         code: "zh-cn",
         icon: "img:" + getImageURL("images/language_flags/zh-cn.svg"),
       },
+      {
+        label: "French",
+        code: "fr",
+        icon: "img:" + getImageURL("images/language_flags/fr.svg"),
+      },
+      {
+        label: "Spanish",
+        code: "es",
+        icon: "img:" + getImageURL("images/language_flags/es.svg"),
+      },
+      {
+        label: "German",
+        code: "de",
+        icon: "img:" + getImageURL("images/language_flags/de.svg"),
+      },
+      {
+        label: "Italian",
+        code: "it",
+        icon: "img:" + getImageURL("images/language_flags/it.svg"),
+      },
+      {
+        label: "Japanese",
+        code: "ja",
+        icon: "img:" + getImageURL("images/language_flags/ja.svg"),
+      },
+      {
+        label: "Korean",
+        code: "ko",
+        icon: "img:" + getImageURL("images/language_flags/ko.svg"),
+      },
+      {
+        label: "Dutch",
+        code: "nl",
+        icon: "img:" + getImageURL("images/language_flags/nl.svg"),
+      },
+      {
+        label: "Portuguese",
+        code: "pt",
+        icon: "img:" + getImageURL("images/language_flags/pt.svg"),
+      },
     ];
 
     const local = ref(getLocale());
