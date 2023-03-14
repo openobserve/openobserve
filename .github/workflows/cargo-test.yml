@@ -14,7 +14,7 @@ env:
 jobs:
   build:
     name: Cargo test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2004-8-cores
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
