@@ -306,8 +306,14 @@ pub async fn ingest(
     }
 
     let time = start.elapsed().as_secs_f64();
-    metrics::LOGS_HTTP_INGEST_BULK_RESPONSE_TIME
-        .with_label_values(&[org_id])
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_bulk",
+            "200",
+            org_id,
+            "",
+            StreamType::Logs.to_string().as_str(),
+        ])
         .observe(time);
 
     //dispose_v8();

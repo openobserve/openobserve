@@ -261,8 +261,14 @@ pub async fn ingest(
     }
 
     let time = start.elapsed().as_secs_f64();
-    metrics::LOGS_HTTP_INGEST_JSON_RESPONSE_TIME
-        .with_label_values(&[org_id, stream_name])
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
         .observe(time);
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(

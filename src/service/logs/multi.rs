@@ -265,10 +265,15 @@ pub async fn ingest(
         }
     }
 
-    let time = start.elapsed().as_secs_f64();
-    metrics::LOGS_HTTP_INGEST_MULTI_RESPONSE_TIME
-        .with_label_values(&[org_id, stream_name])
-        .observe(time);
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_multi",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .observe(start.elapsed().as_secs_f64());
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(
         http::StatusCode::OK.into(),
