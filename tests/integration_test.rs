@@ -14,12 +14,10 @@
 
 #[cfg(test)]
 mod tests {
-
     use actix_web::{http::header::ContentType, test, web, App};
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
     use core::time;
-    use prometheus::{opts, GaugeVec};
     use prost::Message;
     use std::sync::Once;
     use std::{env, fs};
@@ -143,17 +141,11 @@ mod tests {
         let auth = setup();
         let path = "./tests/input.json";
         let body_str = fs::read_to_string(path).expect("Unable to read file");
-        // metrics
-        let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
-        let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
-        // app
         let thread_id: usize = 1;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
                 .configure(get_service_routes)
                 .configure(get_basic_routes),
@@ -172,17 +164,11 @@ mod tests {
     async fn e2e_post_json() {
         let auth = setup();
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
-        // metrics
-        let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
-        let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
-        // app
         let thread_id: usize = 1;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
                 .configure(get_service_routes)
                 .configure(get_basic_routes),
@@ -201,17 +187,11 @@ mod tests {
     async fn e2e_post_multi() {
         let auth = setup();
         let body_str = "{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}";
-        // metrics
-        let stats_opts =
-            opts!("ingest_stats", "Summary ingestion stats metric").namespace("zincobserve");
-        let stats = GaugeVec::new(stats_opts, &["org", "name", "field"]).unwrap();
-        // app
         let thread_id: usize = 1;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .app_data(web::Data::new(stats.clone()))
                 .app_data(web::Data::new(thread_id))
                 .configure(get_service_routes)
                 .configure(get_basic_routes),

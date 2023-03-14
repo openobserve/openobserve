@@ -62,7 +62,7 @@ pub async fn sql(
         return Ok(HashMap::new());
     }
 
-    let now = Instant::now();
+    let start = Instant::now();
 
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
@@ -113,7 +113,7 @@ pub async fn sql(
     let prefixes = vec![prefix];
     log::info!(
         "Prepare table took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     let mut config =
@@ -144,7 +144,7 @@ pub async fn sql(
     config = config.with_schema(schema);
     log::info!(
         "infer schema took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     let table = ListingTable::try_new(config)?;
@@ -154,7 +154,7 @@ pub async fn sql(
     register_udf(&mut ctx, &sql.org_id).await;
     log::info!(
         "Register table took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     // Debug SQL
@@ -194,7 +194,7 @@ pub async fn sql(
     }
     let batches = df.collect().await?;
     result.insert("query".to_string(), batches);
-    log::info!("Query took {:.3} seconds.", now.elapsed().as_secs_f64());
+    log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
     // aggs
     for (name, sql) in sql.aggs.iter() {
         // Debug SQL
@@ -234,13 +234,16 @@ pub async fn sql(
         log::info!(
             "Query agg:{} took {:.3} seconds.",
             name,
-            now.elapsed().as_secs_f64()
+            start.elapsed().as_secs_f64()
         );
     }
 
     // drop table
     ctx.deregister_table("tbl")?;
-    log::info!("Query all took {:.3} seconds.", now.elapsed().as_secs_f64());
+    log::info!(
+        "Query all took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
 
     Ok(result)
 }
@@ -259,13 +262,13 @@ pub async fn merge(
         return Ok(batches.to_owned());
     }
 
-    let now = Instant::now();
+    let start = Instant::now();
 
     // write temp file
     let work_dir = merge_write_recordbatch(batches)?;
     log::info!(
         "merge_write_recordbatch took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     // rewrite sql
@@ -290,7 +293,7 @@ pub async fn merge(
     };
     log::info!(
         "merge_rewrite_sql took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     // query data
@@ -344,7 +347,7 @@ pub async fn merge(
     let batches = df.collect().await?;
     ctx.deregister_table("tbl")?;
 
-    log::info!("Merge took {:.3} seconds.", now.elapsed().as_secs_f64());
+    log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
 
     // clear temp file
     tmpfs::remove_dir_all(work_dir).unwrap();
@@ -495,7 +498,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     let mut need_rewrite = false;
-    let re_field_fn = Regex::new(r##"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"##).unwrap();
+    let re_field_fn = Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"#).unwrap();
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
         if !field.contains('(') {
@@ -527,8 +530,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
         // println!("merge_rewrite_sql B: {}", sql);
         if sql.contains("_PLACEHOLDER_") {
-            sql = sql.replace(r##""_PLACEHOLDER_", "##, "");
-            sql = sql.replace(r##", "_PLACEHOLDER_""##, "");
+            sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
+            sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
         }
         // println!("merge_rewrite_sql C: {}", sql);
     }
@@ -559,7 +562,7 @@ pub async fn convert_parquet_file(
     rules: HashMap<String, DataType>,
     file: &str,
 ) -> Result<()> {
-    let now = Instant::now();
+    let start = Instant::now();
 
     // query data
     let runtime_env = create_runtime_env()?;
@@ -651,7 +654,7 @@ pub async fn convert_parquet_file(
 
     log::info!(
         "convert_parquet_file took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     Ok(())
@@ -662,7 +665,7 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     files: &[String],
 ) -> Result<FileMeta> {
-    let now = Instant::now();
+    let start = Instant::now();
 
     // query data
     let runtime_env = create_runtime_env()?;
@@ -749,7 +752,7 @@ pub async fn merge_parquet_files(
 
     log::info!(
         "merge_parquet_files took {:.3} seconds.",
-        now.elapsed().as_secs_f64()
+        start.elapsed().as_secs_f64()
     );
 
     Ok(file_meta)

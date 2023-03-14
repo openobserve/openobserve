@@ -118,6 +118,8 @@ pub struct Common {
     pub local_mode_storage: String,
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
+    #[env_config(name = "ZO_CLUSTER_NAME", default = "zo1")]
+    pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/zincobserve/")]

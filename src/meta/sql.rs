@@ -577,7 +577,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     }
 
     // check function, like: to_timestamp_micros("field")
-    let re = Regex::new(&format!(r##"(?i)\(['"]?{}['"]?\)"##, field)).unwrap();
+    let re = Regex::new(&format!(r#"(?i)\(['"]?{}['"]?\)"#, field)).unwrap();
     if re.is_match(s) {
         return true;
     }
