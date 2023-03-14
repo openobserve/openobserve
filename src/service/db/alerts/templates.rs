@@ -11,7 +11,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>
         Some(ALERTS_TEMPLATES.get(&map_key).unwrap().clone())
     } else {
         let db = &crate::infra::db::DEFAULT;
-        let key = format!("/alerts/templates/{}/{}", org_id, name);
+        let key = format!("/templates/{}/{}", org_id, name);
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
             Err(_) => None,
@@ -26,7 +26,7 @@ pub async fn set(
     template: DestinationTemplate,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/templates/{}/{}", org_id, name);
+    let key = format!("/templates/{}/{}", org_id, name);
     db.put(&key, json::to_vec(&template).unwrap().into())
         .await?;
     Ok(())
@@ -34,7 +34,7 @@ pub async fn set(
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/templates/{}/{}", org_id, name);
+    let key = format!("/templates/{}/{}", org_id, name);
     match db.delete(&key, false).await {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!(e)),
@@ -44,7 +44,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
 
-    let key = format!("/alerts/templates/{}", org_id);
+    let key = format!("/templates/{}", org_id);
     let ret = db.list_values(&key).await?;
     let mut temp_list: Vec<DestinationTemplate> = Vec::new();
     for item_value in ret {
@@ -56,7 +56,7 @@ pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Erro
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = "/alerts/templates/";
+    let key = "/templates/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[TRACE] Start watching alert templates");
@@ -85,7 +85,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = "/alerts/templates/";
+    let key = "/templates/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();

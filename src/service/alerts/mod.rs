@@ -52,7 +52,7 @@ pub async fn save_alert(
     if dest.is_none() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            format!("Destination with name {} not found", in_dest),
+            Some(format!("Destination with name {} not found", in_dest)),
         )));
     }
 
@@ -233,10 +233,7 @@ mod test {
             duration: 1,
             frequency: 1,
             time_between_alerts: 10,
-            destination: vec![/* AlertDestination {
-                url: "dummy".to_string(),
-                dest_type: AlertDestType::Slack,
-            } */],
+            destination: "test".to_string(),
             is_real_time: false,
             context_attributes: None,
         };

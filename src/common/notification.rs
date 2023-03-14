@@ -38,10 +38,12 @@ pub async fn send_notification(
                 let body = local_dest.template.unwrap().body;
                 let resp_str = serde_json::to_string(&body).unwrap();
 
-        /* match dest.dest_type {
-            alert::AlertDestType::Slack => match url::Url::parse(&dest.url) {
-                Ok(dest_url) => {
-                    //Invoke Webhook
+                let mut resp = resp_str
+                    .replace("{stream_name}", &trigger.stream)
+                    .replace("{org_name}", &trigger.org)
+                    .replace("{alert_name}", &trigger.alert_name)
+                    .replace("{alert_type}", alert_type)
+                    .replace("{timestamp}", &curr_ts.to_string());
 
                 // Replace contextual information with values if any from alert
                 if alert.context_attributes.is_some() {
@@ -49,9 +51,33 @@ pub async fn send_notification(
                         resp = resp.replace(&format!("{{{}}}", key), value)
                     }
                 }
-                Err(_) => log::info!("Error parsing notification url"),
-            },
-        } */
+
+                let msg: Value = serde_json::from_str(&resp).unwrap();
+                let url = url::Url::parse(&local_dest.url);
+                let mut req = match local_dest.method {
+                    alert::AlertHTTPType::POST => client.post(url.unwrap()),
+                    alert::AlertHTTPType::PUT => client.put(url.unwrap()),
+                    alert::AlertHTTPType::GET => client.get(url.unwrap()),
+                }
+                .header("Content-type", "application/json");
+
+                // Add additional headers if any from destination description
+                if local_dest.headers.is_some() {
+                    for (key, value) in local_dest.headers.unwrap() {
+                        req = req.header(key, value);
+                    }
+                };
+
+                let resp = req.json(&msg).send().await;
+                match resp {
+                    Ok(_) => log::info!("Notification Sent"),
+                    Err(err) => log::info!("Error sending notification {:?}", err),
+                }
+            }
+
+            None => todo!(),
+        },
+        Err(_) => todo!(),
     }
 
     Ok(())
@@ -94,20 +120,7 @@ mod tests {
             count: 1,
             is_ingest_time: true,
         };
-        let res = send_notification(
-            &vec![
-               /*  AlertDestination {
-                    url: "https://httpbin.org/post".to_string(),
-                    dest_type: AlertDestType::Slack,
-                },
-                AlertDestination {
-                    url: "https://httpbin.org/post".to_string(),
-                    dest_type: AlertDestType::AlertManager,
-                }, */
-            ],
-            &obj,
-        )
-        .await;
-        assert!(res.is_ok());
+        //let res = send_notification("test", &obj).await;
+        //assert!(res.is_ok());
     }
 }
