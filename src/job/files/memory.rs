@@ -127,6 +127,16 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                         Ok(_) => {
                             if file_lock::FILES.write().unwrap().remove(&path).is_none() {
                                 log::error!("[JOB] Failed to remove memory file: {}", path)
+                            } else {
+                                // println!("removed file: {}", key);
+                                let columns = key.split('/').collect::<Vec<&str>>();
+                                let _ = columns[0].to_string();
+                                let org_id = columns[1].to_string();
+                                let stream_type = columns[2].to_string();
+                                let stream_name = columns[3].to_string();
+                                metrics::INGEST_WAL_USED_BYTES
+                                    .with_label_values(&[&org_id, &stream_name, &stream_type])
+                                    .sub(meta.original_size as i64);
                             }
                         }
                         Err(e) => log::error!(

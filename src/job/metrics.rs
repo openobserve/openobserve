@@ -13,18 +13,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // create wal dir
     fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
+    // load metrics
+    load_ingest_wal_used_bytes().await?;
 
     let mut interval = time::interval(time::Duration::from_secs(5));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = update_ingest_wal_used_bytes().await {
-            log::error!("Error update metrics: {}", e);
-        }
+        // if let Err(e) = update_ingest_wal_used_bytes().await {
+        //     log::error!("Error update metrics: {}", e);
+        // }
     }
 }
 
-async fn update_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
+async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     let data_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
