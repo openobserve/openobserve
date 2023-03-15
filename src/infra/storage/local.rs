@@ -51,13 +51,11 @@ impl FileStorage for Local {
         file.read_to_end(&mut data)?;
 
         // metrics
-        let _ = columns[0].to_string();
-        let org_id = columns[1].to_string();
-        let stream_type = columns[2].to_string();
-        let stream_name = columns[3].to_string();
-        metrics::STORAGE_READ_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
-            .inc_by(data.len() as u64);
+        if columns[0].eq("files") {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data.len() as u64);
+        }
 
         Ok(bytes::Bytes::from(data))
     }
@@ -71,13 +69,11 @@ impl FileStorage for Local {
             Ok(_) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
-                let _ = columns[0].to_string();
-                let org_id = columns[1].to_string();
-                let stream_type = columns[2].to_string();
-                let stream_name = columns[3].to_string();
-                metrics::STORAGE_WRITE_BYTES
-                    .with_label_values(&[&org_id, &stream_name, &stream_type])
-                    .inc_by(data_size as u64);
+                if columns[0].eq("files") {
+                    metrics::STORAGE_WRITE_BYTES
+                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                        .inc_by(data_size as u64);
+                }
                 Ok(())
             }
             Err(e) => Err(anyhow::anyhow!(e)),
