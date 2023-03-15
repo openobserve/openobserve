@@ -23,6 +23,9 @@ const getDefaultDashboardPanelData = () => (
     },
     meta: {
       parsedQuery: "",
+      errors: {
+        queryErrors: []
+      },
       editorValue: "",
       dateTime: {},
       filterValue: <any>[],

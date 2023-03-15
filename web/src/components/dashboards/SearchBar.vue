@@ -7,6 +7,7 @@
         <q-toggle
           v-model="dashboardPanelData.layout.showCustomQuery"
           :label="t('Custom SQL')"
+          @update:model-value="updateToggle(dashboardPanelData.layout.showCustomQuery)"
         />
         <q-btn-dropdown
           color="white"
@@ -39,7 +40,7 @@
         :readOnly="!dashboardPanelData.layout.showCustomQuery"
         ></query-editor>
         <!-- @update-query="updateQueryValue" -->
-        <div style="color: red;" class="q-mx-sm">{{ data.queryErrors.join(', ') }}&nbsp;</div>
+        <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
       </div>
     </div>
 </template>
@@ -72,11 +73,6 @@ export default defineComponent({
   setup() {
     // show the query box
     const showQuery = ref(true)
-
-    const data = reactive({
-      queryErrors: [] // custom query errors
-    })
-
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -190,7 +186,8 @@ export default defineComponent({
         console.log("query: value", dashboardPanelData.data.query);
 
         // empty the errors
-        data.queryErrors = []
+        dashboardPanelData.meta.errors.queryErrors = []
+
         console.log("----------", dashboardPanelData.data.query);
         console.log("---sql mode-------", dashboardPanelData.layout.showCustomQuery);
         
@@ -202,7 +199,7 @@ export default defineComponent({
           console.log("error")
           console.log(e)
           // exit as there is an invalid query
-          data.queryErrors.push("Invalid SQL Syntax")
+          dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
           return null;
         }
         console.log("--parsed query---", dashboardPanelData.meta.parsedQuery);
@@ -229,7 +226,7 @@ export default defineComponent({
             }
           });
         } else {
-          data.queryErrors.push("Invalid Columns")
+          dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns")
         }
 
         // now check if the correct stream is selected
@@ -242,7 +239,7 @@ export default defineComponent({
               dashboardPanelData.data.fields.stream = streamFound.name
             }
           } else {
-            data.queryErrors.push("Invalid stream")
+            dashboardPanelData.meta.errors.queryErrors.push("Invalid stream")
           }
 
           // if (dashboardPanelData.meta.parsedQuery.from[0].table !== dashboardPanelData.data.fields.stream) {
@@ -279,11 +276,15 @@ export default defineComponent({
           //   }
           // }
         } else {
-          data.queryErrors.push("Stream name required")
+          dashboardPanelData.meta.errors.queryErrors.push("Stream name required")
         }
       }
 
     };
+
+    const updateToggle = (value) => {
+      dashboardPanelData.meta.errors.queryErrors = []
+    }
 
 
     return {
@@ -293,7 +294,7 @@ export default defineComponent({
       onDropDownClick,
       showQuery,
       dashboardPanelData,
-      data
+      updateToggle
     };
   },
 });
