@@ -16,7 +16,10 @@ use segment::{message::Track, Client, Message};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::infra::config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION};
+use crate::infra::{
+    cache::stats::STATS,
+    config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION},
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -152,6 +155,17 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
             }
         }
     }
+    let mut sterams_orig_size: f64 = 0.0;
+    let mut sterams_compressed_size: f64 = 0.0;
+    for stats in STATS.iter().clone() {
+        sterams_orig_size += stats.storage_size;
+        sterams_compressed_size += stats.compressed_size
+    }
+    data.insert("streams_total_size".to_string(), sterams_orig_size.into());
+    data.insert(
+        "streams_compressed_size".to_string(),
+        sterams_compressed_size.into(),
+    );
 }
 
 #[cfg(test)]

@@ -93,6 +93,9 @@ impl fmt::Display for AlertHTTPType {
 pub struct DestinationTemplate {
     pub name: Option<String>,
     pub body: Value,
+    #[serde(rename = "isDefault")]
+    #[serde(default)]
+    pub is_default: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
