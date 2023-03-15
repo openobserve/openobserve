@@ -6,7 +6,7 @@
 
         <q-toggle
           v-model="dashboardPanelData.layout.showCustomQuery"
-          :label="t('Custom SQL')"
+          :label="t('panel.customSql')"
           @update:model-value="updateToggle(dashboardPanelData.layout.showCustomQuery)"
         />
         <q-btn-dropdown

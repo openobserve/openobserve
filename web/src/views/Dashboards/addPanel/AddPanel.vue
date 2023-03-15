@@ -13,7 +13,7 @@
           padding="sm lg"
           color="red"
           no-caps
-          :label="t(`Discard`)"
+          :label="t('panel.discard')"
           @click="goBackToDashboardList"
         />
         <q-btn
@@ -23,7 +23,7 @@
           color="white"
           text-color="black"
           no-caps
-          :label="t(`Save`)"
+          :label="t('panel.save')"
           @click="savePanelOnClick"
         />
         <q-btn
@@ -31,7 +31,7 @@
           padding="sm lg"
           color="secondary"
           no-caps
-          :label="t(`Apply`)"
+          :label="t('panel.apply')"
           @click="runQuery"
         />
       </div>

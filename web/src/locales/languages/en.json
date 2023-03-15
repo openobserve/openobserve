@@ -230,6 +230,7 @@
         "name": "Name of Dashboard",
         "typeDesc": "Type Description of Dashboard",
         "createdashboard": "Create a New Dashboard",
+        "updatedashboard": "Update a Dashboard",
         "nameHolder": "Enter Name of New Dashboard",
         "typeHolder": "Enter Type Description of New Dashboard",
         "identifier": "Identifier",
@@ -239,7 +240,9 @@
         "owner": "Owner",
         "created": "Created",
         "actions": "Actions",
-        "nameRequired": "Name is required"
+        "nameRequired": "Name is required",
+        "id": "Id",
+        "goBackToDashboard": "Go back to Dashboard"
     },
     "panel": {
         "header": "Panel",
@@ -254,7 +257,18 @@
         "nameHolder": "Enter Name of New Panel",
         "typeHolder": "Enter Type Description of New Panel",
         "editPanel": "Edit Panel",
-        "addPanel" : "Add Panel" 
+        "addPanel" : "Add Panel",
+        "firstColumn": "First Column",
+        "yAxis": "Y-Axis (Columns)",
+        "xAxis": "X-Axis (Row)",
+        "otherColumn": "Other Columns",
+        "config":"Config",
+        "filters": "Filters",
+        "customSql": "Custom SQL",
+        "field": "Fields",
+        "discard": "Discard",
+        "edit": "Edit",
+        "apply": "Apply"
     },
     "alerts": {
         "header": "Alerts",

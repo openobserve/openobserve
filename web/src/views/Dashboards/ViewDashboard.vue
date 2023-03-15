@@ -12,7 +12,7 @@
           color="white"
           text-color="black"
           no-caps
-          :label="t(`Add Panel`)"
+          :label="t('panel.add')"
           @click="addPanelData"
         />
         <q-btn
@@ -22,7 +22,7 @@
           color="white"
           text-color="black"
           no-caps
-          :label="draggable ? t(`Cancel`) : t(`Edit`)"
+          :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)"
           @click="isDraggableClick"
         />
         <!-- <q-btn
@@ -42,7 +42,7 @@
           color="secondary"
           no-caps
           :disable="!draggable"
-          :label="t(`Save`)"
+          :label="t(`panel.save`)"
           @click="saveDashboardOnClick"
         />
         <q-btn
@@ -51,7 +51,7 @@
           padding="sm lg"
           color="red"
           no-caps
-          :label="t(`Delete`)"
+          :label="t(`dashboard.delete`)"
           @click="deleteDashboardOnClick"
         />
         <q-btn
@@ -59,7 +59,7 @@
           padding="sm lg"
           color="white"
           no-caps
-          :label="t(`Go back to Dashboard`)"
+          :label="t(`dashboard.goBackToDashboard`)"
           outline
           text-color="black"
           @click="goBackToDashboardList"
