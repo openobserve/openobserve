@@ -8,13 +8,7 @@
       <q-expansion-item
         default-opened
         dense
-        :label="
-          dashboardPanelData.data.type == 'table'
-            ? t(`First Column`)
-            : dashboardPanelData.data.type == 'h-bar'
-            ? t(`Y-Axis (Columns)`)
-            : t(`X-Axis (Row)`)
-        "
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.yAxis') :  t('panel.xAxis')"
       >
         <div class="column index-menu q-mb-md">
           <div class="index-table q-mt-xs">
@@ -71,13 +65,7 @@
       <q-expansion-item
         dense
         default-opened
-        :label="
-          dashboardPanelData.data.type == 'table'
-            ? t(`Other Columns`)
-            : dashboardPanelData.data.type == 'h-bar'
-            ? t(`X-Axis (Row)`)
-            : t(`Y-Axis (Columns)`)
-        "
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.xAxis') : t('panel.yAxis')"
       >
         <div class="column index-menu q-mb-lg">
           <div class="index-table q-mt-xs">
@@ -211,7 +199,7 @@
         </div>
       </q-expansion-item>
       <q-separator />
-      <q-expansion-item default-opened dense :label="t(`Config`)">
+      <q-expansion-item default-opened dense :label="t('panel.config')">
         <div>
           <q-toggle
             v-if="dashboardPanelData.data.type != 'table'"
@@ -241,7 +229,7 @@
       </q-expansion-item>
     </div>
     <q-separator />
-    <q-expansion-item default-opened dense :label="t(`Filters`)">
+    <q-expansion-item default-opened dense :label="t('panel.filters')">
       <div class="column index-menu q-mb-lg">
         <div class="index-table q-mt-xs">
           <q-table
