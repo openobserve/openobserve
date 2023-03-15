@@ -607,6 +607,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_etcd_count() {
+        if CONFIG.common.local_mode {
+            return;
+        }
         let client = Etcd::default();
         client
             .put("/test/count/1", bytes::Bytes::from("1"))
