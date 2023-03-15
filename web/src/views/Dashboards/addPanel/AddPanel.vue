@@ -164,6 +164,7 @@ export default defineComponent({
       });
     };
 
+    //validate the data
     const isValid = () => {
       const error = []
       const dashboardData = dashboardPanelData

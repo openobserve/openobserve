@@ -15,7 +15,6 @@
 
 <script lang="ts">
 import { defineComponent, onMounted, ref } from "vue"
-import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";

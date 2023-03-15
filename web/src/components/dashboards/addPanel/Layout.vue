@@ -97,32 +97,8 @@
                     <div class="field_overlay" :title="props.row.column">
                       <div class="field_label">
                         {{ props.row.column }}
-                        <!-- <div>
-                        <q-expansion-item
-                          expand-separator
-                          icon="perm_identity"
-                          label=""
-                          caption=""
-                        >
-                          <div class="color-input-wrapper">
-                            <input type="color" v-model="dashboardPanelData.data.fields.y.color">
-                          </div>
-                          <div>
-                            <q-select
-                              v-model="dashboardPanelData.data.fields.y.aggregationFunction"
-                              :options="triggerOperators"
-                              dense
-                              filled
-                              :label="t('Aggregation')"
-                            ></q-select>
-                          </div>
-                        </q-expansion-item>
-                      </div> -->
                       </div>
-
                       <div class="field_icons">
-                        <!-- TODO: aggregation and color picker and label fields -->
-
                         <div>
                           <q-btn
                             size="xs"
@@ -432,7 +408,6 @@
 <script lang="ts">
 import { defineComponent, ref, reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 
@@ -444,7 +419,6 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const $q = useQuasar();
     const {
       dashboardPanelData,
       removeXAxisItem,

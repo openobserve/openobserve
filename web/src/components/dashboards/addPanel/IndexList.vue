@@ -116,8 +116,6 @@ import {
   defineComponent,
   reactive,
   ref,
-  onMounted,
-  computed,
   watch,
   onActivated,
 } from "vue";
@@ -145,12 +143,7 @@ export default defineComponent({
     const $q = useQuasar();
     const { dashboardPanelData, addXAxisItem, addYAxisItem } =
       useDashboardPanelData();
-    const x = ref();
-    const y = ref();
-    console.log("schemaList:", data.schemaList);
-    // console.log("schemaList name:", schemaList.data  );
-    console.log("indexOptions:", data.indexOptions);
-
+    
     onActivated(() => {
       console.log("inside mounted");
       getStreamList();
@@ -271,10 +264,6 @@ export default defineComponent({
         queryService
           .runquery(query, store.state.selectedOrganization.identifier)
           .then((res) => {
-            console.log(
-              "-distinct vals--",
-              res.data.hits.map((it: any) => it.value).filter((it: any) => it)
-            );
 
             dashboardPanelData.meta.filterValue.push({
               column: name,

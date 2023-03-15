@@ -17,18 +17,6 @@
       </q-bar>
     </div>
     <div class="row" v-if="showQuery">
-      <!-- <div class="col">
-        <q-input
-          v-model="dashboardPanelData.data.query"
-          filled
-          clearable
-          autogrow
-          color="green-8"
-          label="Please provide SQL Query for Visualization"
-          hint="Press Apply Button to complete query preview"
-          :disable="!dashboardPanelData.meta.stream.showCustomQuery"
-        />
-      </div> -->
       <div class="col">
         <query-editor
         ref="queryEditorRef"
@@ -39,7 +27,6 @@
         @run-query="searchData"
         :readOnly="!dashboardPanelData.layout.showCustomQuery"
         ></query-editor>
-        <!-- @update-query="updateQueryValue" -->
         <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
       </div>
     </div>
@@ -65,7 +52,6 @@ export default defineComponent({
   methods: {
     searchData() {
       if (this.searchdashboardPanelData.loading == false) {
-        // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
     },
@@ -188,9 +174,6 @@ export default defineComponent({
         // empty the errors
         dashboardPanelData.meta.errors.queryErrors = []
 
-        console.log("----------", dashboardPanelData.data.query);
-        console.log("---sql mode-------", dashboardPanelData.layout.showCustomQuery);
-        
         // Get the parsed query
         try {
           dashboardPanelData.meta.parsedQuery = parser.astify(dashboardPanelData.data.query);
@@ -202,8 +185,6 @@ export default defineComponent({
           dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
           return null;
         }
-        console.log("--parsed query---", dashboardPanelData.meta.parsedQuery);
-        
         if(!dashboardPanelData.meta.parsedQuery) {
           return;
         }
@@ -231,7 +212,7 @@ export default defineComponent({
 
         // now check if the correct stream is selected
         if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
-          console.log("---parsedQuery.from--------",dashboardPanelData.meta.parsedQuery.from);
+          // console.log("---parsedQuery.from--------",dashboardPanelData.meta.parsedQuery.from);
     
           const streamFound = dashboardPanelData.meta.stream.streamResults.find(it => it.name == dashboardPanelData.meta.parsedQuery.from[0].table)
           if(streamFound) {
@@ -242,39 +223,6 @@ export default defineComponent({
             dashboardPanelData.meta.errors.queryErrors.push("Invalid stream")
           }
 
-          // if (dashboardPanelData.meta.parsedQuery.from[0].table !== dashboardPanelData.data.fields.stream) {
-          //   let streamFound = false;
-          //   const streamNameFromQuery = dashboardPanelData.meta.parsedQuery.from[0].table;
-
-          //   dashboardPanelData.meta.stream.streamResults.forEach((stream) => {
-          //     console.log("Query: get stream data from streamResults", stream);
-              
-          //     if (stream.name == streamNameFromQuery) {
-          //       streamFound = true;
-          //       let itemObj = {
-          //         label: stream.name,
-          //         value: stream.name,
-          //       };
-          //       dashboardPanelData.data.stream.selectedStream = itemObj;
-          //       stream.schema.forEach((field) => {
-          //         dashboardPanelData.meta.stream.selectedStreamFields.push({
-          //           name: field.name,
-          //         });
-          //       });
-          //     }
-          //   });
-
-          //   if (streamFound == false) {
-          //     dashboardPanelData.data.stream.selectedStream = {};
-          //     dashboardPanelData.meta.stream.selectedStreamFields = [];
-          //     $q.notify({
-          //       message: "Stream not found",
-          //       color: "negative",
-          //       position: "top",
-          //       timeout: 2000,
-          //     });
-          //   }
-          // }
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Stream name required")
         }

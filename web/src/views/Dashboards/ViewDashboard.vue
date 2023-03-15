@@ -25,17 +25,6 @@
           :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)"
           @click="isDraggableClick"
         />
-        <!-- <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="white"
-          text-color="black"
-          no-caps
-          :label="t(`Edit Panel`)"
-          @click="addNewPanelOnClick"
-        /> -->
-
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
@@ -65,16 +54,6 @@
           @click="goBackToDashboardList"
         />
         <date-time ref="refDateTime" @date-change="dateChange" />
-        <!-- <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          padding="sm lg"
-          color="white"
-          no-caps
-          :label="t(`show New Panel`)"
-          outline
-          text-color="black"
-          @click="showNewPanel= !showNewPanel"
-        /> -->
       </div>
     </div>
     <q-separator></q-separator>
@@ -240,26 +219,12 @@ export default defineComponent({
         route.query.dashboard,
         currentDashboardData.data
       );
-      // const currentDashboard = currentDashboardData.data
-      // await dashboardService
-      //   .save(
-      //     store.state.selectedOrganization.identifier,
-      //     currentDashboard.dashboardId,
-      //     JSON.stringify(JSON.stringify(currentDashboard))
-      //   )
-      //   .then((res) => {
-      //     $q.notify({
-      //       type: "positive",
-      //       message: "Dashboard saved successfully.",
-      //       timeout: 5000,
-      //     });
-      //   });
+     
       currentDashboardData.data = await getDashboard(
         this.store,
         this.$route.query.dashboard
       );
 
-      //goBack()
     };
 
     const saveDashboardOnClick = async () => {
@@ -346,18 +311,13 @@ export default defineComponent({
       this.draggable = !this.draggable;
     },
     async onUpdatePanel(panelDataElementValue: any) {
-      // let dashboardList = toRaw(this.store.state.allDashboardList);
-      // this.deleteExistingPanel(
-      //   panelDataElementValue,
+      
+      // console.log(
+      //   "deleting",
       //   this.$route.query.dashboard,
-      //   dashboardList
+      //   panelDataElementValue,
+      //   panelDataElementValue.id
       // );
-      console.log(
-        "deleting",
-        this.$route.query.dashboard,
-        panelDataElementValue,
-        panelDataElementValue.id
-      );
 
       await deletePanel(
         this.store,
@@ -475,14 +435,6 @@ export default defineComponent({
     },
   },
   async activated() {
-    // //get dashboard list from the store
-    // let dashboardList = toRaw(this.store.state.allDashboardList);
-    // //find the dashboard details from the dashboard list using dashboardId
-    //   for (const dashboard of dashboardList) {
-    //     if (this.$route.query.dashboard === dashboard.name) {
-    //       this.currentDashboardData.data = JSON.parse(dashboard.details)
-    //     }
-    //   }
     this.currentDashboardData.data = await getDashboard(
       this.store,
       this.$route.query.dashboard

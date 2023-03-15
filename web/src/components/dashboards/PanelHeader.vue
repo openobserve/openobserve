@@ -16,13 +16,10 @@
 <template>
   <div>
     <q-bar class="bg-white">
-      <!-- <q-separator dark vertical inset /> -->
       <div class="">
         {{ renderTitle }}
       </div>
       <q-space />
-      <!-- <q-toolbar-title>{{ panelDataElementObject.title }}</q-toolbar-title>
-      <q-separator dark vertical inset /> -->
       <q-btn-dropdown dense flat label="" no-caps >
         <q-list dense>
           <q-item clickable v-close-popup @click="onPanelModifyClick('EditPanel')">
@@ -35,16 +32,6 @@
               <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
             </q-item-section>
           </q-item>
-          <!-- <q-item clickable v-close-popup @click="onPanelModifyClick('PrintPanel')">
-            <q-item-section>
-              <q-item-label class="q-pa-sm">Print Panel</q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-item clickable v-close-popup @click="onPanelModifyClick('SharePanel')">
-            <q-item-section>
-              <q-item-label class="q-pa-sm">Share Panel</q-item-label>
-            </q-item-section>
-          </q-item> -->
         </q-list>
       </q-btn-dropdown>
     </q-bar>
@@ -52,12 +39,9 @@
 </template>
 
 <script lang="ts">
-import { log } from "console";
 import { computed, defineComponent } from "vue";
 import { toRaw } from 'vue';
 import { useRouter } from "vue-router";
-
-
 
 export default defineComponent({
   name: "PanelHeader",
@@ -72,22 +56,16 @@ export default defineComponent({
     const renderTitle = computed(() => {
       return props.panelDataElement.config?.title
     })
+    //for edit panel
     const addNewPanel = () => {
-      // return router.push({
-      //   path: "/addPanel",
-      //   query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
-      // });
       return router.push({
         path: "/addPanel",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }
 
+    // for delete panel
     const deletePanel = () => {
-      // return router.push({
-      //   path: "/viewDashboard",
-      //   query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
-      // });
         return router.push({
         path: "/viewDashboard",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
@@ -105,7 +83,7 @@ export default defineComponent({
 
     onPanelModifyClick(evt: any) {
       if(evt == 'EditPanel'){this.addNewPanel()}
-      else if(evt == 'DeletePanel') {//this.deletePanel()
+      else if(evt == 'DeletePanel') {
         this.$emit('clicked', this.panelDataElementObject)
       }
       else {console.log(evt)}
