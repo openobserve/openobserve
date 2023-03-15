@@ -50,8 +50,8 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref STREAM_FUNCTIONS: DashMap<String, FunctionList> = DashMap::new();
     pub static ref STREAM_SCHEMAS: DashMap<String, Vec<Schema>> = DashMap::new();
+    pub static ref STREAM_FUNCTIONS: DashMap<String, FunctionList> = DashMap::new();
     pub static ref QUERY_FUNCTIONS: DashMap<String, Transform> = DashMap::new();
     pub static ref USERS: DashMap<String, User> = DashMap::new();
     pub static ref ROOT_USER: DashMap<String, User> = DashMap::new();

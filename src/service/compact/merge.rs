@@ -17,10 +17,12 @@ use ahash::AHashMap as HashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::io::Write;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::time;
 
 use crate::common::json;
 use crate::infra::db::etcd::MAX_OPS_PER_TXN;
+use crate::infra::metrics;
 use crate::infra::storage::generate_partioned_file_key;
 use crate::infra::{cache, ider, storage};
 use crate::infra::{config::CONFIG, db::etcd};
@@ -45,6 +47,7 @@ pub async fn merge_by_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
+    let start = Instant::now();
     let mut locker = None;
     if !CONFIG.common.local_mode {
         // get a cluster lock for compactor stream
@@ -281,6 +284,15 @@ pub async fn merge_by_stream(
         lock.unlock().await?;
     }
 
+    // metrics
+    let time = start.elapsed().as_secs_f64();
+    metrics::COMPACT_USED_TIME
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .inc_by(time);
+    metrics::COMPACT_DELAY_HOURS
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .set((time_now_hour - offset_time_hour) / Duration::hours(1).num_microseconds().unwrap());
+
     Ok(())
 }
 
@@ -305,6 +317,13 @@ async fn merge_files(
         new_file_size += size;
         new_file_list.push(file.to_owned());
         log::info!("[COMPACT] merge small file: {}", file);
+        // metrics
+        metrics::COMPACT_MERGED_FILES
+            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .inc();
+        metrics::COMPACT_MERGED_BYTES
+            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .inc_by(*size);
     }
     // no files need to merge
     if new_file_list.len() <= 1 {
