@@ -38,7 +38,7 @@ pub fn set_file_to_cache(
 ) -> Result<(), anyhow::Error> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.split('/').collect::<Vec<&str>>();
-    if columns.len() < 8 {
+    if columns.len() < 9 {
         return Err(anyhow::anyhow!(
             "[TRACE] [set_file_to_cache] Invalid file path: {}",
             key
