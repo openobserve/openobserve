@@ -48,7 +48,6 @@ pub async fn ingest(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
-
     // let loc_span = info_span!("service:logs:multi:ingest");
     // let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

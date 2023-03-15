@@ -99,7 +99,7 @@ pub async fn update_user(
                         is_updated = true;
                     } else {
                         message =
-                        "Existing/old password mismatch , please provide valid existing password"
+                            "Existing/old password mismatch, please provide valid existing password"
                     }
                 } else if self_update && user.old_password.is_none() {
                     message = "Please provide existing password"
@@ -276,7 +276,7 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
-        if user.key().starts_with(org_id) {
+        if user.key().starts_with(format!("{}/", org_id).as_str()) {
             user_list.push(UserResponse {
                 email: user.value().email.clone(),
                 role: user.value().role.clone(),

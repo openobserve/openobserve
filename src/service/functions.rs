@@ -68,7 +68,7 @@ pub async fn register_function(
                 trans.stream_name = stream_name.to_string();
                 trans.name = name.to_string();
                 extract_num_args(&mut trans);
-                db::udf::set(
+                db::functions::set(
                     org_id.as_str(),
                     Some(stream_name.to_string()),
                     name.as_str(),
@@ -91,7 +91,7 @@ pub async fn register_function(
             }
             if !is_err {
                 extract_num_args(&mut trans);
-                db::udf::set(org_id.as_str(), None, name.as_str(), trans)
+                db::functions::set(org_id.as_str(), None, name.as_str(), trans)
                     .await
                     .unwrap();
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -116,7 +116,9 @@ pub async fn list_functions(
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:functions:list");
     let _guard = loc_span.enter();
-    let udf_list = db::udf::list(org_id.as_str(), stream_name).await.unwrap();
+    let udf_list = db::functions::list(org_id.as_str(), stream_name)
+        .await
+        .unwrap();
     Ok(HttpResponse::Ok().json(FunctionList { list: udf_list }))
 }
 
@@ -127,7 +129,7 @@ pub async fn delete_function(
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:functions:delete");
     let _guard = loc_span.enter();
-    let result = db::udf::delete(org_id.as_str(), stream_name, name.as_str()).await;
+    let result = db::functions::delete(org_id.as_str(), stream_name, name.as_str()).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),

@@ -39,6 +39,12 @@ pub fn default() -> Box<dyn Db> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Stats {
+    pub bytes_len: u64,
+    pub keys_count: usize,
+}
+
 #[derive(Debug)]
 pub enum Event {
     Put(EventData),
@@ -53,6 +59,7 @@ pub struct EventData {
 
 #[async_trait]
 pub trait Db: Sync + 'static {
+    async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
     async fn put(&self, key: &str, value: Bytes) -> Result<()>;
     async fn delete(&self, key: &str, with_prefix: bool) -> Result<()>;
@@ -60,6 +67,7 @@ pub trait Db: Sync + 'static {
     async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
+    async fn count(&self, prefix: &str) -> Result<usize>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
     async fn transaction(
         &self,

@@ -82,6 +82,18 @@ impl FromStr for Role {
         }
     }
 }
+impl std::fmt::Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Role::All => write!(f, "all"),
+            Role::Ingester => write!(f, "ingester"),
+            Role::Querier => write!(f, "querier"),
+            Role::Compactor => write!(f, "compactor"),
+            Role::Router => write!(f, "router"),
+            Role::AlertManager => write!(f, "alertmanager"),
+        }
+    }
+}
 
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
