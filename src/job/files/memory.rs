@@ -129,6 +129,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 log::error!("[JOB] Failed to remove memory file: {}", path)
                             } else {
                                 // println!("removed file: {}", key);
+                                // metrics
                                 let columns = key.split('/').collect::<Vec<&str>>();
                                 let _ = columns[0].to_string();
                                 let org_id = columns[1].to_string();
@@ -166,6 +167,7 @@ async fn upload_file(
     let file_size = buf.len() as u64;
     log::info!("[JOB] File upload begin: memory: {}", path_str);
 
+    // metrics
     metrics::INGEST_WAL_READ_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);

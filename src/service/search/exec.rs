@@ -26,7 +26,6 @@ pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-
     let sql = super::sql::Sql::new(req).await;
     if sql.is_err() {
         return Err(sql.err().unwrap());

@@ -50,6 +50,7 @@ impl Event for Eventer {
             )
             .await
             {
+                // metrics
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
                     .with_label_values(&["/event/send_file_list", "500", "", "", ""])
@@ -61,6 +62,7 @@ impl Event for Eventer {
             }
         }
 
+        // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
             .with_label_values(&["/event/send_file_list", "200", "", "", ""])

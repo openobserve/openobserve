@@ -18,6 +18,7 @@ use std::cmp::max;
 use std::sync::RwLock;
 
 use crate::infra::config::CONFIG;
+use crate::infra::metrics;
 use crate::infra::storage;
 
 lazy_static! {
@@ -78,8 +79,20 @@ impl FileData {
                 if item.is_none() {
                     break;
                 }
-                let (_, v) = item.unwrap();
-                release_size += v.len();
+                let (key, val) = item.unwrap();
+                // metrics
+                let columns = key.split('/').collect::<Vec<&str>>();
+                let _ = columns[0].to_string();
+                let org_id = columns[1].to_string();
+                let stream_type = columns[2].to_string();
+                let stream_name = columns[3].to_string();
+                metrics::QUERY_CACHE_FILES
+                    .with_label_values(&[&org_id, &stream_name, &stream_type])
+                    .dec();
+                metrics::QUERY_CACHE_USED_BYTES
+                    .with_label_values(&[&org_id, &stream_name, &stream_type])
+                    .sub(val.len() as i64);
+                release_size += val.len();
                 if release_size >= need_release_size {
                     break;
                 }
@@ -89,6 +102,18 @@ impl FileData {
 
         self.cur_size += data_size;
         self.data.put(file.to_string(), data);
+        // metrics
+        let columns = file.split('/').collect::<Vec<&str>>();
+        let _ = columns[0].to_string();
+        let org_id = columns[1].to_string();
+        let stream_type = columns[2].to_string();
+        let stream_name = columns[3].to_string();
+        metrics::QUERY_CACHE_FILES
+            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .inc();
+        metrics::QUERY_CACHE_USED_BYTES
+            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .add(data_size as i64);
         Ok(())
     }
 

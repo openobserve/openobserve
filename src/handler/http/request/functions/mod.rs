@@ -44,6 +44,7 @@ pub async fn save_function(
     let transform = js_func.into_inner();
     crate::service::functions::register_function(org_id, None, name, transform).await
 }
+
 /** List all functions for an organization */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
@@ -168,6 +169,7 @@ async fn delete_stream_function(
     let (org_id, stream_name, name) = path.into_inner();
     crate::service::functions::delete_function(org_id, Some(stream_name), name).await
 }
+
 /** Create new query function for an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
@@ -286,6 +288,7 @@ pub async fn save_stream_function(
         )),
     )
 }
+
 /** List all ingest time functions for a stream of an organization */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(

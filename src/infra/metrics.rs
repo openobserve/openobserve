@@ -74,7 +74,7 @@ lazy_static! {
         Opts::new("query_cache_limit_bytes", "Querier cache limit bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &[],
     ).expect("Metric created");
     pub static ref QUERY_CACHE_USED_BYTES: IntGaugeVec = IntGaugeVec::new(
         Opts::new("query_cache_used_bytes", "Querier cache used bytes")

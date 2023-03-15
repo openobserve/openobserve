@@ -60,6 +60,23 @@ impl Default for Etcd {
 
 #[async_trait]
 impl super::Db for Etcd {
+    async fn stats(&self) -> Result<super::Stats> {
+        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let stats = client.status().await?;
+        let bytes_len = stats.db_size() as u64;
+        let resp = client
+            .get(
+                "",
+                Some(GetOptions::new().with_all_keys().with_count_only()),
+            )
+            .await?;
+        let keys_count = resp.count() as usize;
+        Ok(super::Stats {
+            bytes_len,
+            keys_count,
+        })
+    }
+
     async fn get(&self, key: &str) -> Result<Bytes> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
@@ -279,6 +296,14 @@ impl super::Db for Etcd {
             resp = client.get(last_key.clone(), Some(opt.clone())).await?;
         }
         Ok(result)
+    }
+
+    async fn count(&self, prefix: &str) -> Result<usize> {
+        let key = format!("{}{}", self.prefix, prefix);
+        let mut client = ETCD_CLIENT.get().await.clone().unwrap();
+        let opt = GetOptions::new().with_prefix().with_count_only();
+        let resp = client.get(key.clone(), Some(opt)).await?;
+        Ok(resp.count() as usize)
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
@@ -571,11 +596,31 @@ impl Locker {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Db;
     use super::*;
 
     #[tokio::test]
-    async fn test_etcd() {
+    async fn test_etcd_prefix() {
         let client = Etcd::default();
         assert_eq!(client.prefix, "/zinc/observe".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_etcd_count() {
+        let client = Etcd::default();
+        client
+            .put("/test/count/1", bytes::Bytes::from("1"))
+            .await
+            .unwrap();
+        client
+            .put("/test/count/2", bytes::Bytes::from("2"))
+            .await
+            .unwrap();
+        client
+            .put("/test/count/3", bytes::Bytes::from("3"))
+            .await
+            .unwrap();
+        let count = client.count("/test/count").await.unwrap();
+        assert_eq!(count, 3);
     }
 }

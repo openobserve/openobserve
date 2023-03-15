@@ -262,6 +262,7 @@ impl RwFile {
 
     #[inline]
     pub fn write(&self, data: &[u8]) {
+        // metrics
         metrics::INGEST_WAL_USED_BYTES
             .with_label_values(&[
                 &self.org_id,
