@@ -18,6 +18,7 @@ use std::{fs, io::Read, path::Path};
 use super::FileStorage;
 use crate::common::file::put_file_contents;
 use crate::infra::config::CONFIG;
+use crate::infra::metrics;
 
 pub struct Local {}
 
@@ -43,10 +44,21 @@ impl FileStorage for Local {
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+        let columns = file.split('/').collect::<Vec<&str>>();
         let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
         let mut file = fs::File::open(file)?;
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
+
+        // metrics
+        let _ = columns[0].to_string();
+        let org_id = columns[1].to_string();
+        let stream_type = columns[2].to_string();
+        let stream_name = columns[3].to_string();
+        metrics::STORAGE_READ_BYTES
+            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .inc_by(data.len() as u64);
+
         Ok(bytes::Bytes::from(data))
     }
 
@@ -54,8 +66,20 @@ impl FileStorage for Local {
         let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
         let file_path = Path::new(&file);
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
+        let data_size = data.len();
         match put_file_contents(&file, &data) {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                // metrics
+                let columns = file.split('/').collect::<Vec<&str>>();
+                let _ = columns[0].to_string();
+                let org_id = columns[1].to_string();
+                let stream_type = columns[2].to_string();
+                let stream_name = columns[3].to_string();
+                metrics::STORAGE_WRITE_BYTES
+                    .with_label_values(&[&org_id, &stream_name, &stream_type])
+                    .inc_by(data_size as u64);
+                Ok(())
+            }
             Err(e) => Err(anyhow::anyhow!(e)),
         }
     }

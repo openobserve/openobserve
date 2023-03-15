@@ -24,6 +24,7 @@ use std::time::Duration;
 use super::FileStorage;
 use crate::common::utils::is_local_disk_storage;
 use crate::infra::config::CONFIG;
+use crate::infra::metrics;
 
 lazy_static! {
     static ref S3CLIENT: AsyncOnce<Option<Client>> =
@@ -78,11 +79,24 @@ impl FileStorage for S3 {
                 return Err(anyhow::anyhow!("s3 get object {} error: {:?}", file, e));
             }
         };
-        Ok(object.body.collect().await.unwrap().into_bytes())
+        let object = object.body.collect().await.unwrap().into_bytes();
+
+        // metrics
+        let columns = file.split('/').collect::<Vec<&str>>();
+        let _ = columns[0].to_string();
+        let org_id = columns[1].to_string();
+        let stream_type = columns[2].to_string();
+        let stream_name = columns[3].to_string();
+        metrics::STORAGE_READ_BYTES
+            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .inc_by(object.len() as u64);
+
+        Ok(object)
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
         let client = S3CLIENT.get().await.clone().unwrap();
+        let data_size = data.len();
         let result = client
             .put_object()
             .bucket(&CONFIG.s3.bucket_name)
@@ -92,6 +106,15 @@ impl FileStorage for S3 {
             .await;
         match result {
             Ok(_output) => {
+                // metrics
+                let columns = file.split('/').collect::<Vec<&str>>();
+                let _ = columns[0].to_string();
+                let org_id = columns[1].to_string();
+                let stream_type = columns[2].to_string();
+                let stream_name = columns[3].to_string();
+                metrics::STORAGE_WRITE_BYTES
+                    .with_label_values(&[&org_id, &stream_name, &stream_type])
+                    .inc_by(data_size as u64);
                 log::info!("s3 File upload success: {}", file);
                 Ok(())
             }

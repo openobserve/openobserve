@@ -63,7 +63,6 @@ pub async fn sql(
     }
 
     let start = Instant::now();
-
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
         .with_information_schema(schema.is_none())
@@ -263,7 +262,6 @@ pub async fn merge(
     }
 
     let start = Instant::now();
-
     // write temp file
     let work_dir = merge_write_recordbatch(batches)?;
     log::info!(
@@ -563,7 +561,6 @@ pub async fn convert_parquet_file(
     file: &str,
 ) -> Result<()> {
     let start = Instant::now();
-
     // query data
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
@@ -666,7 +663,6 @@ pub async fn merge_parquet_files(
     files: &[String],
 ) -> Result<FileMeta> {
     let start = Instant::now();
-
     // query data
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()

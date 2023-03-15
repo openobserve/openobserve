@@ -49,6 +49,16 @@ impl Default for Sled {
 
 #[async_trait]
 impl super::Db for Sled {
+    async fn stats(&self) -> Result<super::Stats> {
+        let client = SLED_CLIENT.clone().unwrap();
+        let bytes_len = client.size_on_disk()?;
+        let keys_count = client.len();
+        Ok(super::Stats {
+            bytes_len,
+            keys_count,
+        })
+    }
+
     async fn get(&self, key: &str) -> Result<Bytes> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
@@ -179,6 +189,13 @@ impl super::Db for Sled {
             result.push(Bytes::from(v.as_ref().to_vec()));
         }
         Ok(result)
+    }
+
+    async fn count(&self, prefix: &str) -> Result<usize> {
+        let key = format!("{}{}", self.prefix, prefix);
+        let client = SLED_CLIENT.clone().unwrap();
+        let resp = client.scan_prefix(key);
+        Ok(resp.into_iter().count())
     }
 
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {

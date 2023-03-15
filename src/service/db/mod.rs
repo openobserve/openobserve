@@ -28,7 +28,6 @@ pub mod file_list;
 pub mod functions;
 pub mod schema;
 pub mod triggers;
-pub mod udf;
 pub mod user;
 
 pub async fn set_prom_cluster_info(
