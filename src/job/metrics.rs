@@ -183,10 +183,10 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
         metrics::STORAGE_COMPRESSED_BYTES
             .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.compressed_size as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
+        metrics::STORAGE_FILES
             .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.file_num as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
+        metrics::STORAGE_RECORDS
             .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.doc_num as i64);
     }
