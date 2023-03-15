@@ -147,13 +147,13 @@ lazy_static! {
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
     ).expect("Metric created");
-    pub static ref STORAGE_WRITE_BYTES: IntGaugeVec = IntGaugeVec::new(
+    pub static ref STORAGE_WRITE_BYTES: IntCounterVec = IntCounterVec::new(
         Opts::new("storage_write_bytes", "Storage write bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
     ).expect("Metric created");
-    pub static ref STORAGE_READ_BYTES: IntGaugeVec = IntGaugeVec::new(
+    pub static ref STORAGE_READ_BYTES: IntCounterVec = IntCounterVec::new(
         Opts::new("storage_read_bytes", "Storage read bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
