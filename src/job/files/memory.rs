@@ -131,13 +131,11 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 // println!("removed file: {}", key);
                                 // metrics
                                 let columns = key.split('/').collect::<Vec<&str>>();
-                                let _ = columns[0].to_string();
-                                let org_id = columns[1].to_string();
-                                let stream_type = columns[2].to_string();
-                                let stream_name = columns[3].to_string();
-                                metrics::INGEST_WAL_USED_BYTES
-                                    .with_label_values(&[&org_id, &stream_name, &stream_type])
-                                    .sub(meta.original_size as i64);
+                                if columns[0].eq("files") {
+                                    metrics::INGEST_WAL_USED_BYTES
+                                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                                        .sub(meta.original_size as i64);
+                                }
                             }
                         }
                         Err(e) => log::error!(
