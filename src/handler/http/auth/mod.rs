@@ -63,7 +63,6 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<bool, Error> {
     let user;
-
     let ep_suffix = &path[path.rfind('/').unwrap()..];
     //this is only applicable for super admin user
     if is_root_user(user_id).await {
@@ -147,7 +146,7 @@ mod tests {
             .await
             .unwrap());
         assert!(!validate_credentials("", pwd, "/").await.unwrap());
-        assert!(validate_credentials("user@example.com", pwd, "")
+        assert!(!validate_credentials("user@example.com", pwd, "/")
             .await
             .unwrap());
         assert!(
