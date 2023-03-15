@@ -19,10 +19,13 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
-use crate::common::auth::{get_hash, is_root_user};
 use crate::infra::config::CONFIG;
 use crate::meta::user::UserRole;
 use crate::service::users;
+use crate::{
+    common::auth::{get_hash, is_root_user},
+    meta::ingestion::INGESTION_EP,
+};
 
 pub async fn validator(
     req: ServiceRequest,
@@ -60,6 +63,8 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<bool, Error> {
     let user;
+
+    let ep_suffix = &path[path.rfind('/').unwrap()..];
     //this is only applicable for super admin user
     if is_root_user(user_id).await {
         user = users::get_user(None, user_id).await;
@@ -81,7 +86,7 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
-    if user.token.eq(&user_password) {
+    if INGESTION_EP.contains(&ep_suffix) && user.token.eq(&user_password) {
         return Ok(true);
     }
 
