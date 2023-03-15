@@ -200,7 +200,7 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      return router.push("/dashboardList");
+      return router.push("/dashboards");
     };
 
     const goBackToDashboardList = () => {

@@ -109,7 +109,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
-  name: "DashboardList",
+  name: "Dashboards",
   components: {
     AddDashboard,
     QTablePagination,
@@ -346,7 +346,7 @@ export default defineComponent({
       this.orgData.identifier = newVal;
       if (
         (newVal != oldVal || this.dashboards.value == undefined) &&
-        this.router.currentRoute.value.name == "dashboardList"
+        this.router.currentRoute.value.name == "dashboards"
       ) {
         console.log("inside if");
 
