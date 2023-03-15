@@ -268,7 +268,10 @@
         "field": "Fields",
         "discard": "Discard",
         "edit": "Edit",
-        "apply": "Apply"
+        "apply": "Apply",
+        "fields": "Fields",
+        "layout": "Layout",
+        "sql": "SQL"
     },
     "alerts": {
         "header": "Alerts",

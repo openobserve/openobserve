@@ -1,7 +1,7 @@
 <template>
     <div class="col" style="height: 100%">
         <div class="q-pa-sm">
-            <span class="text-weight-bold">Fields</span>
+            <span class="text-weight-bold">{{ t('panel.fields') }}</span>
         </div>
         <div
             class="scroll"
@@ -32,11 +32,13 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
             const store = useStore();
             const router = useRouter();
             const { dashboardPanelData } = useDashboardPanelData()
+            const { t } = useI18n();
 
             return {
                 store,
                 router,
-                dashboardPanelData              
+                dashboardPanelData,
+                t              
             }
         }
           

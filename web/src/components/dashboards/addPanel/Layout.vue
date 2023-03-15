@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="q-pa-sm">
-      <span class="text-weight-bold">Layout</span>
+      <span class="text-weight-bold">{{t("panel.layout")}}</span>
     </div>
     <q-separator />
     <div>

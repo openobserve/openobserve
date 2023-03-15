@@ -1,7 +1,7 @@
 <template>
     <div>
       <q-bar class="q-pa-sm bg-white">
-        <span class="text-subtitle2 text-weight-bold">SQL</span>
+        <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
 
         <q-toggle
