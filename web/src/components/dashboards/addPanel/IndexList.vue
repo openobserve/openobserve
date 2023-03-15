@@ -145,7 +145,7 @@ export default defineComponent({
       useDashboardPanelData();
     
     onActivated(() => {
-      console.log("inside mounted");
+      // console.log("inside mounted");
       getStreamList();
     });
 
@@ -168,7 +168,7 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
       ],
       () => {
-        console.log("updated custom query fields or selected stream fields");
+        // console.log("updated custom query fields or selected stream fields");
 
         data.currentFieldsList = [];
         data.currentFieldsList = [
@@ -215,7 +215,7 @@ export default defineComponent({
     };
 
     const addFilteredItem = (name: string) => {
-      console.log("name=", name);
+      // console.log("name=", name);
       if (!dashboardPanelData.data.fields.filter) {
         dashboardPanelData.data.fields.filter = [];
       }
@@ -225,7 +225,7 @@ export default defineComponent({
           (it: any) => it.column == name
         )
       ) {
-        console.log("data");
+        // console.log("data");
 
         dashboardPanelData.data.fields.filter.push({
           type: "list",
@@ -253,7 +253,7 @@ export default defineComponent({
         //now add the selected stream
         queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`;
 
-        console.log("queryData= ", queryData);
+        // console.log("queryData= ", queryData);
         // add group by statement
         queryData += ` GROUP BY value`;
 

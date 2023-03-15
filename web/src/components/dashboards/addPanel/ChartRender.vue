@@ -194,7 +194,7 @@ export default defineComponent({
     watch(
       () => [searchQueryData.data, props.data.type],
       () => {
-        console.log("Query: new data received");
+        // console.log("Query: new data received");
         if (props.data.type != "table") {
           renderChart();
         }
@@ -203,13 +203,13 @@ export default defineComponent({
     );
 
     const renderChart = async () => {
-      console.log("Query: rendering chart");
-      console.log("Query: chart type", props.data.type);
+      // console.log("Query: rendering chart");
+      // console.log("Query: chart type", props.data.type);
       // Step 1: Get the Y-Axis Count
       const xAxisKey = getXAxisKey();
       const yAxisKeys = getYAxisKeys();
 
-      console.log("xaxis=", textwrapper(getAxisDataFromKey(xAxisKey)));
+      // console.log("xaxis=", textwrapper(getAxisDataFromKey(xAxisKey)));
 
       let traces;
 

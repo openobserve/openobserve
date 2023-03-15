@@ -45,7 +45,7 @@ let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 const useDashboardPanelData = () => {
   const resetDashboardPanelData = () => {
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
-    console.log("updated...",dashboardPanelData);
+    // console.log("updated...",dashboardPanelData);
   };
 
   const addXAxisItem = (name: string) => {

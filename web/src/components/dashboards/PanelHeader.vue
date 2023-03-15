@@ -86,7 +86,9 @@ export default defineComponent({
       else if(evt == 'DeletePanel') {
         this.$emit('clicked', this.panelDataElementObject)
       }
-      else {console.log(evt)}
+      else {
+        // console.log(evt)
+      }
       
     },
   },

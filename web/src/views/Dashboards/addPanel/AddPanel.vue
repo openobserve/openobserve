@@ -127,7 +127,7 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId
         );
-        console.log("panel data", panelData);
+        // console.log("panel data", panelData);
         Object.assign(dashboardPanelData.data, panelData);
         runQuery();
       } else {
@@ -148,7 +148,7 @@ export default defineComponent({
     };
 
     const runQuery = () => {
-      console.log("query change detected to run");
+      // console.log("query change detected to run");
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));

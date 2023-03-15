@@ -63,7 +63,7 @@ export const deletePanelFromDashboard = async (
         counter++;
       }
       if (found === 0) {
-        console.log("Not Deleted Because not found");
+        // console.log("Not Deleted Because not found");
         //modDashboardObject.panels.push(toRaw(panelObject))
       }
       //dashboardList[counter].details = JSON.stringify(modDashboardObject)
@@ -139,9 +139,9 @@ export const setCurrentPanelToDashboardList = (
   let found = 0;
   for (const dashboard of dashboardList) {
     if (dashboardId === dashboard.name) {
-      console.log("Inside " + counter);
+      // console.log("Inside " + counter);
       let modDashboardObject = JSON.parse(toRaw(dashboard.details));
-      console.log("modDashboardObject---",modDashboardObject);
+      // console.log("modDashboardObject---",modDashboardObject);
       
       if (modDashboardObject.layouts && modDashboardObject.layouts.length > 0) {
         modDashboardObject.layouts.push(newLayoutObj);
@@ -150,8 +150,8 @@ export const setCurrentPanelToDashboardList = (
       }
       for (const panel of modDashboardObject.panels) {
         if (panelId === panel.id) {
-          console.log("Inside Panel match  -- " + panelId);
-          console.log("Panel Replace  --- " + JSON.stringify(panel));
+          // console.log("Inside Panel match  -- " + panelId);
+          // console.log("Panel Replace  --- " + JSON.stringify(panel));
           modDashboardObject.panels[counter] = panelObject;
           found++;
         }
@@ -168,7 +168,7 @@ export const setCurrentPanelToDashboardList = (
     }
     dashboardPos++;
   }
-  console.log("query dashboardList ====",dashboardList);
+  // console.log("query dashboardList ====",dashboardList);
   store.dispatch("setAllCurrentDashboards", dashboardList);
 };
 
@@ -181,10 +181,10 @@ export const getDateConsumableDateTime = function (dateVal: {
   endDate: string;
   endTime: string;
 }) {
-  console.log("==dateVal===",dateVal);
+  // console.log("==dateVal===",dateVal);
   
   if (dateVal.tab == "relative") {
-    console.log('r');
+    // console.log('r');
     
     let period = "";
     let periodValue = 0;
@@ -209,7 +209,7 @@ export const getDateConsumableDateTime = function (dateVal: {
       end_time: endTimeStamp,
     };
   } else {
-    console.log('a');
+    // console.log('a');
     let start, end;
 
     if (dateVal.startDate == "" && dateVal.startTime == "") {
@@ -228,7 +228,7 @@ export const getDateConsumableDateTime = function (dateVal: {
       start_time: start,
       end_time: end,
     };
-    console.log(rVal);
+    // console.log(rVal);
 
     return rVal;
   }
@@ -331,13 +331,13 @@ export const getAllDashboards = async (store: any) => {
   return await dashboardService
   .list(0, 1000, "name", false, "",store.state.selectedOrganization.identifier)
   .then((res) => {
-    console.log('dashboard list retriveid');
-    console.log(res);
+    // console.log('dashboard list retriveid');
+    // console.log(res);
     // save to store
     store.dispatch("setAllDashboardList", res.data.list);
   })
   .catch((error) => {
-    console.log(error);
+    // console.log(error);
   });
 }
 
@@ -381,7 +381,7 @@ export const addPanel = async (store: any, dashboardId: any, panelData: any) => 
   }
   currentDashboard.layouts.push(newLayoutObj)
 
-  console.log(currentDashboard);
+  // console.log(currentDashboard);
   
 
   return await updateDashboard(store, store.state.selectedOrganization.identifier, dashboardId, currentDashboard )

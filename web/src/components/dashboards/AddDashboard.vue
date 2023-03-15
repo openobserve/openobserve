@@ -206,7 +206,7 @@ export default defineComponent({
 
             this.$emit("update:modelValue", data);
             this.$emit("updated");
-            console.log("Done saving");
+            // console.log("Done saving");
             this.addDashboardForm.resetValidation();
             dismiss();
           })
@@ -217,7 +217,7 @@ export default defineComponent({
                 err.response.data["error"] || "Dashboard creation failed."
               ),
             });
-            console.log(err);
+            // console.log(err);
             dismiss();
           });
       });

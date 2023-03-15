@@ -82,7 +82,7 @@ export default defineComponent({
 
       // only continue if current mode is auto query generation
       if(!dashboardPanelData.layout.showCustomQuery){
-        console.log("Updating query");
+        // console.log("Updating query");
         
         // STEP 1: first check if there is at least 1 field selected
         if(dashboardPanelData.data.fields.x.length == 0 && dashboardPanelData.data.fields.y.length == 0) {
@@ -140,21 +140,21 @@ export default defineComponent({
             }
             return selectFilter
         })
-        console.log("query: filterData",filterData);
+        // console.log("query: filterData",filterData);
         
         query += filterData.filter((it: any)=> it).join(" AND ")
 
         // add group by statement
         query += ` GROUP BY ${dashboardPanelData.data.fields.x[0]?.label}`
 
-        console.log('generated query: ', query)
+        // console.log('generated query: ', query)
 
         dashboardPanelData.data.query = query
       }
     }, {deep: true})
 
     watch(() => dashboardPanelData.data.query, ()=>{
-      console.log("query changes in search bar",dashboardPanelData.layout.showCustomQuery);
+      // console.log("query changes in search bar",dashboardPanelData.layout.showCustomQuery);
 
       // only continue if current mode is show custom query
       if(dashboardPanelData.layout.showCustomQuery){
@@ -169,7 +169,7 @@ export default defineComponent({
       // dashboardPanelData.data.query = value;
 
       if (dashboardPanelData.layout.showCustomQuery) {
-        console.log("query: value", dashboardPanelData.data.query);
+        // console.log("query: value", dashboardPanelData.data.query);
 
         // empty the errors
         dashboardPanelData.meta.errors.queryErrors = []
@@ -177,10 +177,10 @@ export default defineComponent({
         // Get the parsed query
         try {
           dashboardPanelData.meta.parsedQuery = parser.astify(dashboardPanelData.data.query);
-          console.log(dashboardPanelData.meta.parsedQuery)
+          // console.log(dashboardPanelData.meta.parsedQuery)
         } catch(e) {
-          console.log("error")
-          console.log(e)
+          // console.log("error")
+          // console.log(e)
           // exit as there is an invalid query
           dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax")
           return null;
