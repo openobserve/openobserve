@@ -16,7 +16,10 @@ use segment::{message::Track, Client, Message};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::infra::config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION};
+use crate::infra::{
+    cache::stats::STATS,
+    config::{CONFIG, INSTANCE_ID, STREAM_SCHEMAS, TELEMETRY_CLIENT, USERS, VERSION},
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -163,33 +166,6 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
         "streams_compressed_size".to_string(),
         sterams_compressed_size.into(),
     );
-
-    let iter = STREAM_FUNCTIONS.iter().clone();
-    let mut ingest_functions = 0;
-    for item in iter {
-        ingest_functions += item.value().list.len()
-    }
-    data.insert("num_ingest_functions".to_string(), ingest_functions.into());
-    data.insert(
-        "num_query_functions".to_string(),
-        QUERY_FUNCTIONS.len().into(),
-    );
-
-    let mut rt_alerts = 0;
-    let mut scheduled_alerts = 0;
-    let iter = STREAM_ALERTS.iter().clone();
-
-    for item in iter {
-        for alert in &item.value().list {
-            if alert.is_real_time {
-                rt_alerts += 1
-            } else {
-                scheduled_alerts += 1
-            }
-        }
-    }
-    data.insert("real_time_alerts".to_string(), rt_alerts.into());
-    data.insert("scheduled_alerts".to_string(), scheduled_alerts.into());
 }
 
 #[cfg(test)]
