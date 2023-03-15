@@ -181,20 +181,20 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
-        let org_id = columns[0].to_string();
-        let stream_type = columns[1].to_string();
-        let stream_name = columns[2].to_string();
+        let org_id = columns[0];
+        let stream_type = columns[1];
+        let stream_name = columns[2];
         metrics::STORAGE_ORIGINAL_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .with_label_values(&[org_id, stream_name, stream_type])
             .set(stat.storage_size as i64);
         metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .with_label_values(&[org_id, stream_name, stream_type])
             .set(stat.compressed_size as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+        metrics::STORAGE_FILES
+            .with_label_values(&[org_id, stream_name, stream_type])
             .set(stat.file_num as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+        metrics::STORAGE_RECORDS
+            .with_label_values(&[org_id, stream_name, stream_type])
             .set(stat.doc_num as i64);
     }
     Ok(())
