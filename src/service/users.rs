@@ -37,15 +37,28 @@ use crate::{
 use crate::{infra::config::USERS, meta::user::UpdateUser};
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
-    let salt = Uuid::new_v4().to_string();
-    let password = get_hash(&usr_req.password, &salt);
-    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-    let user = usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token);
-    db::user::set(user).await.unwrap();
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "User saved successfully".to_string(),
-    )))
+    let existing_user = if is_root_user(&usr_req.email).await {
+        db::user::get(None, &usr_req.email).await
+    } else {
+        db::user::get(Some(org_id), &usr_req.email).await
+    };
+    if existing_user.is_err() {
+        let salt = Uuid::new_v4().to_string();
+        let password = get_hash(&usr_req.password, &salt);
+        let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+        let user = usr_req.to_new_dbuser(password, salt, org_id.replace(' ', "_"), token);
+        db::user::set(user).await.unwrap();
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "User saved successfully".to_string(),
+        )))
+    } else {
+        let msg = format!("User with email {} already exists", &usr_req.email);
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            msg,
+        )))
+    }
 }
 
 pub async fn update_user(

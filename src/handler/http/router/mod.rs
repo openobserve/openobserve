@@ -53,7 +53,6 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
-            .service(organizations_by_username)
             .service(users::authentication),
     );
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
