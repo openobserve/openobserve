@@ -144,7 +144,7 @@ import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import dashboardService from "../../services/dashboards";
-import DateTime from "../../plugins/logs/DateTime.vue";
+import DateTime from "../../components/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
 import {

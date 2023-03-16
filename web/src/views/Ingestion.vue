@@ -44,7 +44,7 @@
     >
       <template v-slot:before>
         <q-tabs
-          v-model="ingestiontab"
+          v-model="ingestiontabs"
           indicator-color="transparent"
           class="text-secondary"
           inline-label
@@ -53,7 +53,12 @@
           <q-route-tab
             default
             name="curl"
-            :to="'/ingestion/curl'"
+            :to="{
+              name: 'curl',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
             icon="data_object"
             label="Curl"
             content-class="tab_content"
@@ -61,21 +66,36 @@
           <q-route-tab
             default
             name="fluentbit"
-            :to="'/ingestion/fluentbit'"
+            :to="{
+              name: 'fluentbit',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
             :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
             label="FluentBit"
             content-class="tab_content"
           />
           <q-route-tab
             name="fluentd"
-            :to="'/ingestion/fluentd'"
+            :to="{
+              name: 'fluentd',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
             :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
             label="Fluentd"
             content-class="tab_content"
           />
           <q-route-tab
             name="vector"
-            :to="'/ingestion/vector'"
+            :to="{
+              name: 'vector',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
             :icon="'img:' + getImageURL('images/ingestion/vector_icon.png')"
             label="Vector"
             content-class="tab_content"
@@ -85,7 +105,7 @@
 
       <template v-slot:after>
         <q-tab-panels
-          v-model="ingestiontab"
+          v-model="ingestiontabs"
           animated
           swipeable
           vertical
@@ -153,12 +173,16 @@ import { getImageURL } from "../utils/zincutils";
 export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
+  data() {
+    return {
+      ingestiontabs: "curl",
+    };
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const ingestiontab = ref("fluentbit");
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const currentOrgIdentifier: any = ref(
@@ -167,31 +191,13 @@ export default defineComponent({
 
     onMounted(() => {
       if (router.currentRoute.value.name == "ingestion") {
-        ingestiontab.value = "curl";
-        router.push({ path: "/ingestion/curl" });
-      } else {
-        ingestiontab.value = router.currentRoute.value.name;
-        router.push({ path: "/ingestion/" + router.currentRoute.value.name });
+        router.push({
+          name: "curl",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
-      getOrganizationPasscode();
-    });
-
-    onActivated(() => {
-      if (router.currentRoute.value.name == "ingestion") {
-        ingestiontab.value = "curl";
-        router.push({ path: "/ingestion/curl" });
-      } else {
-        ingestiontab.value = router.currentRoute.value.name;
-        router.push({ path: "/ingestion/" + router.currentRoute.value.name });
-      }
-
-      segment.track("Button Click", {
-        button: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
-
       getOrganizationPasscode();
     });
 
@@ -288,7 +294,6 @@ export default defineComponent({
       router,
       config,
       rowData,
-      ingestiontab,
       splitterModel: ref(170),
       getOrganizationPasscode,
       currentUserEmail: store.state.userInfo.email,
