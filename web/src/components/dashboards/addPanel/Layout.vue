@@ -133,7 +133,7 @@
                   <q-td colspan="100%">
                     <div>
                       <div class="flex items-center">
-                        <div class="q-mr-xs q-mb-sm" style="width: 160px">
+                        <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.y[props.pageIndex]
@@ -159,6 +159,7 @@
                         dense
                         filled
                         label="Label"
+                        v-if="!dashboardPanelData.layout.showCustomQuery"
                         v-model="
                           dashboardPanelData.data.fields.y[props.pageIndex]
                             .label
