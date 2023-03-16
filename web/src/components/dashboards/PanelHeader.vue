@@ -16,9 +16,10 @@
 <template>
   <div>
     <q-bar class="bg-white">
+    <q-icon v-if="draggable" name="drag_indicator" />
       <div class="">
         {{ renderTitle }}
-      </div>
+    </div>
       <q-space />
       <q-btn-dropdown dense flat label="" no-caps >
         <q-list dense>
@@ -45,7 +46,7 @@ import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "PanelHeader",
-  props: ["panelDataElement", "dashboardId"],
+  props: ["panelDataElement", "dashboardId", "draggable"],
   panelData: [],
 
   setup(props, { emit }) {

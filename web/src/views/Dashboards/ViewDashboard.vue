@@ -95,6 +95,7 @@
           <div>
             <PanelContainer
               @updated:chart="onUpdatePanel"
+              :draggable="draggable"
               :data="item"
               :selectedTimeDate="currentTimeObj"
             >
@@ -216,25 +217,31 @@ export default defineComponent({
       await updateDashboard(
         store,
         store.state.selectedOrganization.identifier,
-        route.query.dashboard,
+        dashboardId,
         currentDashboardData.data
       );
      
       currentDashboardData.data = await getDashboard(
-        this.store,
-        this.$route.query.dashboard
+        store,
+        dashboardId
       );
+
+      $q.notify({
+        type: "positive",
+        message: "Dashboard updated successfully.",
+        timeout: 5000,
+      });
 
     };
 
     const saveDashboardOnClick = async () => {
-      await saveDashboard(route.query.dashboard);
+      saveDashboard(route.query.dashboard);
     };
 
-    //get current dashboard Id
-    const getDashboard = () => {
-      return currentDashboardData.data.dashboardId;
-    };
+    // //get current dashboard Id
+    // const getDashboard = () => {
+    //   return currentDashboardData.data.dashboardId;
+    // };
 
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
@@ -309,6 +316,9 @@ export default defineComponent({
   methods: {
     isDraggableClick(evt, row) {
       this.draggable = !this.draggable;
+    },
+    disableDraggable(evt, row) {
+      this.draggable = false;
     },
     async onUpdatePanel(panelDataElementValue: any) {
       
