@@ -62,3 +62,5 @@ pub struct StreamSchemaChk {
     pub has_fields: bool,
     pub has_partition_keys: bool,
 }
+
+pub const INGESTION_EP: [&str; 5] = ["_bulk", "_json", "_multi", "traces", "write"];
