@@ -19,13 +19,11 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
+use crate::common::auth::{get_hash, is_root_user};
+use crate::infra::config::CONFIG;
+use crate::meta::ingestion::INGESTION_EP;
 use crate::meta::user::UserRole;
-use crate::service::users;
-use crate::{
-    common::auth::{get_hash, is_root_user},
-    meta::ingestion::INGESTION_EP,
-};
-use crate::{infra::config::CONFIG, service::db};
+use crate::service::{db, users};
 
 pub async fn validator(
     req: ServiceRequest,
