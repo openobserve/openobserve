@@ -19,7 +19,6 @@ const getDefaultDashboardPanelData = () => (
     },
     layout: {
       showCustomQuery: false,
-      loading:false,
     },
     meta: {
       parsedQuery: "",
