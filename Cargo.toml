@@ -1,5 +1,5 @@
 [package]
-description = "ZincObserve is an observability platfom that allows you to capture, search, and analyze your logs, metrics, and traces."
+description = "ZincObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces."
 edition = "2021"
 homepage = "https://zinc.dev/"
 keywords = [

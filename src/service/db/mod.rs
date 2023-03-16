@@ -29,6 +29,7 @@ pub mod functions;
 pub mod schema;
 pub mod triggers;
 pub mod user;
+pub mod version;
 
 pub async fn set_prom_cluster_info(
     cluster: &str,
