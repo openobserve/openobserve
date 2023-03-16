@@ -163,7 +163,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /** Authenticate a user */
-#[post("user")]
+#[post("/user")]
 pub async fn authentication(user: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
     let mut ret: AHashMap<&str, Value> = AHashMap::new();
 
