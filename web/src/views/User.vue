@@ -537,6 +537,12 @@ export default defineComponent({
           });
         }
       }
+      router.replace({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const confirmDeleteAction = (props: any) => {

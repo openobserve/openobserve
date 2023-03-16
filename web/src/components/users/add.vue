@@ -422,20 +422,45 @@ export default defineComponent({
             this.formData.email = userEmail;
           });
       } else {
-        userServiece
-          .create(this.formData, selectedOrg)
-          .then((res: any) => {
-            dismiss();
-            this.$emit("updated", res.data, this.formData, "created");
-          })
-          .catch((err: any) => {
-            this.$q.notify({
-              color: "negative",
-              message: err.response.data.message,
-              timeout: 2000,
+        if (this.existingUser) {
+          const userEmail = this.formData.email;
+
+          userServiece
+            .updateexistinguser(
+              { role: this.formData.role },
+              selectedOrg,
+              userEmail
+            )
+            .then((res: any) => {
+              dismiss();
+              this.formData.email = userEmail;
+              this.$emit("updated", res.data, this.formData, "updated");
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                color: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+              dismiss();
+              this.formData.email = userEmail;
             });
-            dismiss();
-          });
+        } else {
+          userServiece
+            .create(this.formData, selectedOrg)
+            .then((res: any) => {
+              dismiss();
+              this.$emit("updated", res.data, this.formData, "created");
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                color: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+              dismiss();
+            });
+        }
       }
     },
   },
