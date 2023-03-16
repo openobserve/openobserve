@@ -16,12 +16,9 @@
 import http from "./http";
 
 const auth = {
-  sign_in_user: (orgIdentifier: string, payload: any) => {
-    return http().post(`/auth/${orgIdentifier}/authentication`, payload);
+  sign_in_user: (payload: any) => {
+    return http().post(`/auth/user`, payload);
   },
-  get_organization_by_username: (userName: string) => {
-    return http().get(`/auth/organizations_by_username/${encodeURIComponent(userName)}`);
-  }
 };
 
 export default auth;

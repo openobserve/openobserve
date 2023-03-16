@@ -18,14 +18,11 @@ use ahash::AHashMap;
 use serde_json::Value;
 use std::io::Error;
 
-use crate::common::auth::is_root_user;
-use crate::handler::http::auth::validate_credentials;
 use crate::meta;
 use crate::meta::user::SignInUser;
 use crate::meta::user::UpdateUser;
 use crate::meta::user::UserOrgRole;
 use crate::meta::user::UserRequest;
-use crate::meta::user::UserRole;
 use crate::service::users;
 
 /** List all users of an organization */
@@ -165,28 +162,14 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     users::remove_user_from_org(&org_id, &email_id).await
 }
 
-/** Authenticate a user for an organization */
-#[post("/{org_id}/authentication")]
-pub async fn authentication(
-    org_id: web::Path<String>,
-    user: web::Json<SignInUser>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
+/** Authenticate a user */
+#[post("user")]
+pub async fn authentication(user: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
     let mut ret: AHashMap<&str, Value> = AHashMap::new();
-    match validate_credentials(
-        &user.name,
-        &user.password,
-        &format!("{}/authentication", &org_id),
-    )
-    .await
-    {
+
+    match crate::handler::http::auth::validate_user(&user.name, &user.password).await {
         Ok(v) => {
             if v {
-                if is_root_user(&user.name).await {
-                    ret.insert("role", Value::String(UserRole::Admin.to_string()));
-                } else if let Some(user) = users::get_user(Some(&org_id), &user.name).await {
-                    ret.insert("role", Value::String(user.role.to_string()));
-                }
                 ret.insert("status", Value::Bool(true));
             } else {
                 ret.insert("status", Value::Bool(false));
