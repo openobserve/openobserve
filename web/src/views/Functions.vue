@@ -229,7 +229,16 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
           jsTransforms.value = res.data.list.map((data: any) => {
+            if (router.currentRoute.value.query.action == "update") {
+              if (router.currentRoute.value.query.name == data.name) {
+                showAddUpdateFn({ row: data });
+              }
+            }
+
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
@@ -294,9 +303,24 @@ export default defineComponent({
       if (!props.row) {
         isUpdated.value = false;
         action = "Add Function";
+        router.push({
+          name: "functions",
+          query: {
+            action: "add",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       } else {
         isUpdated.value = true;
         action = "Update Function";
+        router.push({
+          name: "functions",
+          query: {
+            action: "update",
+            name: props.row.name,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
       addTransform();
 
@@ -309,12 +333,24 @@ export default defineComponent({
     };
 
     const refreshList = () => {
+      router.push({
+        name: "functions",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
       showAddJSTransformDialog.value = false;
       getJSTransforms();
     };
 
     const hideForm = () => {
       showAddJSTransformDialog.value = false;
+      router.replace({
+        name: "functions",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const deleteFn = () => {

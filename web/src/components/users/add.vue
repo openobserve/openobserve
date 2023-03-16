@@ -29,6 +29,14 @@
             round
             flat
             :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+            @click="
+              router.push({
+                name: 'users',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              })
+            "
           />
         </div>
       </div>
@@ -254,6 +262,7 @@
               padding="sm md"
               color="accent"
               no-caps
+              @click="$emit('cancel:hideform')"
             />
             <q-btn
               :label="t('user.save')"
@@ -274,6 +283,7 @@
 import { defineComponent, ref, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import userServiece from "../../services/users";
 import { getImageURL } from "../../utils/zincutils";
@@ -309,9 +319,10 @@ export default defineComponent({
       default: "member",
     },
   },
-  emits: ["update:modelValue", "updated"],
+  emits: ["update:modelValue", "updated", "cancel:hideform"],
   setup() {
     const store: any = useStore();
+    const router: any = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
@@ -344,6 +355,7 @@ export default defineComponent({
       t,
       $q,
       store,
+      router,
       formData,
       beingUpdated,
       userForm,
@@ -410,20 +422,45 @@ export default defineComponent({
             this.formData.email = userEmail;
           });
       } else {
-        userServiece
-          .create(this.formData, selectedOrg)
-          .then((res: any) => {
-            dismiss();
-            this.$emit("updated", res.data, this.formData, "created");
-          })
-          .catch((err: any) => {
-            this.$q.notify({
-              color: "negative",
-              message: err.response.data.message,
-              timeout: 2000,
+        if (this.existingUser) {
+          const userEmail = this.formData.email;
+
+          userServiece
+            .updateexistinguser(
+              { role: this.formData.role },
+              selectedOrg,
+              userEmail
+            )
+            .then((res: any) => {
+              dismiss();
+              this.formData.email = userEmail;
+              this.$emit("updated", res.data, this.formData, "updated");
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                color: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+              dismiss();
+              this.formData.email = userEmail;
             });
-            dismiss();
-          });
+        } else {
+          userServiece
+            .create(this.formData, selectedOrg)
+            .then((res: any) => {
+              dismiss();
+              this.$emit("updated", res.data, this.formData, "created");
+            })
+            .catch((err: any) => {
+              this.$q.notify({
+                color: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+              dismiss();
+            });
+        }
       }
     },
   },
