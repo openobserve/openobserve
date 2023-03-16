@@ -6,12 +6,20 @@
     <q-separator />
     <div>
       <q-expansion-item
-        default-opened
+        v-model="expansionItems.x"
         dense
         :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.yAxis') :  t('panel.xAxis')"
       >
-        <div class="column index-menu q-mb-md">
-          <div class="index-table q-mt-xs">
+        <div class="column index-menu q-mb-md droppable" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
+          }"
+          @dragenter="onDragEnter($event, 'x')"
+          @dragleave="onDragLeave($event, 'x')"
+          @dragover="onDragOver($event, 'x')"
+          @drop="onDrop($event, 'x')"
+          v-mutation="handler2">
+          <div class="index-table q-my-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.x"
               :columns="[
@@ -68,11 +76,19 @@
       <q-separator />
       <q-expansion-item
         dense
-        default-opened
+        v-model="expansionItems.y"
         :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.xAxis') : t('panel.yAxis')"
       >
-        <div class="column index-menu q-mb-lg">
-          <div class="index-table q-mt-xs">
+        <div class="column index-menu q-mb-lg" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
+          }"
+          @dragenter="onDragEnter($event, 'y')"
+          @dragleave="onDragLeave($event, 'y')"
+          @dragover="onDragOver($event, 'y')"
+          @drop="onDrop($event, 'y')"
+          v-mutation="handler2">
+          <div class="index-table  q-my-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.y"
               :columns="[
@@ -181,7 +197,7 @@
         </div>
       </q-expansion-item>
       <q-separator />
-      <q-expansion-item default-opened dense :label="t('panel.config')">
+      <q-expansion-item v-model="expansionItems.config" dense :label="t('panel.config')">
         <div>
           <q-toggle
             v-if="dashboardPanelData.data.type != 'table'"
@@ -211,9 +227,17 @@
       </q-expansion-item>
     </div>
     <q-separator />
-    <q-expansion-item default-opened dense :label="t('panel.filters')">
-      <div class="column index-menu q-mb-lg">
-        <div class="index-table q-mt-xs">
+    <q-expansion-item v-model="expansionItems.filter" dense :label="t('panel.filters')">
+      <div class="column index-menu q-mb-lg" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
+          }"
+          @dragenter="onDragEnter($event, 'f')"
+          @dragleave="onDragLeave($event, 'f')"
+          @dragover="onDragOver($event, 'f')"
+          @drop="onDrop($event, 'f')"
+          v-mutation="handler2">
+        <div class="index-table q-my-xs">
           <q-table
             v-model:selected="dashboardPanelData.data.fields.filter"
             :columns="[
@@ -416,7 +440,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from "vue";
+import { defineComponent, ref, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -429,13 +453,86 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
+    const expansionItems = reactive({
+      x: true,
+      y: true,
+      config: true,
+      filter: false
+    })
+
     const {
       dashboardPanelData,
+      addXAxisItem,
+      addYAxisItem,
       removeXAxisItem,
       removeYAxisItem,
       removeFilterItem,
+      addFilteredItem,
     } = useDashboardPanelData();
     const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
+
+    watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
+      if(oldVal == false && newVal == true) {
+        expansionItems.x = true
+        expansionItems.y = true
+        expansionItems.config = false
+        expansionItems.filter = true
+      }
+    })
+    
+    const currentDragArea = ref('')
+
+    const onDrop = (e:any, area: string) => {
+      console.log('dropped');
+      
+      const dragItem = dashboardPanelData.meta.dragAndDrop.dragElement
+
+      dashboardPanelData.meta.dragAndDrop.dragging = false
+      dashboardPanelData.meta.dragAndDrop.dragElement = null
+
+      if(dragItem && area == 'x') {
+        addXAxisItem(dragItem?.name)
+      }else if(dragItem && area == 'y'){
+        addYAxisItem(dragItem?.name)
+      }else if(dragItem && area == 'f'){
+        addFilteredItem(dragItem?.name)
+      }else{
+
+      }
+      currentDragArea.value = ''
+    }
+
+
+    const onDragEnter = (e:any, area: string) => {
+      console.log('enter');
+
+
+      // // don't drop on other draggables
+      // if (e.target.draggable !== true) {
+      //   e.target.classList.add('drag-enter')
+      // }
+    }
+
+    const onDragStart = (e:any, item: any) => {
+      console.log('start');
+
+      e.preventDefault()
+    }
+
+    const onDragLeave = (e:any, area: string) => {
+      console.log('leave');
+      currentDragArea.value = ''
+
+      e.preventDefault()
+    }
+
+    const onDragOver = (e:any, area: string) => {
+      console.log('over');
+      currentDragArea.value = area
+      e.preventDefault()
+    }
+
+    const handler2 = () => {}
 
     return {
       showXAxis,
@@ -454,12 +551,36 @@ export default defineComponent({
       tab: ref("General"),
       options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
       getImageURL,
+      onDrop,
+      onDragStart,
+      onDragLeave,
+      onDragOver,
+      onDragEnter,
+      handler2,
+      currentDragArea,
+      expansionItems
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+
+.droppable {
+  border-color: white;
+  border-style: dotted;
+}
+
+.drop-target {
+  background-color: #dfdfdf;
+  border-color: black;
+  border-style: dotted;
+}
+
+.drop-entered {
+  background-color: #b8b8b8;
+}
+
 .color-input-wrapper {
   height: 1.5em;
   width: 1.5em;

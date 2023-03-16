@@ -53,9 +53,21 @@
                 : ''
               "
               :props="props"
+              v-mutation="mutationHandler"
+              @dragenter="onDragEnter"
+              @dragleave="onDragLeave"
+              @dragover="onDragOver"
+              @drop="onDrop" 
             >
-              <div class="field_overlay" :title="props.row.name">
-                <div class="field_label">
+           
+              <div class="field_overlay" :title="props.row.name"
+                  >
+                <div class="field_label" draggable="true" @dragstart="onDragStart($event, props.row)">
+                  <q-icon 
+                    name="drag_indicator" 
+                    color="grey-13" 
+                    class="drag_indicator q-mr-xs" 
+                     />
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons">
@@ -125,7 +137,6 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import IndexService from "../../../services/index";
-import queryService from "../../../services/nativequery";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -141,7 +152,7 @@ export default defineComponent({
       currentFieldsList: [],
     });
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem } =
       useDashboardPanelData();
     
     onActivated(() => {
@@ -214,79 +225,42 @@ export default defineComponent({
       return filtered;
     };
 
-    const addFilteredItem = (name: string) => {
-      // console.log("name=", name);
-      if (!dashboardPanelData.data.fields.filter) {
-        dashboardPanelData.data.fields.filter = [];
-      }
+    const mutationHandler = (mutationRecords:any) => {}
 
-      if (
-        !dashboardPanelData.data.fields.filter.find(
-          (it: any) => it.column == name
-        )
-      ) {
-        // console.log("data");
+    const onDragEnter = (e:any) => {
+      e.preventDefault()
+    }
 
-        dashboardPanelData.data.fields.filter.push({
-          type: "list",
-          values: [],
-          column: name,
-          operator: null,
-          value: null,
-        });
-      }
+    const onDragStart = (e:any, item: any) => {
+      console.log("dragstart", e, item);
+      dashboardPanelData.meta.dragAndDrop.dragging = true
+      dashboardPanelData.meta.dragAndDrop.dragElement = item
+    }
 
-      if (!dashboardPanelData.meta.filterValue) {
-        dashboardPanelData.meta.filterValue = [];
-      }
+    const onDragLeave = (e:any) => {
+      e.preventDefault()
+      // e.target.classList.remove('drag-enter')
+    }
 
-      if (
-        !dashboardPanelData.meta.filterValue.find(
-          (it: any) => it.column == name
-        )
-      ) {
-        let queryData = "SELECT ";
+    const onDragOver = (e:any) => {
+      e.preventDefault()
+    }
 
-        // get unique value of the selected fields
-        queryData += `${name} as value`;
-
-        //now add the selected stream
-        queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`;
-
-        // console.log("queryData= ", queryData);
-        // add group by statement
-        queryData += ` GROUP BY value`;
-
-        const query = {
-          query: { sql: queryData, sql_mode: "full" },
-        };
-
-        queryService
-          .runquery(query, store.state.selectedOrganization.identifier)
-          .then((res) => {
-
-            dashboardPanelData.meta.filterValue.push({
-              column: name,
-              value: res.data.hits
-                .map((it: any) => it.value)
-                .filter((it: any) => it),
-            });
-
-          })
-          .catch((error) => {
-            $q.notify({
-              type: "negative",
-              message: "Something went wrong!",
-              timeout: 5000,
-            });
-          });
-      }
-    };
+    const onDrop = (e:any) => {
+      dashboardPanelData.meta.dragAndDrop.dragging = false
+      dashboardPanelData.meta.dragAndDrop.dragElement = null
+    }
 
     return {
       t,
       store,
       router,
+      mutationHandler,
+      onDragEnter,
+      onDragLeave,
+      onDragOver,
+      onDrop,
+      onDragStart,
       filterFieldFn,
       addXAxisItem,
       addYAxisItem,
@@ -374,7 +348,6 @@ export default defineComponent({
     margin-bottom: 0.125rem;
     position: relative;
     overflow: visible;
-    cursor: default;
 
     .field_overlay {
       justify-content: space-between;
@@ -407,13 +380,18 @@ export default defineComponent({
       }
 
       .field_label {
-        pointer-events: none;
+        // pointer-events: none;
         font-size: 0.825rem;
         position: relative;
         display: inline;
         z-index: 2;
         left: 0;
         // text-transform: capitalize;
+
+        .drag_indicator {
+          cursor: -webkit-grab;
+          cursor: grab;
+        }
       }
     }
 
