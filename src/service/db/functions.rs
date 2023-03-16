@@ -155,3 +155,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("[TRACE] Functions Cached");
     Ok(())
 }
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/function/";
+    db.delete(key, true).await?;
+    let key = "/transform/";
+    db.delete(key, true).await?;
+    Ok(())
+}

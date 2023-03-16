@@ -34,10 +34,11 @@ use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
 use zincobserve::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
 use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
 use zincobserve::infra::cluster;
-use zincobserve::infra::config::CONFIG;
+use zincobserve::infra::config;
 use zincobserve::infra::file_lock;
 use zincobserve::infra::metrics;
 use zincobserve::meta::telemetry::Telemetry;
+use zincobserve::service::db;
 use zincobserve::service::router;
 
 #[cfg(feature = "mimalloc")]
@@ -46,25 +47,26 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let _app = clap::Command::new("zincobserve")
-        .version(env!("GIT_VERSION"))
-        .about(clap::crate_description!())
-        .get_matches();
+    let command = cli().await?;
+    if command {
+        return Ok(());
+    }
+    log::info!("Starting ZincObserve {}", env!("GIT_VERSION"));
 
-    if CONFIG.common.tracing_enabled {
-        let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
+    if config::CONFIG.common.tracing_enabled {
+        let service_name = format!("zincobserve/{}", config::CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
         let mut headers = HashMap::new();
         headers.insert(
-            CONFIG.common.tracing_header_key.clone(),
-            CONFIG.common.tracing_header_value.clone(),
+            config::CONFIG.common.tracing_header_key.clone(),
+            config::CONFIG.common.tracing_header_value.clone(),
         );
         let tracer = opentelemetry_otlp::new_pipeline()
             .tracing()
             .with_exporter(
                 opentelemetry_otlp::new_exporter()
                     .http()
-                    .with_endpoint(&CONFIG.common.otel_otlp_url)
+                    .with_endpoint(&config::CONFIG.common.otel_otlp_url)
                     .with_headers(headers),
             )
             .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
@@ -74,12 +76,16 @@ async fn main() -> Result<(), anyhow::Error> {
             .install_batch(opentelemetry::runtime::Tokio)?;
 
         Registry::default()
-            .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
+            .with(tracing_subscriber::EnvFilter::new(
+                &config::CONFIG.log.level,
+            ))
             .with(tracing_subscriber::fmt::layer())
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .init();
     } else {
-        env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
+        env_logger::init_from_env(
+            env_logger::Env::new().default_filter_or(&config::CONFIG.log.level),
+        );
     }
 
     // init jobs
@@ -96,7 +102,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     rx.await?;
     if !router::is_router() {
-        let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+        let gaddr: SocketAddr = format!("0.0.0.0:{}", config::CONFIG.grpc.port).parse()?;
         let searcher = Searcher::default();
         let search_svc = SearchServer::new(searcher)
             .send_compressed(CompressionEncoding::Gzip)
@@ -129,30 +135,32 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
-    let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
+    let haddr: SocketAddr = format!("0.0.0.0:{}", config::CONFIG.http.port).parse()?;
     Telemetry::new()
         .event("ZincObserve - Starting server", None, false)
         .await;
     if router::is_router() {
         HttpServer::new(move || {
             log::info!("starting HTTP server at: {}", haddr);
-            let app = if CONFIG.common.base_uri.is_empty() {
+            let app = if config::CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
                     .service(router::dispatch)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
-                    web::scope(&CONFIG.common.base_uri)
+                    web::scope(&config::CONFIG.common.base_uri)
                         .service(router::dispatch)
                         .configure(get_basic_routes),
                 )
             };
-            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+            app.app_data(web::JsonConfig::default().limit(config::CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    config::CONFIG.limit.req_payload_limit,
+                )) // size is in bytes
                 .app_data(web::Data::new(
                     awc::Client::builder()
-                        .timeout(Duration::from_secs(CONFIG.route.timeout))
+                        .timeout(Duration::from_secs(config::CONFIG.route.timeout))
                         .finish(),
                 ))
                 .wrap(middleware::Compress::default())
@@ -167,7 +175,7 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         HttpServer::new(move || {
             let local_id = thread_id.load(Ordering::SeqCst) as usize;
-            if CONFIG.common.feature_per_thread_lock {
+            if config::CONFIG.common.feature_per_thread_lock {
                 thread_id.fetch_add(1, Ordering::SeqCst);
             }
             log::info!(
@@ -176,20 +184,22 @@ async fn main() -> Result<(), anyhow::Error> {
                 local_id
             );
 
-            let app = if CONFIG.common.base_uri.is_empty() {
+            let app = if config::CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
                     .configure(get_service_routes)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
-                    web::scope(&CONFIG.common.base_uri)
+                    web::scope(&config::CONFIG.common.base_uri)
                         .configure(get_service_routes)
                         .configure(get_basic_routes),
                 )
             };
-            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+            app.app_data(web::JsonConfig::default().limit(config::CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    config::CONFIG.limit.req_payload_limit,
+                )) // size is in bytes
                 .app_data(web::Data::new(local_id))
                 .wrap(middleware::Compress::default())
                 .wrap(middleware::Logger::new(
@@ -212,4 +222,81 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     Ok(())
+}
+
+async fn cli() -> Result<bool, anyhow::Error> {
+    let app = clap::Command::new("zincobserve")
+        .version(env!("GIT_VERSION"))
+        .about(clap::crate_description!())
+        .subcommands(&[
+            clap::Command::new("reset")
+                .about("reset zincobserve data")
+                .arg(
+                    clap::Arg::new("component")
+                        .short('c')
+                        .long("component")
+                        .help("reset data of the component: user, alert, function"),
+                ),
+            clap::Command::new("view")
+                .about("view zincobserve data")
+                .arg(
+                    clap::Arg::new("component")
+                        .short('c')
+                        .long("component")
+                        .help("view data of the component: version, user"),
+                ),
+        ])
+        .get_matches();
+
+    if app.subcommand().is_none() {
+        return Ok(false);
+    }
+
+    let (name, command) = app.subcommand().unwrap();
+    match name {
+        "reset" => {
+            let component = command.get_one::<String>("component").unwrap();
+            match component.as_str() {
+                "user" => {
+                    db::user::reset().await?;
+                }
+                "alert" => {
+                    db::alerts::reset().await?;
+                }
+                "function" => {
+                    db::functions::reset().await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                }
+            }
+        }
+        "view" => {
+            let component = command.get_one::<String>("component").unwrap();
+            match component.as_str() {
+                "version" => {
+                    let version = db::version::get().await?;
+                    println!("version: {}", version);
+                }
+                "user" => {
+                    db::user::cache().await?;
+                    let mut id = 0;
+                    for user in config::USERS.iter() {
+                        id += 1;
+                        println!("{}\t{:?}\n{:?}", id, user.key(), user.value());
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                }
+            }
+        }
+        _ => {
+            return Err(anyhow::anyhow!("unsupport sub command: {}", name));
+        }
+    }
+
+    println!("command {} execute success", name);
+
+    Ok(true)
 }

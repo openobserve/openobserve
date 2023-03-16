@@ -169,6 +169,13 @@ pub async fn root_user_exists() -> bool {
     !ret.is_empty()
 }
 
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/user/";
+    db.delete(key, true).await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::meta::user::UserOrg;
