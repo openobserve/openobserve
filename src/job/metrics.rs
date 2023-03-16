@@ -156,17 +156,13 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         let columns = key.split('/').collect::<Vec<&str>>();
         if columns.len() <= 2 {
             // query functions
-            let org_id = columns[0].to_string();
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[&org_id, "", "", "query"])
+                .with_label_values(&[columns[0], "", "", "query"])
                 .inc();
         } else {
             // ingest functions
-            let org_id = columns[0].to_string();
-            let stream_type = columns[1].to_string();
-            let stream_name = columns[2].to_string();
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[&org_id, &stream_name, &stream_type, "ingest"])
+                .with_label_values(&[columns[0], columns[2], columns[1], "ingest"])
                 .inc();
         }
     }
@@ -181,20 +177,17 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
-        let org_id = columns[0].to_string();
-        let stream_type = columns[1].to_string();
-        let stream_name = columns[2].to_string();
         metrics::STORAGE_ORIGINAL_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.storage_size as i64);
         metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.compressed_size as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+        metrics::STORAGE_FILES
+            .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.file_num as i64);
-        metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+        metrics::STORAGE_RECORDS
+            .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.doc_num as i64);
     }
     Ok(())

@@ -65,10 +65,10 @@ pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
             key
         ));
     }
-    let _ = columns[0].to_string();
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let stream_name = columns[3].to_string();
+    let _ = columns[0];
+    let org_id = columns[1];
+    let stream_type = columns[2];
+    let stream_name = columns[3];
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut stats = STATS.entry(key).or_default();
     if val.records == 0 {
@@ -98,10 +98,10 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
             key
         ));
     }
-    let _ = columns[0].to_string();
-    let org_id = columns[1].to_string();
-    let stream_type = columns[2].to_string();
-    let stream_name = columns[3].to_string();
+    let _ = columns[0];
+    let org_id = columns[1];
+    let stream_type = columns[2];
+    let stream_name = columns[3];
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     if !STATS.contains_key(&key) {
         return Ok(());

@@ -66,19 +66,19 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
     let jobs = db::compact::delete::list().await?;
     for job in jobs {
         let columns = job.split('/').collect::<Vec<&str>>();
-        let org_id = columns[0].to_string();
+        let org_id = columns[0];
         let stream_type = StreamType::from(columns[1]);
-        let stream_name = columns[2].to_string();
-        let retention = columns[3].to_string();
+        let stream_name = columns[2];
+        let retention = columns[3];
         tokio::task::yield_now().await; // yield to other tasks
 
         let ret = if retention.eq("all") {
-            delete::delete_all(&org_id, &stream_name, stream_type).await
+            delete::delete_all(org_id, stream_name, stream_type).await
         } else {
             let date_range = retention.split(',').collect::<Vec<&str>>();
             delete::delete_by_date(
-                &org_id,
-                &stream_name,
+                org_id,
+                stream_name,
                 stream_type,
                 (date_range[0], date_range[1]),
             )
