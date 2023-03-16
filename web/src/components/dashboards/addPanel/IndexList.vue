@@ -33,7 +33,7 @@
           },
         ]"
         :rows="data.currentFieldsList"
-        row-key="name"
+        row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
         :filter-method="filterFieldFn"
         :pagination="{ rowsPerPage: 10000 }"
@@ -54,7 +54,7 @@
               "
               :props="props"
             >
-              <div class="field_overlay">
+              <div class="field_overlay" :title="props.row.name">
                 <div class="field_label">
                   {{ props.row.name }}
                 </div>

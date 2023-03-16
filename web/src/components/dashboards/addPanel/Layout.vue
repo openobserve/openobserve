@@ -23,9 +23,13 @@
                 },
               ]"
               :rows="dashboardPanelData.data.fields.x"
-              row-key="name"
+              row-key="column"
               class="field-table"
               id="fieldList"
+              virtual-scroll
+              v-model:pagination="pagination"
+              :rows-per-page-options="[0]"
+              :virtual-scroll-sticky-size-start="48"
               :hide-pagination="true"
               hide-header
               hide-bottom
@@ -33,7 +37,7 @@
               <template #body-cell-column="props">
                 <q-tr :props="props">
                   <q-td :props="props" class="field_list">
-                    <div class="field_overlay">
+                    <div class="field_overlay" :title="props.row.column">
                       <div class="field_label">
                         {{ props.row.column }}
                       </div>
@@ -102,11 +106,11 @@
                         <div>
                           <q-btn
                             size="xs"
-                            color="red"
                             round
                             dense
+                            class="q-mr-xs"
                             @click="props.expand = !props.expand"
-                            :icon="props.expand ? 'remove' : 'add'"
+                            :icon="props.expand ? 'unfold_less' : 'unfold_more'"
                           />
                           <q-icon
                             :name="
@@ -129,7 +133,7 @@
                   <q-td colspan="100%">
                     <div>
                       <div class="flex items-center">
-                        <div class="q-pa-xs" style="width: 180px">
+                        <div class="q-mr-xs q-mb-sm" style="width: 160px">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.y[props.pageIndex]
@@ -159,6 +163,7 @@
                           dashboardPanelData.data.fields.y[props.pageIndex]
                             .label
                         "
+                        :rules="[ val => val.length > 0 || 'Required' ]"
                       />
                     </div>
                   </q-td>
@@ -241,11 +246,11 @@
                       <div>
                         <q-btn
                           size="xs"
-                          color="red"
                           round
                           dense
+                          class="q-mr-xs"
                           @click="props.expand = !props.expand"
-                          :icon="props.expand ? 'remove' : 'add'"
+                          :icon="props.expand ? 'unfold_less' : 'unfold_more'"
                         />
                         <q-icon
                           :name="
@@ -273,6 +278,7 @@
                           dashboardPanelData.data.fields.filter[props.pageIndex]
                             .type
                         "
+                        dense
                       >
                         <q-tab
                           name="list"
@@ -308,6 +314,7 @@
                               :options="options"
                               label="Operator"
                               style="width: 100%"
+                              :rules="[ val => !!val || 'Required' ]"
                             />
                             <q-input
                               dense
@@ -319,6 +326,7 @@
                               "
                               label="Value"
                               style="width: 100%; margin-top: 5px"
+                              :rules="[ val => val.length > 0 || 'Required' ]"
                             />
                           </div>
                         </q-tab-panel>
@@ -336,6 +344,7 @@
                             multiple
                             emit-value
                             map-options
+                            :rules="[ val => val.length > 0 || 'At least 1 item required' ]"
                           >
                             <template v-slot:selected>
                               {{
@@ -553,7 +562,7 @@ export default defineComponent({
       padding: 0px 10px;
       align-items: center;
       position: absolute;
-      line-height: 2rem;
+      // line-height: 2rem;
       overflow: hidden;
       inset: 0;
       display: flex;
