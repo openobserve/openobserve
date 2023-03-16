@@ -11,6 +11,7 @@
         />
         <q-btn-dropdown
           color="white"
+          flat
           text-color="black"
           @click="onDropDownClick"
         />
