@@ -45,7 +45,7 @@ healthcheck.enabled = false</pre
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";

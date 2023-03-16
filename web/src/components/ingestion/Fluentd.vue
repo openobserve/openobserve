@@ -50,7 +50,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { defineComponent, ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
