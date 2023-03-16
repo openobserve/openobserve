@@ -16,10 +16,9 @@ RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --print cfg
 RUN rustc -C target-cpu=native --print cfg
-# RUN cargo install sccache
 # ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 # ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
-# RUN sccache --start-server
+# RUN cargo install sccache
 
 WORKDIR /app
 COPY . /app
@@ -28,7 +27,6 @@ COPY --from=webBuilder /web/dist web/dist
 # RUN cargo build --release
 RUN RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --features tmpcache,zo_functions --target x86_64-unknown-linux-gnu
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
-# RUN sccache --show-stats
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
