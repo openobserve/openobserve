@@ -51,9 +51,17 @@
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
+            <div class="flex justify-end q-pb-sm q-pr-sm">
+              <q-checkbox
+                v-model="shouldWrapValues"
+                label="Wrap"
+                color="primary"
+                size="xs"
+              />
+            </div>
             <q-list
               separator
-              style="height: calc(100vh - 290px)"
+              style="height: calc(100vh - 336px)"
               class="q-px-none q-py-none"
             >
               <q-item class="list-head">
@@ -71,7 +79,11 @@
                 class="list-item"
               >
                 <q-item-section class="col-3">{{ value }}</q-item-section>
-                <q-item-section class="col-9" style="display: inline;relative">
+                <q-item-section
+                  class="col-9"
+                  :class="shouldWrapValues ? 'ellipsis' : ''"
+                  style="display: inline;relative"
+                >
                   <q-btn-dropdown
                     size="0.5rem"
                     outlined
@@ -128,7 +140,13 @@
                       </q-item>
                     </q-list>
                   </q-btn-dropdown>
-                  <pre class="table-pre">{{ key }}</pre>
+                  <pre
+                    class="table-pre"
+                    :style="{
+                      'white-space': shouldWrapValues ? 'nowrap' : 'pre-wrap',
+                    }"
+                    >{{ key }}</pre
+                  >
                 </q-item-section>
               </q-item>
               <q-item></q-item>
@@ -265,6 +283,7 @@ export default defineComponent({
     const tab = ref("table");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
+    const shouldWrapValues: any = ref(true);
 
     const flattenJSONObject = (obj: any, param: string) => {
       let newObj: any = {};
@@ -292,6 +311,7 @@ export default defineComponent({
       selectedRelativeValue,
       recordSizeOptions,
       getImageURL,
+      shouldWrapValues,
     };
   },
   async created() {
