@@ -52,7 +52,7 @@
           </div>
           <div v-else class="indexDetailsContainer">
             <div class="flex justify-end q-pb-sm q-pr-sm">
-              <q-checkbox
+              <q-toggle
                 v-model="shouldWrapValues"
                 label="Wrap"
                 color="primary"
