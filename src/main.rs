@@ -48,11 +48,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let command = cli().await?;
-    if command {
+    if cli().await? {
         return Ok(());
     }
-    log::info!("Starting ZincObserve {}", env!("GIT_VERSION"));
 
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
@@ -84,6 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
+    log::info!("Starting ZincObserve {}", config::VERSION);
 
     // init jobs
     // it must be initialized before the server starts
@@ -281,8 +280,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    let version = db::version::get().await?;
-                    println!("version: {}", version);
+                    println!("version: {}", db::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;
