@@ -24,54 +24,21 @@
           <q-card>
             <q-card-section class="bg-white">
               <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-                <q-input
-                  v-model="name"
-                  data-cy="login-user-id"
-                  label="Email *"
-                  @blur="getOrganizations"
-                >
+                <q-input v-model="name" data-cy="login-user-id" label="Email *">
                   <template #prepend>
                     <q-icon name="email" />
                   </template>
                 </q-input>
 
-                <q-input
-                  v-model="password"
-                  data-cy="login-password"
-                  type="password"
-                  :label="t('login.password') + ' *'"
-                >
+                <q-input v-model="password" data-cy="login-password" type="password" :label="t('login.password') + ' *'">
                   <template #prepend>
                     <q-icon name="lock" />
                   </template>
                 </q-input>
 
-                <q-select
-                  v-model="org_identifier"
-                  :options="organizations"
-                  label="Select Organization *"
-                  :display-value="`${
-                    org_identifier ? org_identifier.label : '-- Select --'
-                  }`"
-                >
-                  <template #prepend>
-                    <q-icon name="corporate_fare" />
-                  </template>
-                </q-select>
-
                 <q-card-actions class="q-px-lg q-mt-md q-mb-xl">
-                  <q-btn
-                    data-cy="login-sign-in"
-                    unelevated
-                    size="lg"
-                    class="full-width"
-                    color="primary"
-                    type="submit"
-                    :label="t('login.signIn')"
-                    :loading="submitting"
-                    no-caps
-                    @click="onSignIn()"
-                  />
+                  <q-btn data-cy="login-sign-in" unelevated size="lg" class="full-width" color="primary" type="submit"
+                    :label="t('login.signIn')" :loading="submitting" no-caps @click="onSignIn()" />
                 </q-card-actions>
               </q-form>
             </q-card-section>
@@ -109,8 +76,6 @@ export default defineComponent({
     const $q = useQuasar();
     const { t } = useI18n();
     const name = ref("");
-    const org_identifier = ref();
-    const organizations = ref([]);
     const password = ref("");
     const confirmpassword = ref("");
     const email = ref("");
@@ -119,13 +84,7 @@ export default defineComponent({
     const submitting = ref(false);
 
     const onSignIn = () => {
-      if (org_identifier.value == undefined) {
-        $q.notify({
-          color: "negative",
-          message: "Organization is required",
-        });
-        return false;
-      }
+
       if (name.value == "" || password.value == "") {
         $q.notify({
           position: "top",
@@ -138,7 +97,7 @@ export default defineComponent({
         submitting.value = true;
         try {
           authService
-            .sign_in_user(org_identifier.value.identifier, {
+            .sign_in_user({
               name: name.value,
               password: password.value,
             })
@@ -166,15 +125,6 @@ export default defineComponent({
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
-
-                const organizations = await getDefaultOrganization(
-                  userInfo,
-                  org_identifier.value.identifier
-                );
-                store.dispatch("setOrganizations", organizations);
-
-                const selectedOrgs = useLocalOrganization(org_identifier.value);
-                store.dispatch("setSelectedOrganization", selectedOrgs);
 
                 const redirectURI =
                   window.sessionStorage.getItem("redirectURI");
@@ -211,32 +161,19 @@ export default defineComponent({
       }
     };
 
-    const getOrganizations = () => {
-      authService
-        .get_organization_by_username(name.value)
-        .then((res) => {
-          organizations.value = res.data;
-          org_identifier.value = res.data[0];
-        })
-        .catch((e) => {
-          console.log(e);
-        });
-    };
+
 
     return {
       t,
       name,
       password,
       confirmpassword,
-      org_identifier,
-      organizations,
       email,
       loginform,
       submitting,
       onSignIn,
       tab: ref("signin"),
       innerTab: ref("signup"),
-      getOrganizations,
     };
   },
   methods: {

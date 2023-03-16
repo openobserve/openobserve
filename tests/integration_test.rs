@@ -111,7 +111,6 @@ mod tests {
         e2e_list_users().await;
         e2e_delete_user().await;
         e2e_get_organizations().await;
-        e2e_get_organization_by_username().await;
         e2e_get_user_passcode().await;
         e2e_update_user_passcode().await;
         e2e_user_authentication().await;
@@ -521,7 +520,7 @@ mod tests {
     }
 
     async fn e2e_get_organizations() {
-        e2e_post_user().await;
+        //e2e_post_user().await;
 
         let auth = setup();
         let app = test::init_service(
@@ -534,30 +533,6 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri(&format!("/api/{}/organizations", "e2e",))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_get_organization_by_username() {
-        e2e_post_user().await;
-
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/auth/organizations_by_username/{}",
-                "root@example.com"
-            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -620,7 +595,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/{}/authentication", "default"))
+            .uri(&format!("/auth/user"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();
@@ -644,7 +619,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/{}/authentication", "e2e"))
+            .uri(&format!("/auth/user"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();

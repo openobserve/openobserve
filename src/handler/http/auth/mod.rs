@@ -19,13 +19,11 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
+use crate::common::auth::{get_hash, is_root_user};
 use crate::infra::config::CONFIG;
+use crate::meta::ingestion::INGESTION_EP;
 use crate::meta::user::UserRole;
-use crate::service::users;
-use crate::{
-    common::auth::{get_hash, is_root_user},
-    meta::ingestion::INGESTION_EP,
-};
+use crate::service::{db, users};
 
 pub async fn validator(
     req: ServiceRequest,
@@ -105,6 +103,21 @@ pub async fn validate_credentials(
     }
 }
 
+pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, Error> {
+    let db_user = db::user::get_db_user(user_id).await;
+    match db_user {
+        Ok(user) => {
+            let in_pass = get_hash(user_password, &user.salt);
+            if user.password.eq(&in_pass) {
+                Ok(true)
+            } else {
+                Err(ErrorForbidden("Not allowed"))
+            }
+        }
+        Err(_) => Err(ErrorForbidden("Not allowed")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::meta::user::UserRequest;
@@ -112,7 +125,7 @@ mod tests {
     use super::*;
 
     #[actix_web::test]
-    async fn test_validate_credentials() {
+    async fn test_validate() {
         let _ = users::post_user(
             "default",
             UserRequest {
@@ -159,5 +172,6 @@ mod tests {
                 .await
                 .unwrap()
         );
+        assert!(validate_user("root@example.com", pwd).await.unwrap());
     }
 }
