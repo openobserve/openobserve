@@ -143,3 +143,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("[TRACE] Alerts Cached");
     Ok(())
 }
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/alerts/";
+    db.delete(key, true).await?;
+    Ok(())
+}

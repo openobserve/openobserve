@@ -53,6 +53,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
+    // check version
+    db::version::set().await?;
+
     // telemetry run
     if CONFIG.common.telemetry_enabled {
         let res = db::get_instance().await;

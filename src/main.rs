@@ -34,11 +34,13 @@ use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
 use zincobserve::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
 use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
 use zincobserve::infra::cluster;
-use zincobserve::infra::config::CONFIG;
+use zincobserve::infra::config::{self, CONFIG};
 use zincobserve::infra::file_lock;
 use zincobserve::infra::metrics;
 use zincobserve::meta::telemetry::Telemetry;
+use zincobserve::service::db;
 use zincobserve::service::router;
+use zincobserve::service::users;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -46,10 +48,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let _app = clap::Command::new("zincobserve")
-        .version(env!("GIT_VERSION"))
-        .about(clap::crate_description!())
-        .get_matches();
+    if cli().await? {
+        return Ok(());
+    }
 
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
@@ -81,6 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
+    log::info!("Starting ZincObserve {}", config::VERSION);
 
     // init jobs
     // it must be initialized before the server starts
@@ -212,4 +214,93 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     Ok(())
+}
+
+async fn cli() -> Result<bool, anyhow::Error> {
+    let app = clap::Command::new("zincobserve")
+        .version(env!("GIT_VERSION"))
+        .about(clap::crate_description!())
+        .subcommands(&[
+            clap::Command::new("reset")
+                .about("reset zincobserve data")
+                .arg(
+                    clap::Arg::new("component")
+                        .short('c')
+                        .long("component")
+                        .help("reset data of the component: root, user, alert, function"),
+                ),
+            clap::Command::new("view")
+                .about("view zincobserve data")
+                .arg(
+                    clap::Arg::new("component")
+                        .short('c')
+                        .long("component")
+                        .help("view data of the component: version, user"),
+                ),
+        ])
+        .get_matches();
+
+    if app.subcommand().is_none() {
+        return Ok(false);
+    }
+
+    let (name, command) = app.subcommand().unwrap();
+    match name {
+        "reset" => {
+            let component = command.get_one::<String>("component").unwrap();
+            match component.as_str() {
+                "root" => {
+                    let _ = users::post_user(
+                        zincobserve::meta::organization::DEFAULT_ORG,
+                        zincobserve::meta::user::UserRequest {
+                            email: CONFIG.auth.root_user_email.clone(),
+                            password: CONFIG.auth.root_user_password.clone(),
+                            role: zincobserve::meta::user::UserRole::Root,
+                            first_name: "root".to_owned(),
+                            last_name: "".to_owned(),
+                        },
+                    )
+                    .await?;
+                }
+                "user" => {
+                    db::user::reset().await?;
+                }
+                "alert" => {
+                    db::alerts::reset().await?;
+                }
+                "function" => {
+                    db::functions::reset().await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                }
+            }
+        }
+        "view" => {
+            let component = command.get_one::<String>("component").unwrap();
+            match component.as_str() {
+                "version" => {
+                    println!("version: {}", db::version::get().await?);
+                }
+                "user" => {
+                    db::user::cache().await?;
+                    let mut id = 0;
+                    for user in config::USERS.iter() {
+                        id += 1;
+                        println!("{}\t{:?}\n{:?}", id, user.key(), user.value());
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                }
+            }
+        }
+        _ => {
+            return Err(anyhow::anyhow!("unsupport sub command: {}", name));
+        }
+    }
+
+    println!("command {} execute success", name);
+
+    Ok(true)
 }
