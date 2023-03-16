@@ -85,7 +85,7 @@
             size="sm"
             round
             flat
-            @click="addUser(props, true)"
+            @click="addRoutePush(props)"
             style="cursor: pointer !important"
           />
         </q-td>
@@ -172,7 +172,7 @@
               icon="add"
               dense
               :label="t(`user.add`)"
-              @click="addUser({}, false)"
+              @click="addRoutePush({})"
             />
           </div>
         </div>
@@ -218,6 +218,7 @@
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
         @updated="addMember"
+        @cancel:hideform="hideForm"
       />
     </q-dialog>
 
@@ -249,7 +250,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch } from "vue";
+import { defineComponent, onMounted, ref, onUpdated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -289,6 +290,19 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
     const qTable: any = ref(null);
+
+    onUpdated(() => {
+      if (router.currentRoute.value.query.action == "add") {
+        addUser({}, false);
+      } else {
+        orgMembers.value.map((member: any) => {
+          if (member.email == router.currentRoute.value.query.email) {
+            addUser({ row: member }, true);
+          }
+        });
+      }
+    });
+
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -365,6 +379,10 @@ export default defineComponent({
               currentUserRole.value = data.role;
             }
 
+            if (data.email == router.currentRoute.value.query.email) {
+              addUser({ row: data }, true);
+            }
+
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               email: data.email,
@@ -425,24 +443,43 @@ export default defineComponent({
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
-      if (props.row != undefined) {
-        selectedUser.value = props.row;
-      } else {
-        selectedUser.value = {};
-      }
-
       selectedUser.value.organization =
         store.state.selectedOrganization.identifier;
 
       showAddUserDialog.value = true;
+      if (props.row != undefined) {
+        selectedUser.value = props.row;
+        segment.track("Button Click", {
+          button: "Actions",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          update_user: props.row.email,
+          page: "Users",
+        });
+      } else {
+        selectedUser.value = {};
+      }
+    };
 
-      segment.track("Button Click", {
-        button: "Actions",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        update_user: props.row.email,
-        page: "Users",
-      });
+    const addRoutePush = (props: any) => {
+      if (props.row != undefined) {
+        router.push({
+          name: "users",
+          query: {
+            action: "update",
+            org_identifier: store.state.selectedOrganization.identifier,
+            email: props.row.email,
+          },
+        });
+      } else {
+        router.push({
+          name: "users",
+          query: {
+            action: "add",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
     };
 
     const updateMember = (data: any) => {
@@ -454,6 +491,16 @@ export default defineComponent({
         });
         showUpdateUserDialog.value = false;
       }
+    };
+
+    const hideForm = () => {
+      showAddUserDialog.value = false;
+      router.replace({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const addMember = (res: any, data: any, operationType: string) => {
@@ -490,6 +537,12 @@ export default defineComponent({
           });
         }
       }
+      router.replace({
+        name: "users",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const confirmDeleteAction = (props: any) => {
@@ -647,7 +700,9 @@ export default defineComponent({
       updateUser,
       updateMember,
       addUser,
+      addRoutePush,
       addMember,
+      hideForm,
       isUpdated,
       showAddUserDialog,
       pagination,
