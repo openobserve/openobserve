@@ -147,6 +147,14 @@ export default defineComponent({
       return currentDashboard.dashboardId;
     };
 
+    const currentXLabel = computed(()=> {
+      return dashboardPanelData.data.type == 'table' ? 'First Column' :dashboardPanelData.data.type == 'h-bar' ? 'Y Axis' :  'X Axis'
+    })
+
+    const currentYLabel = computed(()=> {
+      return dashboardPanelData.data.type == 'table' ? 'Other Columns' :dashboardPanelData.data.type == 'h-bar' ? 'X Axis' :  'Y Axis'
+    })
+
     const runQuery = () => {
       // console.log("query change detected to run");
 
@@ -169,50 +177,67 @@ export default defineComponent({
       const error = []
       const dashboardData = dashboardPanelData
 
+      // check for at least 1 x axis
       if(!dashboardData.data.fields.x.length){
-        error.push("Please add at least one field in X axis")
+        error.push(`Please add at least one field in ${currentXLabel.value}`)
       }
 
+      // check for at least 1 y axis
       if(!dashboardData.data.fields.y.length){
-        error.push("Please add at least one field in Y axis")
+        error.push(`Please add at least one field in ${currentYLabel.value}`)
       }
 
+      // for pie, make sure only 1 y axis is there
       if(dashboardData.data.type == "pie" && dashboardData.data.fields.y.length > 1 ){
-        error.push("You can add only one field in the Y axis while, selected chart type is pie")
+        error.push("You can add only one field in the Y axis for pie chart")
       }
 
-      if(dashboardData.data.fields.y.length && dashboardData.data.fields.y.filter((it:any) => (it.aggregationFunction == null || it.aggregationFunction == '')).length){
-        error.push("Aggregation function required")
+      // check if aggregation function is selected or not
+      const aggregationFunctionError = dashboardData.data.fields.y.filter((it:any) => (it.aggregationFunction == null || it.aggregationFunction == ''))
+      if(dashboardData.data.fields.y.length && aggregationFunctionError.length){
+        error.push(...aggregationFunctionError.map((it:any) => `${currentYLabel.value}: ${it.column}: Aggregation function required`))
       }
 
-      if(dashboardData.data.fields.y.length && dashboardData.data.fields.y.filter((it:any) => (it.label == null || it.label == '')).length){
-        error.push("label required")
+      // check if labels are there for y axis items
+      const labelError = dashboardData.data.fields.y.filter((it:any) => (it.label == null || it.label == ''))
+      if(dashboardData.data.fields.y.length && labelError.length){
+        error.push(...labelError.map((it:any) => `${currentYLabel.value}: ${it.column}: Label required`))
       }
 
+      // check if labels are there for y axis items
       if(dashboardData.data.config.title == null || dashboardData.data.config.title == '' ){
-        error.push("Panel Name is required")
+        error.push("Name of Panel is required")
       }
 
-      if(!dashboardData.data.fields.filter.length){
+      // if there are filters
+      if(dashboardData.data.fields.filter.length){
 
-        if(dashboardData.data.fields.filter.filter((it:any) => ((it.type == "list" && !it.values?.length))).length){
-          error.push("Please select at least one list filter value")
+        // check if at least 1 item from the list is selected
+        const listFilterError = dashboardData.data.fields.filter.filter((it:any) => ((it.type == "list" && !it.values?.length)))
+        if(listFilterError.length){
+          error.push(...listFilterError.map((it:any) => `Filter: ${it.column}: Select at least 1 item from the list`))
         }
 
-        if(dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && it.operator == null)).length){
-          error.push("Please select at least one condition operator value")
+        // check if condition operator is selected
+        const conditionFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && it.operator == null))
+        if(conditionFilterError.length){
+          error.push(...conditionFilterError.map((it:any) => `Filter: ${it.column}: Operator selection required`))
         }
 
-        if(dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && (it.value == null || it.value == ''))).length){
-          error.push("Please select at least one condition value")
+        // check if condition value is selected
+        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && (it.value == null || it.value == '')))
+        if(conditionValueFilterError.length){
+          error.push(...conditionValueFilterError.map((it:any) => `Filter: ${it.column}: Condition value required`))
         }
        
       }
 
+      // check if query syntax is valid
       if(dashboardData.layout.showCustomQuery && dashboardData.meta.errors.queryErrors.length){
         error.push("Please add valid query syntax")
       }
 
+      // show all the errors
       for (let index = 0; index < error.length; index++) {
         $q.notify({
           type: "negative",
