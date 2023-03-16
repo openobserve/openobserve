@@ -237,6 +237,22 @@ export default defineComponent({
         error.push("Please add valid query syntax")
       }
 
+      if(dashboardData.layout.showCustomQuery){
+
+        // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
+       
+        const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column))
+        if(customQueryXFieldError.length){
+          error.push(...customQueryXFieldError.map((it:any) => `Invalid XAxis ${it.column} value`))
+        }
+
+        const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column))
+        if(customQueryYFieldError.length){
+          error.push(...customQueryYFieldError.map((it:any) => `Invalid YAxis ${it.column} value`))
+        }
+       
+      }
+
       // show all the errors
       for (let index = 0; index < error.length; index++) {
         $q.notify({
