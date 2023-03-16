@@ -15,25 +15,21 @@
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
-use serde_json::Value;
 use tracing::info_span;
 
+use crate::common::json;
+use crate::common::time::parse_timestamp_micro_from_value;
+use crate::infra::cluster;
+use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
-use crate::{
-    common::{
-        json::{self, flatten_json},
-        time::parse_timestamp_micro_from_value,
-    },
-    infra::{cluster, config::CONFIG},
-    meta::StreamType,
-};
+use crate::meta::StreamType;
 
 #[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn ingest(
     org_id: &str,
     stream_name: &str,
     thread_id: usize,
-    records: Vec<serde_json::Map<String, Value>>,
+    records: Vec<serde_json::Map<String, json::Value>>,
 ) {
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let loc_span = info_span!("service:metadata:ingest");
@@ -44,7 +40,7 @@ pub async fn ingest(
     for item in records.iter() {
         let value = serde_json::to_value(item).unwrap();
         //JSON Flattening
-        let mut value = flatten_json(&value);
+        let mut value = json::flatten_json_and_format_field(&value);
         // get json object
         let local_val = value.as_object_mut().unwrap();
         // handle timestamp
@@ -57,7 +53,7 @@ pub async fn ingest(
         };
         local_val.insert(
             CONFIG.common.time_stamp_col.clone(),
-            Value::Number(timestamp.into()),
+            json::Value::Number(timestamp.into()),
         );
         let trace_id = local_val.get("trace_id").unwrap().as_str().unwrap();
         let value_str = json::to_string(&local_val).unwrap();

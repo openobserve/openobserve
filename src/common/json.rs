@@ -89,9 +89,32 @@ where
 }
 
 #[inline(always)]
+pub fn flatten_json_and_format_field(obj: &Value) -> Value {
+    let mut obj = flatten_json(obj);
+    if !obj.is_object() {
+        return obj.to_owned();
+    }
+    let mut map = serde_json::Map::new();
+    for (key, value) in obj.as_object_mut().unwrap().iter_mut() {
+        let key = key
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_lowercase().next().unwrap()
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>();
+        map.insert(key, value.to_owned());
+    }
+    Value::Object(map)
+}
+
+#[inline(always)]
 pub fn flatten_json(obj: &Value) -> Value {
     Flattener::new()
-        .set_key_separator(".")
+        .set_key_separator("_")
         .set_array_formatting(ArrayFormatting::Surrounded {
             start: "[".to_string(),
             end: "]".to_string(),
@@ -111,7 +134,7 @@ pub fn unflatten_json(obj: &Value) -> Value {
     let mut unflattened = serde_json::Map::new();
     for (key, value) in obj.as_object().unwrap() {
         let mut current = &mut unflattened;
-        let mut parts = key.split('.');
+        let mut parts = key.split('_');
         let last = parts.next_back().unwrap();
         for part in parts {
             let old = current.get(part);
@@ -138,29 +161,38 @@ pub fn unflatten_json(obj: &Value) -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
     #[test]
     fn test_flatten_json() {
-        let obj = json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}});
-        assert_eq!(
-            flatten_json(&obj),
-            json!({"key": "value", "nested_key.key": "value", "nested_key.foo": "bar"}),
-        );
+        let datas = [
+            (
+                json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}}),
+                json!({"key": "value", "nested_key_key": "value", "nested_key_foo": "bar"}),
+            ),
+            (
+                json!({"key+bar": "value", "@nested_key": {"key": "value", "Foo": "Bar"}}),
+                json!({"key_bar": "value", "_nested_key_key": "value", "_nested_key_foo": "Bar"}),
+            ),
+        ];
+        for (input, expected) in datas.iter() {
+            assert_eq!(flatten_json_and_format_field(input), *expected);
+        }
     }
     #[test]
-    fn test_unflatten_json1() {
-        let obj = json!({"key1": "value1", "nested_key.key2": "value2", "nested_key.foo": "bar"});
-        assert_eq!(
-            unflatten_json(&obj),
-            json!({"key1": "value1", "nested_key": {"key2": "value2", "foo": "bar"}}),
-        );
-    }
-    #[test]
-    fn test_unflatten_json2() {
-        let obj =
-            json!({"key1": "value1", "nested_key.key2": "value2", "nested_key.key2.foo": "bar"});
-        assert_eq!(
-            unflatten_json(&obj),
-            json!({"key1": "value1", "nested_key": {"key2": {"":"value2", "foo": "bar"}}}),
-        );
+
+    fn test_unflatten_json() {
+        let datas = [
+            (
+                json!({"key1": "value1", "nested_key_key2": "value2", "nested_key_foo": "bar"}),
+                json!({"key1": "value1", "nested": {"key": {"key2": "value2", "foo": "bar"}}}),
+            ),
+            (
+                json!({"key1": "value1", "nested_key_key2": "value2", "nested_key_key2_foo": "bar"}),
+                json!({"key1": "value1", "nested": {"key": {"key2": {"":"value2", "foo": "bar"}}}}),
+            ),
+        ];
+        for (input, expected) in datas.iter() {
+            assert_eq!(unflatten_json(input), *expected);
+        }
     }
 }
