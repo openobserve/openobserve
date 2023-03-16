@@ -63,7 +63,7 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<bool, Error> {
     let user;
-    let ep_suffix = &path[path.rfind('/').unwrap()..];
+    let ep_suffix = &path[path.rfind('/').unwrap_or(0)..];
     //this is only applicable for super admin user
     if is_root_user(user_id).await {
         user = users::get_user(None, user_id).await;
