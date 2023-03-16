@@ -79,19 +79,17 @@ impl FileStorage for S3 {
                 return Err(anyhow::anyhow!("s3 get object {} error: {:?}", file, e));
             }
         };
-        let object = object.body.collect().await.unwrap().into_bytes();
+        let data = object.body.collect().await.unwrap().into_bytes();
 
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
-        let _ = columns[0].to_string();
-        let org_id = columns[1].to_string();
-        let stream_type = columns[2].to_string();
-        let stream_name = columns[3].to_string();
-        metrics::STORAGE_READ_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
-            .inc_by(object.len() as u64);
+        if columns[0].eq("files") {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data.len() as u64);
+        }
 
-        Ok(object)
+        Ok(data)
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
@@ -108,13 +106,11 @@ impl FileStorage for S3 {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
-                let _ = columns[0].to_string();
-                let org_id = columns[1].to_string();
-                let stream_type = columns[2].to_string();
-                let stream_name = columns[3].to_string();
-                metrics::STORAGE_WRITE_BYTES
-                    .with_label_values(&[&org_id, &stream_name, &stream_type])
-                    .inc_by(data_size as u64);
+                if columns[0].eq("files") {
+                    metrics::STORAGE_WRITE_BYTES
+                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                        .inc_by(data_size as u64);
+                }
                 log::info!("s3 File upload success: {}", file);
                 Ok(())
             }
