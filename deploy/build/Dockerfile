@@ -16,6 +16,10 @@ RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --print cfg
 RUN rustc -C target-cpu=native --print cfg
+RUN cargo install sccache
+RUN where is sccache
+ENV RUSTC_WRAPPER=~/.cargo/bin/scccache
+ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 
 WORKDIR /app
 COPY . /app
