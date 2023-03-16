@@ -205,7 +205,7 @@
 <script lang="ts">
 // @ts-nocheck
 import { ref, defineComponent } from "vue";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   data() {
