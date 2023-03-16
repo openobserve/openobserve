@@ -167,11 +167,6 @@ export default function (store: any) {
           },
           children: [
             {
-              path: "",
-              name: "curl",
-              redirect: "ingestion/curl",
-            },
-            {
               path: "curl",
               name: "curl",
               component: Curl,
