@@ -16,6 +16,10 @@ RUN rustup target add aarch64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --print cfg
 RUN rustc -C target-cpu=native --print cfg
+RUN cargo install sccache
+ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
+ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+RUN sccache --start-server
 
 WORKDIR /app
 COPY . /app
@@ -28,6 +32,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   RUSTFLAGS='-C target-feature=+aes,+crc,+lse,+neon'
 RUN cargo build --release --features tmpcache,zo_functions --target aarch64-unknown-linux-gnu
 RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
+RUN sccache --show-stats
 
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
