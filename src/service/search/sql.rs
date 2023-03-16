@@ -87,9 +87,6 @@ impl Sql {
                 "Query SQL should likes [select * from table]"
             ));
         }
-
-        // Hack for quote
-        // origin_sql = add_quote_for_sql(&origin_sql);
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
 
         // check sql_mode
@@ -464,9 +461,6 @@ impl Sql {
                     .as_str(),
                 );
             }
-
-            // Hack for quote
-            // sql = add_quote_for_sql(sql.as_str());
 
             aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
         }

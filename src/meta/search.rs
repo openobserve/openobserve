@@ -159,8 +159,7 @@ impl Response {
     }
 
     pub fn add_hit(&mut self, hit: &Value) {
-        let hit = common::json::unflatten_json(hit);
-        self.hits.push(hit);
+        self.hits.push(hit.to_owned());
         self.total += 1;
     }
 

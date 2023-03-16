@@ -125,38 +125,6 @@ pub fn flatten_json(obj: &Value) -> Value {
         .unwrap()
 }
 
-#[inline(always)]
-pub fn unflatten_json(obj: &Value) -> Value {
-    if !obj.is_object() {
-        return obj.to_owned();
-    }
-
-    let mut unflattened = serde_json::Map::new();
-    for (key, value) in obj.as_object().unwrap() {
-        let mut current = &mut unflattened;
-        let mut parts = key.split('_');
-        let last = parts.next_back().unwrap();
-        for part in parts {
-            let old = current.get(part);
-            if let Some(old) = old {
-                if !old.is_object() {
-                    let old = old.to_owned();
-                    current.insert(part.to_string(), Value::Object(serde_json::Map::new()));
-                    current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-                    current.insert("".to_string(), old);
-                } else {
-                    current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-                }
-            } else {
-                current.insert(part.to_string(), Value::Object(serde_json::Map::new()));
-                current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-            }
-        }
-        current.insert(last.to_string(), value.clone());
-    }
-    Value::Object(unflattened)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,23 +144,6 @@ mod tests {
         ];
         for (input, expected) in datas.iter() {
             assert_eq!(flatten_json_and_format_field(input), *expected);
-        }
-    }
-    #[test]
-
-    fn test_unflatten_json() {
-        let datas = [
-            (
-                json!({"key1": "value1", "nested_key_key2": "value2", "nested_key_foo": "bar"}),
-                json!({"key1": "value1", "nested": {"key": {"key2": "value2", "foo": "bar"}}}),
-            ),
-            (
-                json!({"key1": "value1", "nested_key_key2": "value2", "nested_key_key2_foo": "bar"}),
-                json!({"key1": "value1", "nested": {"key": {"key2": {"":"value2", "foo": "bar"}}}}),
-            ),
-        ];
-        for (input, expected) in datas.iter() {
-            assert_eq!(unflatten_json(input), *expected);
         }
     }
 }
