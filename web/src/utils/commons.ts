@@ -370,7 +370,7 @@ export const addPanel = async (store: any, dashboardId: any, panelData: any) => 
     x: 0,
     y: currentDashboard.layouts?.length > 0 ? maxY + 10 : 0,
     w: 12,
-    h: 12,
+    h: 13,
     i: maxI + 1,
     panelId: panelData.id,
     static: false,
