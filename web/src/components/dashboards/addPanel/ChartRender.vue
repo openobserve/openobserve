@@ -1,20 +1,30 @@
 <template>
-  <div v-if="props.data.type == 'table'" class="q-pa-md">
-    <q-table
-      class="my-sticky-virtscroll-table"
-      virtual-scroll
-      v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
-      :virtual-scroll-sticky-size-start="48"
-      dense
-      :rows="searchQueryData?.data || []"
-      :columns="tableColumn"
-      row-key="id"
-    >
-    </q-table>
+  <div style="height: 40px; z-index: 10;">
+    <q-spinner-dots
+      v-if="searchQueryData.loading"
+      color="primary"
+      size="40px"
+      style="margin: 0 auto; display: block"
+    />
   </div>
-  <div v-else>
-    <div ref="plotRef" :id="chartID" class="plotlycontainer"></div>
+  <div style="margin-top: -40px;">
+    <div v-if="props.data.type == 'table'" class="q-pa-md">
+      <q-table
+        class="my-sticky-virtscroll-table"
+        virtual-scroll
+        v-model:pagination="pagination"
+        :rows-per-page-options="[0]"
+        :virtual-scroll-sticky-size-start="48"
+        dense
+        :rows="searchQueryData?.data || []"
+        :columns="tableColumn"
+        row-key="id"
+      >
+      </q-table>
+    </div>
+    <div v-else>
+      <div ref="plotRef" :id="chartID" class="plotlycontainer"></div>
+    </div>
   </div>
 </template>
 
@@ -44,6 +54,7 @@ export default defineComponent({
     const store = useStore();
     const searchQueryData = reactive({
       data: [],
+      loading: false
     });
 
     //render the plotly chart if the chart type is not table
@@ -170,16 +181,17 @@ export default defineComponent({
         },
       };
 
+      searchQueryData.loading = true
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
           searchQueryData.data = res.data.hits;
-
-          $q.notify({
-            type: "positive",
-            message: "Query applied successfully.",
-            timeout: 5000,
-          });
+          searchQueryData.loading = false
+          // $q.notify({
+          //   type: "positive",
+          //   message: "Query applied successfully.",
+          //   timeout: 5000,
+          // });
         })
         .catch((error) => {
           $q.notify({
@@ -248,8 +260,8 @@ export default defineComponent({
           automargin: true,
         },
         margin: {
-          l: 32,
-          r: 16,
+          l: props.data.type == 'pie' ? 60 : 32,
+          r: props.data.type == 'pie' ? 60 : 16,
           t: 38,
           b: 32,
         },
