@@ -27,7 +27,7 @@
           :label="t('search.showFieldLabel')"
         />
         <q-toggle
-          v-show="!searchObj.meta.sqlMode"
+          v-bind:disable="searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
@@ -140,7 +140,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import DateTime from "./DateTime.vue";
+import DateTime from "../../components/DateTime.vue";
 import useLogs from "../../composables/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";

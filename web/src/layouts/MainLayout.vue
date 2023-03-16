@@ -67,7 +67,7 @@
                 {{ selectedLanguage.label }}
               </div>
             </template>
-            <q-list>
+            <q-list class="languagelist">
               <q-item
                 v-for="lang in langList"
                 :key="lang.code"
@@ -95,7 +95,7 @@
             v-model="selectedOrg"
             borderless
             :options="orgOptions"
-            class="q-px-none q-py-none q-mx-none q-my-none"
+            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
         </div>
@@ -235,6 +235,15 @@ export default defineComponent({
       "img:" + getImageURL("images/language_flags/en-gb.svg")
     );
     const zoBackendUrl = store.state.API_ENDPOINT;
+    const customOrganization = router.currentRoute.value.query.org_identifier;
+    if (
+      customOrganization != undefined &&
+      customOrganization != store.state.selectedOrganization.identifier
+    ) {
+      useLocalOrganization("");
+      store.dispatch("setSelectedOrganization", {});
+    }
+
     var linksList = ref([
       {
         title: t("menu.home"),
@@ -413,7 +422,7 @@ export default defineComponent({
       miniMode.value = !miniMode.value;
     }
 
-    const selectedOrg = ref("");
+    const selectedOrg = ref();
     let orgOptions = ref([{ label: Number, value: String }]);
     const getDefaultOrganization = async () => {
       await organizationService
@@ -448,14 +457,21 @@ export default defineComponent({
               };
 
               if (
-                (selectedOrg.value == "" &&
+                ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
                   data.type == "default" &&
-                  store.state.userInfo.email == data.UserObj.email) ||
-                res.data.data.length == 1
+                  store.state.userInfo.email == data.UserObj.email &&
+                  (customOrganization == "" ||
+                    customOrganization == undefined)) ||
+                (res.data.data.length == 1 &&
+                  (customOrganization == "" || customOrganization == undefined))
               ) {
                 selectedOrg.value = localOrg.value
                   ? localOrg.value
                   : optiondata;
+                useLocalOrganization(selectedOrg.value);
+                store.dispatch("setSelectedOrganization", selectedOrg.value);
+              } else if (data.identifier == customOrganization) {
+                selectedOrg.value = optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
@@ -468,6 +484,18 @@ export default defineComponent({
     getDefaultOrganization();
 
     const updateOrganization = () => {
+      const orgIdentifier = selectedOrg.value.identifier;
+      const queryParams =
+        router.currentRoute.value.path.indexOf(".logs") > -1
+          ? router.currentRoute.value.query
+          : {};
+      router.push({
+        path: router.currentRoute.value.path,
+        query: {
+          ...queryParams,
+          org_identifier: orgIdentifier,
+        },
+      });
       useLocalOrganization(selectedOrg.value);
       store.state.selectedOrganization = selectedOrg;
     };
@@ -621,6 +649,11 @@ export default defineComponent({
       }
     }
   }
+}
+
+.q-item {
+  min-height: 30px;
+  padding: 8px 8px;
 }
 
 .q-list {

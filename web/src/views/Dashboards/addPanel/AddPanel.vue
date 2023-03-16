@@ -92,7 +92,7 @@ import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
 import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import DateTime from "../../../plugins/logs/DateTime.vue";
+import DateTime from "../../../components/DateTime.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 
 export default defineComponent({
@@ -208,7 +208,7 @@ export default defineComponent({
       this.goBack();
     },
     savePanelOnClick() {
-      const dashboardId = this.$route.query.dashboard + ""
+      const dashboardId = this.$route.query.dashboard + "";
       this.savePanelChangesToDashboard(dashboardId);
     },
   },
