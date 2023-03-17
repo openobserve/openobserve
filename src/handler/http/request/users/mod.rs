@@ -14,15 +14,13 @@
 
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use ahash::AHashMap;
-use serde_json::Value;
 use std::io::Error;
 
 use crate::meta;
-use crate::meta::user::SignInUser;
 use crate::meta::user::UpdateUser;
 use crate::meta::user::UserOrgRole;
 use crate::meta::user::UserRequest;
+use crate::meta::user::{SignInResponse, SignInUser};
 use crate::service::users;
 
 /** List all users of an organization */
@@ -163,24 +161,31 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /** Authenticate a user */
-#[post("/user")]
-pub async fn authentication(user: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
-    let mut ret: AHashMap<&str, Value> = AHashMap::new();
-
-    match crate::handler::http::auth::validate_user(&user.name, &user.password).await {
+#[utoipa::path(
+    context_path = "/auth",
+    tag = "Auth",
+    operation_id = "UserLoginCheck",
+    request_body(content = SignInUser, description = "User login", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = SignInResponse),
+    )
+)]
+#[post("/login")]
+pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
+    let mut resp = SignInResponse::default();
+    match crate::handler::http::auth::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v {
-                ret.insert("status", Value::Bool(true));
+                resp.status = true;
             } else {
-                ret.insert("status", Value::Bool(false));
-                ret.insert("message", Value::String("Invalid credentials".to_string()));
+                resp.status = false;
+                resp.message = "Invalid credentials".to_string();
             }
         }
         Err(_e) => {
-            ret.insert("status", Value::Bool(false));
-            ret.insert("message", Value::String("Invalid credentials".to_string()));
+            resp.status = false;
+            resp.message = "Invalid credentials".to_string();
         }
     };
-
-    Ok(HttpResponse::Ok().json(ret))
+    Ok(HttpResponse::Ok().json(resp))
 }
