@@ -43,6 +43,11 @@ export const modifySQLQuery = (currentTimeObj: any, querySQL: String) => {
 // ----------- NEW Methods to retrieve dashboard data
 export function getConsumableDateTime(dateObj: any) {
   if (dateObj.tab == "relative") {
+    // watcher issue based on changeRelativeDate() in logs/Index.vue
+    if(typeof dateObj.relative.value == 'string') {
+      dateObj.relative.value = dateObj.relative.value.replace(/[^\d]/g, "");
+    }
+
     let period = "";
     let periodValue = 0;
     // quasar does not support arithmetic on weeks. convert to days.
@@ -193,7 +198,7 @@ export const deletePanel = async (store:any, dashboardId:any, panelId:any) => {
     currentDashboard.layouts.splice(layoutIndex, 1);
     currentDashboard.layouts = currentDashboard.layouts;
 
-    await updateDashboard(store, store.state.selectedOrganization.identifier, dashboardId, currentDashboard )
+    await updateDashboard(store, store.state.selectedOrganization.identifier , dashboardId, currentDashboard )
 }
 
 export const updatePanel = async (store:any, dashboardId:any, panelData:any) => {
@@ -211,7 +216,7 @@ export const updatePanel = async (store:any, dashboardId:any, panelData:any) => 
       currentDashboard.panels[panelIndex] = panelData;
       currentDashboard.panels = currentDashboard.panels;
   
-      await updateDashboard(store, store.state.selectedOrganization.identifier, dashboardId, currentDashboard )
+      await updateDashboard(store, store.state.selectedOrganization.identifier , dashboardId, currentDashboard )
   }
 
 export const updateDashboard = async (store: any, org:any, dashboardId:any, currentDashboardData: any) => {
