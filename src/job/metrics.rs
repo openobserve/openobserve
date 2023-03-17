@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::path::Path;
 use tokio::time;
 
@@ -42,7 +42,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     };
     let pattern = format!("{}/files/*/*/*/*.json", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
-    let mut sizes = HashMap::new();
+    let mut sizes = HashMap::default();
     for file in files {
         let local_file = file.to_owned();
         let local_path = Path::new(&file).canonicalize().unwrap();

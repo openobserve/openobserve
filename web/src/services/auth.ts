@@ -17,7 +17,7 @@ import http from "./http";
 
 const auth = {
   sign_in_user: (payload: any) => {
-    return http().post(`/auth/user`, payload);
+    return http().post(`/auth/login`, payload);
   },
 };
 
