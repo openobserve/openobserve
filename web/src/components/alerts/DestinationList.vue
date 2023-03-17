@@ -1,77 +1,82 @@
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table
-      ref="q-table"
-      :rows="destinations"
-      :columns="columns"
-      row-key="id"
-      style="width: 100%"
-    >
-      <template #no-data>
-        <NoData />
-      </template>
-      <template v-slot:body-cell-actions="props">
-        <q-td :props="props">
+    <div v-if="!showDestinationEditor">
+      <q-table
+        ref="q-table"
+        :rows="destinations"
+        :columns="columns"
+        row-key="id"
+        style="width: 100%"
+      >
+        <template #no-data>
+          <NoData />
+        </template>
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn
+              icon="edit"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alert_destinations.edit')"
+              @click="editTemplate(props)"
+            ></q-btn>
+            <q-btn
+              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alert_destinations.delete')"
+              @click="deleteTemplate(props)"
+            ></q-btn>
+          </q-td>
+        </template>
+        <template #top>
+          <div class="q-table__title">
+            {{ t("alert_destinations.header") }}
+          </div>
+          <q-input
+            v-model="destinationSearchKey"
+            borderless
+            filled
+            dense
+            class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alert_destinations.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
           <q-btn
-            icon="edit"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alerts.edit')"
-            @click="editTemplate(props)"
-          ></q-btn>
-          <q-btn
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alerts.delete')"
-            @click="deleteTemplate(props)"
-          ></q-btn>
-        </q-td>
-      </template>
-      <template #top>
-        <div class="q-table__title">
-          {{ t("templates.header") }}
-        </div>
-        <q-input
-          v-model="destinationSearchKey"
-          borderless
-          filled
-          dense
-          class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('templates.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
-          </template>
-        </q-input>
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t(`templates.add`)"
-          @click="createNewTemplate({})"
-        />
-      </template>
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`alert_destinations.add`)"
+            @click="toggleDestionationEditor"
+          />
+        </template>
 
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
-      </template>
-    </q-table>
+        <template #bottom="scope">
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </template>
+      </q-table>
+    </div>
+    <div v-else>
+      <AddDestination />
+    </div>
   </q-page>
 </template>
 <script lang="ts" setup>
@@ -80,6 +85,7 @@ import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
+import AddDestination from "./AddDestination.vue";
 
 const destinations = ref([]);
 const { t } = useI18n();
@@ -93,33 +99,34 @@ const columns: any = ref<QTableProps["columns"]>([
   {
     name: "name",
     field: "name",
-    label: t("templates.name"),
+    label: t("alert_destinations.name"),
     align: "left",
     sortable: true,
   },
   {
     name: "url",
     field: "url",
-    label: t("templates.url"),
+    label: t("alert_destinations.url"),
     align: "left",
     sortable: false,
   },
   {
     name: "method",
     field: "method",
-    label: t("templates.method"),
+    label: t("alert_destinations.method"),
     align: "left",
     sortable: true,
   },
   {
     name: "actions",
     field: "actions",
-    label: t("alerts.actions"),
+    label: t("alert_destinations.actions"),
     align: "center",
     sortable: false,
   },
 ]);
 const destinationSearchKey = ref("");
+const showDestinationEditor = ref(false);
 const perPageOptions: any = [
   { label: "5", value: 5 },
   { label: "10", value: 10 },
@@ -131,7 +138,10 @@ const perPageOptions: any = [
 const resultTotal = ref<number>(0);
 const editTemplate = (props) => {};
 const deleteTemplate = (props) => {};
-const createNewTemplate = (props) => {};
+const createNewDestination = (props) => {};
 const changePagination = () => {};
+const toggleDestionationEditor = () => {
+  showDestinationEditor.value = !showDestinationEditor.value;
+};
 </script>
 <style lang=""></style>
