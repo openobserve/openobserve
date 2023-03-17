@@ -485,7 +485,7 @@ export default defineComponent({
     const onDrop = (e:any, area: string) => {
       console.log('dropped');
       
-      const dragItem = dashboardPanelData.meta.dragAndDrop.dragElement
+      const dragItem:any  = dashboardPanelData.meta.dragAndDrop.dragElement
 
       dashboardPanelData.meta.dragAndDrop.dragging = false
       dashboardPanelData.meta.dragAndDrop.dragElement = null

@@ -128,7 +128,6 @@ import DateTime from "../../components/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
 import {
-  deletePanelFromDashboard,
   getConsumableDateTime,
   getDashboard,
 } from "../../utils/commons.ts";
@@ -255,19 +254,6 @@ export default defineComponent({
       addNewPanel(route.query.dashboard);
     };
 
-    const deleteExistingPanel = async (
-      panelDataElement: any,
-      dashboardId: String,
-      dashboardList: any
-    ) => {
-      deletePanelFromDashboard(
-        store,
-        dashboardId,
-        panelDataElement.id,
-        dashboardList
-      );
-    };
-
     let list = computed(function () {
       return [toRaw(currentDashboardData.data)];
     });
@@ -286,7 +272,6 @@ export default defineComponent({
       deleteDashboard,
       addNewPanel,
       saveDashboardOnClick,
-      deleteExistingPanel,
       store,
       refDateTime,
       filterQuery: ref(""),
