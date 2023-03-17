@@ -10,20 +10,32 @@ phases:
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
-      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
-      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
-      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
 
+      # build for sccache image
+      - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64 -f deploy/build/Dockerfile.sccache.aarch64 .
+      - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
       - echo 'Pull amd64 image'
-      - docker pull public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
-      - docker pull public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
-       
+      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
       - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:latest --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
-      
+      - docker manifest create public.ecr.aws/zinclabs/rust:bullseye-sccache --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 --amend public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
       - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
-      - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
+      - docker manifest push public.ecr.aws/zinclabs/rust:bullseye-sccache
+
+      # build zincobserve
+      # - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      # - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
+      # - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      # - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
+      # - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+
+      # - echo 'Pull amd64 image'
+      # - docker pull public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
+      # - docker pull public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
+       
+      # - echo 'Create manifests'
+      # - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      # - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:latest --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
+      
+      # - echo 'Push manifests'
+      # - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
+      # - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
