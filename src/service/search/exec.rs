@@ -152,9 +152,8 @@ pub async fn search(
             {
                 Ok(res) => res,
                 Err(err) => {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
+                    log::error!("datafusion merge error: {}", err);
+                    return Err(super::handle_datafusion_error(err));
                 }
             };
     }

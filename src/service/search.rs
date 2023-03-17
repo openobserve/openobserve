@@ -14,6 +14,7 @@
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use datafusion_common::DataFusionError;
 use http_auth_basic::Credentials;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -578,6 +579,25 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     );
 
     Ok(result)
+}
+
+pub fn handle_datafusion_error(err: DataFusionError) -> Error {
+    let err = err.to_string();
+    if err.contains("Schema error: No field named") {
+        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound);
+    }
+    if err.contains("parquet not found") {
+        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
+    }
+    if err.contains("Invalid function ") {
+        return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined);
+    }
+    if err.contains("Incompatible data types") {
+        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType);
+    }
+    Error::ErrorCode(ErrorCodes::ServerInternalError(
+        "sql execute error".to_string(),
+    ))
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);

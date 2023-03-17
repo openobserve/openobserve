@@ -217,25 +217,8 @@ pub async fn search(
                     }
                 }
                 Err(err) => {
-                    log::error!("datafusion exec error: {}", err);
-                    let err = err.to_string();
-                    if err.contains("Filed not found") {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound));
-                    }
-                    if err.contains("Object not found") {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound));
-                    }
-                    if err.contains("Function not found") {
-                        return Err(Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined));
-                    }
-                    if err.contains("conflict data type") {
-                        return Err(Error::ErrorCode(
-                            ErrorCodes::SearchFieldHasNoCompatibleDataType,
-                        ));
-                    }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "datafusion exec error".to_string(),
-                    )));
+                    log::error!("datafusion execute error: {}", err);
+                    return Err(super::handle_datafusion_error(err));
                 }
             },
             Err(err) => {
