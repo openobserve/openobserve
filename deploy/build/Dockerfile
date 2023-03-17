@@ -9,9 +9,9 @@ FROM public.ecr.aws/docker/library/rust:bullseye as builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
-RUN apt-get update
-RUN apt-get install -y protobuf-compiler
-RUN apt-get install -y cmake curl
+# RUN apt-get update
+# RUN apt-get install -y protobuf-compiler
+# RUN apt-get install -y cmake curl
 
 RUN rustup toolchain install nightly-2023-01-26
 RUN rustup default nightly-2023-01-26
@@ -22,7 +22,13 @@ RUN rustc -C target-cpu=native --print cfg
 RUN cargo install sccache
 ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
+ENV SCCACHE_IDLE_TIMEOUT=1800
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip \
+    unzip protoc-21.12-linux-x86_64.zip -d protoc \
+    cp protoc/bin/protoc /usr/local/bin/ \
+    cp -r protoc/include/google /usr/local/include/
 
 WORKDIR /app
 COPY . /app

@@ -20,9 +20,9 @@ phases:
       - mkdir -p web/dist 
       - touch web/dist/index.html
       # increase swap file size
-      # - fallocate -l 32G /swapfile
-      # - chmod 600 /swapfile
-      # - mkswap /swapfile
-      # - swapon /swapfile
+      - fallocate -l 32G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile
+      - swapon /swapfile
       - cargo clippy -- -A clippy::uninlined_format_args
       - ./coverage.sh
