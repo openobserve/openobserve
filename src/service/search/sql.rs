@@ -211,6 +211,19 @@ impl Sql {
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
+        // Hack _timestamp
+        if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
+            let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
+            let caps = re.captures(origin_sql.as_str()).unwrap();
+            let cap_str = caps.get(1).unwrap().as_str();
+            if !cap_str.contains(&CONFIG.common.time_stamp_col) {
+                origin_sql = origin_sql.replace(
+                    cap_str,
+                    &format!("{}, {}", &CONFIG.common.time_stamp_col, cap_str),
+                );
+            }
+        }
+
         // Hack time range
         if req_time_range.0 > 0 || req_time_range.1 > 0 {
             meta.time_range = Some(req_time_range);
