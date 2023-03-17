@@ -23,6 +23,8 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN cargo install sccache
 # ENV SCCACHE_IDLE_TIMEOUT=1800
 # ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
+ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
 
 # RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip \
 #     && unzip protoc-21.12-linux-aarch_64.zip -d protoc \
@@ -34,8 +36,6 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
 # RUN cargo build --release
-ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
-ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
