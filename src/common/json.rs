@@ -89,9 +89,32 @@ where
 }
 
 #[inline(always)]
+pub fn flatten_json_and_format_field(obj: &Value) -> Value {
+    let mut obj = flatten_json(obj);
+    if !obj.is_object() {
+        return obj.to_owned();
+    }
+    let mut map = serde_json::Map::new();
+    for (key, value) in obj.as_object_mut().unwrap().iter_mut() {
+        let key = key
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_lowercase().next().unwrap()
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>();
+        map.insert(key, value.to_owned());
+    }
+    Value::Object(map)
+}
+
+#[inline(always)]
 pub fn flatten_json(obj: &Value) -> Value {
     Flattener::new()
-        .set_key_separator(".")
+        .set_key_separator("_")
         .set_array_formatting(ArrayFormatting::Surrounded {
             start: "[".to_string(),
             end: "]".to_string(),
@@ -102,65 +125,25 @@ pub fn flatten_json(obj: &Value) -> Value {
         .unwrap()
 }
 
-#[inline(always)]
-pub fn unflatten_json(obj: &Value) -> Value {
-    if !obj.is_object() {
-        return obj.to_owned();
-    }
-
-    let mut unflattened = serde_json::Map::new();
-    for (key, value) in obj.as_object().unwrap() {
-        let mut current = &mut unflattened;
-        let mut parts = key.split('.');
-        let last = parts.next_back().unwrap();
-        for part in parts {
-            let old = current.get(part);
-            if let Some(old) = old {
-                if !old.is_object() {
-                    let old = old.to_owned();
-                    current.insert(part.to_string(), Value::Object(serde_json::Map::new()));
-                    current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-                    current.insert("".to_string(), old);
-                } else {
-                    current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-                }
-            } else {
-                current.insert(part.to_string(), Value::Object(serde_json::Map::new()));
-                current = current.get_mut(part).unwrap().as_object_mut().unwrap();
-            }
-        }
-        current.insert(last.to_string(), value.clone());
-    }
-    Value::Object(unflattened)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
     #[test]
     fn test_flatten_json() {
-        let obj = json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}});
-        assert_eq!(
-            flatten_json(&obj),
-            json!({"key": "value", "nested_key.key": "value", "nested_key.foo": "bar"}),
-        );
-    }
-    #[test]
-    fn test_unflatten_json1() {
-        let obj = json!({"key1": "value1", "nested_key.key2": "value2", "nested_key.foo": "bar"});
-        assert_eq!(
-            unflatten_json(&obj),
-            json!({"key1": "value1", "nested_key": {"key2": "value2", "foo": "bar"}}),
-        );
-    }
-    #[test]
-    fn test_unflatten_json2() {
-        let obj =
-            json!({"key1": "value1", "nested_key.key2": "value2", "nested_key.key2.foo": "bar"});
-        assert_eq!(
-            unflatten_json(&obj),
-            json!({"key1": "value1", "nested_key": {"key2": {"":"value2", "foo": "bar"}}}),
-        );
+        let datas = [
+            (
+                json!({"key": "value", "nested_key": {"key": "value", "foo": "bar"}}),
+                json!({"key": "value", "nested_key_key": "value", "nested_key_foo": "bar"}),
+            ),
+            (
+                json!({"key+bar": "value", "@nested_key": {"key": "value", "Foo": "Bar"}}),
+                json!({"key_bar": "value", "_nested_key_key": "value", "_nested_key_foo": "Bar"}),
+            ),
+        ];
+        for (input, expected) in datas.iter() {
+            assert_eq!(flatten_json_and_format_field(input), *expected);
+        }
     }
 }
