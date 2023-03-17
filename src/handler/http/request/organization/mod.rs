@@ -20,11 +20,10 @@ use std::io::Error;
 
 use crate::common::auth::is_root_user;
 use crate::infra::config::USERS;
-use crate::meta::organization::PasscodeResponse;
+use crate::meta::organization::{PasscodeResponse, DEFAULT_ORG};
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
 
-const DEFAULT: &str = "default";
 const CUSTOM: &str = "custom";
 const THRESHOLD: i64 = 9383939382;
 
@@ -77,15 +76,15 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     let is_root_user = is_root_user(user_id).await;
     if is_root_user {
         id += 1;
-        org_names.insert(DEFAULT.to_string());
+        org_names.insert(DEFAULT_ORG.to_string());
         orgs.push(OrganizationDetails {
             id,
-            identifier: DEFAULT.to_string(),
-            name: DEFAULT.to_string(),
+            identifier: DEFAULT_ORG.to_string(),
+            name: DEFAULT_ORG.to_string(),
             user_email: user_id.to_string(),
             ingest_threshold: THRESHOLD,
             search_threshold: THRESHOLD,
-            org_type: DEFAULT.to_string(),
+            org_type: DEFAULT_ORG.to_string(),
             user_obj: user_detail.clone(),
         });
     }

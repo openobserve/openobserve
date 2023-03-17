@@ -162,12 +162,6 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct SignInUser {
-    pub name: String,
-    pub password: String,
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum UserRole {
     #[serde(rename = "admin")]
@@ -202,4 +196,17 @@ pub struct UserResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserList {
     pub data: Vec<UserResponse>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SignInUser {
+    pub name: String,
+    pub password: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SignInResponse {
+    pub status: bool,
+    pub message: String,
+    pub orgaizations: Vec<String>,
 }

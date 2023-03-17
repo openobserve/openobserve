@@ -14,15 +14,17 @@
 
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use ahash::AHashMap;
-use serde_json::Value;
+use std::collections::HashSet;
 use std::io::Error;
 
+use crate::common::auth::is_root_user;
+use crate::infra::config::USERS;
 use crate::meta;
-use crate::meta::user::SignInUser;
+use crate::meta::organization::DEFAULT_ORG;
 use crate::meta::user::UpdateUser;
 use crate::meta::user::UserOrgRole;
 use crate::meta::user::UserRequest;
+use crate::meta::user::{SignInResponse, SignInUser};
 use crate::service::users;
 
 /** List all users of an organization */
@@ -163,24 +165,50 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 }
 
 /** Authenticate a user */
-#[post("/user")]
-pub async fn authentication(user: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
-    let mut ret: AHashMap<&str, Value> = AHashMap::new();
-
-    match crate::handler::http::auth::validate_user(&user.name, &user.password).await {
+#[utoipa::path(
+    context_path = "/auth",
+    tag = "Auth",
+    operation_id = "UserLoginCheck",
+    request_body(content = SignInUser, description = "User login", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = SignInResponse),
+    )
+)]
+#[post("/login")]
+pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
+    let mut resp = SignInResponse::default();
+    match crate::handler::http::auth::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
-            if v {
-                ret.insert("status", Value::Bool(true));
-            } else {
-                ret.insert("status", Value::Bool(false));
-                ret.insert("message", Value::String("Invalid credentials".to_string()));
+            if !v {
+                resp.status = false;
+                resp.message = "Invalid credentials".to_string();
+                return Ok(HttpResponse::Ok().json(resp));
             }
         }
         Err(_e) => {
-            ret.insert("status", Value::Bool(false));
-            ret.insert("message", Value::String("Invalid credentials".to_string()));
+            resp.status = false;
+            resp.message = "Invalid credentials".to_string();
+            return Ok(HttpResponse::Ok().json(resp));
         }
     };
 
-    Ok(HttpResponse::Ok().json(ret))
+    // get orgaizations
+    let mut org_names = HashSet::new();
+    let is_root_user = is_root_user(&auth.name).await;
+    if is_root_user {
+        org_names.insert(DEFAULT_ORG.to_string());
+    }
+    for user in USERS.iter() {
+        if !user.key().contains('/') {
+            continue;
+        }
+        if !is_root_user && !user.key().ends_with(format!("/{}", &auth.name).as_str()) {
+            continue;
+        }
+        org_names.insert(user.key().split('/').collect::<Vec<&str>>()[0].to_string());
+    }
+
+    resp.status = true;
+    resp.orgaizations = org_names.iter().map(|x| x.to_string()).collect();
+    Ok(HttpResponse::Ok().json(resp))
 }
