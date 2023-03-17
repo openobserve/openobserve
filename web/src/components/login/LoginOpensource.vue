@@ -30,15 +30,30 @@
                   </template>
                 </q-input>
 
-                <q-input v-model="password" data-cy="login-password" type="password" :label="t('login.password') + ' *'">
+                <q-input
+                  v-model="password"
+                  data-cy="login-password"
+                  type="password"
+                  :label="t('login.password') + ' *'"
+                >
                   <template #prepend>
                     <q-icon name="lock" />
                   </template>
                 </q-input>
 
                 <q-card-actions class="q-px-lg q-mt-md q-mb-xl">
-                  <q-btn data-cy="login-sign-in" unelevated size="lg" class="full-width" color="primary" type="submit"
-                    :label="t('login.signIn')" :loading="submitting" no-caps @click="onSignIn()" />
+                  <q-btn
+                    data-cy="login-sign-in"
+                    unelevated
+                    size="lg"
+                    class="full-width"
+                    color="primary"
+                    type="submit"
+                    :label="t('login.signIn')"
+                    :loading="submitting"
+                    no-caps
+                    @click="onSignIn()"
+                  />
                 </q-card-actions>
               </q-form>
             </q-card-section>
@@ -57,6 +72,7 @@ import { useRouter } from "vue-router";
 
 import { useI18n } from "vue-i18n";
 import authService from "../../services/auth";
+import organizationsService from "../../services/organizations";
 import {
   useLocalToken,
   getBasicAuth,
@@ -84,7 +100,6 @@ export default defineComponent({
     const submitting = ref(false);
 
     const onSignIn = () => {
-
       if (name.value == "" || password.value == "") {
         $q.notify({
           position: "top",
@@ -130,7 +145,65 @@ export default defineComponent({
                   window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
 
-                redirectUser(redirectURI);
+                const selectedOrg = ref("");
+                const orgOptions = ref([{ label: Number, value: String }]);
+                await organizationsService
+                  .os_list(0, 1000, "id", false, "", "default")
+                  .then((res: any) => {
+                    const localOrg: any = useLocalOrganization();
+                    if (
+                      localOrg.value != null &&
+                      localOrg.value.user_email !== userInfo.email
+                    ) {
+                      localOrg.value = null;
+                      useLocalOrganization("");
+                    }
+
+                    orgOptions.value = res.data.data.map(
+                      (data: {
+                        id: any;
+                        name: any;
+                        type: any;
+                        identifier: any;
+                        user_obj: any;
+                        ingest_threshold: number;
+                        search_threshold: number;
+                        user_email: string;
+                      }) => {
+                        const optiondata: any = {
+                          label: data.name,
+                          id: data.id,
+                          type: data.type,
+                          identifier: data.identifier,
+                          user_email: data.user_email,
+                          ingest_threshold: data.ingest_threshold,
+                          search_threshold: data.search_threshold,
+                        };
+
+                        if (
+                          ((selectedOrg.value == "" ||
+                            selectedOrg.value == undefined) &&
+                            data.type == "default" &&
+                            userInfo.email == data.user_email) ||
+                          res.data.data.length == 1
+                        ) {
+                          selectedOrg.value = localOrg.value
+                            ? localOrg.value
+                            : optiondata;
+                          useLocalOrganization(selectedOrg.value);
+
+                          store.dispatch(
+                            "setSelectedOrganization",
+                            selectedOrg.value
+                          );
+                          redirectUser(redirectURI);
+                        }
+                        return optiondata;
+                      }
+                    );
+
+                    return res.data.data;
+                  });
               } else {
                 submitting.value = false;
                 loginform.value.resetValidation();
@@ -160,8 +233,6 @@ export default defineComponent({
         }
       }
     };
-
-
 
     return {
       t,
