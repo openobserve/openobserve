@@ -50,7 +50,7 @@ export const getDefaultOrganization = async (userInfo: any, org_identifier: any)
         };
 
         if (
-          (selectedOrg.value == "" &&
+          ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
             data.org_type == "default" &&
             userInfo.email == data.user_obj.email) ||
           res.data.data.length == 1
