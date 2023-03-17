@@ -23,7 +23,7 @@ use super::auth::validator;
 use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
-use super::request::ingest;
+use super::request::logs;
 use super::request::organization::*;
 use super::request::prom::*;
 use super::request::search;
@@ -91,9 +91,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .wrap(auth)
             .wrap(cors)
             .service(status::cache_status)
-            .service(ingest::bulk)
-            .service(ingest::multi)
-            .service(ingest::json)
+            .service(logs::ingest::bulk)
+            .service(logs::ingest::multi)
+            .service(logs::ingest::json)
             .service(search::search)
             .service(search::around)
             .service(stream::schema)

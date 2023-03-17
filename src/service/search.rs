@@ -27,11 +27,11 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
 use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::infra::db::etcd;
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
 use crate::meta::search::Response;
 use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::file_list;
+use crate::service::{db, file_list};
 
 mod cache;
 pub mod datafusion;
@@ -39,13 +39,13 @@ pub mod exec;
 pub mod sql;
 mod storage;
 
-pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), anyhow::Error>;
+pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
 
 pub async fn search(
     org_id: &str,
     stream_type: StreamType,
     req: &meta::search::Request,
-) -> Result<Response, anyhow::Error> {
+) -> Result<Response, Error> {
     let root_span = info_span!("service:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -72,20 +72,19 @@ pub async fn search(
 
     if result.is_err() {
         let err = result.err();
-        log::error!("search error: {:?}", err);
-        return Err(anyhow::anyhow!("error: {:?}", err));
+        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
+            "{:?}",
+            err
+        ))));
     }
     match result.unwrap() {
         Ok(res) => Ok(res),
-        Err(err) => {
-            log::error!("search error: {:?}", err);
-            Err(anyhow::anyhow!("error: {:?}", err))
-        }
+        Err(err) => Err(err),
     }
 }
 
 #[tracing::instrument(name = "service:search:local:enter", skip(req))]
-async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, anyhow::Error> {
+async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let resp = match exec::search(&req).await {
         Ok(res) => res,
         Err(err) => return Err(err),
@@ -104,7 +103,14 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, an
             reader.num_batches()
         );
         let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-        let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..])?;
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
         let sources: Vec<serde_json::Value> = json_rows
             .into_iter()
             .map(serde_json::Value::Object)
@@ -125,7 +131,14 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, an
                 reader.num_batches()
             );
             let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-            let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..])?;
+            let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
+                Ok(res) => res,
+                Err(err) => {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
+            };
             let sources: Vec<serde_json::Value> = json_rows
                 .into_iter()
                 .map(serde_json::Value::Object)
@@ -155,7 +168,7 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, an
 }
 
 #[tracing::instrument(name = "service:search:cluster:enter", skip(req))]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, anyhow::Error> {
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     // start time
     let start = std::time::Instant::now();
     let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
@@ -167,8 +180,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     match locker.lock(0).await {
         Ok(res) => res,
         Err(err) => {
-            log::error!("search in cluster get lock error: {}", err);
-            return Err(anyhow::anyhow!(err));
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                err.to_string(),
+            )));
         }
     };
 
@@ -388,7 +402,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     for task in tasks {
-        let result = task.await?;
+        let result = match task.await {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
         match result {
             Ok(res) => {
                 results.push(res);
@@ -398,7 +419,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 if let Err(e) = locker.unlock().await {
                     log::error!("search in cluster unlock error: {}", e);
                 }
-                return Err(err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
             }
         }
     }
@@ -473,7 +496,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             .await
             {
                 Ok(res) => res,
-                Err(err) => return Err(anyhow::anyhow!(err)),
+                Err(err) => {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
             };
         }
     }
@@ -490,7 +517,15 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         None => Vec::new(),
     };
     if !batches_query.is_empty() {
-        let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches_query[0][..])?;
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query[0][..])
+        {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )))
+            }
+        };
         let sources: Vec<serde_json::Value> = json_rows
             .into_iter()
             .map(serde_json::Value::Object)
@@ -506,7 +541,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             continue;
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
-        let json_rows = arrow_json::writer::record_batches_to_json_rows(&batch[0][..])?;
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch[0][..]) {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
         let sources: Vec<serde_json::Value> = json_rows
             .into_iter()
             .map(serde_json::Value::Object)

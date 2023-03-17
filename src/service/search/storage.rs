@@ -23,6 +23,7 @@ use super::datafusion::storage::file_list::SessionType;
 use super::sql::Sql;
 use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
 use crate::service::{db, file_list};
 
@@ -77,12 +78,16 @@ pub async fn search(
     for task in tasks {
         match task.await {
             Ok(ret) => {
-                if let Err(e) = ret {
-                    return Err(anyhow::anyhow!(e));
+                if let Err(err) = ret {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
                 }
             }
-            Err(e) => {
-                return Err(anyhow::anyhow!(e));
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
             }
         };
     }
@@ -93,9 +98,19 @@ pub async fn search(
 
     // fetch all schema versions, group files by version
     let schema_versions =
-        db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
+        match db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
+            Ok(versions) => versions,
+            Err(err) => {
+                log::error!("get schema error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                    sql.stream_name.clone(),
+                )));
+            }
+        };
     if schema_versions.is_empty() {
-        return Err(anyhow::anyhow!("stream not found"));
+        return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+            sql.stream_name.clone(),
+        )));
     }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
@@ -103,7 +118,15 @@ pub async fn search(
         HashMap::with_capacity(schema_versions.len());
     let mut scan_size = 0;
     if !CONFIG.common.widening_schema_evoluation || schema_versions.len() == 1 {
-        scan_size = file_list::calculate_files_size(&files.to_vec()).await?;
+        scan_size = match file_list::calculate_files_size(&files.to_vec()).await {
+            Ok(size) => size,
+            Err(err) => {
+                log::error!("calculate files size error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    "calculate files size error".to_string(),
+                )));
+            }
+        };
         files_group.insert(schema_latest_id, files);
     } else {
         for file in files {
@@ -193,12 +216,32 @@ pub async fn search(
                         group.extend(v);
                     }
                 }
-                Err(e) => {
-                    return Err(anyhow::anyhow!(e));
+                Err(err) => {
+                    log::error!("datafusion exec error: {}", err);
+                    let err = err.to_string();
+                    if err.contains("Filed not found") {
+                        return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound));
+                    }
+                    if err.contains("Object not found") {
+                        return Err(Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound));
+                    }
+                    if err.contains("Function not found") {
+                        return Err(Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined));
+                    }
+                    if err.contains("conflict data type") {
+                        return Err(Error::ErrorCode(
+                            ErrorCodes::SearchFieldHasNoCompatibleDataType,
+                        ));
+                    }
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        "datafusion exec error".to_string(),
+                    )));
                 }
             },
-            Err(e) => {
-                return Err(anyhow::anyhow!(e));
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
             }
         };
     }
@@ -207,19 +250,25 @@ pub async fn search(
 }
 
 #[inline]
-async fn get_file_list(
-    sql: &Sql,
-    stream_type: meta::StreamType,
-) -> Result<Vec<String>, anyhow::Error> {
+async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let results = file_list::get_file_list(
+    let results = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
         Some(stream_type),
         time_min,
         time_max,
     )
-    .await?;
+    .await
+    {
+        Ok(results) => results,
+        Err(err) => {
+            log::error!("get file list error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "get file list error".to_string(),
+            )));
+        }
+    };
 
     let mut files = Vec::new();
     for file in results {
