@@ -14,60 +14,40 @@
 
 use actix_web::{get, put, web, HttpResponse, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
 use crate::infra::config::USERS;
-use crate::meta::organization::{PasscodeResponse, DEFAULT_ORG};
+use crate::meta::organization::{
+    OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+};
 use crate::service::organization::get_passcode;
 use crate::service::organization::{self, update_passcode};
 
-const CUSTOM: &str = "custom";
-const THRESHOLD: i64 = 9383939382;
-
-#[derive(Serialize)]
-struct Organization {
-    identifier: String,
-    label: String,
-}
-
-#[derive(Serialize, Clone)]
-struct User {
-    first_name: String,
-    last_name: String,
-    email: String,
-}
-
-#[derive(Serialize)]
-struct OrganizationDetails {
-    id: i64,
-    identifier: String,
-    name: String,
-    user_email: String,
-    ingest_threshold: i64,
-    search_threshold: i64,
-    #[serde(rename = "type")]
-    org_type: String,
-    #[serde(rename = "UserObj")]
-    user_obj: User,
-}
-
-#[derive(Serialize)]
-struct OrganizationResponse {
-    data: Vec<OrganizationDetails>,
-}
-
+/** Get user organizations */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetUserOrganizations",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = OrganizationResponse),
+    )
+)]
 #[get("/{org_id}/organizations")]
 pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
-    // let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut id = 0;
 
-    let mut orgs: Vec<OrganizationDetails> = vec![];
+    let mut orgs: Vec<OrgDetails> = vec![];
     let mut org_names = HashSet::new();
-    let user_detail = User {
+    let user_detail = OrgUser {
         first_name: user_id.to_string(),
         last_name: user_id.to_string(),
         email: user_id.to_string(),
@@ -77,7 +57,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     if is_root_user {
         id += 1;
         org_names.insert(DEFAULT_ORG.to_string());
-        orgs.push(OrganizationDetails {
+        orgs.push(OrgDetails {
             id,
             identifier: DEFAULT_ORG.to_string(),
             name: DEFAULT_ORG.to_string(),
@@ -98,7 +78,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         }
 
         id += 1;
-        let org = OrganizationDetails {
+        let org = OrgDetails {
             id,
             identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
             name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
@@ -119,6 +99,21 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     Ok(HttpResponse::Ok().json(org_response))
 }
 
+/** Get organization summary */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetOrganizationSummary",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = OrgSummary),
+    )
+)]
 #[get("/{org_id}/summary")]
 async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
@@ -126,6 +121,21 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(org_summary))
 }
 
+/** Get organization ingest token for current user */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetOrganizationUserIngestToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = PasscodeResponse),
+    )
+)]
 #[get("/{org_id}/organizations/passcode")]
 async fn get_user_passcode(
     credentials: BasicAuth,
@@ -141,6 +151,21 @@ async fn get_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
+/** Update organization ingest token for current user */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UpdateOrganizationUserIngestToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = PasscodeResponse),
+    )
+)]
 #[put("/{org_id}/organizations/passcode")]
 async fn update_user_passcode(
     credentials: BasicAuth,

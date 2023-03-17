@@ -208,5 +208,4 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
-    pub orgaizations: Vec<String>,
 }

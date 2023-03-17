@@ -595,7 +595,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/user"))
+            .uri(&format!("/auth/login"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();
