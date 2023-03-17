@@ -21,6 +21,7 @@ RUN rustc --print cfg
 RUN rustc -C target-cpu=native --print cfg
 RUN cargo install sccache
 ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 
 WORKDIR /app
