@@ -1135,7 +1135,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{                              
                                 "condition": {
-                                    "column": "Country",
+                                    "column": "country",
                                     "operator": "=",
                                     "value": "USA"
                                 },

@@ -28,14 +28,6 @@ use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
-const SQL_KEYWORDS: [&str; 32] = [
-    "SELECT", "FROM", "WHERE", "TABLE", "LIMIT", "OFFSET", "AND", "OR", "NOT", "IN", "ANY", "IS",
-    "NULL", "CASE", "AS", "HAVING", "GROUP", "BY", "ORDER", "ASC", "DESC", "BETWEEN", "LIKE",
-    "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
-];
-
-const SQL_PUNCTUATION: [u8; 2] = [b'"', b'\''];
-const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
 const SQL_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
@@ -95,9 +87,6 @@ impl Sql {
                 "Query SQL should likes [select * from table]"
             ));
         }
-
-        // Hack for quote
-        origin_sql = add_quote_for_sql(&origin_sql);
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
 
         // check sql_mode
@@ -473,9 +462,6 @@ impl Sql {
                 );
             }
 
-            // Hack for quote
-            sql = add_quote_for_sql(sql.as_str());
-
             aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
         }
 
@@ -583,107 +569,6 @@ impl Sql {
     }
 }
 
-// Hack for double quote
-fn add_quote_for_sql(text: &str) -> String {
-    let mut tokens = split_token(text);
-    add_quote_for_tokens(&mut tokens);
-    tokens.join("")
-}
-
-fn add_quote_for_tokens(tokens: &mut [String]) {
-    let re_lower = Regex::new(r#"^[a-z0-9_]+$"#).unwrap();
-    for cap in tokens.iter_mut() {
-        let cap_str = cap.as_str();
-        let cap_str_upper = cap_str.to_uppercase();
-        let cap_str_upper = cap_str_upper.as_str();
-        if cap_str.len() == 1 && SQL_DELIMITERS.contains(cap_str.as_bytes().first().unwrap()) {
-            continue;
-        }
-        if SQL_KEYWORDS.contains(&cap_str_upper) {
-            continue;
-        }
-        if SQL_PUNCTUATION.contains(cap_str.as_bytes().first().unwrap()) {
-            continue;
-        }
-        if cap_str.as_bytes().last().unwrap().eq(&b')') {
-            // function
-            let first_bracket = cap_str.find('(').unwrap();
-            let mut tokens = split_token(&cap_str[first_bracket + 1..cap_str.len() - 1]);
-            add_quote_for_tokens(&mut tokens);
-            *cap = format!("{}({})", &cap_str[0..first_bracket], tokens.join(""));
-            continue;
-        }
-        // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
-        if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
-            continue;
-        }
-        if cap_str.parse::<f64>().is_ok() && cap_str.contains('.') {
-            // float number
-            *cap = format!("'{}'", cap_str);
-            continue;
-        }
-        *cap = format!("\"{}\"", cap_str);
-    }
-}
-
-fn split_token(text: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let text_chars = text.chars().collect::<Vec<char>>();
-    let text_chars_len = text_chars.len();
-    let mut start_pos = 0;
-    let mut in_word = false;
-    let mut bracket = 0;
-    let mut in_quote = false;
-    let mut quote = ' ';
-    for i in 0..text_chars_len {
-        let c = text_chars.get(i).unwrap();
-        if *c == '(' {
-            bracket += 1;
-            continue;
-        }
-        if *c == ')' {
-            bracket -= 1;
-            continue;
-        }
-        if *c == '\'' || *c == '"' {
-            if in_quote {
-                if quote == *c {
-                    in_quote = false;
-                }
-            } else {
-                in_quote = true;
-                quote = *c;
-            }
-        }
-        if SQL_DELIMITERS.contains(&(*c as u8)) {
-            if bracket > 0 || in_quote {
-                continue;
-            }
-            if in_word {
-                let token = text_chars[start_pos..i].iter().collect::<String>();
-                tokens.push(token);
-            }
-            tokens.push(String::from_utf8(vec![*c as u8]).unwrap());
-            in_word = false;
-            start_pos = i + 1;
-            continue;
-        }
-        if in_word {
-            continue;
-        }
-        in_word = true;
-    }
-    if start_pos != text_chars_len {
-        let token = text_chars[start_pos..text_chars_len]
-            .iter()
-            .collect::<String>();
-        tokens.push(token);
-    }
-
-    // println!("tokens: {:?}", tokens);
-    tokens
-}
-
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     let re = Regex::new(&format!(r"\b{}\b", field)).unwrap();
     if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
@@ -729,127 +614,5 @@ mod tests {
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
         assert!(check_field_in_use(&resp, col));
-    }
-
-    #[actix_web::test]
-    async fn test_add_quote_for_sql() {
-        let samples = [
-            (
-                "select * from table",
-                "select * from table",
-            ),
-            (
-                "select ab.c from table ",
-                r#"select "ab.c" from table "#,
-            ),
-            (
-                "select * from table where a = 1",
-                "select * from table where a = 1",
-            ),
-            (
-                "select * from table where a=1",
-                "select * from table where a=1",
-            ),
-            (
-                "select * from table where County='中文'",
-                r#"select * from table where "County"='中文'"#,
-            ),
-            (
-                "select * from table where match_all(123)",
-                "select * from table where match_all(123)",
-            ),
-            (
-                "select * from table where match_all('123')",
-                "select * from table where match_all('123')",
-            ),
-            (
-                "select * from table where match_all('中文')",
-                "select * from table where match_all('中文')",
-            ),
-            (
-                "select count(*) from table where match_all('中文')",
-                "select count(*) from table where match_all('中文')",
-            ),
-            (
-                "select count(*) as abc from table where match_all('中文')",
-                "select count(*) as abc from table where match_all('中文')",
-            ),
-            (
-                "select count(abc) as abc from table where match_all('中文')",
-                "select count(abc) as abc from table where match_all('中文')",
-            ),
-            (
-                "select count(Abc) as abc from table where match_all('中文')",
-                r#"select count("Abc") as abc from table where match_all('中文')"#,
-            ),
-            (
-                "select count(_p,stream) as newcol from table",
-                "select count(_p,stream) as newcol from table",
-            ),
-            (
-                "select count(_p,Stream) as newcol from table",
-                r#"select count(_p,"Stream") as newcol from table"#,
-            ),
-            (
-                "select count(_P,Stream) as newcol from table",
-                r#"select count("_P","Stream") as newcol from table"#,
-            ),
-            (
-                "select * from table where str_match(log,'中文')",
-                "select * from table where str_match(log,'中文')",
-            ),
-            (
-                "select * from table where str_match(log, '中文')",
-                "select * from table where str_match(log, '中文')",
-            ),
-            (
-                "select * from table where str_match(log, 'a=b')",
-                "select * from table where str_match(log, 'a=b')",
-            ),
-            (
-                "select * from table wherkubernetes.pod='dc03-eed1-be27'",
-                r#"select * from table "wherkubernetes.pod"='dc03-eed1-be27'"#,
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(Timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-                r#"select * from table where str_match(log, '中文') AND match_all('abc') AND time_range("Timestamp", '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10"#,
-            ),
-            (
-                "select * from table where str_match(log, 'Sql: select * from table')",
-                "select * from table where str_match(log, 'Sql: select * from table')",
-            ),
-            (
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
-            ),
-            (
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
-            ),
-            (
-                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
-                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
-            ),
-            (
-                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
-                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
-            ),
-            (
-                "select * from table where kubernetes.labels.pod-template-hash='7d8765890' and time<10 and time>10 and time>=29 and kubernetes.container_name!='controller'",
-                r#"select * from table where "kubernetes.labels.pod-template-hash"='7d8765890' and time<10 and time>10 and time>=29 and "kubernetes.container_name"!='controller'"#,
-            ),
-        ];
-
-        for (i, (sql, quoted_sql)) in samples.into_iter().enumerate() {
-            assert_eq!(add_quote_for_sql(sql), quoted_sql, "sample #{i}");
-        }
     }
 }

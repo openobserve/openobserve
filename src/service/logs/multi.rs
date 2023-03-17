@@ -149,18 +149,9 @@ pub async fn ingest(
         // End row based transform
 
         // JSON Flattening
-        let mut value = json::flatten_json(&value);
+        let mut value = json::flatten_json_and_format_field(&value);
         // get json object
         let local_val = value.as_object_mut().unwrap();
-
-        // Rename columns starting with @ Start
-        for (key, entry) in local_val.clone() {
-            if key.starts_with('@') {
-                local_val.remove(&key);
-                let new_key = key.replace('@', "_");
-                local_val.insert(new_key, entry);
-            }
-        }
 
         // handle timestamp
         let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
