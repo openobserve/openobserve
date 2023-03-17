@@ -41,6 +41,7 @@ pub struct Alert {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestination {
+    pub name: Option<String>,
     pub url: String,
     pub method: AlertHTTPType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,12 +56,14 @@ impl AlertDestination {
             method: self.method.clone(),
             headers: self.headers.clone(),
             template,
+            name: self.name.clone().unwrap(),
         }
     }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestinationResponse {
+    pub name: String,
     pub url: String,
     pub method: AlertHTTPType,
     #[serde(skip_serializing_if = "Option::is_none")]
