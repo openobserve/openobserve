@@ -23,6 +23,7 @@ use std::fmt::{Display, Formatter};
 use crate::common::str;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
 use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
@@ -70,7 +71,7 @@ impl Display for SqlMode {
 
 impl Sql {
     #[tracing::instrument(name = "service:search:sql:new", skip(req))]
-    pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, anyhow::Error> {
+    pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
@@ -80,12 +81,12 @@ impl Sql {
 
         // quick check SQL
         if origin_sql.is_empty() {
-            return Err(anyhow::anyhow!("Query SQL is empty"));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "".to_string(),
+            )));
         }
         if !origin_sql.to_lowercase().contains(" from ") {
-            return Err(anyhow::anyhow!(
-                "Query SQL should likes [select * from table]"
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
 
@@ -101,35 +102,35 @@ impl Sql {
         let re1 = Regex::new(r"(?i) (limit|offset|group|having|join|union) ").unwrap();
         let re2 = Regex::new(r"(?i) (join|union) ").unwrap();
         if sql_mode.eq(&SqlMode::Context) && re1.is_match(&origin_sql) {
-            return Err(anyhow::anyhow!(
-                "sql_mode=context, Query SQL is not supported [limit|offset|group by|having|join|union]",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
+            )));
         }
         if sql_mode.eq(&SqlMode::Full) && re2.is_match(&origin_sql) {
-            return Err(anyhow::anyhow!(
-                "sql_mode=full, Query SQL is not supported [join|union]",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "sql_mode=full, Query SQL does not supported [join|union]".to_string(),
+            )));
         }
 
         // check time_range
         if req_time_range.0 > 0
             && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
         {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be microseconds",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
         }
         if req_time_range.1 > 0
             && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
         {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be microseconds",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
         }
         if req_time_range.0 > 0 && req_time_range.1 > 0 && req_time_range.1 < req_time_range.0 {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be less than end_time",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be less than end_time".to_string(),
+            )));
         }
 
         // check Agg SQL
@@ -145,7 +146,9 @@ impl Sql {
             req_aggs.insert(agg.name.to_string(), agg.sql.to_string());
         }
         if sql_mode.eq(&SqlMode::Full) && !req_aggs.is_empty() {
-            return Err(anyhow::anyhow!("sql_mode=full, Query not supported aggs"));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "sql_mode=full, Query not supported aggs".to_string(),
+            )));
         }
 
         // check aggs
@@ -154,14 +157,15 @@ impl Sql {
         }
         for sql in req_aggs.values() {
             if !re1.is_match(sql.as_str()) {
-                return Err(anyhow::anyhow!(
-                    "Aggregation SQL only support 'from query' as context",
-                ));
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Aggregation SQL only support 'from query' as context".to_string(),
+                )));
             }
             if re2.is_match(sql.as_str()) {
-                return Err(anyhow::anyhow!(
-                    "Aggregation SQL is not supported 'select *' please specify the fields",
-                ));
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Aggregation SQL is not supported 'select *' please specify the fields"
+                        .to_string(),
+                )));
             }
             if re3.is_match(sql.as_str()) {
                 let caps = re3.captures(sql.as_str()).unwrap();
@@ -173,16 +177,16 @@ impl Sql {
                 let select_caps = match re4.captures(sql.as_str()) {
                     Some(caps) => caps,
                     None => {
-                        return Err(anyhow::anyhow!(
-                            "Aggregation SQL should start with 'select'",
-                        ))
+                        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                            sql.to_owned(),
+                        )));
                     }
                 };
                 if !select_caps.get(1).unwrap().as_str().contains(group_by) {
-                    return Err(anyhow::anyhow!(
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
                         "Aggregation SQL used [group by] you should select the field [{}]",
                         group_by
-                    ));
+                    ))));
                 }
             }
         }
@@ -190,7 +194,12 @@ impl Sql {
         // parse sql
         let meta = MetaSql::new(&origin_sql);
         if meta.is_err() {
-            return Err(anyhow::anyhow!(meta.err().unwrap()));
+            log::error!(
+                "parse sql error: {}, sql: {}",
+                meta.err().unwrap(),
+                origin_sql
+            );
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         let mut meta = meta.unwrap();
 
@@ -207,7 +216,9 @@ impl Sql {
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{}[ '"]?"#, stream_name)).unwrap();
         let caps = match re.captures(origin_sql.as_str()) {
             Some(caps) => caps,
-            None => return Err(anyhow::anyhow!("SQL should likes [select * from table]")),
+            None => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+            }
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
@@ -281,7 +292,9 @@ impl Sql {
                 && !origin_sql.contains(" count(")
                 && !origin_sql.contains(&CONFIG.common.time_stamp_col)
             {
-                return Err(anyhow::anyhow!("sql_mode=full, Query SQL must limit rows"));
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "sql_mode=full, Query SQL must limit rows".to_string(),
+                )));
             }
         }
 
@@ -345,7 +358,7 @@ impl Sql {
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
             }
             if fulltext_search.is_empty() {
-                return Err(anyhow::anyhow!("No full text search field found"));
+                return Err(Error::ErrorCode(ErrorCodes::FullTextSearchFieldNotFound));
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
@@ -452,7 +465,8 @@ impl Sql {
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
-                return Err(sql_meta.err().unwrap());
+                log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
             for cap in re_histogram.captures_iter(sql.clone().as_str()) {
                 let attrs = cap

@@ -12,14 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod alerts;
-pub mod dashboards;
-pub mod functions;
-pub mod logs;
-pub mod organization;
-pub mod prom;
-pub mod search;
-pub mod status;
-pub mod stream;
-pub mod traces;
-pub mod users;
+pub mod ingest;

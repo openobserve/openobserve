@@ -50,7 +50,7 @@ pub async fn get_stream(
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("stream not found".to_owned()),
+            "stream not found".to_string(),
         )))
     }
 }
@@ -175,7 +175,7 @@ pub async fn save_stream_settings(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some(format!("stream [{}] is being deleted", stream_name)),
+                format!("stream [{}] is being deleted", stream_name),
             )),
         );
     }
@@ -217,7 +217,7 @@ pub async fn delete_stream(
     if schema.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("stream not found".to_owned()),
+            "stream not found".to_string(),
         )));
     }
 
@@ -227,7 +227,7 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some(format!("failed to delete stream: {}", e)),
+                format!("failed to delete stream: {}", e),
             )),
         );
     }
@@ -237,7 +237,7 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some(format!("failed to delete stream: {}", e)),
+                format!("failed to delete stream: {}", e),
             )),
         );
     }
@@ -254,14 +254,14 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some(format!("failed to delete stream: {}", e)),
+                format!("failed to delete stream: {}", e),
             )),
         );
     };
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
-        "stream deleted".to_owned(),
+        "stream deleted".to_string(),
     )))
 }
 

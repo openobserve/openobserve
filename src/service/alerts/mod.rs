@@ -52,7 +52,7 @@ pub async fn save_alert(
     if dest.is_none() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some(format!("Destination with name {} not found", in_dest)),
+            format!("Destination with name {} not found", in_dest),
         )));
     }
 
@@ -64,7 +64,7 @@ pub async fn save_alert(
     if fields.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some(format!("Stream with name {} not found", stream_name)),
+            format!("Stream with name {} not found", stream_name),
         )));
     }
 
@@ -104,10 +104,10 @@ pub async fn save_alert(
         } else {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some(format!(
+                format!(
                     "Column named {} not found on stream {}",
                     &alert.condition.column, stream_name
-                )),
+                ),
             )));
         }
         //}
@@ -123,7 +123,7 @@ pub async fn save_alert(
         if sql.is_err() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some(format!("Invalid query : {:?} ", sql.err())),
+                format!("Invalid query : {:?} ", sql.err()),
             )));
         }
     }
@@ -179,9 +179,9 @@ pub async fn delete_alert(
             http::StatusCode::OK.into(),
             "Alert deleted ".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }
@@ -198,7 +198,7 @@ pub async fn get_alert(
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some("alert not found".to_string()),
+            "alert not found".to_string(),
         ))),
     }
 }

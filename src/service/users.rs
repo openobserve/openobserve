@@ -178,7 +178,7 @@ pub async fn update_user(
                         }
                         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                             StatusCode::NOT_FOUND.into(),
-                            Some("User not found".to_string()),
+                            "User not found".to_string(),
                         ))),
                     }
                 } else {
@@ -193,13 +193,13 @@ pub async fn update_user(
             }
             None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                 StatusCode::NOT_FOUND.into(),
-                Some("User not found".to_string()),
+                "User not found".to_string(),
             ))),
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("User not found".to_string()),
+            "User not found".to_string(),
         )))
     }
 }
@@ -251,13 +251,13 @@ pub async fn add_user_to_org(
         } else {
             Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
                 StatusCode::UNAUTHORIZED.into(),
-                Some("Not Allowed".to_string()),
+                "Not Allowed".to_string(),
             )))
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("User not found".to_string()),
+            "User not found".to_string(),
         )))
     }
 }
@@ -326,13 +326,13 @@ pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpRe
             } else {
                 Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                     StatusCode::NOT_FOUND.into(),
-                    Some("User for the organization not found".to_owned()),
+                    "User for the organization not found".to_string(),
                 )))
             }
         }
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("User for the organization not found".to_owned()),
+            "User for the organization not found".to_string(),
         ))),
     }
 }
@@ -344,9 +344,9 @@ pub async fn delete_user(email_id: &str) -> Result<HttpResponse, Error> {
             http::StatusCode::OK.into(),
             "User deleted".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }
