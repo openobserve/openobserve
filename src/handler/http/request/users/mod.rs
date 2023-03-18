@@ -99,7 +99,7 @@ pub async fn update(
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some("Please specify appropriate fields to update user".to_string()),
+                "Please specify appropriate fields to update user".to_string(),
             )),
         );
     }

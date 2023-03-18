@@ -56,9 +56,9 @@ pub async fn delete_template(org_id: String, name: String) -> Result<HttpRespons
             http::StatusCode::OK.into(),
             "Alert template deleted ".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }
@@ -71,7 +71,7 @@ pub async fn get_template(org_id: String, name: String) -> Result<HttpResponse, 
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some("Alert template not found".to_string()),
+            "Alert template not found".to_string(),
         ))),
     }
 }

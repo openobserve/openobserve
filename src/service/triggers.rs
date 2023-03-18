@@ -42,9 +42,9 @@ pub async fn delete_trigger(alert_name: String) -> Result<HttpResponse, Error> {
             http::StatusCode::OK.into(),
             "Trigger deleted ".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }
@@ -61,7 +61,7 @@ pub async fn get_alert(
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("alert not found".to_string()),
+            "alert not found".to_string(),
         ))),
     }
 }

@@ -37,7 +37,7 @@ pub async fn traces_write(
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some("Bad Request".to_string()),
+                "Bad Request".to_string(),
             )),
         )
     }
