@@ -22,7 +22,7 @@
               round
               flat
               :title="t('alert_destinations.edit')"
-              @click="editTemplate(props)"
+              @click="editDestination(props.row)"
             ></q-btn>
             <q-btn
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
@@ -33,7 +33,7 @@
               round
               flat
               :title="t('alert_destinations.delete')"
-              @click="deleteTemplate(props)"
+              @click="deleteDestination(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -75,19 +75,36 @@
       </q-table>
     </div>
     <div v-else>
-      <AddDestination />
+      <AddDestination
+        :destination="editingDestination"
+        :templates="templates"
+      />
     </div>
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref } from "vue";
+import { ref, defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
+import destinationService from "@/services/alert_destination";
+import { useStore } from "vuex";
 
-const destinations = ref([]);
+const props = defineProps({
+  destinations: {
+    type: Array,
+    default: () => [],
+  },
+  templates: {
+    type: Array,
+    default: () => [],
+  },
+});
+
+const store = useStore();
+const editingDestination = ref(null);
 const { t } = useI18n();
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -136,8 +153,17 @@ const perPageOptions: any = [
   { label: "All", value: 0 },
 ];
 const resultTotal = ref<number>(0);
-const editTemplate = (props) => {};
-const deleteTemplate = (props) => {};
+const editDestination = (destination: any) => {
+  toggleDestionationEditor();
+  editingDestination.value = { ...destination };
+};
+const deleteDestination = (destination: any) => {
+  console.log(destination);
+  destinationService.delete({
+    org_identifier: store.state.selectedOrganization.identifier,
+    destination_name: destination.value.name,
+  });
+};
 const createNewDestination = (props) => {};
 const changePagination = () => {};
 const toggleDestionationEditor = () => {

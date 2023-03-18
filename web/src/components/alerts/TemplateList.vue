@@ -3,7 +3,7 @@
     <div v-if="!showTemplateEditor">
       <q-table
         ref="q-table"
-        :rows="destinations"
+        :rows="templates"
         :columns="columns"
         row-key="id"
         style="width: 100%"
@@ -22,7 +22,7 @@
               round
               flat
               :title="t('alert_templates.edit')"
-              @click="editTemplate(props)"
+              @click="editTemplate(props.row)"
             ></q-btn>
             <q-btn
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
@@ -33,7 +33,7 @@
               round
               flat
               :title="t('alert_templates.delete')"
-              @click="deleteTemplate(props)"
+              @click="deleteTemplate(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -75,19 +75,29 @@
       </q-table>
     </div>
     <div v-else>
-      <AddTemplate />
+      <AddTemplate
+        :template="editingTemplate"
+        @cancel:hideform="toggleTemplateEditor"
+      />
     </div>
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref } from "vue";
+import { ref, onBeforeMount, defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { AddTemplate } from "./index";
-
-const destinations = ref([]);
+import templateService from "@/services/alert_templates";
+import { useStore } from "vuex";
+const props = defineProps({
+  templates: {
+    type: Array,
+    default: () => [],
+  },
+});
+const store = useStore();
 const { t } = useI18n();
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -122,11 +132,13 @@ const perPageOptions: any = [
   { label: "All", value: 0 },
 ];
 const resultTotal = ref<number>(0);
-const editTemplate = (props: any) => {
-  console.log(props);
+const editingTemplate = ref(null);
+const editTemplate = (template: any) => {
+  toggleTemplateEditor();
+  editingTemplate.value = { ...template };
 };
-const deleteTemplate = (props: any) => {
-  console.log(props);
+const deleteTemplate = (template: any) => {
+  // Open Dialog
 };
 const changePagination = () => {};
 const toggleTemplateEditor = () => {

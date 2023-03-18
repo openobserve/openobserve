@@ -50,24 +50,31 @@
         </q-tabs>
       </div>
       <div class="col-10">
-        <RouterView></RouterView>
+        <RouterView
+          :templates="templates"
+          :destinations="destinations"
+        ></RouterView>
       </div>
     </div>
   </q-page>
 </template>
 
 <script lang="ts" setup>
-import { ref, onActivated } from "vue";
+import { ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
+import templateService from "@/services/alert_templates";
+import destinationService from "@/services/alert_destination";
 
 const store = useStore();
 const { t } = useI18n();
 const $q = useQuasar();
 const router = useRouter();
 const activeTab: any = ref("destinations");
+const templates = ref([]);
+const destinations = ref([]);
 
 onActivated(() => {
   const routeMapping: any = {
@@ -82,6 +89,27 @@ onActivated(() => {
     router.push("/alerts");
   }
 });
+
+onBeforeMount(() => {
+  if (!templates.value.length) getTemplates();
+  if (!destinations.value.length) getDestinations();
+});
+
+const getTemplates = () => {
+  templateService
+    .list({
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => (templates.value = res.data));
+};
+
+const getDestinations = () => {
+  destinationService
+    .list({
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => (destinations.value = res.data));
+};
 </script>
 
 <style lang="scss">

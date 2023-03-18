@@ -67,14 +67,24 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  defineProps,
+  onBeforeMount,
+  onActivated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import templateService from "@/services/alert_templates";
+import { useStore } from "vuex";
 
 // const defaultFormData = {
 //   name: "",
 //   body: "",
 // };
+const props = defineProps({ template: Object });
 
 const { t } = useI18n();
 const formData = ref({
@@ -82,11 +92,18 @@ const formData = ref({
   body: "",
 });
 
+const store = useStore();
 const editorRef: any = ref(null);
 
 let editorobj: any = null;
 const editorData = ref("");
 const isUpdatingTemplate = ref(false);
+
+onActivated(() => setupTemplateData());
+
+onBeforeMount(() => {
+  setupTemplateData();
+});
 
 onMounted(async () => {
   monaco.editor.defineTheme("myCustomTheme", {
@@ -135,11 +152,44 @@ onMounted(async () => {
   editorobj.setValue(formData.value.body);
 });
 
+const setupTemplateData = () => {
+  if (props.template) {
+    isUpdatingTemplate.value = true;
+    formData.value.name = props.template.name;
+    formData.value.body = props.template.body;
+  }
+};
+
 const editorUpdate = (e: any) => {
   formData.value.body = e.target.value;
 };
 
-const saveTemplate = () => {};
+const isValidTemplate = computed(
+  () => formData.value.name && formData.value.body
+);
+
+const saveTemplate = () => {
+  if (isValidTemplate.value) {
+    templateService
+      .create({
+        org_identifier: store.state.selectedOrganization.identifier,
+        template_name: formData.value.name,
+        data: {
+          name: formData.value.name,
+          body: formData.value.body,
+        },
+      })
+      .then((response) => {
+        console.log(response);
+      });
+
+    templateService
+      .list({
+        org_identifier: store.state.selectedOrganization.identifier,
+      })
+      .then((res) => console.log(res));
+  }
+};
 
 // onBeforeMount(() => {
 //   formData.value = { ...defaultFormData };

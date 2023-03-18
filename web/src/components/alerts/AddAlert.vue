@@ -228,28 +228,10 @@
         </div>
 
         <div class="q-gutter-sm">
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.destination.type"
-            :checked="formData.destination.type == 'slack'"
-            val="slack"
-            :label="t('alerts.slack')"
-          />
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.destination.type"
-            :checked="formData.destination.type == 'alertmanager'"
-            val="alertmanager"
-            :label="t('alerts.prom_am')"
-          />
-        </div>
-
-        <div class="q-pt-sm col-6 q-pb-none">
-          <q-input
-            v-model="formData.destination.url"
+          <q-select
+            v-model="formData.destination"
             :label="t('alerts.destination')"
+            :options="getFormattedDestinations"
             color="input-border"
             bg-color="input-bg"
             class="showLabelOnTop"
@@ -322,10 +304,7 @@ const defaultValue: any = () => {
       value: 0,
       unit: "",
     },
-    destination: {
-      url: "",
-      type: "slack",
-    },
+    destination: "",
   };
 };
 
@@ -341,6 +320,10 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
+    },
+    destinations: {
+      type: Array,
+      default: () => [],
     },
   },
   emits: ["update:list", "cancel:hideform"],
@@ -555,6 +538,11 @@ export default defineComponent({
         });
       });
   },
+  computed: {
+    getFormattedDestinations: function () {
+      return this.destinations.map((destination: any) => destination.url);
+    },
+  },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
       this.$q.notify({
@@ -597,7 +585,7 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: [this.formData.destination],
+            destination: this.formData.destination,
           };
         } else {
           submitData = {
@@ -615,7 +603,7 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: [this.formData.destination],
+            destination: this.formData.destination,
           };
         }
 

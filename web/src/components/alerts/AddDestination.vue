@@ -24,8 +24,8 @@
             outlined
             filled
             dense
-            v-bind:readonly="isUpdatingTemplate"
-            v-bind:disable="isUpdatingTemplate"
+            v-bind:readonly="isUpdatingDestination"
+            v-bind:disable="isUpdatingDestination"
             :rules="[(val: any) => !!val || 'Field is required!']"
             tabindex="0"
           />
@@ -35,7 +35,7 @@
             <q-select
               v-model="formData.template"
               :label="t('alert_destinations.template')"
-              :options="alertTemplates"
+              :options="getFormattedTemplates"
               color="input-border"
               bg-color="input-bg"
               class="showLabelOnTop"
@@ -43,8 +43,6 @@
               outlined
               filled
               dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
             />
@@ -61,8 +59,6 @@
             outlined
             filled
             dense
-            v-bind:readonly="isUpdatingTemplate"
-            v-bind:disable="isUpdatingTemplate"
             :rules="[(val: any) => !!val || 'Field is required!']"
             tabindex="0"
           />
@@ -79,8 +75,6 @@
             outlined
             filled
             dense
-            v-bind:readonly="isUpdatingTemplate"
-            v-bind:disable="isUpdatingTemplate"
             :rules="[(val: any) => !!val || 'Field is required!']"
             tabindex="0"
           />
@@ -103,8 +97,6 @@
                 filled
                 :placeholder="t('alert_destinations.api_header')"
                 dense
-                v-bind:readonly="isUpdatingTemplate"
-                v-bind:disable="isUpdatingTemplate"
                 :rules="[(val: any) => !!val || 'Field is required!']"
                 tabindex="0"
               />
@@ -120,8 +112,7 @@
                 outlined
                 filled
                 dense
-                v-bind:readonly="isUpdatingTemplate"
-                v-bind:disable="isUpdatingTemplate"
+                isUpdatingDestination
                 :rules="[(val: any) => !!val || 'Field is required!']"
                 tabindex="0"
               />
@@ -171,30 +162,45 @@
         class="q-mb-md text-bold no-border q-ml-md"
         color="secondary"
         padding="sm xl"
-        @click="saveTemplate"
+        @click="saveDestination"
         no-caps
       />
     </div>
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  defineProps,
+  onBeforeMount,
+  onActivated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { getUUID } from "@/utils/zincutils";
+import destinationService from "@/services/alert_destination";
+import { useStore } from "vuex";
 
-// const defaultFormData = {
-//   name: "",
-//   body: "",
-// };
+const props = defineProps({
+  templates: {
+    type: Array,
+    default: () => [],
+  },
+  destination: {
+    type: Object,
+    default: () => null,
+  },
+});
 
-const apiMethods = ["GET", "POST", "PUT"];
-
+const apiMethods = ["get", "post", "put"];
+const store = useStore();
 const { t } = useI18n();
 const formData = ref({
   name: "",
   url: "",
-  method: "POST",
+  method: "post",
   template: "",
   headers: {
     key: "",
@@ -205,9 +211,29 @@ const editorRef: any = ref(null);
 
 let editorobj: any = null;
 const editorData = ref("");
-const isUpdatingTemplate = ref(false);
+const isUpdatingDestination = ref(false);
 const apiHeaders = ref([{ key: "", value: "", uuid: getUUID() }]);
-const alertTemplates = ref([]);
+
+onActivated(() => setupDestinationData());
+
+onBeforeMount(() => {
+  setupDestinationData();
+});
+
+const setupDestinationData = () => {
+  if (props.destination) {
+    isUpdatingDestination.value = true;
+    formData.value.name = props.destination.name;
+    formData.value.url = props.destination.url;
+    formData.value.method = props.destination.method;
+    formData.value.template = props.destination.template;
+    formData.value.headers = props.destination.headers;
+  }
+};
+
+const getFormattedTemplates = computed(() =>
+  props.templates.map((template: any) => template.name)
+);
 
 onMounted(async () => {
   monaco.editor.defineTheme("myCustomTheme", {
@@ -256,11 +282,38 @@ onMounted(async () => {
   editorobj.setValue(formData.value.body);
 });
 
-const editorUpdate = (e: any) => {
-  formData.value.body = e.target.value;
-};
+const isValidDestination = computed(
+  () =>
+    formData.value.name &&
+    formData.value.url &&
+    formData.value.method &&
+    formData.value.template
+);
 
-const saveTemplate = () => {};
+const saveDestination = () => {
+  if (isValidDestination.value) {
+    destinationService
+      .create({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: formData.value.name,
+        data: {
+          url: formData.value.url,
+          method: formData.value.method,
+          template: formData.value.template,
+          headers: formData.value.headers,
+        },
+      })
+      .then((response) => {
+        console.log(response);
+      });
+
+    destinationService
+      .list({
+        org_identifier: store.state.selectedOrganization.identifier,
+      })
+      .then((res) => console.log(res));
+  }
+};
 
 const addApiHeader = () => {
   const defaultHeader = { key: "", value: "", uuid: getUUID() };
