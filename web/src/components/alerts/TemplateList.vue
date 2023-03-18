@@ -33,7 +33,7 @@
               round
               flat
               :title="t('alert_templates.delete')"
-              @click="deleteTemplate(props.row)"
+              @click="conformDeleteDestination(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -80,6 +80,14 @@
         @cancel:hideform="toggleTemplateEditor"
       />
     </div>
+
+    <ConfirmDialog
+      title="Delete Alert"
+      message="Are you sure you want to delete alert?"
+      @update:ok="deleteTemplate"
+      @update:cancel="cancelDeleteTemplate"
+      v-model="confirmDelete.visible"
+    />
   </q-page>
 </template>
 <script lang="ts" setup>
@@ -90,6 +98,8 @@ import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { AddTemplate } from "./index";
 import templateService from "@/services/alert_templates";
+import ConfirmDialog from "../ConfirmDialog.vue";
+
 import { useStore } from "vuex";
 const props = defineProps({
   templates: {
@@ -133,14 +143,32 @@ const perPageOptions: any = [
 ];
 const resultTotal = ref<number>(0);
 const editingTemplate = ref(null);
+const confirmDelete = ref({ visible: false, data: null });
+
 const editTemplate = (template: any) => {
   toggleTemplateEditor();
   editingTemplate.value = { ...template };
 };
-const deleteTemplate = (template: any) => {
-  // Open Dialog
+const deleteTemplate = () => {
+  console.log(confirmDelete.value.data);
+  if (confirmDelete.value?.data?.name) {
+    templateService.delete({
+      org_identifier: store.state.selectedOrganization.identifier,
+      template_name: confirmDelete.value.data.name,
+    });
+  }
 };
-const changePagination = () => {};
+
+const conformDeleteDestination = (destination: any) => {
+  confirmDelete.value.visible = true;
+  confirmDelete.value.data = destination;
+};
+
+const cancelDeleteTemplate = () => {
+  confirmDelete.value.visible = false;
+  confirmDelete.value.data = null;
+};
+
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
 };

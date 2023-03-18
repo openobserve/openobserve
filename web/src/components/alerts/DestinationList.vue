@@ -188,7 +188,6 @@ const cancelDeleteDestination = () => {
   confirmDelete.value.data = null;
 };
 
-const createNewDestination = (props) => {};
 const changePagination = () => {};
 const toggleDestionationEditor = () => {
   showDestinationEditor.value = !showDestinationEditor.value;
