@@ -31,7 +31,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )
-    .unwrap();
+    .expect("Email regex is valid");
 
     if !db::user::root_user_exists().await {
         if CONFIG.auth.root_user_email.is_empty()
@@ -54,7 +54,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // check version
-    db::version::set().await?;
+    db::version::set().await.expect("db version set failed");
 
     // telemetry run
     if CONFIG.common.telemetry_enabled {

@@ -105,7 +105,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         return Ok(());
     }
     if let Err(e) = register().await {
-        log::error!("[TRACE] Register to cluster failed: {}", e);
+        log::error!("Register to cluster failed: {}", e);
         return Err(e);
     }
 

@@ -30,7 +30,7 @@ pub enum Error {
     SimdJsonError(#[from] simd_json::Error),
     #[error("DataFusionError# {0}")]
     DataFusionError(#[from] datafusion::error::DataFusionError),
-    #[error("Error# watcher is exists {0}")]
+    #[error("WatchError# watcher is exists {0}")]
     WatcherExists(String),
     #[error("Error# {0}")]
     Message(String),
