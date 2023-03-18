@@ -313,6 +313,6 @@ pub fn connect_sled() -> Option<::sled::Db> {
         return None;
     }
 
-    let db = ::sled::open(&CONFIG.sled.data_dir).expect("Error creating local sled db dir");
+    let db = ::sled::open(&CONFIG.sled.data_dir).expect("sled db dir create failed");
     Some(db)
 }

@@ -119,7 +119,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .add_service(trace_svc)
                 .serve(gaddr)
                 .await
-                .expect("gRPC server failed");
+                .expect("gRPC server init failed");
         });
     }
 
@@ -300,7 +300,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
         }
     }
 
-    println!("command {} execute success", name);
+    println!("command {} execute succeeded", name);
 
     Ok(true)
 }

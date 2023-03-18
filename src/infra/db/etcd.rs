@@ -438,7 +438,7 @@ pub async fn connect_etcd() -> Option<etcd_client::Client> {
     }
     let client = etcd_client::Client::connect([&CONFIG.etcd.addr], Some(opts))
         .await
-        .unwrap();
+        .expect("Etcd connect failed");
 
     // enable keep alive for auth token
     tokio::task::spawn(async move { keepalive_connection().await });
@@ -572,7 +572,7 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("get lock error: {}", err)));
+            return Err(Error::Message(format!("etcd connect error: {}", err)));
         }
         Ok(())
     }
