@@ -40,17 +40,20 @@ impl FileStorage for S3 {
         let client = S3CLIENT.get().await.clone().unwrap();
         let mut start_after: String = "".to_string();
         loop {
-            let objects = client
+            let objects = match client
                 .list_objects_v2()
                 .bucket(&CONFIG.s3.bucket_name)
                 .prefix(prefix)
                 .start_after(&start_after)
                 .send()
-                .await;
-            if objects.is_err() {
-                return Err(anyhow::anyhow!("{}", objects.err().unwrap()));
-            }
-            let objects = objects.unwrap();
+                .await
+            {
+                Ok(objects) => objects,
+                Err(e) => {
+                    log::error!("s3 list objects {} error: {:?}", prefix, e);
+                    return Err(anyhow::anyhow!("s3 list objects error"));
+                }
+            };
 
             for obj in objects.contents().unwrap_or_default() {
                 start_after = obj.key().unwrap().to_string();
@@ -76,7 +79,7 @@ impl FileStorage for S3 {
             Ok(object) => object,
             Err(e) => {
                 log::error!("s3 get object {} error: {:?}", file, e);
-                return Err(anyhow::anyhow!("s3 get object {} error: {:?}", file, e));
+                return Err(anyhow::anyhow!("s3 get object error"));
             }
         };
         let data = object.body.collect().await.unwrap().into_bytes();
@@ -95,14 +98,14 @@ impl FileStorage for S3 {
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
         let client = S3CLIENT.get().await.clone().unwrap();
         let data_size = data.len();
-        let result = client
+        match client
             .put_object()
             .bucket(&CONFIG.s3.bucket_name)
             .key(file)
             .body(data.into())
             .send()
-            .await;
-        match result {
+            .await
+        {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
@@ -111,12 +114,12 @@ impl FileStorage for S3 {
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
                 }
-                log::info!("s3 File upload success: {}", file);
+                log::info!("s3 File upload succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
                 log::error!("s3 File upload error: {:?}", err);
-                Err(anyhow::anyhow!(err))
+                Err(anyhow::anyhow!("s3 put object error"))
             }
         }
     }
@@ -164,11 +167,11 @@ impl FileStorage for S3 {
                 .await;
             match result {
                 Ok(_output) => {
-                    log::info!("s3 File delete success: {:?}", files);
+                    log::info!("s3 File delete succeeded: {:?}", files);
                 }
                 Err(err) => {
                     log::error!("s3 File delete error: {:?}", err);
-                    return Err(anyhow::anyhow!(err));
+                    return Err(anyhow::anyhow!("s3 delete object error"));
                 }
             }
             start += step;
@@ -189,12 +192,12 @@ impl S3 {
             .await;
         match result {
             Ok(_output) => {
-                log::info!("s3[GCS] File delete success: {}", file);
+                log::info!("s3 File delete succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
-                log::error!("s3[GCS] File delete error: {:?}", err);
-                Err(anyhow::anyhow!(err))
+                log::error!("s3 File delete error: {:?}", err);
+                Err(anyhow::anyhow!("s3 delete object error"))
             }
         }
     }

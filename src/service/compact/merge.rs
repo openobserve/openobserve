@@ -400,7 +400,7 @@ async fn merge_files(
     let new_file_key = format!("files/{}{}", new_file.0, new_file.1);
 
     log::info!(
-        "[COMPACT] merge file success, new file: {}, orginal_size: {}, compressed_size: {}",
+        "[COMPACT] merge file succeeded, new file: {}, orginal_size: {}, compressed_size: {}",
         new_file_key,
         new_file_meta.original_size,
         new_file_meta.compressed_size,

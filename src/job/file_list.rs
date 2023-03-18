@@ -110,7 +110,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
         .await;
     match result {
         Ok(_output) => {
-            log::info!("[JOB] File_list upload success: {}", new_file_key);
+            log::info!("[JOB] File_list upload succeeded: {}", new_file_key);
             Ok(())
         }
         Err(err) => {
