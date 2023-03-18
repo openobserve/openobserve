@@ -33,7 +33,7 @@
               round
               flat
               :title="t('alert_destinations.delete')"
-              @click="deleteDestination(props.row)"
+              @click="conformDeleteDestination(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -80,6 +80,14 @@
         :templates="templates"
       />
     </div>
+
+    <ConfirmDialog
+      title="Delete Alert"
+      message="Are you sure you want to delete alert?"
+      @update:ok="deleteDestination"
+      @update:cancel="cancelDeleteDestination"
+      v-model="confirmDelete.visible"
+    />
   </q-page>
 </template>
 <script lang="ts" setup>
@@ -91,6 +99,7 @@ import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
+import ConfirmDialog from "../ConfirmDialog.vue";
 
 const props = defineProps({
   destinations: {
@@ -142,6 +151,7 @@ const columns: any = ref<QTableProps["columns"]>([
     sortable: false,
   },
 ]);
+const confirmDelete = ref({ visible: false, data: null });
 const destinationSearchKey = ref("");
 const showDestinationEditor = ref(false);
 const perPageOptions: any = [
@@ -157,13 +167,27 @@ const editDestination = (destination: any) => {
   toggleDestionationEditor();
   editingDestination.value = { ...destination };
 };
-const deleteDestination = (destination: any) => {
-  console.log(destination);
-  destinationService.delete({
-    org_identifier: store.state.selectedOrganization.identifier,
-    destination_name: destination.value.name,
-  });
+
+const deleteDestination = () => {
+  console.log(confirmDelete.value.data);
+  if (confirmDelete.value?.data?.name) {
+    destinationService.delete({
+      org_identifier: store.state.selectedOrganization.identifier,
+      destination_name: confirmDelete.value.data.name,
+    });
+  }
 };
+
+const conformDeleteDestination = (destination: any) => {
+  confirmDelete.value.visible = true;
+  confirmDelete.value.data = destination;
+};
+
+const cancelDeleteDestination = () => {
+  confirmDelete.value.visible = false;
+  confirmDelete.value.data = null;
+};
+
 const createNewDestination = (props) => {};
 const changePagination = () => {};
 const toggleDestionationEditor = () => {
