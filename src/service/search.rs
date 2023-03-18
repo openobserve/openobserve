@@ -584,16 +584,28 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 pub fn handle_datafusion_error(err: DataFusionError) -> Error {
     let err = err.to_string();
     if err.contains("Schema error: No field named") {
-        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound);
+        let pos = err.find("Schema error: No field named").unwrap();
+        let pos_start = err[pos..].find('\'').unwrap();
+        let pos_end = err[pos + pos_start + 1..].find('\'').unwrap();
+        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
+        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field));
     }
     if err.contains("parquet not found") {
         return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
     }
     if err.contains("Invalid function ") {
-        return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined);
+        let pos = err.find("Invalid function ").unwrap();
+        let pos_start = err[pos..].find('\'').unwrap();
+        let pos_end = err[pos + pos_start + 1..].find('\'').unwrap();
+        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
+        return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(field));
     }
     if err.contains("Incompatible data types") {
-        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType);
+        let pos = err.find("for field").unwrap();
+        let pos_start = err[pos..].find(' ').unwrap();
+        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
+        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
+        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
     }
     Error::ErrorCode(ErrorCodes::ServerInternalError(
         "sql execute error".to_string(),
