@@ -116,6 +116,7 @@
       <AddAlert
         v-model="formData"
         :isUpdated="isUpdated"
+        :destinations="destinations"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
       />
@@ -154,6 +155,12 @@ export default defineComponent({
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
+  props: {
+    destinations: {
+      type: Array,
+      default: () => [],
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
