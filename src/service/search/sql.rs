@@ -214,12 +214,11 @@ impl Sql {
         }
 
         // Hack time_range
-        let time_range = if req_time_range.0 > 0 || req_time_range.1 > 0 {
-            Some(req_time_range)
-        } else {
-            meta.time_range
+        let old_time_range = meta.time_range.clone();
+        if req_time_range.0 > 0 || req_time_range.1 > 0 {
+            meta.time_range = Some(req_time_range)
         };
-        if let Some(time_range) = time_range {
+        if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
                     "({} >= {} AND {} < {})",
@@ -245,10 +244,10 @@ impl Sql {
                                 [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         }
-                        if meta.time_range.is_none()
-                            || (meta.time_range.is_some()
-                                && meta.time_range.unwrap().0 == 0
-                                && meta.time_range.unwrap().1 == 0)
+                        if old_time_range.is_none()
+                            || (old_time_range.is_some()
+                                && old_time_range.unwrap().0 == 0
+                                && old_time_range.unwrap().1 == 0)
                         {
                             let pos_start = origin_sql.find(where_str.as_str()).unwrap();
                             let pos_end = pos_start + where_str.len();
