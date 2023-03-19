@@ -30,6 +30,7 @@ pub struct Sql {
     pub(crate) selection: Option<SqlExpr>,    // where
     pub(crate) source: String,                // table
     pub(crate) order_by: Vec<(String, bool)>, // desc: true / false
+    pub(crate) group_by: Vec<String>,         // field
     pub(crate) offset: usize,
     pub(crate) limit: usize,
     pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
@@ -62,11 +63,15 @@ pub struct Fulltext<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Timerange<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Source<'a>(pub(crate) &'a [TableWithJoins]);
 pub struct Order<'a>(pub(crate) &'a OrderByExpr);
+pub struct Group<'a>(pub(crate) &'a SqlExpr);
 pub struct Offset<'a>(pub(crate) &'a SqlOffset);
 pub struct Limit<'a>(pub(crate) &'a SqlExpr);
 
 impl Sql {
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
+        if sql.is_empty() {
+            return Err(anyhow::anyhow!("SQL is empty"));
+        }
         let dialect = sqlparser::dialect::GenericDialect {};
         let statement = Parser::parse_sql(&dialect, sql);
         if statement.is_err() {
@@ -100,7 +105,7 @@ impl TryFrom<&Statement> for Sql {
                     from: table_with_joins,
                     selection,
                     projection,
-                    group_by: _,
+                    group_by: groups,
                     ..
                 } = match &q.body.as_ref() {
                     SetExpr::Select(statement) => statement.as_ref(),
@@ -116,6 +121,11 @@ impl TryFrom<&Statement> for Sql {
                 let mut order_by = Vec::new();
                 for expr in orders {
                     order_by.push(Order(expr).try_into()?);
+                }
+
+                let mut group_by = Vec::new();
+                for expr in groups {
+                    group_by.push(Group(expr).try_into()?);
                 }
 
                 let offset = offset.map_or(0, |v| Offset(v).into());
@@ -134,6 +144,7 @@ impl TryFrom<&Statement> for Sql {
                     selection,
                     source,
                     order_by,
+                    group_by,
                     offset,
                     limit,
                     quick_text,
@@ -321,6 +332,24 @@ impl<'a> TryFrom<Order<'a>> for (String, bool) {
         };
 
         Ok((name, !o.0.asc.unwrap_or(true)))
+    }
+}
+
+impl<'a> TryFrom<Group<'a>> for String {
+    type Error = anyhow::Error;
+
+    fn try_from(g: Group) -> Result<Self, Self::Error> {
+        let name = match &g.0 {
+            SqlExpr::Identifier(id) => id.to_string(),
+            expr => {
+                return Err(anyhow::anyhow!(
+                    "We only support identifier for order by, got {}",
+                    expr
+                ))
+            }
+        };
+
+        Ok(name)
     }
 }
 
@@ -853,6 +882,34 @@ mod tests {
         assert_eq!(local_sql.offset, 10);
         assert_eq!(local_sql.order_by, vec![("c".into(), true)]);
         assert_eq!(local_sql.fields, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_parse_sqls() {
+        let sqls = [
+            ("select * from table1", true),
+            ("select * from table1 where a=1", true),
+            ("select * from table1 where a='b'", true),
+            ("select * from table1 where a='b' limit 10 offset 10", true),
+            ("select * from table1 where a='b' group by abc", true),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                true,
+            ),
+            ("select * from table1, table2 where a='b'", false),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false,
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false,
+            ),
+        ];
+        for (sql, ok) in sqls {
+            let ret = Sql::new(sql);
+            assert_eq!(ret.is_ok(), ok);
+        }
     }
 
     #[test]
