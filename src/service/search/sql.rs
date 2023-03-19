@@ -214,8 +214,9 @@ impl Sql {
         }
 
         // Hack time_range
-        let old_time_range = meta.time_range.clone();
-        if req_time_range.0 > 0 || req_time_range.1 > 0 {
+        let meta_time_range_is_empty =
+            meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
+        if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
             meta.time_range = Some(req_time_range)
         };
         if let Some(time_range) = meta.time_range {
@@ -234,7 +235,7 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() {
+            if !time_range_sql.is_empty() && meta_time_range_is_empty {
                 let re = Regex::new(r"(?i) where (.*)").unwrap();
                 match re.captures(origin_sql.as_str()) {
                     Some(caps) => {
@@ -244,21 +245,15 @@ impl Sql {
                                 [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         }
-                        if old_time_range.is_none()
-                            || (old_time_range.is_some()
-                                && old_time_range.unwrap().0 == 0
-                                && old_time_range.unwrap().1 == 0)
-                        {
-                            let pos_start = origin_sql.find(where_str.as_str()).unwrap();
-                            let pos_end = pos_start + where_str.len();
-                            origin_sql = format!(
-                                "{}{} AND {}{}",
-                                &origin_sql[0..pos_start],
-                                time_range_sql,
-                                where_str,
-                                &origin_sql[pos_end..]
-                            );
-                        }
+                        let pos_start = origin_sql.find(where_str.as_str()).unwrap();
+                        let pos_end = pos_start + where_str.len();
+                        origin_sql = format!(
+                            "{}{} AND {}{}",
+                            &origin_sql[0..pos_start],
+                            time_range_sql,
+                            where_str,
+                            &origin_sql[pos_end..]
+                        );
                     }
                     None => {
                         origin_sql = origin_sql
@@ -717,49 +712,49 @@ mod tests {
     #[actix_web::test]
     async fn test_context_sqls() {
         let sqls = [
-            ("select * from table1", true),
-            ("select * from table1 where a=1", true),
-            ("select * from table1 where a='b'", true),
-            ("select * from table1 where a='b' limit 10 offset 10", false),
-            ("select * from table1 where a='b' group by abc", false),
+            ("select * from table1", true,(0,0)),
+            ("select * from table1 where a=1", true,(0,0)),
+            ("select * from table1 where a='b'", true,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", false,(0,0)),
+            ("select * from table1 where a='b' group by abc", false,(0,0)),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                false,
+                false,(0,0),
             ),
-            ("select * from table1, table2 where a='b'", false),
+            ("select * from table1, table2 where a='b'", false,(0,0)),
             (
                 "select * from table1 left join table2 on table1.a=table2.b where a='b'",
-                false,
+                false,(0,0),
             ),
             (
                 "select * from table1 union select * from table2 where a='b'",
-                false,
+                false,(0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
-                true,
+                true,(0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                false,
+                false,(0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
-                true,
+                true,(1679202494333000, 1679203394333000),
             ),
             (
                 "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
-                false,
+                false,(0,0),
             ),
             (
                 "select * from table1 where match_all('abc') and str_match(log,'abc') order by _timestamp desc",
-                false,
+                false,(0,0),
             ),
 
         ];
 
         let org_id = "test_org";
-        for (sql, ok) in sqls {
+        for (sql, ok, time_range) in sqls {
             let query = crate::meta::search::Query {
                 sql: sql.to_string(),
                 from: 0,
@@ -770,7 +765,7 @@ mod tests {
                 track_total_hits: true,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
-                query,
+                query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: crate::meta::search::RequestEncoding::Empty,
             };
@@ -778,8 +773,99 @@ mod tests {
             rpc_req.org_id = org_id.to_string();
 
             let resp = Sql::new(&rpc_req).await;
-            println!("isql: {}\nresp: {:?}", sql, resp);
             assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                assert_eq!(resp.meta.limit, query.size);
+            }
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_full_sqls() {
+        let sqls = [
+            ("select * from table1", true, 0,(0,0)),
+            ("select * from table1 where a=1", true, 0,(0,0)),
+            ("select * from table1 where a='b'", true, 0,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", true, 10,(0,0)),
+            ("select * from table1 where a='b' group by abc", true, 0,(0,0)),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                true, 0,(0,0),
+            ),
+            ("select * from table1, table2 where a='b'", false, 0,(0,0)),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
+                true, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
+                true, 10,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true, 0,(1679202494333000, 1679203394333000),
+            ),
+
+        ];
+
+        let org_id = "test_org";
+        for (sql, ok, limit, time_range) in sqls {
+            let query = crate::meta::search::Query {
+                sql: sql.to_string(),
+                from: 0,
+                size: 100,
+                sql_mode: "full".to_owned(),
+                start_time: 1667978895416,
+                end_time: 1667978900217,
+                track_total_hits: true,
+            };
+            let req: crate::meta::search::Request = crate::meta::search::Request {
+                query: query.clone(),
+                aggs: HashMap::new(),
+                encoding: crate::meta::search::RequestEncoding::Empty,
+            };
+            let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+            rpc_req.org_id = org_id.to_string();
+
+            let resp = Sql::new(&rpc_req).await;
+            assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                if limit > 0 {
+                    assert_eq!(resp.meta.limit, limit);
+                } else {
+                    assert_eq!(resp.meta.limit, query.size);
+                }
+            }
         }
     }
 }
