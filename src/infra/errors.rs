@@ -54,10 +54,10 @@ pub enum ErrorCodes {
     SearchSQLNotValid(String),
     SearchStreamNotFound(String),
     FullTextSearchFieldNotFound,
-    SearchFieldNotFound,
-    SearchFunctionNotDefined,
+    SearchFieldNotFound(String),
+    SearchFunctionNotDefined(String),
     SearchParquetFileNotFound,
-    SearchFieldHasNoCompatibleDataType,
+    SearchFieldHasNoCompatibleDataType(String),
 }
 
 impl std::fmt::Display for ErrorCodes {
@@ -78,27 +78,29 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLNotValid(_) => 20001,
             ErrorCodes::SearchStreamNotFound(_) => 20002,
             ErrorCodes::FullTextSearchFieldNotFound => 20003,
-            ErrorCodes::SearchFieldNotFound => 20004,
-            ErrorCodes::SearchFunctionNotDefined => 20005,
+            ErrorCodes::SearchFieldNotFound(_) => 20004,
+            ErrorCodes::SearchFunctionNotDefined(_) => 20005,
             ErrorCodes::SearchParquetFileNotFound => 20006,
-            ErrorCodes::SearchFieldHasNoCompatibleDataType => 20007,
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
         }
     }
     pub fn get_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
-            ErrorCodes::SearchSQLNotValid(sql) => format!("Search SQL not valid, sql: [{}]", sql),
+            ErrorCodes::SearchSQLNotValid(sql) => format!("Search SQL not valid: {}", sql),
             ErrorCodes::SearchStreamNotFound(stream) => {
-                format!("Search stream not found, stream: [{}]", stream)
+                format!("Search stream not found: {}", stream)
             }
             ErrorCodes::FullTextSearchFieldNotFound => {
                 "Full text search field not found".to_string()
             }
-            ErrorCodes::SearchFieldNotFound => "Search field not found".to_string(),
-            ErrorCodes::SearchFunctionNotDefined => "Search function not defined".to_string(),
+            ErrorCodes::SearchFieldNotFound(field) => format!("Search field not found: {}", field),
+            ErrorCodes::SearchFunctionNotDefined(func) => {
+                format!("Search function not defined: {}", func)
+            }
             ErrorCodes::SearchParquetFileNotFound => "Search parquet file not found".to_string(),
-            ErrorCodes::SearchFieldHasNoCompatibleDataType => {
-                "Search field has no compatible data type".to_string()
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
+                format!("Search field has no compatible data type: {}", field)
             }
         }
     }

@@ -77,18 +77,17 @@ impl Sql {
         let org_id = req.org_id.clone();
         let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
 
+        // parse sql
         let mut origin_sql = req_query.sql.clone();
-
-        // quick check SQL
-        if origin_sql.is_empty() {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "".to_string(),
-            )));
-        }
-        if !origin_sql.to_lowercase().contains(" from ") {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
-        }
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
+
+        let mut meta = match MetaSql::new(&origin_sql) {
+            Ok(meta) => meta,
+            Err(err) => {
+                log::error!("parse sql error: {}, sql: {}", err, origin_sql);
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+            }
+        };
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -99,16 +98,13 @@ impl Sql {
         };
 
         // check SQL
-        let re1 = Regex::new(r"(?i) (limit|offset|group|having|join|union) ").unwrap();
-        let re2 = Regex::new(r"(?i) (join|union) ").unwrap();
-        if sql_mode.eq(&SqlMode::Context) && re1.is_match(&origin_sql) {
+        // in context mode, disallow, [limit|offset|group by|having|join|union]
+        // in full    mode, disallow, [join|union]
+        if sql_mode.eq(&SqlMode::Context)
+            && (meta.offset > 0 || meta.limit > 0 || !meta.group_by.is_empty())
+        {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
-            )));
-        }
-        if sql_mode.eq(&SqlMode::Full) && re2.is_match(&origin_sql) {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "sql_mode=full, Query SQL does not supported [join|union]".to_string(),
             )));
         }
 
@@ -190,25 +186,6 @@ impl Sql {
                 }
             }
         }
-
-        // parse sql
-        let meta = MetaSql::new(&origin_sql);
-        if meta.is_err() {
-            log::error!(
-                "parse sql error: {}, sql: {}",
-                meta.err().unwrap(),
-                origin_sql
-            );
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
-        }
-        let mut meta = meta.unwrap();
-
-        // fetch schema
-        let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
-        let schema_fields = schema.fields().to_vec();
 
         // Hack for DataFusion
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
@@ -313,10 +290,17 @@ impl Sql {
                 format!("{} LIMIT {}", origin_sql, meta.offset + meta.limit)
             };
         }
-        // for full sql_mode
+        // Hack limit for full sql_mode
         if sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
             origin_sql = format!("{} LIMIT {}", origin_sql, SQL_FULL_MODE_LIMIT);
         }
+
+        // fetch schema
+        let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
+            Ok(schema) => schema,
+            Err(_) => Schema::empty(),
+        };
+        let schema_fields = schema.fields().to_vec();
 
         // HACK full text search
         let mut fulltext = Vec::new();
