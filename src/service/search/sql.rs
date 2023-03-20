@@ -29,7 +29,8 @@ use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
-const SQL_FULL_MODE_LIMIT: usize = 1000;
+const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
+const SQL_DEFAULT_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -97,7 +98,7 @@ impl Sql {
             req_query.track_total_hits
         };
 
-        // check SQL
+        // check SQL limitation
         // in context mode, disallow, [limit|offset|group by|having|join|union]
         // in full    mode, disallow, [join|union]
         if sql_mode.eq(&SqlMode::Context)
@@ -105,27 +106,6 @@ impl Sql {
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
-            )));
-        }
-
-        // check time_range
-        if req_time_range.0 > 0
-            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
-        {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Query SQL time_range start_time should be microseconds".to_string(),
-            )));
-        }
-        if req_time_range.1 > 0
-            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
-        {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Query SQL time_range start_time should be microseconds".to_string(),
-            )));
-        }
-        if req_time_range.0 > 0 && req_time_range.1 > 0 && req_time_range.1 < req_time_range.0 {
-            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                "Query SQL time_range start_time should be less than end_time".to_string(),
             )));
         }
 
@@ -187,7 +167,7 @@ impl Sql {
             }
         }
 
-        // Hack for DataFusion
+        // Hack for table name
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{}[ '"]?"#, stream_name)).unwrap();
@@ -212,14 +192,33 @@ impl Sql {
             }
         }
 
-        // Hack time range
-        if req_time_range.0 > 0 || req_time_range.1 > 0 {
-            meta.time_range = Some(req_time_range);
+        // check time_range
+        if req_time_range.0 > 0
+            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
         }
-        if req.partition.is_some() {
-            let partition = req.partition.as_ref().unwrap();
-            meta.time_range = Some((partition.time_min, partition.time_max));
+        if req_time_range.1 > 0
+            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
         }
+        if req_time_range.0 > 0 && req_time_range.1 > 0 && req_time_range.1 < req_time_range.0 {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be less than end_time".to_string(),
+            )));
+        }
+
+        // Hack time_range
+        let meta_time_range_is_empty =
+            meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
+        if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
+            meta.time_range = Some(req_time_range)
+        };
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -236,22 +235,25 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() {
-                let re = Regex::new(r"(?i) WHERE (.*)").unwrap();
+            if !time_range_sql.is_empty() && meta_time_range_is_empty {
+                let re = Regex::new(r"(?i) where (.*)").unwrap();
                 match re.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if where_str.to_lowercase().contains(" order ") {
+                        if !meta.order_by.is_empty() {
                             where_str = where_str
-                                [0..where_str.to_lowercase().find(" order ").unwrap()]
+                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         }
-                        if !where_str.contains(&CONFIG.common.time_stamp_col) {
-                            origin_sql = origin_sql.replace(
-                                where_str.as_str(),
-                                &format!("{} AND {}", time_range_sql, where_str),
-                            );
-                        }
+                        let pos_start = origin_sql.find(where_str.as_str()).unwrap();
+                        let pos_end = pos_start + where_str.len();
+                        origin_sql = format!(
+                            "{}{} AND {}{}",
+                            &origin_sql[0..pos_start],
+                            time_range_sql,
+                            where_str,
+                            &origin_sql[pos_end..]
+                        );
                     }
                     None => {
                         origin_sql = origin_sql
@@ -261,24 +263,13 @@ impl Sql {
             }
         }
 
-        // check full sql_mode limit
-        if sql_mode.eq(&SqlMode::Full) {
-            let origin_sql = origin_sql.to_lowercase();
-            if !origin_sql.contains(" limit ")
-                && !origin_sql.contains(" group ")
-                && !origin_sql.contains(" count(")
-                && !origin_sql.contains(&CONFIG.common.time_stamp_col)
-            {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "sql_mode=full, Query SQL must limit rows".to_string(),
-                )));
-            }
-        }
-
         // Hack offset limit
-        meta.offset = req_query.from as usize;
-        meta.limit = req_query.size as usize;
-        if !sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
+        if meta.limit == 0 {
+            meta.offset = req_query.from as usize;
+            meta.limit = req_query.size as usize;
+            if meta.limit == 0 {
+                meta.limit = SQL_DEFAULT_LIMIT;
+            }
             origin_sql = if meta.order_by.is_empty() {
                 format!(
                     "{} ORDER BY {} DESC LIMIT {}",
@@ -290,10 +281,6 @@ impl Sql {
                 format!("{} LIMIT {}", origin_sql, meta.offset + meta.limit)
             };
         }
-        // Hack limit for full sql_mode
-        if sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
-            origin_sql = format!("{} LIMIT {}", origin_sql, SQL_FULL_MODE_LIMIT);
-        }
 
         // fetch schema
         let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
@@ -302,22 +289,38 @@ impl Sql {
         };
         let schema_fields = schema.fields().to_vec();
 
+        // getch sql where tokens
+        let where_tokens = split_sql_token(&origin_sql);
+        let where_pos = where_tokens
+            .iter()
+            .position(|x| x.to_lowercase() == "where");
+        let mut where_tokens = if where_pos.is_none() {
+            Vec::new()
+        } else {
+            where_tokens[where_pos.unwrap() + 1..].to_vec()
+        };
+
         // HACK full text search
         let mut fulltext = Vec::new();
         let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
         let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
-        for cap in re1.captures_iter(&origin_sql) {
-            // println!("match_all: {}, {}", &cap[0], &cap[1]);
-            fulltext.push((cap[0].to_string(), cap[1].to_string()));
-        }
-        for cap in re2.captures_iter(&origin_sql) {
-            // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
-            fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+        for token in &where_tokens {
+            if !token.to_lowercase().starts_with("match_all") {
+                continue;
+            }
+            for cap in re1.captures_iter(token) {
+                // println!("match_all: {}, {}", &cap[0], &cap[1]);
+                fulltext.push((cap[0].to_string(), cap[1].to_string()));
+            }
+            for cap in re2.captures_iter(token) {
+                // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
+                fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+            }
         }
         // fetch fts fields
-        let fts_fiels = get_stream_setting_fts_fields(&schema).unwrap();
-        let match_all_fields = if !fts_fiels.is_empty() {
-            fts_fiels.iter().map(|v| v.to_lowercase()).collect()
+        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+        let match_all_fields = if !fts_fields.is_empty() {
+            fts_fields.iter().map(|v| v.to_lowercase()).collect()
         } else {
             crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
                 .iter()
@@ -347,6 +350,7 @@ impl Sql {
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
         }
+
         // Hack: str_match
         for key in [
             "match",
@@ -360,7 +364,37 @@ impl Sql {
             } else {
                 "ILIKE"
             };
-            for cap in re_str_match.captures_iter(origin_sql.clone().as_str()) {
+            for token in &where_tokens {
+                if !token.to_lowercase().starts_with("match")
+                    && !token.to_lowercase().starts_with("str_match")
+                {
+                    continue;
+                }
+                for cap in re_str_match.captures_iter(token.as_str()) {
+                    let attrs = cap
+                        .get(1)
+                        .unwrap()
+                        .as_str()
+                        .split(',')
+                        .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+                        .collect::<Vec<&str>>();
+                    let field = attrs.first().unwrap();
+                    let value = attrs.get(1).unwrap();
+                    origin_sql = origin_sql.replace(
+                        cap.get(0).unwrap().as_str(),
+                        format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
+                    );
+                }
+            }
+        }
+
+        // query support histogram
+        let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
+        for token in &where_tokens {
+            if !token.to_lowercase().starts_with("histogram") {
+                continue;
+            }
+            for cap in re_histogram.captures_iter(token.as_str()) {
                 let attrs = cap
                     .get(1)
                     .unwrap()
@@ -369,27 +403,8 @@ impl Sql {
                     .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
                     .collect::<Vec<&str>>();
                 let field = attrs.first().unwrap();
-                let value = attrs.get(1).unwrap();
+                let interval = attrs.get(1).unwrap();
                 origin_sql = origin_sql.replace(
-                    cap.get(0).unwrap().as_str(),
-                    format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
-                );
-            }
-        }
-
-        // query support histogram
-        let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
-        for cap in re_histogram.captures_iter(origin_sql.clone().as_str()) {
-            let attrs = cap
-                .get(1)
-                .unwrap()
-                .as_str()
-                .split(',')
-                .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                .collect::<Vec<&str>>();
-            let field = attrs.first().unwrap();
-            let interval = attrs.get(1).unwrap();
-            origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
                 format!(
                     "date_bin(interval '{}', to_timestamp_micros(\"{}\"), to_timestamp('2001-01-01T00:00:00'))",
@@ -398,6 +413,7 @@ impl Sql {
                 )
                 .as_str(),
             );
+            }
         }
 
         // pickup where
@@ -408,8 +424,16 @@ impl Sql {
         };
         if !where_str.is_empty() {
             let mut where_str_lower = where_str.to_lowercase();
-            for key in [" order by", " group by", " offset", " limit"].iter() {
-                if let Some(pos) = where_str_lower.find(key) {
+            for key in ["group", "order", "offset", "limit"].iter() {
+                if !where_tokens.iter().any(|x| x.to_lowercase().eq(key)) {
+                    continue;
+                }
+                let where_pos = where_tokens
+                    .iter()
+                    .position(|x| x.to_lowercase().eq(key))
+                    .unwrap();
+                where_tokens = where_tokens[..where_pos].to_vec();
+                if let Some(pos) = where_str_lower.rfind(key) {
                     where_str = where_str[..pos].to_string();
                     where_str_lower = where_str.to_lowercase();
                 }
@@ -593,6 +617,64 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
+fn split_sql_token(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let text_chars = text.chars().collect::<Vec<char>>();
+    let text_chars_len = text_chars.len();
+    let mut start_pos = 0;
+    let mut in_word = false;
+    let mut bracket = 0;
+    let mut in_quote = false;
+    let mut quote = ' ';
+    for i in 0..text_chars_len {
+        let c = text_chars.get(i).unwrap();
+        if *c == '(' {
+            bracket += 1;
+            continue;
+        }
+        if *c == ')' {
+            bracket -= 1;
+            continue;
+        }
+        if *c == '\'' || *c == '"' {
+            if in_quote {
+                if quote == *c {
+                    in_quote = false;
+                }
+            } else {
+                in_quote = true;
+                quote = *c;
+            }
+        }
+        if SQL_DELIMITERS.contains(&(*c as u8)) {
+            if bracket > 0 || in_quote {
+                continue;
+            }
+            if in_word {
+                let token = text_chars[start_pos..i].iter().collect::<String>();
+                tokens.push(token);
+            }
+            tokens.push(String::from_utf8(vec![*c as u8]).unwrap());
+            in_word = false;
+            start_pos = i + 1;
+            continue;
+        }
+        if in_word {
+            continue;
+        }
+        in_word = true;
+    }
+    if start_pos != text_chars_len {
+        let token = text_chars[start_pos..text_chars_len]
+            .iter()
+            .collect::<String>();
+        tokens.push(token);
+    }
+
+    // println!("tokens: {:?}", tokens);
+    tokens
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -625,5 +707,165 @@ mod tests {
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
         assert!(check_field_in_use(&resp, col));
+    }
+
+    #[actix_web::test]
+    async fn test_context_sqls() {
+        let sqls = [
+            ("select * from table1", true,(0,0)),
+            ("select * from table1 where a=1", true,(0,0)),
+            ("select * from table1 where a='b'", true,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", false,(0,0)),
+            ("select * from table1 where a='b' group by abc", false,(0,0)),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                false,(0,0),
+            ),
+            ("select * from table1, table2 where a='b'", false,(0,0)),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false,(0,0),
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
+                true,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
+                false,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true,(1679202494333000, 1679203394333000),
+            ),
+            (
+                "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
+                false,(0,0),
+            ),
+            (
+                "select * from table1 where match_all('abc') and str_match(log,'abc') order by _timestamp desc",
+                false,(0,0),
+            ),
+
+        ];
+
+        let org_id = "test_org";
+        for (sql, ok, time_range) in sqls {
+            let query = crate::meta::search::Query {
+                sql: sql.to_string(),
+                from: 0,
+                size: 100,
+                sql_mode: "context".to_owned(),
+                start_time: 1667978895416,
+                end_time: 1667978900217,
+                track_total_hits: true,
+            };
+            let req: crate::meta::search::Request = crate::meta::search::Request {
+                query: query.clone(),
+                aggs: HashMap::new(),
+                encoding: crate::meta::search::RequestEncoding::Empty,
+            };
+            let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+            rpc_req.org_id = org_id.to_string();
+
+            let resp = Sql::new(&rpc_req).await;
+            assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                assert_eq!(resp.meta.limit, query.size);
+            }
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_full_sqls() {
+        let sqls = [
+            ("select * from table1", true, 0,(0,0)),
+            ("select * from table1 where a=1", true, 0,(0,0)),
+            ("select * from table1 where a='b'", true, 0,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", true, 10,(0,0)),
+            ("select * from table1 where a='b' group by abc", true, 0,(0,0)),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                true, 0,(0,0),
+            ),
+            ("select * from table1, table2 where a='b'", false, 0,(0,0)),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
+                true, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
+                true, 10,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true, 0,(1679202494333000, 1679203394333000),
+            ),
+
+        ];
+
+        let org_id = "test_org";
+        for (sql, ok, limit, time_range) in sqls {
+            let query = crate::meta::search::Query {
+                sql: sql.to_string(),
+                from: 0,
+                size: 100,
+                sql_mode: "full".to_owned(),
+                start_time: 1667978895416,
+                end_time: 1667978900217,
+                track_total_hits: true,
+            };
+            let req: crate::meta::search::Request = crate::meta::search::Request {
+                query: query.clone(),
+                aggs: HashMap::new(),
+                encoding: crate::meta::search::RequestEncoding::Empty,
+            };
+            let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+            rpc_req.org_id = org_id.to_string();
+
+            let resp = Sql::new(&rpc_req).await;
+            assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                if limit > 0 {
+                    assert_eq!(resp.meta.limit, limit);
+                } else {
+                    assert_eq!(resp.meta.limit, query.size);
+                }
+            }
+        }
     }
 }

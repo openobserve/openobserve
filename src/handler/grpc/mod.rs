@@ -53,7 +53,6 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             stype: cluster_rpc::SearchType::User.into(),
             query: Some(req_query),
             aggs,
-            partition: None,
             file_list: vec![],
             stream_type: "".to_string(),
         }
