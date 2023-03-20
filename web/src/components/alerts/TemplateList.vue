@@ -60,7 +60,7 @@
             color="secondary"
             no-caps
             :label="t(`alert_templates.add`)"
-            @click="toggleTemplateEditor"
+            @click="editTemplate(null)"
           />
         </template>
       </q-table>
@@ -69,7 +69,7 @@
       <AddTemplate
         :template="editingTemplate"
         @cancel:hideform="toggleTemplateEditor"
-        @get:templates="$emit('get:templates')"
+        @get:templates="getTemplates"
       />
     </div>
 
@@ -83,7 +83,7 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, defineProps, defineEmits } from "vue";
+import { ref, defineProps, defineEmits, onActivated, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
@@ -93,17 +93,14 @@ import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 
 import { useStore } from "vuex";
-const props = defineProps({
-  templates: {
-    type: Array,
-    default: () => [],
-  },
-});
+import { useRouter } from "vue-router";
 
 const emit = defineEmits(["get:templates"]);
 
 const store = useStore();
 const { t } = useI18n();
+const router = useRouter();
+const templates = ref([]);
 const columns: any = ref<QTableProps["columns"]>([
   {
     name: "#",
@@ -132,12 +129,63 @@ const showTemplateEditor = ref(false);
 const editingTemplate = ref(null);
 const confirmDelete = ref({ visible: false, data: null });
 
-const editTemplate = (template: any) => {
-  toggleTemplateEditor();
-  editingTemplate.value = { ...template };
+onActivated(() => {
+  if (!templates.value.length) updateRoute();
+});
+onMounted(() => {
+  getTemplates();
+});
+
+const getTemplates = () => {
+  templateService
+    .list({
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => {
+      templates.value = res.data;
+      updateRoute();
+    });
 };
+
+const updateRoute = () => {
+  if (router.currentRoute.value.query.action === "add") editTemplate();
+  if (router.currentRoute.value.query.action === "update")
+    editTemplate(getTemplateByName(router.currentRoute.value.query.name));
+};
+
+const getTemplateByName = (name) => {
+  return templates.value.find((template) => template.name === name);
+};
+
+const editTemplate = (template: any = null) => {
+  resetEditingTemplate();
+  toggleTemplateEditor();
+  if (!template) {
+    router.push({
+      name: "alertTemplates",
+      query: {
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  } else {
+    editingTemplate.value = { ...template };
+    router.push({
+      name: "alertTemplates",
+      query: {
+        action: "update",
+        name: template.name,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  }
+};
+
+const resetEditingTemplate = () => {
+  editingTemplate.value = null;
+};
+
 const deleteTemplate = () => {
-  console.log(confirmDelete.value.data);
   if (confirmDelete.value?.data?.name) {
     templateService
       .delete({
@@ -159,8 +207,14 @@ const cancelDeleteTemplate = () => {
 };
 
 const toggleTemplateEditor = () => {
-  editingTemplate.value = null;
   showTemplateEditor.value = !showTemplateEditor.value;
+  if (!showTemplateEditor.value)
+    router.push({
+      name: "alertTemplates",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
 };
 </script>
 <style lang=""></style>

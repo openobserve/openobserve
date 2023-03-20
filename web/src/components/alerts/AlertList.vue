@@ -132,7 +132,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -140,6 +140,7 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
+import destinationService from "@/services/alert_destination";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -155,12 +156,7 @@ export default defineComponent({
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
-  props: {
-    destinations: {
-      type: Array,
-      default: () => [],
-    },
-  },
+
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -210,7 +206,13 @@ export default defineComponent({
         sortable: true,
         style: "width: 10vw;word-break: break-all;",
       },
-
+      {
+        name: "destination",
+        field: "destination",
+        label: t("alerts.destination"),
+        align: "left",
+        sortable: true,
+      },
       {
         name: "actions",
         field: "actions",
@@ -220,6 +222,7 @@ export default defineComponent({
       },
     ]);
     const activeTab: any = ref("alerts");
+    const destinations = ref([]);
 
     const getAlerts = () => {
       const dismiss = $q.notify({
@@ -243,6 +246,7 @@ export default defineComponent({
             if (data.is_real_time) {
               data.query.sql = "--";
             }
+
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
@@ -273,6 +277,14 @@ export default defineComponent({
             };
           });
 
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
+          if (router.currentRoute.value.query.action == "update") {
+            showAddUpdateFn({
+              row: getAlertByName(router.currentRoute.value.query.name),
+            });
+          }
           dismiss();
         })
         .catch((err) => {
@@ -285,9 +297,27 @@ export default defineComponent({
         });
     };
 
+    const getAlertByName = (name) => {
+      return alerts.value.find((alert) => alert.name === name);
+    };
+
     if (alerts.value == "" || alerts.value == undefined) {
       getAlerts();
     }
+
+    onBeforeMount(() => getDestinations());
+
+    onActivated(() => getDestinations());
+
+    const getDestinations = () => {
+      destinationService
+        .list({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res) => {
+          destinations.value = res.data;
+        });
+    };
 
     interface OptionType {
       label: String;
@@ -339,7 +369,7 @@ export default defineComponent({
         router.push({
           name: "alertList",
           query: {
-            action: "add",
+            action: "update",
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -364,6 +394,12 @@ export default defineComponent({
 
     const hideForm = () => {
       showAddAlertDialog.value = false;
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const deleteFn = () => {
@@ -445,6 +481,7 @@ export default defineComponent({
       },
       getImageURL,
       activeTab,
+      destinations,
     };
   },
   computed: {
