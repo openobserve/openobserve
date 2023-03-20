@@ -20,6 +20,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::handler::grpc::cluster_rpc::search_server::Search;
 use crate::handler::grpc::cluster_rpc::SearchRequest;
 use crate::handler::grpc::cluster_rpc::SearchResponse;
+use crate::infra::errors;
 use crate::infra::metrics;
 use crate::service::search as SearchService;
 
@@ -53,7 +54,10 @@ impl Search for Searcher {
                 metrics::GRPC_INCOMING_REQUESTS
                     .with_label_values(&["/_search", "500", &org_id, "", stream_type])
                     .inc();
-                return Err(Status::internal(err.to_string()));
+                return Err(match err {
+                    errors::Error::ErrorCode(code) => Status::internal(code.to_json()),
+                    _ => Status::internal(err.to_string()),
+                });
             }
         };
 

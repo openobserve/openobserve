@@ -350,7 +350,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         let credentials_str = credentials.clone();
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = req.org_id.parse()?;
+                let org_id: MetadataValue<_> = match req.org_id.parse() {
+                    Ok(org_id) => org_id,
+                    Err(_) => return Err(Error::Message("invalid org_id".to_string())),
+                };
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -361,8 +364,23 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     )
                 });
 
-                let token: MetadataValue<_> = credentials_str.parse()?;
-                let channel = Channel::from_shared(node_addr).unwrap().connect().await?;
+                let token: MetadataValue<_> = match credentials_str.parse() {
+                    Ok(token) => token,
+                    Err(_) => return Err(Error::Message("invalid token".to_string())),
+                };
+                let channel = match Channel::from_shared(node_addr).unwrap().connect().await {
+                    Ok(channel) => channel,
+                    Err(err) => {
+                        log::error!(
+                            "[TRACE] cluster->search: node: {}, connect grpc err: {:?}",
+                            node.id,
+                            err
+                        );
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            "connect search node error".to_string(),
+                        )));
+                    }
+                };
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -376,13 +394,20 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip);
                 let response: cluster_rpc::SearchResponse = match client.search(request).await {
-                    Ok(response) => response.into_inner(),
-                    Err(error) => {
-                        return Err(anyhow::anyhow!(
-                            "cluster search: node: {}, err: {:?}",
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "[TRACE] cluster->search: node: {}, search grpc err: {:?}",
                             node.id,
-                            error
-                        ));
+                            err
+                        );
+                        if err.code().eq(&tonic::Code::Internal) {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            "search node error".to_string(),
+                        )));
                     }
                 };
 
@@ -420,9 +445,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 if let Err(e) = locker.unlock().await {
                     log::error!("search in cluster unlock error: {}", e);
                 }
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
+                return Err(err);
             }
         }
     }
