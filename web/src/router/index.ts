@@ -170,9 +170,6 @@ export default function (store: any) {
           path: "ingestion",
           name: "ingestion",
           component: Ingestion,
-          meta: {
-            keepAlive: true,
-          },
           children: [
             {
               path: "curl",
@@ -200,9 +197,6 @@ export default function (store: any) {
           path: "alerts",
           name: "alerts",
           component: Alerts,
-          meta: {
-            keepAlive: true,
-          },
           children: [
             {
               path: "alerts",

@@ -234,13 +234,12 @@
             :options="getFormattedDestinations"
             color="input-border"
             bg-color="input-bg"
-            class="showLabelOnTop"
+            class="showLabelOnTop no-case"
             stack-label
             outlined
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            tabindex="0"
           />
         </div>
 
@@ -526,7 +525,7 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
-      this.formData.destination = this.modelValue.destination[0];
+      this.formData.destination = this.modelValue.destination;
     }
 
     streamService
@@ -620,7 +619,6 @@ export default defineComponent({
             });
           }
         });
-        console.log(submitData);
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,

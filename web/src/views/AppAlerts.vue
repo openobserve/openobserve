@@ -33,21 +33,36 @@
           >
             <q-route-tab
               name="alerts"
-              to="/alerts/alerts"
+              :to="{
+                name: 'alertList',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
               icon="data"
               label="Alerts"
               content-class="tab_content"
             />
             <q-route-tab
               name="destinations"
-              to="/alerts/destinations"
+              :to="{
+                name: 'alertDestinations',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
               icon="data"
               label="Destinations"
               content-class="tab_content"
             />
             <q-route-tab
               name="templates"
-              to="/alerts/templates"
+              :to="{
+                name: 'alertTemplates',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
               icon="data"
               label="Templates"
               content-class="tab_content"
@@ -88,28 +103,25 @@ const destinations = ref([]);
 const splitterModel = ref(220);
 
 onActivated(() => {
-  const routeMapping: any = {
-    alertList: "alerts",
-    alertDestinations: "destinations",
-    alertTemplates: "templates",
-  };
-  if (router.currentRoute.value.name) {
-    activeTab.value = routeMapping[router.currentRoute.value.name];
-  } else {
-    activeTab.value = "alerts";
-    router.push("/alerts");
-  }
+  redirectRoute();
 });
 
 onBeforeMount(() => {
   if (!templates.value.length) getTemplates();
   if (!destinations.value.length) getDestinations();
+  redirectRoute();
+});
+
+const redirectRoute = () => {
   if (router.currentRoute.value.name === "alerts") {
     router.push({
       name: "alertList",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
   }
-});
+};
 
 const getTemplates = () => {
   templateService

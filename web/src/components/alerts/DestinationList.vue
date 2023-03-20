@@ -60,7 +60,7 @@
             color="secondary"
             no-caps
             :label="t(`alert_destinations.add`)"
-            @click="toggleDestionationEditor"
+            @click="editDestination(null)"
           />
         </template>
       </q-table>
@@ -70,7 +70,7 @@
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestionationEditor"
-        @get:destinations="$emit('get:destinations')"
+        @get:destinations="getDestinations"
       />
     </div>
 
@@ -84,27 +84,17 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, defineProps, defineEmits } from "vue";
+import { ref, onBeforeMount, onActivated, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
+import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import type { emit } from "process";
-
-const props = defineProps({
-  destinations: {
-    type: Array,
-    default: () => [],
-  },
-  templates: {
-    type: Array,
-    default: () => [],
-  },
-});
+import { useRouter } from "vue-router";
 
 const emit = defineEmits(["get:destinations"]);
 
@@ -147,13 +137,77 @@ const columns: any = ref<QTableProps["columns"]>([
     sortable: false,
   },
 ]);
+const destinations = ref([]);
+const templates = ref([]);
 const confirmDelete = ref({ visible: false, data: null });
 const destinationSearchKey = ref("");
 const showDestinationEditor = ref(false);
+const router = useRouter();
+
+onActivated(() => {
+  getTemplates();
+  if (!destinations.value.length) getDestinations();
+});
+onBeforeMount(() => {
+  getDestinations();
+  getTemplates();
+});
+
+const getDestinations = () => {
+  destinationService
+    .list({
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => {
+      destinations.value = res.data;
+      updateRoute();
+    });
+};
+
+const getTemplates = () => {
+  templateService
+    .list({
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+    .then((res) => (templates.value = res.data));
+};
+
+const updateRoute = () => {
+  if (router.currentRoute.value.query.action === "add") editDestination(null);
+  if (router.currentRoute.value.query.action === "update")
+    editDestination(getDestinationByName(router.currentRoute.value.query.name));
+};
+
+const getDestinationByName = (name) => {
+  return destinations.value.find((destination) => destination.name === name);
+};
 
 const editDestination = (destination: any) => {
   toggleDestionationEditor();
-  editingDestination.value = { ...destination };
+  resetEditingDestination();
+  if (!destination) {
+    router.push({
+      name: "alertDestinations",
+      query: {
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  } else {
+    editingDestination.value = { ...destination };
+    router.push({
+      name: "alertDestinations",
+      query: {
+        action: "update",
+        name: destination.name,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+  }
+};
+
+const resetEditingDestination = () => {
+  editingDestination.value = null;
 };
 
 const deleteDestination = () => {
@@ -178,8 +232,14 @@ const cancelDeleteDestination = () => {
 };
 
 const toggleDestionationEditor = () => {
-  editingDestination.value = null;
   showDestinationEditor.value = !showDestinationEditor.value;
+  if (!showDestinationEditor.value)
+    router.push({
+      name: "alertDestinations",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
 };
 </script>
 <style lang=""></style>
