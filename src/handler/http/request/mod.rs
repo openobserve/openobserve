@@ -15,6 +15,7 @@
 pub mod alerts;
 pub mod dashboards;
 pub mod functions;
+pub mod kv;
 pub mod logs;
 pub mod organization;
 pub mod prom;

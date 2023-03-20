@@ -23,6 +23,7 @@ use super::auth::validator;
 use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
+use super::request::kv;
 use super::request::logs;
 use super::request::organization::*;
 use super::request::prom::*;
@@ -134,6 +135,10 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(destinations::save_destination)
             .service(destinations::get_destination)
             .service(destinations::list_destinations)
-            .service(destinations::delete_destination),
+            .service(destinations::delete_destination)
+            .service(kv::get)
+            .service(kv::set)
+            .service(kv::delete)
+            .service(kv::list),
     );
 }

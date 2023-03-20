@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod alert_manager;
-pub mod alerts;
-pub mod compact;
-pub mod dashboards;
-pub mod db;
-pub mod file_list;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod router;
-pub mod schema;
-pub mod search;
-pub mod stream;
-pub mod traces;
-pub mod triggers;
-pub mod users;
+use crate::service::db::kv;
+
+pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
+    let val = kv::get(org_id, key).await?;
+    Ok(val)
+}
+
+pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
+    kv::set(org_id, key, val).await?;
+    Ok(())
+}
+
+pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
+    kv::delete(org_id, key).await?;
+    Ok(())
+}
+
+pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+    let items = kv::list(org_id, prefix).await?;
+    Ok(items)
+}
