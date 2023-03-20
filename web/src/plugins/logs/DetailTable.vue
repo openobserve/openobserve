@@ -33,10 +33,25 @@
       </div>
     </q-card-section>
     <q-separator />
-    <q-tabs v-model="tab" shrink align="left">
-      <q-tab name="table" label="Table" />
-      <q-tab name="json" label="JSON" />
-    </q-tabs>
+    <div class="row justify-between">
+      <div class="col-10">
+        <q-tabs v-model="tab" shrink align="left">
+          <q-tab name="table" label="Table" />
+          <q-tab name="json" label="JSON" />
+        </q-tabs>
+      </div>
+      <div
+        v-show="tab === 'table'"
+        class="col-2 flex justify-end align-center q-pr-md"
+      >
+        <q-toggle
+          v-model="shouldWrapValues"
+          label="Wrap"
+          color="primary"
+          size="xs"
+        />
+      </div>
+    </div>
 
     <q-separator />
 
@@ -51,14 +66,6 @@
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
-            <div class="flex justify-end q-pb-sm q-pr-sm">
-              <q-toggle
-                v-model="shouldWrapValues"
-                label="Wrap"
-                color="primary"
-                size="xs"
-              />
-            </div>
             <q-list
               separator
               style="height: calc(100vh - 336px)"
