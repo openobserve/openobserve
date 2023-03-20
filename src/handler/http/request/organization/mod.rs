@@ -60,42 +60,6 @@ struct OrganizationResponse {
     data: Vec<OrganizationDetails>,
 }
 
-#[get("/organizations_by_username/{user_name}")]
-pub async fn organizations_by_username(user_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let mut orgs = Vec::new();
-    let mut org_names = HashSet::new();
-    let user_id = user_id.to_string();
-    let user_id = user_id.as_str();
-    let is_root_user = is_root_user(user_id).await;
-    if is_root_user {
-        let org = Organization {
-            identifier: DEFAULT.to_string(),
-            label: DEFAULT.to_string(),
-        };
-        org_names.insert(DEFAULT.to_string());
-        orgs.push(org);
-    }
-
-    for user in USERS.iter() {
-        if !user.key().contains('/') {
-            continue;
-        }
-        if !is_root_user && !user.key().ends_with(format!("/{}", user_id).as_str()) {
-            continue;
-        }
-        let org = Organization {
-            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            label: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-        };
-        if !org_names.contains(&org.identifier) {
-            org_names.insert(org.identifier.clone());
-            orgs.push(org);
-        }
-    }
-
-    Ok(HttpResponse::Ok().json(orgs))
-}
-
 #[get("/{org_id}/organizations")]
 pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error> {
     // let org = org_id.into_inner();

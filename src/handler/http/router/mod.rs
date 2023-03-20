@@ -53,7 +53,6 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
-            .service(organizations_by_username)
             .service(users::authentication),
     );
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
@@ -127,6 +126,14 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(org_summary)
             .service(get_user_passcode)
             .service(update_user_passcode)
-            .service(users::update),
+            .service(users::update)
+            .service(templates::save_template)
+            .service(templates::get_template)
+            .service(templates::delete_template)
+            .service(templates::list_templates)
+            .service(destinations::save_destination)
+            .service(destinations::get_destination)
+            .service(destinations::list_destinations)
+            .service(destinations::delete_destination),
     );
 }
