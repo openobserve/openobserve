@@ -168,6 +168,10 @@ export const useLocalLogsObj = (val = "", isDelete = false) => {
   return useLocalStorage("logsobj", val, isDelete, true);
 };
 
+export const useLocalLogFilterField = (val = "", isDelete = false) => {
+  return useLocalStorage("logFilterField", val, isDelete, true);
+};
+
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;

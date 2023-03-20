@@ -135,7 +135,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, useLocalLogFilterField } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -183,6 +183,10 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
       }
+      const identifier: string = store.state.selectedOrganization.identifier || "default";
+      let selectedFields: any = {};
+      selectedFields[identifier] = searchObj.data.stream.selectedFields;
+      useLocalLogFilterField(selectedFields);
     }
 
     return {
