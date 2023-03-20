@@ -66,7 +66,7 @@ pub async fn prometheus_write_proto(
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some("not an ingester".to_string()),
+                "not an ingester".to_string(),
             )),
         );
     }
@@ -216,7 +216,7 @@ pub async fn prometheus_write_proto(
                 return Ok(HttpResponse::InternalServerError().json(
                     meta::http::HttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        Some(format!("stream [{}] is being deleted", metric_name)),
+                        format!("stream [{}] is being deleted", metric_name),
                     ),
                 ));
             }

@@ -56,9 +56,9 @@ pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResp
             http::StatusCode::OK.into(),
             "Alert destination deleted ".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }
@@ -71,7 +71,7 @@ pub async fn get_destination(org_id: String, name: String) -> Result<HttpRespons
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            Some("Alert destination not found".to_string()),
+            "Alert destination not found".to_string(),
         ))),
     }
 }

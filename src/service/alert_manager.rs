@@ -137,7 +137,7 @@ pub async fn handle_trigger(alert_name: &str, alert: Alert) {
                     }
                 }
                 Err(err) => {
-                    log::error!("search error: {:?}", err);
+                    log::error!("alert_manager search error: {:?}", err);
                 }
             }
             //}

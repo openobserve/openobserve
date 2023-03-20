@@ -22,10 +22,9 @@ use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::infra::config::{CONFIG, LOCKER};
-use crate::infra::metrics;
-use crate::meta;
+use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::StreamType;
+use crate::meta::{self, StreamType};
 use crate::service::search as SearchService;
 
 /** Search using SQL against a stream data */
@@ -106,7 +105,7 @@ pub async fn search(
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some(e.to_string()),
+                e.to_string(),
             )))
         }
     };
@@ -117,14 +116,14 @@ pub async fn search(
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some(e.to_string()),
+                e.to_string(),
             )))
         }
     };
     if let Err(e) = req.decode() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
-            Some(e.to_string()),
+            e.to_string(),
         )));
     }
 
@@ -159,7 +158,6 @@ pub async fn search(
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
-            log::error!("search error: {:?}", err);
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
@@ -179,12 +177,15 @@ pub async fn search(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            log::error!("search error: {:?}", err);
+            Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    Some(err.to_string()),
+                    err.to_string(),
                 )),
-            )
+            })
         }
     }
 }
@@ -245,7 +246,7 @@ pub async fn around(
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some(e.to_string()),
+                e.to_string(),
             )))
         }
     };
@@ -285,7 +286,6 @@ pub async fn around(
     let resp_forward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
-            log::error!("search error: {:?}", err);
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
@@ -305,12 +305,15 @@ pub async fn around(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
-            return Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            log::error!("search around error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    Some(err.to_string()),
+                    err.to_string(),
                 )),
-            );
+            });
         }
     };
 
@@ -334,7 +337,6 @@ pub async fn around(
     let resp_backward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
-            log::error!("search error: {:?}", err);
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
@@ -354,12 +356,15 @@ pub async fn around(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
-            return Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            log::error!("search around error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    Some(err.to_string()),
+                    err.to_string(),
                 )),
-            );
+            });
         }
     };
 

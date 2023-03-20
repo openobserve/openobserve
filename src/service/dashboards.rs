@@ -31,11 +31,11 @@ pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, Err
         Ok(Some(dashboard)) => Ok(HttpResponse::Ok().json(dashboard)),
         Ok(None) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("Dashboard not found".to_string()),
+            "Dashboard not found".to_string(),
         ))),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some("Dashboard not found".to_string()),
+            "Dashboard not found".to_string(),
         ))),
     }
 }
@@ -53,10 +53,10 @@ pub async fn save_dashboard(
             http::StatusCode::OK.into(),
             "Dashboard saved".to_string(),
         ))),
-        Err(err) => Ok(
+        Err(e) => Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
-                Some(err.to_string()),
+                e.to_string(),
             )),
         ),
     }
@@ -78,9 +78,9 @@ pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, 
             http::StatusCode::OK.into(),
             "Dashboard deleted".to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }

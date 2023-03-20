@@ -28,10 +28,14 @@ pub enum Error {
     SerdeJsonError(#[from] serde_json::Error),
     #[error("SimdJsonError# {0}")]
     SimdJsonError(#[from] simd_json::Error),
-    #[error("Error# watcher is exists {0}")]
+    #[error("DataFusionError# {0}")]
+    DataFusionError(#[from] datafusion::error::DataFusionError),
+    #[error("WatchError# watcher is exists {0}")]
     WatcherExists(String),
     #[error("Error# {0}")]
     Message(String),
+    #[error("ErrorCode# {0}")]
+    ErrorCode(ErrorCodes),
     #[error("Not implemented")]
     NotImplemented,
     #[error("Unknown error")]
@@ -42,6 +46,64 @@ pub enum Error {
 pub enum DbError {
     #[error("key:{0} not exists")]
     KeyNotExists(String),
+}
+
+#[derive(ThisError, Debug)]
+pub enum ErrorCodes {
+    ServerInternalError(String),
+    SearchSQLNotValid(String),
+    SearchStreamNotFound(String),
+    FullTextSearchFieldNotFound,
+    SearchFieldNotFound(String),
+    SearchFunctionNotDefined(String),
+    SearchParquetFileNotFound,
+    SearchFieldHasNoCompatibleDataType(String),
+}
+
+impl std::fmt::Display for ErrorCodes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"{{"error_code": {}, "error_msg": "{}"}}"#,
+            self.get_code(),
+            self.get_message()
+        )
+    }
+}
+
+impl ErrorCodes {
+    pub fn get_code(&self) -> u16 {
+        match self {
+            ErrorCodes::ServerInternalError(_) => 10001,
+            ErrorCodes::SearchSQLNotValid(_) => 20001,
+            ErrorCodes::SearchStreamNotFound(_) => 20002,
+            ErrorCodes::FullTextSearchFieldNotFound => 20003,
+            ErrorCodes::SearchFieldNotFound(_) => 20004,
+            ErrorCodes::SearchFunctionNotDefined(_) => 20005,
+            ErrorCodes::SearchParquetFileNotFound => 20006,
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
+        }
+    }
+    pub fn get_message(&self) -> String {
+        match self {
+            ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::SearchSQLNotValid(sql) => format!("Search SQL not valid: {}", sql),
+            ErrorCodes::SearchStreamNotFound(stream) => {
+                format!("Search stream not found: {}", stream)
+            }
+            ErrorCodes::FullTextSearchFieldNotFound => {
+                "Full text search field not found".to_string()
+            }
+            ErrorCodes::SearchFieldNotFound(field) => format!("Search field not found: {}", field),
+            ErrorCodes::SearchFunctionNotDefined(func) => {
+                format!("Search function not defined: {}", func)
+            }
+            ErrorCodes::SearchParquetFileNotFound => "Search parquet file not found".to_string(),
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
+                format!("Search field has no compatible data type: {}", field)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

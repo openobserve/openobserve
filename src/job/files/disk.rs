@@ -238,7 +238,7 @@ async fn upload_file(
     let mut meta_batch = vec![];
     for batch in json {
         let batch_write = batch.unwrap();
-        writer.write(&batch_write).expect("Writing batch");
+        writer.write(&batch_write).expect("Write batch succeeded");
         meta_batch.push(batch_write);
     }
     writer.close().unwrap();
@@ -283,7 +283,7 @@ async fn upload_file(
         .await;
     match result {
         Ok(_output) => {
-            log::info!("[JOB] disk file upload success: {}", new_file_key);
+            log::info!("[JOB] disk file upload succeeded: {}", new_file_key);
             Ok((new_file_key, file_meta, stream_type))
         }
         Err(err) => {
