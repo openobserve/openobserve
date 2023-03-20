@@ -80,6 +80,7 @@ import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
+import { useQuasar } from "quasar";
 
 const props = defineProps({ template: Object });
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -91,6 +92,7 @@ const formData = ref({
 });
 
 const store = useStore();
+const q = useQuasar();
 const editorRef: any = ref(null);
 
 let editorobj: any = null;
@@ -167,21 +169,44 @@ const isValidTemplate = computed(
 );
 
 const saveTemplate = () => {
-  if (isValidTemplate.value) {
-    templateService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        template_name: formData.value.name,
-        data: {
-          name: formData.value.name,
-          body: formData.value.body,
-        },
-      })
-      .then(() => {
-        emit("get:templates");
-        emit("cancel:hideform");
-      });
+  if (!isValidTemplate.value) {
+    q.notify({
+      type: "negative",
+      message: "Please fill required fields",
+      timeout: 1500,
+    });
+    return;
   }
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Please wait...",
+    timeout: 2000,
+  });
+  templateService
+    .create({
+      org_identifier: store.state.selectedOrganization.identifier,
+      template_name: formData.value.name,
+      data: {
+        name: formData.value.name,
+        body: formData.value.body,
+      },
+    })
+    .then(() => {
+      dismiss();
+      emit("get:templates");
+      emit("cancel:hideform");
+      q.notify({
+        type: "positive",
+        message: `Alert saved successfully.`,
+      });
+    })
+    .catch((err) => {
+      dismiss();
+      q.notify({
+        type: "negative",
+        message: err.response.data.error,
+      });
+    });
 };
 </script>
 <style lang="scss" scoped>
