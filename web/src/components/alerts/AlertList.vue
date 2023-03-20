@@ -326,9 +326,24 @@ export default defineComponent({
       if (!props.row) {
         isUpdated.value = false;
         action = "Add Alert";
+        router.push({
+          name: "alertList",
+          query: {
+            action: "add",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       } else {
         isUpdated.value = true;
         action = "Update Alert";
+        router.push({
+          name: "alertList",
+          query: {
+            action: "add",
+            name: props.row.name,
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
       addAlert();
 

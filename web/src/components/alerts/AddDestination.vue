@@ -192,7 +192,7 @@ const props = defineProps({
     default: () => null,
   },
 });
-const emit = defineEmits(["get:destinations"]);
+const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 
 const apiMethods = ["get", "post", "put"];
 const store = useStore();
@@ -308,14 +308,13 @@ const saveDestination = () => {
         data: {
           url: formData.value.url,
           method: formData.value.method,
-          template: props.templates.find(
-            (template) => template.name === formData.value.template
-          ),
+          template: formData.value.template,
           headers: headers,
         },
       })
       .then(() => {
         emit("get:destinations");
+        emit("cancel:hideform");
       });
   }
 };
