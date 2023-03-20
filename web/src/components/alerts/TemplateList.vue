@@ -9,6 +9,8 @@
         style="width: 100%"
         :rows-per-page-options="[0]"
         :pagination="pagination"
+        :filter="filterQuery"
+        :filter-method="filterData"
       >
         <template #no-data>
           <NoData />
@@ -44,7 +46,7 @@
             {{ t("alert_templates.header") }}
           </div>
           <q-input
-            v-model="destinationSearchKey"
+            v-model="filterQuery"
             borderless
             filled
             dense
@@ -136,6 +138,8 @@ const pagination = {
   rowsPerPage: 0, // 0 means all rows
 };
 
+const filterQuery = ref("");
+
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
@@ -225,6 +229,17 @@ const toggleTemplateEditor = () => {
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
+};
+
+const filterData = (rows: any, terms: any) => {
+  var filtered = [];
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i]["name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+    }
+  }
+  return filtered;
 };
 </script>
 <style lang=""></style>

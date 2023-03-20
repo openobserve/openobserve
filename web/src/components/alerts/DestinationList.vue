@@ -8,6 +8,8 @@
         row-key="id"
         style="width: 100%"
         :pagination="pagination"
+        :filter="filterQuery"
+        :filter-method="filterData"
       >
         <template #no-data>
           <NoData />
@@ -43,7 +45,7 @@
             {{ t("alert_destinations.header") }}
           </div>
           <q-input
-            v-model="destinationSearchKey"
+            v-model="filterQuery"
             borderless
             filled
             dense
@@ -173,6 +175,7 @@ export default defineComponent({
     const destinationSearchKey = ref("");
     const showDestinationEditor = ref(false);
     const router = useRouter();
+    const filterQuery = ref("");
 
     const perPageOptions: any = [
       { label: "5", value: 5 },
@@ -306,6 +309,16 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
+    const filterData = (rows: any, terms: any) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
     return {
       t,
       qTable,
@@ -315,7 +328,8 @@ export default defineComponent({
       editDestination,
       getImageURL,
       conformDeleteDestination,
-      destinationSearchKey,
+      filterQuery,
+      filterData,
       editingDestination,
       templates,
       toggleDestionationEditor,
