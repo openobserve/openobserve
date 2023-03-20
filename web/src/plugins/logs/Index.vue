@@ -148,7 +148,11 @@ import { Parser } from "node-sql-parser";
 import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import { useLocalLogsObj, b64EncodeUnicode } from "../../utils/zincutils";
+import {
+  useLocalLogsObj,
+  b64EncodeUnicode,
+  useLocalLogFilterField,
+} from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
 
@@ -786,6 +790,12 @@ export default defineComponent({
           align: "left",
           sortable: true,
         });
+
+        const logFilterField: any = useLocalLogFilterField().value != null ? useLocalLogFilterField().value : null;
+        if (!searchObj.data.stream.selectedFields.length && logFilterField) {
+          searchObj.data.stream.selectedFields = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`];
+        }
+
         if (searchObj.data.stream.selectedFields.length == 0) {
           // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
           //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
