@@ -26,6 +26,7 @@ pub mod compact;
 pub mod dashboard;
 pub mod file_list;
 pub mod functions;
+pub mod kv;
 pub mod schema;
 pub mod triggers;
 pub mod user;
