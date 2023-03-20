@@ -311,7 +311,6 @@ export default defineComponent({
             stream_name: indexData.value.name,
             page: "Schema Details",
           });
-          dismiss();
         });
     };
 
