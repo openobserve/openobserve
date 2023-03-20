@@ -332,7 +332,7 @@ const saveDestination = () => {
       emit("cancel:hideform");
       q.notify({
         type: "positive",
-        message: `Alert saved successfully.`,
+        message: `Destination saved successfully.`,
       });
     })
     .catch((err) => {
