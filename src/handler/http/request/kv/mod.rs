@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, http::header::ContentType, post, web, HttpResponse};
+use actix_web::http::header::ContentType;
+use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
+use ahash::HashMap;
 use std::io::Error;
 
 use crate::service::kv;
@@ -111,5 +113,39 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         Err(_) => Ok(HttpResponse::NotFound()
             .content_type(ContentType::plaintext())
             .body("Not Found".to_string())),
+    }
+}
+
+/** list KV keys with prefix */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "KV",
+    operation_id = "ListKVKeys",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("prefix" = Option<String>, Query, description = "Key prefix"),
+      ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = Vec<String>),
+    )
+)]
+#[get("/{org_id}/kv")]
+pub async fn list(org_id: web::Path<String>, in_req: HttpRequest) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let prefix = match query.get("prefix") {
+        Some(prefix) => prefix,
+        None => "",
+    };
+    match kv::list(&org_id, prefix).await {
+        Ok(keys) => Ok(HttpResponse::Ok().json(keys)),
+        Err(err) => {
+            log::error!("list KV keys: {}, error: {}", prefix, err);
+            let keys: Vec<String> = Vec::new();
+            Ok(HttpResponse::Ok().json(keys))
+        }
     }
 }

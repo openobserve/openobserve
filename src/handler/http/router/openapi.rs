@@ -62,6 +62,7 @@ use crate::meta;
         request::kv::get,
         request::kv::set,
         request::kv::delete,
+        request::kv::list,
     ),
     components(
         schemas(

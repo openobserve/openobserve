@@ -138,6 +138,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(destinations::delete_destination)
             .service(kv::get)
             .service(kv::set)
-            .service(kv::delete),
+            .service(kv::delete)
+            .service(kv::list),
     );
 }

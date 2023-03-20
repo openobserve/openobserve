@@ -18,7 +18,7 @@ use crate::infra::config::KVS;
 use crate::infra::db::Event;
 
 pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
+    let cache_key = format!("user/{}/{}", org_id, key);
     let db_key = format!("/kv/{}", cache_key);
     if KVS.contains_key(&cache_key) {
         return Ok(KVS.get(&cache_key).unwrap().value().clone());
@@ -30,7 +30,7 @@ pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error>
 }
 
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
+    let cache_key = format!("user/{}/{}", org_id, key);
     let db_key = format!("/kv/{}", cache_key);
     let db = &crate::infra::db::DEFAULT;
     db.put(&db_key, val.clone()).await?;
@@ -39,12 +39,31 @@ pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyho
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
+    let cache_key = format!("user/{}/{}", org_id, key);
     let db_key = format!("/kv/{}", cache_key);
     let db = &crate::infra::db::DEFAULT;
     KVS.remove(&cache_key);
     db.delete(&db_key, false).await?;
     Ok(())
+}
+
+pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let mut items = Vec::new();
+    let cache_key = if prefix.ends_with('*') {
+        format!("user/{}/{}", org_id, prefix.strip_suffix('*').unwrap())
+    } else {
+        format!("user/{}/{}", org_id, prefix)
+    };
+    let db_key = format!("/kv/{}", cache_key);
+    let ret = db.list_keys(&db_key).await?;
+    for item_key in ret {
+        let item_key = item_key
+            .strip_prefix(format!("/kv/user/{}/", org_id).as_str())
+            .unwrap();
+        items.push(item_key.to_string());
+    }
+    Ok(items)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
