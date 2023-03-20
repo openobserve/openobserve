@@ -19,11 +19,6 @@ message Job {
     int32   partition = 4;
 }
 
-message Partition {
-    int64 time_min = 1;
-    int64 time_max = 2;
-}
-
 // Search request type
 enum SearchType {
     USER       = 0; // user input search request
@@ -49,9 +44,8 @@ message SearchRequest {
     string             stream_type = 3;
     SearchType               stype = 4;
     SearchQuery              query = 5;
-    Partition            partition = 6;
-    repeated string      file_list = 7;
-    repeated SearchAggRequest aggs = 8;
+    repeated string      file_list = 6;
+    repeated SearchAggRequest aggs = 7;
 }
 
 // The response message containing the greetings
