@@ -559,6 +559,18 @@ export default defineComponent({
         }
 
         if (searchObj.meta.sqlMode == true) {
+          const parsedSQL = parser.astify(searchObj.data.query);
+          if (parsedSQL.limit != null) {
+            $q.notify({
+              message: "Limit clause is not allowed in the query.",
+              color: "negative",
+              position: "top",
+              timeout: 2000,
+            });
+
+            return null;
+          }
+
           req.query.sql = query + " limit " + req.query.size;
           req.query["sql_mode"] = "full";
           delete req.aggs;
@@ -623,7 +635,10 @@ export default defineComponent({
         }
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        if (!searchObj.meta.sqlMode) {
+        if (
+          !searchObj.meta.sqlMode &&
+          searchObj.data.resultGrid.currentPage == 0
+        ) {
           req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
         }
 
@@ -664,6 +679,11 @@ export default defineComponent({
         dismiss = Notify();
 
         const queryReq = buildSearch();
+
+        if (queryReq == null) {
+          dismiss();
+          return false;
+        }
 
         searchService
           .search({
