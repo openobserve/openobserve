@@ -7,6 +7,7 @@
         :columns="columns"
         row-key="id"
         style="width: 100%"
+        hide-bottom
       >
         <template #no-data>
           <NoData />
@@ -62,22 +63,14 @@
             @click="toggleDestionationEditor"
           />
         </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
       </q-table>
     </div>
     <div v-else>
       <AddDestination
         :destination="editingDestination"
         :templates="templates"
+        @cancel:hideform="toggleDestionationEditor"
+        @get:destinations="$emit('get:destinations')"
       />
     </div>
 
@@ -91,7 +84,7 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, defineProps } from "vue";
+import { ref, defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
@@ -100,6 +93,7 @@ import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import type { emit } from "process";
 
 const props = defineProps({
   destinations: {
@@ -111,6 +105,8 @@ const props = defineProps({
     default: () => [],
   },
 });
+
+const emit = defineEmits(["get:destinations"]);
 
 const store = useStore();
 const editingDestination = ref(null);
@@ -154,27 +150,20 @@ const columns: any = ref<QTableProps["columns"]>([
 const confirmDelete = ref({ visible: false, data: null });
 const destinationSearchKey = ref("");
 const showDestinationEditor = ref(false);
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "All", value: 0 },
-];
-const resultTotal = ref<number>(0);
+
 const editDestination = (destination: any) => {
   toggleDestionationEditor();
   editingDestination.value = { ...destination };
 };
 
 const deleteDestination = () => {
-  console.log(confirmDelete.value.data);
   if (confirmDelete.value?.data?.name) {
-    destinationService.delete({
-      org_identifier: store.state.selectedOrganization.identifier,
-      destination_name: confirmDelete.value.data.name,
-    });
+    destinationService
+      .delete({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: confirmDelete.value.data.name,
+      })
+      .then(() => emit("get:destinations"));
   }
 };
 
@@ -188,8 +177,8 @@ const cancelDeleteDestination = () => {
   confirmDelete.value.data = null;
 };
 
-const changePagination = () => {};
 const toggleDestionationEditor = () => {
+  editingDestination.value = null;
   showDestinationEditor.value = !showDestinationEditor.value;
 };
 </script>

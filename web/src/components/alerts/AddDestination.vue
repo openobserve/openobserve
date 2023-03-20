@@ -1,9 +1,9 @@
 <template>
   <q-page class="q-pa-none q-pa-md" style="min-height: inherit">
-    <div class="page-content" style="">
+    <div>
       <div class="col-12 items-center no-wrap">
         <div class="col">
-          <div v-if="isUpdatingTemplate" class="text-h6">
+          <div v-if="destination" class="text-h6">
             {{ t("alert_destinations.updateTitle") }}
           </div>
           <div v-else class="text-h6">
@@ -84,7 +84,7 @@
           <div
             v-for="(header, index) in apiHeaders"
             :key="header.uuid"
-            class="row q-col-gutter-sm"
+            class="row q-col-gutter-sm q-pb-sm"
           >
             <div class="col-5 q-ml-none">
               <q-input
@@ -97,7 +97,6 @@
                 filled
                 :placeholder="t('alert_destinations.api_header')"
                 dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
                 tabindex="0"
               />
             </div>
@@ -113,7 +112,6 @@
                 filled
                 dense
                 isUpdatingDestination
-                :rules="[(val: any) => !!val || 'Field is required!']"
                 tabindex="0"
               />
             </div>
@@ -139,7 +137,7 @@
                 round
                 flat
                 :title="t('alert_templates.edit')"
-                @click="addApiHeader"
+                @click="addApiHeader()"
               />
             </div>
           </div>
@@ -176,6 +174,7 @@ import {
   defineProps,
   onBeforeMount,
   onActivated,
+  defineEmits,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
@@ -193,6 +192,7 @@ const props = defineProps({
     default: () => null,
   },
 });
+const emit = defineEmits(["get:destinations"]);
 
 const apiMethods = ["get", "post", "put"];
 const store = useStore();
@@ -202,9 +202,7 @@ const formData = ref({
   url: "",
   method: "post",
   template: "",
-  headers: {
-    key: "",
-  },
+  headers: {},
 });
 
 const editorRef: any = ref(null);
@@ -226,8 +224,14 @@ const setupDestinationData = () => {
     formData.value.name = props.destination.name;
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
-    formData.value.template = props.destination.template;
+    formData.value.template = props.destination.template.name;
     formData.value.headers = props.destination.headers;
+    if (Object.values(formData.value.headers)) {
+      apiHeaders.value = [];
+      Object.entries(formData.value.headers).forEach(([key, value]) => {
+        addApiHeader(key, value);
+      });
+    }
   }
 };
 
@@ -292,6 +296,11 @@ const isValidDestination = computed(
 
 const saveDestination = () => {
   if (isValidDestination.value) {
+    const headers = {};
+    apiHeaders.value.forEach((header) => {
+      headers[header.key] = header.value;
+    });
+    console.log(headers);
     destinationService
       .create({
         org_identifier: store.state.selectedOrganization.identifier,
@@ -299,25 +308,20 @@ const saveDestination = () => {
         data: {
           url: formData.value.url,
           method: formData.value.method,
-          template: formData.value.template,
-          headers: formData.value.headers,
+          template: props.templates.find(
+            (template) => template.name === formData.value.template
+          ),
+          headers: headers,
         },
       })
-      .then((response) => {
-        console.log(response);
+      .then(() => {
+        emit("get:destinations");
       });
-
-    destinationService
-      .list({
-        org_identifier: store.state.selectedOrganization.identifier,
-      })
-      .then((res) => console.log(res));
   }
 };
 
-const addApiHeader = () => {
-  const defaultHeader = { key: "", value: "", uuid: getUUID() };
-  apiHeaders.value.push(defaultHeader);
+const addApiHeader = (key = "", value = "") => {
+  apiHeaders.value.push({ key: key, value: value, uuid: getUUID() });
 };
 
 const deleteApiHeader = (header: any) => {

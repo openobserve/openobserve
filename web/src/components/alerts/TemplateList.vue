@@ -7,6 +7,7 @@
         :columns="columns"
         row-key="id"
         style="width: 100%"
+        hide-bottom
       >
         <template #no-data>
           <NoData />
@@ -62,22 +63,13 @@
             @click="toggleTemplateEditor"
           />
         </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
       </q-table>
     </div>
     <div v-else>
       <AddTemplate
         :template="editingTemplate"
         @cancel:hideform="toggleTemplateEditor"
+        @get:templates="$emit('get:templates')"
       />
     </div>
 
@@ -91,7 +83,7 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onBeforeMount, defineProps } from "vue";
+import { ref, defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
@@ -107,6 +99,9 @@ const props = defineProps({
     default: () => [],
   },
 });
+
+const emit = defineEmits(["get:templates"]);
+
 const store = useStore();
 const { t } = useI18n();
 const columns: any = ref<QTableProps["columns"]>([
@@ -133,15 +128,7 @@ const columns: any = ref<QTableProps["columns"]>([
 ]);
 const destinationSearchKey = ref("");
 const showTemplateEditor = ref(false);
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "All", value: 0 },
-];
-const resultTotal = ref<number>(0);
+
 const editingTemplate = ref(null);
 const confirmDelete = ref({ visible: false, data: null });
 
@@ -152,10 +139,12 @@ const editTemplate = (template: any) => {
 const deleteTemplate = () => {
   console.log(confirmDelete.value.data);
   if (confirmDelete.value?.data?.name) {
-    templateService.delete({
-      org_identifier: store.state.selectedOrganization.identifier,
-      template_name: confirmDelete.value.data.name,
-    });
+    templateService
+      .delete({
+        org_identifier: store.state.selectedOrganization.identifier,
+        template_name: confirmDelete.value.data.name,
+      })
+      .then(() => emit("get:templates"));
   }
 };
 
@@ -170,6 +159,7 @@ const cancelDeleteTemplate = () => {
 };
 
 const toggleTemplateEditor = () => {
+  editingTemplate.value = null;
   showTemplateEditor.value = !showTemplateEditor.value;
 };
 </script>
