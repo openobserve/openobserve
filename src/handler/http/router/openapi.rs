@@ -59,7 +59,9 @@ use crate::meta;
         request::organization::org_summary,
         request::organization::get_user_passcode,
         request::organization::update_user_passcode,
-
+        request::kv::get,
+        request::kv::set,
+        request::kv::delete,
     ),
     components(
         schemas(
@@ -115,6 +117,7 @@ use crate::meta;
         (name = "Organizations", description = "Organizations retrieval & management operations"),
         (name = "Streams", description = "Stream retrieval & management operations"),
         (name = "Users", description = "Users retrieval & management operations"),
+        (name = "KV", description = "Key Value retrieval & management operations"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
