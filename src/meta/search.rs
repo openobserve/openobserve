@@ -79,6 +79,8 @@ pub struct Query {
     #[serde(default)]
     pub sql_mode: String,
     #[serde(default)]
+    pub query_type: String,
+    #[serde(default)]
     pub track_total_hits: bool,
 }
 
@@ -95,6 +97,7 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             sql_mode: "context".to_string(),
+            query_type: "logs".to_string(),
             track_total_hits: false,
         }
     }
