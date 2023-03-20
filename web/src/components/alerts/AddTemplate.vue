@@ -81,12 +81,8 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 
-// const defaultFormData = {
-//   name: "",
-//   body: "",
-// };
 const props = defineProps({ template: Object });
-const emit = defineEmits(["get:templates"]);
+const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
 const { t } = useI18n();
 const formData = ref({
@@ -183,13 +179,10 @@ const saveTemplate = () => {
       })
       .then(() => {
         emit("get:templates");
+        emit("cancel:hideform");
       });
   }
 };
-
-// onBeforeMount(() => {
-//   formData.value = { ...defaultFormData };
-// });
 </script>
 <style lang="scss" scoped>
 #editor {

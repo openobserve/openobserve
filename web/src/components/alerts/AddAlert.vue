@@ -540,7 +540,7 @@ export default defineComponent({
   },
   computed: {
     getFormattedDestinations: function () {
-      return this.destinations.map((destination: any) => destination.url);
+      return this.destinations.map((destination: any) => destination.name);
     },
   },
   methods: {
@@ -620,7 +620,7 @@ export default defineComponent({
             });
           }
         });
-
+        console.log(submitData);
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,
