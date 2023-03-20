@@ -205,11 +205,6 @@ export default function (store: any) {
           },
           children: [
             {
-              path: "",
-              name: "alertList",
-              redirect: "alerts/alerts",
-            },
-            {
               path: "alerts",
               name: "alertList",
               component: AlertList,

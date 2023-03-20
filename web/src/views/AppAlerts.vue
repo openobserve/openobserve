@@ -104,6 +104,11 @@ onActivated(() => {
 onBeforeMount(() => {
   if (!templates.value.length) getTemplates();
   if (!destinations.value.length) getDestinations();
+  if (router.currentRoute.value.name === "alerts") {
+    router.push({
+      name: "alertList",
+    });
+  }
 });
 
 const getTemplates = () => {
