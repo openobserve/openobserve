@@ -233,12 +233,18 @@ export default defineComponent({
     const plotChart: any = ref(null);
 
     const reDrawChart = () => {
-      plotChart.value.reDraw(
-        searchObj.data.histogram.xData,
-        searchObj.data.histogram.yData,
-        searchObj.data.histogram.chartParams
-      );
-      plotChart.value.forceReLayout();
+      if (
+        // eslint-disable-next-line no-prototype-builtins
+        searchObj.data.histogram.hasOwnProperty("xData") &&
+        searchObj.data.histogram.xData.length > 0
+      ) {
+        plotChart.value.reDraw(
+          searchObj.data.histogram.xData,
+          searchObj.data.histogram.yData,
+          searchObj.data.histogram.chartParams
+        );
+        plotChart.value.forceReLayout();
+      }
     };
 
     const changeMaxRecordToReturn = (val: any) => {
