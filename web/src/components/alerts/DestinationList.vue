@@ -135,6 +135,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alert_destinations.actions"),
     align: "center",
     sortable: false,
+    style: "width: 110px",
   },
 ]);
 const destinations = ref([]);
@@ -159,7 +160,10 @@ const getDestinations = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then((res) => {
-      destinations.value = res.data;
+      destinations.value = res.data.map((data: any, index: number) => ({
+        ...data,
+        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
+      }));
       updateRoute();
     });
 };
@@ -217,7 +221,7 @@ const deleteDestination = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         destination_name: confirmDelete.value.data.name,
       })
-      .then(() => emit("get:destinations"));
+      .then(() => getDestinations());
   }
 };
 
