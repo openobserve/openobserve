@@ -197,7 +197,7 @@ const saveTemplate = () => {
       emit("cancel:hideform");
       q.notify({
         type: "positive",
-        message: `Alert saved successfully.`,
+        message: `Template saved successfully.`,
       });
     })
     .catch((err) => {
