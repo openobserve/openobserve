@@ -793,7 +793,7 @@ export default defineComponent({
 
         const logFilterField: any = useLocalLogFilterField().value != null ? useLocalLogFilterField().value : null;
         if (!searchObj.data.stream.selectedFields.length && logFilterField) {
-          searchObj.data.stream.selectedFields = logFilterField[store.state.selectedOrganization.identifier];
+          searchObj.data.stream.selectedFields = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`];
         }
 
         if (searchObj.data.stream.selectedFields.length == 0) {

@@ -185,7 +185,7 @@ export default defineComponent({
       }
       const identifier: string = store.state.selectedOrganization.identifier || "default";
       let selectedFields: any = {};
-      selectedFields[identifier] = searchObj.data.stream.selectedFields;
+      selectedFields[`${identifier}_${searchObj.data.stream.selectedStream.value}`] = searchObj.data.stream.selectedFields;
       useLocalLogFilterField(selectedFields);
     }
 
