@@ -10,7 +10,7 @@
         </div>
       </div>
 
-      <q-separator />
+      <q-separator style="width: 100%" />
 
       <div class="col-12 q-pb-md q-pt-sm">
         <q-input
