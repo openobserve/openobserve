@@ -355,5 +355,5 @@ pub fn create_prometheus_handler() -> PrometheusMetrics {
         .const_labels(create_const_labels())
         .registry(registry)
         .build()
-        .expect("Failed to build prometheus")
+        .expect("Prometheus build failed")
 }

@@ -23,20 +23,14 @@ use std::fmt::{Display, Formatter};
 use crate::common::str;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
 use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
-const SQL_KEYWORDS: [&str; 32] = [
-    "SELECT", "FROM", "WHERE", "TABLE", "LIMIT", "OFFSET", "AND", "OR", "NOT", "IN", "ANY", "IS",
-    "NULL", "CASE", "AS", "HAVING", "GROUP", "BY", "ORDER", "ASC", "DESC", "BETWEEN", "LIKE",
-    "ILIKE", "DISTINCT", "UNION", "JOIN", "INNER", "OUTER", "INDEX", "LEFT", "RIGHT",
-];
-
-const SQL_PUNCTUATION: [u8; 2] = [b'"', b'\''];
 const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
-const SQL_FULL_MODE_LIMIT: usize = 1000;
+const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -78,27 +72,23 @@ impl Display for SqlMode {
 
 impl Sql {
     #[tracing::instrument(name = "service:search:sql:new", skip(req))]
-    pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, anyhow::Error> {
+    pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
         let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
 
+        // parse sql
         let mut origin_sql = req_query.sql.clone();
-
-        // quick check SQL
-        if origin_sql.is_empty() {
-            return Err(anyhow::anyhow!("Query SQL is empty"));
-        }
-        if !origin_sql.to_lowercase().contains(" from ") {
-            return Err(anyhow::anyhow!(
-                "Query SQL should likes [select * from table]"
-            ));
-        }
-
-        // Hack for quote
-        origin_sql = add_quote_for_sql(&origin_sql);
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
+
+        let mut meta = match MetaSql::new(&origin_sql) {
+            Ok(meta) => meta,
+            Err(err) => {
+                log::error!("parse sql error: {}, sql: {}", err, origin_sql);
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+            }
+        };
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -108,39 +98,15 @@ impl Sql {
             req_query.track_total_hits
         };
 
-        // check SQL
-        let re1 = Regex::new(r"(?i) (limit|offset|group|having|join|union) ").unwrap();
-        let re2 = Regex::new(r"(?i) (join|union) ").unwrap();
-        if sql_mode.eq(&SqlMode::Context) && re1.is_match(&origin_sql) {
-            return Err(anyhow::anyhow!(
-                "sql_mode=context, Query SQL is not supported [limit|offset|group by|having|join|union]",
-            ));
-        }
-        if sql_mode.eq(&SqlMode::Full) && re2.is_match(&origin_sql) {
-            return Err(anyhow::anyhow!(
-                "sql_mode=full, Query SQL is not supported [join|union]",
-            ));
-        }
-
-        // check time_range
-        if req_time_range.0 > 0
-            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
+        // check SQL limitation
+        // in context mode, disallow, [limit|offset|group by|having|join|union]
+        // in full    mode, disallow, [join|union]
+        if sql_mode.eq(&SqlMode::Context)
+            && (meta.offset > 0 || meta.limit > 0 || !meta.group_by.is_empty())
         {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be microseconds",
-            ));
-        }
-        if req_time_range.1 > 0
-            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
-        {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be microseconds",
-            ));
-        }
-        if req_time_range.0 > 0 && req_time_range.1 > 0 && req_time_range.1 < req_time_range.0 {
-            return Err(anyhow::anyhow!(
-                "Query SQL time_range start_time should be less than end_time",
-            ));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "sql_mode=context, Query SQL does not supported [limit|offset|group by|having|join|union]".to_string()
+            )));
         }
 
         // check Agg SQL
@@ -156,7 +122,9 @@ impl Sql {
             req_aggs.insert(agg.name.to_string(), agg.sql.to_string());
         }
         if sql_mode.eq(&SqlMode::Full) && !req_aggs.is_empty() {
-            return Err(anyhow::anyhow!("sql_mode=full, Query not supported aggs"));
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "sql_mode=full, Query not supported aggs".to_string(),
+            )));
         }
 
         // check aggs
@@ -165,14 +133,15 @@ impl Sql {
         }
         for sql in req_aggs.values() {
             if !re1.is_match(sql.as_str()) {
-                return Err(anyhow::anyhow!(
-                    "Aggregation SQL only support 'from query' as context",
-                ));
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Aggregation SQL only support 'from query' as context".to_string(),
+                )));
             }
             if re2.is_match(sql.as_str()) {
-                return Err(anyhow::anyhow!(
-                    "Aggregation SQL is not supported 'select *' please specify the fields",
-                ));
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                    "Aggregation SQL is not supported 'select *' please specify the fields"
+                        .to_string(),
+                )));
             }
             if re3.is_match(sql.as_str()) {
                 let caps = re3.captures(sql.as_str()).unwrap();
@@ -184,52 +153,72 @@ impl Sql {
                 let select_caps = match re4.captures(sql.as_str()) {
                     Some(caps) => caps,
                     None => {
-                        return Err(anyhow::anyhow!(
-                            "Aggregation SQL should start with 'select'",
-                        ))
+                        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                            sql.to_owned(),
+                        )));
                     }
                 };
                 if !select_caps.get(1).unwrap().as_str().contains(group_by) {
-                    return Err(anyhow::anyhow!(
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
                         "Aggregation SQL used [group by] you should select the field [{}]",
                         group_by
-                    ));
+                    ))));
                 }
             }
         }
 
-        // parse sql
-        let meta = MetaSql::new(&origin_sql);
-        if meta.is_err() {
-            return Err(anyhow::anyhow!(meta.err().unwrap()));
-        }
-        let mut meta = meta.unwrap();
-
-        // fetch schema
-        let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
-        let schema_fields = schema.fields().to_vec();
-
-        // Hack for DataFusion
+        // Hack for table name
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
         let re = Regex::new(&format!(r#"(?i) from[ '"]+{}[ '"]?"#, stream_name)).unwrap();
         let caps = match re.captures(origin_sql.as_str()) {
             Some(caps) => caps,
-            None => return Err(anyhow::anyhow!("SQL should likes [select * from table]")),
+            None => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+            }
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
-        // Hack time range
-        if req_time_range.0 > 0 || req_time_range.1 > 0 {
-            meta.time_range = Some(req_time_range);
+        // Hack _timestamp
+        if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
+            let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
+            let caps = re.captures(origin_sql.as_str()).unwrap();
+            let cap_str = caps.get(1).unwrap().as_str();
+            if !cap_str.contains(&CONFIG.common.time_stamp_col) {
+                origin_sql = origin_sql.replace(
+                    cap_str,
+                    &format!("{}, {}", &CONFIG.common.time_stamp_col, cap_str),
+                );
+            }
         }
-        if req.partition.is_some() {
-            let partition = req.partition.as_ref().unwrap();
-            meta.time_range = Some((partition.time_min, partition.time_max));
+
+        // check time_range
+        if req_time_range.0 > 0
+            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
         }
+        if req_time_range.1 > 0
+            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
+        {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be microseconds".to_string(),
+            )));
+        }
+        if req_time_range.0 > 0 && req_time_range.1 > 0 && req_time_range.1 < req_time_range.0 {
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query SQL time_range start_time should be less than end_time".to_string(),
+            )));
+        }
+
+        // Hack time_range
+        let meta_time_range_is_empty =
+            meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
+        if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
+            meta.time_range = Some(req_time_range)
+        };
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -246,22 +235,25 @@ impl Sql {
             } else {
                 "".to_string()
             };
-            if !time_range_sql.is_empty() {
-                let re = Regex::new(r"(?i) WHERE (.*)").unwrap();
+            if !time_range_sql.is_empty() && meta_time_range_is_empty {
+                let re = Regex::new(r"(?i) where (.*)").unwrap();
                 match re.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if where_str.to_lowercase().contains(" order ") {
+                        if !meta.order_by.is_empty() {
                             where_str = where_str
-                                [0..where_str.to_lowercase().find(" order ").unwrap()]
+                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         }
-                        if !where_str.contains(&CONFIG.common.time_stamp_col) {
-                            origin_sql = origin_sql.replace(
-                                where_str.as_str(),
-                                &format!("{} AND {}", time_range_sql, where_str),
-                            );
-                        }
+                        let pos_start = origin_sql.find(where_str.as_str()).unwrap();
+                        let pos_end = pos_start + where_str.len();
+                        origin_sql = format!(
+                            "{}{} AND {}{}",
+                            &origin_sql[0..pos_start],
+                            time_range_sql,
+                            where_str,
+                            &origin_sql[pos_end..]
+                        );
                     }
                     None => {
                         origin_sql = origin_sql
@@ -271,22 +263,15 @@ impl Sql {
             }
         }
 
-        // check full sql_mode limit
-        if sql_mode.eq(&SqlMode::Full) {
-            let origin_sql = origin_sql.to_lowercase();
-            if !origin_sql.contains(" limit ")
-                && !origin_sql.contains(" group ")
-                && !origin_sql.contains(" count(")
-                && !origin_sql.contains(&CONFIG.common.time_stamp_col)
-            {
-                return Err(anyhow::anyhow!("sql_mode=full, Query SQL must limit rows"));
-            }
-        }
-
         // Hack offset limit
-        meta.offset = req_query.from as usize;
-        meta.limit = req_query.size as usize;
-        if !sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
+        if meta.limit == 0 {
+            meta.offset = req_query.from as usize;
+            meta.limit = req_query.size as usize;
+            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
+                // sql mode context, allow limit 0, used to no hits, but return aggs
+                // sql mode full, disallow without limit, default limit 1000
+                meta.limit = SQL_DEFAULT_FULL_MODE_LIMIT;
+            }
             origin_sql = if meta.order_by.is_empty() {
                 format!(
                     "{} ORDER BY {} DESC LIMIT {}",
@@ -298,27 +283,46 @@ impl Sql {
                 format!("{} LIMIT {}", origin_sql, meta.offset + meta.limit)
             };
         }
-        // for full sql_mode
-        if sql_mode.eq(&SqlMode::Full) && !origin_sql.to_lowercase().contains(" limit ") {
-            origin_sql = format!("{} LIMIT {}", origin_sql, SQL_FULL_MODE_LIMIT);
-        }
+
+        // fetch schema
+        let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
+            Ok(schema) => schema,
+            Err(_) => Schema::empty(),
+        };
+        let schema_fields = schema.fields().to_vec();
+
+        // getch sql where tokens
+        let where_tokens = split_sql_token(&origin_sql);
+        let where_pos = where_tokens
+            .iter()
+            .position(|x| x.to_lowercase() == "where");
+        let mut where_tokens = if where_pos.is_none() {
+            Vec::new()
+        } else {
+            where_tokens[where_pos.unwrap() + 1..].to_vec()
+        };
 
         // HACK full text search
         let mut fulltext = Vec::new();
         let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
         let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
-        for cap in re1.captures_iter(&origin_sql) {
-            // println!("match_all: {}, {}", &cap[0], &cap[1]);
-            fulltext.push((cap[0].to_string(), cap[1].to_string()));
-        }
-        for cap in re2.captures_iter(&origin_sql) {
-            // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
-            fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+        for token in &where_tokens {
+            if !token.to_lowercase().starts_with("match_all") {
+                continue;
+            }
+            for cap in re1.captures_iter(token) {
+                // println!("match_all: {}, {}", &cap[0], &cap[1]);
+                fulltext.push((cap[0].to_string(), cap[1].to_string()));
+            }
+            for cap in re2.captures_iter(token) {
+                // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
+                fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+            }
         }
         // fetch fts fields
-        let fts_fiels = get_stream_setting_fts_fields(&schema).unwrap();
-        let match_all_fields = if !fts_fiels.is_empty() {
-            fts_fiels.iter().map(|v| v.to_lowercase()).collect()
+        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+        let match_all_fields = if !fts_fields.is_empty() {
+            fts_fields.iter().map(|v| v.to_lowercase()).collect()
         } else {
             crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
                 .iter()
@@ -343,11 +347,12 @@ impl Sql {
                 fulltext_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
             }
             if fulltext_search.is_empty() {
-                return Err(anyhow::anyhow!("No full text search field found"));
+                return Err(Error::ErrorCode(ErrorCodes::FullTextSearchFieldNotFound));
             }
             let fulltext_search = format!("({})", fulltext_search.join(" OR "));
             origin_sql = origin_sql.replace(item.0.as_str(), &fulltext_search);
         }
+
         // Hack: str_match
         for key in [
             "match",
@@ -361,7 +366,37 @@ impl Sql {
             } else {
                 "ILIKE"
             };
-            for cap in re_str_match.captures_iter(origin_sql.clone().as_str()) {
+            for token in &where_tokens {
+                if !token.to_lowercase().starts_with("match")
+                    && !token.to_lowercase().starts_with("str_match")
+                {
+                    continue;
+                }
+                for cap in re_str_match.captures_iter(token.as_str()) {
+                    let attrs = cap
+                        .get(1)
+                        .unwrap()
+                        .as_str()
+                        .split(',')
+                        .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+                        .collect::<Vec<&str>>();
+                    let field = attrs.first().unwrap();
+                    let value = attrs.get(1).unwrap();
+                    origin_sql = origin_sql.replace(
+                        cap.get(0).unwrap().as_str(),
+                        format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
+                    );
+                }
+            }
+        }
+
+        // query support histogram
+        let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
+        for token in &where_tokens {
+            if !token.to_lowercase().starts_with("histogram") {
+                continue;
+            }
+            for cap in re_histogram.captures_iter(token.as_str()) {
                 let attrs = cap
                     .get(1)
                     .unwrap()
@@ -370,27 +405,8 @@ impl Sql {
                     .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
                     .collect::<Vec<&str>>();
                 let field = attrs.first().unwrap();
-                let value = attrs.get(1).unwrap();
+                let interval = attrs.get(1).unwrap();
                 origin_sql = origin_sql.replace(
-                    cap.get(0).unwrap().as_str(),
-                    format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
-                );
-            }
-        }
-
-        // query support histogram
-        let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
-        for cap in re_histogram.captures_iter(origin_sql.clone().as_str()) {
-            let attrs = cap
-                .get(1)
-                .unwrap()
-                .as_str()
-                .split(',')
-                .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                .collect::<Vec<&str>>();
-            let field = attrs.first().unwrap();
-            let interval = attrs.get(1).unwrap();
-            origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
                 format!(
                     "date_bin(interval '{}', to_timestamp_micros(\"{}\"), to_timestamp('2001-01-01T00:00:00'))",
@@ -399,6 +415,7 @@ impl Sql {
                 )
                 .as_str(),
             );
+            }
         }
 
         // pickup where
@@ -409,8 +426,16 @@ impl Sql {
         };
         if !where_str.is_empty() {
             let mut where_str_lower = where_str.to_lowercase();
-            for key in [" order by", " group by", " offset", " limit"].iter() {
-                if let Some(pos) = where_str_lower.find(key) {
+            for key in ["group", "order", "offset", "limit"].iter() {
+                if !where_tokens.iter().any(|x| x.to_lowercase().eq(key)) {
+                    continue;
+                }
+                let where_pos = where_tokens
+                    .iter()
+                    .position(|x| x.to_lowercase().eq(key))
+                    .unwrap();
+                where_tokens = where_tokens[..where_pos].to_vec();
+                if let Some(pos) = where_str_lower.rfind(key) {
                     where_str = where_str[..pos].to_string();
                     where_str_lower = where_str.to_lowercase();
                 }
@@ -450,7 +475,8 @@ impl Sql {
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
-                return Err(sql_meta.err().unwrap());
+                log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
             for cap in re_histogram.captures_iter(sql.clone().as_str()) {
                 let attrs = cap
@@ -472,9 +498,6 @@ impl Sql {
                     .as_str(),
                 );
             }
-
-            // Hack for quote
-            sql = add_quote_for_sql(sql.as_str());
 
             aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
         }
@@ -583,50 +606,20 @@ impl Sql {
     }
 }
 
-// Hack for double quote
-fn add_quote_for_sql(text: &str) -> String {
-    let mut tokens = split_token(text);
-    add_quote_for_tokens(&mut tokens);
-    tokens.join("")
-}
-
-fn add_quote_for_tokens(tokens: &mut [String]) {
-    let re_lower = Regex::new(r#"^[a-z0-9_]+$"#).unwrap();
-    for cap in tokens.iter_mut() {
-        let cap_str = cap.as_str();
-        let cap_str_upper = cap_str.to_uppercase();
-        let cap_str_upper = cap_str_upper.as_str();
-        if cap_str.len() == 1 && SQL_DELIMITERS.contains(cap_str.as_bytes().first().unwrap()) {
-            continue;
-        }
-        if SQL_KEYWORDS.contains(&cap_str_upper) {
-            continue;
-        }
-        if SQL_PUNCTUATION.contains(cap_str.as_bytes().first().unwrap()) {
-            continue;
-        }
-        if cap_str.as_bytes().last().unwrap().eq(&b')') {
-            // function
-            let first_bracket = cap_str.find('(').unwrap();
-            let mut tokens = split_token(&cap_str[first_bracket + 1..cap_str.len() - 1]);
-            add_quote_for_tokens(&mut tokens);
-            *cap = format!("{}({})", &cap_str[0..first_bracket], tokens.join(""));
-            continue;
-        }
-        // level is a special field (keyword for SQL: SET TRANSACTION ISOLATION LEVEL)
-        if cap_str_upper != "LEVEL" && re_lower.is_match(cap_str) {
-            continue;
-        }
-        if cap_str.parse::<f64>().is_ok() && cap_str.contains('.') {
-            // float number
-            *cap = format!("'{}'", cap_str);
-            continue;
-        }
-        *cap = format!("\"{}\"", cap_str);
+fn check_field_in_use(sql: &Sql, field: &str) -> bool {
+    let re = Regex::new(&format!(r"\b{}\b", field)).unwrap();
+    if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
+        return true;
     }
+    for (_, sql) in sql.aggs.iter() {
+        if str::find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
+            return true;
+        }
+    }
+    false
 }
 
-fn split_token(text: &str) -> Vec<String> {
+fn split_sql_token(text: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let text_chars = text.chars().collect::<Vec<char>>();
     let text_chars_len = text_chars.len();
@@ -684,19 +677,6 @@ fn split_token(text: &str) -> Vec<String> {
     tokens
 }
 
-fn check_field_in_use(sql: &Sql, field: &str) -> bool {
-    let re = Regex::new(&format!(r"\b{}\b", field)).unwrap();
-    if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
-        return true;
-    }
-    for (_, sql) in sql.aggs.iter() {
-        if str::find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
-            return true;
-        }
-    }
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,124 +712,162 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_add_quote_for_sql() {
-        let samples = [
+    async fn test_context_sqls() {
+        let sqls = [
+            ("select * from table1", true,(0,0)),
+            ("select * from table1 where a=1", true,(0,0)),
+            ("select * from table1 where a='b'", true,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", false,(0,0)),
+            ("select * from table1 where a='b' group by abc", false,(0,0)),
             (
-                "select * from table",
-                "select * from table",
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                false,(0,0),
+            ),
+            ("select * from table1, table2 where a='b'", false,(0,0)),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false,(0,0),
             ),
             (
-                "select ab.c from table ",
-                r#"select "ab.c" from table "#,
+                "select * from table1 union select * from table2 where a='b'",
+                false,(0,0),
             ),
             (
-                "select * from table where a = 1",
-                "select * from table where a = 1",
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
+                true,(0,0),
             ),
             (
-                "select * from table where a=1",
-                "select * from table where a=1",
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
+                false,(0,0),
             ),
             (
-                "select * from table where County='中文'",
-                r#"select * from table where "County"='中文'"#,
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true,(1679202494333000, 1679203394333000),
             ),
             (
-                "select * from table where match_all(123)",
-                "select * from table where match_all(123)",
+                "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
+                false,(0,0),
             ),
             (
-                "select * from table where match_all('123')",
-                "select * from table where match_all('123')",
+                "select * from table1 where match_all('abc') and str_match(log,'abc') order by _timestamp desc",
+                false,(0,0),
             ),
-            (
-                "select * from table where match_all('中文')",
-                "select * from table where match_all('中文')",
-            ),
-            (
-                "select count(*) from table where match_all('中文')",
-                "select count(*) from table where match_all('中文')",
-            ),
-            (
-                "select count(*) as abc from table where match_all('中文')",
-                "select count(*) as abc from table where match_all('中文')",
-            ),
-            (
-                "select count(abc) as abc from table where match_all('中文')",
-                "select count(abc) as abc from table where match_all('中文')",
-            ),
-            (
-                "select count(Abc) as abc from table where match_all('中文')",
-                r#"select count("Abc") as abc from table where match_all('中文')"#,
-            ),
-            (
-                "select count(_p,stream) as newcol from table",
-                "select count(_p,stream) as newcol from table",
-            ),
-            (
-                "select count(_p,Stream) as newcol from table",
-                r#"select count(_p,"Stream") as newcol from table"#,
-            ),
-            (
-                "select count(_P,Stream) as newcol from table",
-                r#"select count("_P","Stream") as newcol from table"#,
-            ),
-            (
-                "select * from table where str_match(log,'中文')",
-                "select * from table where str_match(log,'中文')",
-            ),
-            (
-                "select * from table where str_match(log, '中文')",
-                "select * from table where str_match(log, '中文')",
-            ),
-            (
-                "select * from table where str_match(log, 'a=b')",
-                "select * from table where str_match(log, 'a=b')",
-            ),
-            (
-                "select * from table wherkubernetes.pod='dc03-eed1-be27'",
-                r#"select * from table "wherkubernetes.pod"='dc03-eed1-be27'"#,
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00')",
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(_timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-            ),
-            (
-                "select * from table where str_match(log, '中文') AND match_all('abc') AND time_range(Timestamp, '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10",
-                r#"select * from table where str_match(log, '中文') AND match_all('abc') AND time_range("Timestamp", '2020-01-01 00:00:00', '2020-01-01 00:00:00') ORDER BY _timestamp DESC limit 10"#,
-            ),
-            (
-                "select * from table where str_match(log, 'Sql: select * from table')",
-                "select * from table where str_match(log, 'Sql: select * from table')",
-            ),
-            (
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = 1')"#,
-            ),
-            (
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
-                r#"select * from table where str_match(log, 'Sql: select * from table where "a" = \'1\'')"#,
-            ),
-            (
-                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = 0.004",
-                "select * from table WHERE remote_addr='110.6.45.247' and request_uri='GET /api/mp-weixin/rxjh-checkline/check_line_status/?region_id=6' and body_bytes_sent=4500 and request_time = '0.004'",
-            ),
-            (
-                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
-                r#"select * from table WHERE log='10.2.69.251 - prabhat@zinclabs.io [10/Mar/2023:12:43:53 +0000] "POST /api/demo_org1_n976k98gUMT17m3/_bulk HTTP/2.0" 200 111 "-" "go-resty/2.7.0 (https://github.com/go-resty/resty)" 633 0.005 [zinc-cp1-zinc-cp-4082] [] 10.2.34.102:4082 127 0.004 200 ef85bcdfc57709b6f9f4a3a117a22c55'"#,
-            ),
-            (
-                "select * from table where kubernetes.labels.pod-template-hash='7d8765890' and time<10 and time>10 and time>=29 and kubernetes.container_name!='controller'",
-                r#"select * from table where "kubernetes.labels.pod-template-hash"='7d8765890' and time<10 and time>10 and time>=29 and "kubernetes.container_name"!='controller'"#,
-            ),
+
         ];
 
-        for (i, (sql, quoted_sql)) in samples.into_iter().enumerate() {
-            assert_eq!(add_quote_for_sql(sql), quoted_sql, "sample #{i}");
+        let org_id = "test_org";
+        for (sql, ok, time_range) in sqls {
+            let query = crate::meta::search::Query {
+                sql: sql.to_string(),
+                from: 0,
+                size: 100,
+                sql_mode: "context".to_owned(),
+                start_time: 1667978895416,
+                end_time: 1667978900217,
+                track_total_hits: true,
+            };
+            let req: crate::meta::search::Request = crate::meta::search::Request {
+                query: query.clone(),
+                aggs: HashMap::new(),
+                encoding: crate::meta::search::RequestEncoding::Empty,
+            };
+            let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+            rpc_req.org_id = org_id.to_string();
+
+            let resp = Sql::new(&rpc_req).await;
+            assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                assert_eq!(resp.meta.limit, query.size);
+            }
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_full_sqls() {
+        let sqls = [
+            ("select * from table1", true, 0,(0,0)),
+            ("select * from table1 where a=1", true, 0,(0,0)),
+            ("select * from table1 where a='b'", true, 0,(0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", true, 10,(0,0)),
+            ("select * from table1 where a='b' group by abc", true, 0,(0,0)),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                true, 0,(0,0),
+            ),
+            ("select * from table1, table2 where a='b'", false, 0,(0,0)),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
+                true, 0,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
+                true, 10,(0,0),
+            ),
+            (
+                "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true, 0,(1679202494333000, 1679203394333000),
+            ),
+
+        ];
+
+        let org_id = "test_org";
+        for (sql, ok, limit, time_range) in sqls {
+            let query = crate::meta::search::Query {
+                sql: sql.to_string(),
+                from: 0,
+                size: 100,
+                sql_mode: "full".to_owned(),
+                start_time: 1667978895416,
+                end_time: 1667978900217,
+                track_total_hits: true,
+            };
+            let req: crate::meta::search::Request = crate::meta::search::Request {
+                query: query.clone(),
+                aggs: HashMap::new(),
+                encoding: crate::meta::search::RequestEncoding::Empty,
+            };
+            let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
+            rpc_req.org_id = org_id.to_string();
+
+            let resp = Sql::new(&rpc_req).await;
+            assert_eq!(resp.is_ok(), ok);
+            if ok {
+                let resp = resp.unwrap();
+                assert_eq!(resp.stream_name, "table1");
+                assert_eq!(resp.org_id, org_id);
+                if time_range.0 > 0 {
+                    assert_eq!(resp.meta.time_range, Some((time_range.0, time_range.1)));
+                } else {
+                    assert_eq!(
+                        resp.meta.time_range,
+                        Some((query.start_time, query.end_time))
+                    );
+                }
+                if limit > 0 {
+                    assert_eq!(resp.meta.limit, limit);
+                } else {
+                    assert_eq!(resp.meta.limit, query.size);
+                }
+            }
         }
     }
 }

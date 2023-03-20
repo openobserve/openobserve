@@ -68,7 +68,7 @@ pub async fn traces_json(
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some("not an ingester".to_string()),
+                "not an ingester".to_string(),
             )),
         );
     }
@@ -253,7 +253,7 @@ pub async fn traces_json(
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    Some("Bad Request".to_string()),
+                    "Bad Request".to_string(),
                 )),
             );
         }

@@ -61,7 +61,7 @@ pub async fn register_function(
                 Ok(
                     HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                         http::StatusCode::BAD_REQUEST.into(),
-                        Some(msg.to_string()),
+                        msg.to_string(),
                     )),
                 )
             } else {
@@ -102,7 +102,7 @@ pub async fn register_function(
                 Ok(
                     HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                         http::StatusCode::BAD_REQUEST.into(),
-                        Some("Not valid function".to_string()),
+                        "Not valid function".to_string(),
                     )),
                 )
             }
@@ -135,9 +135,9 @@ pub async fn delete_function(
             http::StatusCode::OK.into(),
             DELETED.to_string(),
         ))),
-        Err(err) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            Some(err.to_string()),
+            e.to_string(),
         ))),
     }
 }

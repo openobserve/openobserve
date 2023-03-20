@@ -63,7 +63,7 @@ pub async fn handle_trace_request(
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                Some("not an ingester".to_string()),
+                "not an ingester".to_string(),
             )),
         );
     }

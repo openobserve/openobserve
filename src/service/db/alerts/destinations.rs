@@ -34,9 +34,10 @@ pub async fn get(
 pub async fn set(
     org_id: &str,
     name: &str,
-    destination: AlertDestination,
+    mut destination: AlertDestination,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
+    destination.name = Some(name.to_owned());
     let key = format!("/destinations/{}/{}", org_id, name);
     db.put(&key, json::to_vec(&destination).unwrap().into())
         .await?;

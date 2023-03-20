@@ -16,7 +16,17 @@
 <template>
   <q-item
     v-ripple
-    :to="!external ? { path: link, exact: false } : ''"
+    :to="
+      !external
+        ? {
+            path: link,
+            exact: false,
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }
+        : ''
+    "
     clickable
     :class="{ 'ql-item-mini': mini }"
     :target="target"
@@ -42,6 +52,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "MenuLink",
@@ -82,11 +93,13 @@ export default defineComponent({
     },
   },
   setup() {
+    const store = useStore();
     const openWebPage = (url: string) => {
       window.open(url, "_blank");
     };
 
     return {
+      store,
       openWebPage,
     };
   },

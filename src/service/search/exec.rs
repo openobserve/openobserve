@@ -19,12 +19,13 @@ use tracing::{info_span, Instrument};
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
 #[tracing::instrument(name = "service:search:exec", skip(req))]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
-) -> Result<cluster_rpc::SearchResponse, anyhow::Error> {
+) -> Result<cluster_rpc::SearchResponse, Error> {
     let start = std::time::Instant::now();
     let sql = super::sql::Sql::new(req).await;
     if sql.is_err() {
@@ -84,7 +85,11 @@ pub async fn search(
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
             Err(err) => return Err(err),
         },
-        Err(err) => return Err(anyhow::anyhow!(err)),
+        Err(err) => {
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                err.to_string(),
+            )))
+        }
     };
 
     if !batches1.is_empty() {
@@ -104,7 +109,11 @@ pub async fn search(
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
             Err(err) => return Err(err),
         },
-        Err(err) => return Err(anyhow::anyhow!(err)),
+        Err(err) => {
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                err.to_string(),
+            )))
+        }
     };
 
     if !batches2.is_empty() {
@@ -142,7 +151,10 @@ pub async fn search(
                 .await
             {
                 Ok(res) => res,
-                Err(err) => return Err(anyhow::anyhow!(err)),
+                Err(err) => {
+                    log::error!("datafusion merge error: {}", err);
+                    return Err(super::handle_datafusion_error(err));
+                }
             };
     }
 

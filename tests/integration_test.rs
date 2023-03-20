@@ -55,7 +55,7 @@ mod tests {
 
     async fn e2e_100_tear_down() {
         log::info!("Tear Down Invoked");
-        fs::remove_dir_all("./data").expect("Error deleting local dir")
+        fs::remove_dir_all("./data").expect("Delete local dir failed");
     }
 
     #[test]
@@ -147,7 +147,7 @@ mod tests {
     async fn e2e_1_post_bulk() {
         let auth = setup();
         let path = "./tests/input.json";
-        let body_str = fs::read_to_string(path).expect("Unable to read file");
+        let body_str = fs::read_to_string(path).expect("Read file failed");
         let thread_id: usize = 1;
         let app = test::init_service(
             App::new()
@@ -595,7 +595,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/user"))
+            .uri(&format!("/auth/login"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();
@@ -619,7 +619,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/auth/user"))
+            .uri(&format!("/auth/login"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
             .to_request();
@@ -828,7 +828,7 @@ mod tests {
     async fn e2e_post_trace() {
         let auth = setup();
         let path = "./tests/trace_input.json";
-        let body_str = fs::read_to_string(path).expect("Unable to read file");
+        let body_str = fs::read_to_string(path).expect("Read file failed");
 
         // app
         let thread_id: usize = 1;
@@ -1135,7 +1135,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{                              
                                 "condition": {
-                                    "column": "Country",
+                                    "column": "country",
                                     "operator": "=",
                                     "value": "USA"
                                 },

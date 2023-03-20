@@ -20,8 +20,8 @@ use crate::service::logs;
 /** Elasticsearch compatible _bulk ingestion API */
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ingestion",
-    operation_id = "IngestionBulk",
+    tag = "Logs",
+    operation_id = "LogsIngestionBulk",
     security(
         ("Authorization"= [])
     ),
@@ -47,8 +47,8 @@ pub async fn bulk(
 /** ndjson (newline delimited json) multi ingestion API */
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ingestion",
-    operation_id = "IngestionMulti",
+    tag = "Logs",
+    operation_id = "LogsIngestionMulti",
     security(
         ("Authorization"= [])
     ),
@@ -75,8 +75,8 @@ pub async fn multi(
 /** json ingestion API, accepts array of json records */
 #[utoipa::path(
     context_path = "/api",
-    tag = "Ingestion",
-    operation_id = "IngestionJson",
+    tag = "Logs",
+    operation_id = "LogsIngestionJson",
     security(
         ("Authorization"= [])
     ),

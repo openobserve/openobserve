@@ -49,12 +49,12 @@ pub async fn save_destination(
             Some(_) => destinations::save_destination(org_id, name, dest).await,
             None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                Some("Please specify valid template".to_string()),
+                "Please specify valid template".to_string(),
             ))),
         },
         Err(_) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
-            Some("Please specify valid template".to_string()),
+            "Please specify valid template".to_string(),
         ))),
     }
 }

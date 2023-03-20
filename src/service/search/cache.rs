@@ -23,6 +23,7 @@ use super::datafusion::storage::file_list::SessionType;
 use super::sql::Sql;
 use crate::common::file::scan_files;
 use crate::infra::config::{self, CONFIG};
+use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
 use crate::service::db;
 use crate::service::file_list::calculate_local_files_size;
@@ -54,7 +55,15 @@ pub async fn search(
 
     let span2 = info_span!("service:search:cache:calculate_files_size");
     let guard2 = span2.enter();
-    let scan_size = calculate_local_files_size(&files).await?;
+    let scan_size = match calculate_local_files_size(&files).await {
+        Ok(size) => size,
+        Err(err) => {
+            log::error!("calculate files size error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                "calculate files size error".to_string(),
+            )));
+        }
+    };
     log::info!(
         "[TRACE] cache->search: load files {}, scan_size {}",
         file_count,
@@ -66,7 +75,15 @@ pub async fn search(
     let _guard3 = span3.enter();
 
     // fetch all schema versions, get latest schema
-    let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await?;
+    let schema = match db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("get schema error: {}", err);
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
     let schema = Arc::new(
         schema
             .to_owned()
@@ -77,7 +94,7 @@ pub async fn search(
         id: session_id.to_string(),
         data_type: SessionType::Cache,
     };
-    let result = super::datafusion::exec::sql(
+    let result = match super::datafusion::exec::sql(
         &session,
         stream_type,
         Some(schema),
@@ -86,7 +103,14 @@ pub async fn search(
         &files,
         FileType::JSON,
     )
-    .await?;
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            log::error!("datafusion execute error: {}", err);
+            return Err(super::handle_datafusion_error(err));
+        }
+    };
 
     // searching done.
     drop(searching);
@@ -96,10 +120,7 @@ pub async fn search(
 
 /// get file list from local cache, no need match_source, each file will be searched
 #[inline]
-async fn get_file_list(
-    sql: &Sql,
-    stream_type: meta::StreamType,
-) -> Result<Vec<String>, anyhow::Error> {
+async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let pattern = format!(
         "{}/files/{}/{}/{}/*.json",
         &CONFIG.common.data_wal_dir, &sql.org_id, stream_type, &sql.stream_name

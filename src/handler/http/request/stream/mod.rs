@@ -51,7 +51,7 @@ async fn schema(
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    Some(e.to_string()),
+                    e.to_string(),
                 )),
             )
         }
@@ -92,7 +92,7 @@ async fn settings(
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    Some(e.to_string()),
+                    e.to_string(),
                 )),
             )
         }
@@ -131,7 +131,7 @@ async fn delete(
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    Some(e.to_string()),
+                    e.to_string(),
                 )),
             )
         }
@@ -165,7 +165,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
-                    Some(e.to_string()),
+                    e.to_string(),
                 )),
             )
         }

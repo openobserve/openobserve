@@ -106,6 +106,7 @@ mod tests {
             method: alert::AlertHTTPType::POST,
             headers: None,
             template: "testTemplate".to_string(),
+            name: Some("test".to_string()),
         };
         let _ = db::alerts::destinations::set("default", "testDest", destination);
 

@@ -66,6 +66,14 @@
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
+            <div class="flex justify-end q-pb-sm q-pr-sm">
+              <q-toggle
+                v-model="shouldWrapValues"
+                label="Wrap"
+                color="primary"
+                size="xs"
+              />
+            </div>
             <q-list
               separator
               style="height: calc(100vh - 336px)"

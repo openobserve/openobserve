@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::anyhow;
 use chrono::DateTime;
 use regex::Regex;
 use serde::Serialize;
-use sqlparser::{
-    ast::{
-        BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr,
-        Offset as SqlOffset, OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor,
-        TableWithJoins, Value,
-    },
-    parser::Parser,
+use sqlparser::ast::{
+    BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, Offset as SqlOffset,
+    OrderByExpr, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
 };
+use sqlparser::parser::Parser;
 
 use crate::infra::config::CONFIG;
 
@@ -34,6 +30,7 @@ pub struct Sql {
     pub(crate) selection: Option<SqlExpr>,    // where
     pub(crate) source: String,                // table
     pub(crate) order_by: Vec<(String, bool)>, // desc: true / false
+    pub(crate) group_by: Vec<String>,         // field
     pub(crate) offset: usize,
     pub(crate) limit: usize,
     pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
@@ -66,11 +63,15 @@ pub struct Fulltext<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Timerange<'a>(pub(crate) &'a Option<SqlExpr>);
 pub struct Source<'a>(pub(crate) &'a [TableWithJoins]);
 pub struct Order<'a>(pub(crate) &'a OrderByExpr);
+pub struct Group<'a>(pub(crate) &'a SqlExpr);
 pub struct Offset<'a>(pub(crate) &'a SqlOffset);
 pub struct Limit<'a>(pub(crate) &'a SqlExpr);
 
 impl Sql {
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {
+        if sql.is_empty() {
+            return Err(anyhow::anyhow!("SQL is empty"));
+        }
         let dialect = sqlparser::dialect::GenericDialect {};
         let statement = Parser::parse_sql(&dialect, sql);
         if statement.is_err() {
@@ -78,7 +79,7 @@ impl Sql {
         }
         let statement = statement.unwrap();
         if statement.is_empty() {
-            return Err(anyhow!("sql is empty"));
+            return Err(anyhow::anyhow!("sql is empty"));
         }
         let statement = &statement[0];
         let sql: Result<Sql, anyhow::Error> = statement.try_into();
@@ -104,11 +105,15 @@ impl TryFrom<&Statement> for Sql {
                     from: table_with_joins,
                     selection,
                     projection,
-                    group_by: _,
+                    group_by: groups,
                     ..
                 } = match &q.body.as_ref() {
                     SetExpr::Select(statement) => statement.as_ref(),
-                    _ => return Err(anyhow!("We only support Select Query at the moment")),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "We only support Select Query at the moment"
+                        ))
+                    }
                 };
 
                 let source = Source(table_with_joins).try_into()?;
@@ -116,6 +121,11 @@ impl TryFrom<&Statement> for Sql {
                 let mut order_by = Vec::new();
                 for expr in orders {
                     order_by.push(Order(expr).try_into()?);
+                }
+
+                let mut group_by = Vec::new();
+                for expr in groups {
+                    group_by.push(Group(expr).try_into()?);
                 }
 
                 let offset = offset.map_or(0, |v| Offset(v).into());
@@ -134,6 +144,7 @@ impl TryFrom<&Statement> for Sql {
                     selection,
                     source,
                     order_by,
+                    group_by,
                     offset,
                     limit,
                     quick_text,
@@ -141,7 +152,7 @@ impl TryFrom<&Statement> for Sql {
                     time_range,
                 })
             }
-            _ => Err(anyhow!("We only support Query at the moment")),
+            _ => Err(anyhow::anyhow!("We only support Query at the moment")),
         }
     }
 }
@@ -162,7 +173,7 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
                     // we use empty to represent all fields
                     // fields.push("*".to_string());
                 }
-                // _ => return Err(anyhow!("We only support UnnamedExpr at the moment")),
+                // _ => return Err(anyhow::anyhow!("We only support UnnamedExpr at the moment")),
                 _ => {}
             }
         }
@@ -287,17 +298,21 @@ impl<'a> TryFrom<Source<'a>> for String {
 
     fn try_from(source: Source<'a>) -> Result<Self, Self::Error> {
         if source.0.len() != 1 {
-            return Err(anyhow!("We only support single data source at the moment"));
+            return Err(anyhow::anyhow!(
+                "We only support single data source at the moment"
+            ));
         }
 
         let table = &source.0[0];
         if !table.joins.is_empty() {
-            return Err(anyhow!("We do not support joint data source at the moment"));
+            return Err(anyhow::anyhow!(
+                "We do not support joint data source at the moment"
+            ));
         }
 
         match &table.relation {
             TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().value.clone()),
-            _ => Err(anyhow!("We only support table")),
+            _ => Err(anyhow::anyhow!("We only support table")),
         }
     }
 }
@@ -309,7 +324,7 @@ impl<'a> TryFrom<Order<'a>> for (String, bool) {
         let name = match &o.0.expr {
             SqlExpr::Identifier(id) => id.to_string(),
             expr => {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "We only support identifier for order by, got {}",
                     expr
                 ))
@@ -317,6 +332,24 @@ impl<'a> TryFrom<Order<'a>> for (String, bool) {
         };
 
         Ok((name, !o.0.asc.unwrap_or(true)))
+    }
+}
+
+impl<'a> TryFrom<Group<'a>> for String {
+    type Error = anyhow::Error;
+
+    fn try_from(g: Group) -> Result<Self, Self::Error> {
+        let name = match &g.0 {
+            SqlExpr::Identifier(id) => id.to_string(),
+            expr => {
+                return Err(anyhow::anyhow!(
+                    "We only support identifier for order by, got {}",
+                    expr
+                ))
+            }
+        };
+
+        Ok(name)
     }
 }
 
@@ -372,7 +405,7 @@ fn parse_timestamp(s: &SqlValue) -> Result<Option<i64>, anyhow::Error> {
                 } else if s.starts_with("to_timestamp(") {
                     s = s.strip_prefix("to_timestamp(").unwrap();
                 } else {
-                    return Err(anyhow!("Only support timestamp functions [to_timestamp|to_timestamp_millis|to_timestamp_micros|to_timestamp_seconds]"));
+                    return Err(anyhow::anyhow!("Only support timestamp functions [to_timestamp|to_timestamp_millis|to_timestamp_micros|to_timestamp_seconds]"));
                 }
                 s = s.strip_suffix(')').unwrap();
                 s = s.trim_matches(|v| v == '\'' || v == '"');
@@ -392,7 +425,7 @@ fn parse_timestamp(s: &SqlValue) -> Result<Option<i64>, anyhow::Error> {
             } else if *n > (1e9 as i64) {
                 Ok(Some(*n * 1000 * 1000))
             } else {
-                Err(anyhow!("Invalid timestamp: {}", n))
+                Err(anyhow::anyhow!("Invalid timestamp: {}", n))
             }
         }
     }
@@ -428,7 +461,7 @@ fn parse_expr_for_field(
                     if ident.value == field || (eq && nop == SqlOperator::Eq) {
                         let val = get_value_from_expr(right);
                         if val.is_none() {
-                            return Err(anyhow!(
+                            return Err(anyhow::anyhow!(
                                 "SqlExpr::Identifier: We only support Identifier at the moment"
                             ));
                         }
@@ -459,7 +492,7 @@ fn parse_expr_for_field(
                 } => {
                     let ret = parse_expr_between(expr, negated, low, high, field, fields);
                     if ret.is_err() {
-                        return Err(anyhow!("{:?}", ret.err()));
+                        return Err(anyhow::anyhow!("{:?}", ret.err()));
                     }
                 }
                 SqlExpr::Function(f) => {
@@ -469,7 +502,7 @@ fn parse_expr_for_field(
                         if parse_expr_check_field_name(&f_name, field) {
                             let val = get_value_from_expr(right);
                             if val.is_none() {
-                                return Err(anyhow!(
+                                return Err(anyhow::anyhow!(
                                     "SqlExpr::Identifier: We only support Identifier at the moment [_timestamp]"
                                 ));
                             }
@@ -483,7 +516,7 @@ fn parse_expr_for_field(
                     }
                     let ret = parse_expr_function(f, field, fields);
                     if ret.is_err() {
-                        return Err(anyhow!("{:?}", ret.err()));
+                        return Err(anyhow::anyhow!("{:?}", ret.err()));
                     }
                 }
                 _ => {}
@@ -526,13 +559,13 @@ fn parse_expr_for_field(
                 } => {
                     let ret = parse_expr_between(expr, negated, low, high, field, fields);
                     if ret.is_err() {
-                        return Err(anyhow!("{:?}", ret.err()));
+                        return Err(anyhow::anyhow!("{:?}", ret.err()));
                     }
                 }
                 SqlExpr::Function(f) => {
                     let ret = parse_expr_function(f, field, fields);
                     if ret.is_err() {
-                        return Err(anyhow!("{:?}", ret.err()));
+                        return Err(anyhow::anyhow!("{:?}", ret.err()));
                     }
                 }
                 _ => {}
@@ -553,13 +586,13 @@ fn parse_expr_for_field(
         } => {
             let ret = parse_expr_between(expr, negated, low, high, field, fields);
             if ret.is_err() {
-                return Err(anyhow!("{:?}", ret.err()));
+                return Err(anyhow::anyhow!("{:?}", ret.err()));
             }
         }
         SqlExpr::Function(f) => {
             let ret = parse_expr_function(f, field, fields);
             if ret.is_err() {
-                return Err(anyhow!("{:?}", ret.err()));
+                return Err(anyhow::anyhow!("{:?}", ret.err()));
             }
         }
         _ => {}
@@ -599,7 +632,7 @@ fn parse_expr_like(
             let nop = SqlOperator::Like;
             let val = get_value_from_expr(pattern);
             if val.is_none() {
-                return Err(anyhow!(
+                return Err(anyhow::anyhow!(
                     "SqlExpr::Like: We only support Identifier at the moment"
                 ));
             }
@@ -696,11 +729,11 @@ fn parse_expr_function(
                     FunctionArgExpr::Expr(expr) => {
                         let val = get_value_from_expr(expr);
                         if val.is_none() {
-                            return Err(anyhow!("SqlExpr::Function<Named>: We only support Identifier at the moment"));
+                            return Err(anyhow::anyhow!("SqlExpr::Function<Named>: We only support Identifier at the moment"));
                         }
                         fields.push((field.to_string(), val.unwrap(), nop, next_op));
                     }
-                    _ => return Err(anyhow!("We only support String at the moment")),
+                    _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 }
             }
             FunctionArg::Unnamed(arg) => {
@@ -708,11 +741,11 @@ fn parse_expr_function(
                     FunctionArgExpr::Expr(expr) => {
                         let val = get_value_from_expr(expr);
                         if val.is_none() {
-                            return Err(anyhow!("SqlExpr::Function<Unnamed>: We only support Identifier at the moment"));
+                            return Err(anyhow::anyhow!("SqlExpr::Function<Unnamed>: We only support Identifier at the moment"));
                         }
                         fields.push((field.to_string(), val.unwrap(), nop, next_op));
                     }
-                    _ => return Err(anyhow!("We only support String at the moment")),
+                    _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 }
             }
         }
@@ -727,7 +760,7 @@ fn parse_expr_fun_time_range(
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
     if f.args.len() != 3 {
-        return Err(anyhow!(
+        return Err(anyhow::anyhow!(
             "SqlExpr::Function: time_range function must have 3 arguments"
         ));
     }
@@ -743,21 +776,21 @@ fn parse_expr_fun_time_range(
                     FunctionArgExpr::Expr(expr) => {
                         let val = get_value_from_expr(expr);
                         if val.is_none() {
-                            return Err(anyhow!("SqlExpr::Function<Named>: We only support Identifier at the moment"));
+                            return Err(anyhow::anyhow!("SqlExpr::Function<Named>: We only support Identifier at the moment"));
                         }
                         val.unwrap()
                     }
-                    _ => return Err(anyhow!("We only support String at the moment")),
+                    _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 },
                 FunctionArg::Unnamed(arg) => match arg {
                     FunctionArgExpr::Expr(expr) => {
                         let val = get_value_from_expr(expr);
                         if val.is_none() {
-                            return Err(anyhow!("SqlExpr::Function<Unnamed>: We only support Identifier at the moment"));
+                            return Err(anyhow::anyhow!("SqlExpr::Function<Unnamed>: We only support Identifier at the moment"));
                         }
                         val.unwrap()
                     }
-                    _ => return Err(anyhow!("We only support String at the moment")),
+                    _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 },
             };
             vals.push(val);
@@ -806,7 +839,9 @@ impl TryFrom<&BinaryOperator> for SqlOperator {
             BinaryOperator::GtEq => Ok(SqlOperator::Gte),
             BinaryOperator::Lt => Ok(SqlOperator::Lt),
             BinaryOperator::LtEq => Ok(SqlOperator::Lte),
-            _ => Err(anyhow!("We only support BinaryOperator at the moment")),
+            _ => Err(anyhow::anyhow!(
+                "We only support BinaryOperator at the moment"
+            )),
         }
     }
 }
@@ -847,6 +882,34 @@ mod tests {
         assert_eq!(local_sql.offset, 10);
         assert_eq!(local_sql.order_by, vec![("c".into(), true)]);
         assert_eq!(local_sql.fields, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_parse_sqls() {
+        let sqls = [
+            ("select * from table1", true),
+            ("select * from table1 where a=1", true),
+            ("select * from table1 where a='b'", true),
+            ("select * from table1 where a='b' limit 10 offset 10", true),
+            ("select * from table1 where a='b' group by abc", true),
+            (
+                "select * from table1 where a='b' group by abc having count(*) > 19",
+                true,
+            ),
+            ("select * from table1, table2 where a='b'", false),
+            (
+                "select * from table1 left join table2 on table1.a=table2.b where a='b'",
+                false,
+            ),
+            (
+                "select * from table1 union select * from table2 where a='b'",
+                false,
+            ),
+        ];
+        for (sql, ok) in sqls {
+            let ret = Sql::new(sql);
+            assert_eq!(ret.is_ok(), ok);
+        }
     }
 
     #[test]
