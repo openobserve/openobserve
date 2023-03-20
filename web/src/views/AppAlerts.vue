@@ -53,6 +53,8 @@
         <RouterView
           :templates="templates"
           :destinations="destinations"
+          @get:destinations="getDestinations"
+          @get:templates="getTemplates"
         ></RouterView>
       </div>
     </div>

@@ -74,6 +74,7 @@ import {
   defineProps,
   onBeforeMount,
   onActivated,
+  defineEmits,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
@@ -85,6 +86,7 @@ import { useStore } from "vuex";
 //   body: "",
 // };
 const props = defineProps({ template: Object });
+const emit = defineEmits(["get:templates"]);
 
 const { t } = useI18n();
 const formData = ref({
@@ -179,15 +181,9 @@ const saveTemplate = () => {
           body: formData.value.body,
         },
       })
-      .then((response) => {
-        console.log(response);
+      .then(() => {
+        emit("get:templates");
       });
-
-    templateService
-      .list({
-        org_identifier: store.state.selectedOrganization.identifier,
-      })
-      .then((res) => console.log(res));
   }
 };
 
