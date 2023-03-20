@@ -10,10 +10,10 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import config from "../aws-exports";
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref } from "vue";
 
 const useLocalStorage = (
   key: string,
@@ -245,6 +245,15 @@ export const getImageURL = (image_path: string) => {
 
 export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
-  const path = window.location.origin == "http://localhost:8081" ? "/" : (pos > -1 ? window.location.pathname.slice(0, pos + 5) : window.location.pathname)
+  const path =
+    window.location.origin == "http://localhost:8081"
+      ? "/"
+      : pos > -1
+      ? window.location.pathname.slice(0, pos + 5)
+      : window.location.pathname;
   return path;
-}
+};
+
+export const getUUID = () => {
+  return crypto.randomUUID();
+};
