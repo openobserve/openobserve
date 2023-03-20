@@ -84,6 +84,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
         }
     }
+
     pub fn get_message(&self) -> String {
         match self {
             ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
@@ -102,6 +103,64 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
                 format!("Search field has no compatible data type: {}", field)
             }
+        }
+    }
+
+    pub fn get_inner_message(&self) -> String {
+        match self {
+            ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
+            ErrorCodes::SearchStreamNotFound(stream) => stream.to_owned(),
+            ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
+            ErrorCodes::SearchFieldNotFound(field) => field.to_owned(),
+            ErrorCodes::SearchFunctionNotDefined(func) => func.to_owned(),
+            ErrorCodes::SearchParquetFileNotFound => "".to_string(),
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => field.to_owned(),
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        format!(
+            r#"{{"code": {}, "message": "{}", "inner": "{}"}}"#,
+            self.get_code(),
+            self.get_message(),
+            self.get_inner_message()
+        )
+    }
+
+    pub fn from_json(json: &str) -> Result<ErrorCodes> {
+        let val: serde_json::Value = match serde_json::from_str(json) {
+            Ok(val) => val,
+            Err(_) => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
+        };
+        let map = match val.as_object() {
+            Some(map) => map,
+            None => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
+        };
+        let code = match map.get("code") {
+            Some(code) => match code.as_i64() {
+                Some(code) => code as u16,
+                None => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
+            },
+            None => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
+        };
+        let message = match map.get("inner") {
+            Some(message) => match message {
+                serde_json::Value::String(message) => message.to_owned(),
+                _ => message.to_string(),
+            },
+            None => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
+        };
+        match code {
+            10001 => Ok(ErrorCodes::ServerInternalError(message)),
+            20001 => Ok(ErrorCodes::SearchSQLNotValid(message)),
+            20002 => Ok(ErrorCodes::SearchStreamNotFound(message)),
+            20003 => Ok(ErrorCodes::FullTextSearchFieldNotFound),
+            20004 => Ok(ErrorCodes::SearchFieldNotFound(message)),
+            20005 => Ok(ErrorCodes::SearchFunctionNotDefined(message)),
+            20006 => Ok(ErrorCodes::SearchParquetFileNotFound),
+            20007 => Ok(ErrorCodes::SearchFieldHasNoCompatibleDataType(message)),
+            _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
 }
