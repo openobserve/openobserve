@@ -7,7 +7,8 @@
         :columns="columns"
         row-key="id"
         style="width: 100%"
-        hide-bottom
+        :rows-per-page-options="[0]"
+        :pagination="pagination"
       >
         <template #no-data>
           <NoData />
@@ -129,6 +130,11 @@ const showTemplateEditor = ref(false);
 
 const editingTemplate = ref(null);
 const confirmDelete = ref({ visible: false, data: null });
+
+const pagination = {
+  page: 1,
+  rowsPerPage: 0, // 0 means all rows
+};
 
 onActivated(() => {
   if (!templates.value.length) updateRoute();
