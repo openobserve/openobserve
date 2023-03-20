@@ -121,6 +121,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alert_templates.actions"),
     align: "center",
     sortable: false,
+    style: "width: 110px",
   },
 ]);
 const destinationSearchKey = ref("");
@@ -142,7 +143,10 @@ const getTemplates = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then((res) => {
-      templates.value = res.data;
+      templates.value = res.data.map((data: any, index: number) => ({
+        ...data,
+        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
+      }));
       updateRoute();
     });
 };
@@ -192,7 +196,7 @@ const deleteTemplate = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         template_name: confirmDelete.value.data.name,
       })
-      .then(() => emit("get:templates"));
+      .then(() => getTemplates());
   }
 };
 
