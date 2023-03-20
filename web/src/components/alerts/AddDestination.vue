@@ -181,6 +181,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { getUUID } from "@/utils/zincutils";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
+import { useQuasar } from "quasar";
 
 const props = defineProps({
   templates: {
@@ -194,6 +195,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 
+const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
 const store = useStore();
 const { t } = useI18n();
@@ -295,28 +297,51 @@ const isValidDestination = computed(
 );
 
 const saveDestination = () => {
-  if (isValidDestination.value) {
-    const headers = {};
-    apiHeaders.value.forEach((header) => {
-      headers[header.key] = header.value;
+  if (!isValidDestination.value) {
+    q.notify({
+      type: "negative",
+      message: "Please fill required fields",
+      timeout: 1500,
     });
-    console.log(headers);
-    destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: formData.value.name,
-        data: {
-          url: formData.value.url,
-          method: formData.value.method,
-          template: formData.value.template,
-          headers: headers,
-        },
-      })
-      .then(() => {
-        emit("get:destinations");
-        emit("cancel:hideform");
-      });
+    return;
   }
+
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Please wait...",
+    timeout: 2000,
+  });
+  const headers = {};
+  apiHeaders.value.forEach((header) => {
+    headers[header.key] = header.value;
+  });
+  destinationService
+    .create({
+      org_identifier: store.state.selectedOrganization.identifier,
+      destination_name: formData.value.name,
+      data: {
+        url: formData.value.url,
+        method: formData.value.method,
+        template: formData.value.template,
+        headers: headers,
+      },
+    })
+    .then(() => {
+      dismiss();
+      emit("get:destinations");
+      emit("cancel:hideform");
+      q.notify({
+        type: "positive",
+        message: `Alert saved successfully.`,
+      });
+    })
+    .catch((err) => {
+      dismiss();
+      q.notify({
+        type: "negative",
+        message: err.response.data.error,
+      });
+    });
 };
 
 const addApiHeader = (key = "", value = "") => {
