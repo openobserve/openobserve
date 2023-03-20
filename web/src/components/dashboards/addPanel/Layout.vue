@@ -1,23 +1,25 @@
 <template>
   <div>
     <div class="q-pa-sm">
-      <span class="text-weight-bold">Layout</span>
+      <span class="text-weight-bold">{{t("panel.layout")}}</span>
     </div>
     <q-separator />
     <div>
       <q-expansion-item
-        default-opened
+        v-model="expansionItems.x"
         dense
-        :label="
-          dashboardPanelData.data.type == 'table'
-            ? t(`First Column`)
-            : dashboardPanelData.data.type == 'h-bar'
-            ? t(`Y-Axis (Columns)`)
-            : t(`X-Axis (Row)`)
-        "
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.yAxis') :  t('panel.xAxis')"
       >
-        <div class="column index-menu q-mb-md">
-          <div class="index-table q-mt-xs">
+        <div class="column index-menu q-mb-md droppable" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
+          }"
+          @dragenter="onDragEnter($event, 'x')"
+          @dragleave="onDragLeave($event, 'x')"
+          @dragover="onDragOver($event, 'x')"
+          @drop="onDrop($event, 'x')"
+          v-mutation="handler2">
+          <div class="index-table q-my-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.x"
               :columns="[
@@ -29,9 +31,13 @@
                 },
               ]"
               :rows="dashboardPanelData.data.fields.x"
-              row-key="name"
+              row-key="column"
               class="field-table"
               id="fieldList"
+              virtual-scroll
+              v-model:pagination="pagination"
+              :rows-per-page-options="[0]"
+              :virtual-scroll-sticky-size-start="48"
               :hide-pagination="true"
               hide-header
               hide-bottom
@@ -39,7 +45,7 @@
               <template #body-cell-column="props">
                 <q-tr :props="props">
                   <q-td :props="props" class="field_list">
-                    <div class="field_overlay">
+                    <div class="field_overlay" :title="props.row.column">
                       <div class="field_label">
                         {{ props.row.column }}
                       </div>
@@ -70,17 +76,19 @@
       <q-separator />
       <q-expansion-item
         dense
-        default-opened
-        :label="
-          dashboardPanelData.data.type == 'table'
-            ? t(`Other Columns`)
-            : dashboardPanelData.data.type == 'h-bar'
-            ? t(`X-Axis (Row)`)
-            : t(`Y-Axis (Columns)`)
-        "
+        v-model="expansionItems.y"
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.xAxis') : t('panel.yAxis')"
       >
-        <div class="column index-menu q-mb-lg">
-          <div class="index-table q-mt-xs">
+        <div class="column index-menu q-mb-lg" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
+          }"
+          @dragenter="onDragEnter($event, 'y')"
+          @dragleave="onDragLeave($event, 'y')"
+          @dragover="onDragOver($event, 'y')"
+          @drop="onDrop($event, 'y')"
+          v-mutation="handler2">
+          <div class="index-table  q-my-xs">
             <q-table
               v-model:selected="dashboardPanelData.data.fields.y"
               :columns="[
@@ -109,40 +117,16 @@
                     <div class="field_overlay" :title="props.row.column">
                       <div class="field_label">
                         {{ props.row.column }}
-                        <!-- <div>
-                        <q-expansion-item
-                          expand-separator
-                          icon="perm_identity"
-                          label=""
-                          caption=""
-                        >
-                          <div class="color-input-wrapper">
-                            <input type="color" v-model="dashboardPanelData.data.fields.y.color">
-                          </div>
-                          <div>
-                            <q-select
-                              v-model="dashboardPanelData.data.fields.y.aggregationFunction"
-                              :options="triggerOperators"
-                              dense
-                              filled
-                              :label="t('Aggregation')"
-                            ></q-select>
-                          </div>
-                        </q-expansion-item>
-                      </div> -->
                       </div>
-
                       <div class="field_icons">
-                        <!-- TODO: aggregation and color picker and label fields -->
-
                         <div>
                           <q-btn
                             size="xs"
-                            color="red"
                             round
                             dense
+                            class="q-mr-xs"
                             @click="props.expand = !props.expand"
-                            :icon="props.expand ? 'remove' : 'add'"
+                            :icon="props.expand ? 'unfold_less' : 'unfold_more'"
                           />
                           <q-icon
                             :name="
@@ -165,7 +149,7 @@
                   <q-td colspan="100%">
                     <div>
                       <div class="flex items-center">
-                        <div class="q-pa-xs" style="width: 180px">
+                        <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.y[props.pageIndex]
@@ -177,7 +161,7 @@
                             label="Aggregation"
                           ></q-select>
                         </div>
-                        <div class="color-input-wrapper">
+                        <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
                           <input
                             type="color"
                             v-model="
@@ -191,10 +175,12 @@
                         dense
                         filled
                         label="Label"
+                        v-if="!dashboardPanelData.layout.showCustomQuery"
                         v-model="
                           dashboardPanelData.data.fields.y[props.pageIndex]
                             .label
                         "
+                        :rules="[ val => val.length > 0 || 'Required' ]"
                       />
                     </div>
                   </q-td>
@@ -211,16 +197,17 @@
         </div>
       </q-expansion-item>
       <q-separator />
-      <q-expansion-item default-opened dense :label="t(`Config`)">
+      <q-expansion-item v-model="expansionItems.config" dense :label="t('panel.config')">
         <div>
           <q-toggle
+            v-if="dashboardPanelData.data.type != 'table'"
             v-model="dashboardPanelData.data.config.show_legends"
             label="Show Legends"
           />
           <q-form ref="" class="q-pa-sm">
             <q-input
               v-model="dashboardPanelData.data.config.title"
-              :label="t('panel.name')"
+              :label="t('panel.name') + '*'"
               class="q-py-md showLabelOnTop"
               stack-label
               filled
@@ -240,9 +227,17 @@
       </q-expansion-item>
     </div>
     <q-separator />
-    <q-expansion-item default-opened dense :label="t(`Filters`)">
-      <div class="column index-menu q-mb-lg">
-        <div class="index-table q-mt-xs">
+    <q-expansion-item v-model="expansionItems.filter" dense :label="t('panel.filters')">
+      <div class="column index-menu q-mb-lg" :class="{
+          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
+          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
+          }"
+          @dragenter="onDragEnter($event, 'f')"
+          @dragleave="onDragLeave($event, 'f')"
+          @dragover="onDragOver($event, 'f')"
+          @drop="onDrop($event, 'f')"
+          v-mutation="handler2">
+        <div class="index-table q-my-xs">
           <q-table
             v-model:selected="dashboardPanelData.data.fields.filter"
             :columns="[
@@ -276,11 +271,11 @@
                       <div>
                         <q-btn
                           size="xs"
-                          color="red"
                           round
                           dense
+                          class="q-mr-xs"
                           @click="props.expand = !props.expand"
-                          :icon="props.expand ? 'remove' : 'add'"
+                          :icon="props.expand ? 'unfold_less' : 'unfold_more'"
                         />
                         <q-icon
                           :name="
@@ -308,6 +303,7 @@
                           dashboardPanelData.data.fields.filter[props.pageIndex]
                             .type
                         "
+                        dense
                       >
                         <q-tab
                           name="list"
@@ -343,6 +339,7 @@
                               :options="options"
                               label="Operator"
                               style="width: 100%"
+                              :rules="[ val => !!val || 'Required' ]"
                             />
                             <q-input
                               dense
@@ -354,6 +351,7 @@
                               "
                               label="Value"
                               style="width: 100%; margin-top: 5px"
+                              :rules="[ val => val.length > 0 || 'Required' ]"
                             />
                           </div>
                         </q-tab-panel>
@@ -371,6 +369,7 @@
                             multiple
                             emit-value
                             map-options
+                            :rules="[ val => val.length > 0 || 'At least 1 item required' ]"
                           >
                             <template v-slot:selected>
                               {{
@@ -441,9 +440,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive } from "vue";
+import { defineComponent, ref, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 
@@ -455,14 +453,86 @@ export default defineComponent({
     const panelName = ref("");
     const panelDesc = ref("");
     const { t } = useI18n();
-    const $q = useQuasar();
+    const expansionItems = reactive({
+      x: true,
+      y: true,
+      config: true,
+      filter: false
+    })
+
     const {
       dashboardPanelData,
+      addXAxisItem,
+      addYAxisItem,
       removeXAxisItem,
       removeYAxisItem,
       removeFilterItem,
+      addFilteredItem,
     } = useDashboardPanelData();
     const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
+
+    watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
+      if(oldVal == false && newVal == true) {
+        expansionItems.x = true
+        expansionItems.y = true
+        expansionItems.config = false
+        expansionItems.filter = true
+      }
+    })
+    
+    const currentDragArea = ref('')
+
+    const onDrop = (e:any, area: string) => {
+      console.log('dropped');
+      
+      const dragItem:any  = dashboardPanelData.meta.dragAndDrop.dragElement
+
+      dashboardPanelData.meta.dragAndDrop.dragging = false
+      dashboardPanelData.meta.dragAndDrop.dragElement = null
+
+      if(dragItem && area == 'x') {
+        addXAxisItem(dragItem?.name)
+      }else if(dragItem && area == 'y'){
+        addYAxisItem(dragItem?.name)
+      }else if(dragItem && area == 'f'){
+        addFilteredItem(dragItem?.name)
+      }else{
+
+      }
+      currentDragArea.value = ''
+    }
+
+
+    const onDragEnter = (e:any, area: string) => {
+      console.log('enter');
+
+
+      // // don't drop on other draggables
+      // if (e.target.draggable !== true) {
+      //   e.target.classList.add('drag-enter')
+      // }
+    }
+
+    const onDragStart = (e:any, item: any) => {
+      console.log('start');
+
+      e.preventDefault()
+    }
+
+    const onDragLeave = (e:any, area: string) => {
+      console.log('leave');
+      currentDragArea.value = ''
+
+      e.preventDefault()
+    }
+
+    const onDragOver = (e:any, area: string) => {
+      console.log('over');
+      currentDragArea.value = area
+      e.preventDefault()
+    }
+
+    const handler2 = () => {}
 
     return {
       showXAxis,
@@ -481,12 +551,36 @@ export default defineComponent({
       tab: ref("General"),
       options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
       getImageURL,
+      onDrop,
+      onDragStart,
+      onDragLeave,
+      onDragOver,
+      onDragEnter,
+      handler2,
+      currentDragArea,
+      expansionItems
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+
+.droppable {
+  border-color: white;
+  border-style: dotted;
+}
+
+.drop-target {
+  background-color: #dfdfdf;
+  border-color: black;
+  border-style: dotted;
+}
+
+.drop-entered {
+  background-color: #b8b8b8;
+}
+
 .color-input-wrapper {
   height: 1.5em;
   width: 1.5em;
@@ -590,7 +684,7 @@ export default defineComponent({
       padding: 0px 10px;
       align-items: center;
       position: absolute;
-      line-height: 2rem;
+      // line-height: 2rem;
       overflow: hidden;
       inset: 0;
       display: flex;

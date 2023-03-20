@@ -238,11 +238,7 @@ export default defineComponent({
           return {
             suggestions: filteredSuggestions,
           };
-          // } else {
-          //   return {
-          //     suggestions: filteredSuggestions,
-          //   };
-          // }
+         
         },
       });
 

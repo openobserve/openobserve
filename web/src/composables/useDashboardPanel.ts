@@ -1,4 +1,8 @@
 import { reactive } from "vue";
+import queryService from "../services/nativequery"
+import { useStore } from "vuex";
+import { useQuasar } from "quasar";
+
 const getDefaultDashboardPanelData = () => (
   {
     data: {
@@ -11,7 +15,7 @@ const getDefaultDashboardPanelData = () => (
         filter: <any>[]
       },
       config: {
-        title: "Chart",
+        title: "",
         description: "",
         show_legends: false,
       },
@@ -19,10 +23,16 @@ const getDefaultDashboardPanelData = () => (
     },
     layout: {
       showCustomQuery: false,
-      loading:false,
     },
     meta: {
       parsedQuery: "",
+      dragAndDrop: {
+        dragging: false,
+        dragElement: null
+      },
+      errors: {
+        queryErrors: []
+      },
       editorValue: "",
       dateTime: {},
       filterValue: <any>[],
@@ -40,9 +50,12 @@ const getDefaultDashboardPanelData = () => (
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
 const useDashboardPanelData = () => {
+  const store = useStore();
+  const $q = useQuasar();
+
   const resetDashboardPanelData = () => {
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData());
-    console.log("updated...",dashboardPanelData);
+    // console.log("updated...",dashboardPanelData);
   };
 
   const addXAxisItem = (name: string) => {
@@ -102,6 +115,76 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.fields.filter.splice(index, 1)
     }
   }
+
+  const addFilteredItem = (name: string) => {
+    // console.log("name=", name);
+    if (!dashboardPanelData.data.fields.filter) {
+      dashboardPanelData.data.fields.filter = [];
+    }
+
+    if (
+      !dashboardPanelData.data.fields.filter.find(
+        (it: any) => it.column == name
+      )
+    ) {
+      // console.log("data");
+
+      dashboardPanelData.data.fields.filter.push({
+        type: "list",
+        values: [],
+        column: name,
+        operator: null,
+        value: null,
+      });
+    }
+
+    if (!dashboardPanelData.meta.filterValue) {
+      dashboardPanelData.meta.filterValue = [];
+    }
+
+    if (
+      !dashboardPanelData.meta.filterValue.find(
+        (it: any) => it.column == name
+      )
+    ) {
+      let queryData = "SELECT ";
+
+      // get unique value of the selected fields
+      queryData += `${name} as value`;
+
+      //now add the selected stream
+      queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`;
+
+      // console.log("queryData= ", queryData);
+      // add group by statement
+      queryData += ` GROUP BY value`;
+
+      const query = {
+        query: { sql: queryData, sql_mode: "full" },
+      };
+
+      queryService
+        .runquery(query, store.state.selectedOrganization.identifier)
+        .then((res) => {
+
+          dashboardPanelData.meta.filterValue.push({
+            column: name,
+            value: res.data.hits
+              .map((it: any) => it.value)
+              .filter((it: any) => it),
+          });
+
+        })
+        .catch((error) => {
+          $q.notify({
+            type: "negative",
+            message: "Something went wrong!",
+            timeout: 5000,
+          });
+        });
+    }
+  }
+
   return { 
     dashboardPanelData, 
     resetDashboardPanelData, 
@@ -109,7 +192,8 @@ const useDashboardPanelData = () => {
     addYAxisItem,
     removeXAxisItem,
     removeYAxisItem,
-    removeFilterItem
+    removeFilterItem,
+    addFilteredItem 
   };
 };
 
