@@ -257,21 +257,15 @@ export default defineComponent({
         link: "/logs",
       },
       {
-        title: t("menu.user"),
-        icon: "img:" + getImageURL("images/left_nav/user_icon.svg"),
-        link: "/users",
-        display: store.state.currentuser.role == "admin" ? true : false,
+        title: t("menu.dashboard"),
+        icon: "img:" + getImageURL("images/left_nav/dashb2.svg"),
+        link: "/dashboards",
       },
       {
         title: t("menu.index"),
         icon: "img:" + getImageURL("images/left_nav/index_icon.svg"),
         link: "/logstreams",
       },
-      // {
-      //   title: t("menu.function"),
-      //   icon: "transform",
-      //   link: "/function",
-      // },
       {
         title: t("menu.alerts"),
         icon: "img:" + getImageURL("images/left_nav/warning_icon.svg"),
@@ -283,9 +277,10 @@ export default defineComponent({
         link: "/ingestion/",
       },
       {
-        title: t("menu.about"),
-        icon: "img:" + getImageURL("images/left_nav/about_icon.svg"),
-        link: "/about",
+        title: t("menu.user"),
+        icon: "img:" + getImageURL("images/left_nav/user_icon.svg"),
+        link: "/users",
+        display: store.state.currentuser.role == "admin" ? true : false,
       },
       {
         title: t("menu.slack"),
@@ -295,9 +290,9 @@ export default defineComponent({
         external: true,
       },
       {
-        title: t("menu.dashboard"),
-        icon: "img:" + getImageURL("images/left_nav/dashb2.svg"),
-        link: "/dashboards",
+        title: t("menu.about"),
+        icon: "img:" + getImageURL("images/left_nav/about_icon.svg"),
+        link: "/about",
       },
     ]);
 
@@ -305,7 +300,7 @@ export default defineComponent({
       await configService.get_config().then((res: any) => {
         store.dispatch("setConfig", res.data);
         if (res.data.functions_enabled) {
-          linksList.value.splice(4, 0, {
+          linksList.value.splice(5, 0, {
             title: t("menu.function"),
             icon: "transform",
             link: "/functions",
