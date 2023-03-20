@@ -30,7 +30,7 @@ use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
 const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
-const SQL_DEFAULT_LIMIT: usize = 1000;
+const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -267,8 +267,10 @@ impl Sql {
         if meta.limit == 0 {
             meta.offset = req_query.from as usize;
             meta.limit = req_query.size as usize;
-            if meta.limit == 0 {
-                meta.limit = SQL_DEFAULT_LIMIT;
+            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
+                // sql mode context, allow limit 0, used to no hits, but return aggs
+                // sql mode full, disallow without limit, default limit 1000
+                meta.limit = SQL_DEFAULT_FULL_MODE_LIMIT;
             }
             origin_sql = if meta.order_by.is_empty() {
                 format!(
