@@ -109,7 +109,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
-  name: "DashboardList",
+  name: "Dashboards",
   components: {
     AddDashboard,
     QTablePagination,
@@ -213,7 +213,7 @@ export default defineComponent({
       showAddDashboardDialog.value = true;
     };
     const routeToViewD = (row) => {
-      console.log("row");
+      // console.log("row");
       return router.push({
         path: "/viewDashboard",
         query: { dashboard: row.identifier },
@@ -235,13 +235,13 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.list.length;
-          console.log(res);
+          // console.log(res);
           store.dispatch("setAllDashboardList", res.data.list);
 
           dismiss();
         })
         .catch((error) => {
-          console.log(error);
+          // console.log(error);
         });
     };
     const dashboards = computed(function () {
@@ -281,7 +281,7 @@ export default defineComponent({
           });
         })
         .catch((error) => {
-          console.log(error);
+          // console.log(error);
         });
     };
 
@@ -346,9 +346,9 @@ export default defineComponent({
       this.orgData.identifier = newVal;
       if (
         (newVal != oldVal || this.dashboards.value == undefined) &&
-        this.router.currentRoute.value.name == "dashboardList"
+        this.router.currentRoute.value.name == "dashboards"
       ) {
-        console.log("inside if");
+        // console.log("inside if");
 
         this.getDashboards(this.store.state.selectedOrganization.id);
       }

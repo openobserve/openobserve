@@ -28,7 +28,7 @@ import Functions from "../views/Functions.vue";
 import Alerts from "../views/Alerts.vue";
 import Ingestion from "../views/Ingestion.vue";
 import Error404 from "../views/Error404.vue";
-import DashboardList from "../views/Dashboards/DashboardList.vue";
+import Dashboards from "../views/Dashboards/Dashboards.vue";
 import {
   useLocalUserInfo,
   getDecodedUserInfo,
@@ -109,9 +109,9 @@ export default function (store: any) {
           },
         },
         {
-          path: "dashboardList",
-          name: "dashboardList",
-          component: DashboardList,
+          path: "dashboards",
+          name: "dashboards",
+          component: Dashboards,
           meta: {
             keepAlive: true,
           },

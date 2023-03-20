@@ -12,7 +12,7 @@
           color="white"
           text-color="black"
           no-caps
-          :label="t(`Add Panel`)"
+          :label="t('panel.add')"
           @click="addPanelData"
         />
         <q-btn
@@ -22,27 +22,16 @@
           color="white"
           text-color="black"
           no-caps
-          :label="draggable ? t(`Cancel`) : t(`Edit`)"
+          :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)"
           @click="isDraggableClick"
         />
-        <!-- <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="white"
-          text-color="black"
-          no-caps
-          :label="t(`Edit Panel`)"
-          @click="addNewPanelOnClick"
-        /> -->
-
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
           :disable="!draggable"
-          :label="t(`Save`)"
+          :label="t(`panel.save`)"
           @click="saveDashboardOnClick"
         />
         <q-btn
@@ -51,7 +40,7 @@
           padding="sm lg"
           color="red"
           no-caps
-          :label="t(`Delete`)"
+          :label="t(`dashboard.delete`)"
           @click="deleteDashboardOnClick"
         />
         <q-btn
@@ -59,22 +48,12 @@
           padding="sm lg"
           color="white"
           no-caps
-          :label="t(`Go back to Dashboard`)"
+          :label="t(`dashboard.goBackToDashboard`)"
           outline
           text-color="black"
           @click="goBackToDashboardList"
         />
         <date-time ref="refDateTime" @date-change="dateChange" />
-        <!-- <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          padding="sm lg"
-          color="white"
-          no-caps
-          :label="t(`show New Panel`)"
-          outline
-          text-color="black"
-          @click="showNewPanel= !showNewPanel"
-        /> -->
       </div>
     </div>
     <q-separator></q-separator>
@@ -116,6 +95,7 @@
           <div>
             <PanelContainer
               @updated:chart="onUpdatePanel"
+              :draggable="draggable"
               :data="item"
               :selectedTimeDate="currentTimeObj"
             >
@@ -148,7 +128,6 @@ import DateTime from "../../components/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
 import {
-  deletePanelFromDashboard,
   getConsumableDateTime,
   getDashboard,
 } from "../../utils/commons.ts";
@@ -200,7 +179,7 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      return router.push("/dashboardList");
+      return router.push("/dashboards");
     };
 
     const goBackToDashboardList = () => {
@@ -237,39 +216,31 @@ export default defineComponent({
       await updateDashboard(
         store,
         store.state.selectedOrganization.identifier,
-        route.query.dashboard,
+        dashboardId,
         currentDashboardData.data
       );
-      // const currentDashboard = currentDashboardData.data
-      // await dashboardService
-      //   .save(
-      //     store.state.selectedOrganization.identifier,
-      //     currentDashboard.dashboardId,
-      //     JSON.stringify(JSON.stringify(currentDashboard))
-      //   )
-      //   .then((res) => {
-      //     $q.notify({
-      //       type: "positive",
-      //       message: "Dashboard saved successfully.",
-      //       timeout: 5000,
-      //     });
-      //   });
+     
       currentDashboardData.data = await getDashboard(
-        this.store,
-        this.$route.query.dashboard
+        store,
+        dashboardId
       );
 
-      //goBack()
+      $q.notify({
+        type: "positive",
+        message: "Dashboard updated successfully.",
+        timeout: 5000,
+      });
+
     };
 
     const saveDashboardOnClick = async () => {
-      await saveDashboard(route.query.dashboard);
+      saveDashboard(route.query.dashboard);
     };
 
-    //get current dashboard Id
-    const getDashboard = () => {
-      return currentDashboardData.data.dashboardId;
-    };
+    // //get current dashboard Id
+    // const getDashboard = () => {
+    //   return currentDashboardData.data.dashboardId;
+    // };
 
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
@@ -281,19 +252,6 @@ export default defineComponent({
 
     const addPanelData = () => {
       addNewPanel(route.query.dashboard);
-    };
-
-    const deleteExistingPanel = async (
-      panelDataElement: any,
-      dashboardId: String,
-      dashboardList: any
-    ) => {
-      deletePanelFromDashboard(
-        store,
-        dashboardId,
-        panelDataElement.id,
-        dashboardList
-      );
     };
 
     let list = computed(function () {
@@ -314,7 +272,6 @@ export default defineComponent({
       deleteDashboard,
       addNewPanel,
       saveDashboardOnClick,
-      deleteExistingPanel,
       store,
       refDateTime,
       filterQuery: ref(""),
@@ -345,19 +302,17 @@ export default defineComponent({
     isDraggableClick(evt, row) {
       this.draggable = !this.draggable;
     },
+    disableDraggable(evt, row) {
+      this.draggable = false;
+    },
     async onUpdatePanel(panelDataElementValue: any) {
-      // let dashboardList = toRaw(this.store.state.allDashboardList);
-      // this.deleteExistingPanel(
-      //   panelDataElementValue,
+      
+      // console.log(
+      //   "deleting",
       //   this.$route.query.dashboard,
-      //   dashboardList
+      //   panelDataElementValue,
+      //   panelDataElementValue.id
       // );
-      console.log(
-        "deleting",
-        this.$route.query.dashboard,
-        panelDataElementValue,
-        panelDataElementValue.id
-      );
 
       await deletePanel(
         this.store,
@@ -475,14 +430,6 @@ export default defineComponent({
     },
   },
   async activated() {
-    // //get dashboard list from the store
-    // let dashboardList = toRaw(this.store.state.allDashboardList);
-    // //find the dashboard details from the dashboard list using dashboardId
-    //   for (const dashboard of dashboardList) {
-    //     if (this.$route.query.dashboard === dashboard.name) {
-    //       this.currentDashboardData.data = JSON.parse(dashboard.details)
-    //     }
-    //   }
     this.currentDashboardData.data = await getDashboard(
       this.store,
       this.$route.query.dashboard

@@ -1,19 +1,30 @@
 <template>
-  <div v-if="props.data.type == 'table'" class="q-pa-md">
-    <q-table
-      class="my-sticky-virtscroll-table"
-      virtual-scroll
-      v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
-      :virtual-scroll-sticky-size-start="48"
-      dense
-      :rows="searchQueryData?.data || []"
-      row-key="id"
-    >
-    </q-table>
+  <div style="height: 40px; z-index: 10;">
+    <q-spinner-dots
+      v-if="searchQueryData.loading"
+      color="primary"
+      size="40px"
+      style="margin: 0 auto; display: block"
+    />
   </div>
-  <div v-else>
-    <div ref="plotRef" :id="chartID" class="plotlycontainer"></div>
+  <div style="margin-top: -40px;">
+    <div v-if="props.data.type == 'table'" class="q-pa-md">
+      <q-table
+        class="my-sticky-virtscroll-table"
+        virtual-scroll
+        v-model:pagination="pagination"
+        :rows-per-page-options="[0]"
+        :virtual-scroll-sticky-size-start="48"
+        dense
+        :rows="searchQueryData?.data || []"
+        :columns="tableColumn"
+        row-key="id"
+      >
+      </q-table>
+    </div>
+    <div v-else>
+      <div ref="plotRef" :id="chartID" class="plotlycontainer"></div>
+    </div>
   </div>
 </template>
 
@@ -43,10 +54,11 @@ export default defineComponent({
     const store = useStore();
     const searchQueryData = reactive({
       data: [],
+      loading: false
     });
 
+    //render the plotly chart if the chart type is not table
     onUpdated(() => {
-      console.log("updated");
       if (props.data.type != "table") {
         renderChart();
       }
@@ -55,9 +67,29 @@ export default defineComponent({
     const plotRef: any = ref(null);
     const chartID = ref("chart1");
 
+    //change the timeObject if the date is change
     let selectedTimeObj = computed(function () {
       return props.selectedTimeDate;
     });
+
+    const tableColumn : any = ref([]);
+
+    // set column value for type chart if the axis value is undefined
+    const updateTableColumns = () => {
+      const x = props.data?.fields?.x || []
+      const y = props.data?.fields?.y || []
+      const columnData = [...x, ...y]
+      
+      const column = columnData.map((it:any)=>{
+        let obj : any= {}
+        obj["name"] = it.label
+        obj["field"] = it.label
+        obj["label"] = it.label
+        obj["sortable"] = true
+        return obj
+      })
+      tableColumn.value = column
+    }
 
     // If query changes, we need to get the data again and rerender the chart
     watch(
@@ -65,6 +97,7 @@ export default defineComponent({
       () => {
         if (props.data.query) {
           fetchQueryData();
+          updateTableColumns();
         } else {
           Plotly.react(
             plotRef.value,
@@ -126,7 +159,6 @@ export default defineComponent({
       const sqlQueryModified = queryData;
 
       // get query object
-      // TODO: update queryData to sqlQueryModified
       const timestamps = selectedTimeObj.value;
 
       let startISOTimestamp: any;
@@ -149,16 +181,17 @@ export default defineComponent({
         },
       };
 
+      searchQueryData.loading = true
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
           searchQueryData.data = res.data.hits;
-
-          $q.notify({
-            type: "positive",
-            message: "Query applied successfully.",
-            timeout: 5000,
-          });
+          searchQueryData.loading = false
+          // $q.notify({
+          //   type: "positive",
+          //   message: "Query applied successfully.",
+          //   timeout: 5000,
+          // });
         })
         .catch((error) => {
           $q.notify({
@@ -173,7 +206,7 @@ export default defineComponent({
     watch(
       () => [searchQueryData.data, props.data.type],
       () => {
-        console.log("Query: new data received");
+        // console.log("Query: new data received");
         if (props.data.type != "table") {
           renderChart();
         }
@@ -182,16 +215,17 @@ export default defineComponent({
     );
 
     const renderChart = async () => {
-      console.log("Query: rendering chart");
-      console.log("Query: chart type", props.data.type);
+      // console.log("Query: rendering chart");
+      // console.log("Query: chart type", props.data.type);
       // Step 1: Get the Y-Axis Count
       const xAxisKey = getXAxisKey();
       const yAxisKeys = getYAxisKeys();
 
-      console.log("xaxis=", textwrapper(getAxisDataFromKey(xAxisKey)));
+      // console.log("xaxis=", textwrapper(getAxisDataFromKey(xAxisKey)));
 
       let traces;
 
+      //generate the traces value f chart
       traces = yAxisKeys.map((key: any) => {
         const trace = {
           name: props.data.fields?.y.find((it: any) => it.label == key).column,
@@ -207,8 +241,9 @@ export default defineComponent({
         return trace;
       });
 
-      console.log("Query: populating traces: ", traces);
+      // console.log("Query: populating traces: ", traces);
 
+      //generate the layout value of chart
       const layout: any = {
         title: false,
         showlegend: props.data.config?.show_legends,
@@ -225,8 +260,8 @@ export default defineComponent({
           automargin: true,
         },
         margin: {
-          l: 32,
-          r: 16,
+          l: props.data.type == 'pie' ? 60 : 32,
+          r: props.data.type == 'pie' ? 60 : 16,
           t: 38,
           b: 32,
         },
@@ -240,6 +275,7 @@ export default defineComponent({
       });
     };
 
+    // change the axis value based on chart type
     const getTraceValuesByChartType = (xAxisKey: string, yAxisKey: string) => {
       const trace: any = {
         ...getPropsByChartTypeForTraces(),
@@ -257,18 +293,22 @@ export default defineComponent({
       return trace;
     };
 
+    // get the x axis key
     const getXAxisKey = () => {
       return props.data.fields.x.map((it: any) => it.label)[0];
     };
 
+    // get the y axis key
     const getYAxisKeys = () => {
       return props.data.fields.y.map((it: any) => it.label);
     };
 
+    // get the axis data using key
     const getAxisDataFromKey = (key: string) => {
       return searchQueryData.data.map((item) => item[key]);
     };
 
+    // return chart type based on selected chart
     const getPropsByChartTypeForTraces = () => {
       switch (props.data.type) {
         case "bar":
@@ -304,6 +344,7 @@ export default defineComponent({
       }
     };
 
+    // layout changes based on selected chart type
     const getPropsByChartTypeForLayout = async () => {
       switch (props.data.type) {
         case "bar":
@@ -337,6 +378,7 @@ export default defineComponent({
         rowsPerPage: 0,
       }),
       chartID,
+      tableColumn
     };
   },
 });

@@ -5,6 +5,7 @@
         :panelDataElement="props.data"
         :dashboardId="$route.query.dashboard"
         @clicked="onClickChild"
+        :draggable="props.draggable"
       />
     </div>
     <ChartRender
@@ -22,7 +23,7 @@ import PanelHeader from "./PanelHeader.vue";
 export default defineComponent({
   name: "PanelContainer",
   emits: ["updated:chart"],
-  props: ["data", "selectedTimeDate"],
+  props: ["data", "selectedTimeDate", "draggable"],
   components: {
     ChartRender,
     PanelHeader,

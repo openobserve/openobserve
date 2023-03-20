@@ -118,6 +118,7 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
 
+    //generate random integer number for dashboard Id
     function getRandInteger() {
       return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
     }
@@ -205,7 +206,7 @@ export default defineComponent({
 
             this.$emit("update:modelValue", data);
             this.$emit("updated");
-            console.log("Done saving");
+            // console.log("Done saving");
             this.addDashboardForm.resetValidation();
             dismiss();
           })
@@ -216,7 +217,7 @@ export default defineComponent({
                 err.response.data["error"] || "Dashboard creation failed."
               ),
             });
-            console.log(err);
+            // console.log(err);
             dismiss();
           });
       });
