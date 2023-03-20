@@ -17,47 +17,55 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="row">
-      <div class="col-2 alerts-tabs q-pa-sm">
-        <q-tabs
-          v-model="activeTab"
-          indicator-color="transparent"
-          class="text-secondary"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            name="alerts"
-            to="/alerts/alerts"
-            icon="data"
-            label="Alerts"
-            content-class="tab_content"
+    <q-splitter
+      v-model="splitterModel"
+      unit="px"
+      style="min-height: calc(100vh - 57px)"
+    >
+      <template v-slot:before>
+        <div class="alerts-tabs">
+          <q-tabs
+            v-model="activeTab"
+            indicator-color="transparent"
+            class="text-secondary"
+            inline-label
+            vertical
+          >
+            <q-route-tab
+              name="alerts"
+              to="/alerts/alerts"
+              icon="data"
+              label="Alerts"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="destinations"
+              to="/alerts/destinations"
+              icon="data"
+              label="Destinations"
+              content-class="tab_content"
+            />
+            <q-route-tab
+              name="templates"
+              to="/alerts/templates"
+              icon="data"
+              label="Templates"
+              content-class="tab_content"
+            />
+          </q-tabs>
+        </div>
+      </template>
+      <template v-slot:after>
+        <div class="q-mx-md q-my-sm">
+          <RouterView
+            :templates="templates"
+            :destinations="destinations"
+            @get:destinations="getDestinations"
+            @get:templates="getTemplates"
           />
-          <q-route-tab
-            name="destinations"
-            to="/alerts/destinations"
-            icon="data"
-            label="Destinations"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="templates"
-            to="/alerts/templates"
-            icon="data"
-            label="Templates"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </div>
-      <div class="col-10">
-        <RouterView
-          :templates="templates"
-          :destinations="destinations"
-          @get:destinations="getDestinations"
-          @get:templates="getTemplates"
-        ></RouterView>
-      </div>
-    </div>
+        </div>
+      </template>
+    </q-splitter>
   </q-page>
 </template>
 
@@ -77,6 +85,7 @@ const router = useRouter();
 const activeTab: any = ref("destinations");
 const templates = ref([]);
 const destinations = ref([]);
+const splitterModel = ref(220);
 
 onActivated(() => {
   const routeMapping: any = {
@@ -114,7 +123,7 @@ const getDestinations = () => {
 };
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -125,7 +134,7 @@ const getDestinations = () => {
 .alerts-tabs {
   .q-tabs {
     &--vertical {
-      margin: 1.5rem 1rem 0 0;
+      margin: 1.5rem 1rem 0 1rem;
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
