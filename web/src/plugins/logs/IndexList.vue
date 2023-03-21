@@ -135,7 +135,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import { getImageURL, useLocalLogFilterField } from "../../utils/zincutils";
+import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -144,7 +144,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj } = useLogs();
+    const { searchObj, updatedLocalLogFilterField } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const filterStreamFn = (val: string, update: any) => {
@@ -183,10 +183,7 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
       }
-      const identifier: string = store.state.selectedOrganization.identifier || "default";
-      let selectedFields: any = {};
-      selectedFields[`${identifier}_${searchObj.data.stream.selectedStream.value}`] = searchObj.data.stream.selectedFields;
-      useLocalLogFilterField(selectedFields);
+      updatedLocalLogFilterField();
     }
 
     return {

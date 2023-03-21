@@ -774,6 +774,14 @@ export default defineComponent({
       try {
         searchObj.data.resultGrid.columns = [];
 
+        const logFilterField: any = useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
+        const logFieldSelectedValue = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`]
+        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
+        if (!searchObj.data.stream.selectedFields.length && selectedFields.length) {
+          return (searchObj.data.stream.selectedFields = selectedFields);
+        }
+        searchObj.data.stream.selectedFields = selectedFields;
+
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
           field: (row: any) =>
