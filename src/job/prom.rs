@@ -38,8 +38,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
             // log::info!("Cluster leader for {:?} --> {:?}", item.key(), item.value());
             let result = db::set_prom_cluster_leader(item.key(), item.value()).await;
             match result {
-                Ok(_) => log::info!("Successfully updated leader to etcd "),
-                Err(err) => log::error!("error updating leader to etcd {}", err),
+                Ok(_) => log::info!("Successfully updated leader to db "),
+                Err(err) => log::error!("error updating leader to db {}", err),
             }
         }
     }
