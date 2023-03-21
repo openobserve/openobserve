@@ -219,12 +219,10 @@ async fn upload_file(
     drop(schema_reader);
 
     file.seek(SeekFrom::Start(0)).unwrap();
-    let mut json_reader = BufReader::new(&file);
-    let json = arrow::json::Reader::new(
-        &mut json_reader,
-        arrow_schema.clone(),
-        arrow::json::reader::DecoderOptions::new(),
-    );
+    let json_reader = BufReader::new(&file);
+    let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+        .build(json_reader)
+        .unwrap();
 
     let mut buf_parquet = Vec::new();
     let props = WriterProperties::builder()
