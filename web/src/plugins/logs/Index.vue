@@ -148,7 +148,11 @@ import { Parser } from "node-sql-parser";
 import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import { useLocalLogsObj, b64EncodeUnicode } from "../../utils/zincutils";
+import {
+  useLocalLogsObj,
+  b64EncodeUnicode,
+  useLocalLogFilterField,
+} from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
 
@@ -790,6 +794,23 @@ export default defineComponent({
       try {
         searchObj.data.resultGrid.columns = [];
 
+        const logFilterField: any =
+          useLocalLogFilterField()?.value != null
+            ? useLocalLogFilterField()?.value
+            : {};
+        const logFieldSelectedValue =
+          logFilterField[
+            `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+          ];
+        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
+        if (
+          !searchObj.data.stream.selectedFields.length &&
+          selectedFields.length
+        ) {
+          return (searchObj.data.stream.selectedFields = selectedFields);
+        }
+        searchObj.data.stream.selectedFields = selectedFields;
+
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
           field: (row: any) =>
@@ -958,7 +979,8 @@ export default defineComponent({
       reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false
+        searchObj.meta.sqlMode == false &&
+        router.currentRoute.value.path.indexOf("/logs") > -1
       ) {
         setTimeout(() => {
           searchResultRef.value.reDrawChart();
@@ -1191,7 +1213,10 @@ export default defineComponent({
       return this.searchObj.data.stream.selectedStream;
     },
     changeRelativeDate() {
-      return this.searchObj.data.datetime.relative.value;
+      return (
+        this.searchObj.data.datetime.relative.value +
+        this.searchObj.data.datetime.relative.period.value
+      );
     },
     updateSelectedColumns() {
       return this.searchObj.data.stream.selectedFields.length;
@@ -1266,8 +1291,6 @@ export default defineComponent({
     },
     changeRelativeDate() {
       if (this.searchObj.data.datetime.tab == "relative") {
-        this.searchObj.data.datetime.relative.value =
-          this.searchObj.data.datetime.relative.value.replace(/[^\d]/g, "");
         this.runQueryFn();
       }
     },

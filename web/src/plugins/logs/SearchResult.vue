@@ -171,6 +171,9 @@ export default defineComponent({
       );
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
+      this.searchObj.organizationIdetifier =
+        this.store.state.selectedOrganization.identifier;
+      this.updatedLocalLogFilterField();
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
@@ -225,7 +228,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
 
-    const { searchObj } = useLogs();
+    const { searchObj, updatedLocalLogFilterField } = useLogs();
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);
@@ -286,8 +289,10 @@ export default defineComponent({
 
     return {
       t,
+      store,
       plotChart,
       searchObj,
+      updatedLocalLogFilterField,
       byString,
       searchTableRef,
       addSearchTerm,

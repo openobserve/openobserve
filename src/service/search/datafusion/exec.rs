@@ -342,7 +342,21 @@ pub async fn merge(
             return Err(e);
         }
     };
-    let batches = df.collect().await?;
+    let schema: Schema = df.schema().into();
+    let mut batches = df.collect().await?;
+    if batches.len() > 1 {
+        // try to merge recordbatch
+        let schema = Arc::new(schema);
+        let mut merged_batch = batches[0].clone();
+        for item in batches.iter().skip(1) {
+            if item.num_rows() > 0 {
+                merged_batch =
+                    arrow::compute::concat_batches(&schema.clone(), &[merged_batch, item.clone()])
+                        .unwrap();
+            }
+        }
+        batches = vec![merged_batch];
+    }
     ctx.deregister_table("tbl")?;
 
     log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());

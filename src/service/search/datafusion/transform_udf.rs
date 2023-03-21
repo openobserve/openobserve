@@ -46,95 +46,6 @@ fn create_user_df(
     )
 }
 
-/* fn get_udf(fn_name: String, js_func: &str, num_args: u8) -> datafusion::logical_expr::ScalarUDF {
-    let local_fn_name = fn_name.to_owned();
-    let local_js_func = js_func.to_owned();
-
-    let pow_calc = move |args: &[ArrayRef]| {
-        // Create a new Isolate and make it the current one.
-        let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        // Create a stack-allocated handle scope.
-        let handle_scope = &mut v8::HandleScope::new(isolate);
-        // Create a new context.
-        let context = v8::Context::new(handle_scope);
-        // Enter the context for compiling and running the hello world script.
-        let mut scope = v8::ContextScope::new(handle_scope, context);
-
-        let len = args[0].len();
-
-        let mut data_vec = vec![];
-
-        for i in 0..len {
-            data_vec.insert(
-                i,
-                eval_user_fn(
-                    &mut scope,
-                    args,
-                    i,
-                    fn_name.to_owned().as_str(),
-                    local_js_func.to_owned().as_str(),
-                ),
-            );
-        }
-        let result = StringArray::from(data_vec);
-
-        // `Ok` because no error occurred during the calculation (we should add one if exponent was [0, 1[ and the base < 0 because that panics!)
-        // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(Arc::new(result) as ArrayRef)
-    };
-    // the function above expects an `ArrayRef`, but DataFusion may pass a scalar to a UDF.
-    // thus, we use `make_scalar_function` to decorare the closure so that it can handle both Arrays and Scalar values.
-    let pow_scalar = make_scalar_function(pow_calc);
-
-    // Next:
-    // * give it a name so that it shows nicely when the plan is printed
-    // * declare what input it expects
-    // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
-    pow_udf
-}
-
-fn eval_user_fn(
-    scope: &mut ContextScope<HandleScope>,
-    args: &[Arc<dyn Array>],
-    stream: usize,
-    fn_name: &str,
-    js_func: &str,
-) -> String {
-    let mut js_fn_arg = String::new();
-    js_fn_arg.push_str(fn_name);
-    js_fn_arg.push('(');
-
-    for (_i, arg) in args.iter().enumerate() {
-        let col = arg
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
-        if col.data_type().equals_datatype(&DataType::Utf8) {
-            js_fn_arg.push_str(&format!("'{}'", col.value(stream)));
-        } else {
-            js_fn_arg.push_str(&col.value(stream));
-        }
-        js_fn_arg.push(',');
-    }
-    js_fn_arg.pop();
-    js_fn_arg.push(')');
-
-    let js_fn_str = format!(r#"{};{};"#, js_func, js_fn_arg);
-    let source_reg = v8::String::new(scope, &js_fn_str).unwrap();
-    // scope.add_context_data(context, source_log);
-    let script = v8::Script::compile(scope, source_reg, None).unwrap();
-    // Run the script to get the result.
-    let result = script.run(scope);
-    match result {
-        Some(ret) => {
-            let _result = ret.to_string(scope).unwrap();
-            _result.to_rust_string_lossy(scope)
-        }
-        None => "".to_owned(),
-    }
-} */
-
 pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
     let mut udf;
     let mut udf_list = Vec::new();
@@ -205,7 +116,7 @@ fn load_tarnsform(lua: &Lua, js_func: String) -> Function {
 }
 
 fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -> String {
-    let mut input = MultiValue::new();
+    let mut input_vec = vec![];
 
     for (_i, arg) in args.iter().enumerate() {
         let col = arg
@@ -213,9 +124,10 @@ fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -
             .downcast_ref::<StringArray>()
             .expect("cast failed");
 
-        input.push_front(lua.to_value(&col.value(stream)).unwrap());
+        input_vec.push(lua.to_value(&col.value(stream)).unwrap());
     }
 
+    let input = MultiValue::from_vec(input_vec);
     let _res = func.call::<_, String>(input);
     match _res {
         Ok(res) => res,
