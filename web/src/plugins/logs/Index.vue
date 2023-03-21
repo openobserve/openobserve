@@ -1203,7 +1203,10 @@ export default defineComponent({
       return this.searchObj.data.stream.selectedStream;
     },
     changeRelativeDate() {
-      return this.searchObj.data.datetime.relative.value;
+      return (
+        this.searchObj.data.datetime.relative.value +
+        this.searchObj.data.datetime.relative.period.value
+      );
     },
     updateSelectedColumns() {
       return this.searchObj.data.stream.selectedFields.length;
@@ -1278,8 +1281,6 @@ export default defineComponent({
     },
     changeRelativeDate() {
       if (this.searchObj.data.datetime.tab == "relative") {
-        this.searchObj.data.datetime.relative.value =
-          this.searchObj.data.datetime.relative.value.replace(/[^\d]/g, "");
         this.runQueryFn();
       }
     },
