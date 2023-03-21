@@ -81,7 +81,9 @@ export default defineComponent({
       trace.y = y;
       layout.title.text = params.title || "";
       trace.unparsed_x = params.unparsed_x_data;
-      Plotly.redraw("plotly_chart");
+      if (document.getElementById("plotly_chart") != null) {
+        Plotly.redraw("plotly_chart");
+      }
     };
 
     // created force relayout function to avoid infinite loop
@@ -92,7 +94,9 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      Plotly.relayout(plotref.value, update);
+      if (document.getElementById("plotly_chart") != null) {
+        Plotly.relayout(plotref.value, update);
+      }
     };
 
     const onPlotZoom = () => {
