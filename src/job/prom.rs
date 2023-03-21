@@ -35,7 +35,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let leaders = METRIC_CLUSTER_LEADER.clone();
         for item in leaders.iter() {
-            // log::info!("Cluster leader for {:?} --> {:?}", item.key(), item.value());
             let result = db::set_prom_cluster_leader(item.key(), item.value()).await;
             match result {
                 Ok(_) => log::info!("Successfully updated leader to db "),
