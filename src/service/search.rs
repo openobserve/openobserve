@@ -96,6 +96,7 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
     let mut response = Response::new(resp.from as usize, resp.size as usize);
 
     // convert hits
+    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
     if !resp.hits.is_empty() {
         let buf = Cursor::new(resp.hits);
         let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
@@ -112,10 +113,16 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
                 )));
             }
         };
-        let sources: Vec<serde_json::Value> = json_rows
+        let mut sources: Vec<serde_json::Value> = json_rows
             .into_iter()
             .map(serde_json::Value::Object)
             .collect();
+
+        // handle metrics response
+        if query_type.eq("metrics") {
+            sources = handle_metrics_response(sources);
+        }
+
         for source in sources {
             response.add_hit(&source);
         }
@@ -164,6 +171,10 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
     response.set_took(resp.took as usize);
     response.set_file_count(resp.file_count as usize);
     response.set_scan_size(resp.scan_size as usize);
+
+    if query_type.eq("metrics") {
+        response.response_type = "matrix".to_string();
+    }
 
     Ok(response)
 }
@@ -536,6 +547,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
 
     // hits
+    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
     let batches_query = match batches.get("query") {
         Some(batches) => batches.to_owned(),
         None => Vec::new(),
@@ -550,10 +562,16 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 )))
             }
         };
-        let sources: Vec<serde_json::Value> = json_rows
+        let mut sources: Vec<serde_json::Value> = json_rows
             .into_iter()
             .map(serde_json::Value::Object)
             .collect();
+
+        // handle metrics response
+        if query_type.eq("metrics") {
+            sources = handle_metrics_response(sources);
+        }
+
         for source in sources {
             result.add_hit(&source);
         }
@@ -594,6 +612,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     result.set_file_count(file_count as usize);
     result.set_scan_size(scan_size as usize);
 
+    if query_type.eq("metrics") {
+        result.response_type = "matrix".to_string();
+    }
+
     log::info!(
         "[TRACE] cluster->search: total: {}, took: {}, scan_size: {}",
         result.total,
@@ -602,6 +624,48 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     );
 
     Ok(result)
+}
+
+fn handle_metrics_response(sources: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    // handle metrics response
+    let mut results_metrics: HashMap<String, serde_json::Value> = HashMap::with_capacity(16);
+    let mut results_values: HashMap<String, Vec<[serde_json::Value; 2]>> =
+        HashMap::with_capacity(16);
+    for source in sources {
+        let fields = source.as_object().unwrap();
+        let mut key = Vec::with_capacity(fields.len());
+        fields.iter().for_each(|(k, v)| {
+            if !k.eq(&CONFIG.common.time_stamp_col) && !k.eq("value") {
+                key.push(format!("{}_{}", k, v));
+            }
+        });
+        let key = key.join("_");
+        if !results_metrics.contains_key(&key) {
+            let mut fields = fields.clone();
+            fields.remove(&CONFIG.common.time_stamp_col);
+            fields.remove("value");
+            results_metrics.insert(key.clone(), serde_json::Value::Object(fields));
+        }
+        let entry = results_values.entry(key).or_insert(Vec::new());
+        let value = [
+            fields
+                .get(&CONFIG.common.time_stamp_col)
+                .unwrap()
+                .to_owned(),
+            serde_json::Value::String(fields.get("value").unwrap().to_string()),
+        ];
+        entry.push(value);
+    }
+
+    let mut new_sources = Vec::with_capacity(results_metrics.len());
+    for (key, metrics) in results_metrics {
+        new_sources.push(serde_json::json!({
+            "metrics": metrics,
+            "values": results_values.get(&key).unwrap(),
+        }));
+    }
+
+    new_sources
 }
 
 pub fn handle_datafusion_error(err: DataFusionError) -> Error {

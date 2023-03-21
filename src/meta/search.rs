@@ -145,6 +145,8 @@ pub struct Response {
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub response_type: String,
 }
 
 impl Response {
@@ -158,6 +160,7 @@ impl Response {
             scan_size: 0,
             hits: Vec::new(),
             aggs: HashMap::new(),
+            response_type: "".to_string(),
         }
     }
 
