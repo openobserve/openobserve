@@ -175,12 +175,10 @@ async fn upload_file(
     let arrow_schema = Arc::new(inferred_schema.clone());
     drop(schema_reader);
 
-    let mut json_reader = BufReader::new(buf.as_ref());
-    let json = arrow::json::Reader::new(
-        &mut json_reader,
-        arrow_schema.clone(),
-        arrow::json::reader::DecoderOptions::new(),
-    );
+    let json_reader = BufReader::new(buf.as_ref());
+    let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+        .build(json_reader)
+        .unwrap();
 
     let mut buf_parquet = Vec::new();
     let props = WriterProperties::builder()

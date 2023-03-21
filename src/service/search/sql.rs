@@ -272,7 +272,7 @@ impl Sql {
                 // sql mode full, disallow without limit, default limit 1000
                 meta.limit = SQL_DEFAULT_FULL_MODE_LIMIT;
             }
-            origin_sql = if meta.order_by.is_empty() {
+            origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
                 format!(
                     "{} ORDER BY {} DESC LIMIT {}",
                     origin_sql,
