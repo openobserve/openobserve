@@ -390,23 +390,21 @@ impl Sql {
             }
         }
 
-        // query support histogram
+        // Hack for histogram
         let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
-        for token in &where_tokens {
-            if !token.to_lowercase().starts_with("histogram") {
-                continue;
-            }
-            for cap in re_histogram.captures_iter(token.as_str()) {
-                let attrs = cap
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .split(',')
-                    .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-                    .collect::<Vec<&str>>();
-                let field = attrs.first().unwrap();
-                let interval = attrs.get(1).unwrap();
-                origin_sql = origin_sql.replace(
+        let from_pos = origin_sql.to_lowercase().find(" from ").unwrap();
+        let select_str = origin_sql[0..from_pos].to_string();
+        for cap in re_histogram.captures_iter(select_str.as_str()) {
+            let attrs = cap
+                .get(1)
+                .unwrap()
+                .as_str()
+                .split(',')
+                .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+                .collect::<Vec<&str>>();
+            let field = attrs.first().unwrap();
+            let interval = attrs.get(1).unwrap();
+            origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
                 format!(
                     "date_bin(interval '{}', to_timestamp_micros(\"{}\"), to_timestamp('2001-01-01T00:00:00'))",
@@ -415,7 +413,6 @@ impl Sql {
                 )
                 .as_str(),
             );
-            }
         }
 
         // pickup where
@@ -442,7 +439,7 @@ impl Sql {
             }
         }
 
-        // Hack aggregation
+        // Hack for aggregation
         if track_total_hits {
             req_aggs.insert(
                 "_count".to_string(),
@@ -715,43 +712,43 @@ mod tests {
     #[actix_web::test]
     async fn test_context_sqls() {
         let sqls = [
-            ("select * from table1", true,(0,0)),
-            ("select * from table1 where a=1", true,(0,0)),
-            ("select * from table1 where a='b'", true,(0,0)),
-            ("select * from table1 where a='b' limit 10 offset 10", false,(0,0)),
-            ("select * from table1 where a='b' group by abc", false,(0,0)),
+            ("select * from table1", true, (0,0)),
+            ("select * from table1 where a=1", true, (0,0)),
+            ("select * from table1 where a='b'", true, (0,0)),
+            ("select * from table1 where a='b' limit 10 offset 10", false, (0,0)),
+            ("select * from table1 where a='b' group by abc", false, (0,0)),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                false,(0,0),
+                false, (0,0),
             ),
-            ("select * from table1, table2 where a='b'", false,(0,0)),
+            ("select * from table1, table2 where a='b'", false, (0,0)),
             (
                 "select * from table1 left join table2 on table1.a=table2.b where a='b'",
-                false,(0,0),
+                false, (0,0),
             ),
             (
                 "select * from table1 union select * from table2 where a='b'",
-                false,(0,0),
+                false, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
-                true,(0,0),
+                true, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                false,(0,0),
+                false, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
-                true,(1679202494333000, 1679203394333000),
+                true, (1679202494333000, 1679203394333000),
             ),
             (
                 "select * from table1 where match_all('abc') order by _timestamp desc limit 10 offset 10",
-                false,(0,0),
+                false, (0,0),
             ),
             (
                 "select * from table1 where match_all('abc') and str_match(log,'abc') order by _timestamp desc",
-                false,(0,0),
+                false, (0,0),
             ),
 
         ];
@@ -805,28 +802,32 @@ mod tests {
             ("select * from table1 where a='b' group by abc", true, 0,(0,0)),
             (
                 "select * from table1 where a='b' group by abc having count(*) > 19",
-                true, 0,(0,0),
+                true, 0, (0,0),
             ),
             ("select * from table1, table2 where a='b'", false, 0,(0,0)),
             (
                 "select * from table1 left join table2 on table1.a=table2.b where a='b'",
-                false, 0,(0,0),
+                false, 0, (0,0),
             ),
             (
                 "select * from table1 union select * from table2 where a='b'",
-                false, 0,(0,0),
+                false, 0, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150'",
-                true, 0,(0,0),
+                true, 0, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' order by _timestamp desc limit 10 offset 10",
-                true, 10,(0,0),
+                true, 10, (0,0),
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
-                true, 0,(1679202494333000, 1679203394333000),
+                true, 0, (1679202494333000, 1679203394333000),
+            ),
+            (
+                "select histogram(_timestamp, '5 second') AS key, count(*) AS num from table1 GROUP BY key ORDER BY key",
+                true, 0, (0,0),
             ),
 
         ];
