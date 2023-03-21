@@ -798,12 +798,6 @@ export default defineComponent({
           align: "left",
           sortable: true,
         });
-
-        const logFilterField: any = useLocalLogFilterField().value != null ? useLocalLogFilterField().value : null;
-        if (!searchObj.data.stream.selectedFields.length && logFilterField) {
-          searchObj.data.stream.selectedFields = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`];
-        }
-
         if (searchObj.data.stream.selectedFields.length == 0) {
           // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
           //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
