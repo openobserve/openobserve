@@ -169,37 +169,32 @@
 <script lang="ts" setup>
 import {
   ref,
-  onMounted,
   computed,
   defineProps,
   onBeforeMount,
   onActivated,
   defineEmits,
 } from "vue";
+import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { getUUID } from "@/utils/zincutils";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import type { Template, DestinationData, Headers } from "@/ts/interfaces";
 
-const props = defineProps({
-  templates: {
-    type: Array,
-    default: () => [],
-  },
-  destination: {
-    type: Object,
-    default: () => null,
-  },
-});
+const props = defineProps<{
+  templates: Template[] | [];
+  destination: DestinationData | null;
+}>();
+
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
 const store = useStore();
 const { t } = useI18n();
-const formData = ref({
+const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
   method: "post",
@@ -207,12 +202,14 @@ const formData = ref({
   headers: {},
 });
 
-const editorRef: any = ref(null);
-
-let editorobj: any = null;
-const editorData = ref("");
 const isUpdatingDestination = ref(false);
-const apiHeaders = ref([{ key: "", value: "", uuid: getUUID() }]);
+const apiHeaders: Ref<
+  {
+    key: string;
+    value: string;
+    uuid: string;
+  }[]
+> = ref([{ key: "", value: "", uuid: getUUID() }]);
 
 onActivated(() => setupDestinationData());
 
@@ -226,7 +223,8 @@ const setupDestinationData = () => {
     formData.value.name = props.destination.name;
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
-    formData.value.template = props.destination.template.name;
+    const template = props.destination.template as Template;
+    formData.value.template = template.name;
     formData.value.headers = props.destination.headers;
     if (Object.values(formData.value.headers)) {
       apiHeaders.value = [];
@@ -240,53 +238,6 @@ const setupDestinationData = () => {
 const getFormattedTemplates = computed(() =>
   props.templates.map((template: any) => template.name)
 );
-
-onMounted(async () => {
-  monaco.editor.defineTheme("myCustomTheme", {
-    base: "vs", // can also be vs-dark or hc-black
-    inherit: true, // can also be false to completely replace the builtin rules
-    rules: [
-      {
-        token: "comment",
-        foreground: "ffa500",
-        background: "FFFFFF",
-        fontStyle: "italic underline",
-      },
-      {
-        token: "comment.js",
-        foreground: "008800",
-        fontStyle: "bold",
-        background: "FFFFFF",
-      },
-      { token: "comment.css", foreground: "0000ff", background: "FFFFFF" }, // will inherit fontStyle from `comment` above
-    ],
-    colors: {
-      "editor.foreground": "#000000",
-      "editor.background": "#FFFFFF",
-      "editorCursor.foreground": "#000000",
-      "editor.lineHighlightBackground": "#FFFFFF",
-      "editorLineNumber.foreground": "#000000",
-      "editor.border": "#FFFFFF",
-    },
-  });
-  editorobj = monaco.editor.create(editorRef.value, {
-    value: ``,
-    language: "sql",
-    minimap: {
-      enabled: false,
-    },
-    theme: "myCustomTheme",
-  });
-
-  editorobj.onKeyUp((e: any) => {
-    if (editorobj.getValue() != "") {
-      editorData.value = editorobj.getValue();
-      formData.value.body = editorobj.getValue();
-    }
-  });
-
-  editorobj.setValue(formData.value.body);
-});
 
 const isValidDestination = computed(
   () =>
@@ -311,7 +262,7 @@ const saveDestination = () => {
     message: "Please wait...",
     timeout: 2000,
   });
-  const headers = {};
+  const headers: Headers = {};
   apiHeaders.value.forEach((header) => {
     headers[header.key] = header.value;
   });
@@ -344,7 +295,7 @@ const saveDestination = () => {
     });
 };
 
-const addApiHeader = (key = "", value = "") => {
+const addApiHeader = (key: string = "", value: string = "") => {
   apiHeaders.value.push({ key: key, value: value, uuid: getUUID() });
 };
 

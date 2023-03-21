@@ -88,14 +88,13 @@
 import { ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 const router = useRouter();
 const activeTab: any = ref("destinations");
 const templates = ref([]);

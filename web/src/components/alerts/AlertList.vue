@@ -133,9 +133,10 @@
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
+import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
+import { QTable, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -147,6 +148,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
+import type { AlertData } from "@/ts/interfaces/index";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -157,15 +159,15 @@ export default defineComponent({
     "update:maxRecordToReturn",
   ],
 
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const alerts: any = ref([]);
-    const formData: any = ref({});
+    const alerts: Ref<AlertData[]> = ref([]);
+    const formData: Ref<AlertData | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
-    const qTable: any = ref(null);
+    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -280,14 +282,16 @@ export default defineComponent({
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
           }
+
           if (router.currentRoute.value.query.action == "update") {
+            const alertName = router.currentRoute.value.query.name as string;
             showAddUpdateFn({
-              row: getAlertByName(router.currentRoute.value.query.name),
+              row: getAlertByName(alertName),
             });
           }
           dismiss();
         })
-        .catch((err) => {
+        .catch(() => {
           dismiss();
           $q.notify({
             type: "negative",
@@ -297,11 +301,11 @@ export default defineComponent({
         });
     };
 
-    const getAlertByName = (name) => {
+    const getAlertByName = (name: string) => {
       return alerts.value.find((alert) => alert.name === name);
     };
 
-    if (alerts.value == "" || alerts.value == undefined) {
+    if (!alerts.value.length) {
       getAlerts();
     }
 
@@ -319,10 +323,6 @@ export default defineComponent({
         });
     };
 
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
     const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -340,7 +340,7 @@ export default defineComponent({
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
+      qTable.value?.setPagination(pagination.value);
     };
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
@@ -492,7 +492,7 @@ export default defineComponent({
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
       if (
-        (newVal != oldVal || this.alerts.value == undefined) &&
+        newVal != oldVal &&
         this.router.currentRoute.value.name == "transform"
       ) {
         this.resultTotal = 0;

@@ -112,6 +112,7 @@ import {
   onMounted,
   defineComponent,
 } from "vue";
+import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
@@ -123,14 +124,21 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import type { DestinationData } from "@/ts/interfaces";
+import type { Template } from "@/ts/interfaces/index";
+
+interface ConformDelete {
+  visible: boolean;
+  data: any;
+}
 
 export default defineComponent({
   name: "PageAlerts",
   components: { AddDestination, NoData, ConfirmDialog, QTablePagination },
-  setup(props) {
+  setup() {
     const qTable = ref();
     const store = useStore();
-    const editingDestination = ref(null);
+    const editingDestination: Ref<DestinationData | null> = ref(null);
     const { t } = useI18n();
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -169,10 +177,12 @@ export default defineComponent({
         style: "width: 110px",
       },
     ]);
-    const destinations = ref([]);
-    const templates = ref([]);
-    const confirmDelete = ref({ visible: false, data: null });
-    const destinationSearchKey = ref("");
+    const destinations: Ref<DestinationData[]> = ref([]);
+    const templates: Ref<Template[]> = ref([]);
+    const confirmDelete: Ref<ConformDelete> = ref({
+      visible: false,
+      data: null,
+    });
     const showDestinationEditor = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
@@ -235,11 +245,11 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name)
+          getDestinationByName(router.currentRoute.value.query.name as string)
         );
     };
 
-    const getDestinationByName = (name) => {
+    const getDestinationByName = (name: string) => {
       return destinations.value.find(
         (destination) => destination.name === name
       );
