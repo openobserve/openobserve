@@ -45,12 +45,12 @@
   </div>
 </template>
 
-<script>
-import { defineComponent, ref } from "vue";
+<script lang="ts">
+import { defineComponent, ref, type Ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
-
+import type { Endpoint } from "@/ts/interfaces";
 export default defineComponent({
   name: "fluentbit-mechanism",
   props: {
@@ -63,8 +63,13 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint = ref("");
-
+    const endpoint: Ref<Endpoint> = ref({
+      url: "",
+      host: "",
+      port: "",
+      protocol: "",
+      tls: "",
+    });
     const url = new URL(store.state.API_ENDPOINT);
     endpoint.value = {
       url: store.state.API_ENDPOINT,
@@ -73,7 +78,6 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-
     const fluentbitContent = ref(null);
     return {
       store,
@@ -91,27 +95,23 @@ export default defineComponent({
   background-color: $accent; // tab content bg color
   padding: 1rem 1.25rem 0.5rem;
   border-radius: 0.5rem;
-
   &__head {
     justify-content: space-between;
     text-transform: uppercase;
     align-items: center;
     display: flex;
-
     .title {
       font-size: 0.75rem;
       color: $dark-page;
       line-height: 1rem;
       font-weight: 600;
     }
-
     .copy_action {
       .q-btn {
         background-color: white;
       }
     }
   }
-
   pre {
     white-space: pre-wrap;
     word-wrap: break-word;
