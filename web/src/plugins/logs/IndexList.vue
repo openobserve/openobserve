@@ -183,6 +183,8 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
       }
+      searchObj.organizationIdetifier =
+        store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
     }
 
