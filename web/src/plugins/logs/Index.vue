@@ -794,10 +794,19 @@ export default defineComponent({
       try {
         searchObj.data.resultGrid.columns = [];
 
-        const logFilterField: any = useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
-        const logFieldSelectedValue = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`]
+        const logFilterField: any =
+          useLocalLogFilterField()?.value != null
+            ? useLocalLogFilterField()?.value
+            : {};
+        const logFieldSelectedValue =
+          logFilterField[
+            `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+          ];
         const selectedFields = (logFilterField && logFieldSelectedValue) || [];
-        if (!searchObj.data.stream.selectedFields.length && selectedFields.length) {
+        if (
+          !searchObj.data.stream.selectedFields.length &&
+          selectedFields.length
+        ) {
           return (searchObj.data.stream.selectedFields = selectedFields);
         }
         searchObj.data.stream.selectedFields = selectedFields;
@@ -970,7 +979,8 @@ export default defineComponent({
       reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false
+        searchObj.meta.sqlMode == false &&
+        router.currentRoute.value.path.indexOf("/logs") > -1
       ) {
         setTimeout(() => {
           searchResultRef.value.reDrawChart();
