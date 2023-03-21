@@ -289,6 +289,7 @@ export default defineComponent({
 
     return {
       t,
+      store,
       plotChart,
       searchObj,
       updatedLocalLogFilterField,
