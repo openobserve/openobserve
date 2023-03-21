@@ -38,9 +38,11 @@ curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
+import type { Ref } from "vue";
 import config from "../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
+import type { Endpoint } from "@/ts/interfaces/";
 
 export default defineComponent({
   name: "curl-mechanism",
@@ -54,7 +56,13 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint = ref("");
+    const endpoint: Ref<Endpoint> = ref({
+      url: "",
+      host: "",
+      port: "",
+      protocol: "",
+      tls: "",
+    });
 
     const url = new URL(store.state.API_ENDPOINT);
     endpoint.value = {
