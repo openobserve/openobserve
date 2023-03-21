@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <q-dialog v-model="confirmDelete">
+  <q-dialog>
     <q-card style="width: 240px">
       <q-card-section class="confirmBody">
         <div class="head">{{ title }}</div>
@@ -50,7 +50,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
