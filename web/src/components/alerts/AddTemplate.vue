@@ -76,17 +76,20 @@ import {
   onActivated,
   defineEmits,
 } from "vue";
+import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import type { TemplateData, Template } from "@/ts/interfaces/index";
 
-const props = defineProps({ template: Object });
+const props = defineProps<{ template: TemplateData | null }>();
+
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
 const { t } = useI18n();
-const formData = ref({
+const formData: Ref<Template> = ref({
   name: "",
   body: "",
 });

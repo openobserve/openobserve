@@ -86,7 +86,8 @@
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, defineProps, defineEmits, onActivated, onMounted } from "vue";
+import { ref, onActivated, onMounted } from "vue";
+import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
@@ -94,16 +95,15 @@ import { getImageURL } from "@/utils/zincutils";
 import { AddTemplate } from "./index";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import type { TemplateData, Template } from "@/ts/interfaces";
 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-const emit = defineEmits(["get:templates"]);
-
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
-const templates = ref([]);
+const templates: Ref<Template[]> = ref([]);
 const columns: any = ref<QTableProps["columns"]>([
   {
     name: "#",
@@ -127,11 +127,14 @@ const columns: any = ref<QTableProps["columns"]>([
     style: "width: 110px",
   },
 ]);
-const destinationSearchKey = ref("");
+
 const showTemplateEditor = ref(false);
 
-const editingTemplate = ref(null);
-const confirmDelete = ref({ visible: false, data: null });
+const editingTemplate: Ref<TemplateData | null> = ref(null);
+const confirmDelete: Ref<{
+  visible: boolean;
+  data: any;
+}> = ref({ visible: false, data: null });
 
 const pagination = {
   page: 1,
@@ -164,10 +167,12 @@ const getTemplates = () => {
 const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
   if (router.currentRoute.value.query.action === "update")
-    editTemplate(getTemplateByName(router.currentRoute.value.query.name));
+    editTemplate(
+      getTemplateByName(router.currentRoute.value.query.name as string)
+    );
 };
 
-const getTemplateByName = (name) => {
+const getTemplateByName = (name: string) => {
   return templates.value.find((template) => template.name === name);
 };
 

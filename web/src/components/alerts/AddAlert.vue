@@ -358,13 +358,13 @@ export default defineComponent({
     ]);
 
     const editorUpdate = (e: any) => {
-      formData.sql = e.target.value;
+      formData.value.sql = e.target.value;
     };
 
     const updateCondtions = (e: any) => {
       const ast = parser.astify(e.target.value);
-      sqlAST = ast;
-      sqlAST.columns.forEach(function (item: any, index: any) {
+      sqlAST.value = ast;
+      sqlAST.value.columns.forEach(function (item: any, index: any) {
         let val;
         if (item["as"] === undefined || item["as"] === null) {
           val = item["expr"]["column"];
