@@ -1,11 +1,8 @@
 <!-- Copyright 2022 Zinc Labs Inc. and Contributors
-
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
      http:www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -113,9 +110,10 @@
       </q-table>
     </div>
     <div v-else>
-      <AddTransform
+      <AddAlert
         v-model="formData"
         :isUpdated="isUpdated"
+        :destinations="destinations"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
       />
@@ -131,38 +129,39 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onBeforeMount, onActivated } from "vue";
+import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
+import { QTable, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
-
-import QTablePagination from "../components/shared/grid/Pagination.vue";
-import alertsService from "../services/alerts";
-import AddTransform from "../components/alerts/add.vue";
-import NoData from "../components/shared/grid/NoData.vue";
-import ConfirmDialog from "../components/ConfirmDialog.vue";
-import segment from "../services/segment_analytics";
-import config from "../aws-exports";
-import { getImageURL } from "../utils/zincutils";
-
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import alertsService from "@/services/alerts";
+import destinationService from "@/services/alert_destination";
+import AddAlert from "@/components/alerts/AddAlert.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import segment from "@/services/segment_analytics";
+import config from "@/aws-exports";
+import { getImageURL } from "@/utils/zincutils";
+import type { AlertData } from "@/ts/interfaces/index";
 export default defineComponent({
   name: "PageAlerts",
-  components: { QTablePagination, AddTransform, NoData, ConfirmDialog },
+  components: { QTablePagination, AddAlert, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
     const router = useRouter();
-    const alerts: any = ref([]);
-    const formData: any = ref({});
+    const alerts: Ref<AlertData[]> = ref([]);
+    const formData: Ref<AlertData | {}> = ref({});
     const showAddAlertDialog: any = ref(false);
-    const qTable: any = ref(null);
+    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -203,7 +202,13 @@ export default defineComponent({
         sortable: true,
         style: "width: 10vw;word-break: break-all;",
       },
-
+      {
+        name: "destination",
+        field: "destination",
+        label: t("alerts.destination"),
+        align: "left",
+        sortable: true,
+      },
       {
         name: "actions",
         field: "actions",
@@ -212,13 +217,13 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-
+    const activeTab: any = ref("alerts");
+    const destinations = ref([]);
     const getAlerts = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading alerts...",
       });
-
       alertsService
         .list(
           1,
@@ -231,20 +236,10 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
           alerts.value = res.data.list.map((data: any) => {
             if (data.is_real_time) {
               data.query.sql = "--";
             }
-
-            if (router.currentRoute.value.query.action == "update") {
-              if (router.currentRoute.value.query.name == data.name) {
-                showAddUpdateFn({ row: data });
-              }
-            }
-
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
@@ -274,10 +269,18 @@ export default defineComponent({
               isScheduled: (!data.is_real_time).toString(),
             };
           });
-
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
+          if (router.currentRoute.value.query.action == "update") {
+            const alertName = router.currentRoute.value.query.name as string;
+            showAddUpdateFn({
+              row: getAlertByName(alertName),
+            });
+          }
           dismiss();
         })
-        .catch((err) => {
+        .catch(() => {
           dismiss();
           $q.notify({
             type: "negative",
@@ -286,15 +289,23 @@ export default defineComponent({
           });
         });
     };
-
-    if (alerts.value == "" || alerts.value == undefined) {
+    const getAlertByName = (name: string) => {
+      return alerts.value.find((alert) => alert.name === name);
+    };
+    if (!alerts.value.length) {
       getAlerts();
     }
-
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
+    onBeforeMount(() => getDestinations());
+    onActivated(() => getDestinations());
+    const getDestinations = () => {
+      destinationService
+        .list({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res) => {
+          destinations.value = res.data;
+        });
+    };
     const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -312,16 +323,14 @@ export default defineComponent({
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
+      qTable.value?.setPagination(pagination.value);
     };
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
-
-    const addTransform = () => {
+    const addAlert = () => {
       showAddAlertDialog.value = true;
     };
-
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
       let action;
@@ -329,7 +338,7 @@ export default defineComponent({
         isUpdated.value = false;
         action = "Add Alert";
         router.push({
-          name: "alerts",
+          name: "alertList",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
@@ -339,16 +348,15 @@ export default defineComponent({
         isUpdated.value = true;
         action = "Update Alert";
         router.push({
-          name: "alerts",
+          name: "alertList",
           query: {
-            action: "add",
+            action: "update",
             name: props.row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
       }
-      addTransform();
-
+      addAlert();
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
           button: action,
@@ -358,28 +366,19 @@ export default defineComponent({
         });
       }
     };
-
     const refreshList = () => {
       showAddAlertDialog.value = false;
       getAlerts();
-      router.push({
-        name: "functions",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
     };
-
     const hideForm = () => {
       showAddAlertDialog.value = false;
       router.push({
-        name: "alerts",
+        name: "alertList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
-
     const deleteFn = () => {
       alertsService
         .delete(
@@ -403,7 +402,6 @@ export default defineComponent({
             });
           }
         });
-
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
           button: "Delete Alert",
@@ -414,12 +412,10 @@ export default defineComponent({
         });
       }
     };
-
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
     };
-
     return {
       t,
       qTable,
@@ -437,7 +433,7 @@ export default defineComponent({
       refreshList,
       perPageOptions,
       selectedPerPage,
-      addTransform,
+      addAlert,
       deleteFn,
       isUpdated,
       showAddUpdateFn,
@@ -458,6 +454,8 @@ export default defineComponent({
         return filtered;
       },
       getImageURL,
+      activeTab,
+      destinations,
     };
   },
   computed: {
@@ -468,7 +466,7 @@ export default defineComponent({
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
       if (
-        (newVal != oldVal || this.alerts.value == undefined) &&
+        newVal != oldVal &&
         this.router.currentRoute.value.name == "transform"
       ) {
         this.resultTotal = 0;
@@ -485,6 +483,31 @@ export default defineComponent({
   &__top {
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
+  }
+}
+.alerts-tabs {
+  .q-tabs {
+    &--vertical {
+      margin: 1.5rem 1rem 0 0;
+      .q-tab {
+        justify-content: flex-start;
+        padding: 0 1rem 0 1.25rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        color: $dark;
+        &__content.tab_content {
+          .q-tab {
+            &__icon + &__label {
+              padding-left: 0.875rem;
+              font-weight: 600;
+            }
+          }
+        }
+        &--active {
+          background-color: $accent;
+        }
+      }
+    }
   }
 }
 </style>
