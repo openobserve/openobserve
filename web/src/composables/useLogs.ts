@@ -13,7 +13,7 @@
 //  limitations under the License. 
 
 import { reactive } from "vue";
-import { useLocalLogsObj } from "../utils/zincutils";
+import { useLocalLogsObj, useLocalLogFilterField } from "../utils/zincutils";
 
 const defaultObject = {
     organizationIdetifier: "",
@@ -133,7 +133,14 @@ const useLogs = () => {
         searchObj = reactive(Object.assign({}, defaultObject));
 
     }
-    return { searchObj, resetSearchObj };
+    const updatedLocalLogFilterField = (): void => {
+        const identifier: string = searchObj.organizationIdetifier || "default";
+        const selectedFields: any = useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
+        selectedFields[`${identifier}_${searchObj.data.stream.selectedStream.value}`] = searchObj.data.stream.selectedFields;
+        useLocalLogFilterField(selectedFields);
+    }
+
+    return { searchObj, resetSearchObj, updatedLocalLogFilterField };
 }
 
 export default useLogs;

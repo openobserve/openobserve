@@ -144,7 +144,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj } = useLogs();
+    const { searchObj, updatedLocalLogFilterField } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const filterStreamFn = (val: string, update: any) => {
@@ -183,6 +183,7 @@ export default defineComponent({
       } else {
         searchObj.data.stream.selectedFields.push(row.name);
       }
+      updatedLocalLogFilterField();
     }
 
     return {

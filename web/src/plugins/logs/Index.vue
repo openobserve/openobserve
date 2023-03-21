@@ -148,7 +148,11 @@ import { Parser } from "node-sql-parser";
 import streamService from "../../services/stream";
 import searchService from "../../services/search";
 import TransformService from "../../services/jstransform";
-import { useLocalLogsObj, b64EncodeUnicode } from "../../utils/zincutils";
+import {
+  useLocalLogsObj,
+  b64EncodeUnicode,
+  useLocalLogFilterField,
+} from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
 
@@ -789,6 +793,14 @@ export default defineComponent({
     function updateGridColumns() {
       try {
         searchObj.data.resultGrid.columns = [];
+
+        const logFilterField: any = useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
+        const logFieldSelectedValue = logFilterField[`${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`]
+        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
+        if (!searchObj.data.stream.selectedFields.length && selectedFields.length) {
+          return (searchObj.data.stream.selectedFields = selectedFields);
+        }
+        searchObj.data.stream.selectedFields = selectedFields;
 
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
