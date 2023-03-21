@@ -18,6 +18,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::Error;
 
+use crate::infra::config::CONFIG;
 use crate::infra::{cache, cluster, config};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
@@ -34,6 +35,7 @@ struct ConfigResponse<'a> {
     build_date: String,
     functions_enabled: bool,
     default_fts_keys: Vec<String>,
+    telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
 }
 
@@ -51,6 +53,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         functions_enabled: config::HAS_FUNCTIONS,
+        telemetry_enabled: CONFIG.common.telemetry_enabled,
         default_fts_keys: crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
