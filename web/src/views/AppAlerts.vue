@@ -40,7 +40,7 @@
                 },
               }"
               icon="data"
-              label="Alerts"
+              :label="t('alerts.header')"
               content-class="tab_content"
             />
             <q-route-tab
@@ -52,7 +52,7 @@
                 },
               }"
               icon="data"
-              label="Destinations"
+              :label="t('alert_destinations.header')"
               content-class="tab_content"
             />
             <q-route-tab
@@ -64,7 +64,7 @@
                 },
               }"
               icon="data"
-              label="Templates"
+              :label="t('alert_templates.header')"
               content-class="tab_content"
             />
           </q-tabs>
