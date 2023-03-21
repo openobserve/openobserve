@@ -30,31 +30,12 @@ import "./styles/quasar-overrides.scss";
 // import { config } from "./constants/config";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
+import configService from "./services/config";
 
 const app = createApp(App);
 const router = createRouter(store);
 
-if (config.enableAnalytics == "true") {
-  Sentry.init({
-    app,
-    dsn: config.sentryDSN,
-    integrations: [
-      new BrowserTracing({
-        routingInstrumentation: Sentry.vueRouterInstrumentation(router),
-        tracingOrigins: [
-          "localhost",
-          "alpha1.cloud.zinclabs.dev",
-          "observe.zinc.dev",
-          /^\//,
-        ],
-      }),
-    ],
-    // Set tracesSampleRate to 1.0 to capture 100%
-    // of transactions for performance monitoring.
-    // We recommend adjusting this value in production
-    tracesSampleRate: 1.0,
-  });
-}
+
 app
   .use(Quasar, {
     plugins: [Dialog, Notify], // import Quasar plugins and add here
@@ -64,5 +45,35 @@ app
 // const router = createRouter(store);
 app.use(store).use(router);
 app.use(SearchPlugin);
+
+const getConfig = async () => {
+  await configService.get_config().then((res: any) => {
+    store.dispatch("setConfig", res.data);
+    config.enableAnalytics = res.data.telemetry_enabled.toString();;
+    if (res.data.telemetry_enabled == true) {
+      Sentry.init({
+        app,
+        dsn: config.sentryDSN,
+        integrations: [
+          new BrowserTracing({
+            routingInstrumentation: Sentry.vueRouterInstrumentation(router),
+            tracingOrigins: [
+              "localhost",
+              "alpha1.cloud.zinclabs.dev",
+              "observe.zinc.dev",
+              /^\//,
+            ],
+          }),
+        ],
+        // Set tracesSampleRate to 1.0 to capture 100%
+        // of transactions for performance monitoring.
+        // We recommend adjusting this value in production
+        tracesSampleRate: 1.0,
+      });
+    }
+  });
+}
+
+getConfig();
 
 app.mount("#app");
