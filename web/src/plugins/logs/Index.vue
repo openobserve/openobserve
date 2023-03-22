@@ -55,14 +55,11 @@
               "
             >
               <h5 class="text-center">
-                Result not found.
+                <div v-if="searchObj.data.errorCode == 0">
+                  Result not found.
+                </div>
                 <div v-html="searchObj.data.errorMsg"></div>
-                <div
-                  v-show="
-                    searchObj.data.errorMsg ==
-                    'No full text search field found.'
-                  "
-                >
+                <div v-if="parseInt(searchObj.data.errorCode) == 20003">
                   <q-btn
                     no-caps
                     unelevated
@@ -155,6 +152,7 @@ import {
 } from "../../utils/zincutils";
 import segment from "../../services/segment_analytics";
 import config from "../../aws-exports";
+import { logsErrorMessage } from "../../utils/common";
 
 export default defineComponent({
   name: "PageSearch",
@@ -689,6 +687,7 @@ export default defineComponent({
           return false;
         }
 
+        searchObj.data.errorCode = 0;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -726,20 +725,16 @@ export default defineComponent({
               searchObj.data.errorMsg = err.message;
             }
 
-            if (
-              searchObj.data.errorMsg.indexOf(
-                "No full text search field found"
-              ) > -1 ||
-              searchObj.data.errorMsg.indexOf("Schema error: No field named") >
-                -1
-            ) {
-              searchObj.data.errorMsg = "No full text search field found.";
+            const customMessage = logsErrorMessage(err.response.data.code);
+            searchObj.data.errorCode = err.response.data.code;
+            if (customMessage != "") {
+              searchObj.data.errorMsg = t(customMessage);
             }
 
-            $q.notify({
-              message: searchObj.data.errorMsg,
-              color: "negative",
-            });
+            // $q.notify({
+            //   message: searchObj.data.errorMsg,
+            //   color: "negative",
+            // });
           });
       } catch (e) {
         throw new ErrorException("Request failed.");
@@ -1093,6 +1088,7 @@ export default defineComponent({
     const searchAroundData = (obj: any) => {
       try {
         dismiss = Notify();
+        searchObj.data.errorCode = 0;
         searchService
           .search_around({
             org_identifier: searchObj.organizationIdetifier,
@@ -1153,20 +1149,16 @@ export default defineComponent({
               searchObj.data.errorMsg = err.message;
             }
 
-            if (
-              searchObj.data.errorMsg.indexOf(
-                "No full text search field found"
-              ) > -1 ||
-              searchObj.data.errorMsg.indexOf("Schema error: No field named") >
-                -1
-            ) {
-              searchObj.data.errorMsg = "No full text search field found.";
+            const customMessage = logsErrorMessage(err.response.data.code);
+            searchObj.data.errorCode = err.response.data.code;
+            if (customMessage != "") {
+              searchObj.data.errorMsg = t(customMessage);
             }
 
-            $q.notify({
-              message: searchObj.data.errorMsg,
-              color: "negative",
-            });
+            // $q.notify({
+            //   message: searchObj.data.errorMsg,
+            //   color: "negative",
+            // });
           });
       } catch (e) {
         throw new ErrorException("Request failed.");

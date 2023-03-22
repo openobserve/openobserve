@@ -287,5 +287,40 @@
     "ingestionMsg": "Görünüşe göre seçilen kuruluşa herhangi bir veri almadınız, verilerin fluentbit gibi alınabileceği varoius yolları vardır.",
     "inestedInSearch": "Logs Search'i deneyin",
     "searchInDemoOrg": "Demo organizasyonuna geçerek, demo organizasyonuna geçmek için arama kapaklarını keşfedebilir, üstteki organizasyon açılır menüsünü kullanarak 'Demo Organizasyon'u seçebilirsiniz.Demo Organizasyon'a kukla verileri yutmaya devam ediyoruz."
+  },
+  "billing": {
+    "header": "Kullanım ve Faturalandırma",
+    "plans": "Planları",
+    "subtitle": "Basit, şeffaf fiyatlandırma",
+    "individuals": "Bireyler için",
+    "startups": "Startup'lar için",
+    "basic": "Temel",
+    "pro": "Profesyonel",
+    "whatIsIncluded": "Neler dahil",
+    "subscribed": "Abone Oldu",
+    "getStarted": "Başlayın",
+    "paymentMethod": "Ödeme Yöntemi",
+    "invoiceHistory": "Fatura Geçmişi",
+    "generatedAt": "Oluşturulan",
+    "details": "Detaylar",
+    "amount": "Miktar",
+    "amountPaid": "Ödenen Tutar",
+    "amountDue": "Ödenecek Tutar",
+    "dueDate": "Bitiş Tarihi",
+    "status": "Durum",
+    "action": "Eylem",
+    "usage": "Kullanım",
+    "manageCards": "Kartları Yönet",
+    "subscriptionCheckout": "Abonelik ödeme"
+  },
+  "message": {
+    "ServerInternalError": "Hata: Bir şeyler yanlış gitti. Dahili sunucu hatası.",
+    "SearchSQLNotValid": "Hata: Geçerli SQL bulunamadı.",
+    "SearchStreamNotFound": "Hata: Arama akışı bulunamadı.",
+    "FullTextSearchFieldNotFound": "Hata: Tam metin arama alanı bulunamadı.",
+    "SearchFieldNotFound": "Hata: Arama alanı bulunamadı.",
+    "SearchFunctionNotDefined": "Hata: Arama işlevi tanımlanmadı.",
+    "SearchParquetFileNotFound": "Hata: Arama parke dosyası bulunamadı.",
+    "SearchFieldHasNoCompatibleDataType": "Hata: Arama dosyasında uyumlu veri türü yoktur."
   }
 }

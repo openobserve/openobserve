@@ -228,8 +228,19 @@
     "name": "Nome del pannello di controllo",
     "typeDesc": "Descrizione del tipo di dashboard",
     "createdashboard": "Crea un nuovo pannello di controllo",
+    "updatedashboard": "Aggiornare un pannello di controllo",
     "nameHolder": "Inserisci il nome della nuova dashboard",
-    "typeHolder": "Inserisci la descrizione del tipo di nuova dashboard"
+    "typeHolder": "Inserisci la descrizione del tipo di nuova dashboard",
+    "identifier": "Identificatore",
+    "role": "Ruolo",
+    "description": "Descrizione",
+    "type": "Tipo",
+    "owner": "Proprietario",
+    "created": "Creata",
+    "actions": "Azioni",
+    "nameRequired": "Il nome è obbligatorio",
+    "id": "Id",
+    "goBackToDashboard": "Torna alla Dashboard"
   },
   "panel": {
     "header": "Pannello",
@@ -243,7 +254,22 @@
     "createdashboard": "Crea un nuovo pannello",
     "nameHolder": "Inserisci il nome del nuovo pannello",
     "typeHolder": "Inserisci la descrizione del tipo del nuovo pannello",
-    "editPanel": "Pannello di modifica"
+    "editPanel": "Pannello di modifica",
+    "addPanel": "Aggiungi pannello",
+    "firstColumn": "Prima colonna",
+    "yAxis": "Asse Y (colonne)",
+    "xAxis": "Asse X (riga)",
+    "otherColumn": "Altre colonne",
+    "config": "Configurazione",
+    "filters": "Filtri",
+    "customSql": "SQL personalizzato",
+    "field": "Campi",
+    "discard": "Scartare",
+    "edit": "Modifica",
+    "apply": "Applica",
+    "fields": "Campi",
+    "layout": "Layout",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Avvisi",
@@ -305,5 +331,15 @@
     "usage": "Utilizzo",
     "manageCards": "Gestisci carte",
     "subscriptionCheckout": "Pagamento dell'abbonamento"
+  },
+  "message": {
+    "ServerInternalError": "Errore: qualcosa è andato storto. Errore interno del server.",
+    "SearchSQLNotValid": "Errore: codice SQL valido non trovato.",
+    "SearchStreamNotFound": "Errore: flusso di ricerca non trovato.",
+    "FullTextSearchFieldNotFound": "Errore: campo di ricerca nel testo completo non trovato.",
+    "SearchFieldNotFound": "Errore: campo di ricerca non trovato.",
+    "SearchFunctionNotDefined": "Errore: funzione di ricerca non definita.",
+    "SearchParquetFileNotFound": "Errore: ricerca file parquet non trovato.",
+    "SearchFieldHasNoCompatibleDataType": "Errore: il file di ricerca non ha un tipo di dati compatibile."
   }
 }
