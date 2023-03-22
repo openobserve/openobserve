@@ -1,11 +1,8 @@
 <!-- Copyright 2022 Zinc Labs Inc. and Contributors
-
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
-
      http:www.apache.org/licenses/LICENSE-2.0
-
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -84,7 +81,7 @@
         </div>
 
         <!--<q-toggle v-model="formData.isScheduled" :label="t('alerts.isScheduled')" color="input-border" bg-color="input-bg"
-                                                        class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
+                                                          class="q-py-md showLabelOnTop" stack-label outlined filled dense />-->
 
         <div
           v-if="formData.isScheduled === 'true'"
@@ -228,37 +225,18 @@
         </div>
 
         <div class="q-gutter-sm">
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.destination.type"
-            :checked="formData.destination.type == 'slack'"
-            val="slack"
-            :label="t('alerts.slack')"
-          />
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.destination.type"
-            :checked="formData.destination.type == 'alertmanager'"
-            val="alertmanager"
-            :label="t('alerts.prom_am')"
-          />
-        </div>
-
-        <div class="q-pt-sm col-6 q-pb-none">
-          <q-input
-            v-model="formData.destination.url"
+          <q-select
+            v-model="formData.destination"
             :label="t('alerts.destination')"
+            :options="getFormattedDestinations"
             color="input-border"
             bg-color="input-bg"
-            class="showLabelOnTop"
+            class="showLabelOnTop no-case"
             stack-label
             outlined
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            tabindex="0"
           />
         </div>
 
@@ -294,11 +272,9 @@ import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser";
 import segment from "../../services/segment_analytics";
-
 const defaultValue: any = () => {
   return {
     name: "",
@@ -322,15 +298,10 @@ const defaultValue: any = () => {
       value: 0,
       unit: "",
     },
-    destination: {
-      url: "",
-      type: "slack",
-    },
+    destination: "",
   };
 };
-
 let callAlert: Promise<{ data: any }>;
-
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
   props: {
@@ -341,6 +312,10 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
+    },
+    destinations: {
+      type: Array,
+      default: () => [],
     },
   },
   emits: ["update:list", "cancel:hideform"],
@@ -357,9 +332,7 @@ export default defineComponent({
     const editorRef: any = ref(null);
     const filteredColumns: any = ref([]);
     let editorobj: any = null;
-
     var sqlAST: any = ref(null);
-
     const selectedRelativeValue = ref("1");
     const selectedRelativePeriod = ref("Minutes");
     const relativePeriods: any = ref(["Minutes"]);
@@ -374,15 +347,13 @@ export default defineComponent({
       "Contains",
       "NotContains",
     ]);
-
     const editorUpdate = (e: any) => {
-      formData.sql = e.target.value;
+      formData.value.sql = e.target.value;
     };
-
     const updateCondtions = (e: any) => {
       const ast = parser.astify(e.target.value);
-      sqlAST = ast;
-      sqlAST.columns.forEach(function (item: any, index: any) {
+      sqlAST.value = ast;
+      sqlAST.value.columns.forEach(function (item: any, index: any) {
         let val;
         if (item["as"] === undefined || item["as"] === null) {
           val = item["expr"]["column"];
@@ -397,9 +368,7 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
-
     let parser = new Parser();
-
     onMounted(async () => {
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
@@ -436,17 +405,14 @@ export default defineComponent({
         },
         theme: "myCustomTheme",
       });
-
       editorobj.onKeyUp((e: any) => {
         if (editorobj.getValue() != "") {
           editorData.value = editorobj.getValue();
           formData.value.sql = editorobj.getValue();
         }
       });
-
       editorobj.setValue(formData.value.sql);
     });
-
     const updateAlert = (stream_name: any) => {
       updateEditorContent(stream_name);
     };
@@ -454,7 +420,6 @@ export default defineComponent({
       if (stream_name == "") {
         return;
       }
-
       if (editorData.value != "") {
         editorData.value = editorData.value
           .replace(prefixCode.value, "")
@@ -475,7 +440,6 @@ export default defineComponent({
         triggerCols.value.push(item.name);
       });
     };
-
     watch(
       triggerCols.value,
       () => {
@@ -483,7 +447,6 @@ export default defineComponent({
       },
       { immediate: true }
     );
-
     const filterColumns = (val: String, update: Function) => {
       if (val === "") {
         update(() => {
@@ -491,7 +454,6 @@ export default defineComponent({
         });
         return;
       }
-
       update(() => {
         const value = val.toLowerCase();
         filteredColumns.value = triggerCols.value.filter(
@@ -499,7 +461,6 @@ export default defineComponent({
         );
       });
     };
-
     return {
       t,
       $q,
@@ -529,12 +490,10 @@ export default defineComponent({
       filteredColumns,
     };
   },
-
   created() {
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
     this.beingUpdated = this.isUpdated;
-
     if (
       this.modelValue &&
       this.modelValue.name != undefined &&
@@ -543,9 +502,8 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
-      this.formData.destination = this.modelValue.destination[0];
+      this.formData.destination = this.modelValue.destination;
     }
-
     streamService
       .nameList(this.store.state.selectedOrganization.identifier, "", true)
       .then((res) => {
@@ -555,6 +513,11 @@ export default defineComponent({
         });
       });
   },
+  computed: {
+    getFormattedDestinations: function () {
+      return this.destinations.map((destination: any) => destination.name);
+    },
+  },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
       this.$q.notify({
@@ -562,7 +525,6 @@ export default defineComponent({
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
-
     onSubmit() {
       if (this.formData.stream_name == "") {
         this.$q.notify({
@@ -572,7 +534,6 @@ export default defineComponent({
         });
         return false;
       }
-
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -582,7 +543,6 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
-
         let submitData = {};
         if (
           this.formData.isScheduled === "false" ||
@@ -597,7 +557,7 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: [this.formData.destination],
+            destination: this.formData.destination,
           };
         } else {
           submitData = {
@@ -615,10 +575,9 @@ export default defineComponent({
             time_between_alerts: Number(
               this.formData.time_between_alerts.value
             ),
-            destination: [this.formData.destination],
+            destination: this.formData.destination,
           };
         }
-
         this.schemaList.forEach((stream: any) => {
           if (stream.name == this.formData.stream_name) {
             stream.schema.forEach((field: any) => {
@@ -632,18 +591,15 @@ export default defineComponent({
             });
           }
         });
-
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,
           submitData
         );
-
         callAlert
           .then((res: { data: any }) => {
             const data = res.data;
             this.formData = { ...defaultValue };
-
             this.$emit("update:list");
             this.addAlertForm.resetValidation();
             dismiss();
@@ -659,7 +615,6 @@ export default defineComponent({
               message: err.response.data.error,
             });
           });
-
         segment.track("Button Click", {
           button: "Save Alert",
           user_org: this.store.state.selectedOrganization.identifier,
@@ -681,7 +636,6 @@ export default defineComponent({
   padding-bottom: 14px;
   resize: both;
 }
-
 .alert-condition {
   .__column,
   .__value {
@@ -696,23 +650,19 @@ export default defineComponent({
 .no-case .q-field__native span {
   text-transform: none !important;
 }
-
 .add-alert-form {
   .q-field--dense .q-field__control {
     height: 40px !important;
-
     .q-field__native span {
       overflow: hidden;
     }
   }
-
   .alert-condition .__column .q-field__control .q-field__native span {
     max-width: 152px;
     text-overflow: ellipsis;
     text-align: left;
     white-space: nowrap;
   }
-
   .q-field__bottom {
     padding: 8px 0;
   }
