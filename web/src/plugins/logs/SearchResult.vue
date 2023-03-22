@@ -109,7 +109,6 @@
         v-model="searchObj.meta.showDetailTab"
         position="right"
         full-height
-        seamless
         maximized
       >
         <DetailTable
