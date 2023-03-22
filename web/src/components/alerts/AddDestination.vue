@@ -219,7 +219,7 @@ const setupDestinationData = () => {
     const template = props.destination.template as Template;
     formData.value.template = template.name;
     formData.value.headers = props.destination.headers;
-    if (Object.values(formData.value.headers)) {
+    if (Object.keys(formData.value.headers).length) {
       apiHeaders.value = [];
       Object.entries(formData.value.headers).forEach(([key, value]) => {
         addApiHeader(key, value);
@@ -253,7 +253,7 @@ const saveDestination = () => {
   });
   const headers: Headers = {};
   apiHeaders.value.forEach((header) => {
-    headers[header.key] = header.value;
+    if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
   destinationService
     .create({

@@ -342,6 +342,7 @@ export default defineComponent({
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
         color: $dark;
+        text-transform: capitalize;
 
         &__content.tab_content {
           .q-tab {
