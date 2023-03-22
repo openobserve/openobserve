@@ -60,7 +60,7 @@ export default defineComponent({
     //for edit panel
     const addNewPanel = () => {
       return router.push({
-        path: "/addPanel",
+        path: "/dashboards/addPanel",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }
@@ -68,7 +68,7 @@ export default defineComponent({
     // for delete panel
     const deletePanel = () => {
         return router.push({
-        path: "/viewDashboard",
+        path: "/dashboards/view",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }

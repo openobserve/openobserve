@@ -122,7 +122,7 @@ export default function (store: any) {
           },
         },
         {
-          path: "viewDashboard",
+          path: "/dashboards/view",
           name: "viewDashboard",
           component: ViewDashboard,
           props: true,
@@ -131,7 +131,7 @@ export default function (store: any) {
           },
         },
         {
-          path: "addPanel",
+          path: "/dashboards/addPanel",
           name: "addPanel",
           component: AddPanel,
           props: true,

@@ -182,7 +182,7 @@ export default defineComponent({
     };
     const goBack = () => {
       return router.push({
-        path: "/viewDashboard",
+        path: "/dashboards/view",
         query: { dashboard: route.query.dashboard },
       });
     };

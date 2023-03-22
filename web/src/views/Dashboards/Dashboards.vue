@@ -230,7 +230,7 @@ export default defineComponent({
     const routeToViewD = (row) => {
       // console.log("row");
       return router.push({
-        path: "/viewDashboard",
+        path: "/dashboards/view",
         query: { dashboard: row.identifier },
       });
     };

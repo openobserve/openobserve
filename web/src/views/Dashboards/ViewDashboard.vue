@@ -260,7 +260,7 @@ export default defineComponent({
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
       return router.push({
-        path: "/addPanel",
+        path: "/dashboards/addPanel",
         query: { dashboard: dashboardId },
       });
     };
