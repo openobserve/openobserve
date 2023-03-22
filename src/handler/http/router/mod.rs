@@ -65,6 +65,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
     if CONFIG.common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
+        cfg.service(web::redirect("/web/alerts/alerts", "../alerts"));
+        cfg.service(web::redirect("/web/alerts/destinations", "../alerts"));
+        cfg.service(web::redirect("/web/alerts/templates", "../alerts"));
         cfg.service(web::redirect("/web/ingestion/curl", "../ingestion"));
         cfg.service(web::redirect("/web/ingestion/fluentbit", "../ingestion"));
         cfg.service(web::redirect("/web/ingestion/fluentd", "../ingestion"));
