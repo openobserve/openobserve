@@ -135,6 +135,7 @@ onMounted(async () => {
       enabled: false,
     },
     theme: "myCustomTheme",
+    automaticLayout: true,
   });
   editorobj.onKeyUp((e: any) => {
     if (editorobj.getValue() != "") {
@@ -203,6 +204,8 @@ const saveTemplate = () => {
   width: 100%;
   min-height: 5rem;
   padding-bottom: 14px;
-  resize: both;
+  resize: vertical;
+  overflow: auto;
+  max-height: 350px;
 }
 </style>
