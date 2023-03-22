@@ -81,16 +81,16 @@ pub async fn send_notification(
                 match resp {
                     Ok(resp) => {
                         if !resp.status().is_success() {
-                            println!("Notification sent error: {:?}", resp.bytes().await);
+                            log::error!("Notification sent error: {:?}", resp.bytes().await);
                         }
                     }
-                    Err(err) => log::info!("Notification sending error {:?}", err),
+                    Err(err) => log::error!("Notification sending error {:?}", err),
                 }
             }
 
-            None => log::info!("Destination Not found"),
+            None => log::error!("Destination Not found"),
         },
-        Err(err) => log::info!("Error sending notification {:?}", err),
+        Err(err) => log::error!("Error sending notification {:?}", err),
     }
 
     Ok(())
