@@ -37,7 +37,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         for item in leaders.iter() {
             let result = db::set_prom_cluster_leader(item.key(), item.value()).await;
             match result {
-                Ok(_) => log::info!("Successfully updated leader to db "),
+                Ok(_) => {
+                    // log::info!("Successfully updated leader to db ")
+                }
                 Err(err) => log::error!("error updating leader to db {}", err),
             }
         }
