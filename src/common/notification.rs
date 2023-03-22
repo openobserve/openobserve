@@ -53,6 +53,13 @@ pub async fn send_notification(
                 }
 
                 let msg: Value = serde_json::from_str(&resp).unwrap();
+                let msg: Value = match &msg {
+                    Value::String(obj) => match serde_json::from_str(obj) {
+                        Ok(obj) => obj,
+                        Err(_) => msg,
+                    },
+                    _ => msg,
+                };
                 let url = url::Url::parse(&local_dest.url);
                 let mut req = match local_dest.method {
                     alert::AlertHTTPType::POST => client.post(url.unwrap()),
@@ -64,14 +71,20 @@ pub async fn send_notification(
                 // Add additional headers if any from destination description
                 if local_dest.headers.is_some() {
                     for (key, value) in local_dest.headers.unwrap() {
-                        req = req.header(key, value);
+                        if !key.is_empty() && !value.is_empty() {
+                            req = req.header(key, value);
+                        }
                     }
                 };
 
                 let resp = req.json(&msg).send().await;
                 match resp {
-                    Ok(_) => log::info!("Notification Sent"),
-                    Err(err) => log::info!("Error sending notification {:?}", err),
+                    Ok(resp) => {
+                        if !resp.status().is_success() {
+                            println!("Notification sent error: {:?}", resp.bytes().await);
+                        }
+                    }
+                    Err(err) => log::info!("Notification sending error {:?}", err),
                 }
             }
 
