@@ -100,6 +100,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::json)
             .service(search::search)
             .service(search::around)
+            .service(search::values)
             .service(stream::schema)
             .service(stream::settings)
             .service(stream::delete)
