@@ -74,7 +74,7 @@ impl Sql {
     #[tracing::instrument(name = "service:search:sql:new", skip(req))]
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
-        let req_time_range = (req_query.start_time, req_query.end_time);
+        let mut req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
         let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
 
@@ -217,7 +217,10 @@ impl Sql {
         let meta_time_range_is_empty =
             meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-            meta.time_range = Some(req_time_range)
+            if req_time_range.1 == 0 {
+                req_time_range.1 = chrono::Utc::now().timestamp_micros();
+            }
+            meta.time_range = Some(req_time_range); // update meta
         };
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
@@ -404,8 +407,11 @@ impl Sql {
                 .collect::<Vec<&str>>();
             let field = attrs.first().unwrap();
             let interval = match attrs.get(1) {
-                Some(v) => v.to_string(),
-                None => generate_histogram_interval(meta.time_range),
+                Some(v) => match v.parse::<u16>() {
+                    Ok(v) => generate_histogram_interval(meta.time_range, v),
+                    Err(_) => v.to_string(),
+                },
+                None => generate_histogram_interval(meta.time_range, 0),
             };
             origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
@@ -619,11 +625,23 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> String {
+fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
     }
     let time_range = time_range.unwrap();
+    if num > 0 {
+        return format!(
+            "{} second",
+            std::cmp::max(
+                (time_range.1 - time_range.0)
+                    / Duration::seconds(1).num_microseconds().unwrap()
+                    / num as i64,
+                1
+            )
+        );
+    }
+
     let intervals = [
         (
             Duration::hours(24 * 30).num_microseconds().unwrap(),
