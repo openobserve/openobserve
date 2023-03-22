@@ -28,6 +28,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
         let req_query = cluster_rpc::SearchQuery {
             sql: req.query.sql.clone(),
             sql_mode: req.query.sql_mode.clone(),
+            query_type: req.query.query_type.clone(),
             from: req.query.from as i32,
             size: req.query.size as i32,
             start_time: req.query.start_time,
@@ -119,6 +120,7 @@ mod test {
             query: meta::search::Query {
                 sql: "SELECT * FROM test".to_string(),
                 sql_mode: "default".to_string(),
+                query_type: "logs".to_string(),
                 from: 0,
                 size: 100,
                 start_time: 0,

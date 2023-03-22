@@ -79,6 +79,8 @@ pub struct Query {
     #[serde(default)]
     pub sql_mode: String,
     #[serde(default)]
+    pub query_type: String,
+    #[serde(default)]
     pub track_total_hits: bool,
 }
 
@@ -95,6 +97,7 @@ impl Default for Query {
             start_time: 0,
             end_time: 0,
             sql_mode: "context".to_string(),
+            query_type: "logs".to_string(),
             track_total_hits: false,
         }
     }
@@ -142,6 +145,8 @@ pub struct Response {
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub response_type: String,
 }
 
 impl Response {
@@ -155,6 +160,7 @@ impl Response {
             scan_size: 0,
             hits: Vec::new(),
             aggs: HashMap::new(),
+            response_type: "".to_string(),
         }
     }
 
