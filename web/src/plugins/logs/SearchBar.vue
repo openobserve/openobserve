@@ -336,6 +336,7 @@ export default defineComponent({
   }
   .search-time {
     // width: 120px;
+    margin-right: 10px;
     .q-btn-group {
       border-radius: 3px;
 
