@@ -205,7 +205,6 @@ export default defineComponent({
       getDestinations();
       getTemplates();
     });
-    onMounted(() => console.log(qTable));
     const getDestinations = () => {
       destinationService
         .list({

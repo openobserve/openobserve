@@ -367,8 +367,8 @@ export default defineComponent({
       }
     };
     const refreshList = () => {
-      showAddAlertDialog.value = false;
       getAlerts();
+      hideForm();
     };
     const hideForm = () => {
       showAddAlertDialog.value = false;

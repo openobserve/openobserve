@@ -36,7 +36,6 @@
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              icon="data"
               :label="t('alerts.header')"
               content-class="tab_content"
             />
@@ -48,7 +47,6 @@
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              icon="data"
               :label="t('alert_destinations.header')"
               content-class="tab_content"
             />
@@ -60,7 +58,6 @@
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              icon="data"
               :label="t('alert_templates.header')"
               content-class="tab_content"
             />
@@ -140,13 +137,14 @@ const getDestinations = () => {
 .alerts-tabs {
   .q-tabs {
     &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
+      margin: 20px 16px 0 16px;
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
         color: $dark;
+        text-transform: capitalize;
         &__content.tab_content {
           .q-tab {
             &__icon + &__label {
