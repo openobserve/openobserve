@@ -98,7 +98,7 @@
     "inviteByEmailHint": "メンバーを追加すると、日割り計算された金額が請求されます。",
     "admin": "管理者",
     "member": "メンバー",
-    "changePassword": "パスワードを変更",
+    "changePassword": "パスワード変更",
     "oldPassword": "古いパスワード",
     "newPassword": "新しいパスワード"
   },
@@ -228,8 +228,19 @@
     "name": "ダッシュボードの名前",
     "typeDesc": "ダッシュボードの説明を入力",
     "createdashboard": "新しいダッシュボードを作成",
+    "updatedashboard": "ダッシュボードを更新する",
     "nameHolder": "新しいダッシュボードの名前を入力",
-    "typeHolder": "新しいダッシュボードのタイプの説明を入力してください"
+    "typeHolder": "新しいダッシュボードのタイプの説明を入力してください",
+    "identifier": "識別子",
+    "role": "役割",
+    "description": "説明",
+    "type": "タイプ",
+    "owner": "オーナー",
+    "created": "作成済み",
+    "actions": "アクション",
+    "nameRequired": "名前が必要です",
+    "id": "Id",
+    "goBackToDashboard": "ダッシュボードに戻る"
   },
   "panel": {
     "header": "パネル",
@@ -243,7 +254,22 @@
     "createdashboard": "新しいパネルを作成",
     "nameHolder": "新しいパネルの名前を入力",
     "typeHolder": "新しいパネルのタイプの説明を入力してください",
-    "editPanel": "編集パネル"
+    "editPanel": "編集パネル",
+    "addPanel": "パネルを追加",
+    "firstColumn": "第 1 列",
+    "yAxis": "Y 軸 (列)",
+    "xAxis": "X 軸 (行)",
+    "otherColumn": "その他のコラム",
+    "config": "コンフィグ",
+    "filters": "フィルター",
+    "customSql": "カスタム SQL",
+    "field": "フィールド",
+    "discard": "破棄",
+    "edit": "[編集]",
+    "apply": "[適用]",
+    "fields": "フィールド",
+    "layout": "[レイアウト]",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "アラート",
@@ -305,5 +331,15 @@
     "usage": "使い方",
     "manageCards": "カードを管理",
     "subscriptionCheckout": "サブスクリプションチェックアウト"
+  },
+  "message": {
+    "ServerInternalError": "エラー:何か問題が発生しました。内部サーバーエラーです。",
+    "SearchSQLNotValid": "エラー:有効な SQL が見つかりません。",
+    "SearchStreamNotFound": "エラー:検索ストリームが見つかりません。",
+    "FullTextSearchFieldNotFound": "エラー:全文検索フィールドが見つかりません。",
+    "SearchFieldNotFound": "エラー:検索フィールドが見つかりません。",
+    "SearchFunctionNotDefined": "エラー:検索関数が定義されていません。",
+    "SearchParquetFileNotFound": "エラー:パーケットファイルの検索が見つかりません。",
+    "SearchFieldHasNoCompatibleDataType": "エラー:検索ファイルには互換性のあるデータタイプがありません。"
   }
 }

@@ -228,8 +228,19 @@
     "name": "Name des Dashboards",
     "typeDesc": "Typbeschreibung des Dashboards",
     "createdashboard": "Neues Dashboard erstellen",
+    "updatedashboard": "Ein Dashboard aktualisieren",
     "nameHolder": "Geben Sie den Namen des neuen Dashboards ein",
-    "typeHolder": "Geben Sie die Typbeschreibung des neuen Dashboards ein"
+    "typeHolder": "Geben Sie die Typbeschreibung des neuen Dashboards ein",
+    "identifier": "Identifier",
+    "role": "Rolle",
+    "description": "Beschreibung",
+    "type": "Typ",
+    "owner": "Besitzer",
+    "created": "Erstellt",
+    "actions": "Aktionen",
+    "nameRequired": "Name ist erforderlich",
+    "id": "Id",
+    "goBackToDashboard": "Gehe zurück zum Dashboard"
   },
   "panel": {
     "header": "Paneel",
@@ -243,7 +254,22 @@
     "createdashboard": "Neues Panel erstellen",
     "nameHolder": "Geben Sie den Namen des neuen Panels ein",
     "typeHolder": "Geben Sie die Typbeschreibung des neuen Panels ein",
-    "editPanel": "Bedienfeld bearbeiten"
+    "editPanel": "Bedienfeld bearbeiten",
+    "addPanel": "Panel hinzufügen",
+    "firstColumn": "Erste Spalte",
+    "yAxis": "Y-Achse (Spalten)",
+    "xAxis": "X-Achse (Zeile)",
+    "otherColumn": "Andere Kolumnen",
+    "config": "Konfiguration",
+    "filters": "Filter",
+    "customSql": "Benutzerdefiniertes SQL",
+    "field": "Felder",
+    "discard": "Verwerfen",
+    "edit": "Bearbeiten",
+    "apply": "Bewerben",
+    "fields": "Felder",
+    "layout": "Grundriss",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Warnmeldungen",
@@ -305,5 +331,15 @@
     "usage": "Verwendungszweck",
     "manageCards": "Karten verwalten",
     "subscriptionCheckout": "Abonnement-Checkout"
+  },
+  "message": {
+    "ServerInternalError": "Fehler: Etwas ist schief gelaufen. Interner Serverfehler.",
+    "SearchSQLNotValid": "Fehler: Gültiges SQL wurde nicht gefunden.",
+    "SearchStreamNotFound": "Fehler: Der Suchstream wurde nicht gefunden.",
+    "FullTextSearchFieldNotFound": "Fehler: Das Volltextsuchfeld wurde nicht gefunden.",
+    "SearchFieldNotFound": "Fehler: Suchfeld wurde nicht gefunden.",
+    "SearchFunctionNotDefined": "Fehler: Suchfunktion nicht definiert.",
+    "SearchParquetFileNotFound": "Fehler: Die Suche nach einer Parkett-Datei wurde nicht gefunden.",
+    "SearchFieldHasNoCompatibleDataType": "Fehler: Die Suchdatei hat keinen kompatiblen Datentyp."
   }
 }

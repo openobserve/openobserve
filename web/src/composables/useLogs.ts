@@ -71,6 +71,7 @@ const defaultObject = {
         query: "",
         parsedQuery: {},
         errorMsg: "",
+        errorCode: 0,
         additionalErrorMsg: "",
         stream: {
             streamLists: [],

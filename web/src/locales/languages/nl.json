@@ -228,8 +228,19 @@
     "name": "Naam van het dashboard",
     "typeDesc": "Typebeschrijving van het dashboard",
     "createdashboard": "Maak een nieuw dashboard",
+    "updatedashboard": "Een dashboard bijwerken",
     "nameHolder": "Voer de naam van het nieuwe dashboard in",
-    "typeHolder": "Voer de typebeschrijving van het nieuwe dashboard in"
+    "typeHolder": "Voer de typebeschrijving van het nieuwe dashboard in",
+    "identifier": "Identificatienummer",
+    "role": "Rol",
+    "description": "Omschrijving",
+    "type": "Typ",
+    "owner": "eigenaar",
+    "created": "Gemaakt",
+    "actions": "Acties",
+    "nameRequired": "Naam is verplicht",
+    "id": "Id",
+    "goBackToDashboard": "Ga terug naar het Dashboard"
   },
   "panel": {
     "header": "Paneel",
@@ -243,7 +254,22 @@
     "createdashboard": "Maak een nieuw paneel",
     "nameHolder": "Voer de naam van het nieuwe paneel in",
     "typeHolder": "Voer de typebeschrijving van het nieuwe paneel in",
-    "editPanel": "Paneel bewerken"
+    "editPanel": "Paneel bewerken",
+    "addPanel": "Paneel toevoegen",
+    "firstColumn": "Eerste kolom",
+    "yAxis": "Y-as (kolommen)",
+    "xAxis": "X-as (rij)",
+    "otherColumn": "Andere kolommen",
+    "config": "configuratie",
+    "filters": "Filters",
+    "customSql": "SQL op maat",
+    "field": "Velden",
+    "discard": "Weggooien",
+    "edit": "Bewerken",
+    "apply": "Solliciteer",
+    "fields": "Velden",
+    "layout": "Indeling",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Alarmingen",
@@ -305,5 +331,15 @@
     "usage": "Gebruik",
     "manageCards": "Kaarten beheren",
     "subscriptionCheckout": "Afrekenen van het abonnement"
+  },
+  "message": {
+    "ServerInternalError": "Fout: er is iets fout gegaan. Interne serverfout.",
+    "SearchSQLNotValid": "Fout: geldige SQL is niet gevonden.",
+    "SearchStreamNotFound": "Fout: zoekstream niet gevonden.",
+    "FullTextSearchFieldNotFound": "Fout: het zoekveld met volledige tekst is niet gevonden.",
+    "SearchFieldNotFound": "Fout: zoekveld niet gevonden.",
+    "SearchFunctionNotDefined": "Fout: zoekfunctie niet gedefinieerd.",
+    "SearchParquetFileNotFound": "Fout: Zoekbestand voor parket niet gevonden.",
+    "SearchFieldHasNoCompatibleDataType": "Fout: het zoekbestand bevat geen compatibel gegevenstype."
   }
 }

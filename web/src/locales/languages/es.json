@@ -228,8 +228,19 @@
     "name": "Nombre del panel",
     "typeDesc": "Descripción del tipo del panel",
     "createdashboard": "Crear un panel nuevo",
+    "updatedashboard": "Actualizar un panel",
     "nameHolder": "Introduzca el nombre del nuevo panel",
-    "typeHolder": "Introduzca la descripción del tipo del nuevo panel"
+    "typeHolder": "Introduzca la descripción del tipo del nuevo panel",
+    "identifier": "Identificador",
+    "role": "Función",
+    "description": "Descripción",
+    "type": "Teclea",
+    "owner": "Propietario",
+    "created": "Creado",
+    "actions": "Acciones",
+    "nameRequired": "El nombre es obligatorio",
+    "id": "ID",
+    "goBackToDashboard": "Volver al panel de control"
   },
   "panel": {
     "header": "Panel",
@@ -243,7 +254,22 @@
     "createdashboard": "Crear un panel nuevo",
     "nameHolder": "Introduzca el nombre del nuevo panel",
     "typeHolder": "Introduzca la descripción del tipo del nuevo panel",
-    "editPanel": "Panel de edición"
+    "editPanel": "Panel de edición",
+    "addPanel": "Agregar panel",
+    "firstColumn": "Primera columna",
+    "yAxis": "Eje Y (columnas)",
+    "xAxis": "Eje X (fila)",
+    "otherColumn": "Otras columnas",
+    "config": "Configuración",
+    "filters": "Filtros",
+    "customSql": "SQL personalizado",
+    "field": "Campos",
+    "discard": "Descartar",
+    "edit": "Editar",
+    "apply": "Aplicar",
+    "fields": "Campos",
+    "layout": "Diseño",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Alertas",
@@ -305,5 +331,15 @@
     "usage": "Uso",
     "manageCards": "Administrar tarjetas",
     "subscriptionCheckout": "Pago de la suscripción"
+  },
+  "message": {
+    "ServerInternalError": "Error: Ha ocurrido algo malo. Error interno del servidor.",
+    "SearchSQLNotValid": "Error: no se encontró un SQL válido.",
+    "SearchStreamNotFound": "Error: no se encontró el flujo de búsqueda.",
+    "FullTextSearchFieldNotFound": "Error: no se encuentra el campo de búsqueda de texto completo.",
+    "SearchFieldNotFound": "Error: no se encuentra el campo de búsqueda.",
+    "SearchFunctionNotDefined": "Error: función de búsqueda no definida.",
+    "SearchParquetFileNotFound": "Error: no se encontró el archivo de parquet de búsqueda.",
+    "SearchFieldHasNoCompatibleDataType": "Error: el archivo de búsqueda no tiene un tipo de datos compatible."
   }
 }

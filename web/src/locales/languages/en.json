@@ -257,12 +257,12 @@
         "nameHolder": "Enter Name of New Panel",
         "typeHolder": "Enter Type Description of New Panel",
         "editPanel": "Edit Panel",
-        "addPanel" : "Add Panel",
+        "addPanel": "Add Panel",
         "firstColumn": "First Column",
         "yAxis": "Y-Axis (Columns)",
         "xAxis": "X-Axis (Row)",
         "otherColumn": "Other Columns",
-        "config":"Config",
+        "config": "Config",
         "filters": "Filters",
         "customSql": "Custom SQL",
         "field": "Fields",
@@ -336,5 +336,15 @@
         "usage": "Usage",
         "manageCards": "Manage Cards",
         "subscriptionCheckout": "Subscription checkout"
+    },
+    "message": {
+        "ServerInternalError": "Error: Something wrong went. Internal server error.",
+        "SearchSQLNotValid": "Error: Valid SQL not found.",
+        "SearchStreamNotFound": "Error: Search stream not found.",
+        "FullTextSearchFieldNotFound": "Error: Full text search field not found.",
+        "SearchFieldNotFound": "Error: Search field not found.",
+        "SearchFunctionNotDefined": "Error: Search function not defined.",
+        "SearchParquetFileNotFound": "Error: Search parquet file not found.",
+        "SearchFieldHasNoCompatibleDataType": "Error: Search file has no compatible data type."
     }
 }

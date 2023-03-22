@@ -287,5 +287,40 @@
     "ingestionMsg": "看来你没有向选定的组织发送任何数据，有多种方式可以采集数据，比如 fluentbit。",
     "inestedInSearch": "尝试搜索日志",
     "searchInDemoOrg": "你可以通过切换到演示组织来探索搜索功能，要切换到演示组织，请使用顶部的组织下拉列表选择 “演示组织”。我们一直在向演示组织发生演示数据。"
+  },
+  "billing": {
+    "header": "使用情况和账单",
+    "plans": "计划",
+    "subtitle": "简单、透明的定价",
+    "individuals": "对于个人",
+    "startups": "对于初创公司",
+    "basic": "基本",
+    "pro": "专业版",
+    "whatIsIncluded": "包括什么",
+    "subscribed": "已订阅",
+    "getStarted": "开始吧",
+    "paymentMethod": "付款方式",
+    "invoiceHistory": "发票历史记录",
+    "generatedAt": "生成于",
+    "details": "细节",
+    "amount": "金额",
+    "amountPaid": "已支付金额",
+    "amountDue": "到期金额",
+    "dueDate": "截止日期",
+    "status": "状态",
+    "action": "行动",
+    "usage": "用法",
+    "manageCards": "管理卡片",
+    "subscriptionCheckout": "订阅结账"
+  },
+  "message": {
+    "ServerInternalError": "错误：出了点问题。内部服务器错误。",
+    "SearchSQLNotValid": "错误：未找到有效的 SQL。",
+    "SearchStreamNotFound": "错误：未找到搜索流。",
+    "FullTextSearchFieldNotFound": "错误：未找到全文搜索字段。",
+    "SearchFieldNotFound": "错误：未找到搜索字段。",
+    "SearchFunctionNotDefined": "错误：未定义搜索函数。",
+    "SearchParquetFileNotFound": "错误：找不到搜索镶木地板文件。",
+    "SearchFieldHasNoCompatibleDataType": "错误：搜索文件没有兼容的数据类型。"
   }
 }
