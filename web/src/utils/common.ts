@@ -77,3 +77,22 @@ export const redirectUser = (redirectURI: string | null) => {
     window.location.replace(path);
   }
 };
+
+export const logsErrorMessage = (code: number) => {
+  const messages: any = {
+    10001: "ServerInternalError",
+    20001: "SearchSQLNotValid",
+    20002: "SearchStreamNotFound",
+    20003: "FullTextSearchFieldNotFound",
+    20004: "SearchFieldNotFound",
+    20005: "SearchFunctionNotDefined",
+    20006: "SearchParquetFileNotFound",
+    20007: "SearchFieldHasNoCompatibleDataType",
+  };
+
+  if (messages[code] != undefined) {
+    return "message." + messages[code];
+  } else {
+    return "";
+  }
+};

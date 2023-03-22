@@ -228,8 +228,19 @@
     "name": "Nom du tableau de bord",
     "typeDesc": "Description du type de tableau de bord",
     "createdashboard": "Création d'un nouveau tableau de bord",
+    "updatedashboard": "Mettre à jour un tableau de bord",
     "nameHolder": "Entrez le nom du nouveau tableau de bord",
-    "typeHolder": "Entrez la description du type du nouveau tableau de bord"
+    "typeHolder": "Entrez la description du type du nouveau tableau de bord",
+    "identifier": "Identifiant",
+    "role": "Rôle",
+    "description": "Descriptif",
+    "type": "Type",
+    "owner": "Propriétaire",
+    "created": "Créé",
+    "actions": "Actions",
+    "nameRequired": "Le nom est obligatoire",
+    "id": "Identifiant",
+    "goBackToDashboard": "Retourner au tableau de bord"
   },
   "panel": {
     "header": "Panneau",
@@ -243,7 +254,22 @@
     "createdashboard": "Création d'un nouveau panneau",
     "nameHolder": "Entrez le nom du nouveau panneau",
     "typeHolder": "Entrez la description du type du nouveau panneau",
-    "editPanel": "Panneau d'édition"
+    "editPanel": "Panneau d'édition",
+    "addPanel": "Ajouter un panneau",
+    "firstColumn": "Première colonne",
+    "yAxis": "Axe Y (colonnes)",
+    "xAxis": "Axe X (ligne)",
+    "otherColumn": "Autres colonnes",
+    "config": "Configuration",
+    "filters": "Filtres",
+    "customSql": "SQL personnalisé",
+    "field": "Champs",
+    "discard": "Jeter",
+    "edit": "Modifier",
+    "apply": "Postulez",
+    "fields": "Champs",
+    "layout": "Disposition",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Alertes",
@@ -305,5 +331,15 @@
     "usage": "Usage",
     "manageCards": "Gérer les cartes",
     "subscriptionCheckout": "Paiement de l'abonnement"
+  },
+  "message": {
+    "ServerInternalError": "Erreur : un problème s'est produit. Erreur interne du serveur.",
+    "SearchSQLNotValid": "Erreur : code SQL valide introuvable.",
+    "SearchStreamNotFound": "Erreur : flux de recherche introuvable.",
+    "FullTextSearchFieldNotFound": "Erreur : champ de recherche en texte intégral introuvable.",
+    "SearchFieldNotFound": "Erreur : champ de recherche introuvable.",
+    "SearchFunctionNotDefined": "Erreur : fonction de recherche non définie.",
+    "SearchParquetFileNotFound": "Erreur : le fichier de recherche pour parquet est introuvable.",
+    "SearchFieldHasNoCompatibleDataType": "Erreur : le fichier de recherche ne contient aucun type de données compatible."
   }
 }

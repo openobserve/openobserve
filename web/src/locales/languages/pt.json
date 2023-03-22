@@ -228,8 +228,19 @@
     "name": "Nome do painel",
     "typeDesc": "Tipo de descrição do painel",
     "createdashboard": "Criar um novo painel",
+    "updatedashboard": "Atualizar um painel",
     "nameHolder": "Insira o nome do novo painel",
-    "typeHolder": "Insira a descrição do tipo do novo painel"
+    "typeHolder": "Insira a descrição do tipo do novo painel",
+    "identifier": "Identificador",
+    "role": "Função",
+    "description": "Descrição",
+    "type": "Tipo",
+    "owner": "Proprietário",
+    "created": "Criado",
+    "actions": "Ações",
+    "nameRequired": "O nome é obrigatório",
+    "id": "Id",
+    "goBackToDashboard": "Voltar para o painel"
   },
   "panel": {
     "header": "Painel",
@@ -243,7 +254,22 @@
     "createdashboard": "Criar um novo painel",
     "nameHolder": "Digite o nome do novo painel",
     "typeHolder": "Insira a descrição do tipo do novo painel",
-    "editPanel": "Painel de edição"
+    "editPanel": "Painel de edição",
+    "addPanel": "Adicionar painel",
+    "firstColumn": "Primeira coluna",
+    "yAxis": "Eixo Y (colunas)",
+    "xAxis": "Eixo X (linha)",
+    "otherColumn": "Outras colunas",
+    "config": "Configuração",
+    "filters": "Filtros",
+    "customSql": "SQL personalizado",
+    "field": "Campos",
+    "discard": "Descartar",
+    "edit": "Editar",
+    "apply": "Aplique",
+    "fields": "Campos",
+    "layout": "Layout",
+    "sql": "SQL"
   },
   "alerts": {
     "header": "Alertas",
@@ -305,5 +331,15 @@
     "usage": "Uso",
     "manageCards": "Gerenciar cartões",
     "subscriptionCheckout": "Finalização da compra da assinatura"
+  },
+  "message": {
+    "ServerInternalError": "Erro: Algo errado aconteceu. Erro interno do servidor.",
+    "SearchSQLNotValid": "Erro: SQL válido não encontrado.",
+    "SearchStreamNotFound": "Erro: fluxo de pesquisa não encontrado.",
+    "FullTextSearchFieldNotFound": "Erro: campo de pesquisa de texto completo não encontrado.",
+    "SearchFieldNotFound": "Erro: campo de pesquisa não encontrado.",
+    "SearchFunctionNotDefined": "Erro: função de pesquisa não definida.",
+    "SearchParquetFileNotFound": "Erro: Pesquisar arquivo de parquet não encontrado.",
+    "SearchFieldHasNoCompatibleDataType": "Erro: O arquivo de pesquisa não tem nenhum tipo de dados compatível."
   }
 }
