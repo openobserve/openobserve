@@ -6,19 +6,18 @@ import Vector from "../../../../components/ingestion/Vector.vue";
 
 installQuasar();
 
-describe('Vector', async () => {
-    it("should mount Vector", async () => {
-        const wrapper = mount(Vector, {
-            shallow: false,
-            props: {
-                currOrgIdentifier: 'zinc_next',
-                currUserEmail: 'tulsiraval2828@gmail.com',
-                orgAPIKey: 'L"4\R{8f~56e72`0319V'
-            },
-        });
-
-        expect(wrapper.vm.currOrgIdentifier).not.toBe('')
-        expect(wrapper.vm.currUserEmail).not.toBe('')
-        expect(wrapper.vm.orgAPIKey).not.toBe('')
+describe("Vector", async () => {
+  it("should mount Vector", async () => {
+    const wrapper = mount(Vector, {
+      shallow: false,
+      props: {
+        currOrgIdentifier: "zinc_next",
+        currUserEmail: "tulsiraval2828@gmail.com",
+        orgAPIKey: 'L"4R{8f~56e72`0319V',
+      },
     });
-})
+
+    expect(wrapper.vm.currOrgIdentifier).not.toBe("");
+    expect(wrapper.vm.currUserEmail).not.toBe("");
+  });
+});

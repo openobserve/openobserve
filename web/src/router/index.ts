@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { createRouter, createWebHistory } from "vue-router";
 import Login from "../views/Login.vue";
@@ -25,7 +25,7 @@ import MemberSubscription from "../views/MemberSubscription.vue";
 import Search from "../views/Search.vue";
 import LogStream from "../views/LogStream.vue";
 import Functions from "../views/Functions.vue";
-import Alerts from "../views/Alerts.vue";
+import Alerts from "../views/AppAlerts.vue";
 import Ingestion from "../views/Ingestion.vue";
 import Error404 from "../views/Error404.vue";
 import Dashboards from "../views/Dashboards/Dashboards.vue";
@@ -41,6 +41,11 @@ import FluentBit from "../components/ingestion/FluentBit.vue";
 import Fluentd from "../components/ingestion/Fluentd.vue";
 import Vector from "../components/ingestion/Vector.vue";
 import Curl from "../components/ingestion/Curl.vue";
+import {
+  AlertList,
+  TemplateList,
+  DestinationList,
+} from "@/components/alerts/index";
 
 import segment from "@/services/segment_analytics";
 
@@ -162,9 +167,6 @@ export default function (store: any) {
           path: "ingestion",
           name: "ingestion",
           component: Ingestion,
-          meta: {
-            keepAlive: true,
-          },
           children: [
             {
               path: "curl",
@@ -192,9 +194,23 @@ export default function (store: any) {
           path: "alerts",
           name: "alerts",
           component: Alerts,
-          meta: {
-            keepAlive: true,
-          },
+          children: [
+            {
+              path: "alerts",
+              name: "alertList",
+              component: AlertList,
+            },
+            {
+              path: "destinations",
+              name: "alertDestinations",
+              component: DestinationList,
+            },
+            {
+              path: "templates",
+              name: "alertTemplates",
+              component: TemplateList,
+            },
+          ],
         },
         {
           path: "/:catchAll(.*)*",
@@ -231,7 +247,9 @@ export default function (store: any) {
         to.path !== "/cb" &&
         (localStorageToken.value === "" || sessionUserInfo === null)
       ) {
-        if (to.path !== "/logout") { window.sessionStorage.setItem("redirectURI", to.fullPath); }
+        if (to.path !== "/logout") {
+          window.sessionStorage.setItem("redirectURI", to.fullPath);
+        }
         next({ path: "/login" });
       } else {
         if (sessionUserInfo !== null) {

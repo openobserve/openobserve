@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <q-dialog v-model="confirmDelete">
+  <q-dialog>
     <q-card style="width: 240px">
       <q-card-section class="confirmBody">
         <div class="head">{{ title }}</div>
