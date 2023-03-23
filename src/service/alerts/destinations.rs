@@ -16,6 +16,7 @@ use actix_web::{http, HttpResponse};
 use std::io::Error;
 use tracing::info_span;
 
+use crate::infra::config::STREAM_ALERTS;
 use crate::meta::alert::AlertDestination;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
@@ -50,6 +51,18 @@ pub async fn list_destinations(org_id: String) -> Result<HttpResponse, Error> {
 pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:destinations:delete");
     let _guard = loc_span.enter();
+
+    for alert_list in STREAM_ALERTS.iter() {
+        for alert in alert_list.value().list.clone() {
+            if alert_list.key().starts_with(&org_id) && alert.destination.eq(&name) {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN.into(),
+                    format!("Destination is in use for alert {}", alert.name),
+                )));
+            }
+        }
+    }
+
     let result = db::alerts::destinations::delete(org_id.as_str(), name.as_str()).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
