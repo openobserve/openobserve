@@ -138,10 +138,20 @@ async fn get_stream_partition_keys(
         let schema = stream_schema_map.get(&stream_name).unwrap();
         let mut meta = schema.metadata().clone();
         meta.remove("created_at");
-        let mut v: Vec<_> = meta.into_iter().collect();
-        v.sort();
-        for (_, value) in v {
-            keys.push(value);
+
+        let stream_settings = meta.get("settings");
+
+        if let Some(value) = stream_settings {
+            let settings: Value = crate::common::json::from_slice(value.as_bytes()).unwrap();
+            let part_keys = settings.get("partition_keys");
+
+            if let Some(value) = part_keys {
+                let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
+                v.sort_by(|a, b| a.0.cmp(b.0));
+                for (_, value) in v {
+                    keys.push(value.as_str().unwrap().to_string());
+                }
+            }
         }
     }
     keys
