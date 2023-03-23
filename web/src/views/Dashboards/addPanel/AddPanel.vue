@@ -62,22 +62,40 @@
         />
       </div>
       <q-separator vertical />
-      <div class="col scroll" style="height: 100%">
-        <GetFields />
-      </div>
-      <q-separator vertical />
-      <div class="col scroll" style="height: 100%">
-        <Layout />
-      </div>
-      <q-separator vertical />
-      <div class="col-7 scroll" style="height: 100%">
-        <SearchBar />
-        <q-separator />
-        <ChartRender
-          :data="chartData"
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-        />
-      </div>
+      <div class="col" style="width: 100%;">
+				<q-splitter
+					v-model="dashboardPanelData.layout.splitter"
+					style="width: 100%"
+				>
+					<template #before>
+						<div class="col scroll " style="height: calc(100vh - 118px); overflow-y: auto;">
+							<GetFields />
+						</div>
+					</template>
+					<template #separator>
+						<q-avatar
+						color="primary"
+						text-color="white"
+						size="20px"
+						icon="drag_indicator"
+						style="top: 10px"
+						/>
+					</template>
+					<template #after>
+						<div class="row" style="height: calc(100vh - 118px); overflow-y: auto; ">
+							<div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
+								<Layout/>
+							</div>
+							<q-separator vertical />
+							<div class="col scroll " style="height:100%">
+								<SearchBar />
+								<q-separator />
+								<ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
+							</div>
+						</div>
+					</template>
+				</q-splitter>
+			</div>
     </div>
   </div>
 </template>
