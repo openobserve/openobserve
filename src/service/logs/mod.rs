@@ -167,7 +167,7 @@ pub fn get_partition_key_record(s: &str) -> String {
     }
 }
 
-// generate partition key forquery
+// generate partition key for query
 pub fn get_partition_key_query(s: &str) -> String {
     let s = s.replace(['/', '.'], "_");
     if s.len() > 100 {
