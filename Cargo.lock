@@ -5256,7 +5256,6 @@ dependencies = [
  "etcd-client",
  "flatten-json-object",
  "futures",
- "futures-util",
  "get_if_addrs",
  "glob",
  "http-auth-basic",

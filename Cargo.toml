@@ -70,7 +70,6 @@ env_logger = "0.10"
 etcd-client = { version = "0.10.2", features = ["tls"] }
 flatten-json-object = "0.6.1"
 futures = "0.3"
-futures-util = "0.3.25"
 get_if_addrs = "0.5.3"
 glob = "0.3.0"
 http-auth-basic = "0.3.3"
