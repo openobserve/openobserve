@@ -199,10 +199,7 @@ export default defineComponent({
           baseObj.description = obj.description;
           baseObj.dashboardId = "DashID_" + this.getRandInteger();
           baseObj.created = new Date().toISOString();
-          baseObj.owner =
-            toRaw(this.store.state.currentuser.first_name) +
-            " " +
-            toRaw(this.store.state.currentuser.last_name);
+          baseObj.owner = this.store.state.userInfo.name
 
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
