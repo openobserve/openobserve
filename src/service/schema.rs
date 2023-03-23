@@ -16,11 +16,13 @@ use ahash::AHashMap;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::json::reader::infer_json_schema;
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
 use tracing::info_span;
 
+use crate::common::json;
 use crate::infra::config::CONFIG;
 use crate::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
@@ -280,7 +282,14 @@ pub async fn stream_schema_exists(
     if !meta.is_empty() {
         meta.remove("created_at");
         if !meta.is_empty() {
-            schema_chk.has_partition_keys = true;
+            let stream_settings = meta.get("settings");
+            if let Some(value) = stream_settings {
+                let settings: Value = json::from_slice(value.as_bytes()).unwrap();
+                let keys = settings.get("partition_keys");
+                if keys.is_some() {
+                    schema_chk.has_partition_keys = true;
+                }
+            }
         }
     }
     schema_chk
