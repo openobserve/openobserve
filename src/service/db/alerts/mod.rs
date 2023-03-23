@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use crate::common::json;
-use crate::infra::config::STREAM_ALERTS;
+use crate::infra::config::{STREAM_ALERTS, TRIGGERS_IN_PROCESS};
 use crate::infra::db::Event;
 use crate::meta::alert::{Alert, AlertList};
 
@@ -58,7 +58,11 @@ pub async fn delete(org_id: &str, stream_name: &str, name: &str) -> Result<(), a
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/alerts/{}/{}/{}", org_id, stream_name, name);
     match db.delete(&key, false).await {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            // Remove trigger from in-process list as alert is deleted
+            TRIGGERS_IN_PROCESS.remove(name);
+            Ok(())
+        }
         Err(e) => Err(anyhow::anyhow!(e)),
     }
 }
