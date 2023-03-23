@@ -16,6 +16,7 @@ use actix_web::{http, HttpResponse};
 use std::io::Error;
 use tracing::info_span;
 
+use crate::infra::config::ALERTS_DESTINATIONS;
 use crate::meta::alert::DestinationTemplate;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
@@ -50,6 +51,19 @@ pub async fn list_templates(org_id: String) -> Result<HttpResponse, Error> {
 pub async fn delete_template(org_id: String, name: String) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:templates:delete");
     let _guard = loc_span.enter();
+
+    for dest in ALERTS_DESTINATIONS.iter() {
+        if dest.key().starts_with(&org_id) && dest.value().template.eq(&name) {
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                http::StatusCode::FORBIDDEN.into(),
+                format!(
+                    "Template is in use for destination {}",
+                    &dest.value().clone().name.unwrap()
+                ),
+            )));
+        }
+    }
+
     let result = db::alerts::templates::delete(org_id.as_str(), name.as_str()).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
