@@ -73,7 +73,7 @@ const useDashboardPanelData = () => {
   };
 
   const generateLabelFromName = (name: string) => {
-    return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join('_')
+    return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
 
   const addXAxisItem = (name: string) => {
@@ -90,6 +90,7 @@ const useDashboardPanelData = () => {
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.x.push({
         label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.layout.showCustomQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : name,
         column: name,
         color: null,
         aggregationFunction: (name == '_timestamp') ? 'histogram' : null
@@ -105,6 +106,7 @@ const useDashboardPanelData = () => {
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.y.push({
         label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.layout.showCustomQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
         column: name,
         color: '#5960b2',
         aggregationFunction: 'count'

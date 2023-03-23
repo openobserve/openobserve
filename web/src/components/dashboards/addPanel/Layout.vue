@@ -67,7 +67,6 @@
                       <div class="field_icons">
                         <div>
                           <q-btn
-                            v-if="!dashboardPanelData.layout.showCustomQuery" 
                             size="xs"
                             round
                             dense
@@ -86,14 +85,14 @@
                   </q-td>
                 </q-tr>
                 <q-tr
-                  v-show="props.expand && !dashboardPanelData.layout.showCustomQuery"
+                  v-show="props.expand"
                   :props="props"
                   style="height: min-content"
                 >
                   <q-td colspan="100%">
                     <div>
                       <div class="">
-                        <div class="q-mr-xs q-mb-sm">
+                        <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.x[props.pageIndex]
@@ -123,12 +122,11 @@
                         dense
                         filled
                         label="Label"
-                        v-if="!dashboardPanelData.layout.showCustomQuery"
                         v-model="
                           dashboardPanelData.data.fields.x[props.pageIndex]
                             .label
                         "
-                        :rules="[ val => val.length > 0 || 'Required' , val => !val.includes(' ') || 'use _ instead of <space>' ]"
+                        :rules="[ val => val.length > 0 || 'Required']"
                       />
                     </div>
                   </q-td>
@@ -219,7 +217,7 @@
                 >
                   <q-td colspan="100%">
                     <div>
-                      <div class="flex items-center">
+                      <div class="flex items-center q-mb-sm">
                         <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
                           <q-select
                             v-model="
@@ -246,12 +244,11 @@
                         dense
                         filled
                         label="Label"
-                        v-if="!dashboardPanelData.layout.showCustomQuery"
                         v-model="
                           dashboardPanelData.data.fields.y[props.pageIndex]
                             .label
                         "
-                        :rules="[ val => val.length > 0 || 'Required' , val => !val.includes(' ') || 'use _ instead of <space>' ]"
+                        :rules="[ val => val.length > 0 || 'Required']"
                       />
                     </div>
                   </q-td>

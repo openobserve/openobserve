@@ -119,7 +119,7 @@ export default defineComponent({
           } else {
             selector += `${field.column}`
           }
-          selector += ` as "${field.label}"${i==fields.length-1 ? ' ' : ', '}`
+          selector += ` as "${field.alias}"${i==fields.length-1 ? ' ' : ', '}`
           return selector
         })
         query += array.join("")
@@ -161,7 +161,7 @@ export default defineComponent({
         query += filterData.filter((it: any)=> it).join(" AND ")
 
         // add group by statement
-        query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.label}"`
+        query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
 
         // console.log('generated query: ', query)
 

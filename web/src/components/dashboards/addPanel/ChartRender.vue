@@ -100,6 +100,7 @@ export default defineComponent({
       const column = columnData.map((it:any)=>{
         let obj : any= {}
         obj["name"] = it.label
+        obj["field"] = it.alias
         obj["field"] = it.label
         obj["label"] = it.label
         obj["sortable"] = true
@@ -203,7 +204,18 @@ export default defineComponent({
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
-          searchQueryData.data = res.data.hits;
+          const sortFn = (it1:any, it2: any) => {
+            const a = it1[props.data.fields?.x[0].alias] || ""
+            const b = it2[props.data.fields?.x[0].alias] || ""
+            console.log('sorting', a, b)
+            if(typeof a == 'number' && typeof b == 'number') {
+                return a - b
+            } else {
+                return a.toString().localeCompare(b.toString())
+            }
+          }
+
+          searchQueryData.data = props.data.fields?.x && props.data.fields?.x.length > 0 ? res.data.hits.sort(sortFn) : res.data.hits;
           searchQueryData.loading = false
           // $q.notify({
           //   type: "positive",
@@ -246,12 +258,12 @@ export default defineComponent({
       //generate the traces value f chart
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.label == key).column,
+          name: props.data.fields?.y.find((it: any) => it.alias == key).column,
           ...getTraceValuesByChartType(xAxisKey, key),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.label == key).color ||
+              props.data.fields?.y.find((it: any) => it.alias == key).color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -315,12 +327,12 @@ export default defineComponent({
 
     // get the x axis key
     const getXAxisKey = () => {
-      return props.data.fields?.x?.length ? props.data.fields?.x.map((it: any) => it.label)[0] : "";
+      return props.data.fields?.x?.length ? props.data.fields?.x.map((it: any) => it.alias)[0] : "";
     };
 
     // get the y axis key
     const getYAxisKeys = () => {
-      return props.data.fields?.y?.length ? props.data.fields?.y.map((it: any) => it.label) : [];
+      return props.data.fields?.y?.length ? props.data.fields?.y.map((it: any) => it.alias) : [];
     };
 
     // get the axis data using key
@@ -329,7 +341,7 @@ export default defineComponent({
       // check for the histogram _timestamp field
        // If histogram _timestamp field is found, format the date labels
         const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
-        if(field && field.label == key) {
+        if(field && field.alias == key) {
           // get the format
           const timestamps = selectedTimeObj.value
           let keyFormat = "HH:mm:ss";

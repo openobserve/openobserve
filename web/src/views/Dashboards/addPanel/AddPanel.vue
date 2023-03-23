@@ -224,12 +224,6 @@ export default defineComponent({
         error.push(...labelError.map((it:any) => `${currentYLabel.value}: ${it.column}: Label required`))
       }
 
-      // check if labels are there for y axis items
-      const labelSpaceError = dashboardData.data.fields.y.filter((it:any) => (it.label !== null && it.label.includes(' ')))
-      if(dashboardData.data.fields.y.length && labelSpaceError.length){
-        error.push(...labelSpaceError.map((it:any) => `${currentYLabel.value}: ${it.column}: <space> is not allowed in Label, use _ (underscore) instead`))
-      }
-
       // check if name of panel is there
       if(dashboardData.data.config.title == null || dashboardData.data.config.title == '' ){
         error.push("Name of Panel is required")
