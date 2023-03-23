@@ -105,14 +105,14 @@
               data-cy="search-bar-refresh-button"
               dense
               flat
-              title="Run Query"
-              icon="search"
+              title="Run query"
               class="q-pa-none search-button"
               @click="searchData"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
-            ></q-btn>
+              >Run query</q-btn
+            >
           </q-btn-group>
         </div>
       </div>
@@ -346,8 +346,7 @@ export default defineComponent({
     }
   }
   .search-dropdown {
-    padding-top: 2px;
-    padding-bottom: 2px;
+    padding: 0px;
     .block {
       color: $dark-page;
       font-weight: 600;
@@ -410,7 +409,15 @@ export default defineComponent({
     width: 100% !important;
     height: 70px !important;
   }
+
   .search-button {
+    width: 96px;
+    line-height: 29px;
+    font-weight: bold;
+    text-transform: initial;
+    font-size: 11px;
+    color: white;
+
     .q-btn__content {
       background: $primary;
       border-radius: 0px 3px 3px 0px;
