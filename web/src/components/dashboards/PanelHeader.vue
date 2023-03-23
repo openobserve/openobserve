@@ -60,7 +60,7 @@ export default defineComponent({
     //for edit panel
     const addNewPanel = () => {
       return router.push({
-        path: "/dashboards/addPanel",
+        path: "/dashboards/add_panel",
         query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }

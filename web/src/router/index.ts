@@ -131,7 +131,7 @@ export default function (store: any) {
           },
         },
         {
-          path: "/dashboards/addPanel",
+          path: "/dashboards/add_panel",
           name: "addPanel",
           component: AddPanel,
           props: true,
