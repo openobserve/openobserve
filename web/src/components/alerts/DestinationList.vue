@@ -126,7 +126,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationData } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
-import { q } from "msw/lib/SetupApi-8ab693f7";
+
 interface ConformDelete {
   visible: boolean;
   data: any;
