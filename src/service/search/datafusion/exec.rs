@@ -396,19 +396,32 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let sql_chars_len = sql_chars.len();
     let mut start_pos = 0;
     let mut in_word = false;
-    let mut bracket = 0;
+    let mut brackets = 0;
+    let mut quotes = 0;
+    let mut quote_now = '\"';
     for i in 0..sql_chars_len {
         let c = sql_chars.get(i).unwrap();
         if *c == '(' {
-            bracket += 1;
+            brackets += 1;
             continue;
         }
         if *c == ')' {
-            bracket -= 1;
+            brackets -= 1;
             continue;
         }
+        if *c == '"' || *c == '\'' {
+            if quotes == 0 {
+                quotes += 1;
+                quote_now = *c;
+                continue;
+            }
+            if quotes == 1 && quote_now == *c {
+                quotes = 0;
+                continue;
+            }
+        }
         if *c == ',' || *c == ' ' {
-            if bracket > 0 {
+            if brackets > 0 || quotes > 0 {
                 continue;
             }
             if in_word {

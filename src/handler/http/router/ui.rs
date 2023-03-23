@@ -22,7 +22,7 @@ use rust_embed_for_web::RustEmbed;
 #[folder = "web/dist/"]
 struct WebAssets;
 
-pub const UI_PAGES: [&str; 19] = [
+pub const UI_PAGES: [&str; 21] = [
     "login",
     "logout",
     "about",
@@ -31,6 +31,8 @@ pub const UI_PAGES: [&str; 19] = [
     "dashboards",
     "viewDashboard",
     "addPanel",
+    "dashboards/view",
+    "dashboards/addPanel",
     "logstreams",
     "functions",
     "alerts",
@@ -44,7 +46,7 @@ pub const UI_PAGES: [&str; 19] = [
     "ingestion/vector",
 ];
 
-#[route("/web/{path:.*}", method = "GET", method = "HEAD")]
+#[route("/{path:.*}", method = "GET", method = "HEAD")]
 pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileResponse> {
     let mut path = if path.is_empty() {
         "index.html"
