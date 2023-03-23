@@ -67,7 +67,7 @@ mod tests {
     #[actix_web::test]
     async fn test_index_ok() {
         let app = test::init_service(App::new().service(serve)).await;
-        let req = test::TestRequest::get().uri("/web/index.html").to_request();
+        let req = test::TestRequest::get().uri("/index.html").to_request();
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
@@ -76,7 +76,7 @@ mod tests {
     #[actix_web::test]
     async fn test_index_not_ok() {
         let app = test::init_service(App::new().service(serve)).await;
-        let req = test::TestRequest::get().uri("/web/abc.html").to_request();
+        let req = test::TestRequest::get().uri("/abc.html").to_request();
 
         let resp = test::call_service(&app, req).await;
         assert!(!resp.status().is_success());
