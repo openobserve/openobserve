@@ -101,7 +101,6 @@ export default defineComponent({
         let obj : any= {}
         obj["name"] = it.label
         obj["field"] = it.alias
-        obj["field"] = it.label
         obj["label"] = it.label
         obj["sortable"] = true
         return obj
@@ -207,7 +206,6 @@ export default defineComponent({
           const sortFn = (it1:any, it2: any) => {
             const a = it1[props.data.fields?.x[0].alias] || ""
             const b = it2[props.data.fields?.x[0].alias] || ""
-            console.log('sorting', a, b)
             if(typeof a == 'number' && typeof b == 'number') {
                 return a - b
             } else {
@@ -258,7 +256,7 @@ export default defineComponent({
       //generate the traces value f chart
       traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.alias == key).column,
+          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
           ...getTraceValuesByChartType(xAxisKey, key),
           showlegend: props.data.config?.show_legends,
           marker: {
@@ -281,15 +279,6 @@ export default defineComponent({
         autosize: true,
         legend: {
           bgcolor: "#f7f7f7",
-        },
-        xaxis: {
-          title: props.data.fields?.x[0].label,
-          tickangle: -20,
-          automargin: true,
-        },
-        yaxis: {
-          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-          automargin: true,
         },
         margin: {
           l: props.data.type == 'pie' ? 60 : 32,
@@ -315,12 +304,18 @@ export default defineComponent({
       if (props.data.type == "pie") {
         trace["labels"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["values"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{value} (%{percent})<extra></extra>"
       } else if (props.data.type == "h-bar") {
         trace["y"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["x"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{x}<extra></extra>"
       } else {
         trace["x"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["y"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{y}<extra></extra>"
       }
       return trace;
     };
@@ -421,28 +416,95 @@ export default defineComponent({
     };
 
     // layout changes based on selected chart type
-    const getPropsByChartTypeForLayout = async () => {
+    const getPropsByChartTypeForLayout = () => {
       switch (props.data.type) {
         case "bar":
           return {
             barmode: "group",
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
           };
         case "line":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         case "scatter":
           return {
             scattermode: "group",
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
           };
         case "pie":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         case "h-bar":
           return {
             barmode: "group",
+            xaxis: {
+              title: props.data.fields?.y[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+              automargin: true,
+            },
           };
         case "area":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         default:
-          return {};
+          return {
+            xaxis: {
+                title: props.data.fields?.x[0].label,
+                tickangle: -20,
+                automargin: true,
+              },
+              yaxis: {
+                title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                automargin: true,
+              },
+          };
       }
     };
 

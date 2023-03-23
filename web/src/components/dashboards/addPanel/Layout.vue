@@ -75,7 +75,10 @@
                             :icon="props.expand ? 'unfold_less' : 'unfold_more'"
                           />
                           <q-icon
-                            name="img:/assets/images/layout/remove_icon.svg"
+                          :name="
+                              'img:' +
+                              getImageURL('images/layout/remove_icon.svg')
+                            "
                             size="1rem"
                             @click="removeXAxisItem(props.row.column)"
                           />
