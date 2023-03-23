@@ -17,6 +17,21 @@ import queryService from "../services/nativequery"
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
+const colors = [
+  '#5960b2',
+  '#c23531',
+  '#2f4554',
+  '#61a0a8',
+  '#d48265',
+  '#91c7ae',
+  '#749f83',
+  '#ca8622',
+  '#bda29a',
+  '#6e7074',
+  '#546570',
+  '#c4ccd3'
+]
+
 const getDefaultDashboardPanelData = () => (
   {
     data: {
@@ -108,7 +123,7 @@ const useDashboardPanelData = () => {
         label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
         alias: !dashboardPanelData.layout.showCustomQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
         column: name,
-        color: '#5960b2',
+        color: colors[dashboardPanelData.data.fields.y.length % colors.length],
         aggregationFunction: 'count'
       })
     }
