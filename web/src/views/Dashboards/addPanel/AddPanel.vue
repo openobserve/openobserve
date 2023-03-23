@@ -90,6 +90,7 @@ import {
   toRaw,
   onActivated,
   nextTick,
+  watch
 } from "vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
@@ -169,6 +170,10 @@ export default defineComponent({
     const currentYLabel = computed(()=> {
       return dashboardPanelData.data.type == 'table' ? 'Other Columns' :dashboardPanelData.data.type == 'h-bar' ? 'X-Axis' :  'Y-Axis'
     })
+
+    watch(()=> dashboardPanelData.data.type, ()=>{
+			chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
+		})
 
     const runQuery = () => {
       // console.log("query change detected to run");
