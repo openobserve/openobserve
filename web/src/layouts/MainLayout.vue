@@ -419,7 +419,7 @@ export default defineComponent({
 
     const link: any = ref("inbox");
 
-    if (config.enableAnalytics == "true") {
+    if (config.isZincObserveCloud == "true") {
       const tracker = new Tracker({
         projectKey: config.openReplayKey,
       });
