@@ -10,6 +10,7 @@ body:
         - login
         - home
         - logs search
+        - dashboards
         - users
         - streams
         - functions
