@@ -271,7 +271,8 @@
         "apply": "Apply",
         "fields": "Fields",
         "layout": "Layout",
-        "sql": "SQL"
+        "sql": "SQL",
+        "back": "<< Back"
     },
     "alerts": {
         "header": "Alerts",
@@ -301,7 +302,7 @@
     "home": {
         "streams": "Streams",
         "totalDataIngested": "Total data ingested",
-        "view": "View More>>",
+        "view": "View More >>",
         "queryFunctions": "Query functions",
         "ingestFunctions": "Ingest functions",
         "scheduledAlert": "Scheduled alerts",
