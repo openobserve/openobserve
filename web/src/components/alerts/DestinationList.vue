@@ -114,7 +114,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
@@ -126,6 +126,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationData } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
+import { q } from "msw/lib/SetupApi-8ab693f7";
 interface ConformDelete {
   visible: boolean;
   data: any;
@@ -138,6 +139,7 @@ export default defineComponent({
     const store = useStore();
     const editingDestination: Ref<DestinationData | null> = ref(null);
     const { t } = useI18n();
+    const q = useQuasar();
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -277,7 +279,16 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             destination_name: confirmDelete.value.data.name,
           })
-          .then(() => getDestinations());
+          .then(() => getDestinations())
+          .catch((err) => {
+            if (err.response.data.code === 403) {
+              q.notify({
+                type: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+            }
+          });
       }
     };
     const conformDeleteDestination = (destination: any) => {
