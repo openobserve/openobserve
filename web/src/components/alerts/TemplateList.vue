@@ -89,7 +89,7 @@
 import { ref, onActivated, onMounted } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { AddTemplate } from "./index";
@@ -101,6 +101,7 @@ import { useRouter } from "vue-router";
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
+const q = useQuasar();
 const templates: Ref<Template[]> = ref([]);
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -198,7 +199,16 @@ const deleteTemplate = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         template_name: confirmDelete.value.data.name,
       })
-      .then(() => getTemplates());
+      .then(() => getTemplates())
+      .catch((err) => {
+        if (err.response.data.code === 403) {
+          q.notify({
+            type: "negative",
+            message: err.response.data.message,
+            timeout: 2000,
+          });
+        }
+      });
   }
 };
 const conformDeleteDestination = (destination: any) => {
