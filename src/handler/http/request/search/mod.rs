@@ -89,6 +89,7 @@ use crate::service::search as SearchService;
             "scan_size": 28943
         })),
         (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/_search")]
@@ -230,7 +231,7 @@ pub async fn search(
             "size": 10,
             "scan_size": 28943
         })),
-        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/{stream_name}/_around")]
@@ -253,11 +254,16 @@ pub async fn around(
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => 0,
+        None => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "around key is empty".to_string(),
+            )))
+        }
     };
     let around_size = match query.get("size") {
         Some(v) => v.parse::<usize>().unwrap_or(0),
-        None => 0,
+        None => 10,
     };
 
     // get a local search queue lock
@@ -290,7 +296,7 @@ pub async fn around(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_search",
+                    "/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -299,7 +305,7 @@ pub async fn around(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_search",
+                    "/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -342,7 +348,7 @@ pub async fn around(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_search",
+                    "/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -351,7 +357,7 @@ pub async fn around(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_search",
+                    "/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -389,7 +395,7 @@ pub async fn around(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_search",
+            "/_around",
             "200",
             &org_id,
             &stream_name,
@@ -398,7 +404,181 @@ pub async fn around(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_search",
+            "/_around",
+            "200",
+            &org_id,
+            &stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
+
+    Ok(HttpResponse::Ok().json(resp))
+}
+
+/** Search topN keys for fields */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "SearchValues",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "stream_name name"),
+        ("fields" = String, Query, description = "fields, split by comma"),
+        ("size" = i64, Query, description = "size"), // topN
+        ("start_time" = i64, Query, description = "start time"),
+        ("end_time" = i64, Query, description = "end time"),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = SearchResponse, example = json!({
+            "took": 155,
+            "values": [
+                {
+                    "field": "field1",
+                    "values": ["value1", "value2"]
+                }
+            ]
+        })),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/{stream_name}/_values")]
+pub async fn values(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let start = Instant::now();
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or(StreamType::Logs),
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )))
+        }
+    };
+
+    let fields = match query.get("fields") {
+        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<String>>(),
+        None => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "fields is empty".to_string(),
+            )))
+        }
+    };
+    let size = match query.get("size") {
+        Some(v) => v.parse::<usize>().unwrap_or(0),
+        None => 10,
+    };
+    let start_time = match query.get("start_time") {
+        Some(v) => v.parse::<i64>().unwrap_or(0),
+        None => 0,
+    };
+    let mut end_time = match query.get("end_time") {
+        Some(v) => v.parse::<i64>().unwrap_or(0),
+        None => 0,
+    };
+    if start_time == 0 {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "start_time is empty".to_string(),
+        )));
+    }
+    if end_time == 0 {
+        end_time = chrono::Utc::now().timestamp_micros();
+    }
+
+    // search
+    let mut req = meta::search::Request {
+        query: meta::search::Query {
+            sql: format!("SELECT * FROM {}", stream_name),
+            from: 0,
+            size: 0,
+            start_time,
+            end_time,
+            sql_mode: "context".to_string(),
+            query_type: "logs".to_string(),
+            track_total_hits: false,
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    for field in &fields {
+        req.aggs.insert(
+            field.clone(),
+            format!(
+                "SELECT {} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {}",
+                field, size
+            ),
+        );
+    }
+    let resp_search = match SearchService::search(&org_id, stream_type, &req).await {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/_values",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/_values",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search values error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
+
+    let mut resp = meta::search::Response::default();
+    let mut hit_values: Vec<serde_json::Value> = Vec::new();
+    for (key, values) in resp_search.aggs {
+        let mut field_value: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+        field_value.insert("field".to_string(), serde_json::Value::String(key));
+        field_value.insert("values".to_string(), serde_json::Value::Array(values));
+        hit_values.push(serde_json::Value::Object(field_value));
+    }
+    resp.total = fields.len();
+    resp.hits = hit_values;
+    resp.size = size;
+    resp.scan_size = resp_search.scan_size;
+    resp.took = start.elapsed().as_millis() as usize;
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_values",
+            "200",
+            &org_id,
+            &stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/_values",
             "200",
             &org_id,
             &stream_name,
