@@ -67,10 +67,12 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 
     if CONFIG.common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
+        cfg.service(web::redirect("/web", "./web/"));
         cfg.service(
             web::scope("/web")
                 .wrap_fn(|req, srv| {
-                    let path = req.path().strip_prefix("/web/").unwrap().to_string();
+                    let prefix = format!("{}/web/", CONFIG.common.base_uri);
+                    let path = req.path().strip_prefix(&prefix).unwrap().to_string();
                     srv.call(req).map(move |res| {
                         if ui::UI_PAGES.contains(&path.as_str()) {
                             let res = res.unwrap();
@@ -80,8 +82,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                             let body = String::from_utf8(body.to_vec()).unwrap();
                             let body = body.replace(
                                 r#"<base href="/" />"#,
-                                format!(r#"<base href="{}/web/" />"#, CONFIG.common.base_uri)
-                                    .as_str(),
+                                format!(r#"<base href="{}" />"#, prefix).as_str(),
                             );
                             Ok(ServiceResponse::new(req, HttpResponse::Ok().body(body)))
                         } else {
