@@ -128,7 +128,7 @@ impl Sql {
         }
 
         // check aggs
-        if !req_aggs.is_empty() {
+        if !req_aggs.is_empty() && meta.limit > 0 {
             track_total_hits = true;
         }
         for sql in req_aggs.values() {

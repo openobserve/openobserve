@@ -30,6 +30,7 @@ use crate::meta;
         request::logs::ingest::json,
         request::search::search,
         request::search::around,
+        request::search::values,
         request::functions::list_functions,
         request::functions::save_function,
         request::functions::delete_function,
