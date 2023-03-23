@@ -65,15 +65,71 @@
                         {{ props.row.column }}
                       </div>
                       <div class="field_icons">
-                        <q-icon
-                          :name="
-                            'img:' +
-                            getImageURL('images/layout/remove_icon.svg')
-                          "
-                          size="1rem"
-                          @click="removeXAxisItem(props.row.column)"
-                        />
+                        <div>
+                          <q-btn
+                            v-if="!dashboardPanelData.layout.showCustomQuery" 
+                            size="xs"
+                            round
+                            dense
+                            class="q-mr-xs"
+                            @click="props.expand = !props.expand"
+                            :icon="props.expand ? 'unfold_less' : 'unfold_more'"
+                          />
+                          <q-icon
+                            name="img:/assets/images/layout/remove_icon.svg"
+                            size="1rem"
+                            @click="removeXAxisItem(props.row.column)"
+                          />
+                        </div>
                       </div>
+                    </div>
+                  </q-td>
+                </q-tr>
+                <q-tr
+                  v-show="props.expand && !dashboardPanelData.layout.showCustomQuery"
+                  :props="props"
+                  style="height: min-content"
+                >
+                  <q-td colspan="100%">
+                    <div>
+                      <div class="">
+                        <div class="q-mr-xs q-mb-sm">
+                          <q-select
+                            v-model="
+                              dashboardPanelData.data.fields.x[props.pageIndex]
+                                .aggregationFunction
+                            "
+                            :options="(props.row.column == '_timestamp') ? triggerOperatorsWithHistogram : triggerOperators"
+                            dense
+                            filled
+                            label="Aggregation"
+                          >
+                            <template v-slot:append>
+                              <q-icon name="close" size="small" @click.stop.prevent="dashboardPanelData.data.fields.x[props.pageIndex].aggregationFunction = null" class="cursor-pointer" />
+                            </template>
+                          </q-select>
+                        </div>
+                        <!-- <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
+                          <input
+                            type="color"
+                            v-model="
+                              dashboardPanelData.data.fields.y[props.pageIndex]
+                                .color
+                            "
+                          />
+                        </div> -->
+                      </div>
+                      <q-input
+                        dense
+                        filled
+                        label="Label"
+                        v-if="!dashboardPanelData.layout.showCustomQuery"
+                        v-model="
+                          dashboardPanelData.data.fields.x[props.pageIndex]
+                            .label
+                        "
+                        :rules="[ val => val.length > 0 || 'Required' , val => !val.includes(' ') || 'use _ instead of <space>' ]"
+                      />
                     </div>
                   </q-td>
                 </q-tr>
@@ -195,7 +251,7 @@
                           dashboardPanelData.data.fields.y[props.pageIndex]
                             .label
                         "
-                        :rules="[ val => val.length > 0 || 'Required' ]"
+                        :rules="[ val => val.length > 0 || 'Required' , val => !val.includes(' ') || 'use _ instead of <space>' ]"
                       />
                     </div>
                   </q-td>
@@ -485,6 +541,7 @@ export default defineComponent({
       addFilteredItem,
     } = useDashboardPanelData();
     const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
+    const triggerOperatorsWithHistogram: any = ref(["histogram","count", "sum", "avg", "min", "max"]);
 
     watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
       if(oldVal == false && newVal == true) {
@@ -573,7 +630,8 @@ export default defineComponent({
       onDragEnter,
       handler2,
       currentDragArea,
-      expansionItems
+      expansionItems,
+      triggerOperatorsWithHistogram
     };
   },
 });

@@ -120,7 +120,7 @@
       </grid-layout>
     </div>
     <div>
-      <q-h3 no-caps:label="getDashboard"></q-h3>
+      <!-- <q-h3 no-caps:label="getDashboard"></q-h3> -->
     </div>
   </q-page>
 </template>

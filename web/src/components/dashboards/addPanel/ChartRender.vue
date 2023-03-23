@@ -59,6 +59,8 @@ import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import queryService from "../../../services/nativequery";
 import Plotly from "plotly.js";
+import moment from "moment";
+   
 
 export default defineComponent({
   name: "ChartRender",
@@ -109,11 +111,12 @@ export default defineComponent({
     // If query changes, we need to get the data again and rerender the chart
     watch(
       () => [props.data, props.selectedTimeDate],
-      () => {
+      async () => {
         if (props.data.query) {
           fetchQueryData();
           updateTableColumns();
         } else {
+          await nextTick();
           Plotly.react(
             plotRef.value,
             [],
@@ -241,7 +244,7 @@ export default defineComponent({
       let traces;
 
       //generate the traces value f chart
-      traces = yAxisKeys.map((key: any) => {
+      traces = yAxisKeys?.map((key: any) => {
         const trace = {
           name: props.data.fields?.y.find((it: any) => it.label == key).column,
           ...getTraceValuesByChartType(xAxisKey, key),
@@ -268,10 +271,12 @@ export default defineComponent({
           bgcolor: "#f7f7f7",
         },
         xaxis: {
+          title: props.data.fields?.x[0].label,
           tickangle: -20,
           automargin: true,
         },
         yaxis: {
+          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
           automargin: true,
         },
         margin: {
@@ -310,17 +315,61 @@ export default defineComponent({
 
     // get the x axis key
     const getXAxisKey = () => {
-      return props.data.fields.x.map((it: any) => it.label)[0];
+      return props.data.fields?.x?.length ? props.data.fields?.x.map((it: any) => it.label)[0] : "";
     };
 
     // get the y axis key
     const getYAxisKeys = () => {
-      return props.data.fields.y.map((it: any) => it.label);
+      return props.data.fields?.y?.length ? props.data.fields?.y.map((it: any) => it.label) : [];
     };
 
     // get the axis data using key
     const getAxisDataFromKey = (key: string) => {
-      return searchQueryData.data.map((item) => item[key]);
+      let result : string[]= searchQueryData.data.map((item) => item[key]);
+      // check for the histogram _timestamp field
+       // If histogram _timestamp field is found, format the date labels
+        const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
+        if(field && field.label == key) {
+          // get the format
+          const timestamps = selectedTimeObj.value
+          let keyFormat = "HH:mm:ss";
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (
+            timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+            keyFormat = "YYYY-MM-DD";
+          }
+
+          // now we have the format, convert that format
+          result = result.map((it: any) => moment(it + "Z").format(keyFormat))
+        }
+        
+        return result
     };
 
     // return chart type based on selected chart

@@ -72,6 +72,10 @@ const useDashboardPanelData = () => {
     // console.log("updated...",dashboardPanelData);
   };
 
+  const generateLabelFromName = (name: string) => {
+    return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join('_')
+  }
+
   const addXAxisItem = (name: string) => {
     if(!dashboardPanelData.data.fields.x) {
       dashboardPanelData.data.fields.x = []
@@ -85,10 +89,10 @@ const useDashboardPanelData = () => {
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.x.push({
-        label: 'x_axis_' + dashboardPanelData.data.fields.x.length,
+        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
         column: name,
         color: null,
-        aggregationFunction: null
+        aggregationFunction: (name == '_timestamp') ? 'histogram' : null
       })
     }
   }
@@ -100,7 +104,7 @@ const useDashboardPanelData = () => {
 
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.y.push({
-        label: 'y_axis_' + dashboardPanelData.data.fields.y.length,
+        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
         column: name,
         color: '#5960b2',
         aggregationFunction: 'count'
