@@ -598,8 +598,8 @@ impl Sql {
     pub async fn filter_source_by_partition_key(&self, source: &str) -> bool {
         // check partition key
         for key in &self.meta.quick_text {
-            let field = logs::get_partition_key_str(format!("{}=", key.0).as_str());
-            let value = logs::get_partition_key_str(format!("{}={}", key.0, key.1).as_str());
+            let field = logs::get_partition_key_query(format!("{}=", key.0).as_str());
+            let value = logs::get_partition_key_query(format!("{}={}", key.0, key.1).as_str());
             if str::find(source, format!("/{}", field).as_str())
                 && !str::find(source, format!("/{}/", value).as_str())
             {

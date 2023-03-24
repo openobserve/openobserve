@@ -157,9 +157,19 @@ async fn get_stream_partition_keys(
     keys
 }
 
-// generate partition key for the record
-pub fn get_partition_key_str(s: &str) -> String {
+// generate partition key for record
+pub fn get_partition_key_record(s: &str) -> String {
     let s = s.replace(['/', '_'], ".");
+    if s.len() > 100 {
+        s[0..100].to_string()
+    } else {
+        s
+    }
+}
+
+// generate partition key for query
+pub fn get_partition_key_query(s: &str) -> String {
+    let s = s.replace(['/', '.'], "_");
     if s.len() > 100 {
         s[0..100].to_string()
     } else {
@@ -409,7 +419,7 @@ fn get_hour_key(
                 } else {
                     format!("{}={}", key, v)
                 };
-                hour_key.push_str(&format!("_{}", get_partition_key_str(&val)));
+                hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
             }
             None => continue,
         };

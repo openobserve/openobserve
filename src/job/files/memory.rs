@@ -93,7 +93,8 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         partitions.retain(|&x| x.contains('='));
         let mut partition_key = String::from("");
         for key in partitions {
-            partition_key.push_str(key);
+            let key = key.replace('.', "_");
+            partition_key.push_str(&key);
             partition_key.push('/');
         }
 
