@@ -13,66 +13,27 @@
 
     <q-separator style="width: 100%" />
 
-    <q-splitter
-      v-model="splitterModel"
-      unit="%"
-      style="min-height: calc(100vh - 122px)"
-    >
+    <q-splitter v-model="splitterModel" unit="%" style="min-height: calc(100vh - 122px)">
       <template v-slot:before>
         <div class="row q-pa-md">
           <div class="col-12 q-pb-md q-pt-sm">
-            <q-input
-              v-model="formData.name"
-              :label="t('alerts.name')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-            />
+            <q-input v-model="formData.name" :label="t('alerts.name')" color="input-border" bg-color="input-bg"
+              class="showLabelOnTop" stack-label outlined filled dense v-bind:readonly="isUpdatingTemplate"
+              v-bind:disable="isUpdatingTemplate" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
           </div>
           <div class="col-12 q-pb-md q-pt-xs">
             <div class="q-pb-sm text-bold">
               {{ t("alert_templates.body") }}
             </div>
-            <div
-              ref="editorRef"
-              id="editor"
-              :label="t('alerts.sql')"
-              stack-label
-              @keyup="editorUpdate"
-              @paste="handleEditorPasteEvent"
-              style="border: 1px solid #dbdbdb; border-radius: 5px"
-              class="q-py-sm showLabelOnTop"
-              resize
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
+            <div ref="editorRef" id="editor" :label="t('alerts.sql')" stack-label @keyup="editorUpdate"
+              @paste="handleEditorPasteEvent" style="border: 1px solid #dbdbdb; border-radius: 5px"
+              class="q-py-sm showLabelOnTop" resize :rules="[(val: any) => !!val || 'Field is required!']" />
           </div>
           <div class="col-12 flex justify-center q-mt-lg">
-            <q-btn
-              v-close-popup
-              class="q-mb-md text-bold no-border"
-              :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              color="accent"
-              no-caps
-              @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              @click="saveTemplate"
-              no-caps
-            />
+            <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('alerts.cancel')" text-color="light-text"
+              padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
+            <q-btn :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+              @click="saveTemplate" no-caps />
           </div>
         </div>
       </template>
@@ -93,24 +54,15 @@
             <div class="text-bold text-body-1 q-pb-sm">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
-            <div
-              v-for="template in sampleTemplates"
-              class="q-pb-md"
-              :key="template.name"
-            >
+            <div v-for="template in sampleTemplates" class="q-pb-md" :key="template.name">
               <div class="flex justify-between items-center">
                 <div class="q-pb-xs">{{ template.name }}</div>
-                <q-icon
-                  class="cursor-pointer"
-                  name="content_copy"
-                  size="14px"
-                  @click="copyTemplateBody(template.body)"
-                />
+                <q-icon class="cursor-pointer" name="content_copy" size="14px" @click="copyTemplateBody(template.body)" />
               </div>
               <div class="bg-blue-grey-1 q-px-sm rounded-borders">
                 <pre class="example-template-body q-my-0">
-                  {{ template.body }}
-                </pre>
+                    {{ template.body }}
+                  </pre>
               </div>
             </div>
           </div>
@@ -165,15 +117,15 @@ const sampleTemplates = [
 [
   {
     "labels": {
-      "alertname": "{ alert_name }",
-      "stream": "{ stream_name }",
-      "organization": "{ org_name }",
-      "alerttype": "{ alert_type }",
-      "severity": "critical",
+        "alertname": "{alert_name}",
+        "stream": "{stream_name}",
+        "organization": "{org_name}",
+        "alerttype": "{alert_type}",
+        "severity": "critical"
     },
     "annotations": {
-      "timestamp": "{ timestamp }",
-    },
+        "timestamp": "{timestamp}"
+    }
   }
 ]`,
   },
@@ -306,6 +258,7 @@ const copyTemplateBody = (text: any) => {
   overflow: auto;
   max-height: 350px;
 }
+
 .example-template-body {
   font-size: 10px;
 }
