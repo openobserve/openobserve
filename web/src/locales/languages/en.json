@@ -360,7 +360,12 @@
       "cancel": "Cancel",
       "addTitle": "Add Template",
       "updateTitle": "Update Template",
-      "delete": "Delete"
+      "delete": "Delete",
+      "stream_name_variable": "stream_name",
+      "org_name_variable": "org_name",
+      "alert_name_variable": "alert_name",
+      "alert_type_variable": "alert_type",
+      "timestamp_variable": "timestamp"
     },
     "alert_destinations": {
       "header": "Destinations",
