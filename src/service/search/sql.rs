@@ -128,9 +128,6 @@ impl Sql {
         }
 
         // check aggs
-        if !req_aggs.is_empty() && meta.limit > 0 {
-            track_total_hits = true;
-        }
         for sql in req_aggs.values() {
             if !re1.is_match(sql.as_str()) {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
@@ -449,6 +446,9 @@ impl Sql {
         }
 
         // Hack for aggregation
+        if !req_aggs.is_empty() && meta.limit > 0 {
+            track_total_hits = true;
+        }
         if track_total_hits {
             req_aggs.insert(
                 "_count".to_string(),
