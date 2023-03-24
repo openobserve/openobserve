@@ -22,7 +22,7 @@
       style="margin: 0 auto; display: block"
     />
   </div>
-  <div style="margin-top: -40px;">
+  <div style="margin-top: -40px; height: calc(100% - 40px);">
     <div v-if="props.data.type == 'table'" class="q-pa-md">
       <q-table
         class="my-sticky-virtscroll-table"
@@ -37,8 +37,8 @@
       >
       </q-table>
     </div>
-    <div v-else>
-      <div ref="plotRef" :id="chartID" class="plotlycontainer"></div>
+    <div v-else style="height: 100%;">
+      <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
     </div>
   </div>
 </template>

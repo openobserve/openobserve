@@ -38,15 +38,15 @@
         <q-td :props="props">
           <q-btn
             v-if="props.row.actions == 'true'"
-            :icon="'img:' + getImageURL('images/common/remove_icon.svg')"
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
             :title="t('dashboard.delete')"
-            class="iconHoverBtn"
+            class="q-ml-xs iconHoverBtn"
             padding="sm"
             unelevated
             size="sm"
             round
             flat
-            @click.stop="removeDashboard(props)"
+            @click.stop="showDeleteDialogFn(props)"
           ></q-btn>
         </q-td>
       </template>
@@ -105,6 +105,13 @@
     >
       <AddDashboard @updated="updateDashboardList" />
     </q-dialog>
+    <ConfirmDialog
+      title="Delete dashboard"
+      message="Are you sure you want to delete dashboard?"
+      @update:ok="removeDashboard"
+      @update:cancel="confirmDeleteDialog = false"
+      v-model="confirmDeleteDialog"
+    />
   </q-page>
 </template>
 
@@ -122,6 +129,7 @@ import NoData from "../../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
 import { getImageURL } from "../../utils/zincutils";
+import ConfirmDialog from "../../components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "Dashboards",
@@ -129,7 +137,8 @@ export default defineComponent({
     AddDashboard,
     QTablePagination,
     NoData,
-  },
+    ConfirmDialog
+},
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -139,6 +148,8 @@ export default defineComponent({
     const qTable: any = ref(null);
     const router = useRouter();
     const orgData: any = ref(store.state.selectedOrganization);
+    const confirmDeleteDialog = ref<boolean>(false);
+    const selectedDelete = ref(null)
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -277,27 +288,34 @@ export default defineComponent({
       });
     });
 
-    const removeDashboard = async (props: any) => {
-      const dashboardId = props.key;
-      await dashboardService
-        .delete(store.state.selectedOrganization.identifier, dashboardId)
-        .then((res) => {
-          const dashboardList = JSON.parse(
-            JSON.stringify(toRaw(store.state.allDashboardList))
-          );
-          const newDashboardList = dashboardList.filter(
-            (dashboard) => dashboard.name != dashboardId
-          );
-          store.dispatch("setAllDashboardList", newDashboardList);
-          $q.notify({
-            type: "positive",
-            message: "Dashboard deleted successfully.",
-            timeout: 5000,
+    const removeDashboard = async () => {
+      if(selectedDelete.value){
+        const dashboardId = selectedDelete.value.id;
+        await dashboardService
+          .delete(store.state.selectedOrganization.identifier, dashboardId)
+          .then((res) => {
+            const dashboardList = JSON.parse(
+              JSON.stringify(toRaw(store.state.allDashboardList))
+            );
+            const newDashboardList = dashboardList.filter(
+              (dashboard) => dashboard.name != dashboardId
+            );
+            store.dispatch("setAllDashboardList", newDashboardList);
+            $q.notify({
+              type: "positive",
+              message: "Dashboard deleted successfully.",
+              timeout: 5000,
+            });
+          })
+          .catch((error) => {
+            // console.log(error);
           });
-        })
-        .catch((error) => {
-          // console.log(error);
-        });
+        }
+    };
+
+    const showDeleteDialogFn = (props: any) => {
+      selectedDelete.value = props.row;
+      confirmDeleteDialog.value = true;
     };
 
     return {
@@ -320,6 +338,8 @@ export default defineComponent({
       maxRecordToReturn,
       changeMaxRecordToReturn,
       routeToViewD,
+      showDeleteDialogFn,
+      confirmDeleteDialog,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
