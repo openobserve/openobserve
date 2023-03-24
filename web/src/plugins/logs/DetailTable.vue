@@ -89,7 +89,7 @@
                 <q-item-section class="col-3">{{ value }}</q-item-section>
                 <q-item-section
                   class="col-9"
-                  :class="shouldWrapValues ? 'ellipsis' : ''"
+                  :class="!shouldWrapValues ? 'ellipsis' : ''"
                   style="display: inline;relative"
                 >
                   <q-btn-dropdown
@@ -151,7 +151,7 @@
                   <pre
                     class="table-pre"
                     :style="{
-                      'white-space': shouldWrapValues ? 'nowrap' : 'pre-wrap',
+                      'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
                     }"
                     >{{ key }}</pre
                   >
@@ -291,11 +291,11 @@ export default defineComponent({
     const tab = ref("table");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
-    const shouldWrapValues: any = ref(true);
+    const shouldWrapValues: any = ref(false);
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
-        window.localStorage.setItem("wrap-log-details", "true");
+        window.localStorage.setItem("wrap-log-details", "false");
       }
       shouldWrapValues.value =
         window.localStorage.getItem("wrap-log-details") === "true";
