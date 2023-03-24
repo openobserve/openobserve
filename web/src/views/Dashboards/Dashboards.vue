@@ -358,13 +358,18 @@ export default defineComponent({
   },
   methods: {
     //after adding dashboard need to update the dashboard list
-    updateDashboardList() {
+    async updateDashboardList(it: any) {
       this.showAddDashboardDialog = false;
-      this.getDashboards();
+      await this.getDashboards();
 
       this.$q.notify({
         type: "positive",
         message: `Dashboard added successfully.`,
+      });
+
+      this.$router.push({
+        path: "/dashboards/view",
+        query: { dashboard: it },
       });
     },
     onRowClick(evt, row) {
