@@ -89,6 +89,14 @@ jobs:
           unzip protoc-21.12-linux-x86_64.zip -d protoc
           sudo cp protoc/bin/protoc /usr/local/bin/
           sudo cp -r protoc/include/google /usr/local/include/
+      
+      - name: Install Protoc for musl
+        if: contains(matrix.arch, 'linux') && endsWith(matrix.arch, '-musl')
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
 
       - name: Install Protoc for windows
         if: contains(matrix.arch, 'windows')
