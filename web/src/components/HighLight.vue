@@ -16,7 +16,9 @@
 <template>
   <div>
     <span v-for="item in list" :key="item.key" v-bind="item">
-      <span :title="title" v-if="item.isKeyWord" class="highlight">{{ item.text }}</span>
+      <span :title="title" v-if="item.isKeyWord" class="highlight">{{
+        item.text
+      }}</span>
       <span :title="title" v-else>{{ item.text }}</span>
     </span>
   </div>
@@ -85,8 +87,13 @@ export default defineComponent({
         let j = 0;
         while (j < arr.length) {
           let rec = arr[j];
-          let record = rec.text.split(keyword);
-          if (record.length > 1) {
+          let record = rec.text?.split(keyword);
+
+          if (
+            record != undefined &&
+            typeof record == "object" &&
+            record.length > 1
+          ) {
             // delete j replace by new
             arr.splice(j, 1);
             let recKeyword = {
@@ -105,7 +112,11 @@ export default defineComponent({
               }
             }
           }
-          j = j + record.length;
+          if (record != undefined && typeof record == "object") {
+            j = j + record.length;
+          } else {
+            j++;
+          }
         }
       }
       return arr;
