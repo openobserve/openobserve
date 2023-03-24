@@ -304,6 +304,12 @@ export default defineComponent({
         )
         .then((res) => {
           getSchema();
+          q.notify({
+            color: "positive",
+            message: "Stream settings updated successfully.",
+            timeout: 2000,
+          });
+
           segment.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
