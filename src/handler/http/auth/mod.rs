@@ -68,7 +68,7 @@ pub async fn validate_credentials(
         if user.is_none() {
             return Ok(false);
         }
-    } else if path.ends_with("/organizations") {
+    } else if ep_suffix.eq("/organizations") {
         let db_user = db::user::get_db_user(user_id).await;
         user = match db_user {
             Ok(user) => {
