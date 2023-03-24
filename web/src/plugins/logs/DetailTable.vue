@@ -49,6 +49,7 @@
           label="Wrap"
           color="primary"
           size="xs"
+          @update:model-value="toggleWrapLogDetails"
         />
       </div>
     </div>
@@ -227,7 +228,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../utils/zincutils";
@@ -292,6 +293,21 @@ export default defineComponent({
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
 
+    onBeforeMount(() => {
+      if (window.localStorage.getItem("wrap-log-details") === null) {
+        window.localStorage.setItem("wrap-log-details", "true");
+      }
+      shouldWrapValues.value =
+        window.localStorage.getItem("wrap-log-details") === "true";
+    });
+
+    const toggleWrapLogDetails = () => {
+      window.localStorage.setItem(
+        "wrap-log-details",
+        shouldWrapValues.value ? "true" : "false"
+      );
+    };
+
     const flattenJSONObject = (obj: any, param: string) => {
       let newObj: any = {};
       for (let key in obj) {
@@ -319,6 +335,7 @@ export default defineComponent({
       recordSizeOptions,
       getImageURL,
       shouldWrapValues,
+      toggleWrapLogDetails,
     };
   },
   async created() {
