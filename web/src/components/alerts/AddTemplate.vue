@@ -300,7 +300,7 @@ const copyTemplateBody = (text: any) => {
 <style lang="scss" scoped>
 #editor {
   width: 100%;
-  min-height: 5rem;
+  min-height: 310px;
   padding-bottom: 14px;
   resize: vertical;
   overflow: auto;
