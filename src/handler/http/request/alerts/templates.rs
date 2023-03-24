@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::{meta::alert::DestinationTemplate, service::alerts::templates};
 
-/** Create new alert templates for an organization */
+/** Create new alert template */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -63,7 +63,7 @@ async fn list_templates(path: web::Path<String>) -> impl Responder {
     templates::list_templates(org_id).await
 }
 
-/** Get alert template by template name */
+/** Get alert template by name */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -86,7 +86,7 @@ async fn get_template(path: web::Path<(String, String)>) -> impl Responder {
     templates::get_template(org_id, name).await
 }
 
-/** Delete alert template by alert template name */
+/** Delete alert template by alert name */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

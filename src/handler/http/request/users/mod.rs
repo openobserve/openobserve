@@ -70,7 +70,7 @@ pub async fn save(
     users::post_user(&org_id, user).await
 }
 
-/** Update existing user belonging to an organization */
+/** Update existing user */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
