@@ -68,6 +68,19 @@ pub async fn validate_credentials(
         if user.is_none() {
             return Ok(false);
         }
+    } else if ep_suffix.eq("/organizations") {
+        let db_user = db::user::get_db_user(user_id).await;
+        user = match db_user {
+            Ok(user) => {
+                let all_users = user.get_all_users();
+                if all_users.is_empty() {
+                    None
+                } else {
+                    all_users.first().cloned()
+                }
+            }
+            Err(_) => None,
+        }
     } else {
         user = match path.find('/') {
             Some(index) => {
@@ -75,8 +88,8 @@ pub async fn validate_credentials(
                 users::get_user(Some(org_id), user_id).await
             }
             None => users::get_user(None, user_id).await,
-        };
-    }
+        }
+    };
 
     if user.is_none() {
         return Ok(false);
