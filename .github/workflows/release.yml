@@ -97,6 +97,7 @@ jobs:
           unzip protoc-21.12-linux-x86_64.zip -d protoc
           sudo cp protoc/bin/protoc /usr/local/bin/
           sudo cp -r protoc/include/google /usr/local/include/
+          sudo apt-get install musl-tools
 
       - name: Install Protoc for windows
         if: contains(matrix.arch, 'windows')
