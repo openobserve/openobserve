@@ -92,7 +92,13 @@
             >
               <h5 class="text-center">No result found.</h5>
             </div>
-            <div v-show="searchObj.data.errorMsg == ''">
+            <div
+              v-show="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length !== 0 &&
+                searchObj.loading == false
+              "
+            >
               <search-result
                 ref="searchResultRef"
                 @update:datetime="searchData"
