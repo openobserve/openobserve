@@ -137,8 +137,8 @@ export default defineComponent({
     AddDashboard,
     QTablePagination,
     NoData,
-    ConfirmDialog
-},
+    ConfirmDialog,
+  },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -149,7 +149,7 @@ export default defineComponent({
     const router = useRouter();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
-    const selectedDelete = ref(null)
+    const selectedDelete = ref(null);
 
     const columns = ref<QTableProps["columns"]>([
       {
@@ -169,13 +169,6 @@ export default defineComponent({
         name: "identifier",
         field: "identifier",
         label: t("dashboard.identifier"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "role",
-        field: "role",
-        label: t("dashboard.role"),
         align: "left",
         sortable: true,
       },
@@ -282,14 +275,13 @@ export default defineComponent({
           description: jsonDataOBj.description,
           owner: jsonDataOBj.owner,
           created: date.formatDate(jsonDataOBj.created, "YYYY-MM-DDTHH:mm:ssZ"),
-          role: jsonDataOBj.role,
           actions: "true",
         };
       });
     });
 
     const removeDashboard = async () => {
-      if(selectedDelete.value){
+      if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
           .delete(store.state.selectedOrganization.identifier, dashboardId)
@@ -310,7 +302,7 @@ export default defineComponent({
           .catch((error) => {
             // console.log(error);
           });
-        }
+      }
     };
 
     const showDeleteDialogFn = (props: any) => {
