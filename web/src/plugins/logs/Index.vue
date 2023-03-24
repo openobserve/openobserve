@@ -86,7 +86,8 @@
             <div
               v-else-if="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults.hits.length == 0
+                searchObj.data.queryResults.hits.length == 0 &&
+                searchObj.loading == false
               "
             >
               <h5 class="text-center">No result found.</h5>
@@ -563,17 +564,24 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL = parser.astify(searchObj.data.query);
           if (parsedSQL.limit != null) {
-            $q.notify({
-              message: "Limit clause is not allowed in the query.",
-              color: "negative",
-              position: "top",
-              timeout: 2000,
-            });
+            req.query.size = parsedSQL.limit.value[0].value;
 
-            return null;
+            if (parsedSQL.limit.seperator == "offset") {
+              req.query.from = parsedSQL.limit.value[1].value || 0;
+            }
+
+            parsedSQL.limit = null;
+
+            query = parser.sqlify(parsedSQL);
+
+            //replace backticks with \" for sql_mode
+            query = query.replace(/`/g, '"');
+            searchObj.loading = true;
+            searchObj.data.queryResults.hits = [];
+            searchObj.data.queryResults.total = 0;
           }
 
-          req.query.sql = query + " limit " + req.query.size;
+          req.query.sql = query;
           req.query["sql_mode"] = "full";
           delete req.aggs;
         } else {
