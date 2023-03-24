@@ -19,21 +19,26 @@
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
-        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" outline icon="arrow_back_ios_new" />
+        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
         <span class="q-table__title q-mx-md q-mt-xs">{{ list[0].title }}</span>
       </div>
-      <div class="flex items-baseline q-gutter-sm">
-        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
-          :label="t('panel.add')" @click="addPanelData" />
-        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
+      <div class="flex">
+        <q-btn outline padding="xs" color="primary" text-color="black" no-caps icon="add" @click="addPanelData">
+          <q-tooltip>{{ t('panel.add') }}</q-tooltip>
+        </q-btn>
+        <!-- <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
           :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)" @click="isDraggableClick" />
         <q-btn class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg" color="secondary" no-caps :disable="!draggable"
-          :label="t(`panel.save`)" @click="saveDashboardOnClick" />
-        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="red" no-caps
-          :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" />
+          :label="t(`panel.save`)" @click="saveDashboardOnClick" /> -->
+        <!-- <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="red" no-caps
+          :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" /> -->
         <!--<q-btn class="q-ml-md q-mb-xs text-bold" padding="sm lg" color="white" no-caps
             :label="t(`dashboard.goBackToDashboard`)" outline text-color="black" @click="goBackToDashboardList" />-->
-        <date-time ref="refDateTime" @date-change="dateChange" />
+        <date-time
+          class="q-ml-sm"
+          ref="refDateTime"
+          @date-change="dateChange"
+        />
       </div>
     </div>
     <q-separator></q-separator>
@@ -49,7 +54,7 @@
           :i="getPanelLayout(list[0].layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" @resize="resizeEvent"
           @move="moveEvent" @resized="resizedEvent" @container-resized="containerResizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
-          <div>
+          <div style="height: 100%;">
             <PanelContainer @updated:chart="onUpdatePanel" :draggable="draggable" :data="item"
               :selectedTimeDate="currentTimeObj">
             </PanelContainer>
@@ -76,7 +81,6 @@ import {
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import dashboardService from "../../services/dashboards";
 import DateTime from "../../components/DateTime.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
@@ -109,7 +113,6 @@ export default defineComponent({
     const refDateTime: any = ref(null);
     const $q = useQuasar();
     let currentTimeObj: any = ref({});
-    // let showNewPanel = ref(true)
 
     const initialDateValue = {
       tab: "relative",
@@ -140,32 +143,33 @@ export default defineComponent({
     };
 
     // delete dashboard remove the data from database and update store variable and redirect to dashboardList page
-    const deleteDashboard = async (dashboardId: String) => {
-      await dashboardService
-        .delete(store.state.selectedOrganization.identifier, dashboardId)
-        .then((res) => {
-          const dashboardList = JSON.parse(
-            JSON.stringify(toRaw(store.state.allDashboardList))
-          );
-          const newDashboardList = dashboardList.filter(
-            (dashboard) => dashboard.name != dashboardId
-          );
-          store.dispatch("setAllDashboardList", newDashboardList);
-          $q.notify({
-            type: "positive",
-            message: "Dashboard deleted successfully.",
-            timeout: 5000,
-          });
-        });
-      goBack();
-    };
+    // const deleteDashboard = async (dashboardId: String) => {
+    //   await dashboardService
+    //     .delete(store.state.selectedOrganization.identifier, dashboardId)
+    //     .then((res) => {
+    //       const dashboardList = JSON.parse(
+    //         JSON.stringify(toRaw(store.state.allDashboardList))
+    //       );
+    //       const newDashboardList = dashboardList.filter(
+    //         (dashboard) => dashboard.name != dashboardId
+    //       );
+    //       store.dispatch("setAllDashboardList", newDashboardList);
+    //       $q.notify({
+    //         type: "positive",
+    //         message: "Dashboard deleted successfully.",
+    //         timeout: 5000,
+    //       });
+    //     });
+    //   goBack();
+    // };
 
     const deleteDashboardOnClick = async () => {
       await deleteDashboard(route.query.dashboard);
     };
 
     // save the dashboard value
-    const saveDashboard = async (dashboardId: String) => {
+    const saveDashboard = async () => {
+      const dashboardId = route.query.dashboard
       await updateDashboard(
         store,
         store.state.selectedOrganization.identifier,
@@ -173,10 +177,10 @@ export default defineComponent({
         currentDashboardData.data
       );
 
-      currentDashboardData.data = await getDashboard(
-        store,
-        dashboardId
-      );
+      // currentDashboardData.data = await getDashboard(
+      //   store,
+      //   dashboardId
+      // );
 
       $q.notify({
         type: "positive",
@@ -186,14 +190,6 @@ export default defineComponent({
 
     };
 
-    const saveDashboardOnClick = async () => {
-      saveDashboard(route.query.dashboard);
-    };
-
-    // //get current dashboard Id
-    // const getDashboard = () => {
-    //   return currentDashboardData.data.dashboardId;
-    // };
 
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
@@ -222,9 +218,10 @@ export default defineComponent({
       goBack,
       getDashboard,
       dateVal: initialDateValue,
-      deleteDashboard,
+      // deleteDashboard,
       addNewPanel,
-      saveDashboardOnClick,
+      // saveDashboardOnClick,
+      saveDashboard,
       store,
       refDateTime,
       filterQuery: ref(""),
@@ -246,7 +243,7 @@ export default defineComponent({
   data() {
     return {
       computedTimeObj: Date.now(),
-      draggable: false,
+      draggable: true,
       index: 0,
       eventLog: [],
     };
@@ -287,6 +284,7 @@ export default defineComponent({
     movedEvent: function (i, newX, newY) {
       const msg = "MOVED i=" + i + ", X=" + newX + ", Y=" + newY;
       this.eventLog.push(msg);
+      this.saveDashboard()
     },
     resizeEvent: function (i, newH, newW, newHPx, newWPx) {
       const msg =
@@ -316,6 +314,7 @@ export default defineComponent({
         ", W(px)=" +
         newWPx;
       this.eventLog.push(msg);
+      this.saveDashboard()
     },
     containerResizedEvent: function (i, newH, newW, newHPx, newWPx) {
       const msg =
@@ -374,7 +373,7 @@ export default defineComponent({
         case "pie":
         case "scatter":
         case "table":
-          return 13;
+          return 4;
           break;
 
         default:
