@@ -171,7 +171,7 @@ export default defineComponent({
       });
     },
     onSubmit() {
-      let newDashId = ""
+      let newDashId = "";
 
       const dismiss = this.$q.notify({
         spinner: true,
@@ -187,22 +187,16 @@ export default defineComponent({
         delete this.dashboardData.id;
 
         if (dashboardId == "") {
+          const obj = toRaw(this.dashboardData);
           const baseObj = {
-            title: "Experimental Dashboard 1",
-            dashboardId: "Dash_ID1",
-            description: "Monitoring Performance",
-            role: "User Dashboard",
-            owner: "abhattacharya",
-            created: "2022-11-26T18:46:19Z",
+            title: obj.name,
+            dashboardId: this.getRandInteger().toString(),
+            description: obj.description,
+            role: "",
+            owner: this.store.state.userInfo.name,
+            created: new Date().toISOString(),
             panels: [],
           };
-          const obj = toRaw(this.dashboardData);
-          baseObj.title = obj.name;
-          baseObj.description = obj.description;
-          newDashId = "DashID_" + this.getRandInteger();
-          baseObj.dashboardId = newDashId
-          baseObj.created = new Date().toISOString();
-          baseObj.owner = this.store.state.userInfo.name
 
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
