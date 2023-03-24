@@ -171,6 +171,8 @@ export default defineComponent({
       });
     },
     onSubmit() {
+      let newDashId = ""
+
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -197,7 +199,8 @@ export default defineComponent({
           const obj = toRaw(this.dashboardData);
           baseObj.title = obj.name;
           baseObj.description = obj.description;
-          baseObj.dashboardId = "DashID_" + this.getRandInteger();
+          newDashId = "DashID_" + this.getRandInteger();
+          baseObj.dashboardId = newDashId
           baseObj.created = new Date().toISOString();
           baseObj.owner = this.store.state.userInfo.name
 
@@ -217,7 +220,7 @@ export default defineComponent({
             };
 
             this.$emit("update:modelValue", data);
-            this.$emit("updated");
+            this.$emit("updated", newDashId);
             // console.log("Done saving");
             this.addDashboardForm.resetValidation();
             dismiss();
