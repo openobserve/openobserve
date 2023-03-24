@@ -29,6 +29,8 @@ use crate::infra::errors;
 pub struct HttpResponse {
     pub code: u16,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_detail: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,13 +42,18 @@ pub struct ESResponse {
 
 impl HttpResponse {
     pub fn message(code: u16, message: String) -> Self {
-        HttpResponse { code, message }
+        HttpResponse {
+            code,
+            message,
+            error_detail: None,
+        }
     }
 
     pub fn error(code: u16, error: String) -> Self {
         HttpResponse {
             code,
             message: error,
+            error_detail: None,
         }
     }
 
@@ -54,6 +61,7 @@ impl HttpResponse {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
+            error_detail: Some(err.get_error_detail()),
         }
     }
 }

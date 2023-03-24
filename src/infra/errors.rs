@@ -89,8 +89,8 @@ impl ErrorCodes {
 
     pub fn get_message(&self) -> String {
         match self {
-            ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
-            ErrorCodes::SearchSQLNotValid(sql) => format!("Search SQL not valid: {}", sql),
+            ErrorCodes::ServerInternalError(_) => "Server Internal Error".to_string(),
+            ErrorCodes::SearchSQLNotValid(_) => "Search SQL not valid".to_string(),
             ErrorCodes::SearchStreamNotFound(stream) => {
                 format!("Search stream not found: {}", stream)
             }
@@ -105,9 +105,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
                 format!("Search field has no compatible data type: {}", field)
             }
-            ErrorCodes::SearchSQLExecuteError(msg) => {
-                format!("Search SQL execute error: {}", msg)
-            }
+            ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
         }
     }
 
@@ -125,13 +123,32 @@ impl ErrorCodes {
         }
     }
 
+    pub fn get_error_detail(&self) -> String {
+        match self {
+            ErrorCodes::ServerInternalError(msg) => msg.to_owned(),
+            ErrorCodes::SearchSQLNotValid(sql) => sql.to_owned(),
+            ErrorCodes::SearchStreamNotFound(_) => "".to_string(),
+            ErrorCodes::FullTextSearchFieldNotFound => "".to_string(),
+            ErrorCodes::SearchFieldNotFound(_) => "".to_string(),
+            ErrorCodes::SearchFunctionNotDefined(_) => "".to_string(),
+            ErrorCodes::SearchParquetFileNotFound => "".to_string(),
+            ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => "".to_string(),
+            ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
+        }
+    }
+
     pub fn to_json(&self) -> String {
-        format!(
-            r#"{{"code": {}, "message": "{}", "inner": "{}"}}"#,
-            self.get_code(),
-            self.get_message(),
-            self.get_inner_message()
-        )
+        let mut map = serde_json::Map::new();
+        map.insert("code".to_string(), serde_json::Value::from(self.get_code()));
+        map.insert(
+            "message".to_string(),
+            serde_json::Value::from(self.get_message()),
+        );
+        map.insert(
+            "inner".to_string(),
+            serde_json::Value::from(self.get_inner_message()),
+        );
+        serde_json::Value::Object(map).to_string()
     }
 
     pub fn from_json(json: &str) -> Result<ErrorCodes> {
