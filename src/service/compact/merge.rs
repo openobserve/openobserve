@@ -23,7 +23,6 @@ use tokio::time;
 use crate::common::json;
 use crate::infra::db::etcd::MAX_OPS_PER_TXN;
 use crate::infra::metrics;
-use crate::infra::storage::generate_partioned_file_key;
 use crate::infra::{cache, ider, storage};
 use crate::infra::{config::CONFIG, db::etcd};
 use crate::meta::common::{FileKey, FileMeta};
@@ -180,7 +179,7 @@ pub async fn merge_by_stream(
     }
 
     let storage = &storage::DEFAULT;
-    for (_, files_with_size) in partition_files_with_size.iter_mut() {
+    for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
         files_with_size.sort_by(|a, b| a.1.cmp(&b.1));
         loop {
@@ -192,6 +191,7 @@ pub async fn merge_by_stream(
                 stream_name,
                 stream_type,
                 schema.clone(),
+                prefix,
                 files_with_size,
             )
             .await?;
@@ -302,6 +302,7 @@ async fn merge_files(
     stream_name: &str,
     stream_type: StreamType,
     schema: Arc<Schema>,
+    prefix: &str,
     files_with_size: &Vec<(String, u64)>,
 ) -> Result<(String, FileMeta, Vec<String>), anyhow::Error> {
     if files_with_size.len() <= 1 {
@@ -390,14 +391,8 @@ async fn merge_files(
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
 
-    let new_file = generate_partioned_file_key(
-        org_id,
-        stream_name,
-        stream_type,
-        new_file_meta.min_ts,
-        &CONFIG.common.file_ext_parquet,
-    );
-    let new_file_key = format!("files/{}{}", new_file.0, new_file.1);
+    let id = ider::generate();
+    let new_file_key = format!("{}/{}{}", prefix, id, &CONFIG.common.file_ext_parquet);
 
     log::info!(
         "[COMPACT] merge file succeeded, new file: {}, orginal_size: {}, compressed_size: {}",

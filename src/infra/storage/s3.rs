@@ -167,7 +167,7 @@ impl FileStorage for S3 {
                 .await;
             match result {
                 Ok(_output) => {
-                    log::info!("s3 File delete succeeded: {:?}", files);
+                    log::info!("s3 File delete succeeded: {}", files.len());
                 }
                 Err(err) => {
                     log::error!("s3 File delete error: {:?}", err);
