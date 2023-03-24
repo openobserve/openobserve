@@ -18,8 +18,10 @@
 <template>
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
-      <q-btn no-caps color="primary" @click="goBackToDashboardList" flat>{{ t("panel.back") }}</q-btn>
-      <div class="q-table__title q-mr-md">{{ list[0].title }}</div>
+      <div class="flex">
+        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" outline icon="arrow_back_ios_new" />
+        <span class="q-table__title q-mx-md q-mt-xs">{{ list[0].title }}</span>
+      </div>
       <div class="flex items-baseline q-gutter-sm">
         <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
           :label="t('panel.add')" @click="addPanelData" />
