@@ -156,24 +156,26 @@ const sampleTemplates = [
     name: "Slack",
     body: `
 {
-  "text": "{alert_name} is active",    
+  "text": "{alert_name} is active",
 }`,
   },
   {
     name: "Alert Manager",
     body: `
-{
-  "labels": {
-    "alertname": "{ alert_name }",
-    "stream": "{ stream_name }",
-    "organization": "{ org_name }",
-    "alerttype": "{ alert_type }",
-    "severity": "critical",
-  },
-  "annotations": {
-    "timestamp": "{ timestamp }",
-  },
-}`,
+[
+  {
+    "labels": {
+      "alertname": "{ alert_name }",
+      "stream": "{ stream_name }",
+      "organization": "{ org_name }",
+      "alerttype": "{ alert_type }",
+      "severity": "critical",
+    },
+    "annotations": {
+      "timestamp": "{ timestamp }",
+    },
+  }
+]`,
   },
 ];
 onActivated(() => setupTemplateData());
