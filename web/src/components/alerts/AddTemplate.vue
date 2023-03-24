@@ -1,69 +1,122 @@
 <template>
-  <q-page class="q-pa-none q-pa-md" style="min-height: inherit">
-    <div class="row">
-      <div class="col-12 items-center no-wrap">
-        <div class="col">
-          <div v-if="isUpdatingTemplate" class="text-h6">
-            {{ t("alert_templates.updateTitle") }}
-          </div>
-          <div v-else class="text-h6">{{ t("alert_templates.addTitle") }}</div>
+  <q-page class="q-pa-none" style="min-height: inherit">
+    <div class="col-12 items-center no-wrap q-pt-md">
+      <div class="col">
+        <div v-if="isUpdatingTemplate" class="text-h6">
+          {{ t("alert_templates.updateTitle") }}
+        </div>
+        <div v-else class="text-h6">
+          {{ t("alert_templates.addTitle") }}
         </div>
       </div>
-
-      <q-separator style="width: 100%" />
-
-      <div class="col-12 q-pb-md q-pt-sm">
-        <q-input
-          v-model="formData.name"
-          :label="t('alerts.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="isUpdatingTemplate"
-          v-bind:disable="isUpdatingTemplate"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          tabindex="0"
-        />
-      </div>
-      <div class="col-12 q-pb-md q-pt-xs">
-        <div class="q-pb-sm text-bold">Body</div>
-        <div
-          ref="editorRef"
-          id="editor"
-          :label="t('alerts.sql')"
-          stack-label
-          @keyup="editorUpdate"
-          style="border: 1px solid #dbdbdb; border-radius: 5px"
-          class="q-py-sm showLabelOnTop"
-          resize
-          :rules="[(val: any) => !!val || 'Field is required!']"
-        />
-      </div>
     </div>
-    <div class="flex justify-center q-mt-lg">
-      <q-btn
-        v-close-popup
-        class="q-mb-md text-bold no-border"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        color="accent"
-        no-caps
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        @click="saveTemplate"
-        no-caps
-      />
-    </div>
+
+    <q-separator style="width: 100%" />
+
+    <q-splitter
+      v-model="splitterModel"
+      unit="%"
+      style="min-height: calc(100vh - 122px)"
+    >
+      <template v-slot:before>
+        <div class="row q-pa-md">
+          <div class="col-12 q-pb-md q-pt-sm">
+            <q-input
+              v-model="formData.name"
+              :label="t('alerts.name')"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdatingTemplate"
+              v-bind:disable="isUpdatingTemplate"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+            />
+          </div>
+          <div class="col-12 q-pb-md q-pt-xs">
+            <div class="q-pb-sm text-bold">
+              {{ t("alert_templates.body") }}
+            </div>
+            <div
+              ref="editorRef"
+              id="editor"
+              :label="t('alerts.sql')"
+              stack-label
+              @keyup="editorUpdate"
+              @paste="handleEditorPasteEvent"
+              style="border: 1px solid #dbdbdb; border-radius: 5px"
+              class="q-py-sm showLabelOnTop"
+              resize
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
+          </div>
+          <div class="col-12 flex justify-center q-mt-lg">
+            <q-btn
+              v-close-popup
+              class="q-mb-md text-bold no-border"
+              :label="t('alerts.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              color="accent"
+              no-caps
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              :label="t('alerts.save')"
+              class="q-mb-md text-bold no-border q-ml-md"
+              color="secondary"
+              padding="sm xl"
+              @click="saveTemplate"
+              no-caps
+            />
+          </div>
+        </div>
+      </template>
+      <template v-slot:after>
+        <div class="q-px-sm q-pt-sm">
+          <div class="text-bold q-py-sm q-px-xs text-subtitle2">
+            {{ t("alert_templates.variable_guide_header") }}
+          </div>
+          <q-separator style="width: 100%" />
+          <div class="q-py-md q-px-xs">
+            <div>{{ t("alert_templates.stream_name_variable") }}</div>
+            <div>{{ t("alert_templates.org_name_variable") }}</div>
+            <div>{{ t("alert_templates.alert_name_variable") }}</div>
+            <div>{{ t("alert_templates.alert_type_variable") }}</div>
+            <div>{{ t("alert_templates.timestamp_variable") }}</div>
+          </div>
+          <div class="q-pb-md q-px-xs">
+            <div class="text-bold text-body-1 q-pb-sm">
+              {{ t("alert_templates.variable_usage_examples") }}:
+            </div>
+            <div
+              v-for="template in sampleTemplates"
+              class="q-pb-md"
+              :key="template.name"
+            >
+              <div class="flex justify-between items-center">
+                <div class="q-pb-xs">{{ template.name }}</div>
+                <q-icon
+                  class="cursor-pointer"
+                  name="content_copy"
+                  size="14px"
+                  @click="copyTemplateBody(template.body)"
+                />
+              </div>
+              <div class="bg-blue-grey-1 q-px-sm rounded-borders">
+                <pre class="example-template-body q-my-0">
+                  {{ template.body }}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </q-splitter>
   </q-page>
 </template>
 <script lang="ts" setup>
@@ -75,17 +128,19 @@ import {
   onBeforeMount,
   onActivated,
   defineEmits,
+  nextTick,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const { t } = useI18n();
+const splitterModel: Ref<number> = ref(75);
 const formData: Ref<Template> = ref({
   name: "",
   body: "",
@@ -96,6 +151,33 @@ const editorRef: any = ref(null);
 let editorobj: any = null;
 const editorData = ref("");
 const isUpdatingTemplate = ref(false);
+const sampleTemplates = [
+  {
+    name: "Slack",
+    body: `
+{
+  "text": "{alert_name} is active",
+}`,
+  },
+  {
+    name: "Alert Manager",
+    body: `
+[
+  {
+    "labels": {
+      "alertname": "{ alert_name }",
+      "stream": "{ stream_name }",
+      "organization": "{ org_name }",
+      "alerttype": "{ alert_type }",
+      "severity": "critical",
+    },
+    "annotations": {
+      "timestamp": "{ timestamp }",
+    },
+  }
+]`,
+  },
+];
 onActivated(() => setupTemplateData());
 onBeforeMount(() => {
   setupTemplateData();
@@ -155,6 +237,13 @@ const setupTemplateData = () => {
 const editorUpdate = (e: any) => {
   formData.value.body = e.target.value;
 };
+
+const handleEditorPasteEvent = (e: any) => {
+  editorobj.setValue(e.clipboardData.getData("text/plain"));
+  nextTick(() => {
+    formData.value.body = e.clipboardData.getData("text/plain");
+  });
+};
 const isValidTemplate = computed(
   () => formData.value.name && formData.value.body
 );
@@ -178,7 +267,7 @@ const saveTemplate = () => {
       template_name: formData.value.name,
       data: {
         name: formData.value.name,
-        body: formData.value.body,
+        body: editorobj.getValue(),
       },
     })
     .then(() => {
@@ -198,6 +287,15 @@ const saveTemplate = () => {
       });
     });
 };
+const copyTemplateBody = (text: any) => {
+  copyToClipboard(JSON.parse(JSON.stringify(text))).then(() =>
+    q.notify({
+      type: "positive",
+      message: "Content Copied Successfully!",
+      timeout: 1500,
+    })
+  );
+};
 </script>
 <style lang="scss" scoped>
 #editor {
@@ -207,5 +305,8 @@ const saveTemplate = () => {
   resize: vertical;
   overflow: auto;
   max-height: 350px;
+}
+.example-template-body {
+  font-size: 10px;
 }
 </style>
