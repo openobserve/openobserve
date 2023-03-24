@@ -27,7 +27,7 @@ use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
 use crate::service::search as SearchService;
 
-/** Search using SQL against a stream data */
+/** Search stream data using SQL*/
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -191,7 +191,7 @@ pub async fn search(
     }
 }
 
-/** Search around a particular record for contextual result set */
+/** Search around a record*/
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",

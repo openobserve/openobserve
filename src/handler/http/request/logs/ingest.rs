@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::service::logs;
 
-/** Elasticsearch compatible _bulk ingestion API */
+/** ES compatible _bulk ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -44,7 +44,7 @@ pub async fn bulk(
     logs::bulk::ingest(&org_id, body, thread_id).await
 }
 
-/** ndjson (newline delimited json) multi ingestion API */
+/** ndjson multi ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -72,7 +72,7 @@ pub async fn multi(
     logs::multi::ingest(&org_id, &stream_name, body, thread_id).await
 }
 
-/** json ingestion API, accepts array of json records */
+/** json ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
