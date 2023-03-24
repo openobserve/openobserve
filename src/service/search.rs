@@ -694,9 +694,7 @@ pub fn handle_datafusion_error(err: DataFusionError) -> Error {
         let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
         return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
     }
-    Error::ErrorCode(ErrorCodes::ServerInternalError(
-        "sql execute error".to_string(),
-    ))
+    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
