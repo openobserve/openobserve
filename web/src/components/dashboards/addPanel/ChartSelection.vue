@@ -15,7 +15,7 @@
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 75px">
+    <div class="q-pa-none" style="max-width: 80px">
       <q-list separator>
         <q-item
           :class="
@@ -27,7 +27,7 @@
           v-ripple
           @click="$emit('update:selectedChartType', item.id)"
         >
-          <q-item-section class="q-pa-sm">
+          <q-item-section class="">
             <q-icon
               size="sm"
               color="primary"

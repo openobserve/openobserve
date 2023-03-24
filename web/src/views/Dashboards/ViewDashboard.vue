@@ -18,109 +18,47 @@
 <template>
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
-      <div class="q-table__title q-mr-md">{{ list[0].title }}</div>
+      <div class="flex">
+        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" outline icon="arrow_back_ios_new" />
+        <span class="q-table__title q-mx-md q-mt-xs">{{ list[0].title }}</span>
+      </div>
       <div class="flex items-baseline q-gutter-sm">
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="white"
-          text-color="black"
-          no-caps
-          :label="t('panel.add')"
-          @click="addPanelData"
-        />
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="white"
-          text-color="black"
-          no-caps
-          :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)"
-          @click="isDraggableClick"
-        />
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :disable="!draggable"
-          :label="t(`panel.save`)"
-          @click="saveDashboardOnClick"
-        />
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          outline
-          padding="sm lg"
-          color="red"
-          no-caps
-          :label="t(`dashboard.delete`)"
-          @click="deleteDashboardOnClick"
-        />
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold"
-          padding="sm lg"
-          color="white"
-          no-caps
-          :label="t(`dashboard.goBackToDashboard`)"
-          outline
-          text-color="black"
-          @click="goBackToDashboardList"
-        />
+        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
+          :label="t('panel.add')" @click="addPanelData" />
+        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
+          :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)" @click="isDraggableClick" />
+        <q-btn class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg" color="secondary" no-caps :disable="!draggable"
+          :label="t(`panel.save`)" @click="saveDashboardOnClick" />
+        <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="red" no-caps
+          :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" />
+        <!--<q-btn class="q-ml-md q-mb-xs text-bold" padding="sm lg" color="white" no-caps
+            :label="t(`dashboard.goBackToDashboard`)" outline text-color="black" @click="goBackToDashboardList" />-->
         <date-time ref="refDateTime" @date-change="dateChange" />
       </div>
     </div>
     <q-separator></q-separator>
     <div class="displayDiv">
-      <grid-layout
-        v-if="list[0].panels?.length > 0"
-        v-model:layout.sync="list[0].layouts"
-        :col-num="12"
-        :row-height="30"
-        :is-draggable="draggable"
-        :is-resizable="draggable"
-        :vertical-compact="true"
-        :autoSize="true"
-        :restore-on-drag="true"
-        :use-css-transforms="true"
-        @layout-created="layoutCreatedEvent"
-        @layout-before-mount="layoutBeforeMountEvent"
-        @layout-mounted="layoutMountedEvent"
-        @layout-ready="layoutReadyEvent"
-        @layout-updated="layoutUpdatedEvent"
-      >
-        <grid-item
-          class="plotlyBackground"
-          v-for="item in list[0].panels"
-          :key="item.id"
-          :x="getPanelLayout(list[0].layouts, item.id, 'x')"
-          :y="getPanelLayout(list[0].layouts, item.id, 'y')"
-          :w="getPanelLayout(list[0].layouts, item.id, 'w')"
-          :h="getPanelLayout(list[0].layouts, item.id, 'h')"
-          :i="getPanelLayout(list[0].layouts, item.id, 'i')"
-          :minH="getMinimumHeight(item.type)"
-          @resize="resizeEvent"
-          @move="moveEvent"
-          @resized="resizedEvent"
-          @container-resized="containerResizedEvent"
-          @moved="movedEvent"
-          drag-allow-from=".drag-allow"
-        >
+      <grid-layout v-if="list[0].panels?.length > 0" v-model:layout.sync="list[0].layouts" :col-num="12" :row-height="30"
+        :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
+        :restore-on-drag="true" :use-css-transforms="true" @layout-created="layoutCreatedEvent"
+        @layout-before-mount="layoutBeforeMountEvent" @layout-mounted="layoutMountedEvent"
+        @layout-ready="layoutReadyEvent" @layout-updated="layoutUpdatedEvent">
+        <grid-item class="plotlyBackground" v-for="item in list[0].panels" :key="item.id"
+          :x="getPanelLayout(list[0].layouts, item.id, 'x')" :y="getPanelLayout(list[0].layouts, item.id, 'y')"
+          :w="getPanelLayout(list[0].layouts, item.id, 'w')" :h="getPanelLayout(list[0].layouts, item.id, 'h')"
+          :i="getPanelLayout(list[0].layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" @resize="resizeEvent"
+          @move="moveEvent" @resized="resizedEvent" @container-resized="containerResizedEvent" @moved="movedEvent"
+          drag-allow-from=".drag-allow">
           <div>
-            <PanelContainer
-              @updated:chart="onUpdatePanel"
-              :draggable="draggable"
-              :data="item"
-              :selectedTimeDate="currentTimeObj"
-            >
+            <PanelContainer @updated:chart="onUpdatePanel" :draggable="draggable" :data="item"
+              :selectedTimeDate="currentTimeObj">
             </PanelContainer>
           </div>
         </grid-item>
       </grid-layout>
     </div>
     <div>
-      <q-h3 no-caps:label="getDashboard"></q-h3>
+      <!-- <q-h3 no-caps:label="getDashboard"></q-h3> -->
     </div>
   </q-page>
 </template>
@@ -190,7 +128,7 @@ export default defineComponent({
       currentTimeObj.value = getConsumableDateTime(c);
     };
 
-    const initialize = () => {};
+    const initialize = () => { };
 
     // back button to render dashboard List page
     const goBack = () => {
@@ -234,7 +172,7 @@ export default defineComponent({
         dashboardId,
         currentDashboardData.data
       );
-     
+
       currentDashboardData.data = await getDashboard(
         store,
         dashboardId
@@ -260,7 +198,7 @@ export default defineComponent({
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
       return router.push({
-        path: "/addPanel",
+        path: "/dashboards/add_panel",
         query: { dashboard: dashboardId },
       });
     };
@@ -321,7 +259,7 @@ export default defineComponent({
       this.draggable = false;
     },
     async onUpdatePanel(panelDataElementValue: any) {
-      
+
       // console.log(
       //   "deleting",
       //   this.$route.query.dashboard,
@@ -514,8 +452,7 @@ export default defineComponent({
   height: 20px;
   top: 0;
   left: 0;
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>")
-    no-repeat;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle cx='5' cy='5' r='5' fill='#999999'/></svg>") no-repeat;
   background-position: bottom right;
   padding: 0 8px 8px 0;
   background-repeat: no-repeat;
@@ -545,6 +482,7 @@ export default defineComponent({
   // padding: 1.625em 0 0;
   // overflow: auto;
 }
+
 .plotlyBackground {
   background: #fff !important;
   border-radius: 4px;
