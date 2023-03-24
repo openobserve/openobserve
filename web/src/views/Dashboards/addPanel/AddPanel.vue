@@ -55,29 +55,47 @@
     <div class="row" style="height: calc(100vh - 118px); overflow-y: auto">
       <div
         class="col"
-        style="overflow: hidden; min-width: 75px; max-width: 75px"
+        style="overflow: hidden; min-width: 80px; max-width: 80px"
       >
         <ChartSelection
           v-model:selectedChartType="dashboardPanelData.data.type"
         />
       </div>
       <q-separator vertical />
-      <div class="col scroll" style="height: 100%">
-        <GetFields />
-      </div>
-      <q-separator vertical />
-      <div class="col scroll" style="height: 100%">
-        <Layout />
-      </div>
-      <q-separator vertical />
-      <div class="col-7 scroll" style="height: 100%">
-        <SearchBar />
-        <q-separator />
-        <ChartRender
-          :data="chartData"
-          :selectedTimeDate="dashboardPanelData.meta.dateTime"
-        />
-      </div>
+      <div class="col" style="width: 100%;">
+				<q-splitter
+					v-model="dashboardPanelData.layout.splitter"
+					style="width: 100%"
+				>
+					<template #before>
+						<div class="col scroll " style="height: calc(100vh - 118px); overflow-y: auto;">
+							<GetFields />
+						</div>
+					</template>
+					<template #separator>
+						<q-avatar
+						color="primary"
+						text-color="white"
+						size="20px"
+						icon="drag_indicator"
+						style="top: 10px"
+						/>
+					</template>
+					<template #after>
+						<div class="row" style="height: calc(100vh - 118px); overflow-y: auto; ">
+							<div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
+								<Layout/>
+							</div>
+							<q-separator vertical />
+							<div class="col scroll " style="height:100%">
+								<SearchBar />
+								<q-separator />
+								<ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
+							</div>
+						</div>
+					</template>
+				</q-splitter>
+			</div>
     </div>
   </div>
 </template>
@@ -90,6 +108,7 @@ import {
   toRaw,
   onActivated,
   nextTick,
+  watch
 } from "vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
@@ -163,12 +182,16 @@ export default defineComponent({
     };
 
     const currentXLabel = computed(()=> {
-      return dashboardPanelData.data.type == 'table' ? 'First Column' :dashboardPanelData.data.type == 'h-bar' ? 'Y Axis' :  'X Axis'
+      return dashboardPanelData.data.type == 'table' ? 'First Column' :dashboardPanelData.data.type == 'h-bar' ? 'Y-Axis' :  'X-Axis'
     })
 
     const currentYLabel = computed(()=> {
-      return dashboardPanelData.data.type == 'table' ? 'Other Columns' :dashboardPanelData.data.type == 'h-bar' ? 'X Axis' :  'Y Axis'
+      return dashboardPanelData.data.type == 'table' ? 'Other Columns' :dashboardPanelData.data.type == 'h-bar' ? 'X-Axis' :  'Y-Axis'
     })
+
+    watch(()=> dashboardPanelData.data.type, ()=>{
+			chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
+		})
 
     const runQuery = () => {
       // console.log("query change detected to run");
@@ -182,7 +205,7 @@ export default defineComponent({
     };
     const goBack = () => {
       return router.push({
-        path: "/viewDashboard",
+        path: "/dashboards/view",
         query: { dashboard: route.query.dashboard },
       });
     };
@@ -204,7 +227,7 @@ export default defineComponent({
 
       // for pie, make sure only 1 y axis is there
       if(dashboardData.data.type == "pie" && dashboardData.data.fields.y.length > 1 ){
-        error.push("You can add only one field in the Y axis for pie chart")
+        error.push("You can add only one field in the Y-Axis for pie chart")
       }
 
       // check if aggregation function is selected or not
@@ -219,7 +242,7 @@ export default defineComponent({
         error.push(...labelError.map((it:any) => `${currentYLabel.value}: ${it.column}: Label required`))
       }
 
-      // check if labels are there for y axis items
+      // check if name of panel is there
       if(dashboardData.data.config.title == null || dashboardData.data.config.title == '' ){
         error.push("Name of Panel is required")
       }
@@ -252,22 +275,34 @@ export default defineComponent({
         error.push("Please add valid query syntax")
       }
 
+      // check if field selection is from the custom query fields when the custom query mode is ON
       if(dashboardData.layout.showCustomQuery){
 
         // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
        
         const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column))
         if(customQueryXFieldError.length){
-          error.push(...customQueryXFieldError.map((it:any) => `Invalid XAxis ${it.column} value`))
+          error.push(...customQueryXFieldError.map((it:any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
         }
 
         const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column))
         if(customQueryYFieldError.length){
-          error.push(...customQueryYFieldError.map((it:any) => `Invalid YAxis ${it.column} value`))
+          error.push(...customQueryYFieldError.map((it:any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
         }
-       
-      }
 
+      } else {
+        // check if field selection is from the selected stream fields when the custom query mode is OFF
+        const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i:any) => i.name == it.column))
+        if(customQueryXFieldError.length){
+          error.push(...customQueryXFieldError.map((it:any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
+        }
+
+        const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it:any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i:any) => i.name == it.column))
+        if(customQueryYFieldError.length){
+          error.push(...customQueryYFieldError.map((it:any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
+        }
+      }
+        
       // show all the errors
       for (let index = 0; index < error.length; index++) {
         $q.notify({
@@ -309,7 +344,7 @@ export default defineComponent({
 
       await nextTick();
       return router.push({
-        path: "/viewDashboard",
+        path: "/dashboards/view",
         query: { dashboard: dashId },
       });
     };

@@ -338,20 +338,17 @@ export default defineComponent({
       height: 25px;
     }
 
-    .q-table__top {
-      padding: 0px;
+    :deep(.q-table__top) {
+      padding: 0px !important;
+      border-bottom: unset;
     }
-    .q-table__control,
+    :deep(.q-table__control),
     label.q-field {
       width: 100%;
     }
     .q-table thead tr,
     .q-table tbody td {
       height: auto;
-    }
-
-    .q-table__top {
-      border-bottom: unset;
     }
   }
   .field-table {

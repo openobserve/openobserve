@@ -59,6 +59,8 @@ import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import queryService from "../../../services/nativequery";
 import Plotly from "plotly.js";
+import moment from "moment";
+   
 
 export default defineComponent({
   name: "ChartRender",
@@ -98,7 +100,7 @@ export default defineComponent({
       const column = columnData.map((it:any)=>{
         let obj : any= {}
         obj["name"] = it.label
-        obj["field"] = it.label
+        obj["field"] = it.alias
         obj["label"] = it.label
         obj["sortable"] = true
         return obj
@@ -109,11 +111,12 @@ export default defineComponent({
     // If query changes, we need to get the data again and rerender the chart
     watch(
       () => [props.data, props.selectedTimeDate],
-      () => {
+      async () => {
         if (props.data.query) {
           fetchQueryData();
           updateTableColumns();
         } else {
+          await nextTick();
           Plotly.react(
             plotRef.value,
             [],
@@ -200,7 +203,17 @@ export default defineComponent({
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
-          searchQueryData.data = res.data.hits;
+          const sortFn = (it1:any, it2: any) => {
+            const a = it1[props.data.fields?.x[0].alias] || ""
+            const b = it2[props.data.fields?.x[0].alias] || ""
+            if(typeof a == 'number' && typeof b == 'number') {
+                return a - b
+            } else {
+                return a.toString().localeCompare(b.toString())
+            }
+          }
+
+          searchQueryData.data = props.data.fields?.x && props.data.fields?.x.length > 0 ? res.data.hits.sort(sortFn) : res.data.hits;
           searchQueryData.loading = false
           // $q.notify({
           //   type: "positive",
@@ -241,14 +254,14 @@ export default defineComponent({
       let traces;
 
       //generate the traces value f chart
-      traces = yAxisKeys.map((key: any) => {
+      traces = yAxisKeys?.map((key: any) => {
         const trace = {
-          name: props.data.fields?.y.find((it: any) => it.label == key).column,
+          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
           ...getTraceValuesByChartType(xAxisKey, key),
           showlegend: props.data.config?.show_legends,
           marker: {
             color:
-              props.data.fields?.y.find((it: any) => it.label == key).color ||
+              props.data.fields?.y.find((it: any) => it.alias == key).color ||
               "#5960b2",
             opacity: 0.8,
           },
@@ -266,13 +279,6 @@ export default defineComponent({
         autosize: true,
         legend: {
           bgcolor: "#f7f7f7",
-        },
-        xaxis: {
-          tickangle: -20,
-          automargin: true,
-        },
-        yaxis: {
-          automargin: true,
         },
         margin: {
           l: props.data.type == 'pie' ? 60 : 32,
@@ -298,29 +304,79 @@ export default defineComponent({
       if (props.data.type == "pie") {
         trace["labels"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["values"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{value} (%{percent})<extra></extra>"
       } else if (props.data.type == "h-bar") {
         trace["y"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["x"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{x}<extra></extra>"
       } else {
         trace["x"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["y"] = getAxisDataFromKey(yAxisKey);
+        // add hover template for showing Y axis name and count
+        trace["hovertemplate"]= "%{fullData.name}: %{y}<extra></extra>"
       }
       return trace;
     };
 
     // get the x axis key
     const getXAxisKey = () => {
-      return props.data.fields.x.map((it: any) => it.label)[0];
+      return props.data.fields?.x?.length ? props.data.fields?.x.map((it: any) => it.alias)[0] : "";
     };
 
     // get the y axis key
     const getYAxisKeys = () => {
-      return props.data.fields.y.map((it: any) => it.label);
+      return props.data.fields?.y?.length ? props.data.fields?.y.map((it: any) => it.alias) : [];
     };
 
     // get the axis data using key
     const getAxisDataFromKey = (key: string) => {
-      return searchQueryData.data.map((item) => item[key]);
+      let result : string[]= searchQueryData.data.map((item) => item[key]);
+      // check for the histogram _timestamp field
+       // If histogram _timestamp field is found, format the date labels
+        const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
+        if(field && field.alias == key) {
+          // get the format
+          const timestamps = selectedTimeObj.value
+          let keyFormat = "HH:mm:ss";
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+            keyFormat = "HH:mm:ss";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+            keyFormat = "MM-DD HH:mm";
+          }
+          if (
+            timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+            keyFormat = "YYYY-MM-DD";
+          }
+
+          // now we have the format, convert that format
+          result = result.map((it: any) => moment(it + "Z").format(keyFormat))
+        }
+        
+        return result
     };
 
     // return chart type based on selected chart
@@ -360,28 +416,95 @@ export default defineComponent({
     };
 
     // layout changes based on selected chart type
-    const getPropsByChartTypeForLayout = async () => {
+    const getPropsByChartTypeForLayout = () => {
       switch (props.data.type) {
         case "bar":
           return {
             barmode: "group",
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
           };
         case "line":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         case "scatter":
           return {
             scattermode: "group",
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
           };
         case "pie":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         case "h-bar":
           return {
             barmode: "group",
+            xaxis: {
+              title: props.data.fields?.y[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+              automargin: true,
+            },
           };
         case "area":
-          return {};
+          return {
+            xaxis: {
+              title: props.data.fields?.x[0].label,
+              tickangle: -20,
+              automargin: true,
+            },
+            yaxis: {
+              title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+              automargin: true,
+            },
+          };
         default:
-          return {};
+          return {
+            xaxis: {
+                title: props.data.fields?.x[0].label,
+                tickangle: -20,
+                automargin: true,
+              },
+              yaxis: {
+                title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                automargin: true,
+              },
+          };
       }
     };
 

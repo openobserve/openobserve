@@ -119,7 +119,7 @@ export default defineComponent({
           } else {
             selector += `${field.column}`
           }
-          selector += ` as ${field.label}${i==fields.length-1 ? ' ' : ', '}`
+          selector += ` as "${field.alias}"${i==fields.length-1 ? ' ' : ', '}`
           return selector
         })
         query += array.join("")
@@ -161,7 +161,7 @@ export default defineComponent({
         query += filterData.filter((it: any)=> it).join(" AND ")
 
         // add group by statement
-        query += ` GROUP BY ${dashboardPanelData.data.fields.x[0]?.label}`
+        query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
 
         // console.log('generated query: ', query)
 
@@ -169,16 +169,20 @@ export default defineComponent({
       }
     }, {deep: true})
 
-    watch(() => dashboardPanelData.data.query, ()=>{
+    watch(() => [dashboardPanelData.data.query, dashboardPanelData.layout.showCustomQuery], ()=>{
       // console.log("query changes in search bar",dashboardPanelData.layout.showCustomQuery);
 
       // only continue if current mode is show custom query
       if(dashboardPanelData.layout.showCustomQuery){
         updateQueryValue()
-      }
-    })
+      } else {
+        // auto query mode selected
+        // remove the custom fields from the list
+        dashboardPanelData.meta.stream.customQueryFields = []
+       }
+    }, {deep: true})
 
-    //TODO: verification to perform when the query is updated
+     // This function parses the custom query and generates the errors and custom fields
     const updateQueryValue = () => {
       // store the query in the dashboard panel data
       // dashboardPanelData.meta.editorValue = value;
