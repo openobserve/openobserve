@@ -31,6 +31,7 @@ use crate::{meta::alert::AlertDestination, service::alerts::destinations};
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
+    request_body(content = AlertDestination, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
