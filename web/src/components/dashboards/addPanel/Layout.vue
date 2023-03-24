@@ -101,7 +101,7 @@
                               dashboardPanelData.data.fields.x[props.pageIndex]
                                 .aggregationFunction
                             "
-                            :options="(props.row.column == '_timestamp') ? triggerOperatorsWithHistogram : triggerOperators"
+                            :options="triggerOperatorsWithHistogram"
                             dense
                             filled
                             label="Aggregation"
@@ -541,7 +541,7 @@ export default defineComponent({
       addFilteredItem,
     } = useDashboardPanelData();
     const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
-    const triggerOperatorsWithHistogram: any = ref(["histogram","count", "sum", "avg", "min", "max"]);
+    const triggerOperatorsWithHistogram: any = ref(["histogram"]);
 
     watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
       if(oldVal == false && newVal == true) {
