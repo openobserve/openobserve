@@ -58,6 +58,7 @@ pub enum ErrorCodes {
     SearchFunctionNotDefined(String),
     SearchParquetFileNotFound,
     SearchFieldHasNoCompatibleDataType(String),
+    SearchSQLExecuteError(String),
 }
 
 impl std::fmt::Display for ErrorCodes {
@@ -82,6 +83,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFunctionNotDefined(_) => 20005,
             ErrorCodes::SearchParquetFileNotFound => 20006,
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
+            ErrorCodes::SearchSQLExecuteError(_) => 20008,
         }
     }
 
@@ -103,6 +105,9 @@ impl ErrorCodes {
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
                 format!("Search field has no compatible data type: {}", field)
             }
+            ErrorCodes::SearchSQLExecuteError(msg) => {
+                format!("Search SQL execute error: {}", msg)
+            }
         }
     }
 
@@ -116,6 +121,7 @@ impl ErrorCodes {
             ErrorCodes::SearchFunctionNotDefined(func) => func.to_owned(),
             ErrorCodes::SearchParquetFileNotFound => "".to_string(),
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => field.to_owned(),
+            ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
         }
     }
 
@@ -160,6 +166,7 @@ impl ErrorCodes {
             20005 => Ok(ErrorCodes::SearchFunctionNotDefined(message)),
             20006 => Ok(ErrorCodes::SearchParquetFileNotFound),
             20007 => Ok(ErrorCodes::SearchFieldHasNoCompatibleDataType(message)),
+            20008 => Ok(ErrorCodes::SearchSQLExecuteError(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
