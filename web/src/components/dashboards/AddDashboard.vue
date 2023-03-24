@@ -188,9 +188,10 @@ export default defineComponent({
 
         if (dashboardId == "") {
           const obj = toRaw(this.dashboardData);
+          newDashId = this.getRandInteger().toString();
           const baseObj = {
             title: obj.name,
-            dashboardId: this.getRandInteger().toString(),
+            dashboardId: newDashId,
             description: obj.description,
             role: "",
             owner: this.store.state.userInfo.name,
