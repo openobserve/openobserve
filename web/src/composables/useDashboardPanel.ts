@@ -17,6 +17,21 @@ import queryService from "../services/nativequery"
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
+const colors = [
+  '#5960b2',
+  '#c23531',
+  '#2f4554',
+  '#61a0a8',
+  '#d48265',
+  '#91c7ae',
+  '#749f83',
+  '#ca8622',
+  '#bda29a',
+  '#6e7074',
+  '#546570',
+  '#c4ccd3'
+]
+
 const getDefaultDashboardPanelData = () => (
   {
     data: {
@@ -37,6 +52,7 @@ const getDefaultDashboardPanelData = () => (
     },
     layout: {
       showCustomQuery: false,
+      splitter: 20
     },
     meta: {
       parsedQuery: "",
@@ -72,6 +88,10 @@ const useDashboardPanelData = () => {
     // console.log("updated...",dashboardPanelData);
   };
 
+  const generateLabelFromName = (name: string) => {
+    return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
+  }
+
   const addXAxisItem = (name: string) => {
     if(!dashboardPanelData.data.fields.x) {
       dashboardPanelData.data.fields.x = []
@@ -85,10 +105,11 @@ const useDashboardPanelData = () => {
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.x.push({
-        label: 'x_axis_' + dashboardPanelData.data.fields.x.length,
+        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.layout.showCustomQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : name,
         column: name,
         color: null,
-        aggregationFunction: null
+        aggregationFunction: (name == '_timestamp') ? 'histogram' : null
       })
     }
   }
@@ -100,9 +121,10 @@ const useDashboardPanelData = () => {
 
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.y.push({
-        label: 'y_axis_' + dashboardPanelData.data.fields.y.length,
+        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.layout.showCustomQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
         column: name,
-        color: '#5960b2',
+        color: colors[dashboardPanelData.data.fields.y.length % colors.length],
         aggregationFunction: 'count'
       })
     }
