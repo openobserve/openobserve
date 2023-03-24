@@ -164,14 +164,14 @@ const sampleTemplates = [
     body: `
 {
   "labels": {
-    "alertname": { alert_name },
-    "stream": { stream_name },
-    "organization": { org_name },
-    "alerttype": { alert_type },
+    "alertname": "{ alert_name }",
+    "stream": "{ stream_name }",
+    "organization": "{ org_name }",
+    "alerttype": "{ alert_type }",
     "severity": "critical",
   },
   "annotations": {
-    "timestamp": { timestamp },
+    "timestamp": "{ timestamp }",
   },
 }`,
   },
