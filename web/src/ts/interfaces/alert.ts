@@ -36,7 +36,7 @@ export interface AlertData extends Alert {
 // Template payload which is sent to backend
 export interface Template {
   name: string;
-  body: string;
+  body: any;
   isDefault?: boolean;
 }
 

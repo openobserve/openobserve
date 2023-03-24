@@ -45,7 +45,7 @@
               :label="t('alerts.sql')"
               stack-label
               @keyup="editorUpdate"
-              @paste="editorUpdate"
+              @paste="handleEditorPasteEvent"
               style="border: 1px solid #dbdbdb; border-radius: 5px"
               class="q-py-sm showLabelOnTop"
               resize
@@ -124,6 +124,7 @@ import {
   onBeforeMount,
   onActivated,
   defineEmits,
+  nextTick,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -149,24 +150,24 @@ const isUpdatingTemplate = ref(false);
 const sampleTemplates = [
   {
     name: "Slack",
-    body: {
-      text: "For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active",
-    },
+    body: `{
+    "text": "For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active",
+}`,
   },
   {
     name: "Alert Manager",
     body: `{
-      labels: {
-        alertname: { alert_name },
-        stream: { stream_name },
-        organization: { org_name },
-        alerttype: { alert_type },
-        severity: "critical", // static fields if any
-      },
-      annotations: {
-        timestamp: { timestamp },
-      },
-    }`,
+    "labels": {
+      "alertname": { alert_name },
+      "stream": { stream_name },
+      "organization": { org_name },
+      "alerttype": { alert_type },
+      "severity": "critical", // static fields if any
+    },
+    "annotations": {
+      "timestamp": { timestamp },
+    },
+}`,
   },
 ];
 onActivated(() => setupTemplateData());
@@ -228,6 +229,9 @@ const setupTemplateData = () => {
 const editorUpdate = (e: any) => {
   formData.value.body = e.target.value;
 };
+const handleEditorPasteEvent = (e: any) => {
+  editorobj.setValue(e.clipboardData.getData("text/plain"));
+};
 const isValidTemplate = computed(
   () => formData.value.name && formData.value.body
 );
@@ -272,8 +276,7 @@ const saveTemplate = () => {
     });
 };
 const copyTemplateBody = (text: any) => {
-  let bodyJson = JSON.stringify(text).replace(/\n/g, "\r\n");
-  copyToClipboard(bodyJson).then(() =>
+  copyToClipboard(JSON.parse(JSON.stringify(text))).then(() =>
     q.notify({
       type: "positive",
       message: "Content Copied Successfully!",
