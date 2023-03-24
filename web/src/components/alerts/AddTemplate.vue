@@ -38,7 +38,9 @@
             />
           </div>
           <div class="col-12 q-pb-md q-pt-xs">
-            <div class="q-pb-sm text-bold">Body</div>
+            <div class="q-pb-sm text-bold">
+              {{ t("alert_templates.body") }}
+            </div>
             <div
               ref="editorRef"
               id="editor"
@@ -77,7 +79,7 @@
       <template v-slot:after>
         <div class="q-px-sm q-pt-sm">
           <div class="text-bold q-py-sm q-px-xs text-subtitle2">
-            Template variables Guide
+            {{ t("alert_templates.variable_guide_header") }}
           </div>
           <q-separator style="width: 100%" />
           <div class="q-py-md q-px-xs">
@@ -88,7 +90,9 @@
             <div>{{ t("alert_templates.timestamp_variable") }}</div>
           </div>
           <div class="q-pb-md q-px-xs">
-            <div class="text-bold text-body-1 q-pb-sm">Usage Examples:</div>
+            <div class="text-bold text-body-1 q-pb-sm">
+              {{ t("alert_templates.variable_usage_examples") }}:
+            </div>
             <div
               v-for="template in sampleTemplates"
               class="q-pb-md"
@@ -103,10 +107,10 @@
                   @click="copyTemplateBody(template.body)"
                 />
               </div>
-              <div class="bg-blue-grey-1 q-pa-sm rounded-borders">
-                <code>
+              <div class="bg-blue-grey-1 q-px-sm rounded-borders">
+                <pre class="example-template-body q-my-0">
                   {{ template.body }}
-                </code>
+                </pre>
               </div>
             </div>
           </div>
@@ -150,23 +154,25 @@ const isUpdatingTemplate = ref(false);
 const sampleTemplates = [
   {
     name: "Slack",
-    body: `{
-    "text": "For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active",
+    body: `
+{
+  "text": "{alert_name} is active",    
 }`,
   },
   {
     name: "Alert Manager",
-    body: `{
-    "labels": {
-      "alertname": { alert_name },
-      "stream": { stream_name },
-      "organization": { org_name },
-      "alerttype": { alert_type },
-      "severity": "critical", // static fields if any
-    },
-    "annotations": {
-      "timestamp": { timestamp },
-    },
+    body: `
+{
+  "labels": {
+    "alertname": { alert_name },
+    "stream": { stream_name },
+    "organization": { org_name },
+    "alerttype": { alert_type },
+    "severity": "critical",
+  },
+  "annotations": {
+    "timestamp": { timestamp },
+  },
 }`,
   },
 ];
@@ -229,8 +235,12 @@ const setupTemplateData = () => {
 const editorUpdate = (e: any) => {
   formData.value.body = e.target.value;
 };
+
 const handleEditorPasteEvent = (e: any) => {
   editorobj.setValue(e.clipboardData.getData("text/plain"));
+  nextTick(() => {
+    formData.value.body = e.clipboardData.getData("text/plain");
+  });
 };
 const isValidTemplate = computed(
   () => formData.value.name && formData.value.body
@@ -255,7 +265,7 @@ const saveTemplate = () => {
       template_name: formData.value.name,
       data: {
         name: formData.value.name,
-        body: formData.value.body,
+        body: editorobj.getValue(),
       },
     })
     .then(() => {
@@ -293,5 +303,8 @@ const copyTemplateBody = (text: any) => {
   resize: vertical;
   overflow: auto;
   max-height: 350px;
+}
+.example-template-body {
+  font-size: 10px;
 }
 </style>
