@@ -29,6 +29,7 @@ use crate::{meta::alert::DestinationTemplate, service::alerts::templates};
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
+    request_body(content = DestinationTemplate, description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )

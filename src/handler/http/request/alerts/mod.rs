@@ -33,6 +33,7 @@ use crate::{meta::alert::Alert, service::alerts};
         ("stream_name" = String, Path, description = "Stream name"),
         ("alert_name" = String, Path, description = "Alert name"),
       ),
+    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
         (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
     )
