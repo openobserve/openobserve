@@ -221,6 +221,12 @@ const useDashboardPanelData = () => {
     }
   }
 
+  const removeXYFilters = () => {
+    dashboardPanelData.data.fields.x.splice(0,dashboardPanelData.data.fields.x.length)
+    dashboardPanelData.data.fields.y.splice(0,dashboardPanelData.data.fields.y.length)
+    dashboardPanelData.data.fields.filter.splice(0,dashboardPanelData.data.fields.filter.length)
+  }
+
   return { 
     dashboardPanelData, 
     resetDashboardPanelData, 
@@ -229,7 +235,8 @@ const useDashboardPanelData = () => {
     removeXAxisItem,
     removeYAxisItem,
     removeFilterItem,
-    addFilteredItem 
+    addFilteredItem,
+    removeXYFilters
   };
 };
 

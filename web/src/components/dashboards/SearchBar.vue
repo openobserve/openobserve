@@ -19,11 +19,15 @@
         <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
 
-        <q-toggle
-          v-model="dashboardPanelData.layout.showCustomQuery"
-          :label="t('panel.customSql')"
-          @update:model-value="updateToggle(dashboardPanelData.layout.showCustomQuery)"
-        />
+        <div @click.prevent="showWarning" style="cursor: pointer;">
+          <div style="pointer-events: none;">
+            <q-toggle
+              v-model="dashboardPanelData.layout.showCustomQuery"
+              :label="t('panel.customSql')"
+              @update:model-value="onUpdateToggle(dashboardPanelData.layout.showCustomQuery)"
+            />
+          </div>
+        </div>
         <q-btn-dropdown
           color="white"
           flat
@@ -46,6 +50,13 @@
         <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
       </div>
     </div>
+    <ConfirmDialog
+      title="Change Query Mode"
+      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      @update:ok="changeToggle"
+      @update:cancel="confirmQueryModeChangeDialog = false"
+      v-model="confirmQueryModeChangeDialog"
+    />
 </template>
 
 <script lang="ts">
@@ -56,6 +67,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { Parser } from "node-sql-parser";
 
+import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import QueryEditor from "./QueryEditor.vue";
 import useDashboardPanelData from "../../composables/useDashboardPanel";
 
@@ -63,6 +75,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     QueryEditor,
+    ConfirmDialog
   },
   emits: ["searchdata"],
   methods: {
@@ -78,7 +91,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData } = useDashboardPanelData()
+    const { dashboardPanelData, removeXYFilters } = useDashboardPanelData()
+    const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
 
@@ -250,8 +264,18 @@ export default defineComponent({
 
     };
 
-    const updateToggle = (value) => {
+    const onUpdateToggle = (value) => {
       dashboardPanelData.meta.errors.queryErrors = []
+    }
+
+    const changeToggle = () => {
+      dashboardPanelData.layout.showCustomQuery = !dashboardPanelData.layout.showCustomQuery
+      removeXYFilters()
+    }
+
+    const showWarning = (e) => {
+      e.preventDefault();
+      confirmQueryModeChangeDialog.value = true
     }
 
 
@@ -262,7 +286,10 @@ export default defineComponent({
       onDropDownClick,
       showQuery,
       dashboardPanelData,
-      updateToggle
+      confirmQueryModeChangeDialog,
+      onUpdateToggle,
+      changeToggle,
+      showWarning
     };
   },
 });
