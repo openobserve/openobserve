@@ -190,12 +190,14 @@ export default defineComponent({
     })
 
     watch(()=> dashboardPanelData.data.type, ()=>{
-			chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
+			runQuery()
 		})
 
     const runQuery = () => {
       // console.log("query change detected to run");
-
+      if(!isValid(true)){
+        return
+      }
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
     };
@@ -211,7 +213,7 @@ export default defineComponent({
     };
 
     //validate the data
-    const isValid = () => {
+    const isValid = (onlyChart = false) => {
       const error = []
       const dashboardData = dashboardPanelData
 
@@ -243,8 +245,10 @@ export default defineComponent({
       }
 
       // check if name of panel is there
-      if(dashboardData.data.config.title == null || dashboardData.data.config.title == '' ){
-        error.push("Name of Panel is required")
+      if(!onlyChart) {
+        if(dashboardData.data.config.title == null || dashboardData.data.config.title == '' ){
+          error.push("Name of Panel is required")
+        }
       }
 
       // if there are filters
