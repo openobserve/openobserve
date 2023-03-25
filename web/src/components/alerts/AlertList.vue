@@ -467,7 +467,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       if (
         newVal != oldVal &&
-        this.router.currentRoute.value.name == "transform"
+        this.router.currentRoute.value.name == "alertList"
       ) {
         this.resultTotal = 0;
         this.alerts = [];
