@@ -87,7 +87,8 @@ export default defineComponent({
         let j = 0;
         while (j < arr.length) {
           let rec = arr[j];
-          let record = rec.text?.split(keyword);
+          let record =
+            rec.text != undefined ? rec.text.split(keyword) : undefined;
 
           if (
             record != undefined &&
@@ -126,34 +127,31 @@ export default defineComponent({
         return [];
       }
 
-      let arr = [];
-      // queryString + " " is for special split regular
-      // split by space, but ignore double quotation marks
-      const groups = (queryString + " ").split(/ s*(?![^"]*"\ )/);
-      for (let i = 0; i < groups.length - 1; i++) {
-        const group = groups[i];
-        if (!group || group.trim().length == 0) {
-          continue;
+      const regex =
+        /(?:match_all\((['"])([^'"]+)\1\)|match_all_ignore_case\((['"])([^'"]+)\3\)|(['"])([^'"]+)\5)/g;
+
+      let result = [];
+      let match;
+
+      while ((match = regex.exec(queryString)) !== null) {
+        // Group 1: match_all values
+        if (match[2]) {
+          result.push(match[2]);
         }
-        // group + ":" is for special split regular
-        // split by :, but ignore "
-        const fieldWordArr = (group + ":").split(/:s*(?![^"]*"\:)/);
-        let keyword = group;
-        if (fieldWordArr.length > 2) {
-          keyword = fieldWordArr[1];
+        // Group 2: match_all_ignore_case values
+        else if (match[4]) {
+          result.push(match[4]);
         }
-        // delete start and end of * and "
-        keyword = keyword
-          .replace(/(^\**)|(\**$)/g, "")
-          .replace(/(^"*)|("*$)/g, "")
-          .replace(/^match_all\('(.*)'\)$/, "$1")
-          .replace(/^match_all_ignore_case\('(.*)'\)$/, "$1");
-        if (keyword.trim().length > 0) {
-          // make sure key not empty or not space
-          arr.push(keyword);
+        // Group 3: other string values
+        else if (match[6]) {
+          const columnNamePattern = /^[a-zA-Z_]+\s*=\s*$/;
+          if (!columnNamePattern.test(match[6])) {
+            result.push(match[6]);
+          }
         }
       }
-      return arr;
+
+      return result;
     },
   },
 });
