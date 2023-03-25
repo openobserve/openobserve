@@ -13,27 +13,64 @@
 
     <q-separator style="width: 100%" />
 
-    <q-splitter v-model="splitterModel" unit="%" style="min-height: calc(100vh - 122px)">
+    <q-splitter
+      v-model="splitterModel"
+      unit="%"
+      style="min-height: calc(100vh - 122px)"
+    >
       <template v-slot:before>
         <div class="row q-pa-md">
           <div class="col-12 q-pb-md q-pt-sm">
-            <q-input v-model="formData.name" :label="t('alerts.name')" color="input-border" bg-color="input-bg"
-              class="showLabelOnTop" stack-label outlined filled dense v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate" :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
+            <q-input
+              v-model="formData.name"
+              :label="t('alerts.name')"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdatingTemplate"
+              v-bind:disable="isUpdatingTemplate"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              tabindex="0"
+            />
           </div>
           <div class="col-12 q-pb-md q-pt-xs">
             <div class="q-pb-sm text-bold">
               {{ t("alert_templates.body") }}
             </div>
-            <div ref="editorRef" id="editor" :label="t('alerts.sql')" stack-label @keyup="editorUpdate"
-              @paste="handleEditorPasteEvent" style="border: 1px solid #dbdbdb; border-radius: 5px"
-              class="q-py-sm showLabelOnTop" resize :rules="[(val: any) => !!val || 'Field is required!']" />
+            <div
+              ref="editorRef"
+              id="editor"
+              :label="t('alerts.sql')"
+              stack-label
+              style="border: 1px solid #dbdbdb; border-radius: 5px"
+              class="q-py-sm showLabelOnTop"
+              resize
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
           </div>
           <div class="col-12 flex justify-center q-mt-lg">
-            <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('alerts.cancel')" text-color="light-text"
-              padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
-            <q-btn :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-              @click="saveTemplate" no-caps />
+            <q-btn
+              v-close-popup
+              class="q-mb-md text-bold no-border"
+              :label="t('alerts.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              color="accent"
+              no-caps
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              :label="t('alerts.save')"
+              class="q-mb-md text-bold no-border q-ml-md"
+              color="secondary"
+              padding="sm xl"
+              @click="saveTemplate"
+              no-caps
+            />
           </div>
         </div>
       </template>
@@ -54,15 +91,25 @@
             <div class="text-bold text-body-1 q-pb-sm">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
-            <div v-for="template in sampleTemplates" class="q-pb-md" :key="template.name">
+            <div
+              v-for="template in sampleTemplates"
+              class="q-pb-md"
+              :key="template.name"
+            >
               <div class="flex justify-between items-center">
                 <div class="q-pb-xs">{{ template.name }}</div>
-                <q-icon class="cursor-pointer" name="content_copy" size="14px" @click="copyTemplateBody(template.body)" />
+                <q-icon
+                  class="cursor-pointer"
+                  name="content_copy"
+                  size="14px"
+                  @click="copyTemplateBody(template.body)"
+                />
               </div>
               <div class="bg-blue-grey-1 q-px-sm rounded-borders">
                 <pre class="example-template-body q-my-0">
                     {{ template.body }}
-                  </pre>
+                  </pre
+                >
               </div>
             </div>
           </div>
@@ -89,6 +136,7 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
 import type { TemplateData, Template } from "@/ts/interfaces/index";
+import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const { t } = useI18n();
@@ -108,7 +156,7 @@ const sampleTemplates = [
     name: "Slack",
     body: `
 {
-  "text": "{alert_name} is active",
+  "text": "{alert_name} is active"
 }`,
   },
   {
@@ -170,6 +218,7 @@ onMounted(async () => {
     },
     theme: "myCustomTheme",
     automaticLayout: true,
+    suggestOnTriggerCharacters: false,
   });
   editorobj.onKeyUp((e: any) => {
     if (editorobj.getValue() != "") {
@@ -186,21 +235,25 @@ const setupTemplateData = () => {
     formData.value.body = props.template.body;
   }
 };
-const editorUpdate = (e: any) => {
-  formData.value.body = e.target.value;
+
+const isTemplateBodyValid = () => {
+  try {
+    JSON.parse(formData.value.body);
+    return true;
+  } catch (e) {
+    q.notify({
+      type: "negative",
+      message: "Invalid JSON in Template Body",
+      timeout: 1500,
+    });
+    return false;
+  }
 };
 
-const handleEditorPasteEvent = (e: any) => {
-  editorobj.setValue(e.clipboardData.getData("text/plain"));
-  nextTick(() => {
-    formData.value.body = e.clipboardData.getData("text/plain");
-  });
-};
-const isValidTemplate = computed(
-  () => formData.value.name && formData.value.body
-);
+const isTemplateFilled = () => formData.value.name && formData.value.body;
+
 const saveTemplate = () => {
-  if (!isValidTemplate.value) {
+  if (!isTemplateFilled()) {
     q.notify({
       type: "negative",
       message: "Please fill required fields",
@@ -208,6 +261,10 @@ const saveTemplate = () => {
     });
     return;
   }
+
+  // Here checking is template body json valid
+  if (!isTemplateBodyValid()) return;
+
   const dismiss = q.notify({
     spinner: true,
     message: "Please wait...",
@@ -228,7 +285,7 @@ const saveTemplate = () => {
       emit("cancel:hideform");
       q.notify({
         type: "positive",
-        message: `Template saved successfully.`,
+        message: `Template Saved Successfully.`,
       });
     })
     .catch((err) => {
@@ -244,7 +301,7 @@ const copyTemplateBody = (text: any) => {
     q.notify({
       type: "positive",
       message: "Content Copied Successfully!",
-      timeout: 1500,
+      timeout: 1000,
     })
   );
 };
