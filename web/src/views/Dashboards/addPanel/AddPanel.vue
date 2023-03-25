@@ -163,7 +163,7 @@ export default defineComponent({
         );
         // console.log("panel data", panelData);
         Object.assign(dashboardPanelData.data, panelData);
-        runQuery();
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       } else {
         editMode.value = false;
         resetDashboardPanelData();
