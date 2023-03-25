@@ -187,7 +187,7 @@ export default defineComponent({
       }
     }, {deep: true})
 
-    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery], ()=>{
+    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], ()=>{
       // console.log("query changes in search bar",dashboardPanelData.data.customQuery);
 
       // only continue if current mode is show custom query
