@@ -41,7 +41,7 @@
                   >
                 </li>
                 <li>
-                  For case-insesitive full text search of value 'error' use
+                  For case-insensitive full text search of value 'error' use
                   <span class="bg-lightgray"
                     >match_all_ignore_case('error')</span
                   >
@@ -86,7 +86,7 @@
                   >
                 </li>
                 <li>
-                  For case-insesitive full text search of value 'error' use
+                  For case-insensitive full text search of value 'error' use
                   <span class="bg-lightgray"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all_ignore_case('error')</span
