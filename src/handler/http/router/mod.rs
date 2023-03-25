@@ -73,8 +73,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                 .wrap_fn(|req, srv| {
                     let prefix = format!("{}/web/", CONFIG.common.base_uri);
                     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
+
                     srv.call(req).map(move |res| {
-                        if ui::UI_PAGES.contains(&path.as_str()) {
+                        if !path.starts_with("src/") && !path.starts_with("assets/") {
                             let res = res.unwrap();
                             let req = res.request().clone();
                             let body = res.into_body();
