@@ -156,7 +156,7 @@ export const useLocalToken = (val = "", isDelete = false) => {
   return useLocalStorage("token", val, isDelete);
 };
 
-export const useLocalOrganization = (val = "", isDelete = false) => {
+export const useLocalOrganization = (val: any = "", isDelete = false) => {
   return useLocalStorage("organization", val, isDelete, true);
 };
 
