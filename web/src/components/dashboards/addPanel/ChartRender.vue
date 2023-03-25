@@ -159,7 +159,7 @@ export default defineComponent({
       traces = traces.map((text: any) => {
         let rxp = new RegExp(".{1," + addBreaksAtLength + "}", "g");
         if (text) {
-          return text?.match(rxp)?.join("<br>");
+          return text?.toString()?.match(rxp)?.join("<br>");
         } else {
           return " ";
         }
