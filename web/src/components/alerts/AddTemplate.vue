@@ -243,7 +243,7 @@ const isTemplateBodyValid = () => {
   } catch (e) {
     q.notify({
       type: "negative",
-      message: "Invalid JSON in Template Body",
+      message: "Please enter valid JSON in template body",
       timeout: 1500,
     });
     return false;
