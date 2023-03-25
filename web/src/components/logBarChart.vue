@@ -20,7 +20,7 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 
-import { defineComponent, onMounted, ref } from "vue";
+import { defineComponent, onMounted, onUpdated, ref } from "vue";
 
 export default defineComponent({
   name: "logBarChart",
@@ -48,6 +48,7 @@ export default defineComponent({
         },
       },
       font: { size: 12 },
+      autosize: true,
       height: 150,
       legend: {
         bgcolor: "red",
@@ -70,6 +71,16 @@ export default defineComponent({
       });
 
       plotref.value.on("plotly_relayout", onPlotZoom);
+    });
+
+    onUpdated(async () => {
+      const update: any = {
+        "xaxis.autorange": true,
+        "yaxis.autorange": true,
+      };
+      if (document.getElementById("plotly_chart") != null) {
+        Plotly.relayout(plotref.value, update);
+      }
     });
 
     const reDraw: any = (
