@@ -305,7 +305,7 @@ export default defineComponent({
         trace["labels"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["values"] = getAxisDataFromKey(yAxisKey);
         // add hover template for showing Y axis name and count
-        trace["hovertemplate"]= "%{fullData.name}: %{value} (%{percent})<extra></extra>"
+        trace["hovertemplate"]= "%{label}: %{value} (%{percent})<extra></extra>"
       } else if (props.data.type == "h-bar") {
         trace["y"] = textwrapper(getAxisDataFromKey(xAxisKey));
         trace["x"] = getAxisDataFromKey(yAxisKey);
