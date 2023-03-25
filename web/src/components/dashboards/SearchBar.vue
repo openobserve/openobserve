@@ -22,9 +22,9 @@
         <div @click.prevent="showWarning" style="cursor: pointer;">
           <div style="pointer-events: none;">
             <q-toggle
-              v-model="dashboardPanelData.layout.showCustomQuery"
+              v-model="dashboardPanelData.data.customQuery"
               :label="t('panel.customSql')"
-              @update:model-value="onUpdateToggle(dashboardPanelData.layout.showCustomQuery)"
+              @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery)"
             />
           </div>
         </div>
@@ -45,7 +45,7 @@
         v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
         v-model:functions="dashboardPanelData.meta.stream.functions"
         @run-query="searchData"
-        :readOnly="!dashboardPanelData.layout.showCustomQuery"
+        :readOnly="!dashboardPanelData.data.customQuery"
         ></query-editor>
         <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
       </div>
@@ -61,7 +61,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, reactive, toRaw } from "vue";
+import { defineComponent, ref, watch, reactive, toRaw, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -101,17 +101,21 @@ export default defineComponent({
         showQuery.value = !showQuery.value
     }
 
+    onActivated(() => {
+      dashboardPanelData.meta.errors.queryErrors = []
+    })
+
     // Generate the query when the fields are updated
     watch(() => [
       dashboardPanelData.data.fields.stream, 
       dashboardPanelData.data.fields.x, 
       dashboardPanelData.data.fields.y,
       dashboardPanelData.data.fields.filter,
-      dashboardPanelData.layout.showCustomQuery
+      dashboardPanelData.data.customQuery
     ], () => {
 
       // only continue if current mode is auto query generation
-      if(!dashboardPanelData.layout.showCustomQuery){
+      if(!dashboardPanelData.data.customQuery){
         // console.log("Updating query");
         
         // STEP 1: first check if there is at least 1 field selected
@@ -183,11 +187,11 @@ export default defineComponent({
       }
     }, {deep: true})
 
-    watch(() => [dashboardPanelData.data.query, dashboardPanelData.layout.showCustomQuery], ()=>{
-      // console.log("query changes in search bar",dashboardPanelData.layout.showCustomQuery);
+    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], ()=>{
+      // console.log("query changes in search bar",dashboardPanelData.data.customQuery);
 
       // only continue if current mode is show custom query
-      if(dashboardPanelData.layout.showCustomQuery){
+      if(dashboardPanelData.data.customQuery){
         updateQueryValue()
       } else {
         // auto query mode selected
@@ -202,7 +206,7 @@ export default defineComponent({
       // dashboardPanelData.meta.editorValue = value;
       // dashboardPanelData.data.query = value;
 
-      if (dashboardPanelData.layout.showCustomQuery) {
+      if (dashboardPanelData.data.customQuery) {
         // console.log("query: value", dashboardPanelData.data.query);
 
         // empty the errors
@@ -269,7 +273,7 @@ export default defineComponent({
     }
 
     const changeToggle = () => {
-      dashboardPanelData.layout.showCustomQuery = !dashboardPanelData.layout.showCustomQuery
+      dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
       removeXYFilters()
     }
 

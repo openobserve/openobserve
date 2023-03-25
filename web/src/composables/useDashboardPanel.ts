@@ -49,9 +49,9 @@ const getDefaultDashboardPanelData = () => (
         show_legends: true,
       },
       query: "",
+      customQuery: false
     },
     layout: {
-      showCustomQuery: false,
       splitter: 20
     },
     meta: {
@@ -105,8 +105,8 @@ const useDashboardPanelData = () => {
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.x.push({
-        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
-        alias: !dashboardPanelData.layout.showCustomQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : name,
+        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.data.customQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : name,
         column: name,
         color: null,
         aggregationFunction: (name == '_timestamp') ? 'histogram' : null
@@ -121,8 +121,8 @@ const useDashboardPanelData = () => {
 
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == name)) {
       dashboardPanelData.data.fields.y.push({
-        label: !dashboardPanelData.layout.showCustomQuery ? generateLabelFromName(name) : name,
-        alias: !dashboardPanelData.layout.showCustomQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
+        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(name) : name,
+        alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
         column: name,
         color: colors[dashboardPanelData.data.fields.y.length % colors.length],
         aggregationFunction: 'count'
