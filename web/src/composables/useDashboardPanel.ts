@@ -46,7 +46,7 @@ const getDefaultDashboardPanelData = () => (
       config: {
         title: "",
         description: "",
-        show_legends: false,
+        show_legends: true,
       },
       query: "",
     },
