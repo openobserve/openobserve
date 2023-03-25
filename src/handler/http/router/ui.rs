@@ -22,35 +22,14 @@ use rust_embed_for_web::RustEmbed;
 #[folder = "web/dist/"]
 struct WebAssets;
 
-pub const UI_PAGES: [&str; 20] = [
-    "",
-    "login",
-    "logout",
-    "about",
-    "users",
-    "logs",
-    "dashboards",
-    "dashboards/view",
-    "dashboards/add_panel",
-    "logstreams",
-    "functions",
-    "alerts",
-    "alerts/alerts",
-    "alerts/destinations",
-    "alerts/templates",
-    "ingestion",
-    "ingestion/curl",
-    "ingestion/fluentbit",
-    "ingestion/fluentd",
-    "ingestion/vector",
-];
-
 #[route("/{path:.*}", method = "GET", method = "HEAD")]
 pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileResponse> {
     let mut path = path.as_str();
-    if UI_PAGES.contains(&path) {
+
+    if !path.starts_with("src/") && !path.starts_with("assets/") {
         path = "index.html";
     }
+
     WebAssets::get(path)
         .into_response()
         .use_compression(Compress::Never)
@@ -77,6 +56,6 @@ mod tests {
         let req = test::TestRequest::get().uri("/abc.html").to_request();
 
         let resp = test::call_service(&app, req).await;
-        assert!(!resp.status().is_success());
+        assert!(!resp.status().is_client_error());
     }
 }
