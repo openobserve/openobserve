@@ -65,6 +65,14 @@
                   log use
                   <span class="bg-lightgray">extract_ip(log) | code=200</span>
                 </li>
+                <li>
+                  For additional examples,
+                  <a
+                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    target="_blank"
+                    >click here</a
+                  >.
+                </li>
               </ul>
             </div>
           </div>
@@ -118,6 +126,14 @@
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
+                </li>
+                <li>
+                  For additional examples,
+                  <a
+                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    target="_blank"
+                    >click here</a
+                  >.
                 </li>
               </ul>
             </div>
