@@ -34,12 +34,45 @@
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
-                <li>For full text search of value 'error' use <span class="bg-lightgray">match_all('error') in query editor</span></li>
-                <li>For case-insesitive full text search of value 'error' use <span class="bg-lightgray">match_all_ignore_case('error')</span></li>
-                <li>For column search of value 'error' use <span class="bg-lightgray">str_match(<b>FieldName</b>, 'error')</span></li>
-                <li>To search value 200 for code column use <span class="bg-lightgray">code=200</span></li>
-                <li>To search value 'stderr' for stream column use <span class="bg-lightgray">stream='stderr'</span></li>
-                <li>To search and use query function <i>extract_ip</i> on cloumn log use <span class="bg-lightgray">extract_ip(log) | code=200</span></li>
+                <li>
+                  For full text search of value 'error' use
+                  <span class="bg-lightgray"
+                    >match_all('error') in query editor</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use
+                  <span class="bg-lightgray"
+                    >match_all_ignore_case('error')</span
+                  >
+                </li>
+                <li>
+                  For column search of value 'error' use
+                  <span class="bg-lightgray"
+                    >str_match(<b>fieldname</b>, 'error')</span
+                  >
+                </li>
+                <li>
+                  To search value 200 for code column use
+                  <span class="bg-lightgray">code=200</span>
+                </li>
+                <li>
+                  To search value 'stderr' for stream column use
+                  <span class="bg-lightgray">stream='stderr'</span>
+                </li>
+                <li>
+                  To search and use query function <i>extract_ip</i> on cloumn
+                  log use
+                  <span class="bg-lightgray">extract_ip(log) | code=200</span>
+                </li>
+                <li>
+                  For additional examples,
+                  <a
+                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    target="_blank"
+                    >click here</a
+                  >.
+                </li>
               </ul>
             </div>
           </div>
@@ -54,12 +87,54 @@
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
-                <li>For full text search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE match_all('error')</span></li>
-                <li>For case-insesitive full text search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE match_all_ignore_case('error')</span></li>
-                <li>For column search of value 'error' use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE str_match(<b>FiledName</b>, 'error')</span></li>
-                <li>To search value 200 for code column use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE code=200</span></li>
-                <li>To search value 'stderr' for stream column use <span class="bg-lightgray">SELECT * FROM <b>Steam</b> WHERE stream='stderr'</span></li>
-                <li>To search and use query function <i>extract_ip</i> on cloumn log use <span class="bg-lightgray">SELECT extract_ip(log) FROM <b>Steam</b> WHERE code=200</span></li>
+                <li>
+                  For full text search of value 'error' use
+                  <span class="bg-lightgray"
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
+                  >
+                </li>
+                <li>
+                  For case-insensitive full text search of value 'error' use
+                  <span class="bg-lightgray"
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all_ignore_case('error')</span
+                  >
+                </li>
+                <li>
+                  For column search of value 'error' use
+                  <span class="bg-lightgray"
+                    >SELECT * FROM <b>stream</b> WHERE
+                    str_match(<b>fieldname</b>, 'error')</span
+                  >
+                </li>
+                <li>
+                  To search value 200 for code column use
+                  <span class="bg-lightgray"
+                    >SELECT * FROM <b>stream</b> WHERE code=200</span
+                  >
+                </li>
+                <li>
+                  To search value 'stderr' for stream column use
+                  <span class="bg-lightgray"
+                    >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
+                  >
+                </li>
+                <li>
+                  To search and use query function <i>extract_ip</i> on cloumn
+                  log use
+                  <span class="bg-lightgray"
+                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
+                    code=200</span
+                  >
+                </li>
+                <li>
+                  For additional examples,
+                  <a
+                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    target="_blank"
+                    >click here</a
+                  >.
+                </li>
               </ul>
             </div>
           </div>
