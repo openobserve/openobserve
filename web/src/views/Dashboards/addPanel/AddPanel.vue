@@ -190,7 +190,7 @@ export default defineComponent({
     })
 
     watch(()=> dashboardPanelData.data.type, ()=>{
-			runQuery()
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 		})
 
     const runQuery = () => {
