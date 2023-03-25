@@ -49,7 +49,7 @@
                 <li>
                   For column search of value 'error' use
                   <span class="bg-lightgray"
-                    >str_match(<b>FieldName</b>, 'error')</span
+                    >str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
