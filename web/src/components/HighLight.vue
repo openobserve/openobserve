@@ -87,7 +87,8 @@ export default defineComponent({
         let j = 0;
         while (j < arr.length) {
           let rec = arr[j];
-          let record = rec.text.split(keyword);
+          let record =
+            rec.text != undefined ? rec.text.split(keyword) : undefined;
 
           if (
             record != undefined &&
