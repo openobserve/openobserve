@@ -465,7 +465,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
-        this.router.currentRoute.value.name == "function"
+        this.router.currentRoute.value.name == "functions"
       ) {
         this.resultTotal = 0;
         this.jsTransforms = [];
