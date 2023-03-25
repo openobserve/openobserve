@@ -95,7 +95,7 @@
                   <q-td colspan="100%">
                     <div>
                       <div class="">
-                        <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm">
+                        <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.x[props.pageIndex]
@@ -221,7 +221,7 @@
                   <q-td colspan="100%">
                     <div>
                       <div class="flex items-center q-mb-sm">
-                        <div v-if="!dashboardPanelData.layout.showCustomQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
+                        <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
                           <q-select
                             v-model="
                               dashboardPanelData.data.fields.y[props.pageIndex]

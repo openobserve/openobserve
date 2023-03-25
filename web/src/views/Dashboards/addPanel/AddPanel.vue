@@ -163,7 +163,7 @@ export default defineComponent({
         );
         // console.log("panel data", panelData);
         Object.assign(dashboardPanelData.data, panelData);
-        runQuery();
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       } else {
         editMode.value = false;
         resetDashboardPanelData();
@@ -190,7 +190,7 @@ export default defineComponent({
     })
 
     watch(()=> dashboardPanelData.data.type, ()=>{
-			runQuery()
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 		})
 
     const runQuery = () => {
@@ -275,12 +275,12 @@ export default defineComponent({
       }
 
       // check if query syntax is valid
-      if(dashboardData.layout.showCustomQuery && dashboardData.meta.errors.queryErrors.length){
+      if(dashboardData.data.customQuery && dashboardData.meta.errors.queryErrors.length){
         error.push("Please add valid query syntax")
       }
 
       // check if field selection is from the custom query fields when the custom query mode is ON
-      if(dashboardData.layout.showCustomQuery){
+      if(dashboardData.data.customQuery){
 
         // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
        
