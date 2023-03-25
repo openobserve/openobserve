@@ -275,12 +275,12 @@ export default defineComponent({
       }
 
       // check if query syntax is valid
-      if(dashboardData.layout.showCustomQuery && dashboardData.meta.errors.queryErrors.length){
+      if(dashboardData.data.customQuery && dashboardData.meta.errors.queryErrors.length){
         error.push("Please add valid query syntax")
       }
 
       // check if field selection is from the custom query fields when the custom query mode is ON
-      if(dashboardData.layout.showCustomQuery){
+      if(dashboardData.data.customQuery){
 
         // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
        

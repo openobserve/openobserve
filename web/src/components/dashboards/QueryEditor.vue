@@ -315,7 +315,7 @@ export default defineComponent({
     watch(
       () => props.query,
       () => {
-        if (props.readOnly) {
+        if(props.readOnly || !editorObj.hasWidgetFocus()) {
           editorObj.getModel().setValue(props.query);
         }
       }
