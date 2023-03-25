@@ -609,7 +609,9 @@ export default defineComponent({
 
             whereClause = whereClause
               .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=");
+              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
+              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
