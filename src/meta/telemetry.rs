@@ -16,6 +16,8 @@ use segment::{message::Track, Client, Message};
 use serde_json::Value;
 use std::collections::HashMap;
 
+const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+
 use crate::infra::{
     cache::stats::STATS,
     config::{
@@ -158,16 +160,19 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
             }
         }
     }
-    let mut sterams_orig_size: f64 = 0.0;
-    let mut sterams_compressed_size: f64 = 0.0;
+    let mut streams_orig_size: f64 = 0.0;
+    let mut streams_compressed_size: f64 = 0.0;
     for stats in STATS.iter().clone() {
-        sterams_orig_size += stats.storage_size;
-        sterams_compressed_size += stats.compressed_size
+        streams_orig_size += stats.storage_size;
+        streams_compressed_size += stats.compressed_size
     }
-    data.insert("streams_total_size".to_string(), sterams_orig_size.into());
     data.insert(
-        "streams_compressed_size".to_string(),
-        sterams_compressed_size.into(),
+        "streams_total_size_mb".to_string(),
+        format!("{:.0}", (streams_orig_size / SIZE_IN_MB)).into(),
+    );
+    data.insert(
+        "streams_compressed_size_mb".to_string(),
+        format!("{:.0}", (streams_compressed_size / SIZE_IN_MB)).into(),
     );
 
     let iter = STREAM_FUNCTIONS.iter().clone();
