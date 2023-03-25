@@ -68,7 +68,7 @@
                 <li>
                   For additional examples,
                   <a
-                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    href="https://docs.zinc.dev/example-queries/"
                     target="_blank"
                     >click here</a
                   >.
@@ -130,7 +130,7 @@
                 <li>
                   For additional examples,
                   <a
-                    href="https://docs.zinc.dev/user-guide/logs/example-queries/"
+                    href="https://docs.zinc.dev/example-queries/"
                     target="_blank"
                     >click here</a
                   >.
