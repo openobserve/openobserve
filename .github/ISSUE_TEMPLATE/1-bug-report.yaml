@@ -9,7 +9,7 @@ body:
       options:
         - login
         - home
-        - logs search
+        - log search
         - dashboards
         - users
         - streams
