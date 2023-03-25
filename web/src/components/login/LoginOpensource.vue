@@ -65,7 +65,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -145,67 +145,51 @@ export default defineComponent({
                   window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
 
-                const selectedOrg = ref("");
-                const orgOptions = ref([{ label: Number, value: String }]);
-                await organizationsService
-                  .os_list(0, 1000, "id", false, "", "default")
-                  .then((res: any) => {
-                    const localOrg: any = useLocalOrganization();
-                    if (
-                      localOrg.value != null &&
-                      localOrg.value.user_email !== userInfo.email
-                    ) {
-                      localOrg.value = null;
-                      useLocalOrganization("");
-                    }
+                const selectedOrg: Ref<{
+                  label: string;
+                  id: string;
+                  type: string;
+                  identifier: string;
+                  user_email: string;
+                  ingest_threshold: string;
+                  search_threshold: string;
+                } | null> = ref(null);
 
-                    orgOptions.value = res.data.data.map(
-                      (data: {
-                        id: any;
-                        name: any;
-                        type: any;
-                        identifier: any;
-                        user_obj: any;
-                        ingest_threshold: number;
-                        search_threshold: number;
-                        user_email: string;
-                      }) => {
-                        const optiondata: any = {
-                          label: data.name,
-                          id: data.id,
-                          type: data.type,
-                          identifier: data.identifier,
-                          user_email: data.user_email,
-                          ingest_threshold: data.ingest_threshold,
-                          search_threshold: data.search_threshold,
+                const localOrg: any = useLocalOrganization();
+                if (
+                  localOrg.value != null &&
+                  localOrg.value.user_email !== userInfo.email
+                ) {
+                  localOrg.value = null;
+                  useLocalOrganization("");
+                }
+
+                if (localOrg.value) {
+                  selectedOrg.value = localOrg.value;
+                } else {
+                  await organizationsService
+                    .os_list(0, 1000, "id", false, "", "default")
+                    .then((res: any) => {
+                      if (res.data.data.length) {
+                        const firstOrg = res.data.data[0];
+                        selectedOrg.value = {
+                          label: firstOrg.name,
+                          id: firstOrg.id,
+                          type: firstOrg.type,
+                          identifier: firstOrg.identifier,
+                          user_email: firstOrg.user_email,
+                          ingest_threshold: firstOrg.ingest_threshold,
+                          search_threshold: firstOrg.search_threshold,
                         };
-
-                        if (
-                          selectedOrg.value == "" ||
-                          selectedOrg.value == undefined ||
-                          ((selectedOrg.value == "" ||
-                            selectedOrg.value == undefined) &&
-                            data.type == "default" &&
-                            userInfo.email == data.user_email) ||
-                          res.data.data.length == 1
-                        ) {
-                          selectedOrg.value = localOrg.value
-                            ? localOrg.value
-                            : optiondata;
-                          useLocalOrganization(selectedOrg.value);
-
-                          store.dispatch(
-                            "setSelectedOrganization",
-                            selectedOrg.value
-                          );
-                          redirectUser(redirectURI);
-                        }
-                        return optiondata;
                       }
-                    );
+                    });
+                }
 
-                    return res.data.data;
-                  });
+                if (selectedOrg.value) {
+                  useLocalOrganization(selectedOrg.value);
+                  store.dispatch("setSelectedOrganization", selectedOrg.value);
+                  redirectUser(redirectURI);
+                }
               } else {
                 submitting.value = false;
                 loginform.value.resetValidation();
