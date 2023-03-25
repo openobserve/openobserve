@@ -181,6 +181,8 @@ export default defineComponent({
                         };
 
                         if (
+                          selectedOrg.value == "" ||
+                          selectedOrg.value == undefined ||
                           ((selectedOrg.value == "" ||
                             selectedOrg.value == undefined) &&
                             data.type == "default" &&
