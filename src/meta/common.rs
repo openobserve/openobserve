@@ -40,7 +40,7 @@ impl From<&str> for FileMeta {
 
 impl From<FileMeta> for Vec<u8> {
     fn from(value: FileMeta) -> Vec<u8> {
-        serde_json::to_vec(&value).unwrap()
+        json::to_vec(&value).unwrap()
     }
 }
 
@@ -52,7 +52,7 @@ impl From<FileMeta> for String {
 
 impl From<FileMeta> for bytes::Bytes {
     fn from(value: FileMeta) -> bytes::Bytes {
-        serde_json::to_vec(&value).unwrap().into()
+        json::to_vec(&value).unwrap().into()
     }
 }
 

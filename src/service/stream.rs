@@ -15,7 +15,6 @@
 use actix_web::http;
 use actix_web::{http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
-use serde_json::Value;
 use std::io::Error;
 use tracing::info_span;
 
@@ -123,7 +122,7 @@ fn stream_res(
     let stream_settings = meta.get("settings");
 
     if let Some(value) = stream_settings {
-        let settings: Value = json::from_slice(value.as_bytes()).unwrap();
+        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
         let keys = settings.get("partition_keys");
 
         if let Some(value) = keys {
@@ -272,7 +271,7 @@ pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, any
         return Ok(full_text_search_keys);
     }
     let settings = settings.unwrap();
-    let settings: Value = json::from_slice(settings.as_bytes()).unwrap();
+    let settings: json::Value = json::from_slice(settings.as_bytes()).unwrap();
     let fts = settings.get("full_text_search_keys");
     if fts.is_none() {
         return Ok(full_text_search_keys);
@@ -296,12 +295,14 @@ fn transform_stats(stats: &mut StreamStats) -> StreamStats {
 mod test {
     use super::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+
     #[test]
     fn test_transform_stats() {
         let mut stats = StreamStats::default();
         let res = transform_stats(&mut stats);
         assert_eq!(stats, res);
     }
+
     #[test]
     fn test_stream_res() {
         let stats = StreamStats::default();
@@ -309,6 +310,7 @@ mod test {
         let res = stream_res("Test", StreamType::Logs, schema, Some(stats));
         assert_eq!(res.stats, stats);
     }
+
     #[test]
     fn test_get_stream_setting_fts_fields() {
         let sch = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);

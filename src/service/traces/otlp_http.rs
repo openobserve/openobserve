@@ -19,11 +19,11 @@ use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
-use serde_json::{Map, Value};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error};
 use tracing::info_span;
 
+use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::traces::Event;
@@ -74,8 +74,7 @@ pub async fn traces_json(
     }
     let traces_stream_name = "default";
 
-    let mut trace_meta_coll: AHashMap<String, Vec<serde_json::Map<String, Value>>> =
-        AHashMap::new();
+    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, Value>>> = AHashMap::new();
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -88,7 +87,7 @@ pub async fn traces_json(
             continue;
         }
 
-        let traces: Value = serde_json::from_slice(line.as_bytes()).unwrap();
+        let traces: Value = json::from_slice(line.as_bytes()).unwrap();
         if traces.get("resourceSpans").is_some() {
             let res_spans = traces.get("resourceSpans").unwrap().as_array().unwrap();
             for res_span in res_spans {
@@ -227,7 +226,7 @@ pub async fn traces_json(
                                 service: service_att_map.clone(),
                                 flags: 1, //TODO add appropriate value
                                 _timestamp: timestamp,
-                                events: serde_json::to_string(&events).unwrap(),
+                                events: json::to_string(&events).unwrap(),
                             };
                             if timestamp < min_ts.try_into().unwrap() {
                                 min_ts = timestamp as i64;
@@ -238,7 +237,7 @@ pub async fn traces_json(
                             let mut trace_meta = Map::new();
                             trace_meta.insert(
                                 "trace_id".to_owned(),
-                                serde_json::Value::String(trace_id.clone()),
+                                json::Value::String(trace_id.clone()),
                             );
                             trace_meta.insert("_timestamp".to_owned(), start_time.into());
 
@@ -303,14 +302,14 @@ pub async fn traces_json(
             )
             .await;
         }
-        /*let mut hour_meta_buf: Vec<serde_json::Map<String, Value>> =
+        /*let mut hour_meta_buf: Vec<json::Map<String, Value>> =
             trace_meta_coll.get(&key).unwrap().to_vec();
 
         let dest_file = get_storage_file_name(&traces_file_name);
         for item in hour_meta_buf.iter_mut() {
             item.insert(
                 "file_name".to_owned(),
-                serde_json::Value::String(dest_file.clone()),
+                json::Value::String(dest_file.clone()),
             );
         }
         metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await;*/
@@ -324,16 +323,16 @@ pub async fn traces_json(
     //Ok(HttpResponse::Ok().into())
 }
 
-/* fn _rename_keys(json: &mut serde_json::Value) {
+/* fn _rename_keys(json: &mut json::Value) {
     match json {
-        serde_json::Value::Array(a) => a.iter_mut().for_each(_rename_keys),
-        serde_json::Value::Object(o) => {
-            let mut replace = serde_json::Map::with_capacity(o.len());
+        json::Value::Array(a) => a.iter_mut().for_each(_rename_keys),
+        json::Value::Object(o) => {
+            let mut replace = json::Map::with_capacity(o.len());
             o.retain(|k, v| {
                 _rename_keys(v);
                 replace.insert(
                     k.as_str().to_case(Case::Snake),
-                    std::mem::replace(v, serde_json::Value::Null),
+                    std::mem::replace(v, json::Value::Null),
                 );
                 true
             });
@@ -354,7 +353,8 @@ fn get_val_for_attr(attr_val: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use json::json;
+
     #[test]
     fn test_get_val_for_attr() {
         let in_val = 10.00;

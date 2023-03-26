@@ -206,9 +206,9 @@ pub async fn get_alert(
 
 #[cfg(test)]
 mod test {
-    use crate::meta::alert::{AllOperator, Condition};
-
     use super::*;
+    use crate::common::json;
+    use crate::meta::alert::{AllOperator, Condition};
 
     #[actix_web::test]
     async fn test_alerts() {
@@ -229,7 +229,7 @@ mod test {
                 column: "occurance".to_owned(),
                 operator: AllOperator::GreaterThanEquals,
                 ignore_case: None,
-                value: serde_json::json!("5"),
+                value: json::json!("5"),
                 is_numeric: None,
             },
             duration: 1,

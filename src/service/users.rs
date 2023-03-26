@@ -376,8 +376,8 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
     async fn set_up() {
         USERS.insert(
             "dummy/admin@zo.dev".to_string(),

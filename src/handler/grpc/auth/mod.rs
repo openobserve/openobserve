@@ -48,11 +48,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::meta::user::User;
     use tonic::metadata::MetadataValue;
 
     use super::*;
+    use crate::meta::user::User;
 
     #[actix_web::test]
     async fn test_check_no_auth() {

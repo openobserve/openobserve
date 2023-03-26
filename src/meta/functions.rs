@@ -55,6 +55,7 @@ pub struct FunctionList {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::json;
 
     #[test]
     fn test_functions() {
@@ -77,16 +78,16 @@ mod tests {
         };
         assert_eq!(trans, mod_trans);
 
-        let trans_str = serde_json::to_string(&trans).unwrap();
-        let trans2: Transform = serde_json::from_str(&trans_str).unwrap();
+        let trans_str = json::to_string(&trans).unwrap();
+        let trans2: Transform = json::from_str(&trans_str).unwrap();
         assert_eq!(format!("{:?}", trans), format!("{:?}", trans2));
 
         let trans_list = FunctionList {
             list: vec![trans, trans2],
         };
         assert!(!trans_list.list.is_empty());
-        let trans_list_str = serde_json::to_string(&trans_list.clone()).unwrap();
-        let trans_list2: FunctionList = serde_json::from_str(&trans_list_str).unwrap();
+        let trans_list_str = json::to_string(&trans_list.clone()).unwrap();
+        let trans_list2: FunctionList = json::from_str(&trans_list_str).unwrap();
         assert_eq!(trans_list.list.len(), trans_list2.list.len());
     }
 
@@ -96,8 +97,8 @@ mod tests {
             name: "test",
             text: "test",
         };
-        let f1_str = serde_json::to_string(&f1).unwrap();
-        let f2: ZoFunction = serde_json::from_str(&f1_str).unwrap();
+        let f1_str = json::to_string(&f1).unwrap();
+        let f2: ZoFunction = json::from_str(&f1_str).unwrap();
         assert_eq!(f1.name, f2.name);
         assert_eq!(format!("{:?}", f1), format!("{:?}", f2));
     }

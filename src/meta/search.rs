@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use crate::common;
+use crate::common::{self, json};
 use crate::service::search::datafusion::storage::file_list;
 
 #[derive(Clone, Debug)]
@@ -135,10 +134,10 @@ impl Request {
 pub struct Response {
     pub took: usize,
     #[schema(value_type = Vec<Object>)]
-    pub hits: Vec<Value>,
+    pub hits: Vec<json::Value>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[schema(value_type = Object)]
-    pub aggs: HashMap<String, Vec<serde_json::Value>>,
+    pub aggs: HashMap<String, Vec<json::Value>>,
     pub total: usize,
     pub from: usize,
     pub size: usize,
@@ -164,12 +163,12 @@ impl Response {
         }
     }
 
-    pub fn add_hit(&mut self, hit: &Value) {
+    pub fn add_hit(&mut self, hit: &json::Value) {
         self.hits.push(hit.to_owned());
         self.total += 1;
     }
 
-    pub fn add_agg(&mut self, name: &str, hit: &Value) {
+    pub fn add_agg(&mut self, name: &str, hit: &json::Value) {
         let val = self.aggs.entry(name.to_string()).or_default();
         val.push(hit.to_owned());
     }
@@ -193,8 +192,6 @@ impl Response {
 
 #[cfg(test)]
 mod test {
-    use serde_json::json;
-
     use super::*;
 
     #[test]
@@ -202,17 +199,17 @@ mod test {
         let mut res = Response::default();
         res.set_total(10);
         res.set_file_count(5);
-        let hit = json!({"num":12});
-        let mut val_map = serde_json::Map::new();
-        val_map.insert("id".to_string(), json!({"id":1}));
-        res.add_agg("count", &serde_json::Value::Object(val_map));
+        let hit = json::json!({"num":12});
+        let mut val_map = json::Map::new();
+        val_map.insert("id".to_string(), json::json!({"id":1}));
+        res.add_agg("count", &json::Value::Object(val_map));
         res.add_hit(&hit); // total+1
         assert_eq!(res.total, 11);
     }
 
     #[test]
     fn test_request_encoding() {
-        let req = json!(
+        let req = json::json!(
             {
                 "query": {
                     "sql": "c2VsZWN0ICogZnJvbSB0ZXN0",
@@ -229,7 +226,7 @@ mod test {
                 "encoding": "base64"
             }
         );
-        let mut req: Request = serde_json::from_value(req).unwrap();
+        let mut req: Request = json::from_value(req).unwrap();
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
         assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");
@@ -237,7 +234,7 @@ mod test {
 
     #[test]
     fn test_request_no_encoding() {
-        let req = json!(
+        let req = json::json!(
             {
                 "query": {
                     "sql": "select * from test",
@@ -254,7 +251,7 @@ mod test {
                 "encoding": ""
             }
         );
-        let mut req: Request = serde_json::from_value(req).unwrap();
+        let mut req: Request = json::from_value(req).unwrap();
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
         assert_eq!(req.aggs.get("sql").unwrap(), "select * from olympics");

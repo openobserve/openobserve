@@ -29,7 +29,7 @@ pub async fn ingest(
     org_id: &str,
     stream_name: &str,
     thread_id: usize,
-    records: Vec<serde_json::Map<String, json::Value>>,
+    records: Vec<json::Map<String, json::Value>>,
 ) {
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let loc_span = info_span!("service:metadata:ingest");
@@ -38,7 +38,7 @@ pub async fn ingest(
         return;
     }
     for item in records.iter() {
-        let value = serde_json::to_value(item).unwrap();
+        let value = json::to_value(item).unwrap();
         //JSON Flattening
         let mut value = json::flatten_json_and_format_field(&value);
         // get json object

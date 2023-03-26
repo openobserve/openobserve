@@ -108,7 +108,7 @@ impl From<&str> for StreamStats {
 
 impl From<StreamStats> for Vec<u8> {
     fn from(value: StreamStats) -> Vec<u8> {
-        serde_json::to_vec(&value).unwrap()
+        json::to_vec(&value).unwrap()
     }
 }
 

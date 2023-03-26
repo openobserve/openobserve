@@ -53,9 +53,8 @@ pub async fn is_root_user(user_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::{meta::user::UserRequest, service::users};
-
     use super::*;
+    use crate::{meta::user::UserRequest, service::users};
 
     #[actix_web::test]
     async fn test_is_root_user() {

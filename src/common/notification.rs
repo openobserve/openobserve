@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_json::Value;
 use std::error::Error as StdError;
 
-use crate::{
-    meta::alert::{self, Alert},
-    service::db,
-};
+use crate::common::json::{self, Value};
+use crate::meta::alert::{self, Alert};
+use crate::service::db;
 
 pub async fn send_notification(
     alert: &Alert,
@@ -36,7 +34,7 @@ pub async fn send_notification(
         Ok(dest) => match dest {
             Some(local_dest) => {
                 let body = local_dest.template.unwrap().body;
-                let resp_str = serde_json::to_string(&body).unwrap();
+                let resp_str = json::to_string(&body).unwrap();
 
                 let mut resp = resp_str
                     .replace("{stream_name}", &trigger.stream)
@@ -52,9 +50,9 @@ pub async fn send_notification(
                     }
                 }
 
-                let msg: Value = serde_json::from_str(&resp).unwrap();
+                let msg: Value = json::from_str(&resp).unwrap();
                 let msg: Value = match &msg {
-                    Value::String(obj) => match serde_json::from_str(obj) {
+                    Value::String(obj) => match json::from_str(obj) {
                         Ok(obj) => obj,
                         Err(_) => msg,
                     },
@@ -98,12 +96,9 @@ pub async fn send_notification(
 
 #[cfg(test)]
 mod tests {
-    use crate::meta::{
-        alert::{AlertDestination, Condition, DestinationTemplate, Trigger},
-        search::Query,
-    };
-
     use super::*;
+    use crate::meta::alert::{AlertDestination, Condition, DestinationTemplate, Trigger};
+    use crate::meta::search::Query;
 
     #[actix_web::test]
     async fn test_send_notification() {
@@ -150,7 +145,7 @@ mod tests {
                 column: "Country".to_string(),
                 operator: alert::AllOperator::EqualTo,
                 ignore_case: Some(false),
-                value: serde_json::Value::String("USA".to_string()),
+                value: json::Value::String("USA".to_string()),
                 is_numeric: Some(false),
             },
             duration: 5,

@@ -27,6 +27,7 @@ pub fn find(haystack: &str, needle: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_find() {
         let haystack = "This is search-unitTest";

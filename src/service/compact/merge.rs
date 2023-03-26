@@ -412,6 +412,7 @@ async fn merge_files(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[actix_web::test]
     async fn test_compact() {
         let off_set = Duration::hours(2).num_microseconds().unwrap();
