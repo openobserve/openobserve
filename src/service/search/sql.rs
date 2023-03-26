@@ -29,7 +29,9 @@ use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
 use crate::service::{db, file_list, logs};
 
-const SQL_DELIMITERS: [u8; 10] = [b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!'];
+const SQL_DELIMITERS: [u8; 12] = [
+    b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
+];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
 #[derive(Clone, Debug, Serialize)]
@@ -81,7 +83,7 @@ impl Sql {
         // parse sql
         let mut origin_sql = req_query.sql.clone();
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
-
+        origin_sql = split_sql_token(&origin_sql).join("");
         let mut meta = match MetaSql::new(&origin_sql) {
             Ok(meta) => meta,
             Err(err) => {
@@ -291,7 +293,7 @@ impl Sql {
         };
         let schema_fields = schema.fields().to_vec();
 
-        // getch sql where tokens
+        // get sql where tokens
         let where_tokens = split_sql_token(&origin_sql);
         let where_pos = where_tokens
             .iter()
@@ -731,7 +733,14 @@ fn split_sql_token(text: &str) -> Vec<String> {
         tokens.push(token);
     }
 
-    // println!("tokens: {:?}", tokens);
+    // filter tokens by break line
+    for token in tokens.iter_mut() {
+        if token.eq(&"\r\n") || token.eq(&"\n") {
+            *token = " ".to_string();
+        }
+    }
+    println!("tokens: {:?}", tokens);
+
     tokens
 }
 
