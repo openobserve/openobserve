@@ -19,7 +19,6 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
-use serde_json::Value;
 use std::io::Error;
 use std::time::Instant;
 
@@ -126,7 +125,7 @@ pub async fn ingest(
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let body_vec = body.to_vec();
-    let reader: Vec<Value> = json::from_slice(&body_vec)?;
+    let reader: Vec<json::Value> = json::from_slice(&body_vec)?;
     for item in reader.iter() {
         #[cfg(feature = "zo_functions")]
         let mut value = item.to_owned();
@@ -173,7 +172,7 @@ pub async fn ingest(
         }
         local_val.insert(
             CONFIG.common.time_stamp_col.clone(),
-            Value::Number(timestamp.into()),
+            json::Value::Number(timestamp.into()),
         );
 
         let local_trigger = super::add_valid_record(

@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use flatten_json_object::{ArrayFormatting, Flattener};
-
-pub type Value = serde_json::Value;
+pub use serde_json::{from_value, json, to_value, Error, Map, Value};
 
 #[inline(always)]
 #[cfg(target_arch = "x86_64")]
@@ -128,7 +127,6 @@ pub fn flatten_json(obj: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn test_flatten_json() {

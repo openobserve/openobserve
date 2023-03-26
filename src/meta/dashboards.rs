@@ -28,6 +28,7 @@ pub struct DashboardList {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::json;
 
     #[test]
     fn test_dashboard() {
@@ -38,8 +39,8 @@ mod tests {
         assert_eq!(dashboard.name, "test");
         assert_eq!(dashboard.details, "test");
 
-        let dashboard_str = serde_json::to_string(&dashboard.clone()).unwrap();
-        let dashboard2: Dashboard = serde_json::from_str(&dashboard_str).unwrap();
+        let dashboard_str = json::to_string(&dashboard.clone()).unwrap();
+        let dashboard2: Dashboard = json::from_str(&dashboard_str).unwrap();
         assert_eq!(dashboard.name, dashboard2.name);
         assert_eq!(format!("{:?}", dashboard), format!("{:?}", dashboard2));
 
@@ -47,8 +48,8 @@ mod tests {
             list: vec![dashboard.clone()],
         };
         assert!(!dslist.list.is_empty());
-        let dslist_str = serde_json::to_string(&dslist.clone()).unwrap();
-        let dslist2: DashboardList = serde_json::from_str(&dslist_str).unwrap();
+        let dslist_str = json::to_string(&dslist.clone()).unwrap();
+        let dslist2: DashboardList = json::from_str(&dslist_str).unwrap();
         assert_eq!(dslist.list.len(), dslist2.list.len());
         assert_eq!(format!("{:?}", dslist), format!("{:?}", dslist2));
     }

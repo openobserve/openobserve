@@ -133,9 +133,8 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
 
 #[cfg(test)]
 mod tests {
-    use crate::meta::user::UserRequest;
-
     use super::*;
+    use crate::meta::user::UserRequest;
 
     #[actix_web::test]
     async fn test_validate() {

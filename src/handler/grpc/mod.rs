@@ -96,8 +96,9 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::collections::HashMap;
+
+    use super::*;
 
     #[actix_web::test]
     async fn test_get_file_meta() {

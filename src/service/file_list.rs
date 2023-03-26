@@ -67,6 +67,7 @@ pub async fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow:
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[actix_web::test]
     async fn test_get_file_meta() {
         let res = get_file_meta(
@@ -76,6 +77,7 @@ mod test {
         // println!("{:?}", res);
         assert!(res.is_ok());
     }
+
     #[actix_web::test]
     async fn test_get_file_list() {
         let res = get_file_list(

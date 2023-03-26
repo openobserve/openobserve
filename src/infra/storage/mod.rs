@@ -65,6 +65,7 @@ pub fn generate_partioned_file_key(
 mod tests {
     use super::*;
     use crate::infra::config::CONFIG;
+
     #[test]
     fn test_generate_partioned_file_key() {
         let file_key = generate_partioned_file_key(

@@ -848,9 +848,10 @@ impl TryFrom<&BinaryOperator> for SqlOperator {
 
 #[cfg(test)]
 mod tests {
+    use sqlparser::parser::Parser;
+
     use super::*;
     use crate::meta::sql::SqlValue;
-    use sqlparser::parser::Parser;
 
     #[test]
     fn parse_sql_works() {

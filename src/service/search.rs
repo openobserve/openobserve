@@ -24,6 +24,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
+use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
 use crate::infra::config::{CONFIG, ROOT_USER};
@@ -113,10 +114,8 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
                 )));
             }
         };
-        let mut sources: Vec<serde_json::Value> = json_rows
-            .into_iter()
-            .map(serde_json::Value::Object)
-            .collect();
+        let mut sources: Vec<json::Value> =
+            json_rows.into_iter().map(json::Value::Object).collect();
 
         // handle metrics response
         if query_type.eq("metrics") {
@@ -147,10 +146,8 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
                     )));
                 }
             };
-            let sources: Vec<serde_json::Value> = json_rows
-                .into_iter()
-                .map(serde_json::Value::Object)
-                .collect();
+            let sources: Vec<json::Value> =
+                json_rows.into_iter().map(json::Value::Object).collect();
             for source in sources {
                 response.add_agg(&agg.name, &source);
             }
@@ -562,10 +559,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 )))
             }
         };
-        let mut sources: Vec<serde_json::Value> = json_rows
-            .into_iter()
-            .map(serde_json::Value::Object)
-            .collect();
+        let mut sources: Vec<json::Value> =
+            json_rows.into_iter().map(json::Value::Object).collect();
 
         // handle metrics response
         if query_type.eq("metrics") {
@@ -591,10 +586,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 )));
             }
         };
-        let sources: Vec<serde_json::Value> = json_rows
-            .into_iter()
-            .map(serde_json::Value::Object)
-            .collect();
+        let sources: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
         for source in sources {
             result.add_agg(&name, &source);
         }
@@ -626,11 +618,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     Ok(result)
 }
 
-fn handle_metrics_response(sources: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     // handle metrics response
-    let mut results_metrics: HashMap<String, serde_json::Value> = HashMap::with_capacity(16);
-    let mut results_values: HashMap<String, Vec<[serde_json::Value; 2]>> =
-        HashMap::with_capacity(16);
+    let mut results_metrics: HashMap<String, json::Value> = HashMap::with_capacity(16);
+    let mut results_values: HashMap<String, Vec<[json::Value; 2]>> = HashMap::with_capacity(16);
     for source in sources {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
@@ -644,7 +635,7 @@ fn handle_metrics_response(sources: Vec<serde_json::Value>) -> Vec<serde_json::V
             let mut fields = fields.clone();
             fields.remove(&CONFIG.common.time_stamp_col);
             fields.remove("value");
-            results_metrics.insert(key.clone(), serde_json::Value::Object(fields));
+            results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_insert(Vec::new());
         let value = [
@@ -652,14 +643,14 @@ fn handle_metrics_response(sources: Vec<serde_json::Value>) -> Vec<serde_json::V
                 .get(&CONFIG.common.time_stamp_col)
                 .unwrap()
                 .to_owned(),
-            serde_json::Value::String(fields.get("value").unwrap().to_string()),
+            json::Value::String(fields.get("value").unwrap().to_string()),
         ];
         entry.push(value);
     }
 
     let mut new_sources = Vec::with_capacity(results_metrics.len());
     for (key, metrics) in results_metrics {
-        new_sources.push(serde_json::json!({
+        new_sources.push(json::json!({
             "metrics": metrics,
             "values": results_values.get(&key).unwrap(),
         }));

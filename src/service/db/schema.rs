@@ -14,7 +14,6 @@
 
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
-use serde_json::Value;
 use std::sync::Arc;
 
 use crate::common::json;
@@ -46,7 +45,7 @@ pub async fn get(
         let db = &crate::infra::db::DEFAULT;
         if let Ok(v) = db.get(&key).await {
             // for backward compatibility check if value in etcd is vec or schema based on it return value
-            let local_val: Value = json::from_slice(&v).unwrap();
+            let local_val: json::Value = json::from_slice(&v).unwrap();
             if local_val.is_array() {
                 let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
                 value = local_vec.last().unwrap().clone();
@@ -73,7 +72,7 @@ pub async fn get_versions(
         let db = &crate::infra::db::DEFAULT;
         if let Ok(v) = db.get(&key).await {
             // for backward compatibility check if value in etcd is vec or schema based on it return value
-            let local_val: Value = json::from_slice(&v).unwrap();
+            let local_val: json::Value = json::from_slice(&v).unwrap();
             if local_val.is_array() {
                 value = json::from_slice(&v).unwrap()
             } else {

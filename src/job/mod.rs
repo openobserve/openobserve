@@ -115,8 +115,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env;
+
+    use super::*;
+
     #[actix_web::test]
     #[ignore]
     async fn test_init() {

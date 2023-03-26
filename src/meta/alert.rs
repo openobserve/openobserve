@@ -14,11 +14,11 @@
 
 use ahash::HashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 use std::fmt;
 use utoipa::ToSchema;
 
 use super::search::Query;
+use crate::common::json::{Map, Value};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
@@ -182,7 +182,7 @@ pub struct Condition {
     #[serde(default)]
     pub ignore_case: Option<bool>,
     #[schema(value_type = Object)]
-    pub value: serde_json::Value,
+    pub value: Value,
     pub is_numeric: Option<bool>,
 }
 
@@ -195,18 +195,18 @@ impl Evaluate for Condition {
         let evaluate_numeric = if self.is_numeric.is_some() {
             self.is_numeric.unwrap()
         } else {
-            matches!(row.get(&self.column).unwrap(), serde_json::Value::Number(_))
+            matches!(row.get(&self.column).unwrap(), Value::Number(_))
         };
 
         /* let evaluate_numeric = match row.get(&self.column).expect("column exists") {
-            serde_json::Value::Number(number) => number.as_f64().unwrap() > 0.0,
-            serde_json::Value::String(s) => s.is_empty(),
+            Value::Number(number) => number.as_f64().unwrap() > 0.0,
+            Value::String(s) => s.is_empty(),
             _ => false,
         }; */
 
         if evaluate_numeric {
             let number = match row.get(&self.column).expect("column exists") {
-                serde_json::Value::Number(number) => number,
+                Value::Number(number) => number,
                 _ => unreachable!("please make sure right value for is_numeric is set trigger"),
             };
 
@@ -225,7 +225,7 @@ impl Evaluate for Condition {
             }
         } else {
             let string = match row.get(&self.column).expect("column exists") {
-                serde_json::Value::String(s) => s,
+                Value::String(s) => s,
                 _ => unreachable!("please make sure right value for is_numeric is set trigger"),
             };
 
@@ -308,6 +308,7 @@ pub trait Evaluate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::json::json;
 
     #[test]
     fn test_evaluate() {
@@ -315,10 +316,10 @@ mod tests {
             column: "occurance".to_owned(),
             operator: AllOperator::GreaterThanEquals,
             ignore_case: None,
-            value: serde_json::json!("5"),
+            value: json!("5"),
             is_numeric: None,
         };
-        let row = serde_json::json!({"Country":"USA","occurance": 10});
+        let row = json!({"Country":"USA","occurance": 10});
         condition.evaluate(row.as_object().unwrap().clone());
     }
 }

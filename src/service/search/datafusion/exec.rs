@@ -40,6 +40,7 @@ use uuid::Uuid;
 use super::storage::file_list;
 #[cfg(feature = "zo_functions")]
 use super::transform_udf::get_all_transform;
+use crate::common::json;
 use crate::infra::cache::tmpfs;
 use crate::infra::config::{get_parquet_compression, CONFIG};
 use crate::meta::common::FileMeta;
@@ -732,10 +733,7 @@ pub async fn merge_parquet_files(
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
     let json_rows = arrowJson::writer::record_batches_to_json_rows(&batches[..]).unwrap();
-    let mut result: Vec<serde_json::Value> = json_rows
-        .into_iter()
-        .map(serde_json::Value::Object)
-        .collect();
+    let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
     let record = result.pop().unwrap();
     let file_meta = FileMeta {
         min_ts: record["min_ts"].as_i64().unwrap(),
@@ -819,6 +817,7 @@ mod test {
     use datafusion::from_slice::FromSlice;
 
     use super::*;
+
     #[actix_web::test]
     async fn test_register_udf() {
         let mut ctx = SessionContext::new();
