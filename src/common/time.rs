@@ -14,6 +14,8 @@
 
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 
+use super::json;
+
 #[inline(always)]
 pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error> {
     if s.contains('T') && !s.contains(' ') {
@@ -72,10 +74,10 @@ pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
 }
 
 #[inline(always)]
-pub fn parse_timestamp_micro_from_value(v: &serde_json::Value) -> Result<i64, anyhow::Error> {
+pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<i64, anyhow::Error> {
     let n = match v {
-        serde_json::Value::String(s) => parse_str_to_timestamp_micros(s)?,
-        serde_json::Value::Number(n) => {
+        json::Value::String(s) => parse_str_to_timestamp_micros(s)?,
+        json::Value::Number(n) => {
             if n.is_i64() {
                 n.as_i64().unwrap()
             } else if n.is_u64() {
@@ -194,35 +196,35 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp_micro_from_value() {
-        let v = serde_json::json!(1609459200000000i64);
+        let v = json::json!(1609459200000000i64);
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609459200000000);
 
-        let v = serde_json::json!("2021-01-01T00:00:00");
+        let v = json::json!("2021-01-01T00:00:00");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609459200000000);
 
-        let v = serde_json::json!("2021-01-01T00:00:00Z");
+        let v = json::json!("2021-01-01T00:00:00Z");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609459200000000);
 
-        let v = serde_json::json!("2021-01-01T00:00:00+08:00");
+        let v = json::json!("2021-01-01T00:00:00+08:00");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609430400000000);
 
-        let v = serde_json::json!("2021-01-01T00:00:00-08:00");
+        let v = json::json!("2021-01-01T00:00:00-08:00");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609488000000000);
 
-        let v = serde_json::json!("2021-01-01 00:00:00");
+        let v = json::json!("2021-01-01 00:00:00");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609459200000000);
 
-        let v = serde_json::json!("2021-01-01T00:00:00.000000Z");
+        let v = json::json!("2021-01-01T00:00:00.000000Z");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1609459200000000);
 
-        let v = serde_json::json!("Wed, 8 Mar 2023 16:46:51 CST");
+        let v = json::json!("Wed, 8 Mar 2023 16:46:51 CST");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1678315611000000);
     }

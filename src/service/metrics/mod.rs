@@ -356,6 +356,7 @@ async fn prom_ha_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_get_metric_type() {
         let htype = get_metric_type(

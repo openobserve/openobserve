@@ -13,24 +13,19 @@
 // limitations under the License.
 
 use segment::{message::Track, Client, Message};
-use serde_json::Value;
 use std::collections::HashMap;
 
-const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+use crate::common::json;
+use crate::infra::cache::stats::STATS;
+use crate::infra::config::*;
 
-use crate::infra::{
-    cache::stats::STATS,
-    config::{
-        CONFIG, INSTANCE_ID, QUERY_FUNCTIONS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_SCHEMAS,
-        TELEMETRY_CLIENT, USERS, VERSION,
-    },
-};
+const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
     pub instance_id: String,
     pub event: Track,
-    pub base_info: HashMap<String, Value>,
+    pub base_info: HashMap<String, json::Value>,
 }
 
 impl Telemetry {
@@ -49,7 +44,7 @@ impl Telemetry {
     pub async fn event(
         &mut self,
         event: &str,
-        data: Option<HashMap<String, Value>>,
+        data: Option<HashMap<String, json::Value>>,
         send_zo_data: bool,
     ) {
         if !CONFIG.common.telemetry_enabled {
@@ -73,7 +68,7 @@ impl Telemetry {
                 .to_string(),
             },
             event: event.to_string(),
-            properties: serde_json::to_value(props).unwrap(),
+            properties: json::to_value(props).unwrap(),
             timestamp: Some(time::OffsetDateTime::now_utc()),
             ..Default::default()
         });
@@ -90,12 +85,12 @@ impl Telemetry {
         }
     }
 
-    pub async fn heart_beat(&mut self, event: &str, data: Option<HashMap<String, Value>>) {
+    pub async fn heart_beat(&mut self, event: &str, data: Option<HashMap<String, json::Value>>) {
         self.event(event, data, true).await;
     }
 }
 
-pub fn get_base_info(data: &mut HashMap<String, Value>) -> HashMap<String, Value> {
+pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String, json::Value> {
     data.insert("cpu_count".to_string(), sys_info::cpu_num().unwrap().into());
     data.insert(
         "total_memory".to_string(),
@@ -128,7 +123,7 @@ pub fn get_base_info(data: &mut HashMap<String, Value>) -> HashMap<String, Value
     data.clone()
 }
 
-pub fn add_zo_info(data: &mut HashMap<String, Value>) {
+pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     let iter = STREAM_SCHEMAS.iter().clone();
     let mut num_streams = 0;
     for item in iter {
@@ -139,7 +134,7 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
     data.insert("num_users".to_string(), USERS.len().into());
     data.insert(
         "is_local_mode".to_string(),
-        serde_json::Value::Bool(CONFIG.common.local_mode),
+        json::Value::Bool(CONFIG.common.local_mode),
     );
     if CONFIG.common.local_mode {
         data.insert(
@@ -152,11 +147,11 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
     if !crate::infra::cluster::is_single_node(nodes) {
         match crate::infra::cluster::get_cached_online_nodes() {
             Some(nodes) => {
-                data.insert("is_HA_mode".to_string(), serde_json::Value::Bool(true));
+                data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
             }
             None => {
-                data.insert("is_HA_mode".to_string(), serde_json::Value::Bool(false));
+                data.insert("is_HA_mode".to_string(), json::Value::Bool(false));
             }
         }
     }
@@ -206,6 +201,7 @@ pub fn add_zo_info(data: &mut HashMap<String, Value>) {
 #[cfg(test)]
 mod test_telemetry {
     use super::*;
+
     #[test]
     fn test_telemetry_new() {
         let tel = Telemetry::new();

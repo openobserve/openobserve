@@ -169,7 +169,6 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]

@@ -59,7 +59,6 @@ pub async fn clear(session_id: &str) -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]

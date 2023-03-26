@@ -178,9 +178,8 @@ pub async fn reset() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::meta::user::UserOrg;
-
     use super::*;
+    use crate::meta::user::UserOrg;
 
     #[actix_web::test]
     async fn test_user() {

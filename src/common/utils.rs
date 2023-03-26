@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::{
-    arrow::{datatypes::Schema, json, record_batch::RecordBatch},
-    datasource::MemTable,
-    prelude::SessionContext,
-};
-use serde_json::Value;
+use datafusion::arrow::{datatypes::Schema, json as arrow_json, record_batch::RecordBatch};
+use datafusion::{datasource::MemTable, prelude::SessionContext};
 use std::sync::Arc;
 
+use crate::common::json;
 use crate::infra::config::CONFIG;
 use crate::meta::common::FileMeta;
 use crate::meta::StreamType;
@@ -74,11 +71,8 @@ pub async fn populate_file_meta(
     );
     let df = ctx.sql(sql.as_str()).await.unwrap();
     let batches = df.collect().await.unwrap();
-    let json_rows = json::writer::record_batches_to_json_rows(&batches[..]).unwrap();
-    let mut result: Vec<Value> = json_rows
-        .into_iter()
-        .map(serde_json::Value::Object)
-        .collect();
+    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..]).unwrap();
+    let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let record = result.pop().unwrap();
     file_meta.min_ts = record.get("min").unwrap().as_i64().unwrap();
@@ -88,14 +82,11 @@ pub async fn populate_file_meta(
 
 #[cfg(test)]
 mod tests {
+    use datafusion::arrow::array::{Int64Array, StringArray};
+    use datafusion::arrow::datatypes::{DataType, Field};
+    use datafusion::from_slice::FromSlice;
+
     use super::*;
-    use datafusion::{
-        arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field},
-        },
-        from_slice::FromSlice,
-    };
 
     #[test]
     fn test_increment_stream_file_num_v1() {

@@ -18,10 +18,10 @@ use chrono::{TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-use serde_json::{Map, Value};
 
 use super::triggers;
 use crate::common;
+use crate::common::json::{Map, Value};
 use crate::common::notification::send_notification;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;

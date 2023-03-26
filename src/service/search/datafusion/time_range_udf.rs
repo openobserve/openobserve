@@ -111,8 +111,6 @@ pub fn time_range_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -120,6 +118,8 @@ mod tests {
     use datafusion::from_slice::FromSlice;
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
+
+    use super::*;
 
     #[tokio::test]
     async fn time_range() {
