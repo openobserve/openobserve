@@ -188,13 +188,13 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
-const apiMethods = ["get", "post", "put"];
+const apiMethods = ["GET", "POST", "PUT"];
 const store = useStore();
 const { t } = useI18n();
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
-  method: "post",
+  method: "POST",
   template: "",
   headers: {},
 });
