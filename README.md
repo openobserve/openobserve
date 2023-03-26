@@ -55,9 +55,20 @@ You can also try ZincObserve without installing it in under 2 minutes by trying 
 
 ![Home](./screenshots/zo_log_details.png)
 
-## Users
 
-![Home](./screenshots/zo_add_user.png)
+## Visualization and dashboard
+
+![Dashboaard](./screenshots/dashboard.png)
+
+## Alerts
+
+### Real time alerts
+
+![Alerts Realtime](./screenshots/alert_realtime.jpg)
+
+### Scheduled alerts
+
+![Alerts Scheduled](./screenshots/alert_scheduled.jpg)
 
 ## Streams
 
