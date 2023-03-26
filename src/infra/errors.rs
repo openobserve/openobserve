@@ -14,6 +14,8 @@
 
 use thiserror::Error as ThisError;
 
+use crate::common::json;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(ThisError, Debug)]
@@ -25,7 +27,7 @@ pub enum Error {
     #[error("SledError# {0}")]
     SledError(#[from] sled::Error),
     #[error("SerdeJsonError# {0}")]
-    SerdeJsonError(#[from] serde_json::Error),
+    SerdeJsonError(#[from] json::Error),
     #[error("SimdJsonError# {0}")]
     SimdJsonError(#[from] simd_json::Error),
     #[error("DataFusionError# {0}")]
@@ -138,21 +140,18 @@ impl ErrorCodes {
     }
 
     pub fn to_json(&self) -> String {
-        let mut map = serde_json::Map::new();
-        map.insert("code".to_string(), serde_json::Value::from(self.get_code()));
-        map.insert(
-            "message".to_string(),
-            serde_json::Value::from(self.get_message()),
-        );
+        let mut map = json::Map::new();
+        map.insert("code".to_string(), json::Value::from(self.get_code()));
+        map.insert("message".to_string(), json::Value::from(self.get_message()));
         map.insert(
             "inner".to_string(),
-            serde_json::Value::from(self.get_inner_message()),
+            json::Value::from(self.get_inner_message()),
         );
-        serde_json::Value::Object(map).to_string()
+        json::Value::Object(map).to_string()
     }
 
     pub fn from_json(json: &str) -> Result<ErrorCodes> {
-        let val: serde_json::Value = match serde_json::from_str(json) {
+        let val: json::Value = match json::from_str(json) {
             Ok(val) => val,
             Err(_) => return Ok(ErrorCodes::ServerInternalError(json.to_string())),
         };
@@ -169,7 +168,7 @@ impl ErrorCodes {
         };
         let message = match map.get("inner") {
             Some(message) => match message {
-                serde_json::Value::String(message) => message.to_owned(),
+                json::Value::String(message) => message.to_owned(),
                 _ => message.to_string(),
             },
             None => return Ok(ErrorCodes::ServerInternalError(json.to_string())),

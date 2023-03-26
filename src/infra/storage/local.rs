@@ -97,6 +97,7 @@ impl FileStorage for Local {
 #[cfg(test)]
 mod test_util {
     use super::*;
+
     #[actix_web::test]
     async fn test_local_storage() {
         let local = Local {};

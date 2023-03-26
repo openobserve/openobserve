@@ -79,8 +79,9 @@ pub trait Db: Sync + 'static {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
+
+    use super::*;
 
     #[actix_web::test]
     async fn test_put() {

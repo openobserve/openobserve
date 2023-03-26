@@ -24,11 +24,11 @@ use opentelemetry_proto::tonic::{
     collector::trace::v1::ExportTraceServiceResponse,
 };
 use prost::Message;
-use serde_json::{json, Map, Value};
 use std::fs::OpenOptions;
 use std::io::Error;
 use tracing::info_span;
 
+use crate::common::json::{json, Map, Value};
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::traces::Event;
@@ -69,8 +69,7 @@ pub async fn handle_trace_request(
     }
     let traces_stream_name = "default";
 
-    let mut trace_meta_coll: AHashMap<String, Vec<serde_json::Map<String, Value>>> =
-        AHashMap::new();
+    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, Value>>> = AHashMap::new();
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -173,7 +172,7 @@ pub async fn handle_trace_request(
                     service: service_att_map.clone(),
                     flags: 1, //TODO add appropriate value
                     _timestamp: timestamp,
-                    events: serde_json::to_string(&events).unwrap(),
+                    events: json::to_string(&events).unwrap(),
                 };
                 let value_str = json::to_string(&local_val).unwrap();
                 hour_buf.push(value_str);
@@ -184,10 +183,7 @@ pub async fn handle_trace_request(
 
                 //Trace Metadata
                 let mut trace_meta = Map::new();
-                trace_meta.insert(
-                    "trace_id".to_owned(),
-                    serde_json::Value::String(trace_id.clone()),
-                );
+                trace_meta.insert("trace_id".to_owned(), json::Value::String(trace_id.clone()));
                 trace_meta.insert("_timestamp".to_owned(), start_time.into());
 
                 let hour_meta_buf = trace_meta_coll.entry(hour_key.clone()).or_default();
@@ -242,14 +238,14 @@ pub async fn handle_trace_request(
             .await;
         }
         /*
-        let mut hour_meta_buf: Vec<serde_json::Map<String, Value>> =
+        let mut hour_meta_buf: Vec<json::Map<String, Value>> =
             trace_meta_coll.get(&key).unwrap().to_vec();
 
         let dest_file = get_storage_file_name(&traces_file_name);
         for item in hour_meta_buf.iter_mut() {
             item.insert(
                 "file_name".to_owned(),
-                serde_json::Value::String(dest_file.clone()),
+                json::Value::String(dest_file.clone()),
             );
         }
 
@@ -345,6 +341,7 @@ fn get_val(attr_val: Option<AnyValue>) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_get_val() {
         let in_str = "Test".to_string();

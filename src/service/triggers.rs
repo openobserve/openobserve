@@ -68,7 +68,6 @@ pub async fn get_alert(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[actix_web::test]

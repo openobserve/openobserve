@@ -103,8 +103,6 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -112,6 +110,8 @@ mod tests {
     use datafusion::from_slice::FromSlice;
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_match_udf() {

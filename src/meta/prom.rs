@@ -53,8 +53,8 @@ impl Metric {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+    use crate::common::json;
 
     #[test]
     fn test_response() {
@@ -67,8 +67,8 @@ mod test {
             "Gauge".to_string(),
         );
 
-        let str_met = serde_json::to_string(&metric).unwrap();
-        let loc_met: Metric = serde_json::from_str(str_met.as_str()).unwrap();
+        let str_met = json::to_string(&metric).unwrap();
+        let loc_met: Metric = json::from_str(str_met.as_str()).unwrap();
 
         assert_eq!(loc_met.name, name);
     }

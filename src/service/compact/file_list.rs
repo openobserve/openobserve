@@ -221,6 +221,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[actix_web::test]
     async fn test_compact() {
         let off_set = Duration::hours(2).num_microseconds().unwrap();

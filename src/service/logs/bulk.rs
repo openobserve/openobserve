@@ -19,7 +19,6 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
-use serde_json::Value;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
 
@@ -85,9 +84,9 @@ pub async fn ingest(
             continue;
         }
         #[cfg(feature = "zo_functions")]
-        let mut value: Value = json::from_slice(line.as_bytes())?;
+        let mut value: json::Value = json::from_slice(line.as_bytes())?;
         #[cfg(not(feature = "zo_functions"))]
-        let value: Value = json::from_slice(line.as_bytes())?;
+        let value: json::Value = json::from_slice(line.as_bytes())?;
         if !next_line_is_data {
             // check bulk operate
             if value.get("delete").is_some() {
@@ -214,7 +213,7 @@ pub async fn ingest(
             }
             local_val.insert(
                 CONFIG.common.time_stamp_col.clone(),
-                Value::Number(timestamp.into()),
+                json::Value::Number(timestamp.into()),
             );
             let partition_keys: Vec<String> = match stream_partition_keys_map.get(&stream_name) {
                 Some((_, partition_keys)) => partition_keys.to_vec(),

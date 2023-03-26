@@ -14,8 +14,9 @@
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
+
+use crate::common::json;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Span {
@@ -33,10 +34,10 @@ pub struct Span {
     pub service_name: String,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, Value>,
+    pub attributes: AHashMap<String, json::Value>,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub service: AHashMap<String, Value>,
+    pub service: AHashMap<String, json::Value>,
     pub _timestamp: u64,
     pub events: String,
 }
@@ -56,7 +57,7 @@ pub struct Event {
     pub _timestamp: u64,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, Value>,
+    pub attributes: AHashMap<String, json::Value>,
 }
 /* #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SpanReference {

@@ -21,6 +21,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
+use crate::common::json;
 use crate::infra::config::{CONFIG, LOCKER};
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -112,7 +113,7 @@ pub async fn search(
     };
 
     // handle encoding for query and aggs
-    let mut req: meta::search::Request = match serde_json::from_slice(&body) {
+    let mut req: meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -553,12 +554,12 @@ pub async fn values(
     };
 
     let mut resp = meta::search::Response::default();
-    let mut hit_values: Vec<serde_json::Value> = Vec::new();
+    let mut hit_values: Vec<json::Value> = Vec::new();
     for (key, values) in resp_search.aggs {
-        let mut field_value: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
-        field_value.insert("field".to_string(), serde_json::Value::String(key));
-        field_value.insert("values".to_string(), serde_json::Value::Array(values));
-        hit_values.push(serde_json::Value::Object(field_value));
+        let mut field_value: json::Map<String, json::Value> = json::Map::new();
+        field_value.insert("field".to_string(), json::Value::String(key));
+        field_value.insert("values".to_string(), json::Value::Array(values));
+        hit_values.push(json::Value::Object(field_value));
     }
     resp.total = fields.len();
     resp.hits = hit_values;

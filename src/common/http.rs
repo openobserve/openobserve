@@ -43,6 +43,7 @@ pub fn get_stream_type_from_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_get_file_from_cache() {
         let key = "type".to_string();
