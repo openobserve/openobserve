@@ -17,14 +17,16 @@ use ahash::AHashMap;
 use serde::Serialize;
 use std::io::Error;
 
+use utoipa::ToSchema;
+
 use crate::common::json;
 use crate::infra::config::{self, CONFIG};
 use crate::infra::{cache, cluster};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
 
-#[derive(Serialize)]
-struct HealthzResponse {
+#[derive(Serialize, ToSchema)]
+pub struct HealthzResponse {
     status: String,
 }
 
@@ -39,6 +41,14 @@ struct ConfigResponse<'a> {
     default_functions: Vec<ZoFunction<'a>>,
 }
 
+/** healthz */
+#[utoipa::path(
+    path = "/healthz",
+    tag = "Meta",
+    responses(
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+    )
+)]
 #[get("/healthz")]
 pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
