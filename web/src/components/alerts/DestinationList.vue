@@ -208,6 +208,10 @@ export default defineComponent({
       getTemplates();
     });
     const getDestinations = () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while loading destinations...",
+      });
       destinationService
         .list({
           page_num: 1,
@@ -224,7 +228,15 @@ export default defineComponent({
           }));
           updateRoute();
         })
-        .catch(() => console.log("Error while fetching destinations"));
+        .catch(() => {
+          dismiss();
+          q.notify({
+            type: "negative",
+            message: "Error while pulling destinations.",
+            timeout: 2000,
+          });
+        })
+        .finally(() => dismiss());
     };
     const getTemplates = () => {
       templateService
