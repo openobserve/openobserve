@@ -51,13 +51,21 @@ jobs:
           components: rustfmt, clippy
           override: true
 
-      - name: Output package versions
-        run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
+      - name: Show versions of installed binaries
+        run: |
+          protoc --version
+          cargo version
+          rustc --version
+          gcc --version
+          g++ --version
 
       - name: Run cargo clippy
-        run: cargo clippy -- -A clippy::uninlined_format_args
+        run: cargo clippy -- -D warnings
 
       - name: Run cargo test
+        run: cargo test
+
+      - name: Run coverage.sh
         run: |
           mkdir -p web/dist
           touch web/dist/index.html
