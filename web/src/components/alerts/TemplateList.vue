@@ -144,6 +144,10 @@ onMounted(() => {
   getTemplates();
 });
 const getTemplates = () => {
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Please wait while loading templates...",
+  });
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -154,6 +158,17 @@ const getTemplates = () => {
         "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       }));
       updateRoute();
+    })
+    .catch(() => {
+      dismiss();
+      q.notify({
+        type: "negative",
+        message: "Error while pulling templates.",
+        timeout: 2000,
+      });
+    })
+    .finally(() => {
+      dismiss();
     });
 };
 const updateRoute = () => {

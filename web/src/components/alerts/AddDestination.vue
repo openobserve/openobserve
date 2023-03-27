@@ -63,7 +63,7 @@
             tabindex="0"
           />
         </div>
-        <div class="col-6 q-py-xs">
+        <div class="col-6 q-py-xs destination-method-select">
           <q-select
             v-model="formData.method"
             :label="t('alert_destinations.method')"
@@ -73,6 +73,7 @@
             class="showLabelOnTop"
             stack-label
             outlined
+            :popup-content-style="{ textTransform: 'uppercase' }"
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
@@ -304,5 +305,12 @@ const deleteApiHeader = (header: any) => {
 }
 .page-content {
   height: calc(100vh - 112px);
+}
+</style>
+<style lang="scss">
+.destination-method-select {
+  .q-field__native > :first-child {
+    text-transform: uppercase !important;
+  }
 }
 </style>
