@@ -64,6 +64,7 @@ use crate::meta;
         request::kv::set,
         request::kv::delete,
         request::kv::list,
+        request::status::healthz,
     ),
     components(
         schemas(
@@ -107,10 +108,12 @@ use crate::meta;
             meta::organization::OrgUser,
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
+            request::status::HealthzResponse,
         ),
     ),
     modifiers(&SecurityAddon),
     tags(
+        (name = "Meta", description = "Meta details about the ZincObserve state itself. e.g. healthz"),
         (name = "Auth", description = "User login authentication"),
         (name = "Logs", description = "Logs data ingestion operations"),
         (name = "Search", description = "Search/Query operations"),
