@@ -16,7 +16,6 @@ use actix_web::{get, HttpResponse};
 use ahash::AHashMap;
 use serde::Serialize;
 use std::io::Error;
-
 use utoipa::ToSchema;
 
 use crate::common::json;

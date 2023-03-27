@@ -17,7 +17,6 @@ use utoipa::{Modify, OpenApi};
 
 use crate::handler::http::request;
 use crate::meta;
-use crate::handler;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -65,6 +64,7 @@ use crate::handler;
         request::kv::set,
         request::kv::delete,
         request::kv::list,
+        request::status::healthz,
     ),
     components(
         schemas(
@@ -108,7 +108,7 @@ use crate::handler;
             meta::organization::OrgUser,
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
-            handler::http::request::status::HealthzResponse,
+            request::status::HealthzResponse,
         ),
     ),
     modifiers(&SecurityAddon),
