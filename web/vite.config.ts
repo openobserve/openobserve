@@ -81,7 +81,7 @@ export default defineConfig({
     environment: "happy-dom",
     cache: false,
     maxConcurrency: 20,
-    update: true,
+    update: false,
     // testNamePattern: "DateTime",
     // ...
   },
