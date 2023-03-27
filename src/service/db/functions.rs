@@ -23,6 +23,7 @@ use crate::meta::StreamType;
 pub async fn set(
     org_id: &str,
     stream_name: Option<String>,
+    stream_type: Option<StreamType>,
     name: &str,
     js_func: Transform,
 ) -> Result<(), anyhow::Error> {
@@ -31,7 +32,7 @@ pub async fn set(
         Some(idx_name) => format!(
             "/function/{}/{}/{}/{}",
             org_id,
-            StreamType::Logs,
+            stream_type.unwrap(),
             idx_name,
             name
         ),
@@ -44,16 +45,19 @@ pub async fn set(
 pub async fn delete(
     org_id: &str,
     stream_name: Option<String>,
+    stream_type: Option<StreamType>,
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
+    let loc_stream_type = if stream_type.is_some() {
+        stream_type.unwrap()
+    } else {
+        StreamType::Logs
+    };
     let key = match stream_name {
         Some(idx_name) => format!(
             "/function/{}/{}/{}/{}",
-            org_id,
-            StreamType::Logs,
-            idx_name,
-            name
+            org_id, loc_stream_type, idx_name, name
         ),
         None => format!("/function/{}/{}", org_id, name),
     };
@@ -66,16 +70,28 @@ pub async fn delete(
 pub async fn list(
     org_id: &str,
     stream_name: Option<String>,
+    stream_type: Option<StreamType>,
 ) -> Result<Vec<Transform>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let mut udf_list: Vec<Transform> = Vec::new();
-    let key = match stream_name {
-        Some(idx_name) => format!("/function/{}/{}/{}", org_id, StreamType::Logs, idx_name),
-        None => format!("/function/{}", org_id),
+    let loc_stream_type = if stream_type.is_some() {
+        stream_type.unwrap()
+    } else {
+        StreamType::Logs
     };
-    let result = db.list_values(&key).await?;
+    let key = match stream_name {
+        Some(idx_name) => format!("/function/{}/{}/{}", org_id, loc_stream_type, idx_name),
+        None => {
+            if stream_type.is_none() {
+                format!("/function/{}", org_id)
+            } else {
+                format!("/function/{}/{}", org_id, loc_stream_type)
+            }
+        }
+    };
+    let result = db.list(&key).await?;
     for item in result {
-        let json_val = json::from_slice(&item).unwrap();
+        let json_val = json::from_slice(&item.1).unwrap();
         udf_list.push(json_val)
     }
     Ok(udf_list)

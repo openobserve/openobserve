@@ -19,10 +19,10 @@ use actix_web::{
 use std::io::Error;
 use tracing::info_span;
 
-use crate::meta::functions::FunctionList;
 use crate::meta::functions::Transform;
 use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
+use crate::{meta::functions::FunctionList, meta::StreamType};
 
 const SUCCESS: &str = "Function saved successfully";
 const SPECIFY: &str = "Please specify ";
@@ -33,6 +33,7 @@ const DELETED: &str = "Function deleted";
 pub async fn register_function(
     org_id: String,
     stream_name: Option<String>,
+    s_type: Option<StreamType>,
     name: String,
     mut trans: Transform,
 ) -> Result<HttpResponse, Error> {
@@ -52,6 +53,8 @@ pub async fn register_function(
                 msg.push_str(ORDER);
                 is_err = true;
             }
+
+            trans.stream_type = s_type;
             let js_func = trans.function.to_owned();
             if !js_func.contains('(') && !js_func.contains(')') {
                 msg.push_str(" not valid function");
@@ -71,6 +74,7 @@ pub async fn register_function(
                 db::functions::set(
                     org_id.as_str(),
                     Some(stream_name.to_string()),
+                    s_type,
                     name.as_str(),
                     trans,
                 )
@@ -91,7 +95,7 @@ pub async fn register_function(
             }
             if !is_err {
                 extract_num_args(&mut trans);
-                db::functions::set(org_id.as_str(), None, name.as_str(), trans)
+                db::functions::set(org_id.as_str(), None, None, name.as_str(), trans)
                     .await
                     .unwrap();
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -113,10 +117,11 @@ pub async fn register_function(
 pub async fn list_functions(
     org_id: String,
     stream_name: Option<String>,
+    stream_type: Option<StreamType>,
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:functions:list");
     let _guard = loc_span.enter();
-    let udf_list = db::functions::list(org_id.as_str(), stream_name)
+    let udf_list = db::functions::list(org_id.as_str(), stream_name, stream_type)
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(FunctionList { list: udf_list }))
@@ -125,11 +130,13 @@ pub async fn list_functions(
 pub async fn delete_function(
     org_id: String,
     stream_name: Option<String>,
+    stream_type: Option<StreamType>,
     name: String,
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:functions:delete");
     let _guard = loc_span.enter();
-    let result = db::functions::delete(org_id.as_str(), stream_name, name.as_str()).await;
+    let result =
+        db::functions::delete(org_id.as_str(), stream_name, stream_type, name.as_str()).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -172,19 +179,22 @@ mod test {
             stream_name: "Test".to_owned(),
             num_args: 0,
             trans_type: 1,
+            stream_type: None,
         };
-        let res = register_function("nexus".to_owned(), None, trans.name.to_owned(), trans).await;
+        let res =
+            register_function("nexus".to_owned(), None, None, trans.name.to_owned(), trans).await;
         assert!(res.is_ok());
 
-        let list_resp = list_functions("nexus".to_string(), Some("Test".to_string())).await;
+        let list_resp = list_functions("nexus".to_string(), Some("Test".to_string()), None).await;
         assert!(list_resp.is_ok());
 
-        let list_resp = list_functions("nexus".to_string(), None).await;
+        let list_resp = list_functions("nexus".to_string(), None, None).await;
         assert!(list_resp.is_ok());
 
         let del_resp = delete_function(
             "nexus".to_string(),
             Some("Test".to_string()),
+            None,
             "dummyfn".to_owned(),
         )
         .await;
