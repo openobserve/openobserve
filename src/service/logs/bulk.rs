@@ -110,7 +110,7 @@ pub async fn ingest(
             #[cfg(feature = "zo_functions")]
             let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
             #[cfg(feature = "zo_functions")]
-            super::get_stream_transforms(
+            crate::service::ingestion::get_stream_transforms(
                 key,
                 stream_name.clone(),
                 &mut stream_tansform_map,
@@ -136,7 +136,7 @@ pub async fn ingest(
                 .await;
                 let mut partition_keys: Vec<String> = vec![];
                 if stream_schema.has_partition_keys {
-                    partition_keys = super::get_stream_partition_keys(
+                    partition_keys = crate::service::ingestion::get_stream_partition_keys(
                         stream_name.clone(),
                         stream_schema_map.clone(),
                     )
@@ -174,8 +174,11 @@ pub async fn ingest(
             if let Some(transforms) = stream_tansform_map.get(&key) {
                 for trans in transforms {
                     let func_key = format!("{}/{}", &stream_name, trans.name);
-                    value =
-                        super::lua_transform(&lua, &value, stream_lua_map.get(&func_key).unwrap());
+                    value = crate::service::ingestion::lua_transform(
+                        &lua,
+                        &value,
+                        stream_lua_map.get(&func_key).unwrap(),
+                    );
                 }
             }
             if value.is_null() || !value.is_object() {

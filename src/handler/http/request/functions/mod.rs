@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "zo_functions")]
+use crate::meta;
 use actix_web::{delete, get, post, web, HttpResponse};
+#[cfg(feature = "zo_functions")]
+use actix_web::{http, HttpRequest};
+#[cfg(feature = "zo_functions")]
+use std::collections::HashMap;
 use std::io::Error;
 
 use crate::meta::functions::Transform;
@@ -43,7 +49,7 @@ pub async fn save_function(
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let transform = js_func.into_inner();
-    crate::service::functions::register_function(org_id, None, name, transform).await
+    crate::service::functions::register_function(org_id, None, None, name, transform).await
 }
 
 /** List all functions for an organization */
@@ -63,8 +69,23 @@ pub async fn save_function(
     )
 )]
 #[get("/{org_id}/functions")]
-async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    crate::service::functions::list_functions(org_id.into_inner(), None).await
+async fn list_functions(
+    org_id: web::Path<String>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    crate::service::functions::list_functions(org_id.into_inner(), None, stream_type).await
 }
 
 /** Delete a query function by name */
@@ -88,7 +109,7 @@ async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error
 #[delete("/{org_id}/functions/{name}")]
 async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    crate::service::functions::delete_function(org_id, None, name).await
+    crate::service::functions::delete_function(org_id, None, None, name).await
 }
 
 /** Create new ingest time function */
@@ -115,10 +136,35 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
 pub async fn save_stream_function(
     path: web::Path<(String, String, String)>,
     js_func: web::Json<Transform>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    use crate::meta::StreamType;
+
     let (org_id, stream_name, name) = path.into_inner();
     let transform = js_func.into_inner();
-    crate::service::functions::register_function(org_id, Some(stream_name), name, transform).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    crate::service::functions::register_function(
+        org_id,
+        Some(stream_name),
+        stream_type,
+        name,
+        transform,
+    )
+    .await
 }
 
 /** List all ingest time functions for a stream*/
@@ -139,9 +185,24 @@ pub async fn save_stream_function(
     )
 )]
 #[get("/{org_id}/{stream_name}/functions")]
-async fn list_stream_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+async fn list_stream_function(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    crate::service::functions::list_functions(org_id, Some(stream_name)).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    crate::service::functions::list_functions(org_id, Some(stream_name), stream_type).await
 }
 
 /** Delete ingest time function by name */
@@ -166,9 +227,22 @@ async fn list_stream_function(path: web::Path<(String, String)>) -> Result<HttpR
 #[delete("/{org_id}/{stream_name}/functions/{name}")]
 async fn delete_stream_function(
     path: web::Path<(String, String, String)>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
-    crate::service::functions::delete_function(org_id, Some(stream_name), name).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    crate::service::functions::delete_function(org_id, Some(stream_name), stream_type, name).await
 }
 
 /** Create new query function*/
@@ -198,7 +272,7 @@ pub async fn save_function(
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
@@ -224,7 +298,7 @@ async fn list_functions(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
@@ -252,7 +326,7 @@ async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpRespo
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
@@ -285,7 +359,7 @@ pub async fn save_stream_function(
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
@@ -312,7 +386,7 @@ async fn list_stream_function(_path: web::Path<(String, String)>) -> Result<Http
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
@@ -343,7 +417,7 @@ async fn delete_stream_function(
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Function support is not enabled".to_string(),
+            "Functions support is not enabled".to_string(),
         )),
     )
 }
