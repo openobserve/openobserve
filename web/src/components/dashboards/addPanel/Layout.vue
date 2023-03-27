@@ -276,14 +276,14 @@
             label="Show Legends"
           />
           <q-form ref="" class="q-pa-sm">
-            <q-input
+            <!-- <q-input
               v-model="dashboardPanelData.data.config.title"
               :label="t('panel.name') + '*'"
               class="q-py-md showLabelOnTop"
               stack-label
               filled
               dense
-            />
+            /> -->
             <q-input
               v-model="dashboardPanelData.data.config.description"
               type="textarea"

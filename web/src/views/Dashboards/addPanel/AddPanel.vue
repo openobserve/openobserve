@@ -17,8 +17,19 @@
 <template>
   <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
     <div class="flex justify-between items-center q-pa-sm">
-      <div class="q-table__title q-mr-md">
-        {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+      <div class="flex items-baseline q-table__title q-mr-md">
+        <span>
+          {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+        </span>
+        <div>
+          <q-input
+            v-model="dashboardPanelData.data.config.title"
+            :label="t('panel.name') + '*'"
+            class="q-ml-xl"
+            filled
+            dense
+          />
+        </div>
       </div>
       <div class="flex items-baseline q-gutter-sm">
         <date-time @date-change="updateDateTime" />
