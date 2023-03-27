@@ -98,7 +98,7 @@ pub async fn ingest(
         let mut func: Function;
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);
-            func = super::load_lua_transform(&lua, trans.function.clone());
+            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
             stream_lua_map.insert(func_key, func.to_owned());
         }
     }
@@ -113,9 +113,11 @@ pub async fn ingest(
     .await;
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys =
-            super::get_stream_partition_keys(stream_name.to_string(), stream_schema_map.clone())
-                .await;
+        partition_keys = crate::service::ingestion::get_stream_partition_keys(
+            stream_name.to_string(),
+            stream_schema_map.clone(),
+        )
+        .await;
     }
 
     // Start get stream alerts
@@ -135,7 +137,11 @@ pub async fn ingest(
         //Start row based transform
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);
-            value = super::lua_transform(&lua, &value, stream_lua_map.get(&func_key).unwrap());
+            value = crate::service::ingestion::lua_transform(
+                &lua,
+                &value,
+                stream_lua_map.get(&func_key).unwrap(),
+            );
         }
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped

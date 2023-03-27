@@ -19,6 +19,7 @@ pub mod dashboards;
 pub mod db;
 pub mod file_list;
 pub mod functions;
+pub mod ingestion;
 pub mod kv;
 pub mod logs;
 pub mod metrics;

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -30,6 +31,8 @@ pub struct Transform {
     pub num_args: u8,
     #[serde(default)]
     pub trans_type: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<StreamType>,
 }
 
 fn is_zero(b: impl std::borrow::Borrow<u32>) -> bool {
@@ -66,6 +69,7 @@ mod tests {
             name: "jsconcat".to_string(),
             num_args: 2,
             trans_type: 1,
+            stream_type: None,
         };
 
         let mod_trans = Transform {
@@ -75,6 +79,7 @@ mod tests {
             name: "jsconcat".to_string(),
             num_args: 2,
             trans_type: 1,
+            stream_type: None,
         };
         assert_eq!(trans, mod_trans);
 
