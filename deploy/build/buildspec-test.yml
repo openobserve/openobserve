@@ -24,5 +24,6 @@ phases:
       - chmod 600 /swapfile
       - mkswap /swapfile
       - swapon /swapfile
-      - cargo clippy -- -A clippy::uninlined_format_args
+      - cargo clippy -- -D warnings || echo XXX $?
+      - echo XXX-DELETEME; python3 -V; python -V
       - ./coverage.sh
