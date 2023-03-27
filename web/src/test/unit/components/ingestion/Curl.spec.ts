@@ -1,24 +1,23 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-import Vector from "@/components/ingestion/Vector.vue";
+import Curl from "@/components/ingestion/Curl.vue";
 
 installQuasar();
 const store = createStore({
   state: {
     organizationPasscode: 11,
-    API_ENDPOINT: "http://localhost:808",
+    API_ENDPOINT: "http://localhost:8080",
   },
 });
-describe("Vector", async () => {
+describe("Curl", async () => {
   let wrapper: any;
   beforeEach(() => {
-    wrapper = mount(Vector, {
+    wrapper = mount(Curl, {
       props: {
         currOrgIdentifier: "zinc_next",
-        currUserEmail: "tulsiraval2828@gmail.com",
-        orgAPIKey: 'L"4R{8f~56e72`0319V',
+        currUserEmail: "example@gmail.com",
       },
       global: {
         provide: {
@@ -27,25 +26,24 @@ describe("Vector", async () => {
       },
     });
   });
-  it("should mount Vector", async () => {
+  it("should mount FluentBit", async () => {
     expect(wrapper.vm.currOrgIdentifier).not.toBe("");
     expect(wrapper.vm.currUserEmail).not.toBe("");
     expect(wrapper.vm.orgAPIKey).not.toBe("");
   });
 
   it("should render title", () => {
-    const title = wrapper.find('[data-test="vector-title-text"]');
-    expect(title.text()).toBe("Vector");
+    const title = wrapper.find('[data-test="curl-title-text"]');
+    expect(title.text()).toBe("CURL");
   });
 
   it("should render content", () => {
-    const content = wrapper.find('[data-test="vector-content-text"]');
-
+    const content = wrapper.find('[data-test="curl-content-text"]');
     expect(content.text()).toMatchSnapshot();
   });
 
   it("should render copy icon", () => {
-    const btn = wrapper.find('[data-test="vector-copy-btn"]');
+    const btn = wrapper.find('[data-test="curl-copy-btn"]');
     expect(btn.exists()).toBeTruthy();
   });
 });

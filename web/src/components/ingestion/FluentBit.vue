@@ -16,9 +16,10 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title">Fluent Bit</div>
+      <div class="title" data-test="fluent-bit-title-text">Fluent Bit</div>
       <div class="copy_action">
         <q-btn
+          data-test="fluent-bit-copy-btn"
           flat
           round
           size="0.5rem"
@@ -28,7 +29,7 @@
         />
       </div>
     </div>
-    <pre ref="fluentbitContent">
+    <pre ref="fluentbitContent" data-test="fluent-bit-content-text">
 [OUTPUT]
   Name http
   Match *
