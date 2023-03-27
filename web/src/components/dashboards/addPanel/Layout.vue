@@ -621,7 +621,7 @@ export default defineComponent({
       }),
       model: ref([]),
       tab: ref("General"),
-      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
+      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains", 'is', 'is not'],
       getImageURL,
       onDrop,
       onDragStart,
