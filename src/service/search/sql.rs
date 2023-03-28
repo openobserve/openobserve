@@ -83,6 +83,10 @@ impl Sql {
         // parse sql
         let mut origin_sql = req_query.sql.clone();
         // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
+        origin_sql = origin_sql.trim().to_string();
+        if origin_sql.ends_with(';') {
+            origin_sql.pop();
+        }
         origin_sql = split_sql_token(&origin_sql).join("");
         let mut meta = match MetaSql::new(&origin_sql) {
             Ok(meta) => meta,
