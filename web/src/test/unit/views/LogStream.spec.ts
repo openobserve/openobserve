@@ -5,19 +5,26 @@ import { Dialog, Notify } from "quasar";
 import LogStream from "../../../views/LogStream.vue";
 import i18n from "../../../locales";
 import store from "../helpers/store";
+import routes from "@/router/routes";
+import { createRouter, createWebHistory } from "vue-router";
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
 
 installQuasar({
   plugins: [Dialog, Notify],
 });
 
-import { useRouter, useRoute } from "vue-router";
+// import { useRouter, useRoute } from "vue-router";
 
-vi.mock("vue-router", () => ({
-  useRoute: vi.fn(),
-  useRouter: vi.fn(() => ({
-    push: () => {},
-  })),
-}));
+// vi.mock("vue-router", () => ({
+//   useRoute: vi.fn(),
+//   useRouter: vi.fn(() => ({
+//     push: () => {},
+//   })),
+// }));
 
 describe("Streams", async () => {
   let wrapper: any;
@@ -33,7 +40,7 @@ describe("Streams", async () => {
         provide: {
           store: store,
         },
-        plugins: [i18n],
+        plugins: [i18n, router],
       },
     });
   });
@@ -52,6 +59,15 @@ describe("Streams", async () => {
     expect(table.exists()).toBeTruthy();
   });
 
+  it("Should match previous table snapshot", async () => {
+    await flushPromises();
+    const table = wrapper
+      .find('[data-test="log-stream-table"]')
+      .find("table")
+      .html();
+    expect(table).toMatchSnapshot();
+  });
+
   it("Should display table column headers", async () => {
     await flushPromises();
     const tableData = wrapper
@@ -64,7 +80,8 @@ describe("Streams", async () => {
     expect(tableData[2].text()).toContain("Type");
     expect(tableData[3].text()).toContain("Doc Num");
     expect(tableData[4].text()).toContain("Ingested Data");
-    expect(tableData[5].text()).toContain("Actions");
+    expect(tableData[5].text()).toContain("Compressed Size");
+    expect(tableData[6].text()).toContain("Actions");
   });
 
   it("Should display table row data", async () => {
@@ -79,6 +96,7 @@ describe("Streams", async () => {
     expect(tableData[2].text()).toBe("logs");
     expect(tableData[3].text()).toBe("400");
     expect(tableData[4].text()).toBe("0.74 MB");
+    expect(tableData[5].text()).toBe("0.03 MB");
   });
 
   it("Should display refresh stats btn", async () => {
