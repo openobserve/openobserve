@@ -110,9 +110,9 @@ We check for following in CI pipeline for any pull requests.
 1. Unit test code coverage for rust code.
    - If code coverage is less than 81% the CI tests will fail.
    - You can test coverage yourself by running `./coverage.sh`
-   - We use [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)for code generating coverage to generate report in .json format.
-   - Run 'cargo llvm-cov --lcov --output-path lcov.info' to genrate report & use [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) with VS code for visualizing code coverage.
-   - You can also generate html report by using 'cargo llvm-cov --html' to generate html report in target/debug/llvm-cov/html/index.html
+   - We use [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) to generate code coverage report in JSON format.
+   - Run `cargo llvm-cov --lcov --output-path lcov.info` to generate report and use [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters) with VS code for visualizing code coverage.
+   - You can also generate html report by using `cargo llvm-cov --html` to generate html report in target/debug/llvm-cov/html/index.html
 1. Linting in Javascript for GUI
    - We run eslint for javacript anf any linting failures will result in build failures.
    - You can test for linting failures by running `./eslint.sh` in web folder.
