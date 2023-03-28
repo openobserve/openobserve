@@ -21,13 +21,17 @@
         :label="
           dashboardPanelData.data.fields.stream ? '' : t('search.selectIndex')
         "
-        :options="data.indexOptions"
+        :options="filteredStreams"
         data-cy="index-dropdown"
         input-debounce="0"
         behavior="menu"
+        use-input
         filled
         borderless
         dense
+        hide-selected
+        fill-input
+        @filter="filterStreamFn"
       >
         <template #no-option>
           <q-item>
@@ -72,17 +76,19 @@
               @dragenter="onDragEnter"
               @dragleave="onDragLeave"
               @dragover="onDragOver"
-              @drop="onDrop" 
+              @drop="onDrop"
             >
-           
-              <div class="field_overlay" :title="props.row.name"
-                  >
-                <div class="field_label" draggable="true" @dragstart="onDragStart($event, props.row)">
-                  <q-icon 
-                    name="drag_indicator" 
-                    color="grey-13" 
-                    class="drag_indicator q-mr-xs" 
-                     />
+              <div class="field_overlay" :title="props.row.name">
+                <div
+                  class="field_label"
+                  draggable="true"
+                  @dragstart="onDragStart($event, props.row)"
+                >
+                  <q-icon
+                    name="drag_indicator"
+                    color="grey-13"
+                    class="drag_indicator q-mr-xs"
+                  />
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons">
@@ -90,19 +96,36 @@
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="dashboardPanelData.data.fields.x.length >= 1 ? true : false"
+                    :disabled="
+                      dashboardPanelData.data.fields.x.length >= 1
+                        ? true
+                        : false
+                    "
                     @click="addXAxisItem(props.row.name)"
                   >
-                    <div>{{ dashboardPanelData.data.type != 'h-bar' ? '+X' : '+Y' }}</div>
+                    <div>
+                      {{
+                        dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
+                      }}
+                    </div>
                   </q-btn>
                   <q-btn
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="dashboardPanelData.data.fields.y.length >= 1 && dashboardPanelData.data.type == 'pie'  ? true : false"
+                    :disabled="
+                      dashboardPanelData.data.fields.y.length >= 1 &&
+                      dashboardPanelData.data.type == 'pie'
+                        ? true
+                        : false
+                    "
                     @click="addYAxisItem(props.row.name)"
                   >
-                    <div>{{ dashboardPanelData.data.type != 'h-bar' ? '+Y' : '+X' }}</div>
+                    <div>
+                      {{
+                        dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
+                      }}
+                    </div>
                   </q-btn>
                   <q-btn
                     color="white"
@@ -139,13 +162,7 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  reactive,
-  ref,
-  watch,
-  onActivated,
-} from "vue";
+import { defineComponent, reactive, ref, watch, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -166,10 +183,11 @@ export default defineComponent({
       indexOptions: [],
       currentFieldsList: [],
     });
+    const filteredStreams = ref([]);
     const $q = useQuasar();
     const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem } =
       useDashboardPanelData();
-    
+
     onActivated(() => {
       // console.log("inside mounted");
       getStreamList();
@@ -217,6 +235,8 @@ export default defineComponent({
           return data.name;
         });
 
+        filteredStreams.value = [...data.indexOptions];
+
         // set the first stream as the selected stream when the api loads the data
         if (
           !dashboardPanelData.data.fields.stream &&
@@ -240,31 +260,40 @@ export default defineComponent({
       return filtered;
     };
 
-    const mutationHandler = (mutationRecords:any) => {}
+    const mutationHandler = (mutationRecords: any) => {};
 
-    const onDragEnter = (e:any) => {
-      e.preventDefault()
-    }
+    const onDragEnter = (e: any) => {
+      e.preventDefault();
+    };
 
-    const onDragStart = (e:any, item: any) => {
+    const onDragStart = (e: any, item: any) => {
       console.log("dragstart", e, item);
-      dashboardPanelData.meta.dragAndDrop.dragging = true
-      dashboardPanelData.meta.dragAndDrop.dragElement = item
-    }
+      dashboardPanelData.meta.dragAndDrop.dragging = true;
+      dashboardPanelData.meta.dragAndDrop.dragElement = item;
+    };
 
-    const onDragLeave = (e:any) => {
-      e.preventDefault()
+    const onDragLeave = (e: any) => {
+      e.preventDefault();
       // e.target.classList.remove('drag-enter')
-    }
+    };
 
-    const onDragOver = (e:any) => {
-      e.preventDefault()
-    }
+    const onDragOver = (e: any) => {
+      e.preventDefault();
+    };
 
-    const onDrop = (e:any) => {
-      dashboardPanelData.meta.dragAndDrop.dragging = false
-      dashboardPanelData.meta.dragAndDrop.dragElement = null
-    }
+    const onDrop = (e: any) => {
+      dashboardPanelData.meta.dragAndDrop.dragging = false;
+      dashboardPanelData.meta.dragAndDrop.dragElement = null;
+    };
+
+    const filterStreamFn = (val: string, update: any) => {
+      update(() => {
+        filteredStreams.value = data.indexOptions.filter(
+          (streamName: any) =>
+            streamName.toLowerCase().indexOf(val.toLowerCase()) > -1
+        );
+      });
+    };
 
     return {
       t,
@@ -283,6 +312,8 @@ export default defineComponent({
       data,
       getStreamList,
       dashboardPanelData,
+      filterStreamFn,
+      filteredStreams,
     };
   },
 });
