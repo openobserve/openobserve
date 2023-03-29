@@ -5250,6 +5250,7 @@ dependencies = [
  "dashmap",
  "datafusion",
  "datafusion-common",
+ "datafusion-expr",
  "dotenv_config",
  "dotenvy",
  "env_logger",

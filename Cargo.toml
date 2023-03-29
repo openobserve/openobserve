@@ -139,3 +139,6 @@ zstd = "0.12.1"
 chrono = "0.4"
 prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
+
+[dev-dependencies]
+datafusion-expr = "20.0"
