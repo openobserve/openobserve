@@ -219,6 +219,8 @@
     "passwordLabel": "Token de redefinição"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Painéis",
     "add": "Adicionar painel",
     "save": "Salvar",

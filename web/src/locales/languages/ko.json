@@ -219,6 +219,8 @@
     "passwordLabel": "리셋 토큰"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "대시보드",
     "add": "대시보드 추가",
     "save": "저장",

@@ -221,8 +221,10 @@
     "passwordLabel": "重置 Token"
   },
   "dashboard": {
-    "header": "仪表盘",
-    "add": "添加仪表盘",
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
+    "header": "仪表板",
+    "add": "添加仪表板",
     "save": "保存",
     "cancel": "取消",
     "delete": "删除仪表盘",
