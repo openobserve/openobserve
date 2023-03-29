@@ -17,11 +17,18 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
+use mlua::{Function, Lua};
 use prost::Message;
 use std::{collections::HashMap, fs::OpenOptions, io::Error};
 use tracing::info_span;
 
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
+use crate::meta::alert::{Alert, Trigger};
+#[cfg(feature = "zo_functions")]
+use crate::meta::functions::Transform;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -82,6 +89,8 @@ pub async fn prometheus_write_proto(
     let mut metric_data_map: AHashMap<String, HashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_file_map: AHashMap<String, String> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -92,9 +101,8 @@ pub async fn prometheus_write_proto(
         let mut replica_label = String::new();
         let mut main_lable = event.labels.clone();
         main_lable.retain(|x| x.name.eq(MAIN_LABLE));
-        let buf = metric_data_map
-            .entry(main_lable[0].value.clone())
-            .or_default();
+        let metric_name = main_lable[0].value.clone();
+        let buf = metric_data_map.entry(metric_name.clone()).or_default();
 
         metric_file_map
             .entry(main_lable[0].value.clone())
@@ -148,13 +156,13 @@ pub async fn prometheus_write_proto(
                 _timestamp: timestamp,
                 metric_type: metric_type.clone(),
             };
-            let value_str = json::to_string(&metric).unwrap();
+            /* let value_str = json::to_string(&metric).unwrap();
             // get hour file name
             let hour_key = Utc
                 .timestamp_nanos(timestamp * 1000)
                 .format("%Y_%m_%d_%H")
                 .to_string();
-            let hour_buf = buf.entry(hour_key).or_default();
+            let hour_buf = buf.entry(hour_key).or_default(); */
             if i == 0 && dedup_enabled {
                 let leader = METRIC_CLUSTER_LEADER.get(&cluster_name);
                 match leader {
@@ -177,25 +185,139 @@ pub async fn prometheus_write_proto(
                 has_entry = true;
             }
             if !accept_record {
-                //do not accept any entried for request
+                //do not accept any entries for request
                 return Ok(HttpResponse::Ok().into());
             } else if !abnormal_val {
+                // get partition keys
+                let stream_schema = stream_schema_exists(
+                    org_id,
+                    &metric_name,
+                    StreamType::Metrics,
+                    &mut metric_schema_map,
+                )
+                .await;
+                let mut partition_keys: Vec<String> = vec![];
+                if stream_schema.has_partition_keys {
+                    partition_keys = crate::service::ingestion::get_stream_partition_keys(
+                        metric_name.clone(),
+                        metric_schema_map.clone(),
+                    )
+                    .await;
+                }
+
+                // Start get stream alerts
+                let key = format!(
+                    "{}/{}/{}",
+                    &org_id,
+                    StreamType::Metrics,
+                    metric_name.clone()
+                );
+                crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+                // End get stream alert
+
+                #[cfg(feature = "zo_functions")]
+                let lua = Lua::new();
+                #[cfg(feature = "zo_functions")]
+                let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+
+                // Start Register Transfoms for stream
+                #[cfg(feature = "zo_functions")]
+                let mut local_tans: Vec<Transform> = vec![];
+                #[cfg(feature = "zo_functions")]
+                let key = format!(
+                    "{}/{}/{}",
+                    &org_id,
+                    StreamType::Metrics,
+                    metric_name.clone()
+                );
+                #[cfg(feature = "zo_functions")]
+                if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
+                    local_tans = (*transforms.list).to_vec();
+                    local_tans.sort_by(|a, b| a.order.cmp(&b.order));
+                    let mut func: Option<Function>;
+                    for trans in &local_tans {
+                        let func_key = format!("{}/{}", metric_name.clone(), trans.name);
+                        func = crate::service::ingestion::load_lua_transform(
+                            &lua,
+                            trans.function.clone(),
+                        );
+                        if func.is_some() {
+                            stream_lua_map.insert(func_key, func.unwrap().to_owned());
+                        }
+                    }
+                }
+                // End Register Transfoms for stream
+
+                #[cfg(feature = "zo_functions")]
+                let mut value: json::Value = json::to_value(&metric).unwrap();
+                #[cfg(not(feature = "zo_functions"))]
+                let value: json::Value = json::to_value(&metric).unwrap();
+                #[cfg(feature = "zo_functions")]
+                // Start row based transform
+                for trans in &local_tans {
+                    let func_key = format!("{}/{}", metric_name.clone(), trans.name);
+                    if stream_lua_map.contains_key(&func_key) {
+                        value = crate::service::ingestion::lua_transform(
+                            &lua,
+                            &value,
+                            stream_lua_map.get(&func_key).unwrap(),
+                        );
+                    }
+                }
+
+                let value_str = json::to_string(&value).unwrap();
+                // get hour key
+                let hour_key = crate::service::ingestion::get_hour_key(
+                    timestamp,
+                    partition_keys.clone(),
+                    value.as_object().unwrap().clone(),
+                );
+
+                if !stream_alerts_map.is_empty() {
+                    // Start check for alert trigger
+                    let key = format!(
+                        "{}/{}/{}",
+                        &org_id,
+                        StreamType::Metrics,
+                        metric_name.clone()
+                    );
+                    if let Some(alerts) = stream_alerts_map.get(&key) {
+                        for alert in alerts {
+                            if alert.is_real_time {
+                                let set_trigger = meta::alert::Evaluate::evaluate(
+                                    &alert.condition,
+                                    value.as_object().unwrap().clone(),
+                                );
+                                if set_trigger {
+                                    stream_trigger_map.insert(
+                                        metric_name.clone(),
+                                        Trigger {
+                                            timestamp,
+                                            is_valid: true,
+                                            alert_name: alert.name.clone(),
+                                            stream: metric_name.clone().to_string(),
+                                            org: org_id.to_string(),
+                                            stream_type: StreamType::Metrics,
+                                            last_sent_at: 0,
+                                            count: 0,
+                                            is_ingest_time: true,
+                                        },
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    // End check for alert trigger
+                }
+
+                let hour_buf = buf.entry(hour_key.clone()).or_default();
+
                 hour_buf.push(value_str);
+                //Trace Metadata
             }
             i += 1;
         }
     }
-
-    /*  for item in METRIC_CLUSTER_MAP.iter() {
-        log::info!(
-            "Cluster members for {:?} --> {:?}",
-            item.key(),
-            item.value()
-        );
-    }
-      for item in METRIC_CLUSTER_LEADER.iter() {
-        log::info!("Cluster leader for {:?} --> {:?}", item.key(), item.value());
-    } */
 
     for (metric_name, metric_data) in metric_data_map {
         // write to file
@@ -259,6 +381,28 @@ pub async fn prometheus_write_proto(
                 &file,
                 &mut metric_schema_map,
                 min_ts,
+            )
+            .await;
+        }
+    }
+
+    // only one trigger per request, as it updates etcd
+    for (_, entry) in &stream_trigger_map {
+        let mut alerts = stream_alerts_map
+            .get(&format!(
+                "{}/{}/{}",
+                entry.org,
+                StreamType::Metrics,
+                entry.stream
+            ))
+            .unwrap()
+            .clone();
+
+        alerts.retain(|alert| alert.name.eq(&entry.alert_name));
+        if !alerts.is_empty() {
+            crate::service::ingestion::send_ingest_notification(
+                entry.clone(),
+                alerts.first().unwrap().clone(),
             )
             .await;
         }

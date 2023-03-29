@@ -99,6 +99,7 @@ mod tests {
     use super::*;
     use crate::meta::alert::{AlertDestination, Condition, DestinationTemplate, Trigger};
     use crate::meta::search::Query;
+    use crate::meta::StreamType;
 
     #[actix_web::test]
     async fn test_send_notification() {
@@ -123,6 +124,7 @@ mod tests {
             is_valid: true,
             alert_name: "Test Alert".to_string(),
             stream: "olympics".to_string(),
+            stream_type: StreamType::Logs,
             org: "default".to_string(),
             last_sent_at: chrono::Utc::now().timestamp_micros(),
             count: 1,
@@ -131,6 +133,7 @@ mod tests {
         let alert = Alert {
             name: "testAlert".to_string(),
             stream: "olympics".to_string(),
+            stream_type: Some(StreamType::Logs),
             query: Some(Query {
                 sql: "select * from olympics".to_string(),
                 from: 0,

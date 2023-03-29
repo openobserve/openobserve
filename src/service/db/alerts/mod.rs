@@ -17,6 +17,7 @@ use crate::common::json;
 use crate::infra::config::{STREAM_ALERTS, TRIGGERS_IN_PROCESS};
 use crate::infra::db::Event;
 use crate::meta::alert::{Alert, AlertList};
+use crate::meta::StreamType;
 
 pub mod destinations;
 pub mod templates;
@@ -24,16 +25,17 @@ pub mod templates;
 pub async fn get(
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
-    let map_key = format!("{org_id}/{stream_name}");
+    let map_key = format!("{org_id}/{stream_type}/{stream_name}");
     let value: Option<Alert> = if STREAM_ALERTS.contains_key(&map_key) {
         let mut val = STREAM_ALERTS.get(&map_key).unwrap().clone();
         val.list.retain(|alert| alert.name.eq(name));
         val.list.first().cloned()
     } else {
         let db = &crate::infra::db::DEFAULT;
-        let key = format!("/alerts/{org_id}/{stream_name}/{name}");
+        let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
             Err(_) => None,
@@ -45,17 +47,23 @@ pub async fn get(
 pub async fn set(
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{org_id}/{stream_name}/{name}");
+    let key = format!("/alerts/{org_id}/{stream_name}/{stream_type}/{name}");
     Ok(db.put(&key, json::to_vec(&alert).unwrap().into()).await?)
 }
 
-pub async fn delete(org_id: &str, stream_name: &str, name: &str) -> Result<(), anyhow::Error> {
+pub async fn delete(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    name: &str,
+) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{org_id}/{stream_name}/{name}");
+    let key = format!("/alerts/{org_id}/{stream_name}/{stream_type}/{name}");
     match db.delete(&key, false).await {
         Ok(_) => {
             // Remove trigger from in-process list as alert is deleted
@@ -66,10 +74,21 @@ pub async fn delete(org_id: &str, stream_name: &str, name: &str) -> Result<(), a
     }
 }
 
-pub async fn list(org_id: &str, stream_name: Option<&str>) -> Result<Vec<Alert>, anyhow::Error> {
+pub async fn list(
+    org_id: &str,
+    stream_name: Option<&str>,
+    stream_type: Option<StreamType>,
+) -> Result<Vec<Alert>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
+
+    let loc_stream_type = if stream_type.is_some() {
+        stream_type.unwrap()
+    } else {
+        StreamType::Logs
+    };
+
     let key = match stream_name {
-        Some(stream_name) => format!("/alerts/{org_id}/{stream_name}"),
+        Some(stream_name) => format!("/alerts/{org_id}/{loc_stream_type}/{stream_name}"),
         None => format!("/alerts/{org_id}"),
     };
     let ret = db.list_values(&key).await?;

@@ -15,8 +15,10 @@
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
+use mlua::{Function, Lua};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::common::v1::AnyValue;
 use opentelemetry_proto::tonic::{
@@ -30,9 +32,14 @@ use tracing::info_span;
 
 use crate::common::json::{json, Map, Value};
 use crate::infra::config::CONFIG;
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
+use crate::meta::alert::{Alert, Evaluate, Trigger};
+#[cfg(feature = "zo_functions")]
+use crate::meta::functions::Transform;
 use crate::meta::traces::Event;
-use crate::service::schema::{add_stream_schema, stream_schema_exists};
+use crate::service::schema::stream_schema_exists;
 use crate::{
     common::json,
     infra::cluster,
@@ -42,6 +49,8 @@ use crate::{
         StreamType,
     },
 };
+
+use super::schema::add_stream_schema;
 
 pub mod metadata;
 pub mod otlp_http;
@@ -70,9 +79,58 @@ pub async fn handle_trace_request(
     let traces_stream_name = "default";
 
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, Value>>> = AHashMap::new();
+    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+
+    let stream_schema = stream_schema_exists(
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+    )
+    .await;
+    let mut partition_keys: Vec<String> = vec![];
+    if stream_schema.has_partition_keys {
+        partition_keys = crate::service::ingestion::get_stream_partition_keys(
+            traces_stream_name.to_string(),
+            traces_schema_map.clone(),
+        )
+        .await;
+    }
+
+    // Start get stream alerts
+    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
+    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+    // End get stream alert
+
+    #[cfg(feature = "zo_functions")]
+    let lua = Lua::new();
+    #[cfg(feature = "zo_functions")]
+    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+
+    let mut trigger: Option<Trigger> = None;
+    // Start Register Transfoms for stream
+    #[cfg(feature = "zo_functions")]
+    let mut local_tans: Vec<Transform> = vec![];
+    #[cfg(feature = "zo_functions")]
+    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
+    #[cfg(feature = "zo_functions")]
+    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
+        local_tans = (*transforms.list).to_vec();
+        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
+        let mut func: Option<Function>;
+        for trans in &local_tans {
+            let func_key = format!("{}/{}", traces_stream_name, trans.name);
+            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
+            if func.is_some() {
+                stream_lua_map.insert(func_key, func.unwrap().to_owned());
+            }
+        }
+    }
+    // End Register Transfoms for stream
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut service_name: String = traces_stream_name.to_string();
@@ -148,16 +206,14 @@ pub async fn handle_trace_request(
                     })
                 }
 
-                // get hour file name
-                let mut hour_key = Utc
-                    .timestamp_nanos(start_time.try_into().unwrap())
-                    .format("%Y_%m_%d_%H")
-                    .to_string();
-
-                hour_key.push_str(&format!("_service={}", service_name.clone()));
-
-                let hour_buf = data_buf.entry(hour_key.clone()).or_default();
                 let timestamp = start_time / 1000;
+
+                // get hour file name
+                /*   let mut hour_key = Utc
+                .timestamp_nanos(start_time.try_into().unwrap())
+                .format("%Y_%m_%d_%H")
+                .to_string(); */
+
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id,
@@ -174,7 +230,63 @@ pub async fn handle_trace_request(
                     _timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
                 };
-                let value_str = json::to_string(&local_val).unwrap();
+
+                #[cfg(feature = "zo_functions")]
+                let mut value: json::Value = json::to_value(local_val).unwrap();
+                #[cfg(not(feature = "zo_functions"))]
+                let value: json::Value = json::to_value(local_val).unwrap();
+                #[cfg(feature = "zo_functions")]
+                // Start row based transform
+                for trans in &local_tans {
+                    let func_key = format!("{traces_stream_name}/{}", trans.name);
+                    if stream_lua_map.contains_key(&func_key) {
+                        value = crate::service::ingestion::lua_transform(
+                            &lua,
+                            &value,
+                            stream_lua_map.get(&func_key).unwrap(),
+                        );
+                    }
+                }
+
+                let value_str = json::to_string(&value).unwrap();
+                // get hour key
+                let mut hour_key = super::ingestion::get_hour_key(
+                    timestamp.try_into().unwrap(),
+                    partition_keys.clone(),
+                    value.as_object().unwrap().clone(),
+                );
+
+                if !stream_alerts_map.is_empty() {
+                    // Start check for alert trigger
+                    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
+                    if let Some(alerts) = stream_alerts_map.get(&key) {
+                        for alert in alerts {
+                            if alert.is_real_time {
+                                let set_trigger =
+                                    alert.condition.evaluate(value.as_object().unwrap().clone());
+                                if set_trigger {
+                                    trigger = Some(Trigger {
+                                        timestamp: timestamp.try_into().unwrap(),
+                                        is_valid: true,
+                                        alert_name: alert.name.clone(),
+                                        stream: traces_stream_name.to_string(),
+                                        org: org_id.to_string(),
+                                        stream_type: StreamType::Traces,
+                                        last_sent_at: 0,
+                                        count: 0,
+                                        is_ingest_time: true,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    // End check for alert trigger
+                }
+
+                hour_key.push_str(&format!("_service={}", service_name.clone()));
+
+                let hour_buf = data_buf.entry(hour_key.clone()).or_default();
+
                 hour_buf.push(value_str);
 
                 if timestamp < min_ts.try_into().unwrap() {
@@ -237,21 +349,30 @@ pub async fn handle_trace_request(
             )
             .await;
         }
-        /*
-        let mut hour_meta_buf: Vec<json::Map<String, Value>> =
-            trace_meta_coll.get(&key).unwrap().to_vec();
-
-        let dest_file = get_storage_file_name(&traces_file_name);
-        for item in hour_meta_buf.iter_mut() {
-            item.insert(
-                "file_name".to_owned(),
-                json::Value::String(dest_file.clone()),
-            );
-        }
-
-        metadata::ingest(org_id, traces_stream_name, 0, hour_meta_buf.clone()).await; */
     }
 
+    // only one trigger per request, as it updates etcd
+    if trigger.is_some() {
+        let val = trigger.unwrap();
+        let mut alerts = stream_alerts_map
+            .get(&format!(
+                "{}/{}/{}",
+                val.org,
+                StreamType::Traces,
+                val.stream
+            ))
+            .unwrap()
+            .clone();
+
+        alerts.retain(|alert| alert.name.eq(&val.alert_name));
+        if !alerts.is_empty() {
+            super::ingestion::send_ingest_notification(
+                val.clone(),
+                alerts.first().unwrap().clone(),
+            )
+            .await;
+        }
+    }
     let res = ExportTraceServiceResponse {};
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
