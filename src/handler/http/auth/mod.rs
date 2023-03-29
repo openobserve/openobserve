@@ -96,7 +96,9 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
-    if INGESTION_EP.contains(&ep_suffix) && user.token.eq(&user_password) {
+    if (INGESTION_EP.contains(&ep_suffix) || path.matches('/').count() == 1)
+        && user.token.eq(&user_password)
+    {
         return Ok(true);
     }
 

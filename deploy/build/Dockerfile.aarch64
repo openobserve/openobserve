@@ -14,8 +14,8 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
 
-# RUN rustup toolchain install nightly-2023-01-26
-# RUN rustup default nightly-2023-01-26
+# RUN rustup toolchain install nightly-2023-03-28
+# RUN rustup default nightly-2023-03-28
 # RUN rustup target add aarch64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 # RUN rustc --print cfg
@@ -23,8 +23,10 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN cargo install sccache
 # ENV SCCACHE_IDLE_TIMEOUT=1800
 # ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
-ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
-ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
+# ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+# ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
+RUN rustc --version
+RUN sccache --version
 
 # RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip \
 #     && unzip protoc-21.12-linux-aarch_64.zip -d protoc \

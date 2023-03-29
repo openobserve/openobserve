@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, put, web, HttpResponse, Result};
+use actix_web::{get, http, put, web, HttpRequest, HttpResponse, Responder, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::collections::HashSet;
 use std::io::Error;
@@ -179,4 +179,27 @@ async fn update_user_passcode(
     }
     let passcode = update_passcode(org_id, user_id).await;
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
+}
+
+#[get("/{org_id}/")]
+async fn org_index(_org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
+    // eg.1: User-Agent:[elastic-transport-ruby/8.0.1 (RUBY_VERSION: 3.1.2; linux x86_64; Faraday v1.10.0)]
+    let mut version = "0.0.0";
+    let user_agent = match req.headers().get("User-Agent") {
+        Some(user_agent) => user_agent.to_str().unwrap(),
+        None => "",
+    };
+    if user_agent.contains("elastic") {
+        let re = regex::Regex::new(r"(\d+\.\d+\.\d+)").unwrap();
+        version = match re.captures(user_agent) {
+            Some(caps) => caps.get(1).unwrap().as_str(),
+            None => "8.1.0",
+        };
+    }
+    let es_info = r#"{"name":"Elasticsearch","cluster_name":"N/A","cluster_uuid":"N/A","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"N/A","minimum_wire_version":"N/A","minimum_index_compatibility":"N/A"},"tagline":"You Know, for Search"}"#;
+    let es_info = es_info.replace("0.0.0", version);
+    HttpResponse::Ok()
+        .content_type(http::header::ContentType::json())
+        .insert_header(("X-Elastic-Product", "Elasticsearch"))
+        .body(es_info)
 }
