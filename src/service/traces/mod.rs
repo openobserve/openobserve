@@ -16,6 +16,7 @@ use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
+use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
@@ -208,12 +209,6 @@ pub async fn handle_trace_request(
 
                 let timestamp = start_time / 1000;
 
-                // get hour file name
-                /*   let mut hour_key = Utc
-                .timestamp_nanos(start_time.try_into().unwrap())
-                .format("%Y_%m_%d_%H")
-                .to_string(); */
-
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id,
@@ -327,14 +322,7 @@ pub async fn handle_trace_request(
 
         file.write(write_buf.as_ref());
 
-        let schema_exists = stream_schema_exists(
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
-            &mut traces_schema_map,
-        )
-        .await;
-        if !schema_exists.has_fields && !traces_file_name.is_empty() {
+        if !stream_schema.has_fields && !traces_file_name.is_empty() {
             let file = OpenOptions::new()
                 .read(true)
                 .open(&traces_file_name)
@@ -424,40 +412,6 @@ fn get_val(attr_val: Option<AnyValue>) -> Value {
         None => Value::Null,
     }
 }
-
-/* fn _get_storage_file_name(local_path: &str) -> String {
-    let file_path = local_path
-        .strip_prefix(&CONFIG.common.data_wal_dir)
-        .unwrap();
-    let columns = file_path.split('/').collect::<Vec<&str>>();
-    let _ = columns[0].to_string();
-    let org_id = columns[1].to_string();
-    let stream_type: StreamType = StreamType::from(columns[2]);
-    let stream_name = columns[3].to_string();
-    let file_name = columns[4].to_string();
-
-    let new_file = generate_partioned_file_key(
-        &org_id,
-        &stream_name,
-        stream_type,
-        Utc::now().timestamp_micros(),
-        &CONFIG.common.file_ext_parquet,
-    );
-
-    let mut partitions = file_name.split('_').collect::<Vec<&str>>();
-    partitions.retain(|&x| x.contains('='));
-    let mut partition_key = String::from("");
-    for key in partitions {
-        partition_key.push_str(key);
-        partition_key.push('/');
-    }
-
-    if partition_key.eq("") {
-        format!("{}{}", new_file.0, new_file.1)
-    } else {
-        format!("{}{}{}", new_file.0, partition_key, new_file.1)
-    }
-}*/
 
 #[cfg(test)]
 mod tests {
