@@ -235,7 +235,7 @@ export default defineComponent({
         });
 
         streamService
-          .nameList(store.state.selectedOrganization.identifier, "logs", false)
+          .nameList(store.state.selectedOrganization.identifier, "", false)
           .then((res) => {
             let counter = 1;
             let doc_num = "";
