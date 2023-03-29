@@ -89,7 +89,7 @@
     </div>
 
     <ConfirmDialog
-      title="Delete Alert"
+      title="Delete Template"
       message="Are you sure you want to delete template?"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"

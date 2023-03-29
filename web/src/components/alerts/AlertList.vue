@@ -13,9 +13,14 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <q-page
+    data-test="alert-list-page"
+    class="q-pa-none"
+    style="min-height: inherit"
+  >
     <div v-if="!showAddAlertDialog">
       <q-table
+        data-test="alert-list-table"
         ref="qTable"
         :rows="alerts"
         :columns="columns"
@@ -31,6 +36,7 @@
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -42,6 +48,7 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
+              :data-test="`alert-list-${props.row.name}-delete-alert`"
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -64,7 +71,7 @@
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title">
+          <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
           <q-input
@@ -80,6 +87,7 @@
             </template>
           </q-input>
           <q-btn
+            data-test="alert-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"
@@ -121,7 +129,7 @@
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete alert?"
-      @update:ok="deleteFn"
+      @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
@@ -145,8 +153,9 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
+import { q } from "msw/lib/SetupApi-8ab693f7";
 export default defineComponent({
-  name: "PageAlerts",
+  name: "AlertList",
   components: { QTablePagination, AddAlert, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
@@ -312,7 +321,14 @@ export default defineComponent({
         })
         .then((res) => {
           destinations.value = res.data;
-        });
+        })
+        .catch((err) =>
+          $q.notify({
+            type: "negative",
+            message: err.data.message,
+            timeout: 2000,
+          })
+        );
     };
     const perPageOptions: any = [
       { label: "5", value: 5 },
@@ -387,7 +403,7 @@ export default defineComponent({
         },
       });
     };
-    const deleteFn = () => {
+    const deleteAlert = () => {
       alertsService
         .delete(
           store.state.selectedOrganization.identifier,
@@ -409,6 +425,13 @@ export default defineComponent({
               timeout: 2000,
             });
           }
+        })
+        .catch((err) => {
+          $q.notify({
+            type: "negative",
+            message: err.data.message,
+            timeout: 2000,
+          });
         });
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
@@ -442,7 +465,7 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       addAlert,
-      deleteFn,
+      deleteAlert,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,

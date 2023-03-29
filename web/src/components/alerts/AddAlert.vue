@@ -348,7 +348,7 @@ export default defineComponent({
     const schemaList = ref([]);
     const streams: any = ref({});
     const { t } = useI18n();
-    const $q = useQuasar();
+    const q = useQuasar();
     const editorRef: any = ref(null);
     const filteredColumns: any = ref([]);
     let editorobj: any = null;
@@ -515,7 +515,7 @@ export default defineComponent({
     };
     return {
       t,
-      $q,
+      q,
       disableColor,
       beingUpdated,
       formData,
@@ -569,21 +569,21 @@ export default defineComponent({
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
+      this.q.notify({
         type: "negative",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
     onSubmit() {
       if (this.formData.stream_name == "") {
-        this.$q.notify({
+        this.q.notify({
           type: "negative",
           message: "Please select stream name.",
           timeout: 1500,
         });
         return false;
       }
-      const dismiss = this.$q.notify({
+      const dismiss = this.q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
@@ -655,14 +655,14 @@ export default defineComponent({
             this.$emit("update:list");
             this.addAlertForm.resetValidation();
             dismiss();
-            this.$q.notify({
+            this.q.notify({
               type: "positive",
               message: `Alert saved successfully.`,
             });
           })
           .catch((err: any) => {
             dismiss();
-            this.$q.notify({
+            this.q.notify({
               type: "negative",
               message: err.response.data.error,
             });

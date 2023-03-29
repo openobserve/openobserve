@@ -37,6 +37,6 @@ describe("MainLayout", async () => {
         },
       },
     });
-    expect(MainLayout).toBeTruthy();
+    expect(wrapper).toBeTruthy();
   });
 });

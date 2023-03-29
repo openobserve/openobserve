@@ -108,7 +108,7 @@
     </div>
 
     <ConfirmDialog
-      title="Delete Alert"
+      title="Delete Destination"
       message="Are you sure you want to delete destination?"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
