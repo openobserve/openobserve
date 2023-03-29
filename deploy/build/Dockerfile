@@ -14,8 +14,8 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
 
-# RUN rustup toolchain install nightly-2023-02-09
-# RUN rustup default nightly-2023-02-09
+# RUN rustup toolchain install nightly-2023-03-28
+# RUN rustup default nightly-2023-03-28
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 # RUN rustc --print cfg
