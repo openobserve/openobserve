@@ -4,11 +4,25 @@ import { setupServer } from "msw/node";
 import { associate_members } from "../mockData/mockAssociateMembers";
 import streams from "@/test/unit/mockData/streams";
 import users from "../mockData/users";
+import alerts from "../mockData/alerts";
+
 import "whatwg-fetch";
 import store from "./store";
-
+// import { config } from "@vue/test-utils";
+// import MonacoEditorPlugin from "vite-plugin-monaco-editor";
 // const API_ENDPOINT = (import.meta.env.VITE_ZINCOBSERVE_ENDPOINT && import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith('/') ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1) : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT) || (window.location.origin != "http://localhost:8081" ? window.location.origin : "http://localhost:5080");
 import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
+
+// config.global.plugins.unshift([
+//   MonacoEditorPlugin as any,
+//   { languageWorkers: ["html", "json", "typescript"] },
+// ]);
+
+// vi.mock("monaco-editor", () => {
+//   return {
+//     "monaco-editor": () => {},
+//   };
+// });
 
 vi.mock("rudder-sdk-js", () => {
   return {
@@ -18,6 +32,15 @@ vi.mock("rudder-sdk-js", () => {
   };
 });
 
+vi.mock("plotly.js", () => {
+  return {
+    ready: vi.fn(),
+    load: vi.fn(),
+    track: vi.fn(),
+  };
+});
+
+// TODO OK: Move below rest handlers to separate file
 export const restHandlers = [
   rest.get(
     `${store.state.API_ENDPOINT}/api/organizations/associated_members/${store.state.selectedOrganization.identifier}`,
@@ -46,6 +69,27 @@ export const restHandlers = [
       return res(ctx.status(200), ctx.json(users.users));
     }
   ),
+
+  rest.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(alerts.alerts.get));
+    }
+  ),
+
+  rest.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(alerts.templates.get));
+    }
+  ),
+
+  rest.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(alerts.destinations.get));
+    }
+  ),
 ];
 const server = setupServer(...restHandlers);
 
@@ -57,6 +101,23 @@ declare global {
   // eslint-disable-next-line no-var
   var server: any;
 }
+
+global.scrollTo = vi.fn();
+
+global.matchMedia = false;
+Object.defineProperty(global, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // Deprecated
+    removeListener: vi.fn(), // Deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
 
 global.server = server;
 
