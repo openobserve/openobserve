@@ -14,11 +14,7 @@
 
 use crate::meta::StreamType;
 
-fn mk_key(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> String {
+fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
 }
 

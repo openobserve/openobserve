@@ -8,9 +8,9 @@ phases:
       - apt-get install -y protobuf-compiler
       - curl https://sh.rustup.rs -sSf | sh -s -- -y
       - . "$HOME/.cargo/env"
-      - rustup toolchain install nightly-2023-01-26
+      - rustup toolchain install nightly-2023-02-09
       - rustup toolchain list
-      - rustup default nightly-2023-01-26  
+      - rustup default nightly-2023-02-09  
       - rustup component add clippy
       - export RUSTFLAGS='-C target-cpu=native'
 

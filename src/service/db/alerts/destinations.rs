@@ -39,7 +39,9 @@ pub async fn set(
     let db = &crate::infra::db::DEFAULT;
     destination.name = Some(name.to_owned());
     let key = format!("/destinations/{org_id}/{name}");
-    Ok(db.put(&key, json::to_vec(&destination).unwrap().into()).await?)
+    Ok(db
+        .put(&key, json::to_vec(&destination).unwrap().into())
+        .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
