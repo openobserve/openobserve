@@ -23,8 +23,8 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN cargo install sccache
 # ENV SCCACHE_IDLE_TIMEOUT=1800
 # ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
-ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
-ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
+# ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+# ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/arm64/
 RUN rustc --version
 RUN sccache --version
 
@@ -42,9 +42,8 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
   RUSTFLAGS='-C target-feature=+aes,+crc,+lse,+neon'
-RUN sccache --start-server \
-  && cargo build --release --features tmpcache,zo_functions --target aarch64-unknown-linux-gnu \
-  && sccache --show-stats
+RUN cargo build --release --features tmpcache,zo_functions --target aarch64-unknown-linux-gnu
+RUN sccache --show-stats
 RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
 
 
