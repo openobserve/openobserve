@@ -145,38 +145,53 @@ export default defineComponent({
         // now add from stream name
         query += ` FROM "${dashboardPanelData.data.fields.stream}" `
 
-        query += filter.some((it)=> ((it.type == "list" && it.values?.length > 0) || (it.type == "condition" && it.operator != null && it.value != null && it.value != ''))) ? "WHERE " : ""
+        // query += filter.some((it)=> ((it.type == "list" && it.values?.length > 0) || (it.type == "condition" && it.operator != null && it.value != null && it.value != ''))) ? "WHERE " : ""
         const filterData = filter?.map((field, i)=>{
           let selectFilter = ""
             if(field.type == "list" && field.values?.length > 0){
               selectFilter += `${field.column} IN (${field.values.map(it => `'${it}'`).join(', ')})`
-            }else if (field.type == "condition" && field.operator != null && field.value != null && field.value != ''){
+            }else if (field.type == "condition" && field.operator != null){
               selectFilter += `${field.column} `
-              switch(field.operator) {
-                case "=":
-                case "<>":
-                case "<":
-                case ">":
-                case "<=":
-                case ">=":
-                  selectFilter += `${field.operator} ${field.value}`
-                  break;
-                case "Contains":
-                  selectFilter += `LIKE '%${field.value}%'`
-                  break;
-                case "Not Contains":
-                  selectFilter += `NOT LIKE '%${field.value}%'`
-                  break;
-                default:
-                  selectFilter += `${field.operator} ${field.value}`
-                  break;
+              if(["Is Null", "Is Not Null"].includes(field.operator)) {
+                switch(field.operator) {
+                  case "Is Null":
+                    selectFilter += `IS NULL`
+                    break;
+                  case "Is Not Null":
+                    selectFilter += `IS NOT NULL`
+                    break;
+                }
+              } else if (field.value != null && field.value != '') {
+                switch(field.operator) {
+                  case "=":
+                  case "<>":
+                  case "<":
+                  case ">":
+                  case "<=":
+                  case ">=":
+                    selectFilter += `${field.operator} ${field.value}`
+                    break;
+                  case "Contains":
+                    selectFilter += `LIKE '%${field.value}%'`
+                    break;
+                  case "Not Contains":
+                    selectFilter += `NOT LIKE '%${field.value}%'`
+                    break;
+                  default:
+                    selectFilter += `${field.operator} ${field.value}`
+                    break;
+                }
               }
+              
             }
             return selectFilter
         })
         // console.log("query: filterData",filterData);
-        
-        query += filterData.filter((it: any)=> it).join(" AND ")
+        const filterItems = filterData.filter((it: any)=> it)
+        if(filterItems.length > 0) {
+          query += "WHERE "
+          query += filterItems.join(" AND ")
+        }
 
         // add group by statement
         query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.alias}"`

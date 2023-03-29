@@ -278,7 +278,7 @@ export default defineComponent({
         }
 
         // check if condition value is selected
-        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && (it.value == null || it.value == '')))
+        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && !["Is Null", "Is Not Null"].includes(it.operator) && (it.value == null || it.value == '')))
         if(conditionValueFilterError.length){
           error.push(...conditionValueFilterError.map((it:any) => `Filter: ${it.column}: Condition value required`))
         }

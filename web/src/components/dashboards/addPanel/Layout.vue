@@ -415,6 +415,9 @@
                             <q-input
                               dense
                               filled
+                              v-if="!['Is Null', 'Is Not Null'].includes(dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].operator)"
                               v-model="
                                 dashboardPanelData.data.fields.filter[
                                   props.pageIndex
@@ -621,7 +624,7 @@ export default defineComponent({
       }),
       model: ref([]),
       tab: ref("General"),
-      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains", 'IS', 'IS NOT'],
+      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains", 'Is Null', 'Is Not Null'],
       getImageURL,
       onDrop,
       onDragStart,
