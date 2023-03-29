@@ -29,17 +29,13 @@ pub async fn set(
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = match stream_name {
-        Some(idx_name) => format!(
-            "/function/{}/{}/{}/{}",
-            org_id,
-            stream_type.unwrap(),
-            idx_name,
-            name
+        None => format!("/function/{org_id}/{name}"),
+        Some(stream_name) => format!(
+            "/function/{org_id}/{}/{stream_name}/{name}",
+            stream_type.unwrap()
         ),
-        None => format!("/function/{}/{}", org_id, name),
     };
-    db.put(&key, json::to_vec(&js_func).unwrap().into()).await?;
-    Ok(())
+    Ok(db.put(&key, json::to_vec(&js_func).unwrap().into()).await?)
 }
 
 pub async fn delete(
@@ -49,22 +45,14 @@ pub async fn delete(
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let loc_stream_type = if stream_type.is_some() {
-        stream_type.unwrap()
-    } else {
-        StreamType::Logs
-    };
     let key = match stream_name {
-        Some(idx_name) => format!(
-            "/function/{}/{}/{}/{}",
-            org_id, loc_stream_type, idx_name, name
+        None => format!("/function/{org_id}/{name}"),
+        Some(stream_name) => format!(
+            "/function/{org_id}/{}/{stream_name}/{name}",
+            stream_type.unwrap_or(StreamType::Logs)
         ),
-        None => format!("/function/{}/{}", org_id, name),
     };
-    match db.delete(&key, false).await {
-        Ok(_) => Ok(()),
-        Err(_) => Err(anyhow::anyhow!("transform not found")),
-    }
+    Ok(db.delete(&key, false).await?)
 }
 
 pub async fn list(
@@ -73,28 +61,23 @@ pub async fn list(
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Transform>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let mut udf_list: Vec<Transform> = Vec::new();
-    let loc_stream_type = if stream_type.is_some() {
-        stream_type.unwrap()
-    } else {
-        StreamType::Logs
-    };
+    let loc_stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = match stream_name {
-        Some(idx_name) => format!("/function/{}/{}/{}", org_id, loc_stream_type, idx_name),
+        Some(stream_name) => format!("/function/{org_id}/{loc_stream_type}/{stream_name}"),
         None => {
             if stream_type.is_none() {
-                format!("/function/{}", org_id)
+                format!("/function/{org_id}")
             } else {
-                format!("/function/{}/{}", org_id, loc_stream_type)
+                format!("/function/{org_id}/{loc_stream_type}")
             }
         }
     };
-    let result = db.list(&key).await?;
-    for item in result {
-        let json_val = json::from_slice(&item.1).unwrap();
-        udf_list.push(json_val)
-    }
-    Ok(udf_list)
+    Ok(db
+        .list(&key)
+        .await?
+        .values()
+        .map(|val| json::from_slice(val).unwrap())
+        .collect())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

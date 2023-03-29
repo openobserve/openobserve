@@ -308,27 +308,27 @@ pub fn init() -> Config {
 
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
-        panic!("common config error: {}", e);
+        panic!("common config error: {e}");
     }
 
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {}", e);
+        panic!("data path config error: {e}");
     }
 
     // check memeory cache
     if let Err(e) = check_memory_cache_config(&mut cfg) {
-        panic!("memory cache config error: {}", e);
+        panic!("memory cache config error: {e}");
     }
 
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {}", e);
+        panic!("etcd config error: {e}");
     }
 
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
-        panic!("s3 config error: {}", e);
+        panic!("s3 config error: {e}");
     }
     cfg
 }

@@ -31,16 +31,13 @@ pub fn get_stats() -> DashMap<String, StreamStats> {
 
 #[inline]
 pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) -> StreamStats {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    match STATS.get(&key).map(|v| *v.value()) {
-        Some(v) => v,
-        None => StreamStats::default(),
-    }
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    STATS.get(&key).map(|v| *v.value()).unwrap_or_default()
 }
 
 #[inline]
 pub fn remove_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STATS.remove(&key);
 }
 
@@ -51,7 +48,7 @@ pub fn set_stream_stats(
     stream_type: StreamType,
     val: StreamStats,
 ) {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STATS.insert(key, val);
 }
 
@@ -69,7 +66,7 @@ pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     let org_id = columns[1];
     let stream_type = columns[2];
     let stream_name = columns[3];
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut stats = STATS.entry(key).or_default();
     if val.records == 0 {
         return Ok(());
@@ -102,7 +99,7 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     let org_id = columns[1];
     let stream_type = columns[2];
     let stream_name = columns[3];
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     if !STATS.contains_key(&key) {
         return Ok(());
     }
@@ -122,7 +119,7 @@ pub fn reset_stream_stats(
     stream_type: StreamType,
     val: FileMeta,
 ) -> Result<(), anyhow::Error> {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     if !STATS.contains_key(&key) {
         return Ok(());
     }
@@ -133,7 +130,6 @@ pub fn reset_stream_stats(
     if val.max_ts != 0 {
         stats.doc_time_max = val.max_ts;
     }
-
     Ok(())
 }
 

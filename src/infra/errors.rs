@@ -94,18 +94,18 @@ impl ErrorCodes {
             ErrorCodes::ServerInternalError(_) => "Server Internal Error".to_string(),
             ErrorCodes::SearchSQLNotValid(_) => "Search SQL not valid".to_string(),
             ErrorCodes::SearchStreamNotFound(stream) => {
-                format!("Search stream not found: {}", stream)
+                format!("Search stream not found: {stream}")
             }
             ErrorCodes::FullTextSearchFieldNotFound => {
                 "Full text search field not found".to_string()
             }
-            ErrorCodes::SearchFieldNotFound(field) => format!("Search field not found: {}", field),
+            ErrorCodes::SearchFieldNotFound(field) => format!("Search field not found: {field}"),
             ErrorCodes::SearchFunctionNotDefined(func) => {
-                format!("Search function not defined: {}", func)
+                format!("Search function not defined: {func}")
             }
             ErrorCodes::SearchParquetFileNotFound => "Search parquet file not found".to_string(),
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => {
-                format!("Search field has no compatible data type: {}", field)
+                format!("Search field has no compatible data type: {field}")
             }
             ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
         }

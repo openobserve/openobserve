@@ -73,7 +73,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         if !user.key().contains('/') {
             continue;
         }
-        if !is_root_user && !user.key().ends_with(format!("/{}", user_id).as_str()) {
+        if !is_root_user && !user.key().ends_with(&format!("/{user_id}")) {
             continue;
         }
 

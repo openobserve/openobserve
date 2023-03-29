@@ -105,18 +105,18 @@ fn main() -> Result<()> {
         .output()
         .unwrap();
     let git_tag = String::from_utf8(output.stdout).unwrap();
-    println!("cargo:rustc-env=GIT_VERSION={}", git_tag);
+    println!("cargo:rustc-env=GIT_VERSION={git_tag}");
 
     let output = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
         .unwrap();
     let git_commit = String::from_utf8(output.stdout).unwrap();
-    println!("cargo:rustc-env=GIT_COMMIT_HASH={}", git_commit);
+    println!("cargo:rustc-env=GIT_COMMIT_HASH={git_commit}");
 
     let now: DateTime<Utc> = Utc::now();
     let build_date = now.to_rfc3339_opts(SecondsFormat::Secs, true);
-    println!("cargo:rustc-env=GIT_BUILD_DATE={}", build_date);
+    println!("cargo:rustc-env=GIT_BUILD_DATE={build_date}");
 
     Ok(())
 }

@@ -34,9 +34,10 @@ lazy_static! {
 }
 
 pub fn default() -> Box<dyn FileStorage> {
-    match is_local_disk_storage() {
-        true => Box::new(local::Local {}),
-        false => Box::new(s3::S3 {}),
+    if is_local_disk_storage() {
+        Box::new(local::Local {})
+    } else {
+        Box::new(s3::S3 {})
     }
 }
 
@@ -56,8 +57,8 @@ pub fn generate_partioned_file_key(
         time.format("%Y/%m/%d/%H").to_string()
     };
     (
-        format!("{}/{}/{}/{}/", org_id, stream_type, stream_name, prefix),
-        format!("{}{}", id, extn),
+        format!("{org_id}/{stream_type}/{stream_name}/{prefix}/"),
+        format!("{id}{extn}"),
     )
 }
 

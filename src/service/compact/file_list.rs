@@ -96,8 +96,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
     }
 
     for day in days {
-        let mut t =
-            Utc.datetime_from_str(format!("{}T00:00:00Z", day).as_str(), "%Y-%m-%dT%H:%M:%SZ")?;
+        let mut t = Utc.datetime_from_str(&format!("{day}T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ")?;
         for _hour in 0..24 {
             let offset = t.timestamp_micros();
             merge_file_list(offset).await?;
@@ -128,8 +127,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     // get all small file list keys in this hour
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
-    let key = format!("file_list{}", offset_prefix);
-    // println!("merge_file_list: key: {}", key);
+    let key = format!("file_list{offset_prefix}");
     let storage = &storage::DEFAULT;
     let file_list = storage.list(&key).await?;
     if file_list.len() <= 1 {
@@ -171,7 +169,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 
     // write new file list
     let id = ider::generate();
-    let file_name = format!("file_list{}{}.json.zst", offset_prefix, id);
+    let file_name = format!("file_list{offset_prefix}{id}.json.zst");
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
     let mut has_content = false;
     for (_, item) in filter_file_keys.iter() {

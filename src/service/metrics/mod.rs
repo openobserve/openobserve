@@ -216,7 +216,7 @@ pub async fn prometheus_write_proto(
                 return Ok(HttpResponse::InternalServerError().json(
                     meta::http::HttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("stream [{}] is being deleted", metric_name),
+                        format!("stream [{metric_name}] is being deleted"),
                     ),
                 ));
             }
