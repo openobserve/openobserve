@@ -46,7 +46,7 @@ pub async fn send_notification(
                 // Replace contextual information with values if any from alert
                 if alert.context_attributes.is_some() {
                     for (key, value) in alert.context_attributes.as_ref().unwrap() {
-                        resp = resp.replace(&format!("{{{}}}", key), value)
+                        resp = resp.replace(&format!("{{{key}}}"), value)
                     }
                 }
 

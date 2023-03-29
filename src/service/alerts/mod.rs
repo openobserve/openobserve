@@ -52,7 +52,7 @@ pub async fn save_alert(
     if dest.is_none() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            format!("Destination with name {} not found", in_dest),
+            format!("Destination with name {in_dest} not found"),
         )));
     }
 
@@ -64,13 +64,13 @@ pub async fn save_alert(
     if fields.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
-            format!("Stream with name {} not found", stream_name),
+            format!("Stream with name {stream_name} not found"),
         )));
     }
 
     if alert.query.is_none() {
         alert.query = Some(Query {
-            sql: format!("select * from {}", stream_name),
+            sql: format!("select * from {stream_name}"),
             start_time: 0,
             end_time: 0,
             sql_mode: "full".to_owned(),
@@ -81,37 +81,22 @@ pub async fn save_alert(
         });
         alert.is_real_time = true;
 
-        //for condtion in alert.trigger.iter_mut() {
         let mut local_fields = fields.clone();
-
         local_fields.retain(|field| field.name().eq(&alert.condition.column));
 
-        if !local_fields.is_empty() {
-            if local_fields
-                .first()
-                .unwrap()
-                .data_type()
-                .eq(&DataType::Utf8)
-                || local_fields
-                    .first()
-                    .unwrap()
-                    .data_type()
-                    .eq(&DataType::Boolean)
-            {
-                alert.condition.is_numeric = Some(false);
-            } else {
-                alert.condition.is_numeric = Some(true);
-            }
-        } else {
+        if local_fields.is_empty() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(
-                    "Column named {} not found on stream {}",
-                    &alert.condition.column, stream_name
+                    "Column named {} not found on stream {stream_name}",
+                    &alert.condition.column
                 ),
             )));
         }
-        //}
+        alert.condition.is_numeric = Some(!matches!(
+            local_fields[0].data_type(),
+            DataType::Boolean | DataType::Utf8
+        ));
     } else {
         let meta_req = meta::search::Request {
             query: alert.clone().query.unwrap(),

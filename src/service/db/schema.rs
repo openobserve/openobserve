@@ -23,38 +23,46 @@ use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
 use crate::meta::StreamType;
 
+fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
+    format!("/schema/{org_id}/{stream_type}/{stream_name}")
+}
+
 pub async fn get(
     org_id: &str,
     stream_name: &str,
     stream_type: Option<StreamType>,
 ) -> Result<Schema, anyhow::Error> {
-    let mut value = Schema::empty();
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
+
     if STREAM_SCHEMAS.contains_key(map_key) {
-        value = STREAM_SCHEMAS
+        return Ok(STREAM_SCHEMAS
             .get(map_key)
             .unwrap()
             .value()
             .clone()
             .last()
             .unwrap()
-            .clone();
-    } else {
-        let db = &crate::infra::db::DEFAULT;
-        if let Ok(v) = db.get(&key).await {
-            // for backward compatibility check if value in etcd is vec or schema based on it return value
+            .clone());
+    }
+
+    let db = &crate::infra::db::DEFAULT;
+    Ok(match db.get(&key).await {
+        Err(_) => {
+            // REVIEW: shouldn't we report the error?
+            Schema::empty()
+        }
+        Ok(v) => {
             let local_val: json::Value = json::from_slice(&v).unwrap();
+            // for backward compatibility check if value in etcd is vec or schema based on it return value
             if local_val.is_array() {
                 let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
-                value = local_vec.last().unwrap().clone();
+                local_vec.last().unwrap().clone()
             } else {
-                value = json::from_slice(&v).unwrap()
+                json::from_slice(&v).unwrap()
             }
         }
-    }
-    Ok(value)
+    })
 }
 
 pub async fn get_versions(
@@ -62,25 +70,29 @@ pub async fn get_versions(
     stream_name: &str,
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Schema>, anyhow::Error> {
-    let mut value = vec![];
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
+
     if STREAM_SCHEMAS.contains_key(map_key) {
-        value = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
-    } else {
-        let db = &crate::infra::db::DEFAULT;
-        if let Ok(v) = db.get(&key).await {
+        return Ok(STREAM_SCHEMAS.get(map_key).unwrap().value().clone());
+    }
+
+    let db = &crate::infra::db::DEFAULT;
+    Ok(match db.get(&key).await {
+        Err(_) => {
+            // REVIEW: shouldn't we report the error?
+            vec![]
+        }
+        Ok(v) => {
             // for backward compatibility check if value in etcd is vec or schema based on it return value
             let local_val: json::Value = json::from_slice(&v).unwrap();
             if local_val.is_array() {
-                value = json::from_slice(&v).unwrap()
+                json::from_slice(&v).unwrap()
             } else {
-                value = vec![json::from_slice(&v).unwrap()]
+                vec![json::from_slice(&v).unwrap()]
             }
         }
-    }
-    Ok(value)
+    })
 }
 
 pub async fn set(
@@ -92,7 +104,7 @@ pub async fn set(
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let mut versions: Vec<Schema>;
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
         versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
@@ -148,12 +160,46 @@ pub async fn delete(
     stream_type: Option<StreamType>,
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    let key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let db = &crate::infra::db::DEFAULT;
-    match db.delete(&key, false).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    Ok(db.delete(&key, false).await?)
+}
+
+#[tracing::instrument]
+fn list_stream_schemas(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    fetch_schema: bool,
+) -> Vec<StreamSchema> {
+    assert!(!STREAM_SCHEMAS.is_empty());
+    let prefix = match stream_type {
+        None => format!("{org_id}/"),
+        Some(stream_type) => format!("{org_id}/{stream_type}/"),
+    };
+    STREAM_SCHEMAS
+        .iter()
+        .filter_map(|it| {
+            it.key().strip_prefix(&prefix).map(|key| {
+                let (stream_type, stream_name) = match stream_type {
+                    Some(stream_type) => (stream_type, key.into()),
+                    None => {
+                        let columns = key.split('/').take(2).collect::<Vec<_>>();
+                        assert_eq!(columns.len(), 2, "BUG");
+                        (columns[0].into(), columns[1].into())
+                    }
+                };
+                StreamSchema {
+                    stream_name,
+                    stream_type,
+                    schema: if fetch_schema {
+                        it.value().last().unwrap().clone()
+                    } else {
+                        Schema::empty()
+                    },
+                }
+            })
+        })
+        .collect()
 }
 
 #[tracing::instrument(name = "db:schema:list")]
@@ -162,82 +208,40 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    let mut stream_list: Vec<StreamSchema> = Vec::new();
-    if STREAM_SCHEMAS.len() > 0 {
-        let map_key = match stream_type {
-            Some(stream_type_loc) => format!("{}/{}/", org_id, stream_type_loc),
-            None => format!("{}/", org_id),
-        };
-        let iter = STREAM_SCHEMAS
-            .iter()
-            .filter(|entry| entry.key().contains(&map_key));
-        let mut value;
-        for item in iter {
-            let item_key = item.key();
-            let item_key = item_key.strip_prefix(&map_key).unwrap();
-            let stream_name;
-            let stream_type_ret: StreamType;
-            match stream_type {
-                Some(stream_type_loc) => {
-                    stream_name = item_key.to_string();
-                    stream_type_ret = stream_type_loc;
-                }
-                None => {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    stream_type_ret = StreamType::from(columns[0]);
-                    stream_name = columns[1].to_string();
-                }
-            }
-            if fetch_schema {
-                value = item.value().last().unwrap().clone();
-            } else {
-                value = Schema::empty()
-            }
-            stream_list.push(StreamSchema {
-                stream_name,
-                stream_type: stream_type_ret,
-                schema: value,
-            })
-        }
-    } else {
-        let db = &crate::infra::db::DEFAULT;
-        let key = match stream_type {
-            Some(stream_type_loc) => {
-                format!("/schema/{}/{}/", org_id, stream_type_loc)
-            }
-            None => format!("/schema/{}/", org_id),
-        };
-        let ret = db.list(&key).await?;
-        for (item_key, item_value) in ret {
-            let item_key = item_key.strip_prefix(&key).unwrap();
-            let stream_name;
-            let stream_type_ret: StreamType;
-            match stream_type {
-                Some(stream_type_loc) => {
-                    stream_name = item_key.to_string();
-                    stream_type_ret = stream_type_loc;
-                }
-                None => {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    stream_type_ret = StreamType::from(columns[0]);
-                    stream_name = columns[1].to_string();
-                }
-            }
-
-            let value = if fetch_schema {
-                json::from_slice(&item_value).unwrap()
-            } else {
-                Schema::empty()
-            };
-
-            stream_list.push(StreamSchema {
-                stream_name,
-                stream_type: stream_type_ret,
-                schema: value,
-            })
-        }
+    if !STREAM_SCHEMAS.is_empty() {
+        return Ok(list_stream_schemas(org_id, stream_type, fetch_schema));
     }
-    Ok(stream_list)
+
+    let db = &crate::infra::db::DEFAULT;
+    let db_key = match stream_type {
+        None => format!("/schema/{org_id}/"),
+        Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
+    };
+    Ok(db
+        .list(&db_key)
+        .await?
+        .into_iter()
+        .map(|(key, val)| {
+            let key = key.strip_prefix(&db_key).unwrap();
+            let (stream_type, stream_name) = match stream_type {
+                Some(stream_type) => (stream_type, key.into()),
+                None => {
+                    let columns = key.split('/').take(2).collect::<Vec<_>>();
+                    assert_eq!(columns.len(), 2, "BUG");
+                    (columns[0].into(), columns[1].into())
+                }
+            };
+            StreamSchema {
+                stream_name,
+                stream_type,
+                schema: if fetch_schema {
+                    json::from_slice(&val).unwrap()
+                } else {
+                    Schema::empty()
+                },
+            }
+        })
+        .collect())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -297,7 +301,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         // Hack: compatible old version, schema is an object
         if item_value[0] == b'{' {
-            let value_str = format!("[{}]", value_str);
+            let value_str = format!("[{value_str}]");
             item_value = bytes::Bytes::from(value_str);
         }
         // Hack end
@@ -330,10 +334,9 @@ pub fn filter_schema_version_id(schemas: &[Schema], start_dt: i64, end_dt: i64) 
                 return Some(i);
             }
         };
-        if end_dt > end_dt_loc {
-            continue;
+        if end_dt <= end_dt_loc {
+            return Some(i);
         }
-        return Some(i);
     }
     None
 }

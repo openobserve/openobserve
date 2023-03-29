@@ -62,7 +62,7 @@ pub async fn ingest(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{}] is being deleted", stream_name),
+                format!("stream [{stream_name}] is being deleted"),
             )),
         );
     }
@@ -90,14 +90,14 @@ pub async fn ingest(
     #[cfg(feature = "zo_functions")]
     let mut local_tans: Vec<Transform> = vec![];
     #[cfg(feature = "zo_functions")]
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+    let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
     #[cfg(feature = "zo_functions")]
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
         let mut func: Function;
         for trans in &local_tans {
-            let func_key = format!("{}/{}", &stream_name, trans.name);
+            let func_key = format!("{stream_name}/{}", trans.name);
             func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
             stream_lua_map.insert(func_key, func.to_owned());
         }

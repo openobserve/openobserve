@@ -22,7 +22,7 @@ pub fn decode(s: &str) -> Result<String, Error> {
         Err(e) => {
             return Err(Error::new(
                 ErrorKind::InvalidData,
-                format!("base64 decode error: {}", e),
+                format!("base64 decode error: {e}"),
             ))
         }
     };
@@ -31,7 +31,7 @@ pub fn decode(s: &str) -> Result<String, Error> {
         Err(e) => {
             return Err(Error::new(
                 ErrorKind::InvalidData,
-                format!("base64 decode error: {}", e),
+                format!("base64 decode error: {e}"),
             ))
         }
     };

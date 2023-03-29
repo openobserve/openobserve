@@ -63,7 +63,7 @@ pub async fn ingest(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{}] is being deleted", stream_name),
+                format!("stream [{stream_name}] is being deleted"),
             )),
         );
     }

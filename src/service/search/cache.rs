@@ -122,8 +122,8 @@ pub async fn search(
 #[inline]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let pattern = format!(
-        "{}/files/{}/{}/{}/*.json",
-        &CONFIG.common.data_wal_dir, &sql.org_id, stream_type, &sql.stream_name
+        "{}/files/{}/{stream_type}/{}/*.json",
+        &CONFIG.common.data_wal_dir, &sql.org_id, &sql.stream_name
     );
     let files = scan_files(&pattern);
 
@@ -141,9 +141,9 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
-        let source_file = format!("{}/{}", file_path, file_name);
+        let source_file = format!("{file_path}/{file_name}");
         if sql.match_source(&source_file, false, stream_type).await {
-            result.push(format!("{}{}", &CONFIG.common.data_wal_dir, local_file));
+            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
         }
     }
     Ok(result)

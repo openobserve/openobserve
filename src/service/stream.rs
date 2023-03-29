@@ -174,7 +174,7 @@ pub async fn save_stream_settings(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{}] is being deleted", stream_name),
+                format!("stream [{stream_name}] is being deleted"),
             )),
         );
     }
@@ -226,7 +226,7 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {}", e),
+                format!("failed to delete stream: {e}"),
             )),
         );
     }
@@ -236,13 +236,13 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {}", e),
+                format!("failed to delete stream: {e}"),
             )),
         );
     }
 
     // delete stream schema cache
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STREAM_SCHEMAS.remove(&key);
 
     // delete stream stats cache
@@ -253,7 +253,7 @@ pub async fn delete_stream(
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("failed to delete stream: {}", e),
+                format!("failed to delete stream: {e}"),
             )),
         );
     };

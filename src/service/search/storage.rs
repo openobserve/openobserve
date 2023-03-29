@@ -173,7 +173,7 @@ pub async fn search(
         );
         let sql = sql.clone();
         let session = meta::search::Session {
-            id: format!("{}-{}", session_id, ver),
+            id: format!("{session_id}-{ver}"),
             data_type: SessionType::Remote,
         };
         // cacluate the diff between latest schema and group schema

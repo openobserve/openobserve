@@ -26,14 +26,14 @@ pub async fn get(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, anyhow::Error> {
-    let map_key = format!("{}/{}", org_id, stream_name);
+    let map_key = format!("{org_id}/{stream_name}");
     let value: Option<Alert> = if STREAM_ALERTS.contains_key(&map_key) {
         let mut val = STREAM_ALERTS.get(&map_key).unwrap().clone();
         val.list.retain(|alert| alert.name.eq(name));
         val.list.first().cloned()
     } else {
         let db = &crate::infra::db::DEFAULT;
-        let key = format!("/alerts/{}/{}/{}", org_id, stream_name, name);
+        let key = format!("/alerts/{org_id}/{stream_name}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
             Err(_) => None,
@@ -49,14 +49,13 @@ pub async fn set(
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{}/{}/{}", org_id, stream_name, name);
-    db.put(&key, json::to_vec(&alert).unwrap().into()).await?;
-    Ok(())
+    let key = format!("/alerts/{org_id}/{stream_name}/{name}");
+    Ok(db.put(&key, json::to_vec(&alert).unwrap().into()).await?)
 }
 
 pub async fn delete(org_id: &str, stream_name: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{}/{}/{}", org_id, stream_name, name);
+    let key = format!("/alerts/{org_id}/{stream_name}/{name}");
     match db.delete(&key, false).await {
         Ok(_) => {
             // Remove trigger from in-process list as alert is deleted
@@ -70,10 +69,9 @@ pub async fn delete(org_id: &str, stream_name: &str, name: &str) -> Result<(), a
 pub async fn list(org_id: &str, stream_name: Option<&str>) -> Result<Vec<Alert>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = match stream_name {
-        Some(val) => format!("/alerts/{}/{}", org_id, val),
-        None => format!("/alerts/{}", org_id),
+        Some(stream_name) => format!("/alerts/{org_id}/{stream_name}"),
+        None => format!("/alerts/{org_id}"),
     };
-    //let key = format!("/alerts/{}", org_id);
     let ret = db.list_values(&key).await?;
     let mut alerts_list: Vec<Alert> = Vec::new();
     for item_value in ret {

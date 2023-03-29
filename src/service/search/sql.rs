@@ -163,8 +163,7 @@ impl Sql {
                 };
                 if !select_caps.get(1).unwrap().as_str().contains(group_by) {
                     return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-                        "Aggregation SQL used [group by] you should select the field [{}]",
-                        group_by
+                        "Aggregation SQL used [group by] you should select the field [{group_by}]"
                     ))));
                 }
             }
@@ -173,7 +172,7 @@ impl Sql {
         // Hack for table name
         // DataFusion disallow use `k8s-logs-2022.09.11` as table name
         let stream_name = meta.source.clone();
-        let re = Regex::new(&format!(r#"(?i) from[ '"]+{}[ '"]?"#, stream_name)).unwrap();
+        let re = Regex::new(&format!(r#"(?i) from[ '"]+{stream_name}[ '"]?"#)).unwrap();
         let caps = match re.captures(origin_sql.as_str()) {
             Some(caps) => caps,
             None => {
@@ -263,7 +262,7 @@ impl Sql {
                     }
                     None => {
                         origin_sql = origin_sql
-                            .replace(" FROM tbl", &format!(" FROM tbl WHERE {}", time_range_sql));
+                            .replace(" FROM tbl", &format!(" FROM tbl WHERE {time_range_sql}"));
                     }
                 };
             }
@@ -366,7 +365,7 @@ impl Sql {
             "str_match",
             // "str_match_ignore_case", use UDF will get better result
         ] {
-            let re_str_match = Regex::new(&format!(r"(?i)\b{}\b\(([^\)]*)\)", key)).unwrap();
+            let re_str_match = Regex::new(&format!(r"(?i)\b{key}\b\(([^\)]*)\)")).unwrap();
             let re_fn = if key == "match" || key == "str_match" {
                 "LIKE"
             } else {
@@ -390,7 +389,7 @@ impl Sql {
                     let value = attrs.get(1).unwrap();
                     origin_sql = origin_sql.replace(
                         cap.get(0).unwrap().as_str(),
-                        format!("\"{}\" {} '%{}%'", field, re_fn, value,).as_str(),
+                        &format!("\"{field}\" {re_fn} '%{value}%'"),
                     );
                 }
             }
@@ -418,12 +417,9 @@ impl Sql {
             };
             origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
-                format!(
-                    "date_bin(interval '{}', to_timestamp_micros(\"{}\"), to_timestamp('2001-01-01T00:00:00'))",
-                    interval,
-                   field,
+                &format!(
+                    "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))",
                 )
-                .as_str(),
             );
         }
 
@@ -472,15 +468,13 @@ impl Sql {
             if !where_str.is_empty() {
                 match re_where.captures(&sql) {
                     Some(caps) => {
-                        sql = sql.replace(
-                            &caps[0].to_string(),
-                            &format!(" WHERE ({}) AND ", where_str),
-                        );
+                        sql = sql
+                            .replace(&caps[0].to_string(), &format!(" WHERE ({where_str}) AND "));
                     }
                     None => {
                         sql = sql.replace(
                             &" FROM tbl ".to_string(),
-                            &format!(" FROM tbl WHERE ({}) ", where_str),
+                            &format!(" FROM tbl WHERE ({where_str}) "),
                         );
                     }
                 }
@@ -502,12 +496,9 @@ impl Sql {
                 let interval = attrs.get(1).unwrap();
                 sql = sql.replace(
                     cap.get(0).unwrap().as_str(),
-                    format!(
-                        "date_bin(interval '{}', to_timestamp_micros(\"{}\"), to_timestamp('2001-01-01T00:00:00'))",
-                        interval,
-                       field,
+                    &format!(
+                        "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))"
                     )
-                    .as_str(),
                 );
             }
 
@@ -606,20 +597,17 @@ impl Sql {
         for key in &self.meta.quick_text {
             let field = logs::get_partition_key_query(format!("{}=", key.0).as_str());
             let value = logs::get_partition_key_query(format!("{}={}", key.0, key.1).as_str());
-            if str::find(source, format!("/{}", field).as_str())
-                && !str::find(source, format!("/{}/", value).as_str())
+            if str::find(source, &format!("/{field}")) && !str::find(source, &format!("/{value}/"))
             {
                 return false;
             }
-            // println!("source: {}", source);
-            // println!("field: {}, value: {}", field, value);
         }
         true
     }
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
-    let re = Regex::new(&format!(r"\b{}\b", field)).unwrap();
+    let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
     if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
         return true;
     }
@@ -743,7 +731,7 @@ fn split_sql_token(text: &str) -> Vec<String> {
             *token = " ".to_string();
         }
     }
-    println!("tokens: {:?}", tokens);
+    println!("tokens: {tokens:?}");
 
     tokens
 }

@@ -14,13 +14,21 @@
 
 use crate::meta::StreamType;
 
+fn mk_key(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> String {
+    format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
+}
+
 pub async fn get_offset(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<i64, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/compact/files/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type, stream_name);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
@@ -36,9 +44,8 @@ pub async fn set_offset(
     offset: i64,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/compact/files/{}/{}/{}", org_id, stream_type, stream_name);
-    db.put(&key, offset.to_string().into()).await?;
-    Ok(())
+    let key = mk_key(org_id, stream_type, stream_name);
+    Ok(db.put(&key, offset.to_string().into()).await?)
 }
 
 pub async fn del_offset(
@@ -47,7 +54,7 @@ pub async fn del_offset(
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/compact/files/{}/{}/{}", org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type, stream_name);
     if let Err(e) = db.delete(&key, false).await {
         if !e.to_string().contains("not exists") {
             return Err(anyhow::anyhow!(e));

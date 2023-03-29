@@ -498,7 +498,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT * FROM {}", stream_name),
+            sql: format!("SELECT * FROM {stream_name}"),
             from: 0,
             size: 0,
             start_time,
@@ -514,8 +514,7 @@ pub async fn values(
         req.aggs.insert(
             field.clone(),
             format!(
-                "SELECT {} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {}",
-                field, size
+                "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
             ),
         );
     }

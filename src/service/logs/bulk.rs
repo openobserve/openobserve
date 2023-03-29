@@ -101,7 +101,7 @@ pub async fn ingest(
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("stream [{}] is being deleted", stream_name),
+                        format!("stream [{stream_name}] is being deleted"),
                     )),
                 );
             }
@@ -116,7 +116,6 @@ pub async fn ingest(
                 &mut stream_tansform_map,
                 &mut stream_lua_map,
                 &lua,
-                //scope,
             )
             .await;
             // End Register Transfoms for index
@@ -157,9 +156,7 @@ pub async fn ingest(
                     },
                 });
 
-            stream_file_map
-                .entry(stream_name.clone())
-                .or_insert_with(|| String::from(""));
+            stream_file_map.entry(stream_name.clone()).or_default();
         } else {
             next_line_is_data = false;
 
@@ -169,11 +166,11 @@ pub async fn ingest(
 
             //Start row based transform
             #[cfg(feature = "zo_functions")]
-            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
                 for trans in transforms {
-                    let func_key = format!("{}/{}", &stream_name, trans.name);
+                    let func_key = format!("{stream_name}/{}", trans.name);
                     value = crate::service::ingestion::lua_transform(
                         &lua,
                         &value,
