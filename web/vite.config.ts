@@ -72,19 +72,6 @@ export default defineConfig({
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
   },
-  test: {
-    global: true,
-    setupFiles: "src/test/unit/helpers/setupTests.ts",
-    coverage: {
-      reporter: ["text", "json", "html"],
-    },
-    environment: "happy-dom",
-    cache: false,
-    maxConcurrency: 20,
-    update: false,
-    // testNamePattern: "DateTime",
-    // ...
-  },
   server: {
     port: 8081,
   },
@@ -124,5 +111,34 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
+  },
+  test: {
+    global: true,
+    setupFiles: "test/unit/helpers/setupTests.ts",
+    deps: {
+      inline: ["monaco-editor"],
+    },
+    coverage: {
+      reporter: ["text", "json", "html"],
+      all: true,
+      exclude: [
+        "coverage/**",
+        "dist/**",
+        "packages/*/test{,s}/**",
+        "**/*.d.ts",
+        "cypress/**",
+        "test{,s}/**",
+        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/__tests__/**",
+        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
+        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
+      ],
+    },
+    environment: "happy-dom",
+    cache: false,
+    maxConcurrency: 20,
+    update: false,
   },
 });
