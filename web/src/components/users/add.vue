@@ -47,7 +47,7 @@
           <q-toggle
             v-if="!beingUpdated && userRole == 'root'"
             v-model="existingUser"
-            :label="t('search.isExistingUser')"
+            :label="t('user.isExistingUser')"
           />
 
           <q-input

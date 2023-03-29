@@ -20,8 +20,7 @@
         "showQueryLabel": "Query",
         "showFieldLabel": "Fields",
         "showHistogramLabel": "Histogram",
-        "sqlModeLabel": "SQL Mode",
-        "isExistingUser": "Existing User?"
+        "sqlModeLabel": "SQL Mode"
     },
     "menu": {
         "home": "Home",
@@ -102,7 +101,8 @@
         "oldPassword": "Old Password",
         "newPassword": "New Password",
         "organization": "Organization",
-        "otherOrganization": "Other Organization"
+        "otherOrganization": "Other Organization",
+        "isExistingUser": "Existing User?"
     },
     "ticket": {
         "header": "Support Tickets",
