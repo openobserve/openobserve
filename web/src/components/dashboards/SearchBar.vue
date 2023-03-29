@@ -143,7 +143,7 @@ export default defineComponent({
         query += array.join("")
 
         // now add from stream name
-        query += ` FROM '${dashboardPanelData.data.fields.stream}' `
+        query += ` FROM "${dashboardPanelData.data.fields.stream}" `
 
         query += filter.some((it)=> ((it.type == "list" && it.values?.length > 0) || (it.type == "condition" && it.operator != null && it.value != null && it.value != ''))) ? "WHERE " : ""
         const filterData = filter?.map((field, i)=>{
@@ -180,6 +180,7 @@ export default defineComponent({
 
         // add group by statement
         query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
+        query += ` ORDER BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
 
         // console.log('generated query: ', query)
 

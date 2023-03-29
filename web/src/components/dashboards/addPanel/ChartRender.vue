@@ -212,6 +212,7 @@ export default defineComponent({
           sql_mode: "full",
           start_time: startISOTimestamp,
           end_time: endISOTimestamp,
+          size: 0
         },
       };
 
@@ -219,23 +220,18 @@ export default defineComponent({
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
-          const sortFn = (it1:any, it2: any) => {
-            const a = it1[props.data.fields?.x[0].alias] || ""
-            const b = it2[props.data.fields?.x[0].alias] || ""
-            if(typeof a == 'number' && typeof b == 'number') {
-                return a - b
-            } else {
-                return a.toString().localeCompare(b.toString())
-            }
-          }
+          // const sortFn = (it1:any, it2: any) => {
+          //   const a = it1[props.data.fields?.x[0].alias] || ""
+          //   const b = it2[props.data.fields?.x[0].alias] || ""
+          //   if(typeof a == 'number' && typeof b == 'number') {
+          //       return a - b
+          //   } else {
+          //       return a.toString().localeCompare(b.toString())
+          //   }
+          // }
 
-          searchQueryData.data = props.data.fields?.x && props.data.fields?.x.length > 0 ? res.data.hits.sort(sortFn) : res.data.hits;
+          searchQueryData.data = res.data.hits;
           searchQueryData.loading = false
-          // $q.notify({
-          //   type: "positive",
-          //   message: "Query applied successfully.",
-          //   timeout: 5000,
-          // });
         })
         .catch((error) => {
           $q.notify({
