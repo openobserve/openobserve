@@ -78,7 +78,7 @@ impl FromStr for Role {
             "compactor" => Ok(Role::Compactor),
             "router" => Ok(Role::Router),
             "alertmanager" => Ok(Role::AlertManager),
-            _ => Err(format!("Invalid cluster role: {}", s)),
+            _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
 }

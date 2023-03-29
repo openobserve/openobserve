@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
-    let key = format!("{}{}", pass, salt);
+    let key = format!("{pass}{salt}");
     let hash = PASSWORD_HASH.get(&key);
     match hash {
         Some(ret_hash) => ret_hash.value().to_string(),
@@ -44,7 +44,7 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
 }
 
 pub async fn is_root_user(user_id: &str) -> bool {
-    let key = format!("{}/{}", DEFAULT_ORG, user_id);
+    let key = format!("{DEFAULT_ORG}/{user_id}");
     match USERS.get(&key) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,

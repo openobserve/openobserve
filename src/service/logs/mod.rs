@@ -92,12 +92,9 @@ pub fn get_partition_key_record(s: &str) -> String {
 
 // generate partition key for query
 pub fn get_partition_key_query(s: &str) -> String {
-    let s = s.replace(['/', '.'], "_");
-    if s.len() > 100 {
-        s[0..100].to_string()
-    } else {
-        s
-    }
+    let mut s = s.replace(['/', '.'], "_");
+    s.truncate(100);
+    s
 }
 
 pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
@@ -216,7 +213,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Err(_) => parse_error = true,
                     };
                 }
-                _ => println!("{:?}", local_val),
+                _ => println!("{local_val:?}"),
             };
         }
     }
@@ -336,15 +333,15 @@ fn get_hour_key(
 
     for key in &partition_keys {
         match local_val.get(key) {
+            None => continue,
             Some(v) => {
                 let val = if v.is_string() {
-                    format!("{}={}", key, v.as_str().unwrap())
+                    format!("{key}={}", v.as_str().unwrap())
                 } else {
-                    format!("{}={}", key, v)
+                    format!("{key}={v}")
                 };
                 hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
             }
-            None => continue,
         };
     }
     hour_key

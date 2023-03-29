@@ -17,9 +17,14 @@ use std::sync::Arc;
 use crate::infra::config::KVS;
 use crate::infra::db::Event;
 
+fn mk_keys(org_id: &str, key: &str) -> (String, String) {
+    let cache_key = format!("{org_id}/{key}");
+    let db_key = format!("/kv/{cache_key}");
+    (cache_key, db_key)
+}
+
 pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
-    let db_key = format!("/kv/{}", cache_key);
+    let (cache_key, db_key) = mk_keys(org_id, key);
     if KVS.contains_key(&cache_key) {
         return Ok(KVS.get(&cache_key).unwrap().value().clone());
     }
@@ -30,8 +35,7 @@ pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error>
 }
 
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
-    let db_key = format!("/kv/{}", cache_key);
+    let (cache_key, db_key) = mk_keys(org_id, key);
     let db = &crate::infra::db::DEFAULT;
     db.put(&db_key, val.clone()).await?;
     KVS.insert(cache_key, val);
@@ -39,31 +43,26 @@ pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyho
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
-    let cache_key = format!("{}/{}", org_id, key);
-    let db_key = format!("/kv/{}", cache_key);
+    let (cache_key, db_key) = mk_keys(org_id, key);
     let db = &crate::infra::db::DEFAULT;
     KVS.remove(&cache_key);
-    db.delete(&db_key, false).await?;
-    Ok(())
+    Ok(db.delete(&db_key, false).await?)
 }
 
 pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let mut items = Vec::new();
     let cache_key = if prefix.ends_with('*') {
-        format!("{}/{}", org_id, prefix.strip_suffix('*').unwrap())
+        format!("{org_id}/{}", prefix.strip_suffix('*').unwrap())
     } else {
-        format!("{}/{}", org_id, prefix)
+        format!("{org_id}/{prefix}")
     };
-    let db_key = format!("/kv/{}", cache_key);
-    let ret = db.list_keys(&db_key).await?;
-    for item_key in ret {
-        let item_key = item_key
-            .strip_prefix(format!("/kv/{}/", org_id).as_str())
-            .unwrap();
-        items.push(item_key.to_string());
-    }
-    Ok(items)
+    let db_key = format!("/kv/{cache_key}");
+    Ok(db
+        .list_keys(&db_key)
+        .await?
+        .into_iter()
+        .map(|it| it.strip_prefix(&format!("/kv/{org_id}/")).unwrap().into())
+        .collect())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -77,7 +76,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Some(ev) => ev,
             None => {
                 log::error!("watch_kv: event channel closed");
-                break;
+                return Ok(());
             }
         };
         match ev {
@@ -92,5 +91,4 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         }
     }
-    Ok(())
 }

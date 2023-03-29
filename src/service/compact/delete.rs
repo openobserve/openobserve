@@ -33,8 +33,8 @@ pub async fn delete_all(
     // println!("delete_all: {}/{}/{}", org_id, stream_type, stream_name);
     if is_local_disk_storage() {
         let data_dir = format!(
-            "{}/files/{}/{}/{}",
-            CONFIG.common.data_stream_dir, org_id, stream_type, stream_name
+            "{}/files/{org_id}/{stream_type}/{stream_name}",
+            CONFIG.common.data_stream_dir
         );
         let path = std::path::Path::new(&data_dir);
         if path.exists() {
@@ -56,7 +56,7 @@ pub async fn delete_all(
         }
 
         // at the end, fetch a file list from s3 to guatantte there is no file
-        let prefix = format!("files/{}/{}/{}/", org_id, stream_type, stream_name);
+        let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
         loop {
             let files = storage.list(&prefix).await?;
             if files.is_empty() {
@@ -88,28 +88,17 @@ pub async fn delete_by_date(
     stream_type: StreamType,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
-    // println!(
-    //     "delete_by_date: {}/{}/{}, {:?}",
-    //     org_id, stream_type, stream_name, date_range
-    // );
-    let mut date_start = Utc.datetime_from_str(
-        format!("{}T00:00:00Z", date_range.0).as_str(),
-        "%Y-%m-%dT%H:%M:%SZ",
-    )?;
-    let date_end = Utc.datetime_from_str(
-        format!("{}T23:59:59Z", date_range.1).as_str(),
-        "%Y-%m-%dT%H:%M:%SZ",
-    )?;
+    let mut date_start =
+        Utc.datetime_from_str(&format!("{}T00:00:00Z", date_range.0), "%Y-%m-%dT%H:%M:%SZ")?;
+    let date_end =
+        Utc.datetime_from_str(&format!("{}T23:59:59Z", date_range.1), "%Y-%m-%dT%H:%M:%SZ")?;
     let time_range = { (date_start.timestamp_micros(), date_end.timestamp_micros()) };
 
     if is_local_disk_storage() {
         while date_start <= date_end {
             let data_dir = format!(
-                "{}/files/{}/{}/{}/{}",
+                "{}/files/{org_id}/{stream_type}/{stream_name}/{}",
                 CONFIG.common.data_stream_dir,
-                org_id,
-                stream_type,
-                stream_name,
                 date_start.format("%Y/%m/%d")
             );
             let path = std::path::Path::new(&data_dir);
@@ -143,10 +132,7 @@ pub async fn delete_by_date(
         // at the end, fetch a file list from s3 to guatantte there is no file
         while date_start <= date_end {
             let prefix = format!(
-                "files/{}/{}/{}/{}/",
-                org_id,
-                stream_type,
-                stream_name,
+                "files/{org_id}/{stream_type}/{stream_name}/{}/",
                 date_start.format("%Y/%m/%d")
             );
             loop {
@@ -227,7 +213,7 @@ async fn delete_from_file_list(
     let storage = &storage::DEFAULT;
     for (key, items) in hours_files {
         // upload the new file_list to storage
-        let new_file_list_key = format!("file_list/{}/{}.json.zst", key, ider::generate());
+        let new_file_list_key = format!("file_list/{key}/{}.json.zst", ider::generate());
         let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
         for file in items.iter() {
             let mut write_buf = json::to_vec(&file)?;

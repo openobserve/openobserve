@@ -287,20 +287,20 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     let mut id = 0;
                     for user in config::USERS.iter() {
                         id += 1;
-                        println!("{}\t{:?}\n{:?}", id, user.key(), user.value());
+                        println!("{id}\t{:?}\n{:?}", user.key(), user.value());
                     }
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {}", component));
+                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
                 }
             }
         }
         _ => {
-            return Err(anyhow::anyhow!("unsupport sub command: {}", name));
+            return Err(anyhow::anyhow!("unsupport sub command: {name}"));
         }
     }
 
-    println!("command {} execute succeeded", name);
+    println!("command {name} execute succeeded");
 
     Ok(true)
 }

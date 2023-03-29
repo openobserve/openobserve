@@ -7,8 +7,8 @@ use crate::meta::alert::DestinationTemplate;
 use crate::meta::organization::DEFAULT_ORG;
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>, anyhow::Error> {
-    let map_key = format!("{}/{}", org_id, name);
-    let default_org_key = format!("{}/{}", DEFAULT_ORG, name);
+    let map_key = format!("{org_id}/{name}");
+    let default_org_key = format!("{DEFAULT_ORG}/{name}");
     let value: Option<DestinationTemplate> = if ALERTS_TEMPLATES.contains_key(&map_key)
         || ALERTS_TEMPLATES.contains_key(&default_org_key)
     {
@@ -18,11 +18,11 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<DestinationTemplate>
         }
     } else {
         let db = &crate::infra::db::DEFAULT;
-        let key = format!("/templates/{}/{}", org_id, name);
+        let key = format!("/templates/{org_id}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
             Err(_) => {
-                let key = format!("/templates/{}/{}", DEFAULT_ORG, name);
+                let key = format!("/templates/{DEFAULT_ORG}/{name}");
                 match db.get(&key).await {
                     Ok(val) => json::from_slice(&val).unwrap(),
                     Err(_) => None,
@@ -39,46 +39,28 @@ pub async fn set(
     mut template: DestinationTemplate,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    if org_id.eq(DEFAULT_ORG) {
-        template.is_default = Some(true);
-    } else {
-        template.is_default = Some(false);
-    }
-    let key = format!("/templates/{}/{}", org_id, name);
-    db.put(&key, json::to_vec(&template).unwrap().into())
-        .await?;
-    Ok(())
+    template.is_default = Some(org_id == DEFAULT_ORG);
+    let key = format!("/templates/{org_id}/{name}");
+    Ok(db
+        .put(&key, json::to_vec(&template).unwrap().into())
+        .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/templates/{}/{}", org_id, name);
-    match db.delete(&key, false).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    let key = format!("/templates/{org_id}/{name}");
+    Ok(db.delete(&key, false).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<DestinationTemplate>, anyhow::Error> {
-    let mut temp_list: Vec<DestinationTemplate> = Vec::new();
-
-    for template in ALERTS_TEMPLATES.iter() {
-        if template.key().starts_with(&format!("{}/", org_id))
-            || template.key().starts_with(&format!("{}/", DEFAULT_ORG))
-        {
-            temp_list.push(template.value().clone())
-        }
-    }
-
-    /* let db = &crate::infra::db::DEFAULT;
-    let key = format!("/templates/{}", org_id);
-    let ret = db.list_values(&key).await?;
-    let mut temp_list: Vec<DestinationTemplate> = Vec::new();
-    for item_value in ret {
-        let json_val = json::from_slice(&item_value).unwrap();
-        temp_list.push(json_val)
-    } */
-    Ok(temp_list)
+    Ok(ALERTS_TEMPLATES
+        .iter()
+        .filter_map(|template| {
+            let k = template.key();
+            (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
+                .then(|| template.value().clone())
+        })
+        .collect())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

@@ -79,7 +79,7 @@ impl Serialize for StreamSettings {
         let mut state = serializer.serialize_struct("StreamSettings", 2)?;
         let mut part_keys = HashMap::new();
         for (index, key) in self.partition_keys.iter().enumerate() {
-            part_keys.insert(format!("L{}", index), key.to_string());
+            part_keys.insert(format!("L{index}"), key.to_string());
         }
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;

@@ -23,41 +23,39 @@ use crate::meta::user::{DBUser, User, UserRole};
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
     let db_span = info_span!("db:user:get");
     let _guard = db_span.enter();
-    let user = if org_id.is_some() {
-        let key = format!("{}/{}", org_id.unwrap(), name);
-        USERS.get(&key)
-    } else {
-        ROOT_USER.get("root")
+
+    let user = match org_id {
+        None => ROOT_USER.get("root"),
+        Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
     };
 
-    if user.is_none() {
-        let db = &crate::infra::db::DEFAULT;
-        let key = format!("/user/{}", name);
-        let ret = db.get(&key).await?;
-        let loc_value: DBUser = json::from_slice(&ret).unwrap();
-        if org_id.is_some() {
-            Ok(loc_value.get_user(org_id.unwrap().to_string()))
-        } else {
-            Ok(Some(ROOT_USER.get("root").unwrap().value().clone()))
-        }
-    } else {
-        Ok(Some(user.unwrap().clone()))
+    if let Some(user) = user {
+        return Ok(Some(user.clone()));
     }
+
+    let org_id = org_id.expect("BUG");
+
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/user/{name}");
+    let val = db.get(&key).await?;
+    let db_user: DBUser = json::from_slice(&val).unwrap();
+    Ok(db_user.get_user(org_id.to_string()))
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     let db_span = info_span!("db:user:get");
     let _guard = db_span.enter();
+
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/user/{}", name);
-    let ret = db.get(&key).await?;
-    let loc_value: DBUser = json::from_slice(&ret).unwrap();
-    Ok(loc_value)
+    let key = format!("/user/{name}");
+    let val = db.get(&key).await?;
+    Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let db_span = info_span!("db:user:set");
     let _guard = db_span.enter();
+
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/user/{}", user.email);
     db.put(&key, json::to_vec(&user).unwrap().into()).await?;
@@ -85,11 +83,8 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let _guard = db_span.enter();
 
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/user/{}", name);
-    match db.delete(&key, false).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    let key = format!("/user/{name}");
+    Ok(db.delete(&key, false).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

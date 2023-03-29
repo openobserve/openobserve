@@ -50,7 +50,7 @@ pub async fn merge_by_stream(
     let mut locker = None;
     if !CONFIG.common.local_mode {
         // get a cluster lock for compactor stream
-        let lock_key = format!("compactor/files/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("compactor/files/{org_id}/{stream_type}/{stream_name}");
         let mut lock = etcd::Locker::new(&lock_key);
         if lock.lock(CONFIG.etcd.command_timeout).await.is_err() {
             return Ok(()); // lock failed, just skip
@@ -392,7 +392,7 @@ async fn merge_files(
     new_file_meta.compressed_size = buf.len() as u64;
 
     let id = ider::generate();
-    let new_file_key = format!("{}/{}{}", prefix, id, &CONFIG.common.file_ext_parquet);
+    let new_file_key = format!("{prefix}/{id}{}", &CONFIG.common.file_ext_parquet);
 
     log::info!(
         "[COMPACT] merge file succeeded, new file: {}, orginal_size: {}, compressed_size: {}",

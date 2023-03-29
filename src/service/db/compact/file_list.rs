@@ -32,14 +32,14 @@ pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
 
 pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/compact/file_list/delete/{}", key);
+    let key = format!("/compact/file_list/delete/{key}");
     db.put(&key, "OK".into()).await?;
     Ok(())
 }
 
 pub async fn del_delete(key: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/compact/file_list/delete/{}", key);
+    let key = format!("/compact/file_list/delete/{key}");
     if let Err(e) = db.delete(&key, false).await {
         if !e.to_string().contains("not exists") {
             return Err(anyhow::anyhow!(e));

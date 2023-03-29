@@ -37,16 +37,8 @@ pub async fn set_prom_cluster_info(
     members: Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/metrics_members/{}", cluster);
-    let mem_list = members
-        .into_iter()
-        .map(|val| format!("{},", val))
-        .collect::<String>();
-    let members_list = mem_list.strip_suffix(',').unwrap();
-    match db.put(&key, Bytes::from(members_list.to_string())).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    let key = format!("/metrics_members/{cluster}");
+    Ok(db.put(&key, Bytes::from(members.join(","))).await?)
 }
 
 pub async fn set_prom_cluster_leader(
@@ -54,11 +46,8 @@ pub async fn set_prom_cluster_leader(
     leader: &ClusterLeader,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/metrics_leader/{}", cluster);
-    match db.put(&key, json::to_vec(&leader).unwrap().into()).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
-    }
+    let key = format!("/metrics_leader/{cluster}");
+    Ok(db.put(&key, json::to_vec(&leader).unwrap().into()).await?)
 }
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
