@@ -27,7 +27,7 @@ use super::request::dashboards::*;
 use super::request::functions;
 use super::request::kv;
 use super::request::logs;
-use super::request::organization::*;
+use super::request::organization;
 use super::request::prom::*;
 use super::request::search;
 use super::request::status;
@@ -125,7 +125,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(stream::settings)
             .service(stream::delete)
             .service(stream::list)
-            .service(stream::org_index)
             .service(functions::save_function)
             .service(functions::list_functions)
             .service(functions::delete_function)
@@ -142,15 +141,16 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(list_dashboards)
             .service(delete_dashboard)
             .service(traces_write)
-            .service(organizations)
             .service(save_alert)
             .service(get_alert)
             .service(list_alerts)
             .service(list_stream_alerts)
             .service(delete_alert)
-            .service(org_summary)
-            .service(get_user_passcode)
-            .service(update_user_passcode)
+            .service(organization::organizations)
+            .service(organization::org_summary)
+            .service(organization::get_user_passcode)
+            .service(organization::update_user_passcode)
+            .service(organization::org_index)
             .service(users::update)
             .service(templates::save_template)
             .service(templates::get_template)
