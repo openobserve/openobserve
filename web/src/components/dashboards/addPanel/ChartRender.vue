@@ -173,7 +173,7 @@ export default defineComponent({
       
       let data = layout.map((text:any)=>{
         if(text){
-          return text.toString().length > 15 ? text.substring(0, 15) + "..." : text;
+          return text.toString().length > 15 ? text.toString().substring(0, 15) + "..." : text;
         }else {
           return text
         }
@@ -181,6 +181,26 @@ export default defineComponent({
       console.log("data=", data);
       
       return data 
+    }
+
+    const getTickLimits = (layout: string[]) => {
+      if(layout.length > 10) {
+        // do the splitting
+        const n = 10;
+
+        // get the range of difference
+        const range = layout.length / n
+
+        // find the indexes at intervals
+        const array = [...Array(n).keys()]
+        const resultIndex = [...array.map((it: number, i: number) => it * range), layout.length - 1]
+
+        // get the actual values from the indexes
+        const tickVals = resultIndex.map((it: number) => layout[it])
+        return tickVals
+      } else {
+        return layout
+      }
     }
 
     // Chart Related Functions
@@ -432,6 +452,8 @@ export default defineComponent({
     // layout changes based on selected chart type
     const getPropsByChartTypeForLayout = () => {
       const xAxisKey = getXAxisKey();
+      const xAxisData = getAxisDataFromKey(xAxisKey)
+      const xAxisDataWithTicks = getTickLimits(xAxisData)
 
       switch (props.data.type) {
         case "bar":
@@ -439,8 +461,8 @@ export default defineComponent({
             barmode: "group",
             xaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -454,8 +476,8 @@ export default defineComponent({
           return {
             xaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -470,8 +492,8 @@ export default defineComponent({
             scattermode: "group",
             xaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -490,8 +512,8 @@ export default defineComponent({
             },
             yaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
             },
@@ -506,8 +528,8 @@ export default defineComponent({
             },
             yaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
               automargin: true,
             },
@@ -516,8 +538,8 @@ export default defineComponent({
           return {
             xaxis: {
               tickmode: "array",
-              tickvals: getAxisDataFromKey(xAxisKey),
-              ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -531,8 +553,8 @@ export default defineComponent({
           return {
             xaxis: {
                 tickmode: "array",
-                tickvals: getAxisDataFromKey(xAxisKey),
-                ticktext: textformat(getAxisDataFromKey(xAxisKey)),
+                tickvals: xAxisDataWithTicks,
+                ticktext: textformat(xAxisDataWithTicks),
                 title: props.data.fields?.x[0].label,
                 tickangle: -20,
                 automargin: true,
