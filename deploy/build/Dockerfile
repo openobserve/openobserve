@@ -26,6 +26,7 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
 ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
 RUN rustc --version
+RUN sccache --version
 
 # RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip \
 #     && unzip protoc-21.12-linux-x86_64.zip -d protoc \
