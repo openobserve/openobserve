@@ -61,34 +61,34 @@ pub struct DBUser {
     pub password: String,
     #[serde(default)]
     pub salt: String,
-    //#[serde(skip_serializing_if = "Vec::is_empty")]
     pub organizations: Vec<UserOrg>,
 }
 
 impl DBUser {
     pub fn get_user(&self, org_id: String) -> Option<User> {
         if self.organizations.is_empty() {
-            None
-        } else {
-            let mut local = self.clone();
-            local.organizations.retain(|org| org.name.eq(&org_id));
-            if local.organizations.is_empty() {
-                None
-            } else {
-                let org = local.organizations.first().unwrap();
-                Some(User {
-                    email: local.email,
-                    first_name: local.first_name,
-                    last_name: local.last_name,
-                    password: local.password,
-                    role: org.role.clone(),
-                    org: org.name.clone(),
-                    token: org.token.clone(),
-                    salt: local.salt,
-                })
-            }
+            return None;
         }
+
+        let mut local = self.clone();
+        local.organizations.retain(|org| org.name.eq(&org_id));
+        if local.organizations.is_empty() {
+            return None;
+        }
+
+        let org = local.organizations.first().unwrap();
+        Some(User {
+            email: local.email,
+            first_name: local.first_name,
+            last_name: local.last_name,
+            password: local.password,
+            role: org.role.clone(),
+            org: org.name.clone(),
+            token: org.token.clone(),
+            salt: local.salt,
+        })
     }
+
     pub fn get_all_users(&self) -> Vec<User> {
         let mut ret_val = vec![];
         if self.organizations.is_empty() {

@@ -320,18 +320,13 @@ impl<'a> TryFrom<Source<'a>> for String {
 impl<'a> TryFrom<Order<'a>> for (String, bool) {
     type Error = anyhow::Error;
 
-    fn try_from(o: Order) -> Result<Self, Self::Error> {
-        let name = match &o.0.expr {
-            SqlExpr::Identifier(id) => id.to_string(),
-            expr => {
-                return Err(anyhow::anyhow!(
-                    "We only support identifier for order by, got {}",
-                    expr
-                ))
-            }
-        };
-
-        Ok((name, !o.0.asc.unwrap_or(true)))
+    fn try_from(order: Order) -> Result<Self, Self::Error> {
+        match &order.0.expr {
+            SqlExpr::Identifier(id) => Ok((id.to_string(), !order.0.asc.unwrap_or(true))),
+            expr => Err(anyhow::anyhow!(
+                "We only support identifier for order by, got {expr}"
+            )),
+        }
     }
 }
 
@@ -339,25 +334,20 @@ impl<'a> TryFrom<Group<'a>> for String {
     type Error = anyhow::Error;
 
     fn try_from(g: Group) -> Result<Self, Self::Error> {
-        let name = match &g.0 {
-            SqlExpr::Identifier(id) => id.to_string(),
-            expr => {
-                return Err(anyhow::anyhow!(
-                    "We only support identifier for order by, got {}",
-                    expr
-                ))
-            }
-        };
-
-        Ok(name)
+        match &g.0 {
+            SqlExpr::Identifier(id) => Ok(id.to_string()),
+            expr => Err(anyhow::anyhow!(
+                "We only support identifier for order by, got {expr}"
+            )),
+        }
     }
 }
 
 impl std::fmt::Display for SqlValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SqlValue::String(s) => write!(f, "{}", s),
-            SqlValue::Number(n) => write!(f, "{}", n),
+            SqlValue::String(s) => write!(f, "{s}"),
+            SqlValue::Number(n) => write!(f, "{n}"),
         }
     }
 }
@@ -610,12 +600,8 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     }
 
     // check function, like: to_timestamp_micros("field")
-    let re = Regex::new(&format!(r#"(?i)\(['"]?{}['"]?\)"#, field)).unwrap();
-    if re.is_match(s) {
-        return true;
-    }
-
-    false
+    let re = Regex::new(&format!(r#"(?i)\(['"]?{field}['"]?\)"#)).unwrap();
+    re.is_match(s)
 }
 
 fn parse_expr_like(

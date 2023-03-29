@@ -75,7 +75,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
 
                     srv.call(req).map(move |res| {
-                        if !path.starts_with("src/") && !path.starts_with("assets/") {
+                        if path.starts_with("src/") || path.starts_with("assets/") {
+                            res
+                        } else {
                             let res = res.unwrap();
                             let req = res.request().clone();
                             let body = res.into_body();
@@ -83,11 +85,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                             let body = String::from_utf8(body.to_vec()).unwrap();
                             let body = body.replace(
                                 r#"<base href="/" />"#,
-                                format!(r#"<base href="{}" />"#, prefix).as_str(),
+                                &format!(r#"<base href="{prefix}" />"#),
                             );
                             Ok(ServiceResponse::new(req, HttpResponse::Ok().body(body)))
-                        } else {
-                            res
                         }
                     })
                 })

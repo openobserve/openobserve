@@ -72,17 +72,7 @@ pub async fn search(
     })
     .join();
 
-    if result.is_err() {
-        let err = result.err();
-        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-            "{:?}",
-            err
-        ))));
-    }
-    match result.unwrap() {
-        Ok(res) => Ok(res),
-        Err(err) => Err(err),
-    }
+    result.map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(format!("{err:?}"))))?
 }
 
 #[tracing::instrument(name = "service:search:local:enter", skip(req))]
@@ -627,7 +617,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
             if !k.eq(&CONFIG.common.time_stamp_col) && !k.eq("value") {
-                key.push(format!("{}_{}", k, v));
+                key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");

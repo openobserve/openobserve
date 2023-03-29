@@ -115,7 +115,7 @@ impl Locker {
         stream_type: StreamType,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{}_{}_{}_{}", org_id, stream_name, stream_type, key);
+        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
         let file = match self
             .data
             .get(thread_id)
@@ -156,7 +156,7 @@ impl Locker {
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        let full_key = format!("{}_{}_{}_{}", org_id, stream_name, stream_type, key);
+        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
         let file = Arc::new(RwFile::new(
             thread_id,
             org_id,
@@ -215,8 +215,8 @@ impl RwFile {
         use_cache: bool,
     ) -> RwFile {
         let mut dir_path = format!(
-            "{}files/{}/{}/{}/",
-            &CONFIG.common.data_wal_dir, org_id, stream_type, stream_name
+            "{}files/{org_id}/{stream_type}/{stream_name}/",
+            &CONFIG.common.data_wal_dir
         );
         // Hack for file_list
         let file_list_prefix = "/files//file_list//";
@@ -224,11 +224,8 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!(
-            "{}_{}_{}{}",
-            thread_id, key, id, &CONFIG.common.file_ext_json
-        );
-        let file_path = format!("{}{}", dir_path, file_name);
+        let file_name = format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json);
+        let file_path = format!("{dir_path}{file_name}");
         std::fs::create_dir_all(&dir_path).unwrap();
 
         let (file, cache) = if use_cache {

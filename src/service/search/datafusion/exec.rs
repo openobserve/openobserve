@@ -86,16 +86,15 @@ pub async fn sql(
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {:?}",
-                file_type,
+                "Unsupported file type scheme {file_type:?}",
             )));
         }
     };
 
     let prefix = if session.data_type.eq(&file_list::SessionType::Cache) {
         format!(
-            "{}files/{}/{}/{}/",
-            &CONFIG.common.data_wal_dir, sql.org_id, stream_type, sql.stream_name
+            "{}files/{}/{stream_type}/{}/",
+            &CONFIG.common.data_wal_dir, sql.org_id, sql.stream_name
         )
     } else {
         file_list::set(&session.id, files).await.unwrap();
@@ -105,8 +104,7 @@ pub async fn sql(
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {}",
-                e
+                "ListingTableUrl error: {e}",
             )));
         }
     };
@@ -132,8 +130,7 @@ pub async fn sql(
                 Ok(schema) => Arc::new(schema),
                 Err(e) => {
                     return Err(datafusion::error::DataFusionError::Execution(format!(
-                        "ListingTable Merge schema error: {}",
-                        e
+                        "ListingTable Merge schema error: {e}"
                     )));
                 }
             }
@@ -230,10 +227,9 @@ pub async fn sql(
             df = df.select(exprs)?;
         }
         let batches = df.collect().await?;
-        result.insert(format!("agg_{}", name), batches);
+        result.insert(format!("agg_{name}"), batches);
         log::info!(
-            "Query agg:{} took {:.3} seconds.",
-            name,
+            "Query agg:{name} took {:.3} seconds.",
             start.elapsed().as_secs_f64()
         );
     }
@@ -280,7 +276,7 @@ pub async fn merge(
             {
                 sql.replace(
                     &format!(" LIMIT {}", limit + offset),
-                    &format!(" LIMIT {} OFFSET {}", limit, offset),
+                    &format!(" LIMIT {limit} OFFSET {offset}"),
                 )
             } else {
                 sql
@@ -308,16 +304,15 @@ pub async fn merge(
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
     let list_url = if cfg!(feature = "tmpcache") {
-        format!("tmpfs://{}", work_dir)
+        format!("tmpfs://{work_dir}")
     } else {
-        format!("file://{}", work_dir)
+        format!("file://{work_dir}")
     };
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {}",
-                e
+                "ListingTableUrl error: {e}"
             )));
         }
     };
@@ -376,7 +371,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
     );
     tmpfs::create_dir_all(&work_dir).unwrap();
     for (i, item) in batches.iter().enumerate() {
-        let file_name = format!("{}{}.parquet", &work_dir, i);
+        let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
         let mut writer = ArrowWriter::try_new(&mut buf_parquet, item[0].schema().clone(), None)?;
         for row in item.iter() {
@@ -459,7 +454,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         }
         if last_is_as {
             new_fields.remove(new_fields.len() - 1);
-            new_fields.push(format!("{} AS {}", fields[i - 2], field));
+            new_fields.push(format!("{} AS {field}", fields[i - 2]));
             sel_fields_name.remove(sel_fields_name.len() - 1);
             sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
             last_is_as = false;
@@ -471,9 +466,6 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         new_fields.push(field.to_string());
         sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
     }
-    // println!("new fields: {:?}", new_fields);
-    // println!("sel_fields_name: {:?}", sel_fields_name);
-    // println!("schema fields: {:?}", schema.fields());
 
     // handle select *
     let mut fields = new_fields;
@@ -494,7 +486,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
                     } else {
                         f.name()
                     };
-                    new_fields.push(format!("\"{}\"", field_name));
+                    new_fields.push(format!("\"{field_name}\""));
                 }
             } else {
                 new_fields.push(field.to_string());
@@ -545,16 +537,13 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             fn_name = "sum".to_string();
         }
         fields[i] = format!(
-            "{}(\"{}\") as \"{}\"",
-            fn_name,
+            "{fn_name}(\"{}\") as \"{}\"",
             schema.field(i).name(),
             schema.field(i).name()
         );
     }
     if need_rewrite {
-        // println!("merge_rewrite_sql A: {}", sql);
         sql = format!("SELECT {} FROM {}", &fields.join(", "), &sql[from_pos..]);
-        // println!("merge_rewrite_sql B: {}", sql);
         if sql.contains("_PLACEHOLDER_") {
             sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
             sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
@@ -607,12 +596,11 @@ pub async fn convert_parquet_file(
         .await
         .unwrap();
 
-    let prefix = match ListingTableUrl::parse(format!("mem:///{}/", session_id)) {
+    let prefix = match ListingTableUrl::parse(format!("mem:///{session_id}/")) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {}",
-                e
+                "ListingTableUrl error: {e}"
             )));
         }
     };
@@ -707,12 +695,11 @@ pub async fn merge_parquet_files(
     let session_id = Uuid::new_v4().to_string();
     file_list::set(&session_id, files).await.unwrap();
 
-    let prefix = match ListingTableUrl::parse(format!("mem:///{}/", session_id)) {
+    let prefix = match ListingTableUrl::parse(format!("mem:///{session_id}/")) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {}",
-                e
+                "ListingTableUrl error: {e}"
             )));
         }
     };

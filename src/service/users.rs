@@ -264,8 +264,8 @@ pub async fn add_user_to_org(
 
 pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     let key = match org_id {
-        Some(local_org) => format!("{}/{}", local_org, name),
-        None => format!("{}/{}", DEFAULT_ORG, name),
+        Some(local_org) => format!("{local_org}/{name}"),
+        None => format!("{DEFAULT_ORG}/{name}"),
     };
     let user = USERS.get(&key);
     match user {
@@ -289,7 +289,7 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
-        if user.key().starts_with(format!("{}/", org_id).as_str()) {
+        if user.key().starts_with(&format!("{org_id}/")) {
             user_list.push(UserResponse {
                 email: user.value().email.clone(),
                 role: user.value().role.clone(),
@@ -316,7 +316,7 @@ pub async fn remove_user_from_org(org_id: &str, email_id: &str) -> Result<HttpRe
                     let resp = db::user::set(user).await;
                     //special case as we cache flattened user struct
                     if resp.is_ok() {
-                        USERS.remove(&format!("{}/{}", org_id, email_id));
+                        USERS.remove(&format!("{org_id}/{email_id}"));
                     }
                 }
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

@@ -564,7 +564,6 @@ impl Locker {
                 }
                 Err(err) => {
                     last_err = Some(err.to_string());
-                    // log::error!("get lock error: {}, key: {}", err, self.key);
                     if !err.to_string().contains("Timeout expired") {
                         break;
                     }
@@ -572,7 +571,7 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("etcd connect error: {}", err)));
+            return Err(Error::Message(format!("etcd connect error: {err}")));
         }
         Ok(())
     }

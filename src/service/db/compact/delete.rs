@@ -21,6 +21,19 @@ lazy_static! {
     static ref CACHE: DashSet<String> = DashSet::new();
 }
 
+#[inline]
+fn mk_key(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: Option<(&str, &str)>,
+) -> String {
+    match date_range {
+        None => format!("{org_id}/{stream_type}/{stream_name}/all"),
+        Some((start, end)) => format!("{org_id}/{stream_type}/{stream_name}/{start},{end}"),
+    }
+}
+
 // delete data from stream
 // if date_range is empty, delete all data
 // date_range is a tuple of (start, end), eg: (20230102, 20230103)
@@ -32,24 +45,17 @@ pub async fn delete_stream(
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = match date_range {
-        Some((start, end)) => format!(
-            "{}/{}/{}/{},{}",
-            org_id, stream_type, stream_name, start, end
-        ),
-        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
-    };
+    let key = mk_key(org_id, stream_type, stream_name, date_range);
 
     // write in cache
     if CACHE.contains(&key) {
         return Ok(()); // already in cache, just skip
     }
-    CACHE.insert(key.to_string());
 
-    let db_key = format!("/compact/delete/{}", key);
-    db.put(&db_key, "OK".into()).await?;
+    let db_key = format!("/compact/delete/{key}");
+    CACHE.insert(key);
 
-    Ok(())
+    Ok(db.put(&db_key, "OK".into()).await?)
 }
 
 // check if stream is deleting from cache
@@ -60,14 +66,7 @@ pub fn is_deleting_stream(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> bool {
-    let key = match date_range {
-        Some((start, end)) => format!(
-            "{}/{}/{}/{},{}",
-            org_id, stream_type, stream_name, start, end
-        ),
-        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
-    };
-    CACHE.contains(&key)
+    CACHE.contains(&mk_key(org_id, stream_type, stream_name, date_range))
 }
 
 #[inline]
@@ -78,14 +77,8 @@ pub async fn delete_stream_done(
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = match date_range {
-        Some((start, end)) => format!(
-            "{}/{}/{}/{},{}",
-            org_id, stream_type, stream_name, start, end
-        ),
-        None => format!("{}/{}/{}/all", org_id, stream_type, stream_name),
-    };
-    let db_key = format!("/compact/delete/{}", key);
+    let key = mk_key(org_id, stream_type, stream_name, date_range);
+    let db_key = format!("/compact/delete/{key}");
     if let Err(e) = db.delete(&db_key, false).await {
         if !e.to_string().contains("not exists") {
             return Err(anyhow::anyhow!(e));
