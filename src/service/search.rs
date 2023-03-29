@@ -627,7 +627,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
-        let entry = results_values.entry(key).or_insert(Vec::new());
+        let entry = results_values.entry(key).or_default();
         let value = [
             fields
                 .get(&CONFIG.common.time_stamp_col)

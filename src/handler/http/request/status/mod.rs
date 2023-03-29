@@ -19,7 +19,7 @@ use std::io::Error;
 use utoipa::ToSchema;
 
 use crate::common::json;
-use crate::infra::config::{self, CONFIG};
+use crate::infra::config::{self, CONFIG, INSTANCE_ID};
 use crate::infra::{cache, cluster};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
@@ -32,6 +32,7 @@ pub struct HealthzResponse {
 #[derive(Serialize)]
 struct ConfigResponse<'a> {
     version: String,
+    instance: String,
     commit_hash: String,
     build_date: String,
     functions_enabled: bool,
@@ -59,6 +60,7 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
+        instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
         functions_enabled: config::HAS_FUNCTIONS,
