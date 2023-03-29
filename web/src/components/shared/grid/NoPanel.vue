@@ -15,24 +15,31 @@
 
 <template>
   <div
-  class="flex justify-center q-pa-xl text-dark"
+  class="flex column justify-center q-pa-xs text-dark"
   style="font-size: 1.5rem"
   >
-    <q-btn 
-        :label="t('panel.add')"
-        no-caps color="primary"
-        stack 
-        text-color="black" 
-        padding="xl" 
-        outline icon="insert_drive_file"
-        class=""
-        @click="$emit('update:Panel')"
-    >
-    <!-- <q-img
-        :src="getImageURL('images/common/clipboard_icon.svg')"
-        style="width: 230px; margin: 20vh auto 2rem"
-      /> -->
+    <q-img
+      :src="getImageURL('images/common/clipboard_icon.svg')"
+      style="width: 230px; margin: 5vh auto 2rem"
+    />
+    <div class="flex justify-center q-mb-md">
+      <span>Start by adding your first dashboard panel</span>
+    </div>
+    <div class="flex justify-center">
+      <q-btn 
+          :label="t('panel.add')"
+          no-caps color="primary"
+          stack 
+          text-color="black" 
+          padding="md" 
+          outline icon="insert_drive_file"
+          class=""
+          @click="$emit('update:Panel')"
+      >
+   
       </q-btn>
+    </div>
+
   </div>
 </template>
 <script lang="ts">
