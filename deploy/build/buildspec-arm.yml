@@ -28,14 +28,14 @@ phases:
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
 
-      # - echo 'Pull amd64 image'
+      - echo 'Pull amd64 image'
       - docker pull public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker pull public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
        
-      # - echo 'Create manifests'
+      - echo 'Create manifests'
       - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
       - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:latest --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
       
-      # - echo 'Push manifests'
+      - echo 'Push manifests'
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
