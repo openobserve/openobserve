@@ -257,11 +257,8 @@ export default defineComponent({
         "",
         true
       ).then((res) => {
-        console.log("---list---",res.data.list);
-        
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
-        
       });
     };
 

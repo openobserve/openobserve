@@ -188,8 +188,7 @@ export default defineComponent({
         // console.log("query: filterData",filterData);
         const filterItems = filterData.filter((it: any)=> it)
         if(filterItems.length > 0) {
-          query += "WHERE "
-          query += filterItems.join(" AND ")
+          query += "WHERE " + filterItems.join(" AND ")
         }
 
         // add group by statement
