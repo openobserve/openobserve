@@ -68,6 +68,7 @@ pub async fn save_dashboard(
 pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     let loc_span = info_span!("service:dashboards:list");
     let _guard = loc_span.enter();
+
     let list = db::dashboard::list(org_id).await.unwrap();
     Ok(HttpResponse::Ok().json(DashboardList { list }))
 }
