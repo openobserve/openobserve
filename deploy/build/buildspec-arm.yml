@@ -47,3 +47,7 @@ phases:
       - echo 'Push manifests'
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
+
+cache:
+  paths:
+    - /root/.cache/
