@@ -12,7 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardXxx {
+    pub title: String,
+    pub dashboard_id: String,
+    pub description: String,
+    pub role: String,
+    pub owner: String,
+    pub created: DateTime<FixedOffset>,
+    // XXX-HACK: The UI always sends an empty array. And I don't know the type
+    // of items, so it might as well be unit.
+    pub panels: Vec<()>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Dashboard {
