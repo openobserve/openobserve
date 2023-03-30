@@ -57,7 +57,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import queryService from "../../../services/nativequery";
+import queryService from "../../../services/search";
 import Plotly from "plotly.js";
 import moment from "moment";
    
@@ -169,8 +169,6 @@ export default defineComponent({
 
     //It is used for showing long label truncate with "..."
     const textformat =  function(layout: any){
-      console.log("layout=", layout);
-      
       let data = layout.map((text:any)=>{
         if(text && text.toString().length > 15){
           return text.toString().substring(0, 15) + "...";
@@ -178,8 +176,6 @@ export default defineComponent({
           return text;
         }
       })
-      console.log("data=", data);
-      
       return data 
     }
 
@@ -196,7 +192,7 @@ export default defineComponent({
         const resultIndex = [...array.map((it: number, i: number) => it * range), layout.length - 1]
 
         // get the actual values from the indexes
-        const tickVals = resultIndex.map((it: number) => layout[it])
+        const tickVals = resultIndex.map((it: number) => layout[Math.floor(it)])
         return tickVals
       } else {
         return layout
@@ -238,7 +234,11 @@ export default defineComponent({
 
       searchQueryData.loading = true
       await queryService
-        .runquery(query, store.state.selectedOrganization.identifier)
+        .search({
+          org_identifier: store.state.selectedOrganization.identifier, 
+          query: query,
+          page_type: props.data.fields.stream_type,
+        })
         .then((res) => {
 
           searchQueryData.data = res.data.hits;
