@@ -172,10 +172,10 @@ export default defineComponent({
       console.log("layout=", layout);
       
       let data = layout.map((text:any)=>{
-        if(text){
-          return text.toString().length > 15 ? text.toString().substring(0, 15) + "..." : text;
-        }else {
-          return text
+        if(text && text.toString().length > 15){
+          return text.toString().substring(0, 15) + "...";
+        } else {
+          return text;
         }
       })
       console.log("data=", data);
@@ -240,15 +240,6 @@ export default defineComponent({
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
-          // const sortFn = (it1:any, it2: any) => {
-          //   const a = it1[props.data.fields?.x[0].alias] || ""
-          //   const b = it2[props.data.fields?.x[0].alias] || ""
-          //   if(typeof a == 'number' && typeof b == 'number') {
-          //       return a - b
-          //   } else {
-          //       return a.toString().localeCompare(b.toString())
-          //   }
-          // }
 
           searchQueryData.data = res.data.hits;
           searchQueryData.loading = false
