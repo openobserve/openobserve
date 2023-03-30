@@ -68,14 +68,6 @@ describe("Alert List", async () => {
     ).toBeTruthy();
   });
 
-  // it("Should match previous table snapshot", async () => {
-  //   const table = wrapper
-  //     .find('[data-test="alert-list-table"]')
-  //     .find("table")
-  //     .html();
-  //   expect(table).toMatchSnapshot();
-  // });
-
   it("Should display table column headers", async () => {
     await flushPromises();
     const tableData = wrapper
@@ -105,7 +97,6 @@ describe("Alert List", async () => {
     expect(tableData[3].text()).toBe("--");
     expect(tableData[4].text()).toBe("code EqualTo 500");
     expect(tableData[5].text()).toBe("dest1");
-    // TODO OK : Find out way to test actions
   });
 
   it("Should display add alert button", () => {
@@ -201,6 +192,4 @@ describe("Alert List", async () => {
       expect(tableRows[0].html()).not.toContain(alert_name);
     });
   });
-
-  // describe("When user clicks on delete alert", () => {});
 });

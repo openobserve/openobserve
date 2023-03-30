@@ -14,6 +14,7 @@
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showTemplateEditor">
       <q-table
+        data-test="alert-templates-list-table"
         ref="q-table"
         :rows="templates"
         :columns="columns"
@@ -30,6 +31,7 @@
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              :data-test="`alert-template-list-${props.row.name}-udpate-template`"
               icon="edit"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -41,6 +43,7 @@
               @click="editTemplate(props.row)"
             ></q-btn>
             <q-btn
+              :data-test="`alert-template-list-${props.row.name}-delete-template`"
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -54,7 +57,7 @@
           </q-td>
         </template>
         <template #top>
-          <div class="q-table__title">
+          <div class="q-table__title" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
           <q-input
@@ -70,6 +73,7 @@
             </template>
           </q-input>
           <q-btn
+            data-test="alert-template-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"
