@@ -153,7 +153,7 @@ export default defineComponent({
       }
     });
 
-    // wrap the text for long x axis names
+    // wrap the text for long x axis names for pie charts
     const addBreaksAtLength = 12;
     const textwrapper = function (traces: any) {
       traces = traces.map((text: any) => {
@@ -166,6 +166,42 @@ export default defineComponent({
       });
       return traces;
     };
+
+    //It is used for showing long label truncate with "..."
+    const textformat =  function(layout: any){
+      console.log("layout=", layout);
+      
+      let data = layout.map((text:any)=>{
+        if(text && text.toString().length > 15){
+          return text.toString().substring(0, 15) + "...";
+        } else {
+          return text;
+        }
+      })
+      console.log("data=", data);
+      
+      return data 
+    }
+
+    const getTickLimits = (layout: string[]) => {
+      if(layout.length > 10) {
+        // do the splitting
+        const n = 10;
+
+        // get the range of difference
+        const range = layout.length / n
+
+        // find the indexes at intervals
+        const array = [...Array(n).keys()]
+        const resultIndex = [...array.map((it: number, i: number) => it * range), layout.length - 1]
+
+        // get the actual values from the indexes
+        const tickVals = resultIndex.map((it: number) => layout[it])
+        return tickVals
+      } else {
+        return layout
+      }
+    }
 
     // Chart Related Functions
     const fetchQueryData = async () => {
@@ -196,6 +232,7 @@ export default defineComponent({
           sql_mode: "full",
           start_time: startISOTimestamp,
           end_time: endISOTimestamp,
+          size: 0
         },
       };
 
@@ -203,23 +240,9 @@ export default defineComponent({
       await queryService
         .runquery(query, store.state.selectedOrganization.identifier)
         .then((res) => {
-          const sortFn = (it1:any, it2: any) => {
-            const a = it1[props.data.fields?.x[0].alias] || ""
-            const b = it2[props.data.fields?.x[0].alias] || ""
-            if(typeof a == 'number' && typeof b == 'number') {
-                return a - b
-            } else {
-                return a.toString().localeCompare(b.toString())
-            }
-          }
 
-          searchQueryData.data = props.data.fields?.x && props.data.fields?.x.length > 0 ? res.data.hits.sort(sortFn) : res.data.hits;
+          searchQueryData.data = res.data.hits;
           searchQueryData.loading = false
-          // $q.notify({
-          //   type: "positive",
-          //   message: "Query applied successfully.",
-          //   timeout: 5000,
-          // });
         })
         .catch((error) => {
           $q.notify({
@@ -307,15 +330,17 @@ export default defineComponent({
         // add hover template for showing Y axis name and count
         trace["hovertemplate"]= "%{label}: %{value} (%{percent})<extra></extra>"
       } else if (props.data.type == "h-bar") {
-        trace["y"] = textwrapper(getAxisDataFromKey(xAxisKey));
+        trace["y"] = getAxisDataFromKey(xAxisKey);
         trace["x"] = getAxisDataFromKey(yAxisKey);
+        trace["customdata"] = getAxisDataFromKey(xAxisKey);
         // add hover template for showing Y axis name and count
-        trace["hovertemplate"]= "%{fullData.name}: %{x}<extra></extra>"
+        trace["hovertemplate"]= "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>"
       } else {
-        trace["x"] = textwrapper(getAxisDataFromKey(xAxisKey));
+        trace["x"] = getAxisDataFromKey(xAxisKey);
         trace["y"] = getAxisDataFromKey(yAxisKey);
+        trace["customdata"] = getAxisDataFromKey(xAxisKey);
         // add hover template for showing Y axis name and count
-        trace["hovertemplate"]= "%{fullData.name}: %{y}<extra></extra>"
+        trace["hovertemplate"]= "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>"
       }
       return trace;
     };
@@ -417,11 +442,18 @@ export default defineComponent({
 
     // layout changes based on selected chart type
     const getPropsByChartTypeForLayout = () => {
+      const xAxisKey = getXAxisKey();
+      const xAxisData = getAxisDataFromKey(xAxisKey)
+      const xAxisDataWithTicks = getTickLimits(xAxisData)
+
       switch (props.data.type) {
         case "bar":
           return {
             barmode: "group",
             xaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -434,6 +466,9 @@ export default defineComponent({
         case "line":
           return {
             xaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -447,6 +482,9 @@ export default defineComponent({
           return {
             scattermode: "group",
             xaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -464,6 +502,9 @@ export default defineComponent({
               automargin: true,
             },
             yaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
             },
@@ -477,6 +518,9 @@ export default defineComponent({
               automargin: true,
             },
             yaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
               automargin: true,
             },
@@ -484,6 +528,9 @@ export default defineComponent({
         case "area":
           return {
             xaxis: {
+              tickmode: "array",
+              tickvals: xAxisDataWithTicks,
+              ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
               tickangle: -20,
               automargin: true,
@@ -496,6 +543,9 @@ export default defineComponent({
         default:
           return {
             xaxis: {
+                tickmode: "array",
+                tickvals: xAxisDataWithTicks,
+                ticktext: textformat(xAxisDataWithTicks),
                 title: props.data.fields?.x[0].label,
                 tickangle: -20,
                 automargin: true,

@@ -17,10 +17,20 @@
   <div class="column index-menu">
     <div>
       <q-select
+        v-model="dashboardPanelData.data.fields.stream_type"
+        :label="t('dashboard.selectStreamType')"
+        :options="data.streamType"
+        data-cy="index-dropdown"
+        input-debounce="0"
+        behavior="menu"
+        filled
+        borderless
+        dense
+        class="q-mb-xs"
+      ></q-select>
+      <q-select
         v-model="dashboardPanelData.data.fields.stream"
-        :label="
-          dashboardPanelData.data.fields.stream ? '' : t('search.selectIndex')
-        "
+        :label="t('dashboard.selectIndex')"
         :options="filteredStreams"
         data-cy="index-dropdown"
         input-debounce="0"
@@ -181,6 +191,7 @@ export default defineComponent({
     const data = reactive({
       schemaList: [],
       indexOptions: [],
+      streamType: ["logs", "metrics", "traces"],
       currentFieldsList: [],
     });
     const filteredStreams = ref([]);
@@ -195,7 +206,7 @@ export default defineComponent({
 
     // update the selected stream fields list
     watch(
-      () => [data.schemaList, dashboardPanelData.data.fields.stream],
+      () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
@@ -204,6 +215,23 @@ export default defineComponent({
           fields?.schema || [];
       }
     );
+
+    watch(()=> [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], ()=> {
+      dashboardPanelData.data.fields.stream = ""
+      data.indexOptions = dashboardPanelData.meta.stream.streamResults
+        .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
+        .map((data: any) => {
+          return data.name;
+        });
+
+      // set the first stream as the selected stream when the api loads the data
+      if (
+        !dashboardPanelData.data.fields.stream &&
+        data.indexOptions.length > 0
+      ) {
+        dashboardPanelData.data.fields.stream = data.indexOptions[0];
+      }
+    })
 
     // update the current list fields if any of the lists changes
     watch(
@@ -231,19 +259,6 @@ export default defineComponent({
       ).then((res) => {
         data.schemaList = res.data.list;
         dashboardPanelData.meta.stream.streamResults = res.data.list;
-        data.indexOptions = res.data.list.map((data: any) => {
-          return data.name;
-        });
-
-        filteredStreams.value = [...data.indexOptions];
-
-        // set the first stream as the selected stream when the api loads the data
-        if (
-          !dashboardPanelData.data.fields.stream &&
-          data.indexOptions.length > 0
-        ) {
-          dashboardPanelData.data.fields.stream = data.indexOptions[0];
-        }
       });
     };
 

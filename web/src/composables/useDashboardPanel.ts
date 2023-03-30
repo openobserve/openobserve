@@ -39,6 +39,7 @@ const getDefaultDashboardPanelData = () => (
       type: "bar",
       fields: {
         stream: '',
+        stream_type: 'logs',
         x: <any>[],
         y: <any>[],
         filter: <any>[]

@@ -221,6 +221,8 @@
         "passwordLabel": "Reset Token"
     },
     "dashboard": {
+        "selectIndex": "Stream",
+        "selectStreamType": "Stream Type",
         "header": "Dashboards",
         "add": "Add Dashboard",
         "save": "Save",

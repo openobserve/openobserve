@@ -277,14 +277,6 @@
           />
           <q-form ref="" class="q-pa-sm">
             <q-input
-              v-model="dashboardPanelData.data.config.title"
-              :label="t('panel.name') + '*'"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              filled
-              dense
-            />
-            <q-input
               v-model="dashboardPanelData.data.config.description"
               type="textarea"
               :label="t('panel.typeDesc')"
@@ -415,6 +407,9 @@
                             <q-input
                               dense
                               filled
+                              v-if="!['Is Null', 'Is Not Null'].includes(dashboardPanelData.data.fields.filter[
+                                  props.pageIndex
+                                ].operator)"
                               v-model="
                                 dashboardPanelData.data.fields.filter[
                                   props.pageIndex
@@ -621,7 +616,7 @@ export default defineComponent({
       }),
       model: ref([]),
       tab: ref("General"),
-      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains"],
+      options: ["=", "<>", ">=", "<=", ">", "<", "Contains", "Not Contains", 'Is Null', 'Is Not Null'],
       getImageURL,
       onDrop,
       onDragStart,

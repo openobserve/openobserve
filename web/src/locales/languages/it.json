@@ -219,6 +219,8 @@
     "passwordLabel": "Token di ripristino"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Pannelli di controllo",
     "add": "Aggiungi dashboard",
     "save": "Salva",

@@ -218,6 +218,8 @@
     "passwordLabel": "Besleme Sıfırla"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Gösterge Tabloları",
     "add": "Gösterge Tablosu Ekle",
     "save": "Kaydet",

@@ -219,6 +219,8 @@
     "passwordLabel": "トークンをリセット"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "ダッシュボード",
     "add": "ダッシュボードを追加",
     "save": "[保存]",
