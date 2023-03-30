@@ -114,7 +114,7 @@ export default defineConfig({
   },
   test: {
     global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
     deps: {
       inline: ["monaco-editor"],
     },
