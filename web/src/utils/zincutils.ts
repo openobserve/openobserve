@@ -257,7 +257,3 @@ export const getPath = () => {
       : window.location.pathname;
   return path;
 };
-
-export const getUUID = () => {
-  return crypto.randomUUID();
-};
