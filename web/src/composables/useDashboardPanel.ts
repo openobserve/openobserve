@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { reactive } from "vue";
-import queryService from "../services/nativequery"
+import queryService from "../services/search"
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
@@ -201,7 +201,11 @@ const useDashboardPanelData = () => {
       };
 
       queryService
-        .runquery(query, store.state.selectedOrganization.identifier)
+        .search({
+          org_identifier: store.state.selectedOrganization.identifier, 
+          query: query,
+          page_type: dashboardPanelData.data.fields.stream_type,
+        })
         .then((res) => {
 
           dashboardPanelData.meta.filterValue.push({
