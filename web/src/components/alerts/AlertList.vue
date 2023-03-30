@@ -153,7 +153,6 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
-import { q } from "msw/lib/SetupApi-8ab693f7";
 export default defineComponent({
   name: "AlertList",
   components: { QTablePagination, AddAlert, NoData, ConfirmDialog },

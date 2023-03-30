@@ -13,7 +13,7 @@
 <template>
   <div class="q-mx-md q-my-md">
     <div class="row items-center no-wrap">
-      <div class="col">
+      <div class="col" data-test="add-alert-title">
         <div v-if="beingUpdated" class="text-h6">
           {{ t("alerts.updateTitle") }}
         </div>
@@ -27,6 +27,7 @@
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
           <div class="col-4 alert-name-input">
             <q-input
+              data-test="add-alert-name-input"
               v-model="formData.name"
               :label="t('alerts.name')"
               color="input-border"
@@ -61,6 +62,7 @@
           </div>
           <div class="col-4">
             <q-select
+              data-test="add-alert-stream-select"
               v-model="formData.stream_name"
               :options="indexOptions"
               :label="t('alerts.stream_name')"
@@ -79,6 +81,7 @@
         </div>
         <div class="q-gutter-sm">
           <q-radio
+            data-test="add-alert-scheduled-alert-radio"
             v-bind:readonly="beingUpdated"
             v-bind:disable="beingUpdated"
             v-model="formData.isScheduled"
@@ -88,6 +91,7 @@
             class="q-ml-none"
           />
           <q-radio
+            data-test="add-alert-realtime-alert-radio"
             v-bind:readonly="beingUpdated"
             v-bind:disable="beingUpdated"
             v-model="formData.isScheduled"
@@ -104,10 +108,12 @@
         <div
           v-if="formData.isScheduled === 'true'"
           class="q-py-sm showLabelOnTop text-bold text-h7"
+          data-test="add-alert-query-input-title"
         >
           {{ t("alerts.sql") }}:
         </div>
         <div
+          data-test="add-alert-query-input"
           v-show="formData.isScheduled === 'true'"
           ref="editorRef"
           id="editor"
@@ -121,7 +127,10 @@
           :rules="[(val: any) => !!val || 'Field is required!']"
         ></div>
 
-        <div class="q-pt-md q-py-sm showLabelOnTop text-bold text-h7">
+        <div
+          class="q-pt-md q-py-sm showLabelOnTop text-bold text-h7"
+          data-test="add-alert-condition-title"
+        >
           {{ t("alerts.condition") }}:
         </div>
         <div
@@ -129,6 +138,7 @@
         >
           <div class="__column" :title="formData.condition.column">
             <q-select
+              data-test="add-alert-condition-column-select"
               v-model="formData.condition.column"
               :options="filteredColumns"
               dense
@@ -142,6 +152,7 @@
           </div>
           <div class="__operator">
             <q-select
+              data-test="add-alert-condition-operator-select"
               v-model="formData.condition.operator"
               :options="triggerOperators"
               dense
@@ -151,6 +162,7 @@
           </div>
           <div class="__value">
             <q-input
+              data-test="add-alert-condition-value-input"
               v-model="formData.condition.value"
               dense
               placeholder="value"
@@ -163,12 +175,16 @@
 
         <div v-if="formData.isScheduled === 'true'" class="row q-col-gutter-sm">
           <div class="col-4">
-            <div class="q-py-sm showLabelOnTop text-bold text-h7">
+            <div
+              class="q-py-sm showLabelOnTop text-bold text-h7"
+              data-test="add-alert-duration-title"
+            >
               {{ t("alerts.duration") }}:
             </div>
             <div class="col-8 row justify-left align-center q-gutter-sm">
               <div class="" style="width: 80px">
                 <q-input
+                  data-test="add-alert-duration-input"
                   v-model="formData.duration.value"
                   type="number"
                   dense
@@ -179,6 +195,7 @@
               </div>
               <div class="" style="minwidth: 100px">
                 <q-select
+                  data-test="add-alert-duration-select"
                   v-model="formData.duration.unit"
                   :options="relativePeriods"
                   dense
@@ -190,12 +207,16 @@
           </div>
 
           <div class="col-4">
-            <div class="q-py-sm showLabelOnTop text-bold text-h7">
+            <div
+              class="q-py-sm showLabelOnTop text-bold text-h7"
+              data-test="add-alert-frequency-title"
+            >
               {{ t("alerts.interval") }}:
             </div>
             <div class="col-8 row justify-left align-center q-gutter-sm">
               <div class="" style="width: 80px">
                 <q-input
+                  data-test="add-alert-frequency-input"
                   v-model="formData.frequency.value"
                   type="number"
                   dense
@@ -206,6 +227,7 @@
               </div>
               <div class="" style="minwidth: 100px">
                 <q-select
+                  data-test="add-alert-frequency-select"
                   v-model="formData.frequency.unit"
                   :options="relativePeriods"
                   dense
@@ -217,12 +239,16 @@
           </div>
 
           <div class="col-4">
-            <div class="q-py-sm showLabelOnTop text-bold text-h7">
+            <div
+              class="q-py-sm showLabelOnTop text-bold text-h7"
+              data-test="add-alert-delay-title"
+            >
               {{ t("alerts.delayNotificationUntil") }}:
             </div>
             <div class="col-8 row justify-left align-center q-gutter-sm">
               <div class="" style="width: 80px">
                 <q-input
+                  data-test="add-alert-delay-input"
                   v-model="formData.time_between_alerts.value"
                   type="number"
                   dense
@@ -232,6 +258,7 @@
               </div>
               <div class="" style="minwidth: 100px">
                 <q-select
+                  data-test="add-alert-delay-select"
                   v-model="formData.time_between_alerts.unit"
                   :options="relativePeriods"
                   dense
@@ -244,6 +271,7 @@
 
         <div class="q-gutter-sm">
           <q-select
+            data-test="add-alert-destination-select"
             v-model="formData.destination"
             :label="t('alerts.destination')"
             :options="getFormattedDestinations"
@@ -260,6 +288,7 @@
 
         <div class="flex justify-center q-mt-lg">
           <q-btn
+            data-test="add-alert-cancel-btn"
             v-close-popup
             class="q-mb-md text-bold no-border"
             :label="t('alerts.cancel')"
@@ -270,6 +299,7 @@
             @click="$emit('cancel:hideform')"
           />
           <q-btn
+            data-test="add-alert-submit-btn"
             :label="t('alerts.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
