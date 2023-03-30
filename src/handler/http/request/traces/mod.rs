@@ -26,7 +26,7 @@ pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
     tag = "Traces",
     operation_id = "PostTraces",
     request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
-    esponses(
+    responses(
         (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
