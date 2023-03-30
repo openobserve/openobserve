@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 
-use super::search::Query;
+use super::{search::Query, StreamType};
 use crate::common::json::{Map, Value};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -37,6 +37,9 @@ pub struct Alert {
     pub is_real_time: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<StreamType>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -149,6 +152,8 @@ pub struct Trigger {
     pub count: i64,
     #[serde(default)]
     pub is_ingest_time: bool,
+    #[serde(default)]
+    pub stream_type: StreamType,
 }
 
 impl Default for Trigger {
@@ -161,6 +166,7 @@ impl Default for Trigger {
             org: String::new(),
             last_sent_at: 0,
             count: 0,
+            stream_type: StreamType::Logs,
             is_ingest_time: false,
         }
     }

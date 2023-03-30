@@ -22,7 +22,10 @@ use actix_web::{
 use std::io::Error;
 use tracing::info_span;
 
-pub async fn save_trigger(alert_name: String, trigger: Trigger) -> Result<HttpResponse, Error> {
+pub async fn save_trigger(
+    alert_name: String,
+    trigger: Trigger,
+) -> Result<HttpResponse, anyhow::Error> {
     let loc_span = info_span!("service:triggers:save");
     let _guard = loc_span.enter();
 
@@ -49,23 +52,6 @@ pub async fn delete_trigger(alert_name: String) -> Result<HttpResponse, Error> {
     }
 }
 
-pub async fn get_alert(
-    org_id: String,
-    stream_name: String,
-    name: String,
-) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:get");
-    let _guard = loc_span.enter();
-    let result = db::alerts::get(org_id.as_str(), stream_name.as_str(), name.as_str()).await;
-    match result {
-        Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "alert not found".to_string(),
-        ))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,6 +67,7 @@ mod tests {
                 stream: "TestStream".to_string(),
                 org: "dummy".to_string(),
                 last_sent_at: 0,
+                stream_type: crate::meta::StreamType::Logs,
                 count: 0,
                 is_ingest_time: false,
             },
@@ -89,9 +76,10 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = get_alert(
+        let resp = crate::service::alerts::get_alert(
             "dummy".to_string(),
             "TestStream".to_string(),
+            crate::meta::StreamType::Logs,
             "TestAlert".to_string(),
         )
         .await;

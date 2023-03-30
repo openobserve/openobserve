@@ -96,11 +96,13 @@ pub async fn ingest(
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Function;
+        let mut func: Option<Function>;
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);
             func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            stream_lua_map.insert(func_key, func.to_owned());
+            if func.is_some() {
+                stream_lua_map.insert(func_key, func.unwrap().to_owned());
+            }
         }
     }
     // End Register Transfoms for stream
@@ -121,8 +123,8 @@ pub async fn ingest(
         .await;
     }
     // Start get stream alerts
-    let key = format!("{}/{}", &org_id, &stream_name);
-    super::get_stream_alerts(key, &mut stream_alerts_map).await;
+    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+    crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -139,12 +141,14 @@ pub async fn ingest(
         #[cfg(feature = "zo_functions")]
         // Start row based transform
         for trans in &local_tans {
-            let func_key = format!("{}/{}", &stream_name, trans.name);
-            value = crate::service::ingestion::lua_transform(
-                &lua,
-                &value,
-                stream_lua_map.get(&func_key).unwrap(),
-            );
+            let func_key = format!("{stream_name}/{}", trans.name);
+            if stream_lua_map.contains_key(&func_key) {
+                value = crate::service::ingestion::lua_transform(
+                    &lua,
+                    &value,
+                    stream_lua_map.get(&func_key).unwrap(),
+                );
+            }
         }
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped
@@ -249,13 +253,17 @@ pub async fn ingest(
     if trigger.is_some() {
         let val = trigger.unwrap();
         let mut alerts = stream_alerts_map
-            .get(&format!("{}/{}", val.org, val.stream))
+            .get(&format!("{}/{}/{}", val.org, StreamType::Logs, val.stream))
             .unwrap()
             .clone();
 
         alerts.retain(|alert| alert.name.eq(&val.alert_name));
         if !alerts.is_empty() {
-            super::send_ingest_notification(val.clone(), alerts.first().unwrap().clone()).await;
+            crate::service::ingestion::send_ingest_notification(
+                val.clone(),
+                alerts.first().unwrap().clone(),
+            )
+            .await;
         }
     }
 

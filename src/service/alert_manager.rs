@@ -39,7 +39,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 #[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
-    match super::db::alerts::get(&trigger.org, &trigger.stream, &trigger.alert_name).await {
+    match super::db::alerts::get(
+        &trigger.org,
+        &trigger.stream,
+        trigger.stream_type,
+        &trigger.alert_name,
+    )
+    .await
+    {
         Ok(result) => {
             if let Some(alert) = result {
                 if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
@@ -85,8 +92,13 @@ pub async fn handle_trigger(alert_name: &str, frequency: i64) {
         let loc_triggers = TRIGGERS.clone();
         let trigger = loc_triggers.get(&alert_name.to_owned()).unwrap();
         if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
-            let alert_resp =
-                super::db::alerts::get(&trigger.org, &trigger.stream, &trigger.alert_name).await;
+            let alert_resp = super::db::alerts::get(
+                &trigger.org,
+                &trigger.stream,
+                trigger.stream_type,
+                &trigger.alert_name,
+            )
+            .await;
 
             match alert_resp.unwrap_or(None) {
                 Some(alert) => {

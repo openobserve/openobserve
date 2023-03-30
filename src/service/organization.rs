@@ -26,7 +26,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let _guard = loc_span.enter();
     let streams = get_streams(org_id, None, false).await;
     let functions = db::functions::list(org_id, None, None).await.unwrap();
-    let alerts = db::alerts::list(org_id, None).await.unwrap();
+    let alerts = db::alerts::list(org_id, None, None).await.unwrap();
     OrgSummary {
         streams,
         functions,
