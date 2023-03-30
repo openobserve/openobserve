@@ -19,11 +19,7 @@ use actix_web::{
 use std::io;
 use tracing::info_span;
 
-use crate::meta::{
-    self,
-    dashboards::{DashboardList, DashboardXxx},
-    http::HttpResponse as MetaHttpResponse,
-};
+use crate::meta::{self, dashboards::DashboardXxx, http::HttpResponse as MetaHttpResponse};
 use crate::service::db;
 
 pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
@@ -66,11 +62,14 @@ pub async fn save_dashboard(
 }
 
 pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
+    use meta::dashboards::DashboardListXxx;
+
     let loc_span = info_span!("service:dashboards:list");
     let _guard = loc_span.enter();
 
-    let list = db::dashboard::list(org_id).await.unwrap();
-    Ok(HttpResponse::Ok().json(DashboardList { list }))
+    Ok(HttpResponse::Ok().json(DashboardListXxx {
+        list: db::dashboard::list(org_id).await.unwrap(),
+    }))
 }
 
 pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {

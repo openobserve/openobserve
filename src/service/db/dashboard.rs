@@ -14,7 +14,7 @@
 
 use anyhow::Context as _;
 
-use crate::meta::dashboards::{Dashboard, DashboardXxx};
+use crate::meta::dashboards::{Dashboard, DashboardXxx, NamedDashboard};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Dashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
@@ -39,7 +39,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(db.delete(&key, false).await?)
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let db_key = format!("/dashboard/{org_id}/");
     db.list(&db_key)
@@ -50,10 +50,10 @@ pub async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
                 .strip_prefix(&db_key)
                 .ok_or_else(|| anyhow::anyhow!("key {k:?} doesn't start with {db_key:?}"))?
                 .to_string();
-            let details = String::from_utf8(v.to_vec()).with_context(|| {
-                format!("the value by key {k:?} contains non-UTF8 bytes")
+            let details: DashboardXxx = serde_json::from_slice(&v).with_context(|| {
+                format!("Failed to deserialize the value for key {k:?} as `Dashboard`")
             })?;
-            Ok(Dashboard { name, details })
+            Ok(NamedDashboard { name, details })
         })
         .collect()
 }

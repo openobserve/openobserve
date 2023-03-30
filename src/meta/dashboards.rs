@@ -15,7 +15,8 @@
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+// TODO: XXX-RENAMEME
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardXxx {
     pub title: String,
@@ -24,17 +25,31 @@ pub struct DashboardXxx {
     pub role: String,
     pub owner: String,
     pub created: DateTime<FixedOffset>,
-    // XXX-HACK: The UI always sends an empty array. And I don't know the type
-    // of items, so it might as well be unit.
+    // HACK: The UI always sends an empty array. And I don't know the type of
+    // items, so it might as well be unit.
     pub panels: Vec<()>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NamedDashboard {
+    pub name: String,
+    pub details: DashboardXxx,
+}
+
+// TODO: XXX-RENAMEME
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct DashboardListXxx {
+    pub(crate) list: Vec<NamedDashboard>,
+}
+
+// TODO: XXX-DELETEME
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Dashboard {
     pub name: String,
     pub details: String,
 }
 
+// TODO: XXX-DELETEME
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DashboardList {
     pub list: Vec<Dashboard>,
