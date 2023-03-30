@@ -178,7 +178,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { getUUID } from "@/utils/zincutils";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -200,6 +199,12 @@ const formData: Ref<DestinationData> = ref({
   headers: {},
 });
 const isUpdatingDestination = ref(false);
+
+// TODO OK: Use UUID package instead of this and move this method in utils
+const getUUID = () => {
+  return (Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100).toString();
+};
+
 const apiHeaders: Ref<
   {
     key: string;
@@ -211,6 +216,7 @@ onActivated(() => setupDestinationData());
 onBeforeMount(() => {
   setupDestinationData();
 });
+
 const setupDestinationData = () => {
   if (props.destination) {
     isUpdatingDestination.value = true;
