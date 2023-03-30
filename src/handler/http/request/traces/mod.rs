@@ -20,6 +20,17 @@ use crate::{meta, service::traces::otlp_http};
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
 
+/** ingestion endpoint for traces */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "PostTraces",
+    request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
+    esponses(
+        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/traces")]
 pub async fn traces_write(
     org_id: web::Path<String>,

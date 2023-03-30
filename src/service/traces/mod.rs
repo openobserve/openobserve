@@ -16,10 +16,7 @@ use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
-use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
-#[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::common::v1::AnyValue;
 use opentelemetry_proto::tonic::{
@@ -33,12 +30,8 @@ use tracing::info_span;
 
 use crate::common::json::{json, Map, Value};
 use crate::infra::config::CONFIG;
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
 use crate::meta::traces::Event;
 use crate::service::schema::stream_schema_exists;
 use crate::{
@@ -104,31 +97,7 @@ pub async fn handle_trace_request(
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
-    #[cfg(feature = "zo_functions")]
-    let lua = Lua::new();
-    #[cfg(feature = "zo_functions")]
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
-
     let mut trigger: Option<Trigger> = None;
-    // Start Register Transfoms for stream
-    #[cfg(feature = "zo_functions")]
-    let mut local_tans: Vec<Transform> = vec![];
-    #[cfg(feature = "zo_functions")]
-    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
-    #[cfg(feature = "zo_functions")]
-    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_tans = (*transforms.list).to_vec();
-        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Option<Function>;
-        for trans in &local_tans {
-            let func_key = format!("{}/{}", traces_stream_name, trans.name);
-            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            if func.is_some() {
-                stream_lua_map.insert(func_key, func.unwrap().to_owned());
-            }
-        }
-    }
-    // End Register Transfoms for stream
 
     let mut data_buf: AHashMap<String, Vec<String>> = AHashMap::new();
 
@@ -226,23 +195,7 @@ pub async fn handle_trace_request(
                     events: json::to_string(&events).unwrap(),
                 };
 
-                #[cfg(feature = "zo_functions")]
-                let mut value: json::Value = json::to_value(local_val).unwrap();
-                #[cfg(not(feature = "zo_functions"))]
                 let value: json::Value = json::to_value(local_val).unwrap();
-                #[cfg(feature = "zo_functions")]
-                // Start row based transform
-                for trans in &local_tans {
-                    let func_key = format!("{traces_stream_name}/{}", trans.name);
-                    if stream_lua_map.contains_key(&func_key) {
-                        value = crate::service::ingestion::lua_transform(
-                            &lua,
-                            &value,
-                            stream_lua_map.get(&func_key).unwrap(),
-                        );
-                    }
-                }
-
                 let value_str = json::to_string(&value).unwrap();
                 // get hour key
                 let mut hour_key = super::ingestion::get_hour_key(
