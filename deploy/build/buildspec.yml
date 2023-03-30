@@ -8,6 +8,8 @@ phases:
   build:
     commands:
       - pwd
+      - mkdir -p /root/.cache/node_modules
+      - mkdir -p /root/.cache/rust_target
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
 
