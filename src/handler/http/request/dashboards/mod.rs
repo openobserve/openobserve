@@ -15,12 +15,12 @@
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::{meta::dashboards::DashboardXxx, service::dashboards};
+use crate::{meta::dashboards::Dashboard, service::dashboards};
 
 #[post("/{org_id}/dashboards/{name}")]
 pub async fn save_dashboard(
     path: web::Path<(String, String)>,
-    details: web::Json<DashboardXxx>,
+    details: web::Json<Dashboard>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     dashboards::save_dashboard(&org_id, &name, &details.into_inner()).await

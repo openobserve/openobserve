@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 // TODO: XXX-RENAMEME
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DashboardXxx {
+pub struct Dashboard {
     pub title: String,
     pub dashboard_id: String,
     pub description: String,
@@ -32,29 +32,19 @@ pub struct DashboardXxx {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedDashboard {
+    // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
+    // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
     pub name: String,
-    pub details: DashboardXxx,
+    pub details: Dashboard,
 }
 
 // TODO: XXX-RENAMEME
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct DashboardListXxx {
-    pub(crate) list: Vec<NamedDashboard>,
-}
-
-// TODO: XXX-DELETEME
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Dashboard {
-    pub name: String,
-    pub details: String,
-}
-
-// TODO: XXX-DELETEME
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DashboardList {
-    pub list: Vec<Dashboard>,
+    pub list: Vec<NamedDashboard>,
 }
 
+/* XXX-RESTOREME
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,3 +74,4 @@ mod tests {
         assert_eq!(format!("{:?}", dslist), format!("{:?}", dslist2));
     }
 }
+// XXX */
