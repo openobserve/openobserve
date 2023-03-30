@@ -14,7 +14,7 @@
 
 import http from "./http";
 
-var alerts = {
+const alerts = {
   list: (
     page_num: number,
     page_size: number,
