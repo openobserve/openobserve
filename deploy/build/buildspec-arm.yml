@@ -11,6 +11,13 @@ phases:
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
 
+      # install buildx
+      - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-arm-v6
+      - chmod +x buildx-v0.10.4.linux-arm-v6
+      - mkdir -p ~/.docker/cli-plugins
+      - mv buildx-v0.10.4.linux-arm-v6 ~/.docker/cli-plugins/docker-buildx
+      - docker buildx install
+
       # build for sccache image
       # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64 -f deploy/build/Dockerfile.sccache.aarch64 .
       # - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-arm64
@@ -23,7 +30,7 @@ phases:
 
       # build zincobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      - docker build -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
       - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
       - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
@@ -40,3 +47,7 @@ phases:
       - echo 'Push manifests'
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
+
+cache:
+  paths:
+    - /root/.cache/
