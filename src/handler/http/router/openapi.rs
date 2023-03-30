@@ -65,6 +65,8 @@ use crate::meta;
         request::kv::delete,
         request::kv::list,
         request::status::healthz,
+        request::prom::prometheus_write,
+        request::traces::traces_write,
     ),
     components(
         schemas(
@@ -108,7 +110,7 @@ use crate::meta;
             meta::organization::OrgUser,
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
-            request::status::HealthzResponse,
+            request::status::HealthzResponse,     
         ),
     ),
     modifiers(&SecurityAddon),
@@ -123,6 +125,8 @@ use crate::meta;
         (name = "Streams", description = "Stream retrieval & management operations"),
         (name = "Users", description = "Users retrieval & management operations"),
         (name = "KV", description = "Key Value retrieval & management operations"),
+        (name = "Metrics", description = "Metrics data ingestion operations"),
+        (name = "Traces", description = "Traces data ingestion operations"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",

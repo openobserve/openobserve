@@ -22,10 +22,10 @@ use tracing::info_span;
 use super::search::sql::Sql;
 use super::{db, triggers};
 use crate::handler::grpc::cluster_rpc;
-use crate::meta;
 use crate::meta::alert::{Alert, AlertList, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::search::Query;
+use crate::meta::{self, StreamType};
 
 pub mod destinations;
 pub mod templates;
@@ -33,6 +33,7 @@ pub mod templates;
 pub async fn save_alert(
     org_id: String,
     stream_name: String,
+    stream_type: StreamType,
     name: String,
     mut alert: Alert,
 ) -> Result<HttpResponse, Error> {
@@ -41,7 +42,7 @@ pub async fn save_alert(
 
     alert.stream = stream_name.to_string();
     alert.name = name.to_string();
-
+    alert.stream_type = Some(stream_type);
     let in_dest = alert.clone().destination;
 
     // before saving alert check alert destination
@@ -57,7 +58,7 @@ pub async fn save_alert(
     }
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(&org_id, &stream_name, Some(crate::meta::StreamType::Logs))
+    let schema = db::schema::get(&org_id, &stream_name, Some(stream_type))
         .await
         .unwrap();
     let fields = schema.fields;
@@ -117,6 +118,7 @@ pub async fn save_alert(
     db::alerts::set(
         org_id.as_str(),
         stream_name.as_str(),
+        stream_type,
         name.as_str(),
         alert.clone(),
     )
@@ -129,6 +131,7 @@ pub async fn save_alert(
             is_valid: true,
             alert_name: alert.name.clone(),
             stream: stream_name,
+            stream_type,
             org: org_id,
             last_sent_at: 0,
             count: 0,
@@ -143,10 +146,14 @@ pub async fn save_alert(
     )))
 }
 
-pub async fn list_alert(org_id: String, stream_name: Option<&str>) -> Result<HttpResponse, Error> {
+pub async fn list_alert(
+    org_id: String,
+    stream_name: Option<&str>,
+    stream_type: Option<StreamType>,
+) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:list");
     let _guard = loc_span.enter();
-    let alerts_list = db::alerts::list(org_id.as_str(), stream_name)
+    let alerts_list = db::alerts::list(org_id.as_str(), stream_name, stream_type)
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(AlertList { list: alerts_list }))
@@ -155,11 +162,18 @@ pub async fn list_alert(org_id: String, stream_name: Option<&str>) -> Result<Htt
 pub async fn delete_alert(
     org_id: String,
     stream_name: String,
+    stream_type: StreamType,
     name: String,
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:delete");
     let _guard = loc_span.enter();
-    let result = db::alerts::delete(org_id.as_str(), stream_name.as_str(), name.as_str()).await;
+    let result = db::alerts::delete(
+        org_id.as_str(),
+        stream_name.as_str(),
+        stream_type,
+        name.as_str(),
+    )
+    .await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -175,11 +189,18 @@ pub async fn delete_alert(
 pub async fn get_alert(
     org_id: String,
     stream_name: String,
+    stream_type: StreamType,
     name: String,
 ) -> Result<HttpResponse, Error> {
     let loc_span = info_span!("service:alerts:get");
     let _guard = loc_span.enter();
-    let result = db::alerts::get(org_id.as_str(), stream_name.as_str(), name.as_str()).await;
+    let result = db::alerts::get(
+        org_id.as_str(),
+        stream_name.as_str(),
+        stream_type,
+        name.as_str(),
+    )
+    .await;
     match result {
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -200,6 +221,7 @@ mod test {
         let alert = Alert {
             name: "500error".to_string(),
             stream: "olympics".to_string(),
+            stream_type: Some(StreamType::Logs),
             query: Some(Query {
                 sql: format!("select count(*) as occurance from olympics"),
                 start_time: 0,
@@ -227,21 +249,28 @@ mod test {
         let res = save_alert(
             "nexus".to_string(),
             "olympics".to_string(),
+            StreamType::Logs,
             "500error".to_string(),
             alert,
         )
         .await;
         assert!(res.is_ok());
 
-        let list_res = list_alert("nexus".to_string(), Some("olympics")).await;
+        let list_res = list_alert(
+            "nexus".to_string(),
+            Some("olympics"),
+            Some(StreamType::Logs),
+        )
+        .await;
         assert!(list_res.is_ok());
 
-        let list_res = list_alert("nexus".to_string(), None).await;
+        let list_res = list_alert("nexus".to_string(), None, None).await;
         assert!(list_res.is_ok());
 
         let get_res = get_alert(
             "nexus".to_string(),
             "olympics".to_string(),
+            StreamType::Logs,
             "500error".to_string(),
         )
         .await;
@@ -250,6 +279,7 @@ mod test {
         let del_res = delete_alert(
             "nexus".to_string(),
             "olympics".to_string(),
+            StreamType::Logs,
             "500error".to_string(),
         )
         .await;

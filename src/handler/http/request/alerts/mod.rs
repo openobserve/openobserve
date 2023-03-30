@@ -15,10 +15,13 @@
 pub mod destinations;
 pub mod templates;
 
-use actix_web::{delete, get, post, web, HttpResponse, Responder};
-use std::io::Error;
+use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
+use std::{collections::HashMap, io::Error};
 
-use crate::{meta::alert::Alert, service::alerts};
+use crate::{
+    meta::{self, alert::Alert, StreamType},
+    service::alerts,
+};
 
 /** Create new alert for a stream */
 #[utoipa::path(
@@ -42,9 +45,33 @@ use crate::{meta::alert::Alert, service::alerts};
 pub async fn save_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
-    alerts::save_alert(org_id, stream_name, name, alert.into_inner()).await
+
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    alerts::save_alert(
+        org_id,
+        stream_name,
+        stream_type.unwrap(),
+        name,
+        alert.into_inner(),
+    )
+    .await
 }
 /** List all alerts of a stream */
 #[utoipa::path(
@@ -63,9 +90,24 @@ pub async fn save_alert(
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
-async fn list_stream_alerts(path: web::Path<(String, String)>) -> impl Responder {
+async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, stream_name) = path.into_inner();
-    alerts::list_alert(org_id, Some(stream_name.as_str())).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    alerts::list_alert(org_id, Some(stream_name.as_str()), stream_type).await
 }
 
 /** List all alerts of an organization */
@@ -84,9 +126,24 @@ async fn list_stream_alerts(path: web::Path<(String, String)>) -> impl Responder
     )
 )]
 #[get("/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>) -> impl Responder {
+async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> impl Responder {
     let org_id = path.into_inner();
-    alerts::list_alert(org_id, None).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    alerts::list_alert(org_id, None, stream_type).await
 }
 
 /** Get alert by alert name */
@@ -108,9 +165,24 @@ async fn list_alerts(path: web::Path<String>) -> impl Responder {
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
-async fn get_alert(path: web::Path<(String, String, String)>) -> impl Responder {
+async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
-    alerts::get_alert(org_id, stream_name, name).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    alerts::get_alert(org_id, stream_name, stream_type.unwrap(), name).await
 }
 
 /** Delete alert by alert name */
@@ -132,7 +204,25 @@ async fn get_alert(path: web::Path<(String, String, String)>) -> impl Responder 
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
-async fn delete_alert(path: web::Path<(String, String, String)>) -> impl Responder {
+async fn delete_alert(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> impl Responder {
     let (org_id, stream_name, name) = path.into_inner();
-    alerts::delete_alert(org_id, stream_name, name).await
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+    alerts::delete_alert(org_id, stream_name, stream_type.unwrap(), name).await
 }

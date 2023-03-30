@@ -79,6 +79,7 @@ lru = "0.8.1"
 memchr = "2.5.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 mlua = { version = "0.8.4", features = [
+  "send",
   "luajit52",
   "vendored",
   "serialize",

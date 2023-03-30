@@ -14,14 +14,11 @@
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
-use chrono::{TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 
-use super::triggers;
 use crate::common;
 use crate::common::json::{Map, Value};
-use crate::common::notification::send_notification;
-use crate::infra::config::{CONFIG, STREAM_ALERTS};
+use crate::infra::config::CONFIG;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
 use crate::meta::ingestion::RecordStatus;
 use crate::meta::StreamType;
@@ -33,7 +30,7 @@ pub mod multi;
 
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
-        "too old data, by default only last {} hours data can be ingested. Data dscarded.",
+        "too old data, by default only last {} hours data can be ingested. Data discarded.",
         CONFIG.limit.ingest_allowed_upto
     )
 }
@@ -64,29 +61,6 @@ fn get_stream_name(v: &Value) -> String {
                 .as_str()
                 .unwrap(),
         )
-    }
-}
-
-async fn get_stream_alerts<'a>(key: String, stream_alerts_map: &mut AHashMap<String, Vec<Alert>>) {
-    if stream_alerts_map.contains_key(&key) {
-        return;
-    }
-    let alerts_list = STREAM_ALERTS.get(&key);
-    if alerts_list.is_none() {
-        return;
-    }
-    let mut alerts = alerts_list.unwrap().list.clone();
-    alerts.retain(|alert| alert.is_real_time);
-    stream_alerts_map.insert(key, alerts);
-}
-
-// generate partition key for record
-pub fn get_partition_key_record(s: &str) -> String {
-    let s = s.replace(['/', '_'], ".");
-    if s.len() > 100 {
-        s[0..100].to_string()
-    } else {
-        s
     }
 }
 
@@ -254,7 +228,8 @@ async fn add_valid_record(
         .as_i64()
         .unwrap();
     // get hour key
-    let hour_key = get_hour_key(timestamp, stream_meta.partition_keys, local_val);
+    let hour_key =
+        super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val.clone());
     let hour_buf = buf.entry(hour_key.clone()).or_default();
 
     let mut value_str = common::json::to_string(&local_val).unwrap();
@@ -288,7 +263,12 @@ async fn add_valid_record(
         if valid_record {
             if !stream_meta.stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!("{}/{}", &stream_meta.org_id, &stream_meta.stream_name);
+                let key = format!(
+                    "{}/{}/{}",
+                    &stream_meta.org_id,
+                    StreamType::Logs,
+                    &stream_meta.stream_name
+                );
                 if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
                     for alert in alerts {
                         if alert.is_real_time {
@@ -301,6 +281,7 @@ async fn add_valid_record(
                                     alert_name: alert.name.clone(),
                                     stream: stream_meta.stream_name.to_string(),
                                     org: stream_meta.org_id.to_string(),
+                                    stream_type: StreamType::Logs,
                                     last_sent_at: 0,
                                     count: 0,
                                     is_ingest_time: true,
@@ -320,43 +301,9 @@ async fn add_valid_record(
     trigger
 }
 
-fn get_hour_key(
-    timestamp: i64,
-    partition_keys: Vec<String>,
-    local_val: &mut Map<String, Value>,
-) -> String {
-    // get hour file name
-    let mut hour_key = Utc
-        .timestamp_nanos(timestamp * 1000)
-        .format("%Y_%m_%d_%H")
-        .to_string();
-
-    for key in &partition_keys {
-        match local_val.get(key) {
-            None => continue,
-            Some(v) => {
-                let val = if v.is_string() {
-                    format!("{key}={}", v.as_str().unwrap())
-                } else {
-                    format!("{key}={v}")
-                };
-                hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
-            }
-        };
-    }
-    hour_key
-}
-
 struct StreamMeta {
     org_id: String,
     stream_name: String,
     partition_keys: Vec<String>,
     stream_alerts_map: AHashMap<String, Vec<Alert>>,
-}
-
-pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
-    let _ = send_notification(&alert, &trigger.clone()).await;
-    trigger.last_sent_at = Utc::now().timestamp_micros();
-    trigger.count += 1;
-    let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
 }

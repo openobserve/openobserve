@@ -17,6 +17,17 @@ use std::io::Error;
 
 use crate::{meta, service::metrics};
 
+/** remote-write endpoint for metrics */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusRemoteWrite",
+    request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
+   responses(
+        (status = 200, description="Success", content_type = "application/json", body = IngestionResponse, example = json!({"code": 200})),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[post("/{org_id}/prometheus/write")]
 pub async fn prometheus_write(
     org_id: web::Path<String>,

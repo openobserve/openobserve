@@ -12,20 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::json::{Map, Value};
 use ahash::AHashMap;
 use arrow_schema::Schema;
+use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-use serde_json::Value;
 
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
+use crate::{
+    common::notification::send_notification,
+    infra::config::STREAM_ALERTS,
+    meta::alert::{Alert, Trigger},
+};
+
+use super::triggers;
 
 #[cfg(feature = "zo_functions")]
-pub fn load_lua_transform(lua: &Lua, js_func: String) -> Function {
-    lua.load(&js_func).eval().unwrap()
+pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
+    let ret = lua.load(&js_func).eval();
+
+    if ret.is_err() {
+        None
+    } else {
+        Some(ret.unwrap())
+    }
 }
 #[cfg(feature = "zo_functions")]
 pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
@@ -55,13 +69,15 @@ pub async fn get_stream_transforms<'a>(
         return;
     }
 
-    let mut func: Function;
+    let mut func: Option<Function>;
     let mut local_tans: Vec<Transform> = (*transforms.unwrap().list).to_vec();
     local_tans.sort_by(|a, b| a.order.cmp(&b.order));
     for trans in &local_tans {
         let func_key = format!("{}/{}", &stream_name, trans.name);
         func = load_lua_transform(lua, trans.function.clone());
-        stream_lua_map.insert(func_key, func.to_owned());
+        if func.is_some() {
+            stream_lua_map.insert(func_key, func.unwrap().to_owned());
+        }
     }
     stream_tansform_map.insert(key, local_tans.clone());
 }
@@ -92,4 +108,68 @@ pub async fn get_stream_partition_keys(
         }
     }
     keys
+}
+
+pub async fn get_stream_alerts<'a>(
+    key: String,
+    stream_alerts_map: &mut AHashMap<String, Vec<Alert>>,
+) {
+    if stream_alerts_map.contains_key(&key) {
+        return;
+    }
+    let alerts_list = STREAM_ALERTS.get(&key);
+    if alerts_list.is_none() {
+        return;
+    }
+    let mut alerts = alerts_list.unwrap().list.clone();
+    alerts.retain(|alert| alert.is_real_time);
+    stream_alerts_map.insert(key, alerts);
+}
+
+pub fn get_hour_key(
+    timestamp: i64,
+    partition_keys: Vec<String>,
+    local_val: Map<String, Value>,
+) -> String {
+    // get hour file name
+    let mut hour_key = Utc
+        .timestamp_nanos(timestamp * 1000)
+        .format("%Y_%m_%d_%H")
+        .to_string();
+
+    for key in &partition_keys {
+        match local_val.get(key) {
+            Some(v) => {
+                let val = if v.is_string() {
+                    format!("{}={}", key, v.as_str().unwrap())
+                } else {
+                    format!("{}={}", key, v)
+                };
+                hour_key.push_str(&format!("_{}", get_partition_key_record(&val)));
+            }
+            None => continue,
+        };
+    }
+    hour_key
+}
+
+// generate partition key for record
+pub fn get_partition_key_record(s: &str) -> String {
+    let s = s.replace(['/', '_'], ".");
+    if s.len() > 100 {
+        s[0..100].to_string()
+    } else {
+        s
+    }
+}
+
+pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
+    println!(
+        "Sending notification for alert {} {}",
+        alert.name, alert.stream
+    );
+    let _ = send_notification(&alert, &trigger.clone()).await;
+    trigger.last_sent_at = Utc::now().timestamp_micros();
+    trigger.count += 1;
+    let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
 }
