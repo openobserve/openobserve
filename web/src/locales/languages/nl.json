@@ -219,6 +219,8 @@
     "passwordLabel": "Token opnieuw instellen"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Dashboards",
     "add": "Dashboard toevoegen",
     "save": "Opslaan",

@@ -17,8 +17,19 @@
 <template>
   <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
     <div class="flex justify-between items-center q-pa-sm">
-      <div class="q-table__title q-mr-md">
-        {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+      <div class="flex items-baseline q-table__title q-mr-md">
+        <span>
+          {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+        </span>
+        <div>
+          <q-input
+            v-model="dashboardPanelData.data.config.title"
+            :label="t('panel.name') + '*'"
+            class="q-ml-xl"
+            filled
+            dense
+          />
+        </div>
       </div>
       <div class="flex items-baseline q-gutter-sm">
         <date-time @date-change="updateDateTime" />
@@ -267,7 +278,7 @@ export default defineComponent({
         }
 
         // check if condition value is selected
-        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && (it.value == null || it.value == '')))
+        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it:any) => (it.type == "condition" && !["Is Null", "Is Not Null"].includes(it.operator) && (it.value == null || it.value == '')))
         if(conditionValueFilterError.length){
           error.push(...conditionValueFilterError.map((it:any) => `Filter: ${it.column}: Condition value required`))
         }

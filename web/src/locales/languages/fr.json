@@ -219,6 +219,8 @@
     "passwordLabel": "Réinitialiser le jeton"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Tableaux de bord",
     "add": "Ajouter un tableau de bord",
     "save": "Enregistrer",

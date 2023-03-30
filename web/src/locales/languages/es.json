@@ -219,6 +219,8 @@
     "passwordLabel": "Token de restablecimiento"
   },
   "dashboard": {
+    "selectIndex": "Stream",
+    "selectStreamType": "Stream Type",
     "header": "Cuadros de mando",
     "add": "Agregar panel",
     "save": "Guardar",

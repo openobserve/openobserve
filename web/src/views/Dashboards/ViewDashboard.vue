@@ -62,9 +62,11 @@
         </grid-item>
       </grid-layout>
     </div>
-    <div>
-      <!-- <q-h3 no-caps:label="getDashboard"></q-h3> -->
+    <div v-if="!list[0].panels?.length">
+     <!-- if data not available show nodata component -->
+      <NoPanel @update:Panel="addPanelData" />
     </div>
+    
   </q-page>
 </template>
 
@@ -92,6 +94,7 @@ import { toRaw, unref, reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
 import { deletePanel, updateDashboard } from "../../utils/commons";
+import NoPanel from "../../components/shared/grid/NoPanel.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -100,6 +103,7 @@ export default defineComponent({
     GridItem: VueGridLayout.GridItem,
     DateTime,
     PanelContainer,
+    NoPanel
   },
   setup() {
     const { t } = useI18n();
