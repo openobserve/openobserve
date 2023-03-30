@@ -288,15 +288,15 @@ const defaultValue: any = () => {
     },
     duration: {
       value: 0,
-      unit: "",
+      unit: "Minutes",
     },
     frequency: {
       value: 0,
-      unit: "",
+      unit: "Minutes",
     },
     time_between_alerts: {
       value: 0,
-      unit: "",
+      unit: "Minutes",
     },
     destination: "",
   };
