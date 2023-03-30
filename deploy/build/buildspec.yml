@@ -11,6 +11,12 @@ phases:
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
 
+      # install buildx
+      - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-amd64
+      - chmod +x buildx-v0.10.4.linux-amd64
+      - mkdir -p ~/.docker/cli-plugins
+      - mv buildx-v0.10.4.linux-amd64 ~/.docker/cli-plugins/docker-buildx
+
       # build for sccache image
       # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 -f deploy/build/Dockerfile.sccache .
       # - docker push public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64
@@ -22,3 +28,8 @@ phases:
       - docker tag zincobserve:latest-amd64 public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
+
+cache:
+  paths:
+    - /root/.cache
+    - ./target/
