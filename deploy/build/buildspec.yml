@@ -33,5 +33,5 @@ phases:
 cache:
   paths:
     - /root/.cache/
-    - ./target/
-    - ./web/node_modules/
+    # - ./target/
+    # - ./web/node_modules/
