@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::Context as _;
+
 use crate::meta::dashboards::{Dashboard, DashboardXxx};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Dashboard>, anyhow::Error> {
@@ -40,14 +42,18 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 pub async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let db_key = format!("/dashboard/{org_id}/");
-    Ok(db
-        .list(&db_key)
+    db.list(&db_key)
         .await?
         .into_iter()
         .map(|(k, v)| {
-            let name = k.strip_prefix(&db_key).unwrap().to_string();
-            let details = String::from_utf8(v.to_vec()).unwrap();
-            Dashboard { name, details }
+            let name = k
+                .strip_prefix(&db_key)
+                .ok_or_else(|| anyhow::anyhow!("key {k:?} doesn't start with {db_key:?}"))?
+                .to_string();
+            let details = String::from_utf8(v.to_vec()).with_context(|| {
+                format!("the value by key {k:?} contains non-UTF8 bytes")
+            })?;
+            Ok(Dashboard { name, details })
         })
-        .collect())
+        .collect()
 }
