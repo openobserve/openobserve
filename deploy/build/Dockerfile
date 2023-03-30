@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
 WORKDIR /web
 COPY ./web /web/
@@ -7,8 +8,6 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
-ARG AWS_DEFAULT_REGION
-ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
 # RUN apt-get update
 # RUN apt-get install -y protobuf-compiler
