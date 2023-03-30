@@ -227,8 +227,8 @@ export default defineComponent({
     // ------- work with query params ----------
     onActivated(() => {
       const params = route.query
-      if(params.refreshInterval) {
-        refreshInterval.value = params.refreshInterval
+      if(params.refresh) {
+        refreshInterval.value = params.refresh
       }
     })
 
@@ -238,7 +238,7 @@ export default defineComponent({
         name: route.name,
         query: {
           dashboard: route.query.dashboard,
-          refreshInterval: refreshInterval.value
+          refresh: refreshInterval.value
         }
       })
     })
