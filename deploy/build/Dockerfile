@@ -3,7 +3,6 @@ FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
 WORKDIR /web
 COPY ./web /web/
 
-RUN --mount=type=cache,target=/root/.cache ln -s /root/.cache/node_modules ./node_modules
 RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
@@ -21,9 +20,8 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
 # RUN cargo build --release
-RUN --mount=type=cache,target=/root/.cache ln -s /root/.cache/rust_target ./target
-RUN --mount=type=cache,target=/root/.cache RUSTFLAGS='-C target-feature=+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --features tmpcache,zo_functions --target x86_64-unknown-linux-gnu
-RUN --mount=type=cache,target=/root/.cache sccache --show-stats
+RUN --mount=type=cache,target=/root/.cache/sccache RUSTFLAGS='-C target-feature=+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --features tmpcache,zo_functions --target x86_64-unknown-linux-gnu
+RUN --mount=type=cache,target=/root/.cache/sccache sccache --show-stats
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
 
 # FROM gcr.io/distroless/cc as runtime
