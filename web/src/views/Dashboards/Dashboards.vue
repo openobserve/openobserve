@@ -254,27 +254,26 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.list.length;
-          // console.log(res);
           store.dispatch("setAllDashboardList", res.data.list);
 
           dismiss();
         })
         .catch((error) => {
-          // console.log(error);
+          console.error(error);
         });
     };
     const dashboards = computed(function () {
       const dashboardList = toRaw(store.state.allDashboardList);
       return dashboardList.map((data: any, index) => {
-        const jsonDataOBj = JSON.parse(data.details);
+        const board = data.details;
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: jsonDataOBj.dashboardId,
-          name: jsonDataOBj.title,
-          identifier: jsonDataOBj.dashboardId,
-          description: jsonDataOBj.description,
-          owner: jsonDataOBj.owner,
-          created: date.formatDate(jsonDataOBj.created, "YYYY-MM-DDTHH:mm:ssZ"),
+          id: board.dashboardId,
+          name: board.title,
+          identifier: board.dashboardId,
+          description: board.description,
+          owner: board.owner,
+          created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
           actions: "true",
         };
       });
