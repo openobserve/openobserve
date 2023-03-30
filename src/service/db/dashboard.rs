@@ -14,31 +14,37 @@
 
 use anyhow::Context as _;
 
-use crate::meta::dashboards::{Dashboard, DashboardXxx, NamedDashboard};
+use crate::meta::dashboards::{Dashboard, NamedDashboard};
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<Dashboard>, anyhow::Error> {
+#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
+pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
-    let ret = db.get(&key).await?;
-    let details = String::from_utf8(ret.to_vec()).unwrap();
-    Ok(Some(Dashboard {
+    let val = db.get(&key).await?;
+    let details: Dashboard = serde_json::from_slice(&val).with_context(|| {
+        format!("Failed to deserialize the value for key {key:?} as `Dashboard`")
+    })?;
+    Ok(Some(NamedDashboard {
         name: name.to_string(),
         details,
     }))
 }
 
-pub async fn set(org_id: &str, name: &str, dashboard: &DashboardXxx) -> Result<(), anyhow::Error> {
+#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
+pub async fn set(org_id: &str, name: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
     Ok(db.put(&key, serde_json::to_vec(dashboard)?.into()).await?)
 }
 
+#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
     Ok(db.delete(&key, false).await?)
 }
 
+#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let db_key = format!("/dashboard/{org_id}/");
@@ -48,10 +54,10 @@ pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
         .map(|(k, v)| {
             let name = k
                 .strip_prefix(&db_key)
-                .ok_or_else(|| anyhow::anyhow!("key {k:?} doesn't start with {db_key:?}"))?
+                .expect("BUG: key {k:?} doesn't start with {db_key:?}")
                 .to_string();
-            let details: DashboardXxx = serde_json::from_slice(&v).with_context(|| {
-                format!("Failed to deserialize the value for key {k:?} as `Dashboard`")
+            let details: Dashboard = serde_json::from_slice(&v).with_context(|| {
+                format!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
             })?;
             Ok(NamedDashboard { name, details })
         })
