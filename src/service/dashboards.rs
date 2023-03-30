@@ -16,14 +16,17 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use std::io::Error;
+use std::io;
 use tracing::info_span;
 
-use crate::meta::dashboards::DashboardList;
-use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
+use crate::meta::{
+    self,
+    dashboards::{DashboardList, DashboardXxx},
+    http::HttpResponse as MetaHttpResponse,
+};
 use crate::service::db;
 
-pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, Error> {
+pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
     let loc_span = info_span!("service:dashboards:get");
     let _guard = loc_span.enter();
     let ret = db::dashboard::get(org_id, name).await;
@@ -43,12 +46,12 @@ pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, Err
 pub async fn save_dashboard(
     org_id: &str,
     name: &str,
-    details: &str,
-) -> Result<HttpResponse, Error> {
+    dashboard: &DashboardXxx,
+) -> Result<HttpResponse, io::Error> {
     let loc_span = info_span!("service:dashboards:save");
     let _guard = loc_span.enter();
-    let ret = db::dashboard::set(org_id, name, details).await;
-    match ret {
+
+    match db::dashboard::set(org_id, name, dashboard).await {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard saved".to_string(),
@@ -62,14 +65,14 @@ pub async fn save_dashboard(
     }
 }
 
-pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     let loc_span = info_span!("service:dashboards:list");
     let _guard = loc_span.enter();
     let list = db::dashboard::list(org_id).await.unwrap();
     Ok(HttpResponse::Ok().json(DashboardList { list }))
 }
 
-pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, Error> {
+pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
     let loc_span = info_span!("service:dashboards:delete");
     let _guard = loc_span.enter();
     let result = db::dashboard::delete(org_id, name).await;
