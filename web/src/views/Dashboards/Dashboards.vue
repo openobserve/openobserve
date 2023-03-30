@@ -232,7 +232,6 @@ export default defineComponent({
       showAddDashboardDialog.value = true;
     };
     const routeToViewD = (row) => {
-      // console.log("row");
       return router.push({
         path: "/dashboards/view",
         query: { dashboard: row.identifier },
@@ -379,8 +378,6 @@ export default defineComponent({
         (newVal != oldVal || this.dashboards.value == undefined) &&
         this.router.currentRoute.value.name == "dashboards"
       ) {
-        // console.log("inside if");
-
         this.getDashboards(this.store.state.selectedOrganization.id);
       }
     },

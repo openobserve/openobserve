@@ -15,7 +15,14 @@
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
-// TODO: XXX-RENAMEME
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NamedDashboard {
+    // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
+    // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
+    pub name: String,
+    pub details: Dashboard,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
@@ -25,31 +32,60 @@ pub struct Dashboard {
     pub role: String,
     pub owner: String,
     pub created: DateTime<FixedOffset>,
-    // HACK: The UI always sends an empty array. And I don't know the type of
-    // items, so it might as well be unit.
-    pub panels: Vec<()>,
+    pub panels: Vec<Panel>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedDashboard {
-    // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
-    // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
-    pub name: String,
-    pub details: Dashboard,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Panel {
+    /* XXX
+{
+  "id": "Panel_ID5230410",
+  "type": "bar",
+  "fields": {
+    "stream": "default",
+    "stream_type": "logs",
+    "x": [
+      {
+        "label": "Timestamp",
+        "alias": "x_axis_1",
+        "column": "_timestamp",
+        "color": null,
+        "aggregationFunction": "histogram"
+      }
+    ],
+    "y": [
+      {
+        "label": "Method",
+        "alias": "y_axis_1",
+        "column": "method",
+        "color": "#5960b2",
+        "aggregationFunction": "count"
+      }
+    ],
+    "filter": []
+  },
+  "config": {
+    "title": "jopa",
+    "description": "",
+    "show_legends": true
+  },
+  "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(method) as \"y_axis_1\"  FROM \"default\"  GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+  "customQuery": false
+}
+    // XXX */
 }
 
-// TODO: XXX-RENAMEME
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DashboardList {
     pub list: Vec<NamedDashboard>,
 }
 
-/* XXX-RESTOREME
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::common::json;
 
+    // XXX-FIXME
     #[test]
     fn test_dashboard() {
         let dashboard = Dashboard {
@@ -74,4 +110,3 @@ mod tests {
         assert_eq!(format!("{:?}", dslist), format!("{:?}", dslist2));
     }
 }
-// XXX */
