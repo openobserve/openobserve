@@ -38,6 +38,22 @@ pub struct Dashboard {
     pub owner: String,
     pub created: DateTime<FixedOffset>,
     pub panels: Vec<Panel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layouts: Option<Vec<Layout>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Layout {
+    pub x: i64,
+    pub y: i64,
+    pub w: i64,
+    pub h: i64,
+    pub i: i64,
+    #[serde(rename = "panelId")]
+    pub panel_id: String,
+    #[serde(rename = "static")]
+    pub is_static: bool,
 }
 
 // XXX-TODO: Move `Panel` and the associate structs into a separate module.
@@ -77,7 +93,8 @@ pub struct AxisItem {
     pub alias: String,
     pub column: String,
     pub color: Option<String>,
-    pub aggregation_function: AggregationFunc,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aggregation_function: Option<AggregationFunc>,
 }
 
 // XXX-TODO: REVISEME
