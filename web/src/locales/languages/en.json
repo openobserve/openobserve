@@ -210,7 +210,8 @@
         "delete": "Delete",
         "ok": "Ok",
         "type": "Function Type",
-        "showQuery": "Is Ingest Time Function?"
+        "showQuery": "Is Ingest Time Function?",
+        "stream_type": "Stream Type"
     },
     "confirmDialog": {
         "cancel": "Cancel",
@@ -299,7 +300,8 @@
         "prom_am": "Alert manager",
         "addTitle": "Add Alert",
         "updateTitle": "Update Alert",
-        "delete": "Delete"
+        "delete": "Delete",
+        "stream_type": "Stream Type"
     },
     "home": {
         "streams": "Streams",

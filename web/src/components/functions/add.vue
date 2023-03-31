@@ -42,6 +42,23 @@
 
         <q-select
           v-if="formData.ingest"
+          v-model="formData.stream_type"
+          :options="streamTypes"
+          :label="t('alerts.stream_type')"
+          :popup-content-style="{ textTransform: 'capitalize' }"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          @update:model-value="updateStreams()"
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
+
+        <q-select
+          v-if="formData.ingest"
           v-model="formData.stream_name"
           :options="indexOptions"
           :label="t('function.stream_name')"
@@ -156,6 +173,7 @@ const defaultValue: any = () => {
     stream_name: "",
     order: 1,
     ingest: false,
+    stream_type: "logs",
   };
 };
 
@@ -185,6 +203,9 @@ export default defineComponent({
     const $q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
+    const streams: any = ref({});
+
+    const streamTypes = ["logs", "metrics"];
 
     const editorUpdate = (e: any) => {
       formData.function = e.target.value;
@@ -262,6 +283,32 @@ end`;
       formData.value.function = editorobj.getValue();
     };
 
+    const updateStreams = () => {
+      formData.value.stream_name = "";
+
+      if (streams.value[formData.value.stream_type]) {
+        indexOptions.value = streams.value[formData.value.stream_type].map(
+          (data: any) => {
+            return data.name;
+          }
+        );
+        return;
+      }
+
+      streamService
+        .nameList(
+          store.state.selectedOrganization.identifier,
+          formData.value.stream_type,
+          true
+        )
+        .then((res) => {
+          streams.value[formData.value.stream_type] = res.data.list;
+          indexOptions.value = res.data.list.map((data: any) => {
+            return data.name;
+          });
+        });
+    };
+
     return {
       t,
       $q,
@@ -279,9 +326,12 @@ end`;
       editorUpdate,
       updateFunction,
       updateEditorContent,
+      streamTypes,
+      updateStreams,
     };
   },
   created() {
+    this.updateStreams();
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
     this.beingUpdated = this.isUpdated;
@@ -295,16 +345,6 @@ end`;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
     }
-
-    streamService.nameList(
-      this.store.state.selectedOrganization.identifier,
-      "",
-      false
-    ).then((res) => {
-      this.indexOptions = res.data.list.map((data: any) => {
-        return data.name;
-      });
-    });
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
@@ -397,7 +437,7 @@ end`;
   resize: both;
 }
 </style>
-<style >
+<style>
 .no-case .q-field__native span {
   text-transform: none !important;
 }

@@ -25,7 +25,7 @@
     <div>
       <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
-          <div class="col-6 alert-name-input">
+          <div class="col-4 alert-name-input">
             <q-input
               v-model="formData.name"
               :label="t('alerts.name')"
@@ -42,7 +42,24 @@
               tabindex="0"
             />
           </div>
-          <div class="col-6">
+          <div class="col-4 alert-stream-type">
+            <q-select
+              v-model="formData.stream_type"
+              :options="streamTypes"
+              :label="t('alerts.stream_type')"
+              :popup-content-style="{ textTransform: 'capitalize' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              @update:model-value="updateStreams()"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
+          </div>
+          <div class="col-4">
             <q-select
               v-model="formData.stream_name"
               :options="indexOptions"
@@ -266,7 +283,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, ref, onMounted, watch, type Ref } from "vue";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
@@ -281,6 +298,7 @@ const defaultValue: any = () => {
     sql: "",
     isScheduled: "true",
     stream_name: "",
+    stream_type: "logs",
     condition: {
       column: "",
       operator: "",
@@ -327,6 +345,7 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const indexOptions = ref([]);
     const schemaList = ref([]);
+    const streams: any = ref({});
     const { t } = useI18n();
     const $q = useQuasar();
     const editorRef: any = ref(null);
@@ -347,6 +366,7 @@ export default defineComponent({
       "Contains",
       "NotContains",
     ]);
+    const streamTypes = ["logs", "metrics", "traces"];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
@@ -461,6 +481,34 @@ export default defineComponent({
         );
       });
     };
+
+    const updateStreams = () => {
+      formData.value.stream_name = "";
+
+      if (streams.value[formData.value.stream_type]) {
+        schemaList.value = streams.value[formData.value.stream_type];
+        indexOptions.value = streams.value[formData.value.stream_type].map(
+          (data: any) => {
+            return data.name;
+          }
+        );
+        return;
+      }
+
+      streamService
+        .nameList(
+          store.state.selectedOrganization.identifier,
+          formData.value.stream_type,
+          true
+        )
+        .then((res) => {
+          streams.value[formData.value.stream_type] = res.data.list;
+          schemaList.value = res.data.list;
+          indexOptions.value = res.data.list.map((data: any) => {
+            return data.name;
+          });
+        });
+    };
     return {
       t,
       $q,
@@ -488,9 +536,13 @@ export default defineComponent({
       sqlAST,
       schemaList,
       filteredColumns,
+      streamTypes,
+      streams,
+      updateStreams,
     };
   },
   created() {
+    this.updateStreams();
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
     this.beingUpdated = this.isUpdated;
@@ -504,14 +556,6 @@ export default defineComponent({
       this.formData = this.modelValue;
       this.formData.destination = this.modelValue.destination;
     }
-    streamService
-      .nameList(this.store.state.selectedOrganization.identifier, "", true)
-      .then((res) => {
-        this.schemaList = res.data.list;
-        this.indexOptions = res.data.list.map((data: any) => {
-          return data.name;
-        });
-      });
   },
   computed: {
     getFormattedDestinations: function () {

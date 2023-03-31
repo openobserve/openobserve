@@ -180,6 +180,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "stream_type",
+        field: "stream_type",
+        label: t("function.stream_type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "stream_name",
         field: "stream_name",
         label: t("function.stream_name"),
@@ -245,6 +252,7 @@ export default defineComponent({
               function: data.function,
               order: data.order ? data.order : 1,
               stream_name: data.stream_name ? data.stream_name : "--",
+              stream_type: data.stream_type ? data.stream_name : "--",
               ingest: data.stream_name ? true : false,
               actions: "",
             };
