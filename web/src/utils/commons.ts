@@ -120,8 +120,6 @@ export const getAllDashboards = async (store: any) => {
   return await dashboardService
   .list(0, 1000, "name", false, "",store.state.selectedOrganization.identifier)
   .then((res) => {
-    // console.log('dashboard list retriveid');
-    // console.log(res);
     // save to store
     store.dispatch("setAllDashboardList", res.data.list);
   })
@@ -140,7 +138,7 @@ export const addPanel = async (store: any, dashboardId: any, panelData: any) => 
   }
   const dashboardList = store.state.allDashboardList
   let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = JSON.parse(currentDashboard.details)
+  currentDashboard = currentDashboard.details
   if(!currentDashboard.panels){
     currentDashboard.panels = []
   }
@@ -182,7 +180,7 @@ export const deletePanel = async (store:any, dashboardId:any, panelId:any) => {
 // call the update dashboard function
   const dashboardList = store.state.allDashboardList
   let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = JSON.parse(currentDashboard.details)
+  currentDashboard = currentDashboard.details
 
     //remove panel from current dashboard
     const panelIndex = currentDashboard.panels.findIndex(
@@ -207,7 +205,7 @@ export const updatePanel = async (store:any, dashboardId:any, panelData:any) => 
   // call the update dashboard function
     const dashboardList = store.state.allDashboardList
     let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-    currentDashboard = JSON.parse(currentDashboard.details)
+    currentDashboard = currentDashboard.details
   
       //remove panel from current dashboard
       const panelIndex = currentDashboard.panels.findIndex(
@@ -225,7 +223,7 @@ export const updateDashboard = async (store: any, org:any, dashboardId:any, curr
     .save(
       org,
       dashboardId,
-      JSON.stringify(JSON.stringify(currentDashboardData))
+      currentDashboardData
     )
     .then(async (res) => {
     // update dashboardList
@@ -239,8 +237,7 @@ export const getDashboard = async (store: any, dashboardId: any) => {
   }
   const dashboardList = store.state.allDashboardList
   let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = JSON.parse(currentDashboard.details)
-  return currentDashboard
+  return currentDashboard.details
 }
 
 export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
@@ -249,6 +246,6 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   }
   const dashboardList = store.state.allDashboardList
   let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = JSON.parse(currentDashboard.details)
+  currentDashboard = currentDashboard.details
   return currentDashboard.panels?.find((it: any) => it.id == panelId)
 }

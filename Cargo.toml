@@ -143,3 +143,4 @@ tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
 datafusion-expr = "20.0"
+expect-test = "1.4"
