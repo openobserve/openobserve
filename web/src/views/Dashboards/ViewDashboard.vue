@@ -190,8 +190,7 @@ export default defineComponent({
 
     // XXX-RENAMEME: s/list/dashboards/?
     let list = computed(function () {
-      console.log("XXX", currentDashboardData); // XXX-DELETEME
-      return [toRaw(currentDashboardData.data)]; // XXX-TODO: remove `toRaw`?
+      return [toRaw(currentDashboardData.data)];
     });
 
     const refreshData = () => {

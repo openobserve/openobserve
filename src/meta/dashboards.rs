@@ -16,6 +16,11 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DashboardList {
+    pub list: Vec<NamedDashboard>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedDashboard {
     // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
     // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
@@ -35,49 +40,50 @@ pub struct Dashboard {
     pub panels: Vec<Panel>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Panel {
-    /* XXX
-{
-  "id": "Panel_ID5230410",
-  "type": "bar",
-  "fields": {
-    "stream": "default",
-    "stream_type": "logs",
-    "x": [
-      {
-        "label": "Timestamp",
-        "alias": "x_axis_1",
-        "column": "_timestamp",
-        "color": null,
-        "aggregationFunction": "histogram"
-      }
-    ],
-    "y": [
-      {
-        "label": "Method",
-        "alias": "y_axis_1",
-        "column": "method",
-        "color": "#5960b2",
-        "aggregationFunction": "count"
-      }
-    ],
-    "filter": []
-  },
-  "config": {
-    "title": "jopa",
-    "description": "",
-    "show_legends": true
-  },
-  "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(method) as \"y_axis_1\"  FROM \"default\"  GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
-  "customQuery": false
-}
-    // XXX */
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub fields: PanelFields,
+    pub config: PanelConfig,
+    pub query: String,
+    pub custom_query: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DashboardList {
-    pub list: Vec<NamedDashboard>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PanelFields {
+    pub stream: String,
+    pub stream_type: String,
+    pub x: Vec<AxisItem>,
+    pub y: Vec<AxisItem>,
+    // XXX-REVIEW
+    pub filter: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AxisItem {
+    pub label: String,
+    pub alias: String,
+    pub column: String,
+    pub color: Option<String>,
+    pub aggregation_function: AggregationFunc,
+}
+
+// XXX-TODO: REVISEME
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AggregationFunc {
+    Count,
+    Histogram,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PanelConfig {
+    title: String,
+    description: String,
+    show_legends: bool,
 }
 
 #[cfg(test)]
