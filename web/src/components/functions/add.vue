@@ -60,6 +60,7 @@
         <q-select
           v-if="formData.ingest"
           v-model="formData.stream_name"
+          :loading="isFetchingStreams"
           :options="indexOptions"
           :label="t('function.stream_name')"
           color="input-border"
@@ -204,6 +205,7 @@ export default defineComponent({
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const streams: any = ref({});
+    const isFetchingStreams = ref(false);
 
     const streamTypes = ["logs", "metrics"];
 
@@ -295,6 +297,7 @@ end`;
         return;
       }
 
+      isFetchingStreams.value = true;
       streamService
         .nameList(
           store.state.selectedOrganization.identifier,
@@ -306,7 +309,8 @@ end`;
           indexOptions.value = res.data.list.map((data: any) => {
             return data.name;
           });
-        });
+        })
+        .finally(() => (isFetchingStreams.value = false));
     };
 
     return {
@@ -328,6 +332,7 @@ end`;
       updateEditorContent,
       streamTypes,
       updateStreams,
+      isFetchingStreams,
     };
   },
   created() {

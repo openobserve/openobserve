@@ -64,6 +64,7 @@
               v-model="formData.stream_name"
               :options="indexOptions"
               :label="t('alerts.stream_name')"
+              :loading="isFetchingStreams"
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case"
@@ -366,6 +367,7 @@ export default defineComponent({
       "Contains",
       "NotContains",
     ]);
+    const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
@@ -495,6 +497,7 @@ export default defineComponent({
         return;
       }
 
+      isFetchingStreams.value = true;
       streamService
         .nameList(
           store.state.selectedOrganization.identifier,
@@ -507,7 +510,8 @@ export default defineComponent({
           indexOptions.value = res.data.list.map((data: any) => {
             return data.name;
           });
-        });
+        })
+        .finally(() => (isFetchingStreams.value = false));
     };
     return {
       t,
@@ -539,6 +543,7 @@ export default defineComponent({
       streamTypes,
       streams,
       updateStreams,
+      isFetchingStreams,
     };
   },
   created() {
@@ -602,6 +607,7 @@ export default defineComponent({
               this.formData.time_between_alerts.value
             ),
             destination: this.formData.destination,
+            stream_type: this.formData.stream_type,
           };
         } else {
           submitData = {
@@ -620,6 +626,7 @@ export default defineComponent({
               this.formData.time_between_alerts.value
             ),
             destination: this.formData.destination,
+            stream_type: this.formData.stream_type,
           };
         }
         this.schemaList.forEach((stream: any) => {
