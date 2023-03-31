@@ -90,7 +90,7 @@
 
     <ConfirmDialog
       title="Delete Alert"
-      message="Are you sure you want to delete alert?"
+      message="Are you sure you want to delete template?"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
