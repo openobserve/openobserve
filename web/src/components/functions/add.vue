@@ -53,7 +53,7 @@
           outlined
           filled
           dense
-          @update:model-value="updateStreams()"
+          @update:model-value="updateStreams"
           :rules="[(val: any) => !!val || 'Field is required!']"
         />
 
@@ -285,8 +285,8 @@ end`;
       formData.value.function = editorobj.getValue();
     };
 
-    const updateStreams = () => {
-      formData.value.stream_name = "";
+    const updateStreams = (resetStream = true) => {
+      if (resetStream) formData.value.stream_name = "";
 
       if (streams.value[formData.value.stream_type]) {
         indexOptions.value = streams.value[formData.value.stream_type].map(
@@ -336,9 +336,9 @@ end`;
     };
   },
   created() {
-    this.updateStreams();
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
+    this.updateStreams(false);
     this.beingUpdated = this.isUpdated;
 
     if (

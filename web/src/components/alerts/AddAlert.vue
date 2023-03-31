@@ -484,8 +484,8 @@ export default defineComponent({
       });
     };
 
-    const updateStreams = () => {
-      formData.value.stream_name = "";
+    const updateStreams = (resetStream = true) => {
+      if (resetStream) formData.value.stream_name = "";
 
       if (streams.value[formData.value.stream_type]) {
         schemaList.value = streams.value[formData.value.stream_type];
@@ -547,9 +547,9 @@ export default defineComponent({
     };
   },
   created() {
-    this.updateStreams();
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
+    this.updateStreams(false);
     this.beingUpdated = this.isUpdated;
     if (
       this.modelValue &&
