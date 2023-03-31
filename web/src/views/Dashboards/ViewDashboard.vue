@@ -154,27 +154,6 @@ export default defineComponent({
       goBack();
     };
 
-    // delete dashboard remove the data from database and update store variable and redirect to dashboardList page
-    // const deleteDashboard = async (dashboardId: String) => {
-    //   await dashboardService
-    //     .delete(store.state.selectedOrganization.identifier, dashboardId)
-    //     .then((res) => {
-    //       const dashboardList = JSON.parse(
-    //         JSON.stringify(toRaw(store.state.allDashboardList))
-    //       );
-    //       const newDashboardList = dashboardList.filter(
-    //         (dashboard) => dashboard.name != dashboardId
-    //       );
-    //       store.dispatch("setAllDashboardList", newDashboardList);
-    //       $q.notify({
-    //         type: "positive",
-    //         message: "Dashboard deleted successfully.",
-    //         timeout: 5000,
-    //       });
-    //     });
-    //   goBack();
-    // };
-
     const deleteDashboardOnClick = async () => {
       await deleteDashboard(route.query.dashboard);
     };
@@ -189,11 +168,6 @@ export default defineComponent({
         currentDashboardData.data
       );
 
-      // currentDashboardData.data = await getDashboard(
-      //   store,
-      //   dashboardId
-      // );
-
       $q.notify({
         type: "positive",
         message: "Dashboard updated successfully.",
@@ -201,7 +175,6 @@ export default defineComponent({
       });
 
     };
-
 
     //add dashboardId
     const addNewPanel = (dashboardId: String) => {
@@ -215,6 +188,7 @@ export default defineComponent({
       addNewPanel(route.query.dashboard);
     };
 
+    // XXX-RENAMEME: s/list/dashboards/?
     let list = computed(function () {
       return [toRaw(currentDashboardData.data)];
     });
@@ -294,14 +268,6 @@ export default defineComponent({
       this.draggable = false;
     },
     async onUpdatePanel(panelDataElementValue: any) {
-
-      // console.log(
-      //   "deleting",
-      //   this.$route.query.dashboard,
-      //   panelDataElementValue,
-      //   panelDataElementValue.id
-      // );
-
       await deletePanel(
         this.store,
         this.$route.query.dashboard,
