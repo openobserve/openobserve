@@ -202,7 +202,7 @@ export default defineComponent({
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
             baseObj.dashboardId,
-            JSON.stringify(JSON.stringify(baseObj))
+            baseObj
           );
         }
         callDashboard
