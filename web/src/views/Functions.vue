@@ -252,7 +252,7 @@ export default defineComponent({
               function: data.function,
               order: data.order ? data.order : 1,
               stream_name: data.stream_name ? data.stream_name : "--",
-              stream_type: data.stream_type ? data.stream_name : "--",
+              stream_type: data.stream_type ? data.stream_type : "--",
               ingest: data.stream_name ? true : false,
               actions: "",
             };
