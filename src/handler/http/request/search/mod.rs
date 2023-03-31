@@ -48,7 +48,7 @@ use crate::service::search as SearchService;
             "size": 10
         },
         "aggs": {
-            "histogram": "select histogram(_timestamp, '30 second') AS key, count(*) AS num from query GROUP BY key ORDER BY key"
+            "histogram": "select histogram(_timestamp, '30 second') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key"
         }
     })),
     responses(
