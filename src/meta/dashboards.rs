@@ -214,7 +214,9 @@ mod tests {
                                     alias: "x_axis_1",
                                     column: "_timestamp",
                                     color: None,
-                                    aggregation_function: Histogram,
+                                    aggregation_function: Some(
+                                        Histogram,
+                                    ),
                                 },
                             ],
                             y: [
@@ -225,7 +227,9 @@ mod tests {
                                     color: Some(
                                         "#5960b2",
                                     ),
-                                    aggregation_function: Count,
+                                    aggregation_function: Some(
+                                        Count,
+                                    ),
                                 },
                             ],
                             filter: [
@@ -247,6 +251,19 @@ mod tests {
                         custom_query: false,
                     },
                 ],
+                layouts: Some(
+                    [
+                        Layout {
+                            x: 0,
+                            y: 0,
+                            w: 12,
+                            h: 13,
+                            i: 1,
+                            panel_id: "Panel_ID7857010",
+                            is_static: false,
+                        },
+                    ],
+                ),
             }
         "##]].assert_debug_eq(&dashboard);
     }
