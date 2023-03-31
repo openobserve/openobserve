@@ -12,25 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::Bytes;
+use anyhow::Context as _;
 
-use crate::meta::dashboards::Dashboard;
+use crate::{
+    common::json,
+    meta::dashboards::{Dashboard, NamedDashboard},
+};
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<Dashboard>, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
-    let ret = db.get(&key).await?;
-    let details = String::from_utf8(ret.to_vec()).unwrap();
-    Ok(Some(Dashboard {
+    let val = db.get(&key).await?;
+    let details: Dashboard = json::from_slice(&val).with_context(|| {
+        format!("Failed to deserialize the value for key {key:?} as `Dashboard`")
+    })?;
+    Ok(Some(NamedDashboard {
         name: name.to_string(),
         details,
     }))
 }
 
-pub async fn set(org_id: &str, name: &str, details: &str) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
-    Ok(db.put(&key, Bytes::from(details.to_string())).await?)
+    Ok(db.put(&key, json::to_vec(dashboard)?.into()).await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -39,15 +44,21 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(db.delete(&key, false).await?)
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/");
-    let ret = db.list(&key).await?;
-    let mut udf_list: Vec<Dashboard> = Vec::new();
-    for (item_key, item_value) in ret {
-        let name = item_key.strip_prefix(&key).unwrap().to_string();
-        let details = String::from_utf8(item_value.to_vec()).unwrap();
-        udf_list.push(Dashboard { name, details })
-    }
-    Ok(udf_list)
+    let db_key = format!("/dashboard/{org_id}/");
+    db.list(&db_key)
+        .await?
+        .into_iter()
+        .map(|(k, v)| {
+            let name = k
+                .strip_prefix(&db_key)
+                .expect("BUG: key {k:?} doesn't start with {db_key:?}")
+                .to_string();
+            let details: Dashboard = json::from_slice(&v).with_context(|| {
+                format!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
+            })?;
+            Ok(NamedDashboard { name, details })
+        })
+        .collect()
 }

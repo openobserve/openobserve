@@ -174,7 +174,7 @@ export default defineComponent({
         );
         // console.log("panel data", panelData);
         Object.assign(dashboardPanelData.data, panelData);
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        chartData.value = dashboardPanelData.data
       } else {
         editMode.value = false;
         resetDashboardPanelData();
@@ -201,7 +201,7 @@ export default defineComponent({
     })
 
     watch(()=> dashboardPanelData.data.type, ()=>{
-      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      chartData.value = dashboardPanelData.data
 		})
 
     const runQuery = () => {
@@ -210,7 +210,7 @@ export default defineComponent({
         return
       }
       // copy the data object excluding the reactivity
-      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      chartData.value = dashboardPanelData.data
     };
 
     const updateDateTime = (value: object) => {
@@ -343,7 +343,7 @@ export default defineComponent({
         await updatePanel(
           store,
           dashId,
-          JSON.parse(JSON.stringify(dashboardPanelData.data))
+          dashboardPanelData.data
         );
       } else {
         const panelId =
@@ -353,7 +353,7 @@ export default defineComponent({
         await addPanel(
           store,
           dashId,
-          JSON.parse(JSON.stringify(dashboardPanelData.data))
+          dashboardPanelData.data
         );
       }
 
