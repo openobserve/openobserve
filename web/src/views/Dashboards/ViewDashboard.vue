@@ -39,6 +39,9 @@
           ref="refDateTime"
           @date-change="dateChange"
         />
+        <AutoRefreshInterval v-model="refreshInterval" @trigger="refreshData"/>
+        <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="refresh" @click="refreshData">
+        </q-btn>
       </div>
     </div>
     <q-separator></q-separator>
@@ -95,6 +98,7 @@ import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
 import { deletePanel, updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
+import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -103,7 +107,8 @@ export default defineComponent({
     GridItem: VueGridLayout.GridItem,
     DateTime,
     PanelContainer,
-    NoPanel
+    NoPanel,
+    AutoRefreshInterval
   },
   setup() {
     const { t } = useI18n();
@@ -116,7 +121,9 @@ export default defineComponent({
 
     const refDateTime: any = ref(null);
     const $q = useQuasar();
-    let currentTimeObj: any = ref({});
+    const currentDurationSelectionObj = ref ({})
+    const currentTimeObj = ref({});
+    const refreshInterval = ref(0);
 
     const initialDateValue = {
       tab: "relative",
@@ -132,7 +139,8 @@ export default defineComponent({
     // if the date value change, get the Date and time
     const dateChange = (dateValue: any) => {
       const c = toRaw(unref(dateValue));
-      currentTimeObj.value = getConsumableDateTime(c);
+      currentDurationSelectionObj.value = dateValue
+      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
     };
 
     const initialize = () => { };
@@ -211,7 +219,32 @@ export default defineComponent({
       return [toRaw(currentDashboardData.data)];
     });
 
+    const refreshData = () => {
+      console.log('refresh triggered');
+      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
+    }
+
+    // ------- work with query params ----------
+    onActivated(() => {
+      const params = route.query
+      if(params.refresh) {
+        refreshInterval.value = params.refresh
+      }
+    })
+
+    // whenever the refreshInterval is changed, update the query params
+    watch(refreshInterval, () => {
+      router.push({
+        name: route.name,
+        query: {
+          dashboard: route.query.dashboard,
+          refresh: refreshInterval.value
+        }
+      })
+    })
+
     initialize();
+
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -241,7 +274,8 @@ export default defineComponent({
       },
       dateChange,
       currentTimeObj,
-      // showNewPanel,
+      refreshInterval,
+      refreshData
     };
   },
   data() {
