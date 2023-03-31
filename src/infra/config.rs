@@ -173,6 +173,8 @@ pub struct Common {
     pub telemetry_url: String,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = false)]
     pub prometheus_enabled: bool,
+    #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
+    pub print_key_config: bool,
 }
 
 #[derive(EnvConfig)]
@@ -237,7 +239,7 @@ pub struct Log {
     pub level: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
     pub addr: String,
@@ -275,7 +277,7 @@ pub struct Sled {
     pub prefix: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(Debug, EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
     pub provider: String,
