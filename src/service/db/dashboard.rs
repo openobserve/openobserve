@@ -14,13 +14,16 @@
 
 use anyhow::Context as _;
 
-use crate::meta::dashboards::{Dashboard, NamedDashboard};
+use crate::{
+    common::json,
+    meta::dashboards::{Dashboard, NamedDashboard},
+};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
     let val = db.get(&key).await?;
-    let details: Dashboard = serde_json::from_slice(&val).with_context(|| {
+    let details: Dashboard = json::from_slice(&val).with_context(|| {
         format!("Failed to deserialize the value for key {key:?} as `Dashboard`")
     })?;
     Ok(Some(NamedDashboard {
@@ -32,7 +35,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, any
 pub async fn set(org_id: &str, name: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
-    Ok(db.put(&key, serde_json::to_vec(dashboard)?.into()).await?)
+    Ok(db.put(&key, json::to_vec(dashboard)?.into()).await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -52,7 +55,7 @@ pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
                 .strip_prefix(&db_key)
                 .expect("BUG: key {k:?} doesn't start with {db_key:?}")
                 .to_string();
-            let details: Dashboard = serde_json::from_slice(&v).with_context(|| {
+            let details: Dashboard = json::from_slice(&v).with_context(|| {
                 format!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
             })?;
             Ok(NamedDashboard { name, details })
