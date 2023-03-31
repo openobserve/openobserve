@@ -15,6 +15,8 @@
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
+use super::StreamType;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DashboardList {
     pub list: Vec<NamedDashboard>,
@@ -79,13 +81,6 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-// XXX-TODO: REVISEME
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StreamType {
-    Logs,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
@@ -97,12 +92,15 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-// XXX-TODO: REVISEME
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
     Histogram,
+    Sum,
+    Min,
+    Max,
+    Avg,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
