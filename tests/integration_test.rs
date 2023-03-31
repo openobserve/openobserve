@@ -761,7 +761,7 @@ mod tests {
     }
     async fn e2e_post_dashboard() {
         let auth = setup();
-        let body_str = r#""{\"label\" : \"Dashboard1\",\"panels\":[{\"query\": [\"select a as x_axis_chart, b as y_axis_chart from k8s-logs-2022.10.31 group by b\"],\"x_label\": \"\",\"y_label\": \"\",\"title\": \"\",\"type\": \"bar\",\"position\": { \"x_axis\": [1,3],\"y_axis\": [1,1]}}]}""#;
+        let body_str = r##"{"title":"b2","dashboardId":"1501078512","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
