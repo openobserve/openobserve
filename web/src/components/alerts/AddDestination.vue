@@ -50,7 +50,7 @@
               :options="getFormattedTemplates"
               color="input-border"
               bg-color="input-bg"
-              class="showLabelOnTop"
+              class="showLabelOnTop no-case"
               stack-label
               outlined
               filled
@@ -330,5 +330,8 @@ const deleteApiHeader = (header: any) => {
   .q-field__native > :first-child {
     text-transform: uppercase !important;
   }
+}
+.no-case .q-field__native span {
+  text-transform: none !important;
 }
 </style>
