@@ -645,6 +645,7 @@ export default defineComponent({
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           this.formData.stream_name,
+          this.formData.stream_type,
           submitData
         );
         callAlert

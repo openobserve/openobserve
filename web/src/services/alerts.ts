@@ -27,9 +27,14 @@ const alerts = {
       `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
   },
-  create: (org_identifier: string, stream_name: string, data: any) => {
+  create: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string,
+    data: any
+  ) => {
     return http().post(
-      `/api/${org_identifier}/${stream_name}/alerts/${data.name}`,
+      `/api/${org_identifier}/${stream_name}/alerts/${data.name}?type=${stream_type}`,
       data
     );
   },
