@@ -146,6 +146,8 @@ export default defineComponent({
             displayModeBar: false,
           }
         );
+      } else {
+        updateTableColumns()
       }
 
       if (props.data.query) {
