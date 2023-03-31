@@ -219,13 +219,11 @@ export const updatePanel = async (store:any, dashboardId:any, panelData:any) => 
 
 export const updateDashboard = async (store: any, org:any, dashboardId:any, currentDashboardData: any) => {
 // make an api call to update the dashboard
-  console.log("XXX", currentDashboardData); // XXX-DELETEME
   return await dashboardService
     .save(
       org,
       dashboardId,
-      // XXX-REVIEW: should we remove these `JSON.stringify`?
-      JSON.stringify(JSON.stringify(currentDashboardData))
+      currentDashboardData
     )
     .then(async (res) => {
     // update dashboardList
