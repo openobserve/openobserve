@@ -417,6 +417,9 @@ pub async fn connect_etcd() -> Option<etcd_client::Client> {
     if CONFIG.common.local_mode {
         return None;
     }
+    if CONFIG.common.print_key_config {
+        log::info!("etcd init config: {:?}", CONFIG.etcd);
+    }
 
     let mut opts = etcd_client::ConnectOptions::new()
         .with_timeout(core::time::Duration::from_secs(CONFIG.etcd.command_timeout))
