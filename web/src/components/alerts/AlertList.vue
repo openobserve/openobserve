@@ -180,6 +180,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "stream_type",
+        field: "stream_type",
+        label: t("alerts.stream_type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "stream_name",
         field: "stream_name",
         label: t("alerts.stream_name"),
@@ -245,6 +252,7 @@ export default defineComponent({
               name: data.name,
               sql: data.query.sql,
               stream_name: data.stream ? data.stream : "--",
+              stream_type: data.stream_type,
               condition_str:
                 data.condition.column +
                 " " +

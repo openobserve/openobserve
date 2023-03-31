@@ -97,8 +97,6 @@ onActivated(() => {
   redirectRoute();
 });
 onBeforeMount(() => {
-  if (!templates.value.length) getTemplates();
-  if (!destinations.value.length) getDestinations();
   redirectRoute();
 });
 const redirectRoute = () => {
