@@ -16,7 +16,6 @@ use anyhow::Context as _;
 
 use crate::meta::dashboards::{Dashboard, NamedDashboard};
 
-#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
@@ -30,21 +29,18 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, any
     }))
 }
 
-#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn set(org_id: &str, name: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
     Ok(db.put(&key, serde_json::to_vec(dashboard)?.into()).await?)
 }
 
-#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{name}");
     Ok(db.delete(&key, false).await?)
 }
 
-#[tracing::instrument(level = "error", ret, fields(x="XXX"))]
 pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let db_key = format!("/dashboard/{org_id}/");
