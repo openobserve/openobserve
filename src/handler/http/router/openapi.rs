@@ -110,7 +110,7 @@ use crate::meta;
             meta::organization::OrgUser,
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
-            request::status::HealthzResponse,     
+            request::status::HealthzResponse,
         ),
     ),
     modifiers(&SecurityAddon),

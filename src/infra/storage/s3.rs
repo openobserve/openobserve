@@ -205,7 +205,6 @@ impl S3 {
 
 async fn init_s3_config() -> Option<Config> {
     let mut s3config = aws_sdk_s3::config::Builder::new();
-
     if !CONFIG.s3.server_url.is_empty() {
         s3config = s3config.endpoint_url(&CONFIG.s3.server_url);
         if CONFIG.s3.provider.eq("minio") {
@@ -243,6 +242,9 @@ async fn init_s3_config() -> Option<Config> {
 async fn init_s3_client() -> Option<Client> {
     if is_local_disk_storage() {
         return None;
+    }
+    if CONFIG.common.print_key_config {
+        log::info!("s3 init config: {:?}", CONFIG.s3);
     }
 
     let client = if CONFIG.s3.provider.eq("aws") {
