@@ -124,8 +124,8 @@ export default defineComponent({
     //       trace.unparsed_x[end] != undefined
     //     ) {
     //       zoomFlag.value = true;
-    //       let start_d = new Date(Date.parse(trace.unparsed_x[start] + "Z"));
-    //       let end_d = new Date(Date.parse(trace.unparsed_x[end] + "Z"));
+    //       let start_d = new Date(Date.parse(trace.unparsed_x[start]));
+    //       let end_d = new Date(Date.parse(trace.unparsed_x[end]));
 
     //       emit("updated:chart", {
     //         start: start_d.toLocaleString("sv-SE"),
