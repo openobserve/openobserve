@@ -21,7 +21,7 @@ use datafusion::datasource::file_format::json::JsonFormat;
 use datafusion::datasource::file_format::parquet::ParquetFormat;
 use datafusion::datasource::listing::{ListingOptions, ListingTable};
 use datafusion::datasource::listing::{ListingTableConfig, ListingTableUrl};
-use datafusion::datasource::object_store::ObjectStoreRegistry;
+use datafusion::datasource::object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry};
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionConfig;
@@ -767,15 +767,17 @@ pub async fn merge_parquet_files(
 }
 
 fn create_runtime_env() -> Result<RuntimeEnv> {
-    let object_store_registry = ObjectStoreRegistry::new();
+    let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let mem = super::storage::memory::InMemory::new();
     let mem = LimitStore::new(mem, CONFIG.limit.query_thread_num);
-    object_store_registry.register_store("mem", "", Arc::new(mem));
+    let mem_url = url::Url::parse("mem:///").unwrap();
+    object_store_registry.register_store(&mem_url, Arc::new(mem));
 
     let tmpfs = super::storage::tmpfs::InMemory::new();
     let tmpfs = LimitStore::new(tmpfs, CONFIG.limit.query_thread_num);
-    object_store_registry.register_store("tmpfs", "", Arc::new(tmpfs));
+    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
+    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
     let rn_config =
         RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
