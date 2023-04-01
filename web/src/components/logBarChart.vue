@@ -63,8 +63,42 @@ export default defineComponent({
         ticklen: 5,
         nticks: 15,
         type: "date",
-        tickformat: "%H:%M:%S",
+        tickformat: "",
         hoverformat: "%Y-%m-%d %H:%M:%S",
+        tickformatstops: [
+          {
+            dtickrange: [null, 1000],
+            value: "%H:%M:%S.%L",
+          },
+          {
+            dtickrange: [1000, 60000],
+            value: "%H:%M:%S",
+          },
+          {
+            dtickrange: [60000, 3600000],
+            value: "%H:%M",
+          },
+          {
+            dtickrange: [3600000, 86400000],
+            value: "%H:%M",
+          },
+          {
+            dtickrange: [86400000, 604800000],
+            value: "%m-%d %H",
+          },
+          {
+            dtickrange: [604800000, "M1"],
+            value: "%m-%d",
+          },
+          {
+            dtickrange: ["M1", "M12"],
+            value: "%Y-%m",
+          },
+          {
+            dtickrange: ["M12", null],
+            value: "%Y",
+          },
+        ],
       },
     };
     onMounted(async () => {
