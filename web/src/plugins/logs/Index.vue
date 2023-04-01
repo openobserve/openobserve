@@ -859,8 +859,8 @@ export default defineComponent({
         searchObj.data.queryResults.aggs.histogram.map(
           (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
             unparsed_x_data.push(bucket.zo_sql_key);
-            let histDate = new Date(bucket.zo_sql_key + "Z");
-            xData.push(histDate.toLocaleTimeString("en-US", { hour12: false }));
+            let histDate = new Date(bucket.zo_sql_key);
+            xData.push(Math.floor(histDate.getTime()));
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }
         );
@@ -1290,8 +1290,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+div.plotly-notifier {
+  visibility: hidden;
+}
 .logPage {
-
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
