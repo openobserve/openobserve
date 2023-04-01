@@ -731,8 +731,6 @@ fn split_sql_token(text: &str) -> Vec<String> {
             *token = " ".to_string();
         }
     }
-    // println!("tokens: {tokens:?}");
-
     tokens
 }
 
