@@ -80,11 +80,11 @@ export default defineComponent({
           },
           {
             dtickrange: [3600000, 86400000],
-            value: "%H:%M",
+            value: "%m-%d %H:%M",
           },
           {
             dtickrange: [86400000, 604800000],
-            value: "%m-%d %H",
+            value: "%m-%d",
           },
           {
             dtickrange: [604800000, "M1"],
