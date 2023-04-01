@@ -100,6 +100,9 @@ export default defineComponent({
           },
         ],
       },
+      yaxis: {
+        fixedrange: true,
+      },
     };
     onMounted(async () => {
       await Plotly.newPlot(plotref.value, [trace], layout, {
