@@ -75,11 +75,11 @@ export default defineComponent({
             value: "%H:%M:%S",
           },
           {
-            dtickrange: [60000, 3600000],
+            dtickrange: [60000, 43200000], // 12 hours
             value: "%H:%M",
           },
           {
-            dtickrange: [3600000, 86400000],
+            dtickrange: [43200000, 86400000],
             value: "%m-%d %H:%M",
           },
           {
