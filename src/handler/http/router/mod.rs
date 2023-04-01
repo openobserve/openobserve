@@ -75,7 +75,10 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
 
                     srv.call(req).map(move |res| {
-                        if path.starts_with("src/") || path.starts_with("assets/") {
+                        if path.starts_with("src/")
+                            || path.starts_with("assets/")
+                            || path.eq("favicon.ico")
+                        {
                             res
                         } else {
                             let res = res.unwrap();

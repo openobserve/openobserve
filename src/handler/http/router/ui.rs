@@ -26,7 +26,7 @@ struct WebAssets;
 pub async fn serve(path: web::Path<String>) -> EmbedResponse<EmbedableFileResponse> {
     let mut path = path.as_str();
 
-    if !path.starts_with("src/") && !path.starts_with("assets/") {
+    if !path.starts_with("src/") && !path.starts_with("assets/") && !path.eq("favicon.ico") {
         path = "index.html";
     }
 

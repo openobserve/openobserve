@@ -1290,8 +1290,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+div.plotly-notifier {
+  visibility: hidden;
+}
 .logPage {
-
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,

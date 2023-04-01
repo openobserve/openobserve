@@ -61,7 +61,7 @@ export default defineComponent({
       },
       xaxis: {
         ticklen: 5,
-        nticks: 15,
+        nticks: 12,
         type: "date",
         tickformat: "",
         hoverformat: "%Y-%m-%d %H:%M:%S",
@@ -150,22 +150,19 @@ export default defineComponent({
       }
     };
 
-    const onPlotZoom = () => {
+    const onPlotZoom = (e: any) => {
       if (
-        plotref.value.layout.xaxis.range.length == 2 &&
+        e &&
+        e["xaxis.range[0]"] &&
+        e["xaxis.range[1]"] &&
         zoomFlag.value == false
       ) {
-        const start = Math.abs(Math.round(plotref.value.layout.xaxis.range[0]));
-        const end = Math.abs(Math.round(plotref.value.layout.xaxis.range[1]));
-        if (
-          start >= 0 &&
-          end >= 0 &&
-          trace.unparsed_x[start] != undefined &&
-          trace.unparsed_x[end] != undefined
-        ) {
+        const start = plotref.value.layout.xaxis.range[0];
+        const end = plotref.value.layout.xaxis.range[1];
+        if (start != "" && end != "") {
           zoomFlag.value = true;
-          let start_d = new Date(Date.parse(trace.unparsed_x[start]));
-          let end_d = new Date(Date.parse(trace.unparsed_x[end]));
+          let start_d = new Date(start);
+          let end_d = new Date(end);
           emit("updated:chart", {
             start: start_d.toLocaleString("sv-SE"),
             end: end_d.toLocaleString("sv-SE"),
