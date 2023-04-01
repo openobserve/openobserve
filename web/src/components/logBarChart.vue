@@ -61,7 +61,47 @@ export default defineComponent({
       },
       xaxis: {
         ticklen: 5,
-        nticks: 15,
+        nticks: 12,
+        type: "date",
+        tickformat: "",
+        hoverformat: "%Y-%m-%d %H:%M:%S",
+        tickformatstops: [
+          {
+            dtickrange: [null, 1000],
+            value: "%H:%M:%S.%L",
+          },
+          {
+            dtickrange: [1000, 60000],
+            value: "%H:%M:%S",
+          },
+          {
+            dtickrange: [60000, 3600000],
+            value: "%H:%M",
+          },
+          {
+            dtickrange: [3600000, 86400000],
+            value: "%m-%d %H:%M",
+          },
+          {
+            dtickrange: [86400000, 604800000],
+            value: "%m-%d",
+          },
+          {
+            dtickrange: [604800000, "M1"],
+            value: "%m-%d",
+          },
+          {
+            dtickrange: ["M1", "M12"],
+            value: "%Y-%m",
+          },
+          {
+            dtickrange: ["M12", null],
+            value: "%Y",
+          },
+        ],
+      },
+      yaxis: {
+        fixedrange: true,
       },
     };
     onMounted(async () => {
@@ -110,22 +150,19 @@ export default defineComponent({
       }
     };
 
-    const onPlotZoom = () => {
+    const onPlotZoom = (e: any) => {
       if (
-        plotref.value.layout.xaxis.range.length == 2 &&
+        e &&
+        e["xaxis.range[0]"] &&
+        e["xaxis.range[1]"] &&
         zoomFlag.value == false
       ) {
-        const start = Math.abs(Math.round(plotref.value.layout.xaxis.range[0]));
-        const end = Math.abs(Math.round(plotref.value.layout.xaxis.range[1]));
-        if (
-          start >= 0 &&
-          end >= 0 &&
-          trace.unparsed_x[start] != undefined &&
-          trace.unparsed_x[end] != undefined
-        ) {
+        const start = plotref.value.layout.xaxis.range[0];
+        const end = plotref.value.layout.xaxis.range[1];
+        if (start != "" && end != "") {
           zoomFlag.value = true;
-          let start_d = new Date(Date.parse(trace.unparsed_x[start] + "Z"));
-          let end_d = new Date(Date.parse(trace.unparsed_x[end] + "Z"));
+          let start_d = new Date(start);
+          let end_d = new Date(end);
           emit("updated:chart", {
             start: start_d.toLocaleString("sv-SE"),
             end: end_d.toLocaleString("sv-SE"),
