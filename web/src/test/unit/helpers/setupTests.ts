@@ -5,24 +5,11 @@ import { associate_members } from "../mockData/mockAssociateMembers";
 import streams from "@/test/unit/mockData/streams";
 import users from "../mockData/users";
 import alerts from "../mockData/alerts";
-
+import logs from "../mockData/logs";
 import "whatwg-fetch";
 import store from "./store";
-// import { config } from "@vue/test-utils";
-// import MonacoEditorPlugin from "vite-plugin-monaco-editor";
-// const API_ENDPOINT = (import.meta.env.VITE_ZINCOBSERVE_ENDPOINT && import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith('/') ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1) : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT) || (window.location.origin != "http://localhost:8081" ? window.location.origin : "http://localhost:5080");
+
 import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
-
-// config.global.plugins.unshift([
-//   MonacoEditorPlugin as any,
-//   { languageWorkers: ["html", "json", "typescript"] },
-// ]);
-
-// vi.mock("monaco-editor", () => {
-//   return {
-//     "monaco-editor": () => {},
-//   };
-// });
 
 vi.mock("rudder-sdk-js", () => {
   return {
@@ -34,9 +21,14 @@ vi.mock("rudder-sdk-js", () => {
 
 vi.mock("plotly.js", () => {
   return {
-    ready: vi.fn(),
-    load: vi.fn(),
-    track: vi.fn(),
+    default: {
+      newPlot: vi.fn((ref) => {
+        ref.on = vi.fn();
+      }),
+      addTraces: vi.fn(),
+      restyle: vi.fn(),
+      relayout: vi.fn(),
+    },
   };
 });
 
@@ -88,6 +80,13 @@ export const restHandlers = [
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations`,
     (req, res, ctx) => {
       return res(ctx.status(200), ctx.json(alerts.destinations.get));
+    }
+  ),
+
+  rest.post(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(logs.search));
     }
   ),
 ];
