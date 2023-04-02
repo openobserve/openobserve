@@ -418,7 +418,7 @@ impl Sql {
             origin_sql = origin_sql.replace(
                 cap.get(0).unwrap().as_str(),
                 &format!(
-                    "CONCAT(date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00')),'Z')",
+                    "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))",
                 )
             );
         }
@@ -497,7 +497,7 @@ impl Sql {
                 sql = sql.replace(
                     cap.get(0).unwrap().as_str(),
                     &format!(
-                        "CONCAT(date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00')),'Z')"
+                        "date_bin(interval '{interval}', to_timestamp_micros(\"{field}\"), to_timestamp('2001-01-01T00:00:00'))"
                     )
                 );
             }
