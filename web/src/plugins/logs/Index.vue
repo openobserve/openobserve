@@ -859,7 +859,7 @@ export default defineComponent({
         searchObj.data.queryResults.aggs.histogram.map(
           (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
             unparsed_x_data.push(bucket.zo_sql_key);
-            let histDate = new Date(bucket.zo_sql_key);
+            let histDate = new Date(bucket.zo_sql_key + "Z");
             xData.push(Math.floor(histDate.getTime()));
             yData.push(parseInt(bucket.zo_sql_num, 10));
           }

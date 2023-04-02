@@ -400,7 +400,7 @@ export default defineComponent({
           }
 
           // now we have the format, convert that format
-          result = result.map((it: any) => moment(it).format(keyFormat))
+          result = result.map((it: any) => moment(it + "Z").format(keyFormat))
         }
         
         return result
