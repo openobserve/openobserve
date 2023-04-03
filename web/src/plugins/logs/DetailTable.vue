@@ -217,6 +217,7 @@
           </div>
           <div class="">
             <q-btn
+              data-test="logs-detail-table-search-around-btn"
               class="text-bold"
               text-color="light-text"
               no-caps

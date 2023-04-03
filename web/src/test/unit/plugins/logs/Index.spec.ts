@@ -61,9 +61,9 @@ describe("Alert List", async () => {
     // vi.clearAllMocks();
   });
 
-  //   it("Should render search bar when the stream list is not empty", async () => {
-  //     expect(wrapper.get('[data-test="logs-search-bar"]').exists()).toBeTruthy();
-  //   });
+  it("Should render search bar when the stream list is not empty", async () => {
+    expect(wrapper.get('[data-test="logs-search-bar"]').exists()).toBeTruthy();
+  });
 
   it("Should hide search bar when the stream list is empty", async () => {
     vi.advanceTimersByTime(500);
@@ -172,15 +172,36 @@ describe("Alert List", async () => {
     );
   });
 
-  //   it("Should render loading spinner when the component is loading", async () => {
-  //     // Set searchObj.loading to true.
-  //     // Render the component.
-  //     // Expect the loading spinner to be displayed.
-  //   });
+  it("Should render error when error code is 20003", async () => {
+    await flushPromises();
+    global.server.use(
+      rest.post(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+        (req, res, ctx) => {
+          return res(
+            ctx.status(400),
+            ctx.json({
+              code: 20003,
+            })
+          );
+        }
+      )
+    );
 
-  //   it("Should hide loading spinner when the component is not loading", async () => {
-  //     // Set searchObj.loading to false.
-  //     // Render the component.
-  //     // Expect the loading spinner to not be displayed.
-  //   });
+    vi.advanceTimersByTime(500);
+    // Set searchObj.data.errorMsg to a non-empty string.
+    // Set searchObj.data.stream.selectedStream.label to a non-empty string.
+    // Render the component.
+    // Expect the error message to be displayed.
+    await flushPromises();
+    expect(wrapper.find('[data-test="logs-search-error-20003"]').text()).toBe(
+      "Click here to configure a full text search field to the stream."
+    );
+  });
+
+  // When sql mode is on
+
+  // When selected stream fields are greater than 1
+
+  // Search result scroll event
 });

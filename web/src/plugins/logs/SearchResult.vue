@@ -19,12 +19,14 @@
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
       <BarChart
+        data-test="logs-search-result-bar-chart"
         ref="plotChart"
         v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
         @updated:chart="onChartUpdate"
       ></BarChart>
 
       <q-virtual-scroll
+        data-test="logs-search-result-logs-table"
         id="searchGridComponent"
         type="table"
         ref="searchTableRef"
@@ -67,6 +69,7 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
+            :data-test="`logs-search-result-detail-${row._timestamp}`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"

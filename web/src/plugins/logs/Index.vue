@@ -69,7 +69,10 @@
                   data-test="logs-search-error-message"
                   v-html="searchObj.data.errorMsg"
                 ></div>
-                <div v-if="parseInt(searchObj.data.errorCode) == 20003">
+                <div
+                  data-test="logs-search-error-20003"
+                  v-if="parseInt(searchObj.data.errorCode) == 20003"
+                >
                   <q-btn
                     no-caps
                     unelevated
@@ -133,7 +136,7 @@
         />
       </div>
       <div v-else>
-        <h5 class="text-center">
+        <h5 data-test="logs-search-error-message" class="text-center">
           <q-icon name="warning" color="warning" size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
