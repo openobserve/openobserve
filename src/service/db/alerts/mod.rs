@@ -52,7 +52,7 @@ pub async fn set(
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{org_id}/{stream_name}/{stream_type}/{name}");
+    let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     Ok(db.put(&key, json::to_vec(&alert).unwrap().into()).await?)
 }
 
@@ -63,7 +63,7 @@ pub async fn delete(
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/alerts/{org_id}/{stream_name}/{stream_type}/{name}");
+    let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     match db.delete(&key, false).await {
         Ok(_) => {
             // Remove trigger from in-process list as alert is deleted
