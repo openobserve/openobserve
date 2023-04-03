@@ -45,6 +45,7 @@
                 v-for="(col, index) in searchObj.data.resultGrid.columns"
                 :key="'result_' + index"
                 class="table-header"
+                :data-test="`log-search-result-table-th-${col.label}`"
               >
                 <q-chip
                   v-if="col.closable"

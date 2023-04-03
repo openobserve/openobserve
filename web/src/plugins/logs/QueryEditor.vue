@@ -305,7 +305,7 @@ export default defineComponent({
     });
 
     const setValue = (value: string) => {
-      editorObj.setValue(value);
+      if (editorObj?.setValue) editorObj.setValue(value);
     };
 
     return {

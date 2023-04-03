@@ -27,6 +27,7 @@ export default {
           time_between_alerts: 0,
           destination: "dest1",
           is_real_time: true,
+          stream_type: "logs",
         },
         {
           name: "alert2",
@@ -53,6 +54,7 @@ export default {
           time_between_alerts: 2,
           destination: "dest1",
           is_real_time: false,
+          stream_type: "logs",
         },
       ],
     },
