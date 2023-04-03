@@ -34,7 +34,7 @@
           :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" /> -->
         <!--<q-btn class="q-ml-md q-mb-xs text-bold" padding="sm lg" color="white" no-caps
             :label="t(`dashboard.goBackToDashboard`)" outline text-color="black" @click="goBackToDashboardList" />-->
-        <date-time
+        <DateTimePicker 
           class="q-ml-sm"
           ref="refDateTime"
           @date-change="dateChange"
@@ -86,7 +86,7 @@ import {
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import DateTime from "../../components/DateTime.vue";
+import DateTimePicker from "../../components/DateTimePicker.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
 import {
@@ -105,7 +105,7 @@ export default defineComponent({
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
-    DateTime,
+    DateTimePicker,
     PanelContainer,
     NoPanel,
     AutoRefreshInterval

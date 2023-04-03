@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="flex items-baseline q-gutter-sm">
-        <date-time @date-change="updateDateTime" />
+        <DateTimePicker @date-change="updateDateTime" />
         <q-btn
           class="q-ml-md q-mb-xs text-bold"
           outline
@@ -137,7 +137,7 @@ import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
 import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import DateTime from "../../../components/DateTime.vue";
+import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 
 export default defineComponent({
@@ -147,9 +147,9 @@ export default defineComponent({
     GetFields,
     Layout,
     SearchBar,
-    DateTime,
+    DateTimePicker,
     ChartRender,
-  },
+},
   setup() {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
