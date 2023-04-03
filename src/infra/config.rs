@@ -291,6 +291,8 @@ pub struct S3 {
     pub secret_key: String,
     #[env_config(name = "ZO_S3_BUCKET_NAME", default = "")]
     pub bucket_name: String,
+    #[env_config(name = "ZO_S3_BUCKET_PREFIX", default = "")]
+    pub bucket_prefix: String,
 }
 
 pub fn init() -> Config {
@@ -452,6 +454,9 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         } else {
             cfg.s3.provider = "aws".to_string();
         }
+    }
+    if !cfg.s3.bucket_prefix.ends_with('/') {
+        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
     }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
     Ok(())
