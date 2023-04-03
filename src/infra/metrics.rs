@@ -310,6 +310,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(STORAGE_READ_BYTES.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(STORAGE_TIME.clone()))
+        .expect("Metric registered");
 
     // metadata stats
     registry

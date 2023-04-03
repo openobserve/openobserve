@@ -131,8 +131,8 @@ impl FileStorage for S3 {
 
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-            .with_label_values(&[columns[1], columns[3], columns[2], "get"])
-            .inc_by(time);
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
+                .inc_by(time);
         }
 
         Ok(data)
@@ -163,13 +163,14 @@ impl FileStorage for S3 {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
-                }
-                log::info!("s3 File upload succeeded: {}", file);
 
-                let time = start.elapsed().as_secs_f64();
-                metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[3], columns[2], "put"])
-                .inc_by(time);
+                    let time = start.elapsed().as_secs_f64();
+                    metrics::STORAGE_TIME
+                        .with_label_values(&[columns[1], columns[3], columns[2], "put"])
+                        .inc_by(time);
+                }
+
+                log::info!("s3 File upload succeeded: {}", file);
 
                 Ok(())
             }
@@ -181,18 +182,38 @@ impl FileStorage for S3 {
     }
 
     async fn del(&self, files: &[&str]) -> Result<(), anyhow::Error> {
+        let start_time = Instant::now();
         if files.is_empty() {
             return Ok(());
         }
 
+        let mut columns: Option<Vec<&str>> = Default::default();
+
         // Hack for GCS
         if CONFIG.s3.provider.eq("gcs") {
             for file in files {
+                if columns.is_none() {
+                    let _columns = file.split('/').collect::<Vec<&str>>();
+                    if _columns[0].eq("files") {
+                        columns = Some(_columns);
+                    }
+                }
+
                 if let Err(e) = self.del_for_gcs(file).await {
                     return Err(anyhow::anyhow!(e));
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
+
+            if let Some(columns) = columns {
+                if columns[0].eq("files") {
+                    let time = start_time.elapsed().as_secs_f64();
+                    metrics::STORAGE_TIME
+                        .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                        .inc_by(time);
+                }
+            }
+
             return Ok(());
         }
 
@@ -216,6 +237,13 @@ impl FileStorage for S3 {
                                     {
                                         format!("{}{}", CONFIG.s3.bucket_prefix, file)
                                     } else {
+                                        if columns.is_none() {
+                                            let _columns = file.split('/').collect::<Vec<&str>>();
+                                            if _columns[0].eq("files") {
+                                                columns = Some(_columns);
+                                            }
+                                        }
+
                                         file.to_string()
                                     };
                                     ObjectIdentifier::builder().set_key(Some(key)).build()
@@ -238,6 +266,16 @@ impl FileStorage for S3 {
             start += step;
             tokio::task::yield_now().await; // yield to other tasks
         }
+
+        if let Some(columns) = columns {
+            if columns[0].eq("files") {
+                let time = start_time.elapsed().as_secs_f64();
+                metrics::STORAGE_TIME
+                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                    .inc_by(time);
+            }
+        }
+
         Ok(())
     }
 }
