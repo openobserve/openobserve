@@ -68,7 +68,7 @@ impl FileStorage for Local {
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
         let start = Instant::now();
-        let root_path = Path::new(&CONFIG.common.data_stream_dir).to_str().unwrap();
+        let columns = file.split('/').collect::<Vec<&str>>();
         let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
         let file_path = Path::new(&file);
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
@@ -76,8 +76,6 @@ impl FileStorage for Local {
         match put_file_contents(&file, &data) {
             Ok(_) => {
                 // metrics
-                let file = file[root_path.len()..].to_string();
-                let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0].eq("files") {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
@@ -100,30 +98,20 @@ impl FileStorage for Local {
         }
 
         let start = Instant::now();
-        let mut columns: Option<Vec<&str>> = Default::default();
+        let columns = files[0].split('/').collect::<Vec<&str>>();
 
         for file in files {
-            if columns.is_none() {
-                let _columns = file.split('/').collect::<Vec<&str>>();
-                if _columns[0].eq("files") {
-                    columns = Some(_columns);
-                }
-            }
-
             let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
-
             if let Err(e) = fs::remove_file(file) {
                 return Err(anyhow::anyhow!(e));
             }
         }
 
-        if let Some(columns) = columns {
-            if columns[0].eq("files") {
-                let time = start.elapsed().as_secs_f64();
-                metrics::STORAGE_TIME
-                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
-                    .inc_by(time);
-            }
+        if columns[0].eq("files") {
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                .inc_by(time);
         }
 
         Ok(())

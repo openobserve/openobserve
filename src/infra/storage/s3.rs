@@ -182,36 +182,27 @@ impl FileStorage for S3 {
     }
 
     async fn del(&self, files: &[&str]) -> Result<(), anyhow::Error> {
-        let start_time = Instant::now();
         if files.is_empty() {
             return Ok(());
         }
 
-        let mut columns: Option<Vec<&str>> = Default::default();
+        let start_time = Instant::now();
+        let columns = files[0].split('/').collect::<Vec<&str>>();
 
         // Hack for GCS
         if CONFIG.s3.provider.eq("gcs") {
             for file in files {
-                if columns.is_none() {
-                    let _columns = file.split('/').collect::<Vec<&str>>();
-                    if _columns[0].eq("files") {
-                        columns = Some(_columns);
-                    }
-                }
-
                 if let Err(e) = self.del_for_gcs(file).await {
                     return Err(anyhow::anyhow!(e));
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
 
-            if let Some(columns) = columns {
-                if columns[0].eq("files") {
-                    let time = start_time.elapsed().as_secs_f64();
-                    metrics::STORAGE_TIME
-                        .with_label_values(&[columns[1], columns[3], columns[2], "del"])
-                        .inc_by(time);
-                }
+            if columns[0].eq("files") {
+                let time = start_time.elapsed().as_secs_f64();
+                metrics::STORAGE_TIME
+                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                    .inc_by(time);
             }
 
             return Ok(());
@@ -236,14 +227,7 @@ impl FileStorage for S3 {
                                         && !file.starts_with(&CONFIG.s3.bucket_prefix)
                                     {
                                         format!("{}{}", CONFIG.s3.bucket_prefix, file)
-                                    } else {
-                                        if columns.is_none() {
-                                            let _columns = file.split('/').collect::<Vec<&str>>();
-                                            if _columns[0].eq("files") {
-                                                columns = Some(_columns);
-                                            }
-                                        }
-
+                                    } else { 
                                         file.to_string()
                                     };
                                     ObjectIdentifier::builder().set_key(Some(key)).build()
@@ -267,13 +251,11 @@ impl FileStorage for S3 {
             tokio::task::yield_now().await; // yield to other tasks
         }
 
-        if let Some(columns) = columns {
-            if columns[0].eq("files") {
-                let time = start_time.elapsed().as_secs_f64();
-                metrics::STORAGE_TIME
-                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
-                    .inc_by(time);
-            }
+        if columns[0].eq("files") {
+            let time = start_time.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                .inc_by(time);
         }
 
         Ok(())
