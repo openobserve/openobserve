@@ -36,7 +36,7 @@ pub struct S3 {}
 #[async_trait]
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-        let instant = Instant::now();
+        let start = Instant::now();
         let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
             && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
         {
@@ -96,16 +96,16 @@ impl FileStorage for S3 {
             }
         }
 
-        let time = instant.elapsed().as_secs_f64();
+        let time = start.elapsed().as_secs_f64();
         metrics::STORAGE_TIME
         .with_label_values(&[columns[1], columns[3], columns[2]], 'list')
-        .observe(time);
+        .inc_by(time);
 
         Ok(files)
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
-        let instant = Instant::now();
+        let start = Instant::now();
         let key =
             if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
                 format!("{}{}", CONFIG.s3.bucket_prefix, file)
@@ -135,17 +135,17 @@ impl FileStorage for S3 {
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
 
-            let time = instant.elapsed().as_secs_f64();
+            let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
             .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
-            .observe(time);
+            .inc_by(time);
         }
 
         Ok(data)
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
-        let instant = Instant::now();
+        let start = Instant::now();
         let key =
             if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
                 format!("{}{}", CONFIG.s3.bucket_prefix, file)
@@ -172,10 +172,10 @@ impl FileStorage for S3 {
                 }
                 log::info!("s3 File upload succeeded: {}", file);
 
-                let time = instant.elapsed().as_secs_f64();
+                let time = start.elapsed().as_secs_f64();
                 metrics::STORAGE_TIME
                 .with_label_values(&[columns[1], columns[3], columns[2]], 'put')
-                .observe(time);
+                .inc_by(time);
 
                 Ok(())
             }
