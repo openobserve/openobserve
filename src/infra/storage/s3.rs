@@ -40,28 +40,50 @@ impl FileStorage for S3 {
         let client = S3CLIENT.get().await.clone().unwrap();
         let mut start_after: String = "".to_string();
         loop {
-            let objects = match client
-                .list_objects_v2()
-                .bucket(&CONFIG.s3.bucket_name)
-                .prefix(prefix)
-                .start_after(&start_after)
-                .send()
-                .await
-            {
-                Ok(objects) => objects,
-                Err(e) => {
-                    log::error!("s3 list objects {} error: {:?}", prefix, e);
-                    return Err(anyhow::anyhow!("s3 list objects error"));
+            if CONFIG.s3.provider.eq("swift") {
+                let objects = match client
+                    .list_objects()
+                    .bucket(&CONFIG.s3.bucket_name)
+                    .marker(&start_after)
+                    .prefix(prefix)
+                    .send()
+                    .await
+                {
+                    Ok(objects) => objects,
+                    Err(e) => {
+                        log::error!("s3 list objects {} error: {:?}", prefix, e);
+                        return Err(anyhow::anyhow!("s3 list objects error"));
+                    }
+                };
+                for obj in objects.contents().unwrap_or_default() {
+                    start_after = obj.key().unwrap().to_string();
+                    files.push(start_after.clone());
                 }
-            };
-
-            for obj in objects.contents().unwrap_or_default() {
-                start_after = obj.key().unwrap().to_string();
-                files.push(start_after.clone());
-            }
-
-            if objects.key_count < 1000 {
-                break;
+                if objects.contents().unwrap_or_default().len() < 1000 {
+                    break;
+                }
+            } else {
+                let objects = match client
+                    .list_objects_v2()
+                    .bucket(&CONFIG.s3.bucket_name)
+                    .prefix(prefix)
+                    .start_after(&start_after)
+                    .send()
+                    .await
+                {
+                    Ok(objects) => objects,
+                    Err(e) => {
+                        log::error!("s3 list objects v2 {} error: {:?}", prefix, e);
+                        return Err(anyhow::anyhow!("s3 list objects v2 error"));
+                    }
+                };
+                for obj in objects.contents().unwrap_or_default() {
+                    start_after = obj.key().unwrap().to_string();
+                    files.push(start_after.clone());
+                }
+                if objects.key_count < 1000 {
+                    break;
+                }
             }
         }
         Ok(files)
