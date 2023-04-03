@@ -115,7 +115,7 @@ export default defineConfig({
   test: {
     enable: true,
     global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
     deps: {
       inline: ["monaco-editor", "plotly.js"],
     },
@@ -126,8 +126,8 @@ export default defineConfig({
         "coverage/**",
         "dist/**",
         "packages/*/test{,s}/**",
-        "**/*.d.ts",
         "cypress/**",
+        "src/test/**",
         "test{,s}/**",
         "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
         "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
