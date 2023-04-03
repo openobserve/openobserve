@@ -229,7 +229,7 @@ async fn init_s3_config() -> Option<Config> {
     let mut s3config = aws_sdk_s3::config::Builder::new();
     if !CONFIG.s3.server_url.is_empty() {
         s3config = s3config.endpoint_url(&CONFIG.s3.server_url);
-        if CONFIG.s3.provider.eq("minio") {
+        if CONFIG.s3.provider.eq("minio") || CONFIG.s3.provider.eq("swift") {
             s3config = s3config.force_path_style(true);
         }
     }
