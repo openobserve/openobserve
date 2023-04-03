@@ -19,7 +19,7 @@ use aws_config::retry::RetryConfig;
 use aws_config::timeout::TimeoutConfig;
 use aws_sdk_s3::model::{Delete, ObjectIdentifier};
 use aws_sdk_s3::{Client, Config, Credentials, Region};
-use std::time::Duration;
+use std::{time::Duration, time::Instant};
 
 use super::FileStorage;
 use crate::common::utils::is_local_disk_storage;
@@ -36,7 +36,6 @@ pub struct S3 {}
 #[async_trait]
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-        let start = Instant::now();
         let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
             && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
         {
@@ -96,11 +95,6 @@ impl FileStorage for S3 {
             }
         }
 
-        let time = start.elapsed().as_secs_f64();
-        metrics::STORAGE_TIME
-        .with_label_values(&[columns[1], columns[3], columns[2]], 'list')
-        .inc_by(time);
-
         Ok(files)
     }
 
@@ -137,7 +131,7 @@ impl FileStorage for S3 {
 
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-            .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+            .with_label_values(&[columns[1], columns[3], columns[2], "get"])
             .inc_by(time);
         }
 
@@ -174,7 +168,7 @@ impl FileStorage for S3 {
 
                 let time = start.elapsed().as_secs_f64();
                 metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[3], columns[2]], 'put')
+                .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                 .inc_by(time);
 
                 Ok(())

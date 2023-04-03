@@ -160,7 +160,7 @@ lazy_static! {
         &["organization", "stream", "stream_type"],
     ).expect("Metric created");
     pub static ref STORAGE_TIME: CounterVec = CounterVec::new(
-      HistogramOpts::new("storage_time", "Storage response time")
+        Opts::new("storage_time", "Storage response time")
           .namespace(NAMESPACE)
           .const_labels(create_const_labels()),
           &["organization", "stream", "stream_type", "method_type"],

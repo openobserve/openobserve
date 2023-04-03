@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use std::{fs, io::Read, path::Path};
+use std::{fs, io::Read, path::Path, time::Instant};
 
 use super::FileStorage;
 use crate::common::file::put_file_contents;
@@ -59,7 +59,7 @@ impl FileStorage for Local {
 
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-            .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+            .with_label_values(&[columns[1], columns[3], columns[2], "get"])
             .inc_by(time);
         }
 
@@ -83,7 +83,7 @@ impl FileStorage for Local {
 
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
-                    .with_label_values(&[columns[1], columns[3], columns[2]], 'put')
+                    .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                     .inc_by(time);
                 }
                 Ok(())
