@@ -227,7 +227,7 @@ impl FileStorage for S3 {
                                         && !file.starts_with(&CONFIG.s3.bucket_prefix)
                                     {
                                         format!("{}{}", CONFIG.s3.bucket_prefix, file)
-                                    } else { 
+                                    } else {
                                         file.to_string()
                                     };
                                     ObjectIdentifier::builder().set_key(Some(key)).build()
