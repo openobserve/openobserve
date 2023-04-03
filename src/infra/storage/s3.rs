@@ -90,7 +90,7 @@ impl FileStorage for S3 {
 
         let time = instant.elapsed().as_secs_f64();
         metrics::STORAGE_TIME
-        .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+        .with_label_values(&[columns[1], columns[3], columns[2]], 'list')
         .observe(time);
 
         Ok(files)
