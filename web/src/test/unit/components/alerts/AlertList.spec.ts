@@ -77,11 +77,12 @@ describe("Alert List", async () => {
       .findAll("th");
     expect(tableData[0].text()).toBe("#");
     expect(tableData[1].text()).toContain("Name");
-    expect(tableData[2].text()).toContain("Stream Name");
-    expect(tableData[3].text()).toContain("Query");
-    expect(tableData[4].text()).toContain("Condition");
-    expect(tableData[5].text()).toContain("Destination");
-    expect(tableData[6].text()).toContain("Actions");
+    expect(tableData[2].text()).toContain("Stream Type");
+    expect(tableData[3].text()).toContain("Stream Name");
+    expect(tableData[4].text()).toContain("Query");
+    expect(tableData[5].text()).toContain("Condition");
+    expect(tableData[6].text()).toContain("Destination");
+    expect(tableData[7].text()).toContain("Actions");
   });
 
   it("Should display table row data", async () => {
@@ -93,10 +94,11 @@ describe("Alert List", async () => {
       .findAll("td");
     expect(tableData[0].text()).toBe("01");
     expect(tableData[1].text()).toBe("alert1");
-    expect(tableData[2].text()).toBe("default");
-    expect(tableData[3].text()).toBe("--");
-    expect(tableData[4].text()).toBe("code EqualTo 500");
-    expect(tableData[5].text()).toBe("dest1");
+    expect(tableData[2].text()).toContain("logs");
+    expect(tableData[3].text()).toBe("default");
+    expect(tableData[4].text()).toBe("--");
+    expect(tableData[5].text()).toBe("code EqualTo 500");
+    expect(tableData[6].text()).toBe("dest1");
   });
 
   it("Should display add alert button", () => {
