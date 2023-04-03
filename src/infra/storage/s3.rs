@@ -36,6 +36,7 @@ pub struct S3 {}
 #[async_trait]
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+        let instant = Instant::now();
         let mut files = Vec::new();
         let client = S3CLIENT.get().await.clone().unwrap();
         let mut start_after: String = "".to_string();
@@ -86,10 +87,17 @@ impl FileStorage for S3 {
                 }
             }
         }
+
+        let time = instant.elapsed().as_secs_f64();
+        metrics::STORAGE_TIME
+        .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+        .observe(time);
+
         Ok(files)
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+        let instant = Instant::now();
         let client = S3CLIENT.get().await.clone().unwrap();
         let object = match client
             .get_object()
@@ -112,12 +120,18 @@ impl FileStorage for S3 {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
+
+            let time = instant.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+            .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+            .observe(time);
         }
 
         Ok(data)
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+        let instant = Instant::now();
         let client = S3CLIENT.get().await.clone().unwrap();
         let data_size = data.len();
         match client
@@ -137,6 +151,12 @@ impl FileStorage for S3 {
                         .inc_by(data_size as u64);
                 }
                 log::info!("s3 File upload succeeded: {}", file);
+
+                let time = instant.elapsed().as_secs_f64();
+                metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2]], 'put')
+                .observe(time);
+
                 Ok(())
             }
             Err(err) => {

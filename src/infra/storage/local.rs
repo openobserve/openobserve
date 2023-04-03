@@ -44,6 +44,7 @@ impl FileStorage for Local {
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+        let instant = Instant::now();
         let columns = file.split('/').collect::<Vec<&str>>();
         let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
         let mut file = fs::File::open(file)?;
@@ -55,12 +56,18 @@ impl FileStorage for Local {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
+
+            let time = instant.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+            .with_label_values(&[columns[1], columns[3], columns[2]], 'get')
+            .observe(time);
         }
 
         Ok(bytes::Bytes::from(data))
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+        let instant = Instant::now();
         let file = format!("{}{}", CONFIG.common.data_stream_dir, file);
         let file_path = Path::new(&file);
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
@@ -73,6 +80,11 @@ impl FileStorage for Local {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
+
+                    let time = instant.elapsed().as_secs_f64();
+                    metrics::STORAGE_TIME
+                    .with_label_values(&[columns[1], columns[3], columns[2]], 'put')
+                    .observe(time);
                 }
                 Ok(())
             }
