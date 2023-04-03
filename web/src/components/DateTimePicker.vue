@@ -177,11 +177,50 @@ import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "DateTimePicker",
-  props: [],
-  emits: ["date-change"],
+  props: {
+    modelValue: {
+      type: Object,
+      default: ()=>({
+        tab: "relative",
+        relative: {
+          period: { label: "Minutes", value: "Minutes" },
+          value: 15,
+        },
+        absolute: {
+          date: {
+            from: new Date().toLocaleDateString("en-ZA"),
+            to: new Date().toLocaleDateString("en-ZA"),
+          },
+          startTime: "00:00",
+          endTime: "23:59",
+        },
+      }),
+    },
+  },
+  emits: ["update:modelValue"],
 
   setup(props, { emit }) {
     const datetimeBtn = ref();
+
+     // v-model computed value
+    const selectedDateEmitValue = computed({
+      get() {
+        console.log("get value-");
+        
+        return props.modelValue
+      },
+      set(value) {
+        console.log("set value-");
+        
+        emit('update:modelValue', value)
+      }
+    })
+    // console.log("--selectedValue---",selectedDateEmitValue );
+
+    watch(props.modelValue, () => {
+      console.log('DateTimePicker: selected date emit value updated: ', props.modelValue);
+      data.selectedDate = JSON.parse(JSON.stringify(props.modelValue))
+    })
 
     const relativePeriods = reactive([
       { label: "Minutes", value: "Minutes" },
@@ -199,26 +238,14 @@ export default defineComponent({
       Months: [1, 2, 3, 4, 5, 6],
     });
 
+    console.log('DateTimePicker: setup: model value',props.modelValue);
+    
+
     const data = reactive({
-      selectedDate: {
-        tab: "relative",
-        relative: {
-          period: { label: "Minutes", value: "Minutes" },
-          value: 15,
-        },
-        absolute: {
-          date: {
-            from: new Date().toLocaleDateString("en-ZA"),
-            to: new Date().toLocaleDateString("en-ZA"),
-          },
-          startTime: "00:00",
-          endTime: "23:59",
-        },
-        userChangedValue: false,
-      },
+      selectedDate: JSON.parse(JSON.stringify(props.modelValue))
     });
 
-    const selectedDateEmitValue = ref(JSON.parse(JSON.stringify(data.selectedDate)));
+    // const selectedDateEmitValue = ref(JSON.parse(JSON.stringify(props.modelValue)));
 
     const setRelativeDate = (period: any, value: any) => {
       data.selectedDate.tab = "relative";
@@ -309,6 +336,8 @@ export default defineComponent({
     watch(
       data.selectedDate,
       () => {
+        // console.log("selectedDateEmitValue",selectedDateEmitValue.value);
+        // console.log("data", data.selectedDate);
 
         if (
           JSON.stringify(selectedDateEmitValue.value) != JSON.stringify(data.selectedDate)
@@ -319,13 +348,7 @@ export default defineComponent({
       },
       { deep: true }
     );
-
-    watch(selectedDateEmitValue, () => {
-      console.log("emit-");
-      
-      emit("date-change", selectedDateEmitValue.value);
-    });
-
+  
     return {
       relativePeriods,
       relativeDates,
@@ -333,11 +356,11 @@ export default defineComponent({
       setRelativeDate,
       onCustomPeriodSelect,
       datetimeBtn,
-      getDate,
-      setDate,
       displayValue,
       calculateMaxValue,
       getImageURL,
+      getDate,
+      setDate,
     };
   },
 });
