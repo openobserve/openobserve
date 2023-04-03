@@ -37,6 +37,14 @@ pub struct S3 {}
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
         let instant = Instant::now();
+        let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
+            && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
+        {
+            format!("{}{}", CONFIG.s3.bucket_prefix, prefix)
+        } else {
+            prefix.to_string()
+        };
+        let prefix = prefix.as_str();
         let mut files = Vec::new();
         let client = S3CLIENT.get().await.clone().unwrap();
         let mut start_after: String = "".to_string();
@@ -98,11 +106,17 @@ impl FileStorage for S3 {
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
         let instant = Instant::now();
+        let key =
+            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
+                format!("{}{}", CONFIG.s3.bucket_prefix, file)
+            } else {
+                file.to_string()
+            };
         let client = S3CLIENT.get().await.clone().unwrap();
         let object = match client
             .get_object()
             .bucket(&CONFIG.s3.bucket_name)
-            .key(file)
+            .key(key)
             .send()
             .await
         {
@@ -132,12 +146,18 @@ impl FileStorage for S3 {
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
         let instant = Instant::now();
+        let key =
+            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
+                format!("{}{}", CONFIG.s3.bucket_prefix, file)
+            } else {
+                file.to_string()
+            };
         let client = S3CLIENT.get().await.clone().unwrap();
         let data_size = data.len();
         match client
             .put_object()
             .bucket(&CONFIG.s3.bucket_name)
-            .key(file)
+            .key(key)
             .body(data.into())
             .send()
             .await
@@ -197,9 +217,14 @@ impl FileStorage for S3 {
                             files[start..(start + step).min(files_len)]
                                 .iter()
                                 .map(|file| {
-                                    ObjectIdentifier::builder()
-                                        .set_key(Some(file.to_string()))
-                                        .build()
+                                    let key = if !CONFIG.s3.bucket_prefix.is_empty()
+                                        && !file.starts_with(&CONFIG.s3.bucket_prefix)
+                                    {
+                                        format!("{}{}", CONFIG.s3.bucket_prefix, file)
+                                    } else {
+                                        file.to_string()
+                                    };
+                                    ObjectIdentifier::builder().set_key(Some(key)).build()
                                 })
                                 .collect::<Vec<_>>(),
                         ))
@@ -225,11 +250,17 @@ impl FileStorage for S3 {
 
 impl S3 {
     async fn del_for_gcs(&self, file: &str) -> Result<(), anyhow::Error> {
+        let key =
+            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
+                format!("{}{}", CONFIG.s3.bucket_prefix, file)
+            } else {
+                file.to_string()
+            };
         let client = S3CLIENT.get().await.clone().unwrap();
         let result = client
             .delete_object()
             .bucket(&CONFIG.s3.bucket_name)
-            .key(file)
+            .key(key)
             .send()
             .await;
         match result {
