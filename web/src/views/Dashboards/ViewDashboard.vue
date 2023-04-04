@@ -190,7 +190,6 @@ export default defineComponent({
       addNewPanel(route.query.dashboard);
     };
 
-    // XXX-RENAMEME: s/list/dashboards/?
     let list = computed(function () {
       return [toRaw(currentDashboardData.data)];
     });

@@ -18,12 +18,12 @@ use std::io::Error;
 use crate::{meta::dashboards::Dashboard, service::dashboards};
 
 #[post("/{org_id}/dashboards/{name}")]
-pub async fn save_dashboard(
+pub async fn create_dashboard(
     path: web::Path<(String, String)>,
     details: web::Json<Dashboard>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    dashboards::save_dashboard(&org_id, &name, &details.into_inner()).await
+    dashboards::create_dashboard(&org_id, &name, &details.into_inner()).await
 }
 
 #[get("/{org_id}/dashboards")]
