@@ -22,21 +22,36 @@ use crate::service::db::dashboard;
 #[instrument(skip(dashboard))]
 pub async fn create_dashboard(
     org_id: &str,
-    dashboard: Dashboard,
+    mut dashboard: Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    // XXX-TODO: Generate `dashboard_id` and overwrite `dashboard.dashboard_id`
-    // with that value.
-    if let Err(e) = dashboard::set(org_id, &dashboard).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )),
-        );
+    // NOTE: here we overwrite whatever `dashboard_id` the client sent us.
+    dashboard.dashboard_id = crate::infra::ider::generate();
+    let resp = if let Err(e) = dashboard::put(org_id, &dashboard).await {
+        Response::InternalServerError(e)
+    } else {
+        tracing::info!(dashboard_id = dashboard.dashboard_id, "Dashboard created");
+        Response::Created {
+            dashboard_id: dashboard.dashboard_id,
+        }
+    };
+    Ok(resp.into())
+}
+
+#[instrument(skip(dashboard))]
+pub async fn update_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    dashboard: &Dashboard,
+) -> Result<HttpResponse, io::Error> {
+    if dashboard::get(org_id, dashboard_id).await.is_err() {
+        return Ok(Response::NotFound { error: None }.into());
+    }
+    if let Err(e) = dashboard::put(org_id, dashboard).await {
+        return Ok(Response::InternalServerError(e).into());
     }
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
-        "Dashboard saved".to_string(),
+        "Dashboard updated".to_owned(),
     )))
 }
 
@@ -52,9 +67,10 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
 #[instrument]
 pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
     Ok(match dashboard::get(org_id, dashboard_id).await {
-        Err(_) => not_found("Dashboard not found"),
+        Err(_) => Response::NotFound { error: None }.into(),
         Ok(dashboard) => HttpResponse::Ok().json(
-            // `dashboard::get` never returns `Ok(None)`
+            // The value is safe to unwrap, because `dashboard::get` never
+            // returns `Ok(None)`.
             dashboard.unwrap(),
         ),
     })
@@ -63,7 +79,10 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRespo
 #[instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
     if let Err(e) = dashboard::delete(org_id, dashboard_id).await {
-        return Ok(not_found(e.to_string()));
+        return Ok(Response::NotFound {
+            error: Some(e.to_string()),
+        }
+        .into());
     }
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
@@ -71,9 +90,27 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRe
     )))
 }
 
-fn not_found(error_message: impl AsRef<str>) -> HttpResponse {
-    HttpResponse::NotFound().json(MetaHttpResponse::error(
-        StatusCode::NOT_FOUND.into(),
-        error_message.as_ref().to_owned(),
-    ))
+#[derive(Debug)]
+enum Response {
+    Created { dashboard_id: String },
+    NotFound { error: Option<String> },
+    InternalServerError(anyhow::Error),
+}
+
+impl From<Response> for HttpResponse {
+    fn from(resp: Response) -> Self {
+        match resp {
+            Response::Created { dashboard_id } => Self::Created().json(MetaHttpResponse::message(
+                StatusCode::CREATED.into(),
+                format!("Dashboard {dashboard_id} created"),
+            )),
+            Response::NotFound { error } => Self::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                error.unwrap_or_else(|| "Dashboard not found".to_owned()),
+            )),
+            Response::InternalServerError(err) => Self::InternalServerError().json(
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
+            ),
+        }
+    }
 }

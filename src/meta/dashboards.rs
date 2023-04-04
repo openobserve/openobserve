@@ -34,6 +34,7 @@ pub struct NamedDashboard {
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub title: String,
+    // XXX-TODO(vvv): s/String/u64/
     pub dashboard_id: String,
     pub description: String,
     pub role: String,
