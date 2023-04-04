@@ -17,13 +17,15 @@ use std::io::Error;
 
 use crate::{meta::dashboards::Dashboard, service::dashboards};
 
-#[post("/{org_id}/dashboards/{name}")]
+// XXX-TODO: Remove `{dashboard_id}` parameter.
+// See https://github.com/zinclabs/zincobserve/issues/501
+#[post("/{org_id}/dashboards/{dashboard_id}")]
 pub async fn create_dashboard(
     path: web::Path<(String, String)>,
     details: web::Json<Dashboard>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    dashboards::create_dashboard(&org_id, &name, &details.into_inner()).await
+    let (org_id, dashboard_id) = path.into_inner();
+    dashboards::create_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
 }
 
 #[get("/{org_id}/dashboards")]
@@ -31,14 +33,14 @@ async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
     dashboards::list_dashboards(&org_id.into_inner()).await
 }
 
-#[get("/{org_id}/dashboards/{name}")]
+#[get("/{org_id}/dashboards/{dashboard_id}")]
 async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, name) = path.into_inner();
-    dashboards::get_dashboard(&org_id, &name).await
+    let (org_id, dashboard_id) = path.into_inner();
+    dashboards::get_dashboard(&org_id, &dashboard_id).await
 }
 
-#[delete("/{org_id}/dashboards/{name}")]
+#[delete("/{org_id}/dashboards/{dashboard_id}")]
 async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, name) = path.into_inner();
-    dashboards::delete_dashboard(&org_id, &name).await
+    let (org_id, dashboard_id) = path.into_inner();
+    dashboards::delete_dashboard(&org_id, &dashboard_id).await
 }
