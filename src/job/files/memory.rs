@@ -132,7 +132,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 // println!("removed file: {}", key);
                                 // metrics
                                 let columns = key.split('/').collect::<Vec<&str>>();
-                                if columns[0].eq("files") {
+                                if columns[0] == "files" {
                                     metrics::INGEST_WAL_USED_BYTES
                                         .with_label_values(&[columns[1], columns[3], columns[2]])
                                         .sub(meta.original_size as i64);

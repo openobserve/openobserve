@@ -52,7 +52,7 @@ impl FileStorage for Local {
         file.read_to_end(&mut data)?;
 
         // metrics
-        if columns[0].eq("files") {
+        if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
@@ -76,7 +76,7 @@ impl FileStorage for Local {
         match put_file_contents(&file, &data) {
             Ok(_) => {
                 // metrics
-                if columns[0].eq("files") {
+                if columns[0] == "files" {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
@@ -107,7 +107,7 @@ impl FileStorage for Local {
             }
         }
 
-        if columns[0].eq("files") {
+        if columns[0] == "files" {
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
                 .with_label_values(&[columns[1], columns[3], columns[2], "del"])
