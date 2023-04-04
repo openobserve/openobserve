@@ -190,7 +190,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
         false => (file_num / querier_num) + 1,
     };
     log::info!(
-        "[TRACE] cluster->file_list: num: {}, offset: {}",
+        "[TRACE] search->file_list: num: {}, offset: {}",
         file_num,
         offset
     );
@@ -240,7 +240,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
             req_file_list_end = offset_start - offset + req.file_list.len();
         }
         log::info!(
-            "[TRACE] cluster->partition: node: {}, is_querier: {}, file_range: {}-{}",
+            "[TRACE] search->partition: node: {}, is_querier: {}, file_range: {}-{}",
             node.id,
             is_querier,
             req_file_list_start,
@@ -275,7 +275,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
                     Ok(channel) => channel,
                     Err(err) => {
                         log::error!(
-                            "[TRACE] cluster->search: node: {}, connect grpc err: {:?}",
+                            "[TRACE] search->grpc: node: {}, connect err: {:?}",
                             node.id,
                             err
                         );
@@ -300,7 +300,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[TRACE] cluster->search: node: {}, search grpc err: {:?}",
+                            "[TRACE] search->grpc: node: {}, search err: {:?}",
                             node.id,
                             err
                         );
@@ -315,7 +315,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
                 };
 
                 log::info!(
-                "[TRACE] cluster->search: node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
                 node.id,
                 is_querier,
                 response.total,
@@ -508,7 +508,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     }
 
     log::info!(
-        "[TRACE] cluster->search: total: {}, took: {}, scan_size: {}",
+        "[TRACE] search->result: total: {}, took: {}, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,
