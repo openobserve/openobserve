@@ -62,16 +62,113 @@ pub async fn search(
             .enable_all()
             .build()
             .unwrap();
-        rt.block_on(async move { search_exec(req).instrument(root_span).await })
+        rt.block_on(async move {
+            if CONFIG.common.local_mode {
+                search_in_local(req).instrument(root_span).await
+            } else {
+                search_in_cluster(req).instrument(root_span).await
+            }
+        })
     })
     .join();
     result.map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(format!("{err:?}"))))?
 }
 
-#[tracing::instrument(name = "service:search:exec", skip(req))]
-async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
+#[tracing::instrument(name = "service:search:local", skip(req))]
+async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
+    let resp = match exec::search(&req).await {
+        Ok(res) => res,
+        Err(err) => return Err(err),
+    };
+
+    let span2 = info_span!("service:search:local:convert").entered();
+
+    let mut response = Response::new(resp.from as usize, resp.size as usize);
+
+    // convert hits
+    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
+    if !resp.hits.is_empty() {
+        let buf = Cursor::new(resp.hits);
+        let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+        log::info!(
+            "search_in_local: query num_batches: {:?}",
+            reader.num_batches()
+        );
+        let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
+        let mut sources: Vec<json::Value> =
+            json_rows.into_iter().map(json::Value::Object).collect();
+
+        // handle metrics response
+        if query_type.eq("metrics") {
+            sources = handle_metrics_response(sources);
+        }
+
+        for source in sources {
+            response.add_hit(&source);
+        }
+    }
+
+    // convert aggs
+    if !resp.aggs.is_empty() {
+        for agg in resp.aggs {
+            let buf = Cursor::new(agg.hits);
+            let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+            log::info!(
+                "search_in_local: aggs:{} num_batches: {:?}",
+                agg.name,
+                reader.num_batches()
+            );
+            let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+            let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
+                Ok(res) => res,
+                Err(err) => {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
+            };
+            let sources: Vec<json::Value> =
+                json_rows.into_iter().map(json::Value::Object).collect();
+            for source in sources {
+                response.add_agg(&agg.name, &source);
+            }
+        }
+    }
+
+    span2.exit();
+    let _span3 = info_span!("service:search:local:response").entered();
+
+    // handle count
+    let total = match response.aggs.get("_count") {
+        Some(v) => v.get(0).unwrap().get("num").unwrap().as_u64().unwrap() as usize,
+        None => response.hits.len(),
+    };
+    response.aggs.remove("_count");
+
+    response.set_total(total);
+    response.set_took(resp.took as usize);
+    response.set_file_count(resp.file_count as usize);
+    response.set_scan_size(resp.scan_size as usize);
+
+    if query_type.eq("metrics") {
+        response.response_type = "matrix".to_string();
+    }
+
+    Ok(response)
+}
+
+#[tracing::instrument(name = "service:search:cluster", skip(req))]
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
-    let span1 = info_span!("service:search:exec:get_queue_lock").entered();
+    let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
 
     // get a cluster search queue lock
     let mut locker = None;
@@ -89,7 +186,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     }
 
     span1.exit(); // drop span1
-    let span2 = info_span!("service:search:exec:prepare_base").entered();
+    let span2 = info_span!("service:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
     let mut querier = Vec::new();
@@ -147,7 +244,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     };
 
     span2.exit(); // drop span2
-    let span3 = info_span!("service:search:exec:prepare_filelist").entered();
+    let span3 = info_span!("service:search:cluster:prepare_filelist").entered();
 
     // partition by file_list
     let mut file_list = match file_list::get_file_list(
@@ -205,7 +302,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     };
 
     span3.exit(); // drop span3
-    let span4 = info_span!("service:search:exec:do_search").entered();
+    let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
@@ -247,7 +344,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
             req_file_list_end,
         );
 
-        let grpc_span = info_span!("service:search:exec:grpc_search");
+        let grpc_span = info_span!("service:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
         let credentials_str = credentials.clone();
@@ -356,7 +453,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     }
 
     span4.exit(); // drop span4
-    let span6 = info_span!("service:search:exec:release_queue_lock").entered();
+    let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -366,7 +463,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     }
 
     span6.exit(); // drop span6
-    let span7 = info_span!("service:search:exec:merge_result").entered();
+    let span7 = info_span!("service:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
@@ -437,7 +534,7 @@ async fn search_exec(req: cluster_rpc::SearchRequest) -> Result<Response, Error>
     }
 
     span7.exit(); // drop span7
-    let _span8 = info_span!("service:search:exec:response").entered();
+    let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
