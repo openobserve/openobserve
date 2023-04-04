@@ -9,7 +9,7 @@ import logs from "../mockData/logs";
 import "whatwg-fetch";
 import store from "./store";
 
-global.jest = vi;
+vi.stubGlobal("jest", vi);
 
 import "jest-canvas-mock";
 class ResizeObserver {
@@ -113,17 +113,12 @@ const server = setupServer(...restHandlers);
 // example: suppose for '/posts' we need to need to test sending response as error, [] and [post1, post2].
 // For this we need instance of server while testing
 // So have added server instance on global so that it can be accessed while testing
-declare global {
-  // eslint-disable-next-line no-var
-  var server: any;
-}
+vi.stubGlobal("server", server);
 
-global.scrollTo = vi.fn();
-
-global.matchMedia = false;
-Object.defineProperty(global, "matchMedia", {
-  writable: true,
-  value: vi.fn().mockImplementation((query) => ({
+vi.stubGlobal("scrollTo", vi.fn());
+vi.stubGlobal(
+  "matchMedia",
+  vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -132,16 +127,16 @@ Object.defineProperty(global, "matchMedia", {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  })),
-});
-
-global.server = server;
+  }))
+);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 
 //  Close server after all tests
-afterAll(() => server.close());
+afterAll(() => {
+  server.close();
+});
 
 // Reset handlers after each test `important for test isolation`
 afterEach(() => server.resetHandlers());
