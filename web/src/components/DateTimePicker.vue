@@ -23,7 +23,7 @@
                 <div class="relative-period-name">
                   {{ period.value }}
                 </div>
-                <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
+                <div v-for="(item, item_index) in (relativeDates as any)[period.value]" :key="item">
                   <q-btn :class="
                     data.selectedDate.tab == 'relative' &&
                       data.selectedDate.relative.period.value == period.value &&
@@ -138,7 +138,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const datetimeBtn = ref();
 
-    // v-model computed value
+    // v-model computed value which is used for the getvalue and setvalue for the props
     const selectedDateEmitValue = computed({
       get() {
         return props.modelValue
@@ -148,31 +148,34 @@ export default defineComponent({
       }
     })
 
-    watch([selectedDateEmitValue, props.modelValue], () => {
-      Object.assign(data.selectedDate,JSON.parse(JSON.stringify(props.modelValue)))
+    // when the props value is changed copy in to the data.selectedDate 
+    // because data.selectedDate has actual value
+    watch(selectedDateEmitValue, () => {
+      Object.assign(data.selectedDate, JSON.parse(JSON.stringify(props.modelValue)))
     })
 
-    const relativePeriods = reactive([
+    const relativePeriods = [
       { label: "Minutes", value: "Minutes" },
       { label: "Hours", value: "Hours" },
       { label: "Days", value: "Days" },
       { label: "Weeks", value: "Weeks" },
       { label: "Months", value: "Months" },
-    ]);
+    ];
 
-    const relativeDates = reactive({
+    const relativeDates = {
       Minutes: [1, 5, 10, 15, 30, 45],
       Hours: [1, 2, 3, 6, 8, 12],
       Days: [1, 2, 3, 4, 5, 6],
       Weeks: [1, 2, 3, 4, 5, 6],
       Months: [1, 2, 3, 4, 5, 6],
-    });
+    };
 
-
+    // Internal date object, who is containing actual value
     const data = reactive({
       selectedDate: JSON.parse(JSON.stringify(props.modelValue))
     });
 
+    // this method set the value of date when the relative tab is selected
     const setRelativeDate = (period: any, value: any) => {
       data.selectedDate.tab = "relative";
       data.selectedDate.relative.period = period;
@@ -184,6 +187,7 @@ export default defineComponent({
       data.selectedDate.relative.value = 1;
     };
 
+    // change the actual date object based on selected tab.
     const displayValue = computed(() => {
       if (data.selectedDate.tab === "relative") {
         return `${data.selectedDate.relative.value} ${data.selectedDate.relative.period.label}`;
@@ -250,6 +254,8 @@ export default defineComponent({
       }
     };
 
+    // set watcher on date selected variable. 
+    // when, the old value and new value is not same at that time copy the new value in selectedDateEmit
     watch(
       data.selectedDate,
       () => {
