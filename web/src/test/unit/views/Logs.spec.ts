@@ -61,7 +61,7 @@ describe("Alert List", async () => {
     wrapper.unmount();
   });
 
-  it("Should render alerts title", () => {
-    console.log(wrapper.html());
+  it("Should render zinc logs plugin", () => {
+    expect(wrapper.find('[data-test="zinc-logs"]').exists()).toBe(true);
   });
 });
