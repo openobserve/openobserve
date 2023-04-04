@@ -31,8 +31,7 @@
                 "args": [
                     "build",
                     "--bin=zincobserve",
-                    "--package=zincobserve",
-                    "-F zo_functions"
+                    "--package=zincobserve"
                 ],
                 "filter": {
                     "name": "zincobserve",
