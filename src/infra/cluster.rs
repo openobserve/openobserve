@@ -35,7 +35,6 @@ pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 lazy_static! {
     pub static ref LOCAL_NODE_UUID: String = load_local_node_uuid();
     pub static ref LOCAL_NODE_ROLE: Vec<Role> = load_local_node_role();
-    pub static ref LOCAL_MODE_NODE: Node = load_local_mode_node();
     pub static ref NODES: DashMap<String, Node> = DashMap::new();
 }
 
@@ -83,6 +82,7 @@ impl FromStr for Role {
         }
     }
 }
+
 impl std::fmt::Display for Role {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -103,6 +103,8 @@ pub async fn register_and_keepalive() -> Result<()> {
         if !is_single_node(nodes) {
             panic!("For local mode only single node deployment is allowed !");
         }
+        // cache local node
+        NODES.insert(LOCAL_NODE_UUID.clone(), load_local_mode_node());
         return Ok(());
     }
     if let Err(e) = register().await {
@@ -296,9 +298,6 @@ pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
 
 #[inline(always)]
 pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
-    if CONFIG.common.local_mode {
-        return Some([LOCAL_MODE_NODE.clone()].to_vec());
-    }
     if NODES.len() == 0 {
         return None;
     }
@@ -571,11 +570,10 @@ mod tests {
         register_and_keepalive().await.unwrap();
         set_online().await.unwrap();
         leave().await.unwrap();
-        assert!(get_cached_online_nodes().is_none());
-        assert!(get_cached_online_query_nodes().is_none());
-        assert!(get_cached_online_ingester_nodes().is_none());
-        assert!(get_cached_online_querier_nodes().is_none());
-        assert!(get_cached_online_querier_nodes().is_none());
+        assert!(get_cached_online_nodes().is_some());
+        assert!(get_cached_online_query_nodes().is_some());
+        assert!(get_cached_online_ingester_nodes().is_some());
+        assert!(get_cached_online_querier_nodes().is_some());
     }
 
     #[test]
