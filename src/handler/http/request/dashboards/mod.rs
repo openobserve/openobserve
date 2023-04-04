@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{delete, get, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
 
 use crate::{meta::dashboards::Dashboard, service::dashboards};
@@ -24,6 +24,15 @@ pub async fn create_dashboard(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     dashboards::create_dashboard(&org_id, details.into_inner()).await
+}
+
+#[put("/{org_id}/dashboards/{dashboard_id}")]
+async fn update_dashboard(
+    path: web::Path<(String, String)>,
+    details: web::Json<Dashboard>,
+) -> impl Responder {
+    let (org_id, dashboard_id) = path.into_inner();
+    dashboards::update_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
 }
 
 #[get("/{org_id}/dashboards")]

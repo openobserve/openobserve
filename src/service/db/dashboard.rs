@@ -46,20 +46,10 @@ pub async fn get(
 }
 
 #[instrument(err, skip(dashboard))]
-pub async fn set(
-    org_id: &str,
-    dashboard: &Dashboard,
-) -> Result<(), anyhow::Error> {
+pub async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{}", dashboard.dashboard_id);
     Ok(db.put(&key, json::to_vec(dashboard)?.into()).await?)
-}
-
-#[instrument(err)]
-pub async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/{dashboard_id}");
-    Ok(db.delete(&key, false).await?)
 }
 
 #[instrument(err)]
@@ -80,6 +70,13 @@ pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
             Ok(NamedDashboard { name, details })
         })
         .collect()
+}
+
+#[instrument(err)]
+pub async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/dashboard/{org_id}/{dashboard_id}");
+    Ok(db.delete(&key, false).await?)
 }
 
 #[instrument(err)]
