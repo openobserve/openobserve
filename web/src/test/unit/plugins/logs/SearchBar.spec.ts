@@ -166,7 +166,13 @@ describe("Search Result", async () => {
     );
   });
 
-  it("should disable histogram when show histogram is toggled", async () => {
+  it("should disable histogram chart when show histogram is toggled", async () => {
+    if (wrapper.vm.searchObj.meta.sqlMode) {
+      await wrapper
+        .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+        .trigger("click");
+    }
+
     await wrapper
       .find('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
       .trigger("click");

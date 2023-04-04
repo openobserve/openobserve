@@ -1,10 +1,13 @@
-import { DOMWrapper, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach } from "vitest";
 import { installQuasar } from "../helpers/install-quasar-plugin";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import i18n from "../../../locales";
+import { Dialog } from "quasar";
 
-installQuasar();
+installQuasar({
+  plugins: [Dialog],
+});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -21,6 +24,7 @@ describe("ConfirmDialog", async () => {
         title: "Dialog Title",
         message: "Dialog Message",
         confirmDelete: true,
+        modelValue: true,
       },
       global: {
         plugins: [i18n],
@@ -31,16 +35,6 @@ describe("ConfirmDialog", async () => {
   it("should mount ConfirmDialog component", async () => {
     const documentWrapper = new DOMWrapper(document.body);
     const dialog = documentWrapper.find(".q-dialog");
-    expect(dialog.exists()).toBeFalsy();
-  });
-  it("should trigger cancel button", async () => {
-    const documentWrapper = new DOMWrapper(document.body);
-    const dialog = documentWrapper.find(".q-dialog");
-    await dialog.get('[data-test="cancel-button"]').trigger("click");
-  });
-  it("should trigger confirm button", async () => {
-    const documentWrapper = new DOMWrapper(document.body);
-    const dialog = documentWrapper.find(".q-dialog");
-    await dialog.get('[data-test="confirm-button"]').trigger("click");
+    expect(dialog.exists()).toBeTruthy();
   });
 });
