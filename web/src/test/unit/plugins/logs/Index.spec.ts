@@ -25,6 +25,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import { rest } from "msw";
 import "plotly.js";
 import logs from "../../mockData/logs";
+import SearchResult from "@/plugins/logs/SearchResult.vue";
+import searchService from "@/services/search";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -199,9 +201,10 @@ describe("Alert List", async () => {
     );
   });
 
-  // When sql mode is on
-
-  // When selected stream fields are greater than 1
-
-  // Search result scroll event
+  it("Should get logs data when scrolled in search results", async () => {
+    const search = vi.spyOn(searchService, "search");
+    wrapper.findComponent(SearchResult).vm.$emit("update:scroll");
+    await vi.advanceTimersByTime(500);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
 });
