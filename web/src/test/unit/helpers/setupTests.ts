@@ -9,6 +9,23 @@ import logs from "../mockData/logs";
 import "whatwg-fetch";
 import store from "./store";
 
+global.jest = vi;
+
+import "jest-canvas-mock";
+class ResizeObserver {
+  observe() {
+    // do nothing
+  }
+  unobserve() {
+    // do nothing
+  }
+  disconnect() {
+    // do nothing
+  }
+}
+
+global.ResizeObserver = ResizeObserver;
+
 import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
 
 vi.mock("rudder-sdk-js", () => {
