@@ -14,9 +14,12 @@
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+use crate::common::json;
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct RecordStatus {
     pub successful: u32,
     pub failed: u32,
@@ -25,9 +28,8 @@ pub struct RecordStatus {
     pub error: String,
 }
 
-pub struct StreamData {
+pub struct BulkStreamData {
     pub data: AHashMap<String, Vec<String>>,
-    pub status: RecordStatus,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -64,3 +66,103 @@ pub struct StreamSchemaChk {
 }
 
 pub const INGESTION_EP: [&str; 5] = ["/_bulk", "/_json", "/_multi", "/traces", "/write"];
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct BulkResponse {
+    pub took: u128,
+    pub errors: bool,
+    pub items: Vec<HashMap<String, BulkResponseItem>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct BulkResponseItem {
+    pub _index: String,
+    pub _id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _version: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _shards: Option<ShardResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _seq_no: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _primary_term: Option<i64>,
+    pub status: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<BulkResponseError>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "originalRecord")]
+    #[schema(value_type = Object)]
+    pub original_record: Option<json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ShardResponse {
+    pub total: i64,
+    pub successful: i64,
+    pub failed: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct BulkResponseError {
+    #[serde(rename = "type")]
+    pub err_type: String,
+    pub reason: String,
+    pub index_uuid: String,
+    pub shard: String,
+    pub index: String,
+}
+
+impl BulkResponseError {
+    pub fn new(err_type: String, index: String, reason: String, index_uuid: String) -> Self {
+        BulkResponseError {
+            err_type,
+            reason,
+            index_uuid,
+            shard: "1".to_owned(),
+            index,
+        }
+    }
+}
+
+impl BulkResponseItem {
+    pub fn new_failed(
+        _index: String,
+        error: BulkResponseError,
+        orig_record: json::Value,
+        stream_name: String,
+    ) -> Self {
+        BulkResponseItem {
+            _index: stream_name,
+            _id: 1,
+            _version: None,
+            result: None,
+            _shards: None,
+            _seq_no: None,
+            _primary_term: None,
+            status: 200,
+            error: Some(error),
+            original_record: Some(orig_record),
+        }
+    }
+
+    pub fn new(_index: String, _orig_record: json::Value, stream_name: String) -> Self {
+        BulkResponseItem {
+            _index: stream_name,
+            _id: 1,
+            _version: Some(1),
+            result: Some("created".to_owned()),
+            _shards: Some(ShardResponse {
+                total: 1,
+                successful: 1,
+                failed: 0,
+            }),
+            _seq_no: Some(1),
+            _primary_term: Some(1),
+            status: 200,
+            error: None,
+            original_record: None,
+        }
+    }
+}

@@ -30,36 +30,42 @@ pub mod multi;
 
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
-        "too old data, by default only last {} hours data can be ingested. Data discarded.",
+        "Too old data,only last {} hours data can be ingested. Data discarded.",
         CONFIG.limit.ingest_allowed_upto
     )
 }
 
-fn get_stream_name(v: &Value) -> String {
+fn get_stream_name_action(v: &Value) -> (String, String) {
     let local_val = v.as_object().unwrap();
     if local_val.contains_key("index") {
-        String::from(
-            local_val
-                .get("index")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get("_index")
-                .unwrap()
-                .as_str()
-                .unwrap(),
+        (
+            "index".to_owned(),
+            String::from(
+                local_val
+                    .get("index")
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .get("_index")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+            ),
         )
     } else {
-        String::from(
-            local_val
-                .get("create")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get("_index")
-                .unwrap()
-                .as_str()
-                .unwrap(),
+        (
+            "create".to_owned(),
+            String::from(
+                local_val
+                    .get("create")
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .get("_index")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+            ),
         )
     }
 }
@@ -71,9 +77,10 @@ pub fn get_partition_key_query(s: &str) -> String {
     s
 }
 
-pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
+pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
     let local_map = value.as_object_mut().unwrap();
-    let mut parse_error = false;
+    //let mut error_msg = String::new();
+    let mut parse_error = String::new();
     for field in delta {
         let field_map = local_map.get(field.name());
         if let Some(val) = field_map {
@@ -88,7 +95,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Int8 => {
@@ -96,7 +103,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Int16 => {
@@ -104,7 +111,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Int32 => {
@@ -112,7 +119,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Int64 => {
@@ -120,7 +127,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::UInt8 => {
@@ -128,7 +135,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::UInt16 => {
@@ -136,7 +143,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::UInt32 => {
@@ -144,7 +151,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::UInt64 => {
@@ -152,7 +159,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Float16 => {
@@ -160,7 +167,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Float32 => {
@@ -168,7 +175,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Float64 => {
@@ -176,7 +183,7 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 DataType::Utf8 => {
@@ -184,17 +191,17 @@ pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> Option<String> {
                         Ok(val) => {
                             local_map.insert(field.name().clone(), val.into());
                         }
-                        Err(_) => parse_error = true,
+                        Err(_) => set_parsing_error(&mut parse_error, &field),
                     };
                 }
                 _ => println!("{local_val:?}"),
             };
         }
     }
-    if !parse_error {
-        Some(common::json::to_string(&local_map).unwrap())
+    if parse_error.is_empty() {
+        (Some(common::json::to_string(&local_map).unwrap()), None)
     } else {
-        None
+        (None, Some(parse_error))
     }
 }
 
@@ -248,12 +255,13 @@ async fn add_valid_record(
         let valid_record = if delta_fields.is_some() {
             let delta = delta_fields.unwrap();
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
-            let ret_val = cast_to_type(loc_value, delta);
+            let (ret_val, error) = cast_to_type(loc_value, delta);
             if ret_val.is_some() {
                 value_str = ret_val.unwrap();
                 true
             } else {
                 status.failed += 1;
+                status.error = error.unwrap();
                 false
             }
         } else {
@@ -301,9 +309,39 @@ async fn add_valid_record(
     trigger
 }
 
+fn set_parsing_error(parse_error: &mut String, field: &Field) {
+    parse_error.push_str(&format!(
+        "Failed to cast {} to type {} ",
+        field.name(),
+        field.data_type()
+    ));
+}
+
 struct StreamMeta {
     org_id: String,
     stream_name: String,
     partition_keys: Vec<String>,
     stream_alerts_map: AHashMap<String, Vec<Alert>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_parsing_error() {
+        let mut parse_error = String::new();
+        set_parsing_error(&mut parse_error, &Field::new("test", DataType::Utf8, true));
+        assert!(!parse_error.is_empty());
+    }
+
+    #[test]
+    fn test_cast_to_type() {
+        let mut local_val = Map::new();
+        local_val.insert("test".to_string(), Value::from("test13212"));
+        let delta = vec![Field::new("test", DataType::Utf8, true)];
+        let (ret_val, error) = cast_to_type(Value::from(local_val), delta);
+        assert!(ret_val.is_some());
+        assert!(error.is_none());
+    }
 }

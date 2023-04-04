@@ -111,6 +111,10 @@ use crate::meta;
             meta::organization::IngestionPasscode,
             meta::organization::PasscodeResponse,
             request::status::HealthzResponse,
+            meta::ingestion::BulkResponse,
+            meta::ingestion::BulkResponseItem,
+            meta::ingestion::ShardResponse,
+            meta::ingestion::BulkResponseError
         ),
     ),
     modifiers(&SecurityAddon),
