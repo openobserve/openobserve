@@ -10,6 +10,7 @@ phases:
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
       - GIT_HASH="$(git rev-parse --short HEAD)"
+      - echo "Building for commit - $GIT_HASH"
 
       # install buildx
       - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-amd64
