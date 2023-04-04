@@ -19,6 +19,7 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua};
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
 
@@ -33,12 +34,17 @@ use crate::meta::alert::Alert;
 use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{
-    IngestionResponse, RecordStatus, StreamData, StreamSchemaChk, StreamStatus,
+    BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+    StreamSchemaChk,
 };
 use crate::meta::StreamType;
 use crate::service::db;
 use crate::service::schema::stream_schema_exists;
 use crate::{common::time::parse_timestamp_micro_from_value, meta::alert::Trigger};
+
+pub const TRANSFORM_FAILED: &str = "document_failed_transform";
+pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
+pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
 pub async fn ingest(
     org_id: &str,
@@ -56,6 +62,12 @@ pub async fn ingest(
             )),
         );
     }
+    //let mut errors = false;
+    let mut bulk_res = BulkResponse {
+        took: 0,
+        errors: false,
+        items: vec![],
+    };
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -74,6 +86,7 @@ pub async fn ingest(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
 
     let mut stream_name = String::from("");
+    let mut action = String::from("");
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
 
     let mut next_line_is_data = false;
@@ -93,7 +106,7 @@ pub async fn ingest(
                 continue; // skip, we don't support delete
             }
             next_line_is_data = true;
-            stream_name = super::get_stream_name(&value);
+            (action, stream_name) = super::get_stream_name_action(&value);
 
             // check if we are allowed to ingest
             if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
@@ -147,13 +160,8 @@ pub async fn ingest(
 
             stream_data_map
                 .entry(stream_name.clone())
-                .or_insert(StreamData {
+                .or_insert(BulkStreamData {
                     data: AHashMap::new(),
-                    status: RecordStatus {
-                        successful: 0,
-                        failed: 0,
-                        error: "".to_string(),
-                    },
                 });
 
             stream_file_map.entry(stream_name.clone()).or_default();
@@ -162,28 +170,40 @@ pub async fn ingest(
 
             let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
             let buf = &mut stream_data.data;
-            let status = &mut stream_data.status;
 
             //Start row based transform
             #[cfg(feature = "zo_functions")]
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
             #[cfg(feature = "zo_functions")]
+            let mut ret_value = json::Value::Null;
+            #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
                 for trans in transforms {
                     let func_key = format!("{stream_name}/{}", trans.name);
                     if stream_lua_map.contains_key(&func_key) {
-                        value = crate::service::ingestion::lua_transform(
+                        ret_value = crate::service::ingestion::lua_transform(
                             &lua,
                             &value,
                             stream_lua_map.get(&func_key).unwrap(),
                         );
                     }
                 }
+                if ret_value.is_null() || !ret_value.is_object() {
+                    bulk_res.errors = true;
+                    add_record_status(
+                        stream_name.clone(),
+                        action.clone(),
+                        value,
+                        &mut bulk_res,
+                        Some(TRANSFORM_FAILED.to_owned()),
+                        Some(TRANSFORM_FAILED.to_owned()),
+                    );
+                    continue;
+                } else {
+                    value = ret_value;
+                }
             }
-            if value.is_null() || !value.is_object() {
-                status.failed += 1; // transform failed or dropped
-                continue;
-            }
+
             //End row based transform
 
             //JSON Flattening
@@ -195,19 +215,34 @@ pub async fn ingest(
             let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
                 Some(v) => match parse_timestamp_micro_from_value(v) {
                     Ok(t) => t,
-                    Err(e) => {
-                        status.failed += 1;
-                        status.error = e.to_string();
+                    Err(_e) => {
+                        bulk_res.errors = true;
+                        add_record_status(
+                            stream_name.clone(),
+                            action.clone(),
+                            value,
+                            &mut bulk_res,
+                            Some(TS_PARSE_FAILED.to_owned()),
+                            Some(TS_PARSE_FAILED.to_owned()),
+                        );
                         continue;
                     }
                 },
                 None => Utc::now().timestamp_micros(),
             };
             // check ingestion time
-            let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-            if timestamp < earlest_time.timestamp_micros() {
-                status.failed += 1; // to old data, just discard
-                status.error = super::get_upto_discard_error();
+            let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+            if timestamp < earliest_time.timestamp_micros() {
+                bulk_res.errors = true;
+                let failure_reason = Some(super::get_upto_discard_error());
+                add_record_status(
+                    stream_name.clone(),
+                    action.clone(),
+                    value,
+                    &mut bulk_res,
+                    failure_reason.to_owned(),
+                    failure_reason,
+                );
                 continue;
             }
             if timestamp < min_ts {
@@ -222,6 +257,8 @@ pub async fn ingest(
                 None => vec![],
             };
 
+            // only for bulk insert
+            let mut status = RecordStatus::default();
             let local_trigger = super::add_valid_record(
                 StreamMeta {
                     org_id: org_id.to_string(),
@@ -230,7 +267,7 @@ pub async fn ingest(
                     stream_alerts_map: stream_alerts_map.clone(),
                 },
                 &mut stream_schema_map,
-                status,
+                &mut status,
                 buf,
                 local_val,
             )
@@ -238,10 +275,30 @@ pub async fn ingest(
             if local_trigger.is_some() {
                 stream_trigger_map.insert(stream_name.clone(), local_trigger.unwrap());
             }
+            if status.failed > 0 {
+                bulk_res.errors = true;
+                add_record_status(
+                    stream_name.clone(),
+                    action.clone(),
+                    value,
+                    &mut bulk_res,
+                    Some(SCHEMA_CONFORMANCE_FAILED.to_owned()),
+                    Some(status.error),
+                );
+            } else {
+                add_record_status(
+                    stream_name.clone(),
+                    action.clone(),
+                    value,
+                    &mut bulk_res,
+                    None,
+                    None,
+                );
+            }
         }
     }
 
-    let mut response_vec: Vec<StreamStatus> = Vec::new();
+    //let mut response_vec: Vec<StreamStatus> = Vec::new();
     for (stream_name, stream_data) in stream_data_map {
         // write to file
         let mut stream_file_name = "".to_string();
@@ -276,11 +333,6 @@ pub async fn ingest(
                 .with_label_values(&[org_id, &stream_name, StreamType::Logs.to_string().as_str()])
                 .add(write_buf.len() as i64);
         }
-
-        response_vec.push(StreamStatus {
-            name: stream_name.to_string(),
-            status: stream_data.status,
-        });
     }
 
     // only one trigger per request, as it updates etcd
@@ -324,10 +376,64 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+    bulk_res.took = start.elapsed().as_millis();
 
-    //dispose_v8();
-    Ok(HttpResponse::Ok().json(IngestionResponse::new(
-        http::StatusCode::OK.into(),
-        response_vec,
-    )))
+    Ok(HttpResponse::Ok().json(bulk_res))
+}
+
+fn add_record_status(
+    stream_name: String,
+    action: String,
+    value: json::Value,
+    bulk_res: &mut BulkResponse,
+    failure_type: Option<String>,
+    failure_reason: Option<String>,
+) {
+    let mut item = HashMap::new();
+
+    match failure_type {
+        Some(failure_type) => {
+            let bulk_err = BulkResponseError::new(
+                failure_type,
+                stream_name.clone(),
+                failure_reason.unwrap(),
+                "0".to_owned(), //TODO check
+            );
+
+            item.insert(
+                action,
+                BulkResponseItem::new_failed(stream_name.clone(), bulk_err, value, stream_name),
+            );
+        }
+        None => {
+            item.insert(
+                action,
+                BulkResponseItem::new(stream_name.clone(), value, stream_name),
+            );
+        }
+    }
+    bulk_res.items.push(item);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_record_status() {
+        let mut bulk_res = BulkResponse {
+            took: 0,
+            errors: false,
+            items: vec![],
+        };
+        add_record_status(
+            "olympics".to_owned(),
+            "create".to_owned(),
+            json::Value::Null,
+            &mut bulk_res,
+            None,
+            None,
+        );
+        assert!(bulk_res.items.len() == 1);
+    }
 }

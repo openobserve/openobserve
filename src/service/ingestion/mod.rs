@@ -33,12 +33,10 @@ use super::triggers;
 
 #[cfg(feature = "zo_functions")]
 pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
-    let ret = lua.load(&js_func).eval();
-
-    if ret.is_err() {
-        None
+    if let Ok(val) = lua.load(&js_func).eval() {
+        val
     } else {
-        Some(ret.unwrap())
+        None
     }
 }
 #[cfg(feature = "zo_functions")]
@@ -49,6 +47,7 @@ pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
         Ok(res) => lua.from_value(res).unwrap(),
         Err(err) => {
             log::error!("Err from lua {:?}", err.to_string());
+            //Value::Null
             row.clone()
         }
     }
@@ -164,12 +163,70 @@ pub fn get_partition_key_record(s: &str) -> String {
 }
 
 pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
-    println!(
+    log::info!(
         "Sending notification for alert {} {}",
-        alert.name, alert.stream
+        alert.name,
+        alert.stream
     );
     let _ = send_notification(&alert, &trigger.clone()).await;
     trigger.last_sent_at = Utc::now().timestamp_micros();
     trigger.count += 1;
     let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_get_partition_key_record() {
+        assert_eq!(
+            get_partition_key_record("default/olympics"),
+            "default.olympics"
+        );
+    }
+    #[test]
+    fn test_get_hour_key() {
+        let mut local_val = Map::new();
+        local_val.insert("country".to_string(), Value::String("USA".to_string()));
+        local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
+        assert_eq!(
+            get_hour_key(
+                1620000000,
+                vec!["country".to_string(), "sport".to_string()],
+                local_val
+            ),
+            "1970_01_01_00_country=USA_sport=basketball"
+        );
+    }
+
+    #[test]
+    fn test_get_hour_key_no_partition_keys() {
+        let mut local_val = Map::new();
+        local_val.insert("country".to_string(), Value::String("USA".to_string()));
+        local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
+        assert_eq!(get_hour_key(1620000000, vec![], local_val), "1970_01_01_00");
+    }
+    #[test]
+    fn test_get_hour_key_no_partition_keys_no_local_val() {
+        assert_eq!(
+            get_hour_key(1620000000, vec![], Map::new()),
+            "1970_01_01_00"
+        );
+    }
+    #[actix_web::test]
+    async fn test_get_stream_partition_keys() {
+        let mut stream_schema_map = AHashMap::new();
+        let mut meta = HashMap::new();
+        meta.insert(
+            "settings".to_string(),
+            r#"{"partition_keys": {"country": "country", "sport": "sport"}}"#.to_string(),
+        );
+        let schema = Schema::new(vec![]).with_metadata(meta);
+        stream_schema_map.insert("olympics".to_string(), schema);
+        let keys = get_stream_partition_keys("olympics".to_string(), stream_schema_map).await;
+        assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);
+    }
 }

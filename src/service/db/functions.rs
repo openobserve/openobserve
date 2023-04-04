@@ -124,9 +124,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         .unwrap()
                         .clone();
                     group.list.retain(|trans| !trans.name.eq(&item_name));
-                    STREAM_FUNCTIONS.insert(trans_key.to_string(), group);
+                    if group.list.is_empty() {
+                        STREAM_FUNCTIONS.remove(&trans_key.to_string());
+                    } else {
+                        STREAM_FUNCTIONS.insert(trans_key.to_string(), group);
+                    }
                 } else {
-                    STREAM_FUNCTIONS.remove(item_key);
+                    STREAM_FUNCTIONS.remove(&trans_key.to_string());
                 }
             }
         }
