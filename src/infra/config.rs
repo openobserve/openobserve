@@ -293,6 +293,12 @@ pub struct S3 {
     pub bucket_name: String,
     #[env_config(name = "ZO_S3_BUCKET_PREFIX", default = "")]
     pub bucket_prefix: String,
+    #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
+    pub feature_force_path_style: bool,
+    #[env_config(name = "ZO_S3_FEATURE_LIST_OBJECTS_V2", default = false)]
+    pub feature_list_objects_v2: bool,
+    #[env_config(name = "ZO_S3_FEATURE_DELETE_OBJECTS", default = false)]
+    pub feature_delete_objects: bool,
 }
 
 pub fn init() -> Config {
@@ -446,6 +452,9 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.s3.bucket_prefix.ends_with('/') {
+        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
+    }
     if cfg.s3.provider.is_empty() {
         if cfg.s3.server_url.contains(".googleapis.com") {
             cfg.s3.provider = "gcs".to_string();
@@ -455,10 +464,36 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.s3.provider = "aws".to_string();
         }
     }
-    if !cfg.s3.bucket_prefix.ends_with('/') {
-        cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
-    }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
+    match cfg.s3.provider.as_str() {
+        "aws" => {
+            cfg.s3.feature_force_path_style = false;
+            cfg.s3.feature_list_objects_v2 = true;
+            cfg.s3.feature_delete_objects = true;
+        }
+        "gcs" => {
+            cfg.s3.feature_force_path_style = false;
+            cfg.s3.feature_list_objects_v2 = true;
+            cfg.s3.feature_delete_objects = false;
+        }
+        "oss" => {
+            cfg.s3.feature_force_path_style = false;
+            cfg.s3.feature_list_objects_v2 = true;
+            cfg.s3.feature_delete_objects = true;
+        }
+        "minio" => {
+            cfg.s3.feature_force_path_style = true;
+            cfg.s3.feature_list_objects_v2 = true;
+            cfg.s3.feature_delete_objects = true;
+        }
+        "swift" => {
+            cfg.s3.feature_force_path_style = true;
+            cfg.s3.feature_list_objects_v2 = true;
+            cfg.s3.feature_delete_objects = true;
+            std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
+        }
+        _ => {}
+    }
     Ok(())
 }
 
