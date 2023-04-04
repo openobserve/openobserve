@@ -25,6 +25,8 @@ import routes from "@/router/routes";
 import { createRouter, createWebHistory } from "vue-router";
 import "plotly.js";
 import searchService from "@/services/search";
+import SearchResult from "@/plugins/logs/SearchResult.vue";
+import QueryEditor from "@/plugins/logs/QueryEditor.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -52,7 +54,6 @@ describe("Search Result", async () => {
         plugins: [i18n, router],
         stubs: {
           IndexList: true,
-          SearchResult: true,
         },
       },
     });
@@ -98,6 +99,86 @@ describe("Search Result", async () => {
     ).toBeTruthy();
   });
 
+  it("should enable histogram toggle btn and histogram chart when custom sql is on", async () => {
+    expect(
+      wrapper
+        .findComponent(SearchResult)
+        .find('[data-test="logs-search-result-bar-chart"]')
+        .isVisible()
+    ).toBe(true);
+
+    expect(
+      wrapper
+        .findComponent(SearchBar)
+        .find('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
+        .classes("disabled")
+    ).toBe(false);
+  });
+
+  it("should disable histogram when full sql mode is on", async () => {
+    await wrapper
+      .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+      .trigger("click");
+
+    expect(
+      wrapper
+        .findComponent(SearchResult)
+        .find('[data-test="logs-search-result-bar-chart"]')
+        .isVisible()
+    ).toBe(false);
+
+    expect(
+      wrapper
+        .findComponent(SearchBar)
+        .find('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
+        .classes("disabled")
+    ).toBe(true);
+  });
+
+  it("Should emit searchdata when sql mode is on and run query is clicked", async () => {
+    wrapper.vm.searchObj.data.query =
+      "SELECT *, fn6(_timestamp) FROM 'k8s_json' WHERE code=200 limit 100 offset 100";
+
+    await wrapper
+      .find('[data-test="logs-search-bar-refresh-btn"]')
+      .trigger("click");
+
+    expect(
+      wrapper.findComponent(SearchBar).emitted()["searchdata"]
+    ).toBeTruthy();
+  });
+
+  it("Should add where clause when switched to sql mode", async () => {
+    if (wrapper.vm.searchObj.meta.sqlMode) {
+      await wrapper
+        .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+        .trigger("click");
+    }
+
+    wrapper.vm.searchObj.data.query = "fn6(_timestamp) as t1 | code=500";
+
+    await wrapper
+      .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+      .trigger("click");
+
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT *,fn6(_timestamp) as t1 FROM "k8s_json" WHERE code=500'
+    );
+  });
+
+  it("should disable histogram when show histogram is toggled", async () => {
+    await wrapper
+      .find('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
+      .trigger("click");
+
+    expect(
+      wrapper
+        .findComponent(SearchResult)
+        .find('[data-test="logs-search-result-bar-chart"]')
+        .isVisible()
+    ).toBe(false);
+  });
+
   it("Should render date selection", () => {
     expect(
       wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()
@@ -105,6 +186,14 @@ describe("Search Result", async () => {
   });
 
   it("Should render Run Query btn and emit searchdata on click", async () => {
+    if (wrapper.vm.searchObj.meta.sqlMode) {
+      await wrapper
+        .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+        .trigger("click");
+    }
+
+    wrapper.vm.searchObj.data.editorValue = "fn6(_timestamp) as t1 | code=500";
+
     await wrapper
       .find('[data-test="logs-search-bar-refresh-btn"]')
       .trigger("click");
@@ -125,9 +214,9 @@ describe("Search Result", async () => {
       .find('[data-test="logs-search-bar-refresh-time-5"]')
       .trigger("click");
 
-    await vi.advanceTimersByTime(6000);
+    await vi.advanceTimersByTime(5000);
     expect(search).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTime(6000);
+    await vi.advanceTimersByTime(5000);
     expect(search).toHaveBeenCalledTimes(2);
   });
 
@@ -140,7 +229,7 @@ describe("Search Result", async () => {
       .find('[data-test="date-time-relative-1-Weeks-btn"]')
       .trigger("click");
 
-    await vi.advanceTimersByTime(2000);
+    await vi.advanceTimersByTime(1000);
     expect(search).toHaveBeenCalledTimes(1);
   });
 });

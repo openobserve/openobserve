@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="editorRef" id="editor"></div>
+  <div data-test="query-editor" ref="editorRef" id="editor"></div>
 </template>
 
 <script lang="ts">
@@ -224,7 +224,6 @@ export default defineComponent({
 
           let arr = textUntilPosition.trim().split(" ");
           let filteredSuggestions = [];
-
           filteredSuggestions = createDependencyProposals(range);
           filteredSuggestions = filteredSuggestions.filter((item) => {
             return item.label.toLowerCase().includes(word.word.toLowerCase());
