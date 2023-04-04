@@ -19,7 +19,7 @@ use aws_config::retry::RetryConfig;
 use aws_config::timeout::TimeoutConfig;
 use aws_sdk_s3::model::{Delete, ObjectIdentifier};
 use aws_sdk_s3::{Client, Config, Credentials, Region};
-use std::time::Duration;
+use std::{time::Duration, time::Instant};
 
 use super::FileStorage;
 use crate::common::utils::is_local_disk_storage;
@@ -94,10 +94,12 @@ impl FileStorage for S3 {
                 }
             }
         }
+
         Ok(files)
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+        let start = Instant::now();
         let key =
             if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
                 format!("{}{}", CONFIG.s3.bucket_prefix, file)
@@ -126,12 +128,18 @@ impl FileStorage for S3 {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
+
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
+                .inc_by(time);
         }
 
         Ok(data)
     }
 
     async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+        let start = Instant::now();
         let key =
             if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
                 format!("{}{}", CONFIG.s3.bucket_prefix, file)
@@ -155,8 +163,15 @@ impl FileStorage for S3 {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
+
+                    let time = start.elapsed().as_secs_f64();
+                    metrics::STORAGE_TIME
+                        .with_label_values(&[columns[1], columns[3], columns[2], "put"])
+                        .inc_by(time);
                 }
+
                 log::info!("s3 File upload succeeded: {}", file);
+
                 Ok(())
             }
             Err(err) => {
@@ -171,6 +186,9 @@ impl FileStorage for S3 {
             return Ok(());
         }
 
+        let start_time = Instant::now();
+        let columns = files[0].split('/').collect::<Vec<&str>>();
+
         // Hack for GCS
         if CONFIG.s3.provider.eq("gcs") {
             for file in files {
@@ -179,6 +197,14 @@ impl FileStorage for S3 {
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
+
+            if columns[0].eq("files") {
+                let time = start_time.elapsed().as_secs_f64();
+                metrics::STORAGE_TIME
+                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                    .inc_by(time);
+            }
+
             return Ok(());
         }
 
@@ -224,6 +250,14 @@ impl FileStorage for S3 {
             start += step;
             tokio::task::yield_now().await; // yield to other tasks
         }
+
+        if columns[0].eq("files") {
+            let time = start_time.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                .inc_by(time);
+        }
+
         Ok(())
     }
 }
