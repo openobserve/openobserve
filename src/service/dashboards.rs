@@ -12,59 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
+use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
-use tracing::info_span;
+use tracing::instrument;
 
 use crate::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboard;
 
+#[instrument]
 pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
-    let loc_span = info_span!("service:dashboards:get");
-    let _guard = loc_span.enter();
-
-    match dashboard::get(org_id, name).await {
-        Ok(Some(dashboard)) => Ok(HttpResponse::Ok().json(dashboard)),
-        Ok(None) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "Dashboard not found".to_string(),
-        ))),
-        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "Dashboard not found".to_string(),
-        ))),
-    }
+    Ok(match dashboard::get(org_id, name).await {
+        Err(_) | Ok(None) => not_found("Dashboard not found"),
+        Ok(Some(dashboard)) => HttpResponse::Ok().json(dashboard),
+    })
 }
 
+#[instrument(skip(dashboard))]
 pub async fn create_dashboard(
     org_id: &str,
     name: &str,
     dashboard: &Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    let loc_span = info_span!("service:dashboards:create");
-    let _guard = loc_span.enter();
-
-    match dashboard::set(org_id, name, dashboard).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard saved".to_string(),
-        ))),
-        Err(e) => Ok(
+    if let Err(e) = dashboard::set(org_id, name, dashboard).await {
+        return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
             )),
-        ),
+        );
     }
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        "Dashboard saved".to_string(),
+    )))
 }
 
+#[instrument]
 pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
-    let loc_span = info_span!("service:dashboards:list");
-    let _guard = loc_span.enter();
-
     use meta::dashboards::DashboardList;
 
     Ok(HttpResponse::Ok().json(DashboardList {
@@ -72,18 +56,20 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     }))
 }
 
+#[instrument]
 pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
-    let loc_span = info_span!("service:dashboards:delete");
-    let _guard = loc_span.enter();
-    let result = dashboard::delete(org_id, name).await;
-    match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard deleted".to_string(),
-        ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+    if let Err(e) = dashboard::delete(org_id, name).await {
+        return Ok(not_found(e.to_string()));
     }
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        "Dashboard deleted".to_string(),
+    )))
+}
+
+fn not_found(error_message: impl AsRef<str>) -> HttpResponse {
+    HttpResponse::NotFound().json(MetaHttpResponse::error(
+        StatusCode::NOT_FOUND.into(),
+        error_message.as_ref().to_owned(),
+    ))
 }
