@@ -31,7 +31,6 @@ pub async fn get_file_list(
 }
 
 #[inline]
-#[tracing::instrument(name = "service:file_list:get_file_meta")]
 pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     match file_list::get_file_from_cache(file) {
         Ok(v) => Ok(v),

@@ -71,11 +71,10 @@ pub async fn search(
         })
     })
     .join();
-
     result.map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(format!("{err:?}"))))?
 }
 
-#[tracing::instrument(name = "service:search:local:enter", skip(req))]
+#[tracing::instrument(name = "service:search:local", skip(req))]
 async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let resp = match exec::search(&req).await {
         Ok(res) => res,
@@ -166,24 +165,25 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
     Ok(response)
 }
 
-#[tracing::instrument(name = "service:search:cluster:enter", skip(req))]
+#[tracing::instrument(name = "service:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
-    // start time
     let start = std::time::Instant::now();
-    let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
-
     let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
 
     // get a cluster search queue lock
-    let mut locker = etcd::Locker::new("search/cluster_queue");
-    match locker.lock(0).await {
-        Ok(res) => res,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )));
-        }
-    };
+    let mut locker = None;
+    if !CONFIG.common.local_mode {
+        let mut lock = etcd::Locker::new("search/cluster_queue");
+        match lock.lock(0).await {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
+        locker = Some(lock);
+    }
 
     span1.exit(); // drop span1
     let span2 = info_span!("service:search:cluster:prepare_base").entered();
@@ -194,7 +194,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.id.cmp(&b.id));
     for node in nodes.iter() {
-        log::info!("[TRACE] cluster->node: {:?}", node);
         let role = node.role.clone();
         if cluster::is_querier(&role.to_vec()) {
             querier.push(node.clone());
@@ -203,12 +202,15 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     // handle request time range
+    let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
     let sub_req = req.clone();
-    let meta = crate::service::search::sql::Sql::new(&sub_req).await;
+    let meta = sql::Sql::new(&sub_req).await;
     if meta.is_err() {
         // search done, release lock
-        if let Err(e) = locker.unlock().await {
-            log::error!("search in cluster unlock error: {}", e);
+        if locker.is_some() {
+            if let Err(e) = locker.unwrap().unlock().await {
+                log::error!("search in cluster unlock error: {}", e);
+            }
         }
         return Err(meta.err().unwrap());
     }
@@ -285,7 +287,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         false => (file_num / querier_num) + 1,
     };
     log::info!(
-        "[TRACE] cluster->file_list: num: {}, offset: {}",
+        "[TRACE] search->file_list: num: {}, offset: {}",
         file_num,
         offset
     );
@@ -335,7 +337,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             req_file_list_end = offset_start - offset + req.file_list.len();
         }
         log::info!(
-            "[TRACE] cluster->partition: node: {}, is_querier: {}, file_range: {}-{}",
+            "[TRACE] search->partition: node: {}, is_querier: {}, file_range: {}-{}",
             node.id,
             is_querier,
             req_file_list_start,
@@ -370,7 +372,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     Ok(channel) => channel,
                     Err(err) => {
                         log::error!(
-                            "[TRACE] cluster->search: node: {}, connect grpc err: {:?}",
+                            "[TRACE] search->grpc: node: {}, connect err: {:?}",
                             node.id,
                             err
                         );
@@ -395,7 +397,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[TRACE] cluster->search: node: {}, search grpc err: {:?}",
+                            "[TRACE] search->grpc: node: {}, search err: {:?}",
                             node.id,
                             err
                         );
@@ -410,7 +412,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 };
 
                 log::info!(
-                "[TRACE] cluster->search: node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
                 node.id,
                 is_querier,
                 response.total,
@@ -440,8 +442,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             }
             Err(err) => {
                 // search done, release lock
-                if let Err(e) = locker.unlock().await {
-                    log::error!("search in cluster unlock error: {}", e);
+                if locker.is_some() {
+                    if let Err(e) = locker.unwrap().unlock().await {
+                        log::error!("search in cluster unlock error: {}", e);
+                    }
                 }
                 return Err(err);
             }
@@ -452,8 +456,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
-    if let Err(e) = locker.unlock().await {
-        log::error!("search in cluster unlock error: {}", e);
+    if locker.is_some() {
+        if let Err(e) = locker.unwrap().unlock().await {
+            log::error!("search in cluster unlock error: {}", e);
+        }
     }
 
     span6.exit(); // drop span6
@@ -508,7 +514,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     .0
                     .clone()
             };
-            *batch = match super::search::datafusion::exec::merge(
+            *batch = match datafusion::exec::merge(
                 &sql.org_id,
                 sql.meta.offset,
                 sql.meta.limit,
@@ -599,7 +605,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     log::info!(
-        "[TRACE] cluster->search: total: {}, took: {}, scan_size: {}",
+        "[TRACE] search->result: total: {}, took: {}, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,
@@ -653,20 +659,20 @@ pub fn handle_datafusion_error(err: DataFusionError) -> Error {
     let err = err.to_string();
     if err.contains("Schema error: No field named") {
         let pos = err.find("Schema error: No field named").unwrap();
-        let pos_start = err[pos..].find('\'').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('\'').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field));
+        return match get_key_from_error(&err, pos) {
+            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
+            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
+        };
     }
     if err.contains("parquet not found") {
         return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
     }
     if err.contains("Invalid function ") {
         let pos = err.find("Invalid function ").unwrap();
-        let pos_start = err[pos..].find('\'').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('\'').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(field));
+        return match get_key_from_error(&err, pos) {
+            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
+            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
+        };
     }
     if err.contains("Incompatible data types") {
         let pos = err.find("for field").unwrap();
@@ -676,6 +682,23 @@ pub fn handle_datafusion_error(err: DataFusionError) -> Error {
         return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
     }
     Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
+}
+
+fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
+    for ponct in ['\'', '"'] {
+        let pos_start = err[pos..].find(ponct);
+        if pos_start.is_none() {
+            continue;
+        }
+        let pos_start = pos_start.unwrap();
+        let pos_end = err[pos + pos_start + 1..].find(ponct);
+        if pos_end.is_none() {
+            continue;
+        }
+        let pos_end = pos_end.unwrap();
+        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
+    }
+    None
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);

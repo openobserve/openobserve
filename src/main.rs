@@ -227,7 +227,9 @@ async fn cli() -> Result<bool, anyhow::Error> {
                     clap::Arg::new("component")
                         .short('c')
                         .long("component")
-                        .help("reset data of the component: root, user, alert, function"),
+                        .help(
+                            "reset data of the component: root, user, alert, dashboard, function",
+                        ),
                 ),
             clap::Command::new("view")
                 .about("view zincobserve data")
@@ -267,6 +269,9 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 "alert" => {
                     db::alerts::reset().await?;
+                }
+                "dashboard" => {
+                    db::dashboard::reset().await?;
                 }
                 "function" => {
                     db::functions::reset().await?;
