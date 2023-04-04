@@ -19,21 +19,13 @@ use tracing::instrument;
 use crate::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboard;
 
-#[instrument]
-pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
-    Ok(match dashboard::get(org_id, name).await {
-        Err(_) | Ok(None) => not_found("Dashboard not found"),
-        Ok(Some(dashboard)) => HttpResponse::Ok().json(dashboard),
-    })
-}
-
 #[instrument(skip(dashboard))]
 pub async fn create_dashboard(
     org_id: &str,
-    name: &str,
+    dashboard_id: &str,
     dashboard: &Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    if let Err(e) = dashboard::set(org_id, name, dashboard).await {
+    if let Err(e) = dashboard::set(org_id, dashboard_id, dashboard).await {
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
@@ -57,8 +49,19 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
 }
 
 #[instrument]
-pub async fn delete_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io::Error> {
-    if let Err(e) = dashboard::delete(org_id, name).await {
+pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
+    Ok(match dashboard::get(org_id, dashboard_id).await {
+        Err(_) => not_found("Dashboard not found"),
+        Ok(dashboard) => HttpResponse::Ok().json(
+            // `dashboard::get` never returns `Ok(None)`
+            dashboard.unwrap(),
+        ),
+    })
+}
+
+#[instrument]
+pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
+    if let Err(e) = dashboard::delete(org_id, dashboard_id).await {
         return Ok(not_found(e.to_string()));
     }
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

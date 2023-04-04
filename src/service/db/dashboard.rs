@@ -19,28 +19,39 @@ use crate::{
     meta::dashboards::{Dashboard, NamedDashboard},
 };
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<NamedDashboard>, anyhow::Error> {
+pub async fn get(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<NamedDashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/{name}");
+    let key = format!("/dashboard/{org_id}/{dashboard_id}");
     let val = db.get(&key).await?;
     let details: Dashboard = json::from_slice(&val).with_context(|| {
         format!("Failed to deserialize the value for key {key:?} as `Dashboard`")
     })?;
+    assert_eq!(
+        details.dashboard_id, dashboard_id,
+        "BUG: stored dashboard_id is not equal to the requested one"
+    );
     Ok(Some(NamedDashboard {
-        name: name.to_string(),
+        name: dashboard_id.to_string(),
         details,
     }))
 }
 
-pub async fn set(org_id: &str, name: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
+pub async fn set(
+    org_id: &str,
+    dashboard_id: &str,
+    dashboard: &Dashboard,
+) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/{name}");
+    let key = format!("/dashboard/{org_id}/{dashboard_id}");
     Ok(db.put(&key, json::to_vec(dashboard)?.into()).await?)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+pub async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/{name}");
+    let key = format!("/dashboard/{org_id}/{dashboard_id}");
     Ok(db.delete(&key, false).await?)
 }
 
@@ -66,6 +77,5 @@ pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
 pub async fn reset() -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = "/dashboard/";
-    db.delete(key, true).await?;
-    Ok(())
+    Ok(db.delete(key, true).await?)
 }
