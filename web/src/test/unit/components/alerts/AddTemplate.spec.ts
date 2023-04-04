@@ -100,7 +100,6 @@ describe("Alert List", async () => {
         .find('[data-test="add-template-name-input"]')
         .setValue(template_name);
       wrapper.vm.formData.body = JSON.stringify("This is alert.");
-      console.log(wrapper.vm.formData);
     });
 
     it("Should create alert on clicking Submit", async () => {
