@@ -17,15 +17,13 @@ use std::io::Error;
 
 use crate::{meta::dashboards::Dashboard, service::dashboards};
 
-// XXX-TODO: Remove `{dashboard_id}` parameter.
-// See https://github.com/zinclabs/zincobserve/issues/501
-#[post("/{org_id}/dashboards/{dashboard_id}")]
+#[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
     details: web::Json<Dashboard>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, dashboard_id) = path.into_inner();
-    dashboards::create_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
+    let org_id = path.into_inner();
+    dashboards::create_dashboard(&org_id, details.into_inner()).await
 }
 
 #[get("/{org_id}/dashboards")]
