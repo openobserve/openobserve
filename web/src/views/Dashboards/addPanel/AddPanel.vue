@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="flex items-baseline q-gutter-sm">
-        <DateTimePicker @date-change="updateDateTime" />
+        <DateTimePicker v-model="selectedDate" />
         <q-btn
           class="q-ml-md q-mb-xs text-bold"
           outline
@@ -162,6 +162,7 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData();
     const editMode = ref(false);
+    const selectedDate = ref()
 
     onActivated(async () => {
       // todo check for the edit more
@@ -203,6 +204,10 @@ export default defineComponent({
     watch(()=> dashboardPanelData.data.type, ()=>{
       chartData.value = dashboardPanelData.data
 		})
+
+    watch(selectedDate, () => {
+      updateDateTime(selectedDate.value)
+    })
 
     const runQuery = () => {
       // console.log("query change detected to run");
@@ -376,6 +381,7 @@ export default defineComponent({
       dashboardPanelData,
       chartData,
       editMode,
+      selectedDate
     };
   },
   methods: {
