@@ -53,7 +53,7 @@ aws-smithy-async = "0.54"
 aws-sdk-s3 = "0.24"
 base64 = "0.21.0"
 bytes = "1.4"
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false }
 clap = { version = "4.1.6", default-features = false, features = [
   "std",
   "help",
@@ -109,7 +109,7 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
 ] }
 rs-snowflake = "0.6.0"
-rsfs = { version = "0.4.1", optional = true }
+rsfs = { version = "0.4.1", git = "https://github.com/zinclabs/rsfs.git", optional = true }
 rust-embed-for-web = "11.1.0"
 segment = "0.2.2"
 serde = { version = "1", features = ["derive"] }
@@ -137,7 +137,7 @@ walkdir = "2"
 zstd = "0.12.1"
 
 [build-dependencies]
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false }
 prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
