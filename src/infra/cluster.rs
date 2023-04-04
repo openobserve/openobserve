@@ -82,6 +82,7 @@ impl FromStr for Role {
         }
     }
 }
+
 impl std::fmt::Display for Role {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -102,6 +103,8 @@ pub async fn register_and_keepalive() -> Result<()> {
         if !is_single_node(nodes) {
             panic!("For local mode only single node deployment is allowed !");
         }
+        // cache local node
+        NODES.insert(LOCAL_NODE_UUID.clone(), load_local_mode_node());
         return Ok(());
     }
     if let Err(e) = register().await {
@@ -402,6 +405,20 @@ async fn watch_node_list() -> Result<()> {
 }
 
 #[inline(always)]
+pub fn load_local_mode_node() -> Node {
+    Node {
+        id: 1,
+        uuid: load_local_node_uuid(),
+        name: CONFIG.common.instance_name.clone(),
+        http_addr: format!("http://127.0.0.1:{}", CONFIG.http.port),
+        grpc_addr: format!("http://127.0.0.1:{}", CONFIG.grpc.port),
+        role: [Role::All].to_vec(),
+        cpu_num: CONFIG.limit.cpu_num as u64,
+        status: NodeStatus::Online,
+    }
+}
+
+#[inline(always)]
 fn load_local_node_uuid() -> String {
     Uuid::new_v4().to_string()
 }
@@ -553,11 +570,10 @@ mod tests {
         register_and_keepalive().await.unwrap();
         set_online().await.unwrap();
         leave().await.unwrap();
-        assert!(get_cached_online_nodes().is_none());
-        assert!(get_cached_online_query_nodes().is_none());
-        assert!(get_cached_online_ingester_nodes().is_none());
-        assert!(get_cached_online_querier_nodes().is_none());
-        assert!(get_cached_online_querier_nodes().is_none());
+        assert!(get_cached_online_nodes().is_some());
+        assert!(get_cached_online_query_nodes().is_some());
+        assert!(get_cached_online_ingester_nodes().is_some());
+        assert!(get_cached_online_querier_nodes().is_some());
     }
 
     #[test]
