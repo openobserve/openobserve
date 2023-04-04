@@ -36,66 +36,11 @@ pub struct S3 {}
 #[async_trait]
 impl FileStorage for S3 {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-        let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
-            && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
-        {
-            format!("{}{}", CONFIG.s3.bucket_prefix, prefix)
+        if CONFIG.s3.feature_list_objects_v2 {
+            self.list_objects_v2(prefix).await
         } else {
-            prefix.to_string()
-        };
-        let prefix = prefix.as_str();
-        let mut files = Vec::new();
-        let client = S3CLIENT.get().await.clone().unwrap();
-        let mut start_after: String = "".to_string();
-        loop {
-            if CONFIG.s3.provider.eq("swift") {
-                let objects = match client
-                    .list_objects()
-                    .bucket(&CONFIG.s3.bucket_name)
-                    .marker(&start_after)
-                    .prefix(prefix)
-                    .send()
-                    .await
-                {
-                    Ok(objects) => objects,
-                    Err(e) => {
-                        log::error!("s3 list objects {} error: {:?}", prefix, e);
-                        return Err(anyhow::anyhow!("s3 list objects error"));
-                    }
-                };
-                for obj in objects.contents().unwrap_or_default() {
-                    start_after = obj.key().unwrap().to_string();
-                    files.push(start_after.clone());
-                }
-                if objects.contents().unwrap_or_default().len() < 1000 {
-                    break;
-                }
-            } else {
-                let objects = match client
-                    .list_objects_v2()
-                    .bucket(&CONFIG.s3.bucket_name)
-                    .prefix(prefix)
-                    .start_after(&start_after)
-                    .send()
-                    .await
-                {
-                    Ok(objects) => objects,
-                    Err(e) => {
-                        log::error!("s3 list objects v2 {} error: {:?}", prefix, e);
-                        return Err(anyhow::anyhow!("s3 list objects v2 error"));
-                    }
-                };
-                for obj in objects.contents().unwrap_or_default() {
-                    start_after = obj.key().unwrap().to_string();
-                    files.push(start_after.clone());
-                }
-                if objects.key_count < 1000 {
-                    break;
-                }
-            }
+            self.list_objects(prefix).await
         }
-
-        Ok(files)
     }
 
     async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
@@ -189,27 +134,135 @@ impl FileStorage for S3 {
         let start_time = Instant::now();
         let columns = files[0].split('/').collect::<Vec<&str>>();
 
-        // Hack for GCS
-        if CONFIG.s3.provider.eq("gcs") {
+        if CONFIG.s3.feature_delete_objects {
+            if let Err(e) = self.delete_objects(files).await {
+                return Err(anyhow::anyhow!(e));
+            }
+        } else {
             for file in files {
-                if let Err(e) = self.del_for_gcs(file).await {
+                if let Err(e) = self.delete_object(file).await {
                     return Err(anyhow::anyhow!(e));
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
-
-            if columns[0].eq("files") {
-                let time = start_time.elapsed().as_secs_f64();
-                metrics::STORAGE_TIME
-                    .with_label_values(&[columns[1], columns[3], columns[2], "del"])
-                    .inc_by(time);
-            }
-
-            return Ok(());
         }
 
-        let client = S3CLIENT.get().await.clone().unwrap();
+        if columns[0].eq("files") {
+            let time = start_time.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                .inc_by(time);
+        }
 
+        Ok(())
+    }
+}
+
+impl S3 {
+    async fn list_objects(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+        let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
+            && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
+        {
+            format!("{}{}", CONFIG.s3.bucket_prefix, prefix)
+        } else {
+            prefix.to_string()
+        };
+        let prefix = prefix.as_str();
+        let mut files = Vec::new();
+        let client = S3CLIENT.get().await.clone().unwrap();
+        let mut start_after: String = "".to_string();
+        loop {
+            let objects = match client
+                .list_objects()
+                .bucket(&CONFIG.s3.bucket_name)
+                .marker(&start_after)
+                .prefix(prefix)
+                .send()
+                .await
+            {
+                Ok(objects) => objects,
+                Err(e) => {
+                    log::error!("s3 list objects {} error: {:?}", prefix, e);
+                    return Err(anyhow::anyhow!("s3 list objects error"));
+                }
+            };
+            for obj in objects.contents().unwrap_or_default() {
+                start_after = obj.key().unwrap().to_string();
+                files.push(start_after.clone());
+            }
+            if objects.contents().unwrap_or_default().len() < 1000 {
+                break;
+            }
+        }
+        Ok(files)
+    }
+
+    async fn list_objects_v2(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+        let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
+            && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
+        {
+            format!("{}{}", CONFIG.s3.bucket_prefix, prefix)
+        } else {
+            prefix.to_string()
+        };
+        let prefix = prefix.as_str();
+        let mut files = Vec::new();
+        let client = S3CLIENT.get().await.clone().unwrap();
+        let mut start_after: String = "".to_string();
+        loop {
+            let objects = match client
+                .list_objects_v2()
+                .bucket(&CONFIG.s3.bucket_name)
+                .prefix(prefix)
+                .start_after(&start_after)
+                .send()
+                .await
+            {
+                Ok(objects) => objects,
+                Err(e) => {
+                    log::error!("s3 list objects v2 {} error: {:?}", prefix, e);
+                    return Err(anyhow::anyhow!("s3 list objects v2 error"));
+                }
+            };
+            for obj in objects.contents().unwrap_or_default() {
+                start_after = obj.key().unwrap().to_string();
+                files.push(start_after.clone());
+            }
+            if objects.key_count < 1000 {
+                break;
+            }
+        }
+        Ok(files)
+    }
+
+    async fn delete_object(&self, file: &str) -> Result<(), anyhow::Error> {
+        let key =
+            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
+                format!("{}{}", CONFIG.s3.bucket_prefix, file)
+            } else {
+                file.to_string()
+            };
+        let client = S3CLIENT.get().await.clone().unwrap();
+        let result = client
+            .delete_object()
+            .bucket(&CONFIG.s3.bucket_name)
+            .key(key)
+            .send()
+            .await;
+        match result {
+            Ok(_output) => {
+                log::info!("s3 File delete succeeded: {}", file);
+                Ok(())
+            }
+            Err(err) => {
+                log::error!("s3 File delete error: {:?}", err);
+                Err(anyhow::anyhow!("s3 delete object error"))
+            }
+        }
+    }
+
+    async fn delete_objects(&self, files: &[&str]) -> Result<(), anyhow::Error> {
+        let client = S3CLIENT.get().await.clone().unwrap();
         let step = 100;
         let mut start = 0;
         let files_len = files.len();
@@ -250,43 +303,7 @@ impl FileStorage for S3 {
             start += step;
             tokio::task::yield_now().await; // yield to other tasks
         }
-
-        if columns[0].eq("files") {
-            let time = start_time.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
-                .inc_by(time);
-        }
-
         Ok(())
-    }
-}
-
-impl S3 {
-    async fn del_for_gcs(&self, file: &str) -> Result<(), anyhow::Error> {
-        let key =
-            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
-                format!("{}{}", CONFIG.s3.bucket_prefix, file)
-            } else {
-                file.to_string()
-            };
-        let client = S3CLIENT.get().await.clone().unwrap();
-        let result = client
-            .delete_object()
-            .bucket(&CONFIG.s3.bucket_name)
-            .key(key)
-            .send()
-            .await;
-        match result {
-            Ok(_output) => {
-                log::info!("s3 File delete succeeded: {}", file);
-                Ok(())
-            }
-            Err(err) => {
-                log::error!("s3 File delete error: {:?}", err);
-                Err(anyhow::anyhow!("s3 delete object error"))
-            }
-        }
     }
 }
 
@@ -294,7 +311,7 @@ async fn init_s3_config() -> Option<Config> {
     let mut s3config = aws_sdk_s3::config::Builder::new();
     if !CONFIG.s3.server_url.is_empty() {
         s3config = s3config.endpoint_url(&CONFIG.s3.server_url);
-        if CONFIG.s3.provider.eq("minio") || CONFIG.s3.provider.eq("swift") {
+        if CONFIG.s3.feature_force_path_style {
             s3config = s3config.force_path_style(true);
         }
     }
