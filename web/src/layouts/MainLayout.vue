@@ -51,6 +51,30 @@
           :label="t(`menu.docs`)"
           @click="navigateToDocs()"
         />
+        <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
+          <div
+            type="warning"
+            icon="cloud"
+            class="warning-msg"
+            style="display: inline"
+          >
+            <q-icon name="warning"
+size="xs" class="warning" />{{
+              store.state.quotaThresholdMsg
+            }}
+          </div>
+          <q-btn
+            color="secondary"
+            size="sm"
+            style="display: inline; padding: 5px 10px"
+            rounded
+            borderless
+            dense
+            class="q-ma-xs"
+            @click="router.replace('/billing/plans')"
+            >Upgrade to PRO Plan</q-btn
+          >
+        </div>
         <div class="languageWrapper">
           <q-btn-dropdown
             unelevated
@@ -112,7 +136,8 @@
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -190,10 +215,26 @@
 </template>
 
 <script lang="ts">
+import {
+  QPage,
+  QPageContainer,
+  QLayout,
+  QDrawer,
+  QList,
+  QItem,
+  QItemLabel,
+  QItemSection,
+  QBtn,
+  QBtnDropdown,
+  QToolbarTitle,
+  QHeader,
+  QToolbar,
+  QAvatar,
+  QIcon,
+  QSelect,
+} from "quasar";
 import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
-import { getLocale } from "../locales";
-import { setLanguage } from "../utils/cookies";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -202,19 +243,47 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent } from "vue";
+import { ref, defineComponent, KeepAlive } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import organizationService from "../services/organizations";
+import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
-import Tracker from "@openreplay/tracker";
-import configService from "../services/config";
+
+import { setLanguage } from "../utils/cookies";
+import { getLocale } from "../locales";
+
+import MainLayoutOpenSourceMixin from "../mixins/opensource/mainLayout.mixin";
+import MainLayoutCloudMixin from "../mixins/cloud/mainLayout.mixin";
+
+let mainLayoutMixin: any = null;
+if (config.isZincObserveCloud == "true") {
+  mainLayoutMixin = MainLayoutCloudMixin;
+} else {
+  mainLayoutMixin = MainLayoutOpenSourceMixin;
+}
 
 export default defineComponent({
   name: "MainLayout",
-
+  mixins: [mainLayoutMixin],
   components: {
-    MenuLink,
+    "menu-link": MenuLink,
+    "keep-alive": KeepAlive,
+    "q-page": QPage,
+    "q-page-container": QPageContainer,
+    "q-layout": QLayout,
+    "q-drawer": QDrawer,
+    "q-list": QList,
+    "q-item": QItem,
+    "q-item-label": QItemLabel,
+    "q-item-section": QItemSection,
+    "q-btn": QBtn,
+    "q-btn-dropdown": QBtnDropdown,
+    "q-toolbar-title": QToolbarTitle,
+    "q-header": QHeader,
+    "q-toolbar": QToolbar,
+    "router-view": RouterView,
+    "q-avatar": QAvatar,
+    "q-icon": QIcon,
+    "q-select": QSelect,
   },
   methods: {
     navigateToDocs() {
@@ -223,26 +292,36 @@ export default defineComponent({
     navigateToOpenAPI(zoBackendUrl: string) {
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
+    signout() {
+      this.store.dispatch("logout");
+      useLocalToken("", true);
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+      this.$router.push("/logout");
+    },
+    goToHome() {
+      this.$router.push("/");
+    },
+    changeLanguage(item: { code: string; label: string; icon: string }) {
+      setLanguage(item.code);
+      window.location.reload();
+    },
   },
   setup() {
-    const store = useStore();
-    const router = useRouter();
+    const store: any = useStore();
+    const router: any = useRouter();
     const { t } = useI18n();
-    const quotaThresholdMsg = ref();
-    let quotaAlertClass = "warning";
-    let user = store.state.userInfo;
+    const miniMode = ref(false);
     const languageFlag = ref(
       "img:" + getImageURL("images/language_flags/en-gb.svg")
     );
     const zoBackendUrl = store.state.API_ENDPOINT;
     const customOrganization = router.currentRoute.value.query.org_identifier;
-    if (
-      customOrganization != undefined &&
-      customOrganization != store.state.selectedOrganization.identifier
-    ) {
-      useLocalOrganization("");
-      store.dispatch("setSelectedOrganization", {});
-    }
+    const selectedOrg = ref(store.state.selectedOrganization);
+
+    const orgOptions = ref([{ label: Number, value: String }]);
+
+    let user = store.state.userInfo;
 
     var linksList = ref([
       {
@@ -295,14 +374,6 @@ export default defineComponent({
         link: "/about",
       },
     ]);
-
-    if (store.state.zoConfig.functions_enabled) {
-      linksList.value.splice(5, 0, {
-        title: t("menu.function"),
-        icon: "transform",
-        link: "/functions",
-      });
-    }
 
     const langList = [
       {
@@ -362,46 +433,28 @@ export default defineComponent({
       },
     ];
 
-    const local = ref(getLocale());
-    const selectedLanguage: any = ref(
-      langList.find((l) => l.code == local.value)
-    );
+    const selectedLanguage: any =
+      langList.find((l) => l.code == getLocale()) || langList[0];
 
-    if (user.picture == "") {
-      user.picture = getImageURL("images/common/profile.svg");
+    //additional links based on environment and conditions
+    if (
+      store.state.zoConfig.functions_enabled &&
+      config.isZincObserveCloud == "false"
+    ) {
+      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
+    } else if (config.isZincObserveCloud == "false") {
+      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
     }
 
-    if (!selectedLanguage.value && langList.length > 0) {
-      selectedLanguage.value = langList[0];
-      languageFlag.value =
-        "img:" +
-        getImageURL("images/language_flags/") +
-        langList[0].code +
-        ".svg";
-    } else {
-      const langDetail = selectedLanguage.value;
-      languageFlag.value =
-        "img:" +
-        getImageURL("images/language_flags/") +
-        langDetail?.code +
-        ".svg";
+    //orgIdentifier query param exists then clear the localstorage and store.
+    if (
+      mainLayoutMixin.setup().customOrganization != undefined &&
+      mainLayoutMixin.setup().customOrganization !=
+        store.state.selectedOrganization.identifier
+    ) {
+      useLocalOrganization("");
+      store.dispatch("setSelectedOrganization", {});
     }
-
-    const changeLanguage = (item: any) => {
-      setLanguage(item.code);
-      selectedLanguage.value = item;
-      languageFlag.value =
-        "img:" + getImageURL("images/language_flags/") + item.code + ".svg";
-      router.go(0);
-    };
-    const signout = () => {
-      store.dispatch("logout");
-      useLocalToken("", true);
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-      router.push("/logout");
-    };
-    const miniMode = ref(false);
 
     if (
       store.state.currentuser.hasOwnProperty("miniMode") &&
@@ -410,66 +463,18 @@ export default defineComponent({
       miniMode.value = !miniMode.value;
     }
 
-    const selectedOrg = ref(store.state.selectedOrganization);
-    let orgOptions = ref([{ label: Number, value: String }]);
-    const getDefaultOrganization = async () => {
-      await organizationService
-        .os_list(
-          0,
-          1000,
-          "id",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
-        .then((res: any) => {
-          const localOrg: any = useLocalOrganization();
-          store.dispatch("setOrganizations", res.data.data);
-          orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-              ingest_threshold: number;
-              search_threshold: number;
-            }) => {
-              let optiondata: any = {
-                label: data.name,
-                id: data.id,
-                identifier: data.identifier,
-                user_email: store.state.userInfo.email,
-                ingest_threshold: data.ingest_threshold,
-                search_threshold: data.search_threshold,
-              };
+    //get refresh token for cloud environment
+    if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
+      const d = new Date();
+      const timeoutinterval = Math.floor(d.getTime() / 1000);
+      const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
 
-              if (
-                ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
-                  data.type == "default" &&
-                  store.state.userInfo.email == data.UserObj.email &&
-                  (customOrganization == "" ||
-                    customOrganization == undefined)) ||
-                (res.data.data.length == 1 &&
-                  (customOrganization == "" || customOrganization == undefined))
-              ) {
-                selectedOrg.value = localOrg.value
-                  ? localOrg.value
-                  : optiondata;
-                useLocalOrganization(selectedOrg.value);
-                store.dispatch("setSelectedOrganization", selectedOrg.value);
-              } else if (data.identifier == customOrganization) {
-                selectedOrg.value = optiondata;
-                useLocalOrganization(selectedOrg.value);
-                store.dispatch("setSelectedOrganization", selectedOrg.value);
-              }
-              return optiondata;
-            }
-          );
-        });
-    };
-
-    getDefaultOrganization();
+      if (config.isZincObserveCloud == "true") {
+        setTimeout(() => {
+          mainLayoutMixin.setup().getRefreshToken();
+        }, timeout);
+      }
+    }
 
     const updateOrganization = () => {
       const orgIdentifier = selectedOrg.value.identifier;
@@ -488,35 +493,75 @@ export default defineComponent({
       store.state.selectedOrganization = selectedOrg;
     };
 
-    if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
-      const d = new Date();
-      const timeoutinterval = Math.floor(d.getTime() / 1000);
-      const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-    }
+    const setSelectedOrganization = () => {
+      if (store.state.organizations.length > 0) {
+        const localOrg: any = useLocalOrganization();
+        orgOptions.value = store.state.organizations.map(
+          (data: {
+            id: any;
+            name: any;
+            type: any;
+            identifier: any;
+            UserObj: any;
+            ingest_threshold: number;
+            search_threshold: number;
+            CustomerBillingObj: { subscription_type: string };
+          }) => {
+            const optiondata: any = {
+              label: data.name,
+              id: data.id,
+              identifier: data.identifier,
+              user_email: store.state.userInfo.email,
+              ingest_threshold: data.ingest_threshold,
+              search_threshold: data.search_threshold,
+              subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                ? data.CustomerBillingObj.subscription_type
+                : "",
+            };
 
-    const link: any = ref("inbox");
+            if (
+              config.isZincObserveCloud == "true" &&
+              localOrg.value.identifier == data.identifier &&
+              (customOrganization == "" || customOrganization == undefined)
+            ) {
+              localOrg.value.subscription_type =
+                data.CustomerBillingObj.subscription_type;
+              useLocalOrganization(localOrg.value);
+            }
 
-    if (config.isZincObserveCloud == "true") {
-      const tracker = new Tracker({
-        projectKey: config.openReplayKey,
-      });
-
-      tracker.start();
-      tracker.setUserID(store.state.userInfo.email);
-    }
-
-    const goToHome = () => {
-      router.push("/");
+            if (
+              ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
+                data.type == "default" &&
+                store.state.userInfo.email == data.UserObj.email &&
+                (customOrganization == "" ||
+                  customOrganization == undefined)) ||
+              (store.state.organizations.length == 1 &&
+                (customOrganization == "" || customOrganization == undefined))
+            ) {
+              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
+              useLocalOrganization(selectedOrg.value);
+              store.dispatch("setSelectedOrganization", selectedOrg.value);
+            } else if (data.identifier == customOrganization) {
+              selectedOrg.value = optiondata;
+              useLocalOrganization(selectedOrg.value);
+              store.dispatch("setSelectedOrganization", selectedOrg.value);
+            }
+            return optiondata;
+          }
+        );
+      }
     };
 
     return {
       t,
-      goToHome,
+      router,
       store,
-      quotaThresholdMsg,
-      link,
-      quotaAlertClass,
+      config,
+      langList,
+      selectedLanguage,
       linksList,
+      selectedOrg,
+      orgOptions,
       leftDrawerOpen: true,
       miniMode,
       toggleLeftDrawer() {
@@ -529,18 +574,30 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
       user,
-      langList,
-      selectedLanguage,
-      changeLanguage,
       languageFlag,
-      getDefaultOrganization,
-      signout,
-      orgOptions,
-      updateOrganization,
-      selectedOrg,
       zoBackendUrl,
       getImageURL,
+      updateOrganization,
+      setSelectedOrganization,
     };
+  },
+  computed: {
+    quota() {
+      return this.store.state.selectedOrganization;
+    },
+    changeOrganization() {
+      return this.store.state.organizations;
+    },
+  },
+  watch: {
+    quota() {
+      if (this.config.isZincObserveCloud == "true") {
+        mainLayoutMixin.setup().getOrganizationThreshold();
+      }
+    },
+    changeOrganization() {
+      this.setSelectedOrganization();
+    },
   },
 });
 </script>
