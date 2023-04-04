@@ -199,7 +199,7 @@ dependencies = [
  "serde_urlencoded",
  "smallvec",
  "socket2",
- "time 0.3.20",
+ "time",
  "url",
 ]
 
@@ -262,8 +262,7 @@ dependencies = [
 [[package]]
 name = "actix-web-rust-embed-responder"
 version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5acf7b61a2fbb0394e6b5ff968b76c2d7481c9cf60a33625364416e297d11375"
+source = "git+https://github.com/zinclabs/actix-web-rust-embed-responder.git#fd94715f740fb106ceaf823c437e9bde2a9c8ab8"
 dependencies = [
  "actix-web",
  "base64 0.21.0",
@@ -761,7 +760,7 @@ dependencies = [
  "http",
  "hyper",
  "ring",
- "time 0.3.20",
+ "time",
  "tokio",
  "tower",
  "tracing",
@@ -931,7 +930,7 @@ dependencies = [
  "percent-encoding",
  "regex",
  "sha2",
- "time 0.3.20",
+ "time",
  "tracing",
 ]
 
@@ -1087,7 +1086,7 @@ dependencies = [
  "itoa",
  "num-integer",
  "ryu",
- "time 0.3.20",
+ "time",
 ]
 
 [[package]]
@@ -1359,12 +1358,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16b0a3d9ed01224b22057780a37bb8c5dbfe1be8ba48678e7bf57ec4b385411f"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-integer",
  "num-traits",
  "serde",
- "time 0.1.43",
- "wasm-bindgen",
  "winapi 0.3.9",
 ]
 
@@ -1482,7 +1478,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e859cd57d0710d9e06c381b550c06e76992472a8c6d527aecd2fc673dcc231fb"
 dependencies = [
  "percent-encoding",
- "time 0.3.20",
+ "time",
  "version_check",
 ]
 
@@ -3822,8 +3818,7 @@ dependencies = [
 [[package]]
 name = "rust-embed-for-web"
 version = "11.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "315ba69a3ecad03d3c99629d7190993599e7e2612b6e4b27bd3c769969f5eec1"
+source = "git+https://github.com/zinclabs/rust-embed-for-web.git#529ff4b7d68ab7e89e7fd8520787e25be0b0ff0e"
 dependencies = [
  "rust-embed-for-web-impl",
  "rust-embed-for-web-utils",
@@ -3833,8 +3828,7 @@ dependencies = [
 [[package]]
 name = "rust-embed-for-web-impl"
 version = "11.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6c181b631a5952c043c187d396778db3a56ec0df4abad6e34c5e1753d6e7631"
+source = "git+https://github.com/zinclabs/rust-embed-for-web.git#529ff4b7d68ab7e89e7fd8520787e25be0b0ff0e"
 dependencies = [
  "brotli",
  "flate2",
@@ -3850,8 +3844,7 @@ dependencies = [
 [[package]]
 name = "rust-embed-for-web-utils"
 version = "11.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a1a7f864975b56e94ea5258076d5bdca4920cfbc7eaabc68d85eb524cd217f"
+source = "git+https://github.com/zinclabs/rust-embed-for-web.git#529ff4b7d68ab7e89e7fd8520787e25be0b0ff0e"
 dependencies = [
  "base85rs",
  "chrono",
@@ -4033,7 +4026,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "time 0.3.20",
+ "time",
 ]
 
 [[package]]
@@ -4388,16 +4381,6 @@ dependencies = [
  "byteorder",
  "integer-encoding",
  "ordered-float",
-]
-
-[[package]]
-name = "time"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
-dependencies = [
- "libc",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5287,7 +5270,7 @@ dependencies = [
  "sqlparser",
  "sys-info",
  "thiserror",
- "time 0.3.20",
+ "time",
  "tokio",
  "tonic",
  "tonic-build",
