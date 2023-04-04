@@ -84,8 +84,7 @@ impl super::Db for Etcd {
         if ret.kvs().is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key)));
         }
-        let value: Bytes = Bytes::from(ret.kvs()[0].value().to_vec());
-        Ok(value)
+        Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
     async fn put(&self, key: &str, value: Bytes) -> Result<()> {
@@ -98,17 +97,12 @@ impl super::Db for Etcd {
     async fn delete(&self, key: &str, with_prefix: bool) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
-        let opt = if with_prefix {
-            Some(DeleteOptions::new().with_prefix())
-        } else {
-            None
-        };
-        let result = client.delete(key.as_str(), opt).await?;
-        if result.deleted() > 0 {
-            Ok(())
-        } else {
+        let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
+        let nr_deleted_keys = client.delete(key.as_str(), opt).await?.deleted();
+        if nr_deleted_keys <= 0 {
             return Err(Error::from(DbError::KeyNotExists(key)));
         }
+        Ok(())
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
