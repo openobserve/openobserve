@@ -1133,7 +1133,7 @@ mod tests {
 
     async fn e2e_post_alert() {
         let auth = setup();
-        let body_str = r#"{                              
+        let body_str = r#"{
                                 "condition": {
                                     "column": "country",
                                     "operator": "=",
@@ -1145,7 +1145,7 @@ mod tests {
                                 "destination":"slack",
                                 "context_attributes":{
                                     "app_name":"App1"
-                                } 
+                                }
                             }"#;
         let app = test::init_service(
             App::new()
