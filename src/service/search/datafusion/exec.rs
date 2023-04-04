@@ -409,6 +409,10 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             if quotes == 0 {
                 quotes += 1;
                 quote_now = *c;
+                if !in_word {
+                    start_pos = i;
+                    in_word = true;
+                }
                 continue;
             }
             if quotes == 1 && quote_now == *c {
