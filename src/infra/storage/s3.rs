@@ -69,7 +69,7 @@ impl FileStorage for S3 {
 
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0].eq("files") {
+        if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc_by(data.len() as u64);
@@ -104,7 +104,7 @@ impl FileStorage for S3 {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
-                if columns[0].eq("files") {
+                if columns[0] == "files" {
                     metrics::STORAGE_WRITE_BYTES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .inc_by(data_size as u64);
@@ -135,19 +135,15 @@ impl FileStorage for S3 {
         let columns = files[0].split('/').collect::<Vec<&str>>();
 
         if CONFIG.s3.feature_delete_objects {
-            if let Err(e) = self.delete_objects(files).await {
-                return Err(anyhow::anyhow!(e));
-            }
+            self.delete_objects(files).await?;
         } else {
             for file in files {
-                if let Err(e) = self.delete_object(file).await {
-                    return Err(anyhow::anyhow!(e));
-                }
+                self.delete_object(file).await?;
                 tokio::task::yield_now().await; // yield to other tasks
             }
         }
 
-        if columns[0].eq("files") {
+        if columns[0] == "files" {
             let time = start_time.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
                 .with_label_values(&[columns[1], columns[3], columns[2], "del"])

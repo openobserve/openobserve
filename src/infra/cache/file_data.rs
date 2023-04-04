@@ -82,7 +82,7 @@ impl FileData {
                 let (key, val) = item.unwrap();
                 // metrics
                 let columns = key.split('/').collect::<Vec<&str>>();
-                if columns[0].eq("files") {
+                if columns[0] == "files" {
                     metrics::QUERY_CACHE_FILES
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .dec();
@@ -102,7 +102,7 @@ impl FileData {
         self.data.put(file.to_string(), data);
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0].eq("files") {
+        if columns[0] == "files" {
             metrics::QUERY_CACHE_FILES
                 .with_label_values(&[columns[1], columns[3], columns[2]])
                 .inc();
