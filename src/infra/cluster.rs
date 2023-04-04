@@ -35,6 +35,7 @@ pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 lazy_static! {
     pub static ref LOCAL_NODE_UUID: String = load_local_node_uuid();
     pub static ref LOCAL_NODE_ROLE: Vec<Role> = load_local_node_role();
+    pub static ref LOCAL_MODE_NODE: Node = load_local_mode_node();
     pub static ref NODES: DashMap<String, Node> = DashMap::new();
 }
 
@@ -295,6 +296,9 @@ pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
 
 #[inline(always)]
 pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
+    if CONFIG.common.local_mode {
+        return Some([LOCAL_MODE_NODE.clone()].to_vec());
+    }
     if NODES.len() == 0 {
         return None;
     }
@@ -399,6 +403,20 @@ async fn watch_node_list() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[inline(always)]
+pub fn load_local_mode_node() -> Node {
+    Node {
+        id: 1,
+        uuid: load_local_node_uuid(),
+        name: CONFIG.common.instance_name.clone(),
+        http_addr: format!("http://127.0.0.1:{}", CONFIG.http.port),
+        grpc_addr: format!("http://127.0.0.1:{}", CONFIG.grpc.port),
+        role: [Role::All].to_vec(),
+        cpu_num: CONFIG.limit.cpu_num as u64,
+        status: NodeStatus::Online,
+    }
 }
 
 #[inline(always)]
