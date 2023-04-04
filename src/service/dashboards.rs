@@ -39,12 +39,12 @@ pub async fn get_dashboard(org_id: &str, name: &str) -> Result<HttpResponse, io:
     }
 }
 
-pub async fn save_dashboard(
+pub async fn create_dashboard(
     org_id: &str,
     name: &str,
     dashboard: &Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    let loc_span = info_span!("service:dashboards:save");
+    let loc_span = info_span!("service:dashboards:create");
     let _guard = loc_span.enter();
 
     match dashboard::set(org_id, name, dashboard).await {
