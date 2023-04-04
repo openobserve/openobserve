@@ -195,7 +195,6 @@ export default defineComponent({
     });
 
     const refreshData = () => {
-      console.log('refresh triggered');
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
     }
 
@@ -205,17 +204,8 @@ export default defineComponent({
 
     // ------- work with query params ----------
     onActivated(() => {
-      console.log("onactivated");
       const params = route.query
 
-
-      // console.log(params.date);
-      
-      
-      // console.log("parse-", JSON.parse(params.date));
-      console.log("ViewDashboard: on activated: decoded ", JSON.parse(atob(params.date)));
-      
-      
       if(params.refresh) {
         refreshInterval.value = params.refresh
       }
@@ -225,20 +215,15 @@ export default defineComponent({
       }
     })
 
-    // whenever the refreshInterval is changed, update the query params
+   // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate], () => {
-      console.log("ViewDashboard: watch: refresh and date");
-      // console.log("router");
-      // console.log("stringify---", JSON.stringify(selectedDate.value));
-      console.log("ViewDashboard: watch: date decoded object",  btoa(JSON.stringify(selectedDate.value)));
       
       router.replace({
-        ...router.currentRoute,
-        query: {
+        query: Object.assign({...route.query}, {
           dashboard: route.query.dashboard,
           refresh: refreshInterval.value,
           date: btoa(JSON.stringify(selectedDate.value))
-        }
+        })
       })
     })
 
