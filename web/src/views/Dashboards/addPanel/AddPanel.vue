@@ -31,10 +31,10 @@
           />
         </div>
       </div>
-      <div class="flex items-baseline q-gutter-sm">
+      <div class="flex q-gutter-sm">
         <DateTimePicker v-model="selectedDate" />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold"
+          class="q-ml-md text-bold"
           outline
           padding="sm lg"
           color="red"
@@ -43,7 +43,7 @@
           @click="goBackToDashboardList"
         />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold"
+          class="q-ml-md text-bold"
           outline
           padding="sm lg"
           color="white"
@@ -53,7 +53,7 @@
           @click="savePanelOnClick"
         />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
+          class="q-ml-md text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
