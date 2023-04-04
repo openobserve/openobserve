@@ -62,3 +62,10 @@ pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
         })
         .collect()
 }
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = "/dashboard/";
+    db.delete(key, true).await?;
+    Ok(())
+}
