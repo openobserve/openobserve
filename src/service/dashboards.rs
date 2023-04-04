@@ -22,10 +22,11 @@ use crate::service::db::dashboard;
 #[instrument(skip(dashboard))]
 pub async fn create_dashboard(
     org_id: &str,
-    dashboard_id: &str,
-    dashboard: &Dashboard,
+    dashboard: Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    if let Err(e) = dashboard::set(org_id, dashboard_id, dashboard).await {
+    // XXX-TODO: Generate `dashboard_id` and overwrite `dashboard.dashboard_id`
+    // with that value.
+    if let Err(e) = dashboard::set(org_id, &dashboard).await {
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),

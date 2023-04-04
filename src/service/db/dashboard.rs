@@ -48,11 +48,10 @@ pub async fn get(
 #[instrument(err, skip(dashboard))]
 pub async fn set(
     org_id: &str,
-    dashboard_id: &str,
     dashboard: &Dashboard,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = format!("/dashboard/{org_id}/{dashboard_id}");
+    let key = format!("/dashboard/{org_id}/{}", dashboard.dashboard_id);
     Ok(db.put(&key, json::to_vec(dashboard)?.into()).await?)
 }
 
