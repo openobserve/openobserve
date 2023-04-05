@@ -30,9 +30,7 @@ pub async fn create_dashboard(
         Response::InternalServerError(e)
     } else {
         tracing::info!(dashboard_id = dashboard.dashboard_id, "Dashboard created");
-        Response::Created {
-            dashboard_id: dashboard.dashboard_id,
-        }
+        Response::DashboardCreated
     };
     Ok(resp.into())
 }
@@ -88,7 +86,7 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRe
 
 #[derive(Debug)]
 enum Response {
-    Created { dashboard_id: String },
+    DashboardCreated,
     NotFound { error: Option<String> },
     InternalServerError(anyhow::Error),
 }
@@ -96,9 +94,9 @@ enum Response {
 impl From<Response> for HttpResponse {
     fn from(resp: Response) -> Self {
         match resp {
-            Response::Created { dashboard_id } => Self::Created().json(MetaHttpResponse::message(
+            Response::DashboardCreated => Self::Created().json(MetaHttpResponse::message(
                 StatusCode::CREATED.into(),
-                format!("Dashboard {dashboard_id} created"),
+                "Dashboard created".to_owned(),
             )),
             Response::NotFound { error } => Self::NotFound().json(MetaHttpResponse::error(
                 StatusCode::NOT_FOUND.into(),
