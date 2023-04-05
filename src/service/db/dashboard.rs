@@ -15,34 +15,19 @@
 use anyhow::Context as _;
 use tracing::instrument;
 
-use crate::{
-    common::json,
-    meta::dashboards::{Dashboard, NamedDashboard},
-};
+use crate::{common::json, meta::dashboards::Dashboard};
 
 /// # Panics
 ///
 /// Panics if [`Dashboard::dashboard_id`] stored in the database is not equal to
 /// `dashboard_id` argument.
 #[instrument(err)]
-pub async fn get(
-    org_id: &str,
-    dashboard_id: &str,
-) -> Result<Option<NamedDashboard>, anyhow::Error> {
+pub async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
-    let val = db.get(&key).await?;
-    let details: Dashboard = json::from_slice(&val).with_context(|| {
-        format!("Failed to deserialize the value for key {key:?} as `Dashboard`")
-    })?;
-    assert_eq!(
-        details.dashboard_id, dashboard_id,
-        "BUG: stored dashboard_id is not equal to the requested one"
-    );
-    Ok(Some(NamedDashboard {
-        name: dashboard_id.to_string(),
-        details,
-    }))
+    let bytes = db.get(&key).await?;
+    json::from_slice(&bytes)
+        .with_context(|| format!("Failed to deserialize the value for key {key:?} as `Dashboard`"))
 }
 
 #[instrument(err, skip(dashboard))]
@@ -53,21 +38,16 @@ pub async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyhow::Erro
 }
 
 #[instrument(err)]
-pub async fn list(org_id: &str) -> Result<Vec<NamedDashboard>, anyhow::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let db_key = format!("/dashboard/{org_id}/");
     db.list(&db_key)
         .await?
-        .into_iter()
-        .map(|(k, v)| {
-            let name = k
-                .strip_prefix(&db_key)
-                .expect("BUG: key {k:?} doesn't start with {db_key:?}")
-                .to_string();
-            let details: Dashboard = json::from_slice(&v).with_context(|| {
+        .into_values()
+        .map(|val| {
+            json::from_slice(&val).with_context(|| {
                 format!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
-            })?;
-            Ok(NamedDashboard { name, details })
+            })
         })
         .collect()
 }

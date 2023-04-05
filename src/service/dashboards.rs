@@ -57,23 +57,19 @@ pub async fn update_dashboard(
 
 #[instrument]
 pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
-    use meta::dashboards::DashboardList;
+    use meta::dashboards::Dashboards;
 
-    Ok(HttpResponse::Ok().json(DashboardList {
-        list: dashboard::list(org_id).await.unwrap(),
+    Ok(HttpResponse::Ok().json(Dashboards {
+        dashboards: dashboard::list(org_id).await.unwrap(),
     }))
 }
 
 #[instrument]
 pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    Ok(match dashboard::get(org_id, dashboard_id).await {
-        Err(_) => Response::NotFound { error: None }.into(),
-        Ok(dashboard) => HttpResponse::Ok().json(
-            // The value is safe to unwrap, because `dashboard::get` never
-            // returns `Ok(None)`.
-            dashboard.unwrap(),
-        ),
-    })
+    if let Ok(dashboard) = dashboard::get(org_id, dashboard_id).await {
+        return Ok(HttpResponse::Ok().json(dashboard));
+    }
+    Ok(Response::NotFound { error: None }.into())
 }
 
 #[instrument]
