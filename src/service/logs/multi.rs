@@ -21,6 +21,7 @@ use datafusion::arrow::datatypes::Schema;
 use mlua::{Function, Lua};
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
+use vrl::Program;
 
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
@@ -74,6 +75,8 @@ pub async fn ingest(
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    #[cfg(feature = "zo_functions")]
+    let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -96,12 +99,20 @@ pub async fn ingest(
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Option<Function>;
+        //let mut func: Option<Function>;
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);
-            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            if func.is_some() {
-                stream_lua_map.insert(func_key, func.unwrap().to_owned());
+            if trans.trans_type == 0 {
+                let func =
+                    crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
+                if func.is_some() {
+                    stream_lua_map.insert(func_key, func.unwrap().to_owned());
+                }
+            } else {
+                let program = crate::service::ingestion::compile_vrl_function(&trans.function);
+                if program.is_some() {
+                    stream_vrl_map.insert(func_key, program.unwrap().to_owned());
+                }
             }
         }
     }
@@ -140,6 +151,8 @@ pub async fn ingest(
         let value: json::Value = json::from_slice(line.as_bytes())?;
         #[cfg(feature = "zo_functions")]
         // Start row based transform
+        let state = vrl::state::Runtime::default();
+        let mut runtime = vrl::Runtime::new(state);
         for trans in &local_tans {
             let func_key = format!("{stream_name}/{}", trans.name);
             if stream_lua_map.contains_key(&func_key) {
@@ -147,6 +160,12 @@ pub async fn ingest(
                     &lua,
                     &value,
                     stream_lua_map.get(&func_key).unwrap(),
+                );
+            } else if stream_vrl_map.contains_key(&func_key) {
+                value = crate::service::ingestion::apply_vrl_fn(
+                    &mut runtime,
+                    stream_vrl_map.get(&func_key).unwrap().clone(),
+                    &value,
                 );
             }
         }

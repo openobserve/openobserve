@@ -15,9 +15,12 @@
 use crate::common::json::{Map, Value};
 use ahash::AHashMap;
 use arrow_schema::Schema;
-use chrono::{TimeZone, Utc};
+use chrono::{SecondsFormat, TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
+
+#[cfg(feature = "zo_functions")]
+use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
 
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
@@ -39,6 +42,23 @@ pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
         None
     }
 }
+
+#[cfg(feature = "zo_functions")]
+pub fn compile_vrl_function(func: &str) -> Option<Program> {
+    let result = vrl::compile(&func, &stdlib::all());
+
+    match result {
+        Ok(CompilationResult {
+            program,
+            warnings: _,
+            config: _,
+        }) => Some(program),
+        Err(e) => {
+            log::info!("Error compiling vrl {:?}", e);
+            None
+        }
+    }
+}
 #[cfg(feature = "zo_functions")]
 pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
     let input = lua.to_value(&row).unwrap();
@@ -52,6 +72,29 @@ pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
         }
     }
 }
+
+#[cfg(feature = "zo_functions")]
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    program: vrl::Program,
+    row: &serde_json::Value,
+) -> Value {
+    let mut metadata = value::Value::from(BTreeMap::new());
+    let mut target = TargetValueRef {
+        value: &mut value::Value::from(row),
+        metadata: &mut metadata,
+        secrets: &mut value::Secrets::new(),
+    };
+    let timezone = vrl::TimeZone::Local;
+    let result = match VrlRuntime::default() {
+        VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
+    };
+    match result {
+        Ok(res) => vrl_value_to_json_value(res),
+        Err(_) => row.clone(),
+    }
+}
+
 #[cfg(feature = "zo_functions")]
 pub async fn get_stream_transforms<'a>(
     key: String,
@@ -172,6 +215,32 @@ pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
     trigger.last_sent_at = Utc::now().timestamp_micros();
     trigger.count += 1;
     let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
+}
+
+fn vrl_value_to_json_value(value: value::Value) -> serde_json::Value {
+    use serde_json::Value::*;
+
+    match value {
+        v @ value::Value::Bytes(_) => String(
+            vrl::value::VrlValueConvert::try_bytes_utf8_lossy(&v)
+                .unwrap()
+                .into_owned(),
+        ),
+        value::Value::Integer(v) => v.into(),
+        value::Value::Float(v) => v.into_inner().into(),
+        value::Value::Boolean(v) => v.into(),
+        value::Value::Object(v) => v
+            .into_iter()
+            .map(|(k, v)| (k, vrl_value_to_json_value(v)))
+            .collect::<serde_json::Value>(),
+        value::Value::Array(v) => v
+            .into_iter()
+            .map(vrl_value_to_json_value)
+            .collect::<serde_json::Value>(),
+        value::Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
+        value::Value::Regex(v) => v.to_string().into(),
+        value::Value::Null => Null,
+    }
 }
 
 #[cfg(test)]
