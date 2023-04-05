@@ -35,8 +35,8 @@ actix-cors = "0.6.4"
 actix-web = "4.3"
 actix-web-httpauth = "0.8"
 actix-web-opentelemetry = { version = "0.13", features = ["metrics"] }
-actix-web-prometheus = { version = "0.1.2", features = ["process"] }
-actix-web-rust-embed-responder = { version = "2.2.0", default-features = false, features = [
+actix-web-prometheus = { version = "0.1.2", features = ["process"] } 
+actix-web-rust-embed-responder = { git = "https://github.com/zinclabs/actix-web-rust-embed-responder.git", default-features = false, features = [
   "support-rust-embed-for-web",
   "base64",
 ] }
@@ -53,7 +53,7 @@ aws-smithy-async = "0.54"
 aws-sdk-s3 = "0.24"
 base64 = "0.21.0"
 bytes = "1.4"
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.1.6", default-features = false, features = [
   "std",
   "help",
@@ -62,8 +62,8 @@ clap = { version = "4.1.6", default-features = false, features = [
   "cargo",
 ] }
 dashmap = { version = "5.4.0", features = ["serde"] }
-datafusion = { version = "21.1.0", features = ["simd"] }
-datafusion-common = "21.1.0"
+datafusion = { version = "21.1", features = ["simd"] }
+datafusion-common = "21.1"
 dotenv_config = "0.1.5"
 dotenvy = "0.15.6"
 env_logger = "0.10"
@@ -109,8 +109,8 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
 ] }
 rs-snowflake = "0.6.0"
-rsfs = { version = "0.4.1", optional = true }
-rust-embed-for-web = "11.1.0"
+rsfs = { git = "https://github.com/zinclabs/rsfs.git", optional = true }
+rust-embed-for-web = { git = "https://github.com/zinclabs/rust-embed-for-web.git" }
 segment = "0.2.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -137,10 +137,10 @@ walkdir = "2"
 zstd = "0.12.1"
 
 [build-dependencies]
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = "21.1.0"
+datafusion-expr = "21.1"
 expect-test = "1.4"
