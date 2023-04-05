@@ -93,7 +93,7 @@ import {
   getConsumableDateTime,
   getDashboard,
 } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel } from "../../utils/date"
+import { parseDuration, generateDurationLabel, getDurationObjectFromParams, getQueryParamsForDuration } from "../../utils/date"
 import { toRaw, unref, reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
@@ -211,8 +211,8 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh)
       }
 
-      if(params.date){
-        selectedDate.value = JSON.parse(atob(params.date))
+      if(params.period || (params.to && params.from)){
+        selectedDate.value = getDurationObjectFromParams(params)
       }
     })
 
@@ -220,11 +220,11 @@ export default defineComponent({
     watch([refreshInterval, selectedDate], () => {
       
       router.replace({
-        query: Object.assign({...route.query}, {
+        query: {
           dashboard: route.query.dashboard,
           refresh: generateDurationLabel(refreshInterval.value),
-          date: btoa(JSON.stringify(selectedDate.value))
-        })
+          ...getQueryParamsForDuration(selectedDate.value)
+        }
       })
     })
 
