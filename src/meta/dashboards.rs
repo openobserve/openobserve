@@ -18,24 +18,15 @@ use serde::{Deserialize, Serialize};
 use super::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DashboardList {
-    pub list: Vec<NamedDashboard>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedDashboard {
-    // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
-    // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
-    pub name: String,
-    pub details: Dashboard,
+pub struct Dashboards {
+    pub dashboards: Vec<Dashboard>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
-    pub title: String,
-    // XXX-TODO(vvv): s/String/u64/
     pub dashboard_id: String,
+    pub title: String,
     pub description: String,
     pub role: String,
     pub owner: String,
@@ -53,14 +44,11 @@ pub struct Layout {
     pub w: i64,
     pub h: i64,
     pub i: i64,
-    #[serde(rename = "panelId")]
     pub panel_id: String,
     #[serde(rename = "static")]
     pub is_static: bool,
 }
 
-// XXX-TODO: Move `Panel` and the associate structs into a separate module.
-// `meta::dashboard::panel` perhaps?
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
@@ -196,8 +184,8 @@ mod tests {
 
         expect![[r##"
             Dashboard {
-                title: "b2",
                 dashboard_id: "1501078512",
+                title: "b2",
                 description: "desc2",
                 role: "",
                 owner: "root@example.com",
