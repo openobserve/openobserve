@@ -1,42 +1,62 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
-import { installQuasar } from "../helpers/install-quasar-plugin";
-import { createStore } from "vuex";
-import MainLayout from "../../../layouts/MainLayout.vue";
-import MenuLink from "../../../components/MenuLink.vue";
-import i18n from "../../../locales";
+// Copyright 2022 Zinc Labs Inc. and Contributors
 
-installQuasar();
-const store = createStore({
-  state: {
-    currentuser: {
-      miniMode: false,
-    },
-    userInfo: {
-      email: "",
-      exp: 0,
-    },
-    selectedOrganization: "",
-  },
-  mutations: {
-    setOrganizations: vi.fn(),
-    setSelectedOrganization: vi.fn(),
-  },
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http:www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { flushPromises, DOMWrapper, mount } from "@vue/test-utils";
+import { installQuasar } from "../helpers/install-quasar-plugin";
+import { Dialog, Notify } from "quasar";
+import i18n from "@/locales";
+import store from "../helpers/store";
+import routes from "@/router/routes";
+import { createRouter, createWebHistory } from "vue-router";
+import "plotly.js";
+import MainLayout from "@/layouts/MainLayout.vue";
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
 });
-describe("MainLayout", async () => {
-  it("should mount MainLayout view", async () => {
-    const wrapper = mount(MainLayout, {
-      shallow: false,
-      components: {
-        MenuLink,
-      },
+
+const node = document.createElement("div");
+node.setAttribute("id", "app");
+document.body.appendChild(node);
+
+installQuasar({
+  plugins: [Dialog, Notify],
+});
+
+describe("Search Result", async () => {
+  let wrapper: any;
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    wrapper = mount(MainLayout, {
       global: {
-        plugins: [i18n],
         provide: {
           store: store,
         },
+        plugins: [i18n, router],
       },
     });
-    expect(wrapper).toBeTruthy();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("Checks if main layout is rendered", () => {
+    expect(wrapper.exists()).toBe(true);
   });
 });
