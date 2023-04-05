@@ -104,7 +104,7 @@ import { useRouter } from "vue-router";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
-import useLogs from "../../composables/useLogs";
+import useLogs from "../../composables/common/useLogs";
 import { deepKeys, byString } from "../../utils/json";
 import { Parser } from "node-sql-parser";
 

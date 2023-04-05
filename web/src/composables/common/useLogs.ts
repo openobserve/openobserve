@@ -13,7 +13,7 @@
 //  limitations under the License. 
 
 import { reactive } from "vue";
-import { useLocalLogsObj, useLocalLogFilterField } from "../utils/zincutils";
+import { useLocalLogsObj, useLocalLogFilterField } from "../../utils/zincutils";
 
 const defaultObject = {
     organizationIdetifier: "",

@@ -141,7 +141,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import DateTime from "../../components/DateTime.vue";
-import useLogs from "../../composables/useLogs";
+import useLogs from "../../composables/common/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
