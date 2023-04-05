@@ -5,10 +5,15 @@ import { Dialog, Notify } from "quasar";
 import User from "../../../views/User.vue";
 import i18n from "../../../locales";
 import store from "../helpers/store";
-import { rest } from "msw";
-import OrganizationService from "@/services/organizations";
+import routes from "@/router/routes";
+import { createRouter, createWebHistory } from "vue-router";
 installQuasar({
   plugins: [Dialog, Notify],
+});
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
 });
 
 describe("Users", async () => {
@@ -24,7 +29,7 @@ describe("Users", async () => {
         provide: {
           store: store,
         },
-        plugins: [i18n],
+        plugins: [i18n, router],
       },
     });
     await flushPromises();
