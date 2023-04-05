@@ -212,6 +212,7 @@ describe("Search Result", async () => {
   it("Should get logs after 5 secs when search interval is updated to 5 secs", async () => {
     const search = vi.spyOn(searchService, "search");
     const domWrapper = new DOMWrapper(document.body);
+    wrapper.vm.router.currentRoute.value.name = "logs";
     await wrapper
       .find('[data-test="logs-search-refresh-interval-dropdown-btn"]')
       .trigger("click");
@@ -235,7 +236,7 @@ describe("Search Result", async () => {
       .find('[data-test="date-time-relative-1-Weeks-btn"]')
       .trigger("click");
 
-    await vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTime(300);
     expect(search).toHaveBeenCalledTimes(1);
   });
 });
