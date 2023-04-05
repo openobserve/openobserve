@@ -8,46 +8,9 @@ import alerts from "../mockData/alerts";
 import logs from "../mockData/logs";
 import "whatwg-fetch";
 import store from "./store";
-
-vi.stubGlobal("jest", vi);
-
-import "jest-canvas-mock";
-class ResizeObserver {
-  observe() {
-    // do nothing
-  }
-  unobserve() {
-    // do nothing
-  }
-  disconnect() {
-    // do nothing
-  }
-}
-
-global.ResizeObserver = ResizeObserver;
+import "../../__mocks__/index";
 
 import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
-
-vi.mock("rudder-sdk-js", () => {
-  return {
-    ready: vi.fn(),
-    load: vi.fn(),
-    track: vi.fn(),
-  };
-});
-
-vi.mock("plotly.js", () => {
-  return {
-    default: {
-      newPlot: vi.fn((ref) => {
-        ref.on = vi.fn();
-      }),
-      addTraces: vi.fn(),
-      restyle: vi.fn(),
-      relayout: vi.fn(),
-    },
-  };
-});
 
 // TODO OK: Move below rest handlers to separate file
 export const restHandlers = [
@@ -114,21 +77,6 @@ const server = setupServer(...restHandlers);
 // For this we need instance of server while testing
 // So have added server instance on global so that it can be accessed while testing
 vi.stubGlobal("server", server);
-vi.stubGlobal("open", vi.fn());
-vi.stubGlobal("scrollTo", vi.fn());
-vi.stubGlobal(
-  "matchMedia",
-  vi.fn().mockImplementation((query) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // Deprecated
-    removeListener: vi.fn(), // Deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }))
-);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
