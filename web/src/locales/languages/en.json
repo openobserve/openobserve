@@ -211,7 +211,9 @@
         "ok": "Ok",
         "type": "Function Type",
         "showQuery": "Is Ingest Time Function?",
-        "stream_type": "Stream Type"
+        "stream_type": "Stream Type",
+        "vrl": "VRL",
+        "lua": "Lua"
     },
     "confirmDialog": {
         "cancel": "Cancel",

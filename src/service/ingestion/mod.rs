@@ -15,24 +15,23 @@
 use crate::common::json::{Map, Value};
 use ahash::AHashMap;
 use arrow_schema::Schema;
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-
 #[cfg(feature = "zo_functions")]
 use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
 
+use super::triggers;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
+use crate::meta::StreamType;
 use crate::{
     common::notification::send_notification,
     infra::config::STREAM_ALERTS,
     meta::alert::{Alert, Trigger},
 };
-
-use super::triggers;
 
 #[cfg(feature = "zo_functions")]
 pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
@@ -45,7 +44,7 @@ pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
 
 #[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str) -> Option<Program> {
-    let result = vrl::compile(&func, &stdlib::all());
+    let result = vrl::compile(func, &stdlib::all());
 
     match result {
         Ok(CompilationResult {
@@ -90,38 +89,34 @@ pub fn apply_vrl_fn(
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
-        Ok(res) => vrl_value_to_json_value(res),
+        Ok(res) => crate::common::vrl_utils::vrl_value_to_json_value(res),
         Err(_) => row.clone(),
     }
 }
 
 #[cfg(feature = "zo_functions")]
 pub async fn get_stream_transforms<'a>(
-    key: String,
     stream_name: String,
-    stream_tansform_map: &mut AHashMap<String, Vec<Transform>>,
+    org_id: String,
+    stream_type: StreamType,
+    stream_transform_map: &mut AHashMap<String, Vec<Transform>>,
     stream_lua_map: &mut AHashMap<String, Function<'a>>,
+    stream_vrl_map: &mut AHashMap<String, Program>,
     lua: &'a Lua,
 ) {
-    if stream_tansform_map.contains_key(&key) {
+    let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
+    if stream_transform_map.contains_key(&key) {
         return;
     }
-    let transforms = STREAM_FUNCTIONS.get(&key);
-    if transforms.is_none() {
-        return;
-    }
-
-    let mut func: Option<Function>;
-    let mut local_tans: Vec<Transform> = (*transforms.unwrap().list).to_vec();
-    local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-    for trans in &local_tans {
-        let func_key = format!("{}/{}", &stream_name, trans.name);
-        func = load_lua_transform(lua, trans.function.clone());
-        if func.is_some() {
-            stream_lua_map.insert(func_key, func.unwrap().to_owned());
-        }
-    }
-    stream_tansform_map.insert(key, local_tans.clone());
+    let mut _local_tans: Vec<Transform> = vec![];
+    (_local_tans, *stream_lua_map, *stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(
+            &org_id,
+            &stream_name,
+            stream_type,
+            lua,
+        );
+    stream_transform_map.insert(key, _local_tans);
 }
 
 pub async fn get_stream_partition_keys(
@@ -217,30 +212,68 @@ pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
     let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
 }
 
-fn vrl_value_to_json_value(value: value::Value) -> serde_json::Value {
-    use serde_json::Value::*;
+#[cfg(feature = "zo_functions")]
+pub fn register_stream_transforms<'a>(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    lua: &'a Lua,
+) -> (
+    Vec<Transform>,
+    AHashMap<String, Function<'a>>,
+    AHashMap<String, Program>,
+) {
+    let mut local_tans = vec![];
+    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
+    let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
-    match value {
-        v @ value::Value::Bytes(_) => String(
-            vrl::value::VrlValueConvert::try_bytes_utf8_lossy(&v)
-                .unwrap()
-                .into_owned(),
-        ),
-        value::Value::Integer(v) => v.into(),
-        value::Value::Float(v) => v.into_inner().into(),
-        value::Value::Boolean(v) => v.into(),
-        value::Value::Object(v) => v
-            .into_iter()
-            .map(|(k, v)| (k, vrl_value_to_json_value(v)))
-            .collect::<serde_json::Value>(),
-        value::Value::Array(v) => v
-            .into_iter()
-            .map(vrl_value_to_json_value)
-            .collect::<serde_json::Value>(),
-        value::Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
-        value::Value::Regex(v) => v.to_string().into(),
-        value::Value::Null => Null,
+    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
+        local_tans = (*transforms.list).to_vec();
+        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
+        for trans in &local_tans {
+            let func_key = format!("{}/{}", &stream_name, trans.name);
+            if trans.trans_type == 0 {
+                let func = load_lua_transform(lua, trans.function.clone());
+                if let Some(local_fn) = func {
+                    stream_lua_map.insert(func_key, local_fn.to_owned());
+                }
+            } else {
+                let program = compile_vrl_function(&trans.function);
+                if let Some(local_pg) = program {
+                    stream_vrl_map.insert(func_key, local_pg.to_owned());
+                }
+            }
+        }
     }
+
+    (local_tans, stream_lua_map, stream_vrl_map)
+}
+
+#[cfg(feature = "zo_functions")]
+pub fn apply_stream_transform<'a>(
+    local_tans: &Vec<Transform>,
+    value: &'a Value,
+    lua: &'a Lua,
+    stream_lua_map: &'a AHashMap<String, Function>,
+    stream_vrl_map: &'a AHashMap<String, Program>,
+    stream_name: &str,
+    runtime: &mut Runtime,
+) -> Value {
+    let mut value = value.clone();
+    for trans in local_tans {
+        let func_key = format!("{stream_name}/{}", trans.name);
+        if stream_lua_map.contains_key(&func_key) {
+            value = lua_transform(lua, &value, stream_lua_map.get(&func_key).unwrap());
+        } else if stream_vrl_map.contains_key(&func_key) {
+            value = apply_vrl_fn(
+                runtime,
+                stream_vrl_map.get(&func_key).unwrap().clone(),
+                &value,
+            );
+        }
+    }
+    value
 }
 
 #[cfg(test)]

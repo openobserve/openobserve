@@ -27,128 +27,47 @@
     <q-separator />
     <div>
       <q-form ref="addJSTransformForm" @submit="onSubmit">
-        <q-toggle
-          v-model="formData.ingest"
-          :label="t('function.showQuery')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          @update:model-value="updateEditorContent(formData.name)"
-        />
+        <q-toggle v-model="formData.ingest" :label="t('function.showQuery')" color="input-border" bg-color="input-bg"
+          class="q-py-md showLabelOnTop" stack-label outlined filled dense @update:model-value="updateEditorContent()" />
+        <div class="row q-pb-sm q-pt-md q-col-gutter-md">
+          <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
+            class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+            tabindex="0" />
 
-        <q-select
-          v-if="formData.ingest"
-          v-model="formData.stream_type"
-          :options="streamTypes"
-          :label="t('alerts.stream_type')"
-          :popup-content-style="{ textTransform: 'capitalize' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          @update:model-value="updateStreams"
-          :rules="[(val: any) => !!val || 'Field is required!']"
-        />
+          <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
+            :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
+            bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
+            @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
 
-        <q-select
-          v-if="formData.ingest"
-          v-model="formData.stream_name"
-          :loading="isFetchingStreams"
-          :options="indexOptions"
-          :label="t('function.stream_name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop no-case"
-          stack-label
-          outlined
-          filled
-          dense
-        />
+          <q-select v-if="formData.ingest" v-model="formData.stream_name" :loading="isFetchingStreams"
+            :options="indexOptions" :label="t('function.stream_name')" color="input-border" bg-color="input-bg"
+            class="col-4 q-py-md showLabelOnTop no-case" stack-label outlined filled dense />
+        </div>
 
-        <q-input
-          v-model="formData.name"
-          :label="t('function.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated"
-          :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-          tabindex="0"
-          @keyup="updateFunction"
-        />
+        <div class="q-gutter-sm">
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.trans_type"
+            :checked="formData.trans_type === '1'" val="1" :label="t('function.vrl')" class="q-ml-none"
+            @update:model-value="updateFunction" />
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.trans_type"
+            :checked="formData.trans_type === '0'" val="0" :label="t('function.lua')" class="q-ml-none"
+            @update:model-value="updateFunction" />
+
+        </div>
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <div
-          ref="editorRef"
-          id="editor"
-          :label="t('function.jsfunction')"
-          stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px"
-          @keyup="editorUpdate"
-          class="q-py-md showLabelOnTop"
-          resize
-        ></div>
-        <!-- <q-input
-          v-model="formData.function"
-          min-height="5rem"
-          type="textarea"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :label="t('function.jsfunction')"
-          :rules="[(val) => !!val || 'Field is required!']"
-        /> -->
+        <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
+          style="border: 1px solid #dbdbdb; border-radius: 5px" @keyup="editorUpdate" class="q-py-md showLabelOnTop"
+          resize></div>
 
-        <q-input
-          v-if="formData.ingest"
-          v-model="formData.order"
-          :label="t('function.order')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          type="number"
-          min="1"
-        />
+        <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
+          bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup
-            class="q-mb-md text-bold no-border"
-            :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            :label="t('function.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('function.cancel')" text-color="light-text"
+            padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
+          <q-btn :label="t('function.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+            type="submit" no-caps />
         </div>
       </q-form>
     </div>
@@ -175,6 +94,7 @@ const defaultValue: any = () => {
     order: 1,
     ingest: false,
     stream_type: "logs",
+    trans_type: "1",
   };
 };
 
@@ -253,12 +173,9 @@ export default defineComponent({
     });
 
     const updateFunction = (e: any) => {
-      updateEditorContent(e.target.value);
+      updateEditorContent();
     };
-    const updateEditorContent = (fnName: string) => {
-      if (fnName == "") {
-        return;
-      }
+    const updateEditorContent = () => {
       if (editorData.value != "") {
         editorData.value = editorData.value
           .replace(prefixCode.value, "")
@@ -268,14 +185,26 @@ export default defineComponent({
           .trim();
       }
 
-      if (formData.value.ingest) {
-        prefixCode.value = `function(row)`;
-        suffixCode.value = `
+      if (formData.value.trans_type == "0") {
+
+        if (formData.value.ingest) {
+          prefixCode.value = `function(row)`;
+          suffixCode.value = `
 end`;
+        } else {
+          prefixCode.value = `function()`;
+          suffixCode.value = `
+end`;
+        }
       } else {
-        prefixCode.value = `function()`;
-        suffixCode.value = `
+        if (formData.value.ingest) {
+          prefixCode.value = "";
+          suffixCode.value = "";
+        } else {
+          prefixCode.value = `function()`;
+          suffixCode.value = `
 end`;
+        }
       }
 
       const someCode = `${prefixCode.value}
@@ -372,7 +301,7 @@ end`;
         return false;
       }
 
-      if (this.formData.function.indexOf("function") == -1) {
+      if (this.formData.trans_type == "0" && this.formData.function.indexOf("function") == -1) {
         this.$q.notify({
           type: "negative",
           message:
@@ -393,6 +322,7 @@ end`;
         }
 
         this.formData.order = parseInt(this.formData.order);
+        this.formData.trans_type = parseInt(this.formData.trans_type);
         if (this.formData.ingest) {
           callTransform = jsTransformService.create_with_index(
             this.store.state.selectedOrganization.identifier,

@@ -53,20 +53,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
+    let res = db::get_instance().await;
+    let instance_id;
+    if res.as_ref().is_err() || res.as_ref().unwrap().is_none() {
+        instance_id = ider::generate();
+        let _ = db::set_instance(&instance_id).await;
+    } else {
+        instance_id = res.unwrap().unwrap();
+    }
+    INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
+
     // check version
     db::version::set().await.expect("db version set failed");
 
     // telemetry run
     if CONFIG.common.telemetry_enabled {
-        let res = db::get_instance().await;
-        let instance_id;
-        if res.as_ref().is_err() || res.as_ref().unwrap().is_none() {
-            instance_id = ider::generate();
-            let _ = db::set_instance(&instance_id).await;
-        } else {
-            instance_id = res.unwrap().unwrap();
-        }
-        INSTANCE_ID.insert("instance_id".to_owned(), instance_id);
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
