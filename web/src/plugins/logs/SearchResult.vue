@@ -79,6 +79,7 @@
             <q-td
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
+              class="field_list"
             >
               <high-light
                 :content="
@@ -102,6 +103,28 @@
                     : ''
                 "
               ></high-light>
+              <div
+                v-if="column.closable"
+                class="field_overlay"
+                :title="row.name"
+              >
+                <q-icon
+                  :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                  size="1rem"
+                  title="Add to search query"
+                  @click.prevent.stop="
+                    addSearchTerm(`${column.name}='${row[column.name]}'`)
+                  "
+                />
+                <q-icon
+                  :name="'img:' + getImageURL('images/common/remove_icon.svg')"
+                  size="1rem"
+                  title="Add to search query"
+                  @click.prevent.stop="
+                    addSearchTerm(`${column.name}!='${row[column.name]}'`)
+                  "
+                />
+              </div>
             </q-td> </q-tr
         ></template>
       </q-virtual-scroll>
@@ -284,8 +307,6 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    removeSearchTerm;
-
     return {
       t,
       store,
@@ -449,5 +470,44 @@ export default defineComponent({
 
 .tfoot-sticky tr:first-child > * {
   bottom: 0;
+}
+
+.field_list {
+  padding: 0px;
+  margin-bottom: 0.125rem;
+  position: relative;
+  overflow: visible;
+  cursor: default;
+
+  .field_overlay {
+    position: absolute;
+    height: 100%;
+    right: 0;
+    top: 0;
+    background-color: #ffffff;
+    border-radius: 6px;
+    padding: 0 6px;
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s linear;
+
+    .q-icon {
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.3s linear;
+      margin: 0 1px;
+    }
+  }
+
+  &:hover {
+    .field_overlay {
+      visibility: visible;
+
+      .q-icon {
+        opacity: 1;
+      }
+    }
+  }
 }
 </style>
