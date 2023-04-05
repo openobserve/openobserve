@@ -15,7 +15,7 @@
 use crate::common::json::{Map, Value};
 use ahash::AHashMap;
 use arrow_schema::Schema;
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
 #[cfg(feature = "zo_functions")]
@@ -25,6 +25,7 @@ use super::triggers;
 #[cfg(feature = "zo_functions")]
 use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
 
+use super::triggers;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
