@@ -34,10 +34,10 @@
           :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" /> -->
         <!--<q-btn class="q-ml-md q-mb-xs text-bold" padding="sm lg" color="white" no-caps
             :label="t(`dashboard.goBackToDashboard`)" outline text-color="black" @click="goBackToDashboardList" />-->
-        <date-time
+        <DateTimePicker 
           class="q-ml-sm"
           ref="refDateTime"
-          @date-change="dateChange"
+          v-model="selectedDate"
         />
         <AutoRefreshInterval v-model="refreshInterval" @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="refresh" @click="refreshData">
@@ -86,7 +86,7 @@ import {
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import DateTime from "../../components/DateTime.vue";
+import DateTimePicker from "../../components/DateTimePicker.vue";
 import VueGridLayout from "vue3-grid-layout";
 import { useRouter } from "vue-router";
 import {
@@ -105,7 +105,7 @@ export default defineComponent({
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
-    DateTime,
+    DateTimePicker,
     PanelContainer,
     NoPanel,
     AutoRefreshInterval
@@ -124,6 +124,7 @@ export default defineComponent({
     const currentDurationSelectionObj = ref ({})
     const currentTimeObj = ref({});
     const refreshInterval = ref(0);
+    const selectedDate = ref()
 
     const initialDateValue = {
       tab: "relative",
@@ -194,26 +195,35 @@ export default defineComponent({
     });
 
     const refreshData = () => {
-      console.log('refresh triggered');
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
     }
+
+    watch(selectedDate, () => {
+      dateChange(selectedDate.value)
+    })
 
     // ------- work with query params ----------
     onActivated(() => {
       const params = route.query
+
       if(params.refresh) {
         refreshInterval.value = params.refresh
       }
+
+      if(params.date){
+        selectedDate.value = JSON.parse(atob(params.date))
+      }
     })
 
-    // whenever the refreshInterval is changed, update the query params
-    watch(refreshInterval, () => {
-      router.push({
-        name: route.name,
-        query: {
+   // whenever the refreshInterval is changed, update the query params
+    watch([refreshInterval, selectedDate], () => {
+      
+      router.replace({
+        query: Object.assign({...route.query}, {
           dashboard: route.query.dashboard,
-          refresh: refreshInterval.value
-        }
+          refresh: refreshInterval.value,
+          date: btoa(JSON.stringify(selectedDate.value))
+        })
       })
     })
 
@@ -249,7 +259,8 @@ export default defineComponent({
       dateChange,
       currentTimeObj,
       refreshInterval,
-      refreshData
+      refreshData,
+      selectedDate
     };
   },
   data() {

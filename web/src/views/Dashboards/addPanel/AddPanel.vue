@@ -31,10 +31,10 @@
           />
         </div>
       </div>
-      <div class="flex items-baseline q-gutter-sm">
-        <date-time @date-change="updateDateTime" />
+      <div class="flex q-gutter-sm">
+        <DateTimePicker v-model="selectedDate" />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold"
+          class="q-ml-md text-bold"
           outline
           padding="sm lg"
           color="red"
@@ -43,7 +43,7 @@
           @click="goBackToDashboardList"
         />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold"
+          class="q-ml-md text-bold"
           outline
           padding="sm lg"
           color="white"
@@ -53,7 +53,7 @@
           @click="savePanelOnClick"
         />
         <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
+          class="q-ml-md text-bold no-border"
           padding="sm lg"
           color="secondary"
           no-caps
@@ -137,7 +137,7 @@ import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
 import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import DateTime from "../../../components/DateTime.vue";
+import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 
 export default defineComponent({
@@ -147,9 +147,9 @@ export default defineComponent({
     GetFields,
     Layout,
     SearchBar,
-    DateTime,
+    DateTimePicker,
     ChartRender,
-  },
+},
   setup() {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
@@ -162,6 +162,7 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData();
     const editMode = ref(false);
+    const selectedDate = ref()
 
     onActivated(async () => {
       // todo check for the edit more
@@ -203,6 +204,10 @@ export default defineComponent({
     watch(()=> dashboardPanelData.data.type, ()=>{
       chartData.value = dashboardPanelData.data
 		})
+
+    watch(selectedDate, () => {
+      updateDateTime(selectedDate.value)
+    })
 
     const runQuery = () => {
       // console.log("query change detected to run");
@@ -376,6 +381,7 @@ export default defineComponent({
       dashboardPanelData,
       chartData,
       editMode,
+      selectedDate
     };
   },
   methods: {
