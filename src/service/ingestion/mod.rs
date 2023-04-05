@@ -26,6 +26,7 @@ use super::triggers;
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
+#[cfg(feature = "zo_functions")]
 use crate::meta::StreamType;
 use crate::{
     common::notification::send_notification,
