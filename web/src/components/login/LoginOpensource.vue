@@ -111,13 +111,16 @@ export default defineComponent({
       } else {
         submitting.value = true;
         try {
+          //authorize user using username and password
           authService
             .sign_in_user({
               name: name.value,
               password: password.value,
             })
             .then(async (res: any) => {
+              //if user is authorized, get user info
               if (res.data.status == true) {
+                //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
                 useLocalToken(authToken);
                 const userInfo = {
@@ -135,12 +138,14 @@ export default defineComponent({
                   JSON.stringify(userInfo)
                 );
 
+                //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
                 store.dispatch("setUserInfo", encodedUserInfo);
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
 
+                //check for redirect URI and redirect user to that page
                 const redirectURI =
                   window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
@@ -155,6 +160,8 @@ export default defineComponent({
                   search_threshold: string;
                 } | null> = ref(null);
 
+                //check organization information stored in localstorage along with email
+                //if email is different, remove organization information from localstorage
                 const localOrg: any = useLocalOrganization();
                 if (
                   localOrg.value != null &&
@@ -164,6 +171,8 @@ export default defineComponent({
                   useLocalOrganization("");
                 }
 
+                //if organization information is not available in localstorage, get all organizations from backend
+                //and set first organization as selected organization
                 if (localOrg.value) {
                   selectedOrg.value = localOrg.value;
                 } else {
@@ -185,12 +194,14 @@ export default defineComponent({
                     });
                 }
 
+                //if selected organization is available, set it into localstorage and store
                 if (selectedOrg.value) {
                   useLocalOrganization(selectedOrg.value);
                   store.dispatch("setSelectedOrganization", selectedOrg.value);
                   redirectUser(redirectURI);
                 }
               } else {
+                //if user is not authorized, show error message and reset form.
                 submitting.value = false;
                 loginform.value.resetValidation();
                 $q.notify({
@@ -200,6 +211,7 @@ export default defineComponent({
               }
             })
             .catch((e: Error) => {
+              //if any error occurs, show error message and reset form.
               submitting.value = false;
               loginform.value.resetValidation();
               $q.notify({

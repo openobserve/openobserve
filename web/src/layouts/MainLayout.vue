@@ -58,8 +58,8 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -136,8 +136,8 @@ size="xs" class="warning" />{{
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey"
-text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -160,7 +160,9 @@ text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup clickable @click="signout">
+              <q-item v-ripple
+v-close-popup clickable
+@click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -253,6 +255,8 @@ import { getLocale } from "../locales";
 
 import MainLayoutOpenSourceMixin from "../mixins/opensource/mainLayout.mixin";
 import MainLayoutCloudMixin from "../mixins/cloud/mainLayout.mixin";
+
+import configService from "../services/config";
 
 let mainLayoutMixin: any = null;
 if (config.isZincObserveCloud == "true") {
@@ -551,6 +555,22 @@ export default defineComponent({
         );
       }
     };
+
+    /**
+     * Get configuration from the backend.
+     * @return {"version":"","instance":"","commit_hash":"","build_date":"","functions_enabled":true,"default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
+     * @throws {Error} If the request fails.
+     */
+    const getConfig = async () => {
+      await configService
+        .get_config()
+        .then((res: any) => {
+          store.dispatch("setConfig", res.data);
+        })
+        .catch((error) => console.log(error));
+    };
+
+    getConfig();
 
     return {
       t,

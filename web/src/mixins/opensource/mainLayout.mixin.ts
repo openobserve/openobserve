@@ -1,13 +1,18 @@
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-
+import { useStore } from "vuex";
 import organizationService from "../../services/organizations";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
-    const store: any = useStore();
     const { t } = useI18n();
 
+    const store: any = useStore();
+
+    /**
+     * Add function menu in left navigation
+     * @param linksList
+     * @returns linksList.value
+     */
     const leftNavigationLinks = (linksList: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
@@ -18,6 +23,9 @@ const MainLayoutOpenSourceMixin = {
       return linksList.value;
     };
 
+    /**
+     * Get default organization
+     */
     const getDefaultOrganization = async () => {
       await organizationService
         .os_list(

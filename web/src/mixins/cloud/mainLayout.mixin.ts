@@ -7,7 +7,6 @@ import config from "../../aws-exports";
 import { useLocalToken, getUserInfo, getImageURL } from "../../utils/zincutils";
 import organizationService from "../../services/organizations";
 import billingService from "../../services/billings";
-import configService from "../../services/config";
 import userService from "../../services/users";
 
 import Tracker from "@openreplay/tracker";
@@ -18,7 +17,10 @@ const MainLayoutCloudMixin = {
     const router = useRouter();
     const { t } = useI18n();
 
+    
+    //check if organization identifier is present in query params
     const customOrganization = router.currentRoute.value.query.org_identifier;
+    //if present, set it as selected organization
     const selectedOrg = ref(store.state.selectedOrganization);
     const orgOptions = ref([{ label: Number, value: String }]);
 
@@ -30,6 +32,11 @@ const MainLayoutCloudMixin = {
       tracker.setUserID(store.state.userInfo.email);
     }
 
+    /**
+     * Add function & organization menu in left navigation
+     * @param linksList
+     * @returns linksList.value
+     */
     const leftNavigationLinks = (linksList: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
@@ -45,15 +52,9 @@ const MainLayoutCloudMixin = {
       return linksList.value;
     };
 
-    const getConfig = async () => {
-      await configService
-        .get_config()
-        .then((res: any) => {
-          store.dispatch("setConfig", res.data);
-        })
-        .catch((error) => console.log(error));
-    };
-
+    /**
+     * Get default organization
+     */
     const getDefaultOrganization = async () => {
       await organizationService
         .list(0, 1000, "id", false, "")
@@ -63,6 +64,11 @@ const MainLayoutCloudMixin = {
         .catch((error) => console.log(error));
     };
 
+    /**
+     * Get organization plan
+     * if plan is free, get the threshold and extract search and ingest threshold
+     * if one of the threshold exceed the threshold, show the warning message else show error message
+     */
     const getOrganizationThreshold = async () => {
       const organization: {
         identifier: "";
@@ -139,6 +145,9 @@ const MainLayoutCloudMixin = {
       }
     };
 
+    /**
+     * Get refresh token
+     */
     const getRefreshToken = () => {
       userService
         .getRefreshToken()
@@ -168,7 +177,6 @@ const MainLayoutCloudMixin = {
         });
     };
 
-    getConfig();
     getDefaultOrganization();
     getOrganizationThreshold();
 
