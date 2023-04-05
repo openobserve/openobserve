@@ -104,7 +104,7 @@
                 "
               ></high-light>
               <div
-                v-if="column.closable"
+                v-if="column.closable && row[column.name]"
                 class="field_overlay"
                 :title="row.name"
               >
