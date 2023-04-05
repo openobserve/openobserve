@@ -21,6 +21,7 @@ use datafusion::arrow::datatypes::Schema;
 use mlua::Lua;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
+use vrl::Program;
 
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
