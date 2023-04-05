@@ -261,11 +261,18 @@ export default defineComponent({
         if (
           !isEqual(selectedDateEmitValue.value, data.selectedDate)
         ) {
-          selectedDateEmitValue.value = JSON.parse(JSON.stringify(data.selectedDate));
+          updateEmitValue()
         }
       },
       { deep: true }
     );
+
+    const updateEmitValue = () => {
+      selectedDateEmitValue.value = JSON.parse(JSON.stringify(data.selectedDate));
+    }
+
+    // on the initial call emit the value once
+    updateEmitValue()
 
     return {
       relativePeriods,
