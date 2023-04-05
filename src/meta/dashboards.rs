@@ -96,11 +96,11 @@ pub enum AggregationFunc {
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
-    pub typ: String, // HACK: use enum
-    pub values: Vec<()>,       // XXX-FIXME
-    pub column: String,        // HACK: use enum
-    pub operator: String,      // HACK: use enum
-    pub value: Option<String>, // XXX-REVIEW
+    pub typ: String,
+    pub values: Vec<String>,
+    pub column: String,
+    pub operator: Option<String>,
+    pub value: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -117,7 +117,7 @@ mod tests {
     use expect_test::expect;
 
     #[test]
-    fn test_dashboard_defs() {
+    fn test_dashboard_defs_1() {
         let dashboard: Dashboard = json::from_str(r##"{
             "title": "b2",
             "dashboardId": "1501078512",
@@ -226,7 +226,9 @@ mod tests {
                                     typ: "condition",
                                     values: [],
                                     column: "method",
-                                    operator: "Is Not Null",
+                                    operator: Some(
+                                        "Is Not Null",
+                                    ),
                                     value: None,
                                 },
                             ],
@@ -249,6 +251,169 @@ mod tests {
                             h: 13,
                             i: 1,
                             panel_id: "Panel_ID7857010",
+                            is_static: false,
+                        },
+                    ],
+                ),
+            }
+        "##]].assert_debug_eq(&dashboard);
+    }
+
+    #[test]
+    fn test_dashboard_defs_2() {
+        let dashboard: Dashboard = json::from_str(r##"{
+            "dashboardId": "7049428968893710336",
+            "title": "board1",
+            "description": "",
+            "role": "",
+            "owner": "root@example.com",
+            "created": "2023-04-05T17:13:58.204+00:00",
+            "panels": [
+              {
+                "id": "Panel_ID1135310",
+                "type": "bar",
+                "fields": {
+                  "stream": "default",
+                  "stream_type": "logs",
+                  "x": [
+                    {
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram"
+                    }
+                  ],
+                  "y": [
+                    {
+                      "label": "Kubernetes Host",
+                      "alias": "y_axis_1",
+                      "column": "kubernetes_host",
+                      "color": "#5960b2",
+                      "aggregationFunction": "count"
+                    }
+                  ],
+                  "filter": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "log",
+                      "operator": "Is Not Null",
+                      "value": null
+                    },
+                    {
+                      "type": "list",
+                      "values": [
+                        "stdout",
+                        "stderr"
+                      ],
+                      "column": "stream",
+                      "operator": null,
+                      "value": null
+                    }
+                  ]
+                },
+                "config": {
+                  "title": "p1",
+                  "description": "",
+                  "show_legends": true
+                },
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                "customQuery": false
+              }
+            ],
+            "layouts": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 13,
+                "i": 1,
+                "panelId": "Panel_ID1135310",
+                "static": false
+              }
+            ]
+        }"##).unwrap();
+
+        expect![[r##"
+            Dashboard {
+                dashboard_id: "7049428968893710336",
+                title: "board1",
+                description: "",
+                role: "",
+                owner: "root@example.com",
+                created: 2023-04-05T17:13:58.204+00:00,
+                panels: [
+                    Panel {
+                        id: "Panel_ID1135310",
+                        typ: "bar",
+                        fields: PanelFields {
+                            stream: "default",
+                            stream_type: Logs,
+                            x: [
+                                AxisItem {
+                                    label: "Timestamp",
+                                    alias: "x_axis_1",
+                                    column: "_timestamp",
+                                    color: None,
+                                    aggregation_function: Some(
+                                        Histogram,
+                                    ),
+                                },
+                            ],
+                            y: [
+                                AxisItem {
+                                    label: "Kubernetes Host",
+                                    alias: "y_axis_1",
+                                    column: "kubernetes_host",
+                                    color: Some(
+                                        "#5960b2",
+                                    ),
+                                    aggregation_function: Some(
+                                        Count,
+                                    ),
+                                },
+                            ],
+                            filter: [
+                                PanelFilter {
+                                    typ: "condition",
+                                    values: [],
+                                    column: "log",
+                                    operator: Some(
+                                        "Is Not Null",
+                                    ),
+                                    value: None,
+                                },
+                                PanelFilter {
+                                    typ: "list",
+                                    values: [
+                                        "stdout",
+                                        "stderr",
+                                    ],
+                                    column: "stream",
+                                    operator: None,
+                                    value: None,
+                                },
+                            ],
+                        },
+                        config: PanelConfig {
+                            title: "p1",
+                            description: "",
+                            show_legends: true,
+                        },
+                        query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                        custom_query: false,
+                    },
+                ],
+                layouts: Some(
+                    [
+                        Layout {
+                            x: 0,
+                            y: 0,
+                            w: 12,
+                            h: 13,
+                            i: 1,
+                            panel_id: "Panel_ID1135310",
                             is_static: false,
                         },
                     ],
