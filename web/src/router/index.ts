@@ -13,34 +13,34 @@
 //  limitations under the License.
 
 import { createRouter, createWebHistory } from "vue-router";
-import Login from "../views/Login.vue";
-import Home from "../views/HomeView.vue";
-import Tickets from "../views/TicketsView.vue";
-import Users from "../views/User.vue";
-import About from "../views/About.vue";
-import ViewDashboard from "../views/Dashboards/ViewDashboard.vue";
-import AddPanel from "../views/Dashboards/addPanel/AddPanel.vue";
-import LoginCallback from "../views/LoginCallback.vue";
-import MemberSubscription from "../views/MemberSubscription.vue";
-import Search from "../views/Search.vue";
-import LogStream from "../views/LogStream.vue";
-import Functions from "../views/Functions.vue";
-import Alerts from "../views/AppAlerts.vue";
-import Ingestion from "../views/Ingestion.vue";
-import Error404 from "../views/Error404.vue";
-import Dashboards from "../views/Dashboards/Dashboards.vue";
+import Login from "@/views/Login.vue";
+import Home from "@/views/HomeView.vue";
+import Tickets from "@/views/TicketsView.vue";
+import Users from "@/views/User.vue";
+import About from "@/views/About.vue";
+import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
+import AddPanel from "@/views/Dashboards/addPanel/AddPanel.vue";
+import LoginCallback from "@/components/cloud/login/Login.vue";
+import MemberSubscription from "@/views/MemberSubscription.vue";
+import Search from "@/views/Search.vue";
+import LogStream from "@/views/LogStream.vue";
+import Functions from "@/views/Functions.vue";
+import Alerts from "@/views/AppAlerts.vue";
+import Ingestion from "@/views/Ingestion.vue";
+import Error404 from "@/views/Error404.vue";
+import Dashboards from "@/views/Dashboards/Dashboards.vue";
 import {
   useLocalUserInfo,
   getDecodedUserInfo,
   useLocalToken,
   useLocalCurrentUser,
   getPath,
-} from "../utils/zincutils";
+} from "@/utils/zincutils";
 import type { cp } from "fs";
-import FluentBit from "../components/ingestion/FluentBit.vue";
-import Fluentd from "../components/ingestion/Fluentd.vue";
-import Vector from "../components/ingestion/Vector.vue";
-import Curl from "../components/ingestion/Curl.vue";
+import FluentBit from "@/components/ingestion/FluentBit.vue";
+import Fluentd from "@/components/ingestion/Fluentd.vue";
+import Vector from "@/components/ingestion/Vector.vue";
+import Curl from "@/components/ingestion/Curl.vue";
 import {
   AlertList,
   TemplateList,

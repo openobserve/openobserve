@@ -18,7 +18,7 @@
 </template>
 
 <script lang="ts">
-import Login from "../components/login/LoginOpensource.vue";
+import Login from "../components/opensource/login/Login.vue";
 
 export default {
   name: "LoginPage",
