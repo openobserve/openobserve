@@ -11,6 +11,9 @@ const store = createStore({
       user_email: "example@gmail.com",
       subscription_type: "",
     },
+    currentuser: {
+      role: "",
+    },
     userInfo: {
       at_hash: "QicVZWM5kDY6hOzf",
       email_verified: false,
