@@ -108,6 +108,7 @@
 <script lang="ts">
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
+import { isEqual } from "lodash-es";
 
 export default defineComponent({
   name: "DateTimePicker",
@@ -258,7 +259,7 @@ export default defineComponent({
       data.selectedDate,
       () => {
         if (
-          JSON.stringify(selectedDateEmitValue.value) != JSON.stringify(data.selectedDate)
+          !isEqual(selectedDateEmitValue.value, data.selectedDate)
         ) {
           selectedDateEmitValue.value = JSON.parse(JSON.stringify(data.selectedDate));
         }
