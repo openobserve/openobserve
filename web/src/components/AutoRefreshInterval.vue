@@ -23,6 +23,7 @@ import { defineComponent, ref, reactive, computed, watch, onActivated, onDeactiv
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
+import { generateDurationLabel } from "../utils/date"
 
 export default defineComponent({
   name: "AutoRefreshInterval",
@@ -67,7 +68,7 @@ export default defineComponent({
     })
 
     // computed label based on the selected value
-    const selectedLabel = computed(() => refreshTimes.find((it:any) => it.value == selectedValue.value)?.label)
+    const selectedLabel = computed(() => refreshTimes.find((it:any) => it.value == selectedValue.value)?.label || generateDurationLabel(selectedValue.value))
 
     // update model when the selection has changed
     const onItemClick = (item: any) => {
