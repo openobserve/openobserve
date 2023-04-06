@@ -13,11 +13,23 @@
     <q-separator class="q-my-sm"/>
     <div>
       <q-form @submit="onSubmit">
-        <q-uploader
-          label="Drag your json file here"
-          accept=".json/*"
-          style="max-width: 300px"
-        ></q-uploader>
+        <div class="q-my-md">
+          Import Dashboard from exported JSON file
+        </div>
+        <div style="width: 400px; height: 100px;">
+          <q-file filled bottom-slots v-model="jsonFile" label="Drop your file here" accept=".json">
+            <template v-slot:prepend>
+              <q-icon name="cloud_upload" @click.stop.prevent />
+            </template>
+            <template v-slot:append>
+              <q-icon name="close" @click.stop.prevent="jsonFile = null" class="cursor-pointer" />
+            </template>
+
+            <template v-slot:hint>
+              .json files only
+            </template>
+          </q-file>
+        </div>
 
         <div class="flex q-mt-lg">
           <q-btn
@@ -28,15 +40,17 @@
             padding="sm md"
             color="accent"
             no-caps
-            @click="$emit('cancel:hideform')"
+            @click="goBack()"
           />
           <q-btn
-            :label="t('function.save')"
+            :disable="!jsonFile"
+            :label="t('dashboard.import')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
             type="submit"
             no-caps
+            @click="importFile()"
           />
         </div>
       </q-form>
@@ -50,6 +64,8 @@ import { useI18n } from "vue-i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
+import dashboardService from "../../services/dashboards";
 
 export default defineComponent({
   name: "Import Dashboard",
@@ -58,17 +74,45 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore()
     const router = useRouter()
-    const downloadDashboard = async () => {
-      // get the dashboard
-      const dashboard = await getDashboard(store, props.dashboardId)
+    const jsonFile = ref<any>()
+    const $q = useQuasar();
 
-      // prepare json and download via a click
-      const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard));
-      const htmlA = document.createElement('a');
-      htmlA.setAttribute("href", data);
-      const fileName = dashboard.title || "dashboard"
-      htmlA.setAttribute("download", fileName + ".dashboard.json");
-      htmlA.click();
+    const importFile = async () => {
+      // get the dashboard
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+
+      var reader = new FileReader();
+      reader.onload = function() {
+        const data = JSON.parse(reader.result)
+
+        dashboardService.create(
+          store.state.selectedOrganization.identifier,
+          data
+        ).then((res: { data: any }) => {
+            jsonFile.value = null
+            dismiss();
+            $q.notify({
+              type: "positive",
+              message: `Dashboard Imported Successfully`,
+            });
+          })
+          .catch((err: any) => {
+            $q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err?.response?.data["error"] || 'Dashboard import failed'
+              ),
+            });
+            dismiss();
+          });
+
+        dismiss();
+      };
+      reader.readAsText(jsonFile.value);
     }
 
     // back button to render dashboard List page
@@ -77,14 +121,15 @@ export default defineComponent({
     };
 
     const onSubmit = () => {
-
+      // do nothing here
     }
 
     return {
       t,
-      downloadDashboard,
       goBack,
-      onSubmit
+      onSubmit,
+      importFile,
+      jsonFile
     }
   }
 })
