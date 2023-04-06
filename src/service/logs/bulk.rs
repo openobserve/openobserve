@@ -22,6 +22,8 @@ use mlua::{Function, Lua};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
+#[cfg(feature = "zo_functions")]
+use vrl::Program;
 
 use super::StreamMeta;
 use crate::common::json;
@@ -74,7 +76,13 @@ pub async fn ingest(
     #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
+    let state = vrl::state::Runtime::default();
+    #[cfg(feature = "zo_functions")]
+    let mut runtime = vrl::Runtime::new(state);
+    #[cfg(feature = "zo_functions")]
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    #[cfg(feature = "zo_functions")]
+    let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
 
     let mut stream_file_map: AHashMap<String, String> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -121,13 +129,13 @@ pub async fn ingest(
 
             // Start Register Transfoms for stream
             #[cfg(feature = "zo_functions")]
-            let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-            #[cfg(feature = "zo_functions")]
             crate::service::ingestion::get_stream_transforms(
-                key,
                 stream_name.clone(),
+                org_id.to_owned(),
+                StreamType::Logs,
                 &mut stream_tansform_map,
                 &mut stream_lua_map,
+                &mut stream_vrl_map,
                 &lua,
             )
             .await;
@@ -174,20 +182,20 @@ pub async fn ingest(
             //Start row based transform
             #[cfg(feature = "zo_functions")]
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-            #[cfg(feature = "zo_functions")]
-            let mut ret_value = json::Value::Null;
+
             #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
-                for trans in transforms {
-                    let func_key = format!("{stream_name}/{}", trans.name);
-                    if stream_lua_map.contains_key(&func_key) {
-                        ret_value = crate::service::ingestion::lua_transform(
-                            &lua,
-                            &value,
-                            stream_lua_map.get(&func_key).unwrap(),
-                        );
-                    }
-                }
+                let mut ret_value = value.clone();
+                ret_value = crate::service::ingestion::apply_stream_transform(
+                    transforms,
+                    &ret_value,
+                    &lua,
+                    &stream_lua_map,
+                    &stream_vrl_map,
+                    &stream_name,
+                    &mut runtime,
+                );
+
                 if ret_value.is_null() || !ret_value.is_object() {
                     bulk_res.errors = true;
                     add_record_status(

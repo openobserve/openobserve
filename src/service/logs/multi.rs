@@ -18,7 +18,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
+use mlua::Lua;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
 
@@ -26,13 +26,9 @@ use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::meta::alert::{Alert, Trigger};
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
 use crate::meta::StreamType;
@@ -47,6 +43,7 @@ pub async fn ingest(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
+
     // let loc_span = info_span!("service:logs:multi:ingest");
     // let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -68,12 +65,15 @@ pub async fn ingest(
         );
     }
 
-    let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    let state = vrl::state::Runtime::default();
+    #[cfg(feature = "zo_functions")]
+    let mut runtime = vrl::Runtime::new(state);
+
+    let mut min_ts =
+        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -87,25 +87,16 @@ pub async fn ingest(
     };
     let mut trigger: Option<Trigger> = None;
 
-    // Start Register Transfoms for stream
+    // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let mut local_tans: Vec<Transform> = vec![];
-    #[cfg(feature = "zo_functions")]
-    let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-    #[cfg(feature = "zo_functions")]
-    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_tans = (*transforms.list).to_vec();
-        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Option<Function>;
-        for trans in &local_tans {
-            let func_key = format!("{}/{}", &stream_name, trans.name);
-            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            if func.is_some() {
-                stream_lua_map.insert(func_key, func.unwrap().to_owned());
-            }
-        }
-    }
-    // End Register Transfoms for stream
+    let (local_tans, stream_lua_map, stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &lua,
+        );
+    // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -134,22 +125,21 @@ pub async fn ingest(
         if line.is_empty() {
             continue;
         }
-        #[cfg(feature = "zo_functions")]
-        let mut value: json::Value = json::from_slice(line.as_bytes())?;
-        #[cfg(not(feature = "zo_functions"))]
+
         let value: json::Value = json::from_slice(line.as_bytes())?;
-        #[cfg(feature = "zo_functions")]
+
         // Start row based transform
-        for trans in &local_tans {
-            let func_key = format!("{stream_name}/{}", trans.name);
-            if stream_lua_map.contains_key(&func_key) {
-                value = crate::service::ingestion::lua_transform(
-                    &lua,
-                    &value,
-                    stream_lua_map.get(&func_key).unwrap(),
-                );
-            }
-        }
+        #[cfg(feature = "zo_functions")]
+        let value = crate::service::ingestion::apply_stream_transform(
+            &local_tans,
+            &value,
+            &lua,
+            &stream_lua_map,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        );
+        #[cfg(feature = "zo_functions")]
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped
             continue;
@@ -174,8 +164,8 @@ pub async fn ingest(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earlest_time.timestamp_micros() {
+        let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+        if timestamp < earliest_time.timestamp_micros() {
             stream_status.status.failed += 1; // to old data, just discard
             stream_status.status.error = super::get_upto_discard_error();
             continue;

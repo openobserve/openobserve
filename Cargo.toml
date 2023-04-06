@@ -103,7 +103,7 @@ parquet = { version = "34.0", features = ["arrow", "async"] }
 prometheus = "0.13.3"
 prost = "0.11.2"
 rand = "0.8.5"
-regex = "1"
+regex = "1.7.3"
 regex-syntax = "0.6.27"
 reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
@@ -135,6 +135,11 @@ utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = "2"
 zstd = "0.12.1"
+
+vrl = {  git  = "https://github.com/zinclabs/vrl",version = "0.1.0" }
+vrl-value = { package = "value", git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
+vrl-stdlib = { package = "vrl-stdlib",  git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
+
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

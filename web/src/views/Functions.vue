@@ -253,6 +253,7 @@ export default defineComponent({
               order: data.order ? data.order : 1,
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type ? data.stream_type : "--",
+              trans_type: data.trans_type.toString(),
               ingest: data.stream_name ? true : false,
               actions: "",
             };

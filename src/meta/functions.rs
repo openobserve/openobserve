@@ -15,6 +15,7 @@
 use super::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use vrl::{TimeZone, VrlRuntime};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Transform {
@@ -53,6 +54,12 @@ pub struct ZoFunction<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FunctionList {
     pub list: Vec<Transform>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VRLConfig {
+    pub runtime: VrlRuntime,
+    pub timezone: TimeZone,
 }
 
 #[cfg(test)]
