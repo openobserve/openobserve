@@ -22,7 +22,7 @@ pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub dashboard_id: String,
@@ -36,7 +36,7 @@ pub struct Dashboard {
     pub layouts: Option<Vec<Layout>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -49,7 +49,7 @@ pub struct Layout {
     pub is_static: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -61,7 +61,7 @@ pub struct Panel {
     pub custom_query: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -70,7 +70,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -81,7 +81,7 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -92,7 +92,7 @@ pub enum AggregationFunc {
     Avg,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
@@ -103,7 +103,7 @@ pub struct PanelFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PanelConfig {
     title: String,
     description: String,
@@ -117,7 +117,7 @@ mod tests {
     use expect_test::expect;
 
     #[test]
-    fn test_dashboard_defs_1() {
+    fn test_de1() {
         let dashboard: Dashboard = json::from_str(r##"{
             "title": "b2",
             "dashboardId": "1501078512",
@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dashboard_defs_2() {
+    fn test_de2() {
         let dashboard: Dashboard = json::from_str(r##"{
             "dashboardId": "7049428968893710336",
             "title": "board1",
