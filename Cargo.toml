@@ -17,9 +17,11 @@ license = "Apache-2.0"
 name = "zincobserve"
 repository = "https://github.com/zinclabs/zincobserve/"
 version = "0.1.0"
+publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = ["tmpcache", "zo_functions"]
 mimalloc = ["dep:mimalloc"]
 tmpcache = ["dep:rsfs"]
 zo_functions = ["dep:mlua"]
@@ -35,8 +37,8 @@ actix-cors = "0.6.4"
 actix-web = "4.3"
 actix-web-httpauth = "0.8"
 actix-web-opentelemetry = { version = "0.13", features = ["metrics"] }
-actix-web-prometheus = { version = "0.1.2", features = ["process"] } 
-actix-web-rust-embed-responder = { git = "https://github.com/zinclabs/actix-web-rust-embed-responder.git", default-features = false, features = [
+actix-web-prometheus = { version = "0.1.2", features = ["process"] }
+actix-web-rust-embed-responder = { version = "2.2.1", default-features = false, features = [
   "support-rust-embed-for-web",
   "base64",
 ] }
@@ -110,7 +112,7 @@ reqwest = { version = "0.11", default-features = false, features = [
 ] }
 rs-snowflake = "0.6.0"
 rsfs = { git = "https://github.com/zinclabs/rsfs.git", optional = true }
-rust-embed-for-web = { git = "https://github.com/zinclabs/rust-embed-for-web.git" }
+rust-embed-for-web = "11.1.1"
 segment = "0.2.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -133,13 +135,11 @@ url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+vrl = { git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
+vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
 walkdir = "2"
 zstd = "0.12.1"
-
-vrl = {  git  = "https://github.com/zinclabs/vrl",version = "0.1.0" }
-vrl-value = { package = "value", git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
-vrl-stdlib = { package = "vrl-stdlib",  git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
-
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

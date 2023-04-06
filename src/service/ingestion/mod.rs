@@ -237,10 +237,8 @@ pub fn register_stream_transforms<'a>(
                 if let Some(local_fn) = load_lua_transform(lua, trans.function.clone()) {
                     stream_lua_map.insert(func_key, local_fn.to_owned());
                 }
-            } else {
-                if let Some(program) = compile_vrl_function(&trans.function) {
-                    stream_vrl_map.insert(func_key, program.to_owned());
-                }
+            } else if let Some(program) = compile_vrl_function(&trans.function) {
+                stream_vrl_map.insert(func_key, program.to_owned());
             }
         }
     }
