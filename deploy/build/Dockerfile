@@ -20,7 +20,7 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
 RUN --mount=type=cache,target=/root/.cache/sccache du -sh /root/.cache/sccache
-RUN --mount=type=cache,target=/root/.cache/sccache RUSTFLAGS='-C target-feature=+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --features tmpcache,zo_functions --target x86_64-unknown-linux-gnu \
+RUN --mount=type=cache,target=/root/.cache/sccache RUSTFLAGS='-C target-feature=+sse2,+sse3,+ssse3,+sse4.1,+sse4.2' cargo build --release --target x86_64-unknown-linux-gnu \
   && sccache --show-stats \
   && du -sh /root/.cache/sccache
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
