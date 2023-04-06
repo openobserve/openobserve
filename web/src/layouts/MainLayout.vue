@@ -616,7 +616,9 @@ export default defineComponent({
       }
     },
     changeOrganization() {
-      this.setSelectedOrganization();
+      setTimeout(() => {
+        this.setSelectedOrganization();
+      }, 500);
     },
   },
 });

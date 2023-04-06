@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -17,7 +17,6 @@ const MainLayoutCloudMixin = {
     const router = useRouter();
     const { t } = useI18n();
 
-    
     //check if organization identifier is present in query params
     const customOrganization = router.currentRoute.value.query.org_identifier;
     //if present, set it as selected organization
@@ -182,8 +181,15 @@ const MainLayoutCloudMixin = {
         });
     };
 
-    getDefaultOrganization();
-    getOrganizationThreshold();
+    onActivated(() => {
+      getDefaultOrganization();
+      getOrganizationThreshold();
+    });
+
+    onMounted(() => {
+      getDefaultOrganization();
+      getOrganizationThreshold();
+    });
 
     return {
       t,
