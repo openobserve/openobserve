@@ -22,8 +22,6 @@ use datafusion::{
     prelude::create_udf,
 };
 
-use crate::common::json;
-
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};

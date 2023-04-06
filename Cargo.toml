@@ -141,9 +141,9 @@ vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", 
 walkdir = "2"
 zstd = "0.12.1"
 
-vrl = {  git  = "https://github.com/vectordotdev/vrl",version = "0.1.0" }
-value = { package = "value", git  = "https://github.com/vectordotdev/vrl",version = "0.1.0"  }
-stdlib = { package = "vrl-stdlib",  git  = "https://github.com/vectordotdev/vrl",version = "0.1.0"  }
+vrl = {  git  = "https://github.com/zinclabs/vrl",version = "0.1.0" }
+vrl-value = { package = "value", git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
+vrl-stdlib = { package = "vrl-stdlib",  git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }
 
 
 [build-dependencies]

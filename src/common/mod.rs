@@ -22,4 +22,3 @@ pub mod str;
 pub mod stream;
 pub mod time;
 pub mod utils;
-pub mod vrl_utils;
