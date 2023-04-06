@@ -134,18 +134,15 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
     }
 }
 
-pub async fn validator_amz(
+pub async fn validator_aws(
     req: ServiceRequest,
     _credentials: Option<BasicAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let path = match req
+    let path = req
         .request()
         .path()
         .strip_prefix(format!("{}/aws/", CONFIG.common.base_uri).as_str())
-    {
-        Some(path) => path,
-        None => req.request().path(),
-    };
+        .unwrap_or(req.request().path());
 
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
@@ -163,7 +160,7 @@ pub async fn validator_amz(
                     Err(err) => Err((err, req)),
                 }
             }
-            Err(_) => Err((ErrorForbidden("Forbidden Access"), req)),
+            Err(_) => Err((ErrorUnauthorized("Unauthorized Access"), req)),
         },
         None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
     }

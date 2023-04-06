@@ -110,7 +110,7 @@ pub async fn process(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    for (_i, record) in request.records.iter().enumerate() {
+    for record in request.records {
         match decode_and_decompress(&record.data) {
             Ok(decompressed_data) => {
                 let kfh_data: KinesisFHData = json::from_str(&decompressed_data)?;

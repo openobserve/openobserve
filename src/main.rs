@@ -184,14 +184,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 App::new()
                     .wrap(prometheus.clone())
                     .configure(get_service_routes)
-                    .configure(get_basic_routes)
                     .configure(get_other_service_routes)
+                    .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
                         .configure(get_service_routes)
-                        .configure(get_basic_routes)
-                        .configure(get_other_service_routes),
+                        .configure(get_other_service_routes)
+                        .configure(get_basic_routes),
                 )
             };
             app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))

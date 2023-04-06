@@ -22,7 +22,7 @@ use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
-use super::auth::{validator, validator_amz};
+use super::auth::{validator, validator_aws};
 use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
@@ -172,7 +172,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 }
 
 pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
-    let amz_auth = HttpAuthentication::with_fn(validator_amz);
+    let amz_auth = HttpAuthentication::with_fn(validator_aws);
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
