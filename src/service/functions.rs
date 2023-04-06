@@ -56,7 +56,7 @@ pub async fn register_function(
 
             trans.stream_type = s_type;
             let js_func = trans.function.to_owned();
-            if !js_func.contains('(') && !js_func.contains(')') {
+            if trans.trans_type == 0 && !js_func.contains('(') && !js_func.contains(')') {
                 msg.push_str(" not valid function");
                 is_err = true;
             }
@@ -70,7 +70,11 @@ pub async fn register_function(
             } else {
                 trans.stream_name = stream_name.to_string();
                 trans.name = name.to_string();
-                extract_num_args(&mut trans);
+                if trans.trans_type == 0 {
+                    extract_num_args(&mut trans);
+                } else {
+                    trans.num_args = 1;
+                }
                 db::functions::set(
                     org_id.as_str(),
                     Some(stream_name.to_string()),
@@ -90,11 +94,15 @@ pub async fn register_function(
             let mut is_err = false;
             trans.name = name.to_string();
             let js_func = trans.function.to_owned();
-            if !js_func.contains('(') && !js_func.contains(')') {
+            if trans.trans_type == 0 && !js_func.contains('(') && !js_func.contains(')') {
                 is_err = true;
             }
             if !is_err {
-                extract_num_args(&mut trans);
+                if trans.trans_type == 0 {
+                    extract_num_args(&mut trans);
+                } else {
+                    trans.num_args = 2;
+                }
                 db::functions::set(org_id.as_str(), None, None, name.as_str(), trans)
                     .await
                     .unwrap();
@@ -159,9 +167,6 @@ fn extract_num_args(trans: &mut Transform) {
     } else {
         let args_vec = args.split(',');
         trans.num_args = args_vec.into_iter().count() as u8;
-
-        /* let args_vec: Vec<_> = args.split(',').collect();
-        trans.num_args = args_vec.len() as u8; */
     }
 }
 

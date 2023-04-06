@@ -18,17 +18,13 @@ use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
+use mlua::Lua;
 use prost::Message;
 use std::{collections::HashMap, fs::OpenOptions, io::Error};
 use tracing::info_span;
 
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -218,52 +214,35 @@ pub async fn prometheus_write_proto(
                 #[cfg(feature = "zo_functions")]
                 let lua = Lua::new();
                 #[cfg(feature = "zo_functions")]
-                let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+                let state = vrl::state::Runtime::default();
+                #[cfg(feature = "zo_functions")]
+                let mut runtime = vrl::Runtime::new(state);
 
-                // Start Register Transfoms for stream
+                // Start Register Transforms for stream
                 #[cfg(feature = "zo_functions")]
-                let mut local_tans: Vec<Transform> = vec![];
-                #[cfg(feature = "zo_functions")]
-                let key = format!(
-                    "{}/{}/{}",
-                    &org_id,
-                    StreamType::Metrics,
-                    metric_name.clone()
-                );
-                #[cfg(feature = "zo_functions")]
-                if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-                    local_tans = (*transforms.list).to_vec();
-                    local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-                    let mut func: Option<Function>;
-                    for trans in &local_tans {
-                        let func_key = format!("{}/{}", metric_name.clone(), trans.name);
-                        func = crate::service::ingestion::load_lua_transform(
-                            &lua,
-                            trans.function.clone(),
-                        );
-                        if func.is_some() {
-                            stream_lua_map.insert(func_key, func.unwrap().to_owned());
-                        }
-                    }
-                }
-                // End Register Transfoms for stream
+                let (local_tans, stream_lua_map, stream_vrl_map) =
+                    crate::service::ingestion::register_stream_transforms(
+                        org_id,
+                        &metric_name,
+                        StreamType::Metrics,
+                        &lua,
+                    );
+                // End Register Transforms for stream
 
-                #[cfg(feature = "zo_functions")]
-                let mut value: json::Value = json::to_value(&metric).unwrap();
-                #[cfg(not(feature = "zo_functions"))]
                 let value: json::Value = json::to_value(&metric).unwrap();
-                #[cfg(feature = "zo_functions")]
+
                 // Start row based transform
-                for trans in &local_tans {
-                    let func_key = format!("{}/{}", metric_name.clone(), trans.name);
-                    if stream_lua_map.contains_key(&func_key) {
-                        value = crate::service::ingestion::lua_transform(
-                            &lua,
-                            &value,
-                            stream_lua_map.get(&func_key).unwrap(),
-                        );
-                    }
-                }
+                #[cfg(feature = "zo_functions")]
+                let value = crate::service::ingestion::apply_stream_transform(
+                    &local_tans,
+                    &value,
+                    &lua,
+                    &stream_lua_map,
+                    &stream_vrl_map,
+                    &metric_name,
+                    &mut runtime,
+                );
+                // End row based transform
 
                 let value_str = json::to_string(&value).unwrap();
                 // get hour key

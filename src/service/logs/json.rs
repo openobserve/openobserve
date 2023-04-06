@@ -18,7 +18,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
+use mlua::Lua;
 use std::io::Error;
 use std::time::Instant;
 
@@ -26,13 +26,9 @@ use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::config::CONFIG;
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
 use crate::meta::StreamType;
@@ -72,7 +68,9 @@ pub async fn ingest(
     #[cfg(feature = "zo_functions")]
     let lua = Lua::new();
     #[cfg(feature = "zo_functions")]
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    let state = vrl::state::Runtime::default();
+    #[cfg(feature = "zo_functions")]
+    let mut runtime = vrl::Runtime::new(state);
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -86,25 +84,17 @@ pub async fn ingest(
     };
 
     let mut trigger: Option<Trigger> = None;
-    // Start Register Transfoms for stream
+
+    // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let mut local_tans: Vec<Transform> = vec![];
-    #[cfg(feature = "zo_functions")]
-    let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-    #[cfg(feature = "zo_functions")]
-    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_tans = (*transforms.list).to_vec();
-        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Option<Function>;
-        for trans in &local_tans {
-            let func_key = format!("{stream_name}/{}", trans.name);
-            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            if func.is_some() {
-                stream_lua_map.insert(func_key, func.unwrap().to_owned());
-            }
-        }
-    }
-    // End Register Transfoms for stream
+    let (local_tans, stream_lua_map, stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &lua,
+        );
+    // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -131,27 +121,24 @@ pub async fn ingest(
     let body_vec = body.to_vec();
     let reader: Vec<json::Value> = json::from_slice(&body_vec)?;
     for item in reader.iter() {
-        #[cfg(feature = "zo_functions")]
-        let mut value = item.to_owned();
-        #[cfg(not(feature = "zo_functions"))]
         let value = item.to_owned();
+
         #[cfg(feature = "zo_functions")]
-        //Start row based transform
-        for trans in &local_tans {
-            let func_key = format!("{stream_name}/{}", trans.name);
-            if stream_lua_map.contains_key(&func_key) {
-                value = crate::service::ingestion::lua_transform(
-                    &lua,
-                    &value,
-                    stream_lua_map.get(&func_key).unwrap(),
-                );
-            }
-        }
+        let value = crate::service::ingestion::apply_stream_transform(
+            &local_tans,
+            &value,
+            &lua,
+            &stream_lua_map,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        );
+        #[cfg(feature = "zo_functions")]
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped
             continue;
         }
-        //End row based transform
+        // End row based transform
 
         //JSON Flattening
         let mut value = json::flatten_json_and_format_field(&value);
