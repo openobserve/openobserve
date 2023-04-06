@@ -186,7 +186,6 @@ export default defineComponent({
       )
         .then((res) => {
           this.loadSubscription();
-          //   alert(res);
         })
         .catch((e) => {
           this.freeLoading = false;
@@ -287,7 +286,6 @@ export default defineComponent({
           // ) {
           //   this.subScribePlan = true;
           // }
-          // alert(res);
         })
         .catch((e) => {
           this.loading = false;
@@ -316,7 +314,6 @@ export default defineComponent({
           )
             .then((res) => {
               this.loadSubscription();
-              //   alert(res);
             })
             .catch((e) => {
               this.$q.notify({
