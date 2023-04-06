@@ -134,7 +134,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import useLogs from "../../composables/common/useLogs";
+import useLogs from "../../composables/useLogs";
 import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({

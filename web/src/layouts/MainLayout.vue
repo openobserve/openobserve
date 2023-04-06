@@ -258,8 +258,6 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 
-import configService from "../services/config";
-
 let mainLayoutMixin: any = null;
 if (config.isZincObserveCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;

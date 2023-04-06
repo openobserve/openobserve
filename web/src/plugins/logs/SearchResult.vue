@@ -143,7 +143,7 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import useLogs from "../../composables/common/useLogs";
+import useLogs from "../../composables/useLogs";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
 
