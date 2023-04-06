@@ -17,10 +17,6 @@ use tracing::instrument;
 
 use crate::{common::json, infra::db, meta::dashboards::Dashboard};
 
-/// # Panics
-///
-/// Panics if [`Dashboard::dashboard_id`] stored in the database is not equal to
-/// `dashboard_id` argument.
 #[instrument(err)]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");

@@ -24,15 +24,13 @@ pub async fn create_dashboard(
     org_id: &str,
     mut dashboard: Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    // NOTE: here we overwrite whatever `dashboard_id` the client sent us.
+    // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     dashboard.dashboard_id = crate::infra::ider::generate();
-    let resp = if let Err(e) = dashboard::put(org_id, &dashboard).await {
-        Response::InternalServerError(e)
-    } else {
-        tracing::info!(dashboard_id = dashboard.dashboard_id, "Dashboard created");
-        Response::DashboardCreated
-    };
-    Ok(resp.into())
+    if let Err(e) = dashboard::put(org_id, &dashboard).await {
+        return Ok(Response::InternalServerError(e).into());
+    }
+    tracing::info!(dashboard_id = dashboard.dashboard_id, "Dashboard created");
+    Ok(HttpResponse::Created().json(dashboard))
 }
 
 #[instrument(skip(dashboard))]
@@ -41,16 +39,26 @@ pub async fn update_dashboard(
     dashboard_id: &str,
     dashboard: &Dashboard,
 ) -> Result<HttpResponse, io::Error> {
-    if dashboard::get(org_id, dashboard_id).await.is_err() {
-        return Ok(Response::NotFound { error: None }.into());
+    // Try to find this dashboard in the database
+    let old_dashboard = match dashboard::get(org_id, dashboard_id).await {
+        Ok(dashboard) => dashboard,
+        Err(error) => {
+            tracing::info!(%error, dashboard_id, "Cannot find the dashboard");
+            return Ok(Response::NotFound { error: None }.into());
+        }
+    };
+
+    if dashboard == &old_dashboard {
+        // There is no need to update the database
+        return Ok(HttpResponse::Ok().json(dashboard));
     }
-    if let Err(e) = dashboard::put(org_id, dashboard).await {
-        return Ok(Response::InternalServerError(e).into());
+
+    // Store new dashboard in the database
+    if let Err(error) = dashboard::put(org_id, dashboard).await {
+        tracing::error!(%error, dashboard_id, "Failed to store the dashboard");
+        return Ok(Response::InternalServerError(error).into());
     }
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        StatusCode::OK.into(),
-        "Dashboard updated".to_owned(),
-    )))
+    Ok(HttpResponse::Ok().json(dashboard))
 }
 
 #[instrument]
@@ -72,21 +80,19 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRespo
 
 #[instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    if let Err(e) = dashboard::delete(org_id, dashboard_id).await {
-        return Ok(Response::NotFound {
+    let resp = if let Err(e) = dashboard::delete(org_id, dashboard_id).await {
+        Response::NotFound {
             error: Some(e.to_string()),
         }
-        .into());
-    }
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        StatusCode::OK.into(),
-        "Dashboard deleted".to_string(),
-    )))
+    } else {
+        Response::OkMessage("Dashboard deleted".to_owned())
+    };
+    Ok(resp.into())
 }
 
 #[derive(Debug)]
 enum Response {
-    DashboardCreated,
+    OkMessage(String),
     NotFound { error: Option<String> },
     InternalServerError(anyhow::Error),
 }
@@ -94,10 +100,9 @@ enum Response {
 impl From<Response> for HttpResponse {
     fn from(resp: Response) -> Self {
         match resp {
-            Response::DashboardCreated => Self::Created().json(MetaHttpResponse::message(
-                StatusCode::CREATED.into(),
-                "Dashboard created".to_owned(),
-            )),
+            Response::OkMessage(message) => {
+                Self::Ok().json(MetaHttpResponse::message(StatusCode::OK.into(), message))
+            }
             Response::NotFound { error } => Self::NotFound().json(MetaHttpResponse::error(
                 StatusCode::NOT_FOUND.into(),
                 error.unwrap_or_else(|| "Dashboard not found".to_owned()),
