@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
+    "build-alpha1": "run-p type-check build-only-alpha1",
+    "build-cloud-prod": "run-p type-check build-only-cloud-prod",
     "build": "run-p type-check build-only",
     "postbuild": "run-p copy",
     "preview": "vite preview",
@@ -14,6 +17,8 @@
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' :4173 'cypress open --e2e'",
     "build-only": "vite build",
+    "build-only-alpha1": "vite build --mode=alpha1",
+    "build-only-cloud-prod": "vite build --mode=production",
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
@@ -65,6 +70,7 @@
     "c8": "^7.11.3",
     "cypress": "^10.3.0",
     "cypress-localstorage-commands": "^2.2.1",
+    "dotenv": "^16.0.3",
     "eslint": "^8.5.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-cypress": "^2.12.1",

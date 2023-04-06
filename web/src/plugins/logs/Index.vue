@@ -601,7 +601,6 @@ export default defineComponent({
             "[INDEX_NAME]",
             searchObj.data.stream.selectedStream.value
           );
-          // alert(req.query.sql);
           // const parsedSQL = parser.astify(req.query.sql);
           // const unparsedSQL = parser.sqlify(parsedSQL);
           // console.log(unparsedSQL);

@@ -446,7 +446,7 @@ export default defineComponent({
       config.isZincObserveCloud == "false"
     ) {
       linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
-    } else if (config.isZincObserveCloud == "false") {
+    } else if (config.isZincObserveCloud == "true") {
       linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
     }
 

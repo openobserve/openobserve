@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { fileURLToPath, URL } from "node:url";
 
@@ -20,6 +20,25 @@ import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
+import dotenv from "dotenv";
+import fs from "fs";
+
+// Load environment variables from the appropriate .env file
+if (process.env.NODE_ENV === "production") {
+  dotenv.config({ path: ".env.production" });
+} else if (process.env.NODE_ENV === "devcloud") {
+  dotenv.config({ path: ".env.devcloud" });
+} else {
+  dotenv.config();
+}
+
+let filePath = path.resolve(process.cwd(), 'src');
+if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
+  filePath = path.resolve(process.cwd(), 'src/enterprise');
+}
+
+const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
+const srcPath = path.resolve(process.cwd(), 'src');
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -30,7 +49,7 @@ export default defineConfig({
   },
   test: {
     global: true,
-    setupFiles: 'src/test/unit/helpers/setupTests.ts',
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
     coverage: {
       reporter: ["text", "json", "html"],
     },
@@ -56,6 +75,20 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Check if the file exists in the enterprise folder before creating the alias
+      // "@both": fileURLToPath(new URL(filePath, import.meta.url)),
+      // Use a default alias for the src folder
+      // "@both$": fileURLToPath(new URL("./src", import.meta.url)),
+      // "@both": (filePath) => {
+      //   console.log(filePath)
+      //   const enterpriseFile = path.resolve(enterprisePath, filePath);
+      //   if (fs.existsSync(enterpriseFile)) {
+      //     return enterpriseFile;
+      //   } else {
+      //     const srcFile = path.resolve(srcPath, filePath);
+      //     return fs.existsSync(srcFile) ? srcFile : null;
+      //   }
+      // },
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",

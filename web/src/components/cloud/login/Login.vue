@@ -22,6 +22,8 @@
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
+import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getUserInfo, getDecodedUserInfo, getPath } from "@/utils/zincutils";
 
@@ -37,8 +39,9 @@ export default defineComponent({
   // eslint-disable-next-line vue/no-unused-components
   components: { MainLayout },
   setup() {
-    const $store = useStore();
-
+    const store = useStore();
+    const q = useQuasar();
+    const router = useRouter();
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
 
@@ -54,13 +57,13 @@ export default defineComponent({
         const localOrg: any = useLocalOrganization();
         if (
           localOrg.value != null &&
-          localOrg.value.user_email !== $store.state.userInfo.email
+          localOrg.value.user_email !== store.state.userInfo.email
         ) {
           localOrg.value = null;
           useLocalOrganization("");
         }
 
-        $store.dispatch("setOrganizations", res.data.data);
+        store.dispatch("setOrganizations", res.data.data);
         orgOptions.value = res.data.data.map(
           (data: {
             id: any;
@@ -73,18 +76,18 @@ export default defineComponent({
               label: data.name,
               id: data.id,
               identifier: data.identifier,
-              user_email: $store.state.userInfo.email,
+              user_email: store.state.userInfo.email,
             };
 
             if (
               (selectedOrg.value == "" &&
                 data.type == "default" &&
-                $store.state.userInfo.email == data.UserObj.email) ||
+                store.state.userInfo.email == data.UserObj.email) ||
               res.data.data.length == 1
             ) {
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
               useLocalOrganization(selectedOrg.value);
-              $store.dispatch("setSelectedOrganization", selectedOrg.value);
+              store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
             return optiondata;
           }
@@ -103,16 +106,16 @@ export default defineComponent({
     const redirectUser = (redirectURI) => {
       const path = getPath();
       if (redirectURI != null && redirectURI != "") {
-        // $router.push({ path: redirectURI });
+        // router.push({ path: redirectURI });
         window.location.replace(path);
       } else {
-        // $router.push({ path: "/" });
+        // router.push({ path: "/" });
         window.location.replace(path);
       }
     };
 
     return {
-      $store,
+      store,
       redirectUser,
       getDefaultOrganization,
     };
@@ -153,7 +156,7 @@ export default defineComponent({
     this.userInfo =
       sessionUserInfo !== null ? JSON.parse(sessionUserInfo) : null;
     if (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) {
-      this.$store.dispatch("login", {
+      this.store.dispatch("login", {
         loginState: true,
         userInfo: this.userInfo,
       });
@@ -171,17 +174,17 @@ export default defineComponent({
     VerifyAndCreateUser() {
       usersService.verifyUser(this.userInfo.email).then((res) => {
         useLocalCurrentUser(res.data.data);
-        this.$store.dispatch("setCurrentUser", res.data.data);
+        this.store.dispatch("setCurrentUser", res.data.data);
 
         if (res.data.data.id == 0) {
-          const dismiss = this.$q.notify({
+          const dismiss = this.q.notify({
             spinner: true,
             message: "Please wait while creating new user...",
           });
 
           usersService.addNewUser(this.user).then((res) => {
             this.userInfo.pgdata = res.data.data;
-            this.$store.dispatch("login", {
+            this.store.dispatch("login", {
               loginState: true,
               userInfo: this.userInfo,
             });
@@ -205,7 +208,7 @@ export default defineComponent({
           });
         } else {
           this.userInfo.pgdata = res.data.data;
-          this.$store.dispatch("login", {
+          this.store.dispatch("login", {
             loginState: true,
             userInfo: this.userInfo,
           });

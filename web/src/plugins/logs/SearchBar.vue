@@ -189,11 +189,6 @@ export default defineComponent({
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery.from.length > 0) {
-          // alert(
-          //   searchObj.data.parsedQuery.from[0].table !==
-          //     searchObj.data.stream.selectedStream.value
-          // );
-          // alert(searchObj.data.parsedQuery.from[0].table !== streamName);
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&
@@ -256,7 +251,6 @@ export default defineComponent({
     };
 
     const udpateQuery = () => {
-      // alert(searchObj.data.query);
       queryEditorRef.value.setValue(searchObj.data.query);
     };
 

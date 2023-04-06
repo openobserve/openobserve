@@ -10,19 +10,23 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import store from "../stores";
 import router from "../router";
 import axios from "axios";
 import { Notify } from "quasar";
+import config from "../aws-exports";
 
 const http = () => {
   const instance = axios.create({
     // timeout: 10000,
     baseURL: store.state.API_ENDPOINT,
     headers: {
-      Authorization: localStorage.getItem("token") || "",
+      Authorization:
+        config.isZincObserveCloud == "true"
+          ? "Bearer " + localStorage.getItem("token")
+          : localStorage.getItem("token") || "",
     },
   });
 
@@ -34,28 +38,32 @@ const http = () => {
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
-            console.log(JSON.stringify(
-              error.response.data["error"] || "Bad Request"
-            ));
+            console.log(
+              JSON.stringify(error.response.data["error"] || "Bad Request")
+            );
             break;
           case 401:
-            console.log(JSON.stringify(
-              error.response.data["error"] || "Invalid credentials"
-            ));
+            console.log(
+              JSON.stringify(
+                error.response.data["error"] || "Invalid credentials"
+              )
+            );
             store.dispatch("logout");
             localStorage.clear();
             sessionStorage.clear();
             window.location.reload();
             break;
           case 404:
-            console.log(JSON.stringify(
-              error.response.data["error"] || "Not Found"
-            ));
+            console.log(
+              JSON.stringify(error.response.data["error"] || "Not Found")
+            );
             break;
           case 500:
-            console.log(JSON.stringify(
-              error.response.data["error"] || "Invalid ServerError"
-            ));
+            console.log(
+              JSON.stringify(
+                error.response.data["error"] || "Invalid ServerError"
+              )
+            );
             break;
           default:
           // noop
