@@ -32,13 +32,13 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
-let filePath = path.resolve(process.cwd(), 'src');
-if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
-  filePath = path.resolve(process.cwd(), 'src/enterprise');
-}
+// let filePath = path.resolve(process.cwd(), "src");
+// if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
+const filePath = path.resolve(process.cwd(), "src/enterprise");
+// }
 
-const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
-const srcPath = path.resolve(process.cwd(), 'src');
+// const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
+// const srcPath = path.resolve(process.cwd(), 'src');
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -76,7 +76,9 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       // Check if the file exists in the enterprise folder before creating the alias
-      // "@both": fileURLToPath(new URL(filePath, import.meta.url)),
+      // "@enterprise": fileURLToPath(
+        // new URL("./src", import.meta.url)
+      // ),
       // Use a default alias for the src folder
       // "@both$": fileURLToPath(new URL("./src", import.meta.url)),
       // "@both": (filePath) => {

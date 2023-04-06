@@ -51,9 +51,9 @@ import { computed, defineComponent, onMounted, ref } from "@vue/runtime-core";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import NoData from "../../../components/shared/grid/NoData.vue";
-import QTablePagination from "../../../components/shared/grid/Pagination.vue";
-import BillingService from "../../../services/billings";
+import NoData from "@/components/shared/grid/NoData.vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import BillingService from "@/services/billings";
 
 export default defineComponent({
   name: "InvoiceHistory",

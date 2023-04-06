@@ -200,15 +200,15 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
 import { useI18n } from "vue-i18n";
-import config from "../../../aws-exports";
-import QTablePagination from "../../../components/shared/grid/Pagination.vue";
-import usersService from "../../../services/users";
-import UpdateUserRole from "../../../components/users/UpdateRole.vue";
-import AddUser from "../../../components/opensource/users/add.vue";
-import NoData from "../../../components/shared/grid/NoData.vue";
-import organizationsService from "../../../services/organizations";
-import segment from "../../../services/segment_analytics";
-import { getImageURL } from "../../../utils/zincutils";
+import config from "@/aws-exports";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import usersService from "@/services/users";
+import UpdateUserRole from "@/components/users/UpdateRole.vue";
+import AddUser from "@/components/users/add.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
+import organizationsService from "@/services/organizations";
+import segment from "@/services/segment_analytics";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "UserPageOpenSource",

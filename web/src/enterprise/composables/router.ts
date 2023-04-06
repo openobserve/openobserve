@@ -13,7 +13,7 @@
 //  limitations under the License. 
 
 import Login from "@/views/Login.vue";
-import LoginCallback from "@/components/cloud/login/Login.vue";
+import LoginCallback from "@/enterprise/components/login/Login.vue";
 import {
   useLocalUserInfo,
   useLocalToken,
@@ -22,12 +22,12 @@ import {
   getLogoutURL,
 } from "@/utils/zincutils";
 
-import Organizations from "@/components/cloud/organizations/Organization.vue";
+import Organizations from "@/enterprise/components/organizations/Organization.vue";
 
-import Billing from "@/components/cloud/billings/Billing.vue";
-import Plans from "@/components/cloud/billings/plans.vue";
-import InvoiceHistory from "@/components/cloud/billings/invoiceHistory.vue";
-import Usage from "@/components/cloud/billings/usage.vue";
+import Billing from "@/enterprise/components/billings/Billing.vue";
+import Plans from "@/enterprise/components/billings/plans.vue";
+import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
+import Usage from "@/enterprise/components/billings/usage.vue";
 
 const useCloudRoutes = () => {
   const parentRoutes = [

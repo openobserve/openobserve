@@ -6,9 +6,9 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import UsersCloud from "../components/cloud/users/User.vue";
-import UsersOpenSource from "../components/opensource/users/User.vue";
-import config from "../aws-exports";
+import UsersCloud from "@/enterprise/components/users/User.vue";
+import UsersOpenSource from "@/components/users/User.vue";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "UserPage",

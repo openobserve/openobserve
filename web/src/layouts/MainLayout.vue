@@ -253,10 +253,10 @@ import config from "../aws-exports";
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
 
-import MainLayoutOpenSourceMixin from "../mixins/opensource/mainLayout.mixin";
-import MainLayoutCloudMixin from "../mixins/cloud/mainLayout.mixin";
+import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
+import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
-import configService from "../services/config";
+import configService from "@/services/config";
 
 let mainLayoutMixin: any = null;
 if (config.isZincObserveCloud == "true") {

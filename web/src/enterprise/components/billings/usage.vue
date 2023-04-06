@@ -39,9 +39,9 @@
 import { defineComponent, ref, computed, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import ReactiveLineChart from "../../shared/plotly/doubleLinechart.vue";
+import ReactiveLineChart from "@/components/shared/plotly/doubleLinechart.vue";
 import { useI18n } from "vue-i18n";
-import BillingService from "../../../services/billings";
+import BillingService from "@/services/billings";
 
 const blankChartObj: any = {
   id: "panel_usage",

@@ -71,8 +71,8 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 
 import { useI18n } from "vue-i18n";
-import authService from "../../../services/auth";
-import organizationsService from "../../../services/organizations";
+import authService from "@/services/auth";
+import organizationsService from "@/services/organizations";
 import {
   useLocalToken,
   getBasicAuth,
@@ -80,8 +80,8 @@ import {
   useLocalUserInfo,
   useLocalCurrentUser,
   useLocalOrganization,
-} from "../../../utils/zincutils";
-import { getDefaultOrganization, redirectUser } from "../../../utils/common";
+} from "@/utils/zincutils";
+import { getDefaultOrganization, redirectUser } from "@/utils/common";
 
 export default defineComponent({
   name: "PageLogin",

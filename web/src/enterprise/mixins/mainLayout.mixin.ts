@@ -2,12 +2,12 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import config from "../../aws-exports";
+import config from "@/aws-exports";
 
-import { useLocalToken, getUserInfo, getImageURL } from "../../utils/zincutils";
-import organizationService from "../../services/organizations";
-import billingService from "../../services/billings";
-import userService from "../../services/users";
+import { useLocalToken, getUserInfo, getImageURL } from "@/utils/zincutils";
+import organizationService from "@/services/organizations";
+import billingService from "@/services/billings";
+import userService from "@/services/users";
 
 import Tracker from "@openreplay/tracker";
 

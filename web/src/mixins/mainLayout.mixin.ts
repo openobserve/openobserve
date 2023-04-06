@@ -1,6 +1,6 @@
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import organizationService from "../../services/organizations";
+import organizationService from "@/services/organizations";
 
 const MainLayoutOpenSourceMixin = {
   setup() {

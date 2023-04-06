@@ -125,11 +125,11 @@
 import { defineComponent, ref } from "@vue/runtime-core";
 import { useI18n } from "vue-i18n";
 import PlanCard from "./planCard.vue";
-import Plan from "../../../constants/plans";
-import BillingService from "../../../services/billings";
+import Plan from "@/constants/plans";
+import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import { useLocalOrganization } from "../../../utils/zincutils";
+import { useLocalOrganization } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "plans",

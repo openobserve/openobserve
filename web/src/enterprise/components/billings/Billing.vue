@@ -92,8 +92,8 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import config from "../../../aws-exports";
-import ConfirmDialog from "../../../components/ConfirmDialog.vue";
+import config from "@/aws-exports";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 
 export default defineComponent({

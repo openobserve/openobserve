@@ -140,14 +140,14 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import DateTime from "../../components/DateTime.vue";
-import useLogs from "../../composables/common/useLogs";
+import DateTime from "@/components/DateTime.vue";
+import useLogs from "@/composables/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser";
-import segment from "../../services/segment_analytics";
-import config from "../../aws-exports";
+import segment from "@/services/segment_analytics";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",

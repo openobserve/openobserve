@@ -37,7 +37,7 @@
 import { defineComponent } from "@vue/runtime-core";
 import { useI18n } from "vue-i18n";
 import PaymentCard from "./paymentCard.vue";
-import Card from "../../../constants/cards";
+import Card from "@/constants/cards";
 
 export default defineComponent({
   name: "Payment Details",
