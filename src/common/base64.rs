@@ -41,16 +41,11 @@ pub fn decode(s: &str) -> Result<String, Error> {
 
 #[inline(always)]
 pub fn decode_raw(s: &str) -> Result<Vec<u8>, Error> {
-    let ns = match base64::engine::general_purpose::STANDARD.decode(s.as_bytes()) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(Error::new(
+    base64::engine::general_purpose::STANDARD.decode(s.as_bytes())
+        .map_err(|e| Error::new(
                 ErrorKind::InvalidData,
-                format!("base64 decode error: {e}"),
+                format!("base64 decode error: {e}")
             ))
-        }
-    };
-    Ok(ns)
 }
 
 #[cfg(test)]

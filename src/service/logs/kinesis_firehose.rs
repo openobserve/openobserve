@@ -110,12 +110,12 @@ pub async fn process(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    for (_i, record) in request.records.iter().enumerate() {
+    for record in request.records {
         match decode_and_decompress(&record.data) {
             Ok(decompressed_data) => {
                 let kfh_data: KinesisFHData = json::from_str(&decompressed_data)?;
 
-                for event in kfh_data.log_events.iter() {
+                for event in kfh_data.log_events {
                     let mut value = json::to_value(event).unwrap();
                     let local_val = value.as_object_mut().unwrap();
 
@@ -132,21 +132,12 @@ pub async fn process(
                         kfh_data.subscription_filters.clone().into(),
                     );
 
-                    let local_msg = event.message.as_str().unwrap();
-
-                    if local_msg.starts_with('{') && local_msg.ends_with('}') {
-                        let result: Result<json::Value, json::Error> = json::from_str(local_msg);
-
-                        match result {
-                            Err(_e) => {
-                                local_val.insert("message".to_owned(), event.message.clone());
-                            }
-                            Ok(message_val) => {
-                                local_val.insert("message".to_owned(), message_val.clone());
-                            }
+                    {
+                        let mut msg = event.message.as_str().unwrap();
+                        if msg.starts_with('{') && msg.ends_with('}') {
+                            msg = json::from_str::<json::Value>(local_msg).unwrap_or_else(|| event.essage.clone());
                         }
-                    } else {
-                        local_val.insert("message".to_owned(), local_msg.into());
+                        local_val.insert("message".to_owned(), msg);
                     }
 
                     value = local_val.clone().into();
@@ -358,11 +349,7 @@ mod tests {
 
     #[test]
     fn test_decode_and_decompress_invalid_gzip() {
-        let encoded_data = "aGVsbG8gd29ybGQh"; // "hello world!" base64-encoded but not compressed
-        let result = decode_and_decompress(encoded_data);
-        assert!(
-            result.is_err(),
-            "Expected an error due to invalid gzip data"
-        );
+        let invalid_input = "aGVsbG8gd29ybGQh"; // "hello world!" base64-encoded but not compressed
+        assert!(decode_and_decompress(invalid_input).is_err());
     }
 }

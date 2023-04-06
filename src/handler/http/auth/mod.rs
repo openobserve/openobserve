@@ -142,10 +142,7 @@ pub async fn validator_amz(
         .request()
         .path()
         .strip_prefix(format!("{}/aws/", CONFIG.common.base_uri).as_str())
-    {
-        Some(path) => path,
-        None => req.request().path(),
-    };
+        .unwrap_or(req.request().path());
 
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
