@@ -22,8 +22,6 @@ use datafusion::{
     prelude::create_udf,
 };
 
-use crate::common::json;
-
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
@@ -122,7 +120,7 @@ fn get_udf_vrl(
 }
 
 pub fn compile_vrl_function(func: &str) -> Option<Program> {
-    let result = vrl::compile(func, &stdlib::all());
+    let result = vrl::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
             program,
@@ -139,26 +137,18 @@ pub fn compile_vrl_function(func: &str) -> Option<Program> {
 pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
     let obj_str = String::from("");
 
-    let mut metadata = value::Value::from(BTreeMap::new());
+    let mut metadata = vrl_value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut value::Value::from(obj_str),
+        value: &mut vrl_value::Value::from(obj_str),
         metadata: &mut metadata,
-        secrets: &mut value::Secrets::new(),
+        secrets: &mut vrl_value::Secrets::new(),
     };
     let timezone = vrl::TimeZone::Local;
     let result = match VrlRuntime::default() {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
-        Ok(res) => {
-            if let Ok(val) =
-                json::to_string(&crate::common::vrl_utils::vrl_value_to_json_value(res))
-            {
-                val
-            } else {
-                "".to_string()
-            }
-        }
+        Ok(res) => vrl_value::Value::to_string(&res),
         Err(err) => {
             log::error!("vrl_transform execute error: {}", err);
             "".to_string()

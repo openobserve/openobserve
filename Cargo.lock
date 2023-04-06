@@ -1301,7 +1301,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4114279215a005bc675e386011e594e1d9b800918cea18fcadadcce864a2046b"
 dependencies = [
  "borsh-derive",
- "hashbrown 0.12.3",
+ "hashbrown 0.13.2",
 ]
 
 [[package]]
@@ -1866,7 +1866,7 @@ checksum = "23d8666cb01533c39dde32bcbab8e227b4ed6679b2c925eba05feabea39508fb"
 [[package]]
 name = "datadog-filter"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "datadog-search-syntax",
  "dyn-clone",
@@ -1876,7 +1876,7 @@ dependencies = [
 [[package]]
 name = "datadog-grok"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "bytes",
  "chrono",
@@ -1900,7 +1900,7 @@ dependencies = [
 [[package]]
 name = "datadog-search-syntax"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "itertools",
  "once_cell",
@@ -3158,7 +3158,7 @@ dependencies = [
 [[package]]
 name = "lookup"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "inherent",
  "lalrpop",
@@ -5649,7 +5649,7 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 [[package]]
 name = "value"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "bytes",
  "chrono",
@@ -5683,7 +5683,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vrl"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "bytes",
  "indoc",
@@ -5699,7 +5699,7 @@ dependencies = [
 [[package]]
 name = "vrl-compiler"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "anymap",
  "bytes",
@@ -5722,7 +5722,7 @@ dependencies = [
 [[package]]
 name = "vrl-core"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "bytes",
  "chrono",
@@ -5742,7 +5742,7 @@ dependencies = [
 [[package]]
 name = "vrl-diagnostic"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "codespan-reporting",
  "termcolor",
@@ -5751,7 +5751,7 @@ dependencies = [
 [[package]]
 name = "vrl-parser"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
@@ -5765,7 +5765,7 @@ dependencies = [
 [[package]]
 name = "vrl-stdlib"
 version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl#4d0fda2325d6a36a11f3477b37381ed85b313643"
+source = "git+https://github.com/zinclabs/vrl#650547870a16c66dcfab01ec382cfdc23415d85b"
 dependencies = [
  "aes",
  "base16",

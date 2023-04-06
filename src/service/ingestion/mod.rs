@@ -45,7 +45,7 @@ pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
 
 #[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str) -> Option<Program> {
-    let result = vrl::compile(func, &stdlib::all());
+    let result = vrl::compile(func, &vrl_stdlib::all());
 
     match result {
         Ok(CompilationResult {
@@ -74,23 +74,22 @@ pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn apply_vrl_fn(
-    runtime: &mut Runtime,
-    program: vrl::Program,
-    row: &serde_json::Value,
-) -> Value {
-    let mut metadata = value::Value::from(BTreeMap::new());
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program, row: &Value) -> Value {
+    let mut metadata = vrl_value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut value::Value::from(row),
+        value: &mut vrl_value::Value::from(row),
         metadata: &mut metadata,
-        secrets: &mut value::Secrets::new(),
+        secrets: &mut vrl_value::Secrets::new(),
     };
     let timezone = vrl::TimeZone::Local;
     let result = match VrlRuntime::default() {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
-        Ok(res) => crate::common::vrl_utils::vrl_value_to_json_value(res),
+        Ok(res) => match res.try_into() {
+            Ok(val) => val,
+            Err(_) => row.clone(),
+        },
         Err(_) => row.clone(),
     }
 }
@@ -235,14 +234,12 @@ pub fn register_stream_transforms<'a>(
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.name);
             if trans.trans_type == 0 {
-                let func = load_lua_transform(lua, trans.function.clone());
-                if let Some(local_fn) = func {
+                if let Some(local_fn) = load_lua_transform(lua, trans.function.clone()) {
                     stream_lua_map.insert(func_key, local_fn.to_owned());
                 }
             } else {
-                let program = compile_vrl_function(&trans.function);
-                if let Some(local_pg) = program {
-                    stream_vrl_map.insert(func_key, local_pg.to_owned());
+                if let Some(program) = compile_vrl_function(&trans.function) {
+                    stream_vrl_map.insert(func_key, program.to_owned());
                 }
             }
         }
