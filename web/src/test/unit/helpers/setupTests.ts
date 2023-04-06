@@ -10,6 +10,7 @@ import organizations from "../mockData/organizations";
 import "whatwg-fetch";
 import store from "./store";
 import "../../__mocks__/index";
+import home from "../mockData/home";
 
 import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
 
@@ -38,6 +39,13 @@ export const restHandlers = [
 
   rest.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/org_users`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(users.org_users));
+    }
+  ),
+
+  rest.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/users`,
     (req, res, ctx) => {
       return res(ctx.status(200), ctx.json(users.users));
     }
@@ -75,6 +83,13 @@ export const restHandlers = [
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/organizations`,
     (req, res, ctx) => {
       return res(ctx.status(200), ctx.json(organizations.list));
+    }
+  ),
+
+  rest.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/summary`,
+    (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(home.summary.get));
     }
   ),
 ];

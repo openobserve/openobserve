@@ -49,6 +49,7 @@
               >
                 <q-chip
                   v-if="col.closable"
+                  :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
                   :icon-remove="
                     'img:' + getImageURL('images/common/close_icon.svg')
                   "
@@ -234,11 +235,6 @@ export default defineComponent({
       ) {
         this.searchObj.data.resultGrid.currentPage += 1;
         this.$emit("update:scroll");
-      }
-    },
-    onCancel() {
-      if (this.searchObj.meta.showDetailTab) {
-        this.searchObj.meta.showDetailTab = false;
       }
     },
     onTimeBoxed(obj: any) {

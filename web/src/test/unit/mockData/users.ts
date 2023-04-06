@@ -1,5 +1,5 @@
 export default {
-  users: {
+  org_users: {
     data: [
       {
         id: 1,
@@ -33,6 +33,36 @@ export default {
         member_updated: 1678089178,
         role: "member",
         org_member_id: 212,
+        first_name: "test",
+      },
+    ],
+  },
+  users: {
+    data: [
+      {
+        id: 11,
+        email: "root@example.com",
+        first_name: "root",
+        last_name: "",
+        role: "root",
+      },
+      {
+        id: 1,
+        email: "john@gmail.com",
+        role: "admin",
+        first_name: "John",
+        last_name: "Doe",
+      },
+      {
+        id: 2,
+        email: "example@gmail.com",
+        role: "admin",
+        first_name: "example",
+      },
+      {
+        id: 3,
+        email: "test@gmail.com",
+        role: "member",
         first_name: "test",
       },
     ],

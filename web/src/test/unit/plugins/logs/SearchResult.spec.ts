@@ -26,7 +26,6 @@ import routes from "@/router/routes";
 import { createRouter, createWebHistory } from "vue-router";
 import { rest } from "msw";
 import "plotly.js";
-import logs from "../../mockData/logs";
 import DetailTable from "@/plugins/logs/DetailTable.vue";
 
 const router = createRouter({

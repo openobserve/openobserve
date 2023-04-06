@@ -13,21 +13,17 @@
 //  limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
 import Index from "@/plugins/logs/Index.vue";
 import IndexList from "@/plugins/logs/IndexList.vue";
-import BarChart from "@/components/logBarChart.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 import routes from "@/router/routes";
 import { createRouter, createWebHistory } from "vue-router";
-import { rest } from "msw";
 import "plotly.js";
-import logs from "../../mockData/logs";
-import DetailTable from "@/plugins/logs/DetailTable.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 
 const router = createRouter({
@@ -110,7 +106,7 @@ describe("Search Result", async () => {
     ).toBeTruthy();
   });
 
-  it("Should add field to table when clicked on add field", async () => {
+  it("Should add field to query when clicked on filter field", async () => {
     const field = "kubernetes_container_hash";
 
     await wrapper
@@ -119,5 +115,36 @@ describe("Search Result", async () => {
       .trigger("click");
 
     expect(wrapper.vm.searchObj.data.query).toContain(field);
+  });
+
+  it("Should remove field from table when clicked on added field", async () => {
+    const field = "kubernetes.container_hash";
+    await wrapper
+      .findComponent(IndexList)
+      .find(`[data-test="log-search-index-list-add-${field}-field-btn"]`)
+      .trigger("click");
+
+    await wrapper
+      .findComponent(IndexList)
+      .find(`[data-test="log-search-index-list-remove-${field}-field-btn"]`)
+      .trigger("click");
+
+    expect(
+      wrapper
+        .findComponent(SearchResult)
+        .find(`[data-test="log-search-result-table-th-${field}"]`)
+        .exists()
+    ).toBeFalsy();
+  });
+
+  it("Should filter fields when searched for specific field", async () => {
+    const field = "kubernetes.container_hash";
+    expect(wrapper.findComponent(IndexList).text()).toContain("_timestamp");
+    await wrapper
+      .findComponent(IndexList)
+      .find(`[data-test="log-search-index-list-field-search-input"]`)
+      .setValue(field);
+    expect(wrapper.findComponent(IndexList).text()).not.toContain("_timestamp");
+    expect(wrapper.findComponent(IndexList).text()).toContain(field);
   });
 });
