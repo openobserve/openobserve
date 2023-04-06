@@ -37,7 +37,7 @@ const dashboards = {
     return http().get(`/api/dashboards/passcode/${org_identifier}`);
   },
   save: (organization: string, dashboardID: string, data: any) => {
-    return http().post(`/api/${organization}/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
+    return http().put(`/api/${organization}/dashboards/${dashboardID}`, data, { headers: { 'Content-Type': 'application/json; charset=UTF-8' } });
   }
 
 };
