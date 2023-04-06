@@ -452,7 +452,7 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.s3.bucket_prefix.ends_with('/') {
+    if !cfg.s3.bucket_prefix.is_empty() && !cfg.s3.bucket_prefix.ends_with('/') {
         cfg.s3.bucket_prefix = format!("{}/", cfg.s3.bucket_prefix);
     }
     if cfg.s3.provider.is_empty() {
