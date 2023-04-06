@@ -18,7 +18,6 @@ use actix_web::{
     Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use http_auth_basic::Credentials;
 
 use crate::common::{
     self,
@@ -149,30 +148,24 @@ pub async fn validator_aws(
 
     match req.headers().get("X-Amz-Firehose-Access-Key") {
         Some(val) => match val.to_str() {
-            Ok(val) => match common::base64::decode(&val.to_owned()) {
-                Ok(amz_creds) => {
-                    if amz_creds.contains(':') {
-                        let creds = amz_creds
-                            .split(':')
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>();
+            Ok(val) => {
+                let amz_creds = common::base64::decode(val).unwrap();
+                let creds = amz_creds
+                    .split(':')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
 
-                        match validate_credentials(&creds[0], &creds[1], path).await {
-                            Ok(res) => {
-                                if res {
-                                    Ok(req)
-                                } else {
-                                    Err((ErrorUnauthorized("Unauthorized Access"), req))
-                                }
-                            }
-                            Err(err) => Err((err, req)),
+                match validate_credentials(&creds[0], &creds[1], path).await {
+                    Ok(res) => {
+                        if res {
+                            Ok(req)
+                        } else {
+                            Err((ErrorUnauthorized("Unauthorized Access"), req))
                         }
-                    } else {
-                        Err((ErrorUnauthorized("Unauthorized Access"), req))
                     }
+                    Err(err) => Err((err, req)),
                 }
-                Err(_) => Err((ErrorUnauthorized("Unauthorized Access"), req)),
-            },
+            }
             Err(_) => Err((ErrorUnauthorized("Unauthorized Access"), req)),
         },
         None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
