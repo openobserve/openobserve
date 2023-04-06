@@ -286,8 +286,8 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import userServiece from "../../services/users";
-import { getImageURL } from "../../utils/zincutils";
+import userServiece from "../../../services/users";
+import { getImageURL } from "../../../utils/zincutils";
 
 const defaultValue: any = () => {
   return {

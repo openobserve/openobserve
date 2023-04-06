@@ -71,7 +71,7 @@ class="warning" />{{
             borderless
             dense
             class="q-ma-xs"
-            @click="router.replace('/billing/plans')"
+            @click="router.replace('/billings/plans')"
             >Upgrade to PRO Plan</q-btn
           >
         </div>

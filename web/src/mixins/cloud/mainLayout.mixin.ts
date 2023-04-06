@@ -38,6 +38,11 @@ const MainLayoutCloudMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any) => {
+      linksList.value.splice(6, 0, {
+        title: t("menu.billings"),
+        icon: "billing",
+        link: "/billings",
+      });
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
         icon: "transform",

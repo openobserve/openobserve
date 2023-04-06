@@ -47,6 +47,13 @@ import {
   DestinationList,
 } from "@/components/alerts/index";
 
+import Organizations from "../components/cloud/organizations/Organization.vue";
+
+import Billing from "../components/cloud/billings/Billing.vue";
+import Plans from "../components/cloud/billings/plans.vue";
+import InvoiceHistory from "../components/cloud/billings/invoiceHistory.vue";
+import Usage from "../components/cloud/billings/usage.vue";
+
 import segment from "@/services/segment_analytics";
 
 export default function (store: any) {
@@ -209,6 +216,39 @@ export default function (store: any) {
               path: "templates",
               name: "alertTemplates",
               component: TemplateList,
+            },
+          ],
+        },
+        {
+          path: "organizations",
+          name: "organizations",
+          component: Organizations,
+          meta: {
+            keepAlive: true,
+          },
+        },
+        {
+          path: "billings",
+          name: "billings",
+          component: Billing,
+          meta: {
+            keepAlive: false,
+          },
+          children: [
+            {
+              path: "usage",
+              name: "usage",
+              component: Usage,
+            },
+            {
+              path: "plans",
+              name: "plans",
+              component: Plans,
+            },
+            {
+              path: "invoice_history",
+              name: "invoice_history",
+              component: InvoiceHistory,
             },
           ],
         },
