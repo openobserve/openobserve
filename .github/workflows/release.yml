@@ -13,32 +13,32 @@ jobs:
         include:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            features: "--features tmpcache,zo_functions"
+            features: ""
             file_name: zincobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
             os: ubuntu-2004-8-cores
-            features: "--features tmpcache,zo_functions"
+            features: ""
             file_name: zincobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            features: "--features tmpcache,zo_functions"
+            features: ""
             file_name: zincobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
-            features: "--features tmpcache,zo_functions"
+            features: ""
             file_name: zincobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
-            features: "--features tmpcache"
+            features: "--no-default-features --features tmpcache"
             file_name: zincobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-2022-16-cores
-            features: "--features zo_functions"
+            features: "--no-default-features --features zo_functions"
             file_name: zincobserve-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}

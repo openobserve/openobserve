@@ -24,7 +24,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
   RUSTFLAGS='-C target-feature=+aes,+crc,+lse,+neon'
 RUN --mount=type=cache,target=/root/.cache/sccache du -sh /root/.cache/sccache
-RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features tmpcache,zo_functions --target aarch64-unknown-linux-gnu \
+RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --target aarch64-unknown-linux-gnu \
   && sccache --show-stats \
   && du -sh /root/.cache/sccache
 RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
