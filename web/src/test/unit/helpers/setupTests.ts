@@ -99,6 +99,10 @@ const server = setupServer(...restHandlers);
 // example: suppose for '/posts' we need to need to test sending response as error, [] and [post1, post2].
 // For this we need instance of server while testing
 // So have added server instance on global so that it can be accessed while testing
+declare global {
+  // eslint-disable-next-line no-var
+  var server: any;
+}
 vi.stubGlobal("server", server);
 
 // Start server before all tests

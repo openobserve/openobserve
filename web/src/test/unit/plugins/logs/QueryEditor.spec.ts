@@ -13,22 +13,15 @@
 //  limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
-import Index from "@/plugins/logs/Index.vue";
 import QueryEditor from "@/plugins/logs/QueryEditor.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import "plotly.js";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

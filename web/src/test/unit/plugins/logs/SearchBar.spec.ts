@@ -21,17 +21,10 @@ import Index from "@/plugins/logs/Index.vue";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import "plotly.js";
 import searchService from "@/services/search";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
-import QueryEditor from "@/plugins/logs/QueryEditor.vue";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

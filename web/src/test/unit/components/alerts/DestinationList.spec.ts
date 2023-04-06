@@ -19,15 +19,10 @@ import { Dialog, Notify } from "quasar";
 import DestinationList from "@/components/alerts/DestinationList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import { rest } from "msw";
 import destinationService from "@/services/alert_destination";
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

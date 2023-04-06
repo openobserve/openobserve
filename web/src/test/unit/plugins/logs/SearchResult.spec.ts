@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
@@ -22,16 +22,10 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import BarChart from "@/components/logBarChart.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import { rest } from "msw";
 import "plotly.js";
 import DetailTable from "@/plugins/logs/DetailTable.vue";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

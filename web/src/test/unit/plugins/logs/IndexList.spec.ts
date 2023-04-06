@@ -21,15 +21,9 @@ import Index from "@/plugins/logs/Index.vue";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import "plotly.js";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

@@ -19,13 +19,7 @@ import { Dialog, Notify } from "quasar";
 import AppAlerts from "../../../views/AppAlerts.vue";
 import i18n from "../../../locales";
 import store from "../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../helpers/router";
 
 installQuasar({
   plugins: [Dialog, Notify],

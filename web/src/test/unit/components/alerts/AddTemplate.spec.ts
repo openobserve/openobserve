@@ -18,16 +18,10 @@ import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
 import TemplateService from "@/services/alert_templates";
 import { rest } from "msw";
 import { AddTemplate } from "@/components/alerts";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 installQuasar({
   plugins: [Dialog, Notify],

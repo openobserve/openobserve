@@ -20,16 +20,7 @@ import { Dialog, Notify } from "quasar";
 import DetailTable from "@/plugins/logs/DetailTable.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import routes from "@/router/routes";
-import { createRouter, createWebHistory } from "vue-router";
-import { rest } from "msw";
-import templateService from "@/services/alert_templates";
-import { nextTick } from "process";
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from "../../helpers/router";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
