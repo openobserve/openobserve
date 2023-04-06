@@ -23,10 +23,6 @@ use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef
 
 use super::triggers;
 #[cfg(feature = "zo_functions")]
-use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
-
-use super::triggers;
-#[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
