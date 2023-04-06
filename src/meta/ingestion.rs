@@ -65,7 +65,14 @@ pub struct StreamSchemaChk {
     pub has_partition_keys: bool,
 }
 
-pub const INGESTION_EP: [&str; 5] = ["/_bulk", "/_json", "/_multi", "/traces", "/write"];
+pub const INGESTION_EP: [&str; 6] = [
+    "/_bulk",
+    "/_json",
+    "/_multi",
+    "/traces",
+    "/write",
+    "/_kinesis_firehose",
+];
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct BulkResponse {
@@ -165,4 +172,44 @@ impl BulkResponseItem {
             original_record: None,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KinesisFHRequest {
+    pub records: Vec<KFHRecordRequest>,
+    pub request_id: String,
+    pub timestamp: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KFHRecordRequest {
+    pub data: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KinesisFHData {
+    pub log_events: Vec<KinesisFHLogEvent>,
+    pub log_group: String,
+    pub log_stream: String,
+    pub message_type: String,
+    pub owner: String,
+    pub subscription_filters: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KinesisFHLogEvent {
+    pub message: json::Value,
+    pub id: String,
+    pub timestamp: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KinesisFHIngestionResponse {
+    pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    pub timestamp: i64,
 }

@@ -82,9 +82,10 @@ memchr = "2.5.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 mlua = { version = "0.8.4", features = [
   "send",
-  "luajit52",
+  #"luajit52",
   "vendored",
   "serialize",
+  "luau",
 ], optional = true }
 object_store = { version = "0.5.4", features = ["aws", "gcp"] }
 once_cell = "1.15.0"
@@ -140,6 +141,7 @@ vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = 
 vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
 walkdir = "2"
 zstd = "0.12.1"
+flate2 = {version = "1.0", features = ["zlib"]}
 
 vrl = {  git  = "https://github.com/zinclabs/vrl",version = "0.1.0" }
 vrl-value = { package = "value", git  = "https://github.com/zinclabs/vrl",version = "0.1.0"  }

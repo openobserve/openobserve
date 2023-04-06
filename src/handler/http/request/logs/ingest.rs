@@ -15,7 +15,7 @@
 use actix_web::{post, web, HttpResponse};
 use std::io::Error;
 
-use crate::service::logs;
+use crate::{meta::ingestion::KinesisFHRequest, service::logs};
 
 /** ES compatible _bulk ingestion API */
 #[utoipa::path(
@@ -98,4 +98,14 @@ pub async fn json(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     logs::json::ingest(&org_id, &stream_name, body, thread_id).await
+}
+
+#[post("/{org_id}/{stream_name}/_kinesis_firehose")]
+pub async fn handle_kinesis_request(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<KinesisFHRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    logs::kinesis_firehose::process(&org_id, &stream_name, post_data.into_inner(), thread_id).await
 }

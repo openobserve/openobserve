@@ -2349,6 +2349,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8a2db397cb1c8772f31494cb8917e48cd1e64f0fa7efac59fbd741a0a8ce841"
 dependencies = [
  "crc32fast",
+ "libz-sys",
  "miniz_oxide",
 ]
 
@@ -3099,6 +3100,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libz-sys"
+version = "1.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9702761c3935f8cc2f101793272e202c72b99da8f4224a19ddcf1279a6450bbf"
+dependencies = [
+ "cc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "link-cplusplus"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3193,6 +3205,15 @@ name = "luajit-src"
 version = "210.4.5+resty2cf5186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27b7992a40e602786272d84c6f2beca44a588ededcfd57b48ec6f82008a7cb97"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "luau0-src"
+version = "0.5.4+luau567"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17e337cbef9e46642b01f5aa5403e93ad3449eede3252813bad50a92abac561a"
 dependencies = [
  "cc",
 ]
@@ -3345,6 +3366,7 @@ dependencies = [
  "erased-serde",
  "lua-src",
  "luajit-src",
+ "luau0-src",
  "num-traits",
  "once_cell",
  "pkg-config",
@@ -5679,6 +5701,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "vcpkg"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6217,6 +6245,7 @@ dependencies = [
  "env_logger",
  "etcd-client",
  "expect-test",
+ "flate2",
  "flatten-json-object",
  "futures",
  "get_if_addrs",
