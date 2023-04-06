@@ -408,6 +408,7 @@ export default defineComponent({
       sqlAST.value.columns.forEach(function (item: any, index: any) {
         let val;
         if (item["as"] === undefined || item["as"] === null) {
+          console.log("item ----", item);
           val = item["expr"]["column"];
         } else {
           val = item["as"];

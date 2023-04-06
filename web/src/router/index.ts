@@ -14,7 +14,6 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, useLocalToken, getPath } from "@/utils/zincutils";
-
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
