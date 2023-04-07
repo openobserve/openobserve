@@ -373,22 +373,20 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_success() {
+        let encoded_data = "eyJtZXNzYWdlIjoiMiAwNTg2OTQ4NTY0NzYgZW5pLTAzYzBmNWJhNzlhNjZlZjE3IDEwLjMuMTY2LjcxIDEwLjMuMTQxLjIwOSA0NDMgMzg2MzQgNiAxMDMgNDI5MjYgMTY4MDgzODU1NiAxNjgwODM4NTc4IEFDQ0VQVCBPSyJ9Cg==";
+        let expected = "{\"message\":\"2 058694856476 eni-03c0f5ba79a66ef17 10.3.166.71 10.3.141.209 443 38634 6 103 42926 1680838556 1680838578 ACCEPT OK\"}\n";
+        let result = decode_and_decompress(encoded_data).expect("Failed to decode data");
+        assert_eq!(result.0, expected);
+    }
+
+    #[test]
     fn test_decode_and_decompress_invalid_base64() {
         let encoded_data = "H4sIAAAAAAAC/ytJLS4BAAxGw7gNAAA&"; // Invalid base64 string
         let result = decode_and_decompress(encoded_data);
         assert!(
             result.is_err(),
             "Expected an error due to invalid base64 input"
-        );
-    }
-
-    #[test]
-    fn test_decode_and_decompress_invalid_gzip() {
-        let encoded_data = "aGVsbG8gd29ybGQh"; // "hello world!" base64-encoded but not compressed
-        let result = decode_and_decompress(encoded_data);
-        assert!(
-            result.is_err(),
-            "Expected an error due to invalid gzip data"
         );
     }
 }
