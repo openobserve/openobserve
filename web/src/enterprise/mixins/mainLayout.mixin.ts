@@ -1,7 +1,6 @@
 import { ref, onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 
 import { useLocalToken, getUserInfo, getImageURL } from "@/utils/zincutils";
@@ -15,7 +14,6 @@ const MainLayoutCloudMixin = {
   setup() {
     const store: any = useStore();
     const router = useRouter();
-    const { t } = useI18n();
 
     //check if organization identifier is present in query params
     const customOrganization = router.currentRoute.value.query.org_identifier;
@@ -36,7 +34,7 @@ const MainLayoutCloudMixin = {
      * @param linksList
      * @returns linksList.value
      */
-    const leftNavigationLinks = (linksList: any) => {
+    const leftNavigationLinks = (linksList: any, t: any) => {
       // linksList.value.splice(7, 0, {
       //   title: t("menu.billings"),
       //   icon: "payment",
@@ -192,7 +190,6 @@ const MainLayoutCloudMixin = {
     });
 
     return {
-      t,
       orgOptions,
       selectedOrg,
       customOrganization,

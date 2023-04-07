@@ -1,11 +1,8 @@
-import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
-    const { t } = useI18n();
-
     const store: any = useStore();
 
     /**
@@ -13,7 +10,7 @@ const MainLayoutOpenSourceMixin = {
      * @param linksList
      * @returns linksList.value
      */
-    const leftNavigationLinks = (linksList: any) => {
+    const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
         icon: "transform",
@@ -44,7 +41,6 @@ const MainLayoutOpenSourceMixin = {
     getDefaultOrganization();
 
     return {
-      t,
       leftNavigationLinks,
       getDefaultOrganization,
     };
