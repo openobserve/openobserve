@@ -84,19 +84,12 @@
                     </div>
                     <div class="field_overlay">
                       <q-icon
-                        v-if="false"
-                        name="filter_alt"
-                        style="margin-right: 0.375rem"
-                        size="1rem"
-                        @click.stop="openFilterCreator(props.row.name)"
-                      />
-                      <q-icon
                         :name="
                           'img:' + getImageURL('images/common/search_icon.svg')
                         "
                         style="margin-right: 0.375rem"
                         size="1rem"
-                        @click="addToFilter(props.row.name)"
+                        @click.stop="addToFilter(props.row.name)"
                       />
                       <q-icon
                         v-if="
@@ -108,7 +101,7 @@
                           'img:' + getImageURL('images/common/add_icon.svg')
                         "
                         size="1rem"
-                        @click="clickFieldFn(props.row, props.pageIndex)"
+                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                       <q-icon
                         v-if="
@@ -120,7 +113,7 @@
                           'img:' + getImageURL('images/common/remove_icon.svg')
                         "
                         size="1rem"
-                        @click="clickFieldFn(props.row, props.pageIndex)"
+                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                     </div>
                   </div>
@@ -130,7 +123,7 @@
                     <div class="filter-values-container">
                       <div
                         v-show="!fieldValues[props.row.name]?.length"
-                        class="q-pl-md"
+                        class="q-pl-md q-py-sm text-subtitle2"
                       >
                         No values found
                       </div>
