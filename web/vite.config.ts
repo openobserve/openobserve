@@ -33,8 +33,8 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
-const componentResolverPlugin = {
-  name: "mixins-resolver",
+const enterpriseResolverPlugin = {
+  name: "enterprise-resolver",
   async resolveId(source) {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
@@ -96,7 +96,7 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
-    componentResolverPlugin,
+    enterpriseResolverPlugin,
     vueJsx(),
   ],
   resolve: {
