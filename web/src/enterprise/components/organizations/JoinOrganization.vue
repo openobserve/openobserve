@@ -54,7 +54,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import organizationsService from "../../../services/organizations";
+import organizationsService from "@/services/organizations";
 import ListAssociatedMembers from "./ListAssociatedMembers.vue";
 
 const defaultValue: any = () => {
