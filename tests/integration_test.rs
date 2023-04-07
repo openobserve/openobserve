@@ -20,13 +20,15 @@ mod tests {
     use core::time;
     use prost::Message;
     use std::sync::Once;
-    use std::{env, fs};
-    use std::{str, thread};
+    use std::{env, fs, str, thread};
+    use zincobserve::common::json;
     use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
     use zincobserve::infra::config::CONFIG;
     use zincobserve::infra::db::default;
+    use zincobserve::meta::dashboards::{Dashboard, Dashboards};
 
     static START: Once = Once::new();
+
     pub mod prometheus_prot {
         include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
     }
@@ -118,10 +120,20 @@ mod tests {
         e2e_user_authentication_with_error().await;
 
         // dashboards
-        e2e_post_dashboard().await;
-        e2e_list_dashboards().await;
-        e2e_get_dashboard().await;
-        e2e_delete_dashboard().await;
+        {
+            let board = e2e_create_dashboard().await;
+            assert_eq!(e2e_list_dashboards().await.dashboards, vec![board.clone()]);
+
+            let board = e2e_update_dashboard(Dashboard {
+                title: "e2e test".to_owned(),
+                description: "Logs flow downstream".to_owned(),
+                ..board
+            })
+            .await;
+            assert_eq!(e2e_get_dashboard(&board.dashboard_id).await, board);
+            e2e_delete_dashboard(&board.dashboard_id).await;
+            assert!(e2e_list_dashboards().await.dashboards.is_empty());
+        }
 
         // alert
         e2e_post_alert_template().await;
@@ -472,7 +484,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp)
         assert!(resp.status().is_success());
     }
 
@@ -521,8 +532,6 @@ mod tests {
     }
 
     async fn e2e_get_organizations() {
-        //e2e_post_user().await;
-
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -562,7 +571,7 @@ mod tests {
 
     async fn e2e_update_user_passcode() {
         let auth = setup();
-        let body_str = r#""#;
+        let body_str = "";
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -601,7 +610,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -623,26 +631,6 @@ mod tests {
             .uri(&format!("/auth/login"))
             .insert_header(ContentType::json())
             .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_list_dashboards() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/dashboards", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
@@ -760,9 +748,10 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
-    async fn e2e_post_dashboard() {
+
+    async fn e2e_create_dashboard() -> Dashboard {
         let auth = setup();
-        let body_str = r##"{"title":"b2","dashboardId":"1501078512","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
+        let body_str = r##"{"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","panels":[{"id":"Panel_ID7857010","type":"bar","fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":[{"type":"condition","values":[],"column":"method","operator":"Is Not Null","value":null}]},"config":{"title":"p5","description":"sample config blah blah blah","show_legends":true},"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false}],"layouts":[{"x":0,"y":0,"w":12,"h":13,"i":1,"panelId":"Panel_ID7857010","static":false}]}"##;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -772,18 +761,17 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!(
-                "/api/{}/dashboards/{}",
-                "e2e", "dashboard_hash_XYZABC124"
-            ))
+            .uri(&format!("/api/{}/dashboards", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
             .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+
+        let body = test::call_and_read_body(&app, req).await;
+        json::from_slice(&body).unwrap()
     }
-    async fn e2e_get_dashboard() {
+
+    async fn e2e_list_dashboards() -> Dashboards {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -794,17 +782,60 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/dashboards/{}",
-                "e2e", "dashboard_hash_XYZABC124"
-            ))
+            .uri(&format!("/api/{}/dashboards", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+
+        let body = test::call_and_read_body(&app, req).await;
+        json::from_slice(&body).unwrap()
     }
-    async fn e2e_delete_dashboard() {
+
+    async fn e2e_update_dashboard(dashboard: Dashboard) -> Dashboard {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::put()
+            .uri(&format!(
+                "/api/{}/dashboards/{}",
+                "e2e", dashboard.dashboard_id
+            ))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(json::to_string(&dashboard).unwrap())
+            .to_request();
+
+        let body = test::call_and_read_body(&app, req).await;
+        json::from_slice(&body).unwrap()
+    }
+
+    async fn e2e_get_dashboard(dashboard_id: &str) -> Dashboard {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/dashboards/{dashboard_id}", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+
+        let body = test::call_and_read_body(&app, req).await;
+        json::from_slice(&body).unwrap()
+    }
+
+    async fn e2e_delete_dashboard(dashboard_id: &str) {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -815,10 +846,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/dashboards/{}",
-                "e2e", "dashboard_hash_XYZABC124"
-            ))
+            .uri(&format!("/api/{}/dashboards/{dashboard_id}", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -926,7 +954,6 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/prometheus/write", "e2e"))
-            //.insert_header(ContentType::json())
             .insert_header(("X-Prometheus-Remote-Write-Version", "0.1.0"))
             .insert_header(("Content-Encoding", "snappy"))
             .insert_header(("Content-Type", "application/x-protobuf"))
@@ -1070,7 +1097,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -1166,7 +1192,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -1270,7 +1295,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -1290,7 +1314,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -1310,7 +1333,6 @@ mod tests {
             .append_header(auth)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        // println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
