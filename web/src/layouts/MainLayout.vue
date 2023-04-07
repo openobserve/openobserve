@@ -560,7 +560,7 @@ export default defineComponent({
         .get_config()
         .then((res: any) => {
           if (
-            store.state.zoConfig.functions_enabled &&
+            res.data.functions_enabled &&
             config.isZincObserveCloud == "false"
           ) {
             linksList.value = mainLayoutMixin
