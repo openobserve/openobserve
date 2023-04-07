@@ -441,7 +441,7 @@ export default defineComponent({
 
     //additional links based on environment and conditions
     if (config.isZincObserveCloud == "true") {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
+      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
@@ -563,9 +563,7 @@ export default defineComponent({
             res.data.functions_enabled &&
             config.isZincObserveCloud == "false"
           ) {
-            linksList.value = mainLayoutMixin
-              .setup()
-              .leftNavigationLinks(linksList);
+            linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
           store.dispatch("setConfig", res.data);
         })
