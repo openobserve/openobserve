@@ -26,6 +26,7 @@ use crate::service::schema::check_for_schema;
 
 pub mod bulk;
 pub mod json;
+pub mod kinesis_firehose;
 pub mod multi;
 
 pub(crate) fn get_upto_discard_error() -> String {

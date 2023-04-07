@@ -32,7 +32,9 @@ use zincobserve::handler::grpc::auth::check_auth;
 use zincobserve::handler::grpc::cluster_rpc::event_server::EventServer;
 use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
 use zincobserve::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
-use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
+use zincobserve::handler::http::router::{
+    get_basic_routes, get_other_service_routes, get_service_routes,
+};
 use zincobserve::infra::cluster;
 use zincobserve::infra::config::{self, CONFIG};
 use zincobserve::infra::file_lock;
@@ -141,12 +143,14 @@ async fn main() -> Result<(), anyhow::Error> {
             let app = if CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
-                    .service(router::dispatch)
+                    .service(router::api)
+                    .service(router::aws)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
-                        .service(router::dispatch)
+                        .service(router::api)
+                        .service(router::aws)
                         .configure(get_basic_routes),
                 )
             };
@@ -182,11 +186,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 App::new()
                     .wrap(prometheus.clone())
                     .configure(get_service_routes)
+                    .configure(get_other_service_routes)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
                         .configure(get_service_routes)
+                        .configure(get_other_service_routes)
                         .configure(get_basic_routes),
                 )
             };
