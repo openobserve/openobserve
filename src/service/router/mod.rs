@@ -21,23 +21,16 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
+const QUERIER_ROUTES: [&str; 4] = ["/_search", "/_around", "/_values", "/api/cache/status"];
+
 #[inline]
 pub fn is_router() -> bool {
     cluster::is_router(&cluster::load_local_node_role().to_vec())
 }
 
 #[inline]
-fn check_search_route(path: &str) -> bool {
-    if path.contains(format!("{}/_search", CONFIG.common.base_uri).as_str()) {
-        return true;
-    }
-    if path.contains(format!("{}/_around", CONFIG.common.base_uri).as_str()) {
-        return true;
-    }
-    if path.eq(format!("{}/api/cache/status", CONFIG.common.base_uri).as_str()) {
-        return true;
-    }
-    false
+fn check_querier_route(path: &str) -> bool {
+    QUERIER_ROUTES.iter().any(|x| path.contains(x))
 }
 
 #[route(
@@ -77,7 +70,7 @@ async fn dispatch(
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
-    let nodes = if check_search_route(path) {
+    let nodes = if check_querier_route(path) {
         cluster::get_cached_online_querier_nodes()
     } else {
         cluster::get_cached_online_ingester_nodes()
@@ -135,10 +128,10 @@ mod tests {
     }
 
     #[test]
-    fn test_check_search_route() {
-        assert!(check_search_route("/api/_search"));
-        assert!(check_search_route("/api/_around"));
-        assert!(check_search_route("/api/cache/status"));
-        assert!(!check_search_route("/api/_bulk"));
+    fn test_check_querier_route() {
+        assert!(check_querier_route("/api/_search"));
+        assert!(check_querier_route("/api/_around"));
+        assert!(check_querier_route("/api/cache/status"));
+        assert!(!check_querier_route("/api/_bulk"));
     }
 }
