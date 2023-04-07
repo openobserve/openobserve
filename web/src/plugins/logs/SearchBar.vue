@@ -140,14 +140,14 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import DateTime from "../../components/DateTime.vue";
-import useLogs from "../../composables/useLogs";
+import DateTime from "@/components/DateTime.vue";
+import useLogs from "@/composables/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser";
-import segment from "../../services/segment_analytics";
-import config from "../../aws-exports";
+import segment from "@/services/segment_analytics";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -189,11 +189,6 @@ export default defineComponent({
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery.from.length > 0) {
-          // alert(
-          //   searchObj.data.parsedQuery.from[0].table !==
-          //     searchObj.data.stream.selectedStream.value
-          // );
-          // alert(searchObj.data.parsedQuery.from[0].table !== streamName);
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&
@@ -256,7 +251,6 @@ export default defineComponent({
     };
 
     const udpateQuery = () => {
-      // alert(searchObj.data.query);
       queryEditorRef.value.setValue(searchObj.data.query);
     };
 

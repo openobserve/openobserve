@@ -14,16 +14,32 @@
 -->
 
 <template>
-  <login></login>
+  <q-page class="q-pa-md">
+    <div class="row text-body1 text-weight-medium">
+      {{ t("billing.invoiceHistory") }}
+    </div>
+    <div>
+      <invoice-table></invoice-table>
+    </div>
+  </q-page>
 </template>
 
 <script lang="ts">
-import Login from "@/components/login/Login.vue";
+import { defineComponent } from "@vue/runtime-core";
+import { useI18n } from "vue-i18n";
+import InvoiceTable from "./invoiceTable.vue";
 
-export default {
-  name: "LoginPage",
+export default defineComponent({
+  name: "Payment Details",
   components: {
-    Login,
+    InvoiceTable,
   },
-};
+  setup() {
+    const { t } = useI18n();
+    return {
+      t,
+    };
+  },
+});
 </script>
+<style lang="scss" scoped></style>

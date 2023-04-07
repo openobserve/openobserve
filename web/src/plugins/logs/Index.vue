@@ -104,21 +104,21 @@ import { useRouter } from "vue-router";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
-import useLogs from "../../composables/useLogs";
-import { deepKeys, byString } from "../../utils/json";
+import useLogs from "@/composables/useLogs";
+import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser";
 
-import streamService from "../../services/stream";
-import searchService from "../../services/search";
-import TransformService from "../../services/jstransform";
+import streamService from "@/services/stream";
+import searchService from "@/services/search";
+import TransformService from "@/services/jstransform";
 import {
   useLocalLogsObj,
   b64EncodeUnicode,
   useLocalLogFilterField,
-} from "../../utils/zincutils";
-import segment from "../../services/segment_analytics";
-import config from "../../aws-exports";
-import { logsErrorMessage } from "../../utils/common";
+} from "@/utils/zincutils";
+import segment from "@/services/segment_analytics";
+import config from "@/aws-exports";
+import { logsErrorMessage } from "@/utils/common";
 
 export default defineComponent({
   name: "PageSearch",
@@ -601,7 +601,6 @@ export default defineComponent({
             "[INDEX_NAME]",
             searchObj.data.stream.selectedStream.value
           );
-          // alert(req.query.sql);
           // const parsedSQL = parser.astify(req.query.sql);
           // const unparsedSQL = parser.sqlify(parsedSQL);
           // console.log(unparsedSQL);

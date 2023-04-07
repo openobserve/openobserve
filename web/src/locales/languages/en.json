@@ -32,6 +32,7 @@
         "signOut": "Sign Out",
         "account": "Account",
         "feedback": "Feedback",
+        "zincSearch": "ZincSearch",
         "documentation": "Docs",
         "tickets": "Ticket",
         "organizations": "Organizations",
@@ -42,7 +43,8 @@
         "dashboard": "Dashboards",
         "alerts": "Alerts",
         "openapi": "OpenAPI",
-        "docs": "Docs"
+        "docs": "Docs",
+        "billings": "Billings"
     },
     "about": {
         "name": "ZincObserve",
