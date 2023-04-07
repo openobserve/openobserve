@@ -67,43 +67,125 @@
                   : ''
               "
             >
-              <div class="field_overlay" :title="props.row.name">
-                <div class="field_label">
-                  {{ props.row.name }}
-                </div>
-                <div class="field_icons">
-                  <q-icon
-                    :name="
-                      'img:' + getImageURL('images/common/search_icon.svg')
-                    "
-                    style="margin-right: 0.375rem"
-                    size="1rem"
-                    @click="addToFilter(props.row.name)"
-                  />
-                  <q-icon
-                    v-if="
-                      !searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                    size="1rem"
-                    @click="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                  <q-icon
-                    v-if="
-                      searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="
-                      'img:' + getImageURL('images/common/remove_icon.svg')
-                    "
-                    size="1rem"
-                    @click="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                </div>
-              </div>
+              <q-expansion-item
+                dense
+                dense-toggle
+                :label="props.row.name"
+                @before-show="openFilterCreator(props.row.name)"
+              >
+                <template v-slot:header>
+                  <div class="field-container" :title="props.row.name">
+                    <div class="field_label">
+                      {{ props.row.name }}
+                    </div>
+                    <div class="field_overlay" v-if="false">
+                      <q-icon
+                        v-if="false"
+                        name="filter_alt"
+                        style="margin-right: 0.375rem"
+                        size="1rem"
+                        @click.stop="openFilterCreator(props.row.name)"
+                      />
+                      <q-icon
+                        :name="
+                          'img:' + getImageURL('images/common/search_icon.svg')
+                        "
+                        style="margin-right: 0.375rem"
+                        size="1rem"
+                        @click="addToFilter(props.row.name)"
+                      />
+                      <q-icon
+                        v-if="
+                          !searchObj.data.stream.selectedFields.includes(
+                            props.row.name
+                          )
+                        "
+                        :name="
+                          'img:' + getImageURL('images/common/add_icon.svg')
+                        "
+                        size="1rem"
+                        @click="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                      <q-icon
+                        v-if="
+                          searchObj.data.stream.selectedFields.includes(
+                            props.row.name
+                          )
+                        "
+                        :name="
+                          'img:' + getImageURL('images/common/remove_icon.svg')
+                        "
+                        size="1rem"
+                        @click="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                    </div>
+                  </div>
+                </template>
+                <q-card>
+                  <q-card-section class="q-pl-md q-pr-sm q-py-xs">
+                    <div class="filter-values-container">
+                      <div v-show="!fieldValues[props.row.name]?.length">
+                        No values present
+                      </div>
+                      <div
+                        v-for="value in fieldValues[props.row.name]"
+                        :key="value.key"
+                      >
+                        <q-list dense>
+                          <q-item tag="label" class="q-pr-none">
+                            <div
+                              class="flex row wrap justify-between"
+                              style="width: calc(100% - 44px)"
+                            >
+                              <div
+                                :title="value.key"
+                                class="ellipsis q-pr-xs"
+                                style="width: calc(100% - 50px)"
+                              >
+                                {{ value.key }}
+                              </div>
+                              <div
+                                :title="value.count"
+                                class="ellipsis text-right q-pr-xs"
+                                style="width: 50px"
+                              >
+                                {{ value.count }}
+                              </div>
+                            </div>
+                            <div class="flex row">
+                              <q-icon
+                                :name="
+                                  'img:' +
+                                  getImageURL('images/common/add_icon.svg')
+                                "
+                                class="q-mr-xs"
+                                size="1rem"
+                                @click="
+                                  addSearchTerm(
+                                    `${props.row.name}='${value.key}'`
+                                  )
+                                "
+                              />
+                              <q-icon
+                                :name="
+                                  'img:' +
+                                  getImageURL('images/common/remove_icon.svg')
+                                "
+                                size="1rem"
+                                @click="
+                                  addSearchTerm(
+                                    `${props.row.name}!='${value.key}'`
+                                  )
+                                "
+                              />
+                            </div>
+                          </q-item>
+                        </q-list>
+                      </div>
+                    </div>
+                  </q-card-section>
+                </q-card>
+              </q-expansion-item>
             </q-td>
           </q-tr>
         </template>
@@ -129,14 +211,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import { getImageURL } from "../../utils/zincutils";
+import FilterCreatorPopup from "@/components/shared/filter/FilterCreatorPopup.vue";
+import streamService from "../../services/stream";
+import { getConsumableDateTime } from "@/utils/commons";
 
+interface Filter {
+  fieldName: string;
+  selectedValues: string[];
+  selectedOperator: string;
+}
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   setup() {
@@ -146,6 +236,9 @@ export default defineComponent({
     const $q = useQuasar();
     const { searchObj, updatedLocalLogFilterField } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
+    const fieldValues: Ref<{
+      [key: string | number]: { key: string; count: string }[] | [];
+    }> = ref({});
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -188,6 +281,59 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
+    const openFilterCreator = (fieldName: string) => {
+      // Make api call to get the field values
+      console.log(fieldName);
+      const timestamps = getConsumableDateTime(searchObj.data.datetime);
+      const startISOTimestamp: any =
+        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
+      const endISOTimestamp: any =
+        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      console.log(startISOTimestamp, endISOTimestamp);
+      try {
+        streamService
+          .fieldValues({
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream_name: searchObj.data.stream.selectedStream.value,
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            fields: [fieldName],
+            size: 10,
+          })
+          .then((res: any) => {
+            if (res.data.hits.length) {
+              fieldValues.value[fieldName] = res.data.hits
+                .find((field: any) => field.field === fieldName)
+                .values.map((value: any) => {
+                  return {
+                    key: value.key,
+                    count: formatNumberWithPrefix(value.num),
+                  };
+                });
+            }
+          });
+      } catch (err) {
+        console.log(err);
+      }
+    };
+
+    function formatNumberWithPrefix(number: number) {
+      if (number >= 1000000000) {
+        return (number / 1000000000).toFixed(1) + "B";
+      } else if (number >= 1000000) {
+        return (number / 1000000).toFixed(1) + "M";
+      } else if (number >= 1000) {
+        return (number / 1000).toFixed(1) + "K";
+      } else {
+        return number.toString();
+      }
+    }
+
+    const addSearchTerm = (term: string) => {
+      // searchObj.meta.showDetailTab = false;
+      searchObj.data.stream.addToFilter = term;
+    };
+
     return {
       t,
       store,
@@ -199,6 +345,9 @@ export default defineComponent({
       clickFieldFn,
       getImageURL,
       filterStreamFn,
+      openFilterCreator,
+      addSearchTerm,
+      fieldValues,
     };
   },
 });
@@ -237,7 +386,8 @@ export default defineComponent({
     // border: 1px solid rgba(0, 0, 0, 0.02);
 
     .q-table {
-      display: block;
+      display: table;
+      table-layout: fixed !important;
     }
     tr {
       margin-bottom: 1px;
@@ -247,7 +397,8 @@ export default defineComponent({
     td {
       width: 100%;
       display: block;
-      height: 25px;
+      height: fit-content;
+      overflow: hidden;
     }
 
     .q-table__control,
@@ -274,44 +425,34 @@ export default defineComponent({
     overflow: visible;
     cursor: default;
 
+    .field_label {
+      pointer-events: none;
+      font-size: 0.825rem;
+      position: relative;
+      display: inline;
+      z-index: 2;
+      left: 0;
+      // text-transform: capitalize;
+    }
+
     .field_overlay {
-      justify-content: space-between;
-      background-color: transparent;
-      transition: all 0.3s ease;
-      padding: 0px 10px;
-      align-items: center;
       position: absolute;
-      line-height: 2rem;
-      overflow: hidden;
-      inset: 0;
+      height: 100%;
+      right: 0;
+      top: 0;
+      background-color: #ffffff;
+      border-radius: 6px;
+      padding: 0 6px;
+      visibility: hidden;
       display: flex;
-      z-index: 1;
-      width: 100%;
-      border-radius: 0px;
-      height: 25px;
+      align-items: center;
+      transition: all 0.3s linear;
 
-      .field_icons {
-        padding: 0 0.625rem 0 0.25rem;
-        transition: all 0.3s ease;
-        background-color: white;
-        position: absolute;
-        z-index: 3;
+      .q-icon {
+        cursor: pointer;
         opacity: 0;
-        right: 0;
-
-        .q-icon {
-          cursor: pointer;
-        }
-      }
-
-      .field_label {
-        pointer-events: none;
-        font-size: 0.825rem;
-        position: relative;
-        display: inline;
-        z-index: 2;
-        left: 0;
-        // text-transform: capitalize;
+        transition: all 0.3s linear;
+        margin: 0 1px;
       }
     }
 
@@ -334,18 +475,19 @@ export default defineComponent({
         }
       }
     }
+
     &:hover {
       .field_overlay {
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+        visibility: visible;
 
-        .field_icons {
-          background-color: white;
+        .q-icon {
           opacity: 1;
         }
       }
     }
   }
 }
+
 .q-item {
   color: $dark-page;
   min-height: 1.3rem;
@@ -388,5 +530,23 @@ export default defineComponent({
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
+}
+</style>
+
+<style lang="scss">
+.index-table {
+  .q-table {
+    width: 100%;
+    table-layout: fixed;
+
+    .q-expansion-item {
+      .q-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-right: 4px;
+      }
+    }
+  }
 }
 </style>
