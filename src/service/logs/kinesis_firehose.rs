@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use crate::common::json;
 use crate::common::time::parse_i64_to_timestamp_micros;
+use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
@@ -112,71 +113,70 @@ pub async fn process(
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     for record in request.records {
         match decode_and_decompress(&record.data) {
-            Ok(decompressed_data) => {
-                let kfh_data: KinesisFHData = json::from_str(&decompressed_data)?;
+            Ok((decompressed_data, is_json)) => {
+                let mut value = json::Value::Null;
+                let mut timestamp = 0;
+                if !is_json {
+                    let kfh_data: KinesisFHData = json::from_str(&decompressed_data)?;
 
-                for event in kfh_data.log_events.iter() {
-                    let mut value = json::to_value(event).unwrap();
-                    let local_val = value.as_object_mut().unwrap();
+                    for event in kfh_data.log_events.iter() {
+                        value = json::to_value(event).unwrap();
+                        let local_val = value.as_object_mut().unwrap();
 
-                    local_val.insert("requestId".to_owned(), request.request_id.clone().into());
-                    local_val.insert(
-                        "messageType".to_owned(),
-                        kfh_data.message_type.clone().into(),
-                    );
-                    local_val.insert("owner".to_owned(), kfh_data.owner.clone().into());
-                    local_val.insert("logGroup".to_owned(), kfh_data.log_group.clone().into());
-                    local_val.insert("logStream".to_owned(), kfh_data.log_stream.clone().into());
-                    local_val.insert(
-                        "subscriptionFilters".to_owned(),
-                        kfh_data.subscription_filters.clone().into(),
-                    );
+                        local_val.insert("requestId".to_owned(), request.request_id.clone().into());
+                        local_val.insert(
+                            "messageType".to_owned(),
+                            kfh_data.message_type.clone().into(),
+                        );
+                        local_val.insert("owner".to_owned(), kfh_data.owner.clone().into());
+                        local_val.insert("logGroup".to_owned(), kfh_data.log_group.clone().into());
+                        local_val
+                            .insert("logStream".to_owned(), kfh_data.log_stream.clone().into());
+                        local_val.insert(
+                            "subscriptionFilters".to_owned(),
+                            kfh_data.subscription_filters.clone().into(),
+                        );
 
-                    let local_msg = event.message.as_str().unwrap();
+                        let local_msg = event.message.as_str().unwrap();
 
-                    if local_msg.starts_with('{') && local_msg.ends_with('}') {
-                        let result: Result<json::Value, json::Error> = json::from_str(local_msg);
+                        if local_msg.starts_with('{') && local_msg.ends_with('}') {
+                            let result: Result<json::Value, json::Error> =
+                                json::from_str(local_msg);
 
-                        match result {
-                            Err(_e) => {
-                                local_val.insert("message".to_owned(), event.message.clone());
+                            match result {
+                                Err(_e) => {
+                                    local_val.insert("message".to_owned(), event.message.clone());
+                                }
+                                Ok(message_val) => {
+                                    local_val.insert("message".to_owned(), message_val.clone());
+                                }
                             }
-                            Ok(message_val) => {
-                                local_val.insert("message".to_owned(), message_val.clone());
-                            }
+                        } else {
+                            local_val.insert("message".to_owned(), local_msg.into());
                         }
-                    } else {
-                        local_val.insert("message".to_owned(), local_msg.into());
+
+                        value = local_val.clone().into();
+                        // handling of timestamp
+                        timestamp = match event.timestamp {
+                            Some(v) => match parse_i64_to_timestamp_micros(v) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    stream_status.status.failed += 1;
+                                    stream_status.status.error = e.to_string();
+                                    continue;
+                                }
+                            },
+                            None => Utc::now().timestamp_micros(),
+                        };
                     }
-
-                    value = local_val.clone().into();
-
-                    // Start row based transform
-                    #[cfg(feature = "zo_functions")]
-                    let value = crate::service::ingestion::apply_stream_transform(
-                        &local_tans,
-                        &value,
-                        &lua,
-                        &stream_lua_map,
-                        &stream_vrl_map,
-                        stream_name,
-                        &mut runtime,
-                    );
-                    #[cfg(feature = "zo_functions")]
-                    if value.is_null() || !value.is_object() {
-                        stream_status.status.failed += 1; // transform failed or dropped
-                        continue;
-                    }
-                    // End row based transform
-
-                    // JSON Flattening
-                    let mut value = json::flatten_json_and_format_field(&value);
-                    // get json object
-                    let local_val = value.as_object_mut().unwrap();
-
-                    // handle timestamp
-                    let timestamp = match event.timestamp {
-                        Some(v) => match parse_i64_to_timestamp_micros(v) {
+                } else {
+                    value = json::from_str(&decompressed_data)?;
+                    timestamp = match value
+                        .as_object()
+                        .unwrap()
+                        .get(&CONFIG.common.time_stamp_col)
+                    {
+                        Some(v) => match parse_timestamp_micro_from_value(v) {
                             Ok(t) => t,
                             Err(e) => {
                                 stream_status.status.failed += 1;
@@ -186,40 +186,64 @@ pub async fn process(
                         },
                         None => Utc::now().timestamp_micros(),
                     };
-                    // check ingestion time
-                    let earliest_time =
-                        Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-                    if timestamp < earliest_time.timestamp_micros() {
-                        stream_status.status.failed += 1; // to old data, just discard
-                        stream_status.status.error = super::get_upto_discard_error();
-                        continue;
-                    }
-                    if timestamp < min_ts {
-                        min_ts = timestamp;
-                    }
-                    local_val.insert(
-                        CONFIG.common.time_stamp_col.clone(),
-                        json::Value::Number(timestamp.into()),
-                    );
+                }
 
-                    // write data
-                    let local_trigger = super::add_valid_record(
-                        StreamMeta {
-                            org_id: org_id.to_string(),
-                            stream_name: stream_name.to_string(),
-                            partition_keys: partition_keys.clone(),
-                            stream_alerts_map: stream_alerts_map.clone(),
-                        },
-                        &mut stream_schema_map,
-                        &mut stream_status.status,
-                        &mut buf,
-                        local_val,
-                    )
-                    .await;
+                // Start row based transform
+                #[cfg(feature = "zo_functions")]
+                let value = crate::service::ingestion::apply_stream_transform(
+                    &local_tans,
+                    &value,
+                    &lua,
+                    &stream_lua_map,
+                    &stream_vrl_map,
+                    stream_name,
+                    &mut runtime,
+                );
+                #[cfg(feature = "zo_functions")]
+                if value.is_null() || !value.is_object() {
+                    stream_status.status.failed += 1; // transform failed or dropped
+                    continue;
+                }
+                // End row based transform
 
-                    if local_trigger.is_some() {
-                        trigger = Some(local_trigger.unwrap());
-                    }
+                // JSON Flattening
+                let mut value = json::flatten_json_and_format_field(&value);
+                // get json object
+                let local_val = value.as_object_mut().unwrap();
+
+                // check ingestion time
+                let earliest_time =
+                    Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+                if timestamp < earliest_time.timestamp_micros() {
+                    stream_status.status.failed += 1; // to old data, just discard
+                    stream_status.status.error = super::get_upto_discard_error();
+                    continue;
+                }
+                if timestamp < min_ts {
+                    min_ts = timestamp;
+                }
+                local_val.insert(
+                    CONFIG.common.time_stamp_col.clone(),
+                    json::Value::Number(timestamp.into()),
+                );
+
+                // write data
+                let local_trigger = super::add_valid_record(
+                    StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        partition_keys: partition_keys.clone(),
+                        stream_alerts_map: stream_alerts_map.clone(),
+                    },
+                    &mut stream_schema_map,
+                    &mut stream_status.status,
+                    &mut buf,
+                    local_val,
+                )
+                .await;
+
+                if local_trigger.is_some() {
+                    trigger = Some(local_trigger.unwrap());
                 }
             }
             Err(err) => {
@@ -325,12 +349,14 @@ pub async fn process(
     }))
 }
 
-fn decode_and_decompress(encoded_data: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn decode_and_decompress(encoded_data: &str) -> Result<(String, bool), Box<dyn std::error::Error>> {
     let decoded_data = crate::common::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
-    gz.read_to_string(&mut decompressed_data)?;
-    Ok(decompressed_data)
+    match gz.read_to_string(&mut decompressed_data) {
+        Ok(_) => Ok((decompressed_data, false)),
+        Err(_) => Ok((String::from_utf8(decoded_data)?, true)),
+    }
 }
 
 #[cfg(test)]
@@ -343,7 +369,7 @@ mod tests {
         let expected = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1680683189085,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}";
         let result =
             decode_and_decompress(encoded_data).expect("Failed to decode and decompress data");
-        assert_eq!(result, expected);
+        assert_eq!(result.0, expected);
     }
 
     #[test]
