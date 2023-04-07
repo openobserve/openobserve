@@ -69,16 +69,20 @@
             >
               <q-expansion-item
                 dense
-                dense-toggle
+                switch-toggle-side
                 :label="props.row.name"
+                expand-icon-class="field-expansion-icon"
                 @before-show="openFilterCreator(props.row.name)"
               >
                 <template v-slot:header>
-                  <div class="field-container" :title="props.row.name">
-                    <div class="field_label">
+                  <div
+                    class="field-container flex content-center ellipsis"
+                    :title="props.row.name"
+                  >
+                    <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div class="field_overlay" v-if="false">
+                    <div class="field_overlay">
                       <q-icon
                         v-if="false"
                         name="filter_alt"
@@ -122,10 +126,13 @@
                   </div>
                 </template>
                 <q-card>
-                  <q-card-section class="q-pl-md q-pr-sm q-py-xs">
+                  <q-card-section class="q-pl-sm q-pr-xs q-py-xs">
                     <div class="filter-values-container">
-                      <div v-show="!fieldValues[props.row.name]?.length">
-                        No values present
+                      <div
+                        v-show="!fieldValues[props.row.name]?.length"
+                        class="q-pl-md"
+                      >
+                        No values found
                       </div>
                       <div
                         v-for="value in fieldValues[props.row.name]"
@@ -135,7 +142,7 @@
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 44px)"
+                              style="width: calc(100% - 36px)"
                             >
                               <div
                                 :title="value.key"
@@ -146,7 +153,7 @@
                               </div>
                               <div
                                 :title="value.count"
-                                class="ellipsis text-right q-pr-xs"
+                                class="ellipsis text-right q-pr-sm"
                                 style="width: 50px"
                               >
                                 {{ value.count }}
@@ -221,6 +228,7 @@ import { getImageURL } from "../../utils/zincutils";
 import FilterCreatorPopup from "@/components/shared/filter/FilterCreatorPopup.vue";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
+import { q } from "msw/lib/SetupApi-8ab693f7";
 
 interface Filter {
   fieldName: string;
@@ -282,14 +290,11 @@ export default defineComponent({
     }
 
     const openFilterCreator = (fieldName: string) => {
-      // Make api call to get the field values
-      console.log(fieldName);
       const timestamps = getConsumableDateTime(searchObj.data.datetime);
       const startISOTimestamp: any =
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
       const endISOTimestamp: any =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-      console.log(startISOTimestamp, endISOTimestamp);
       try {
         streamService
           .fieldValues({
@@ -301,6 +306,7 @@ export default defineComponent({
             size: 10,
           })
           .then((res: any) => {
+            fieldValues.value[fieldName] = [];
             if (res.data.hits.length) {
               fieldValues.value[fieldName] = res.data.hits
                 .find((field: any) => field.field === fieldName)
@@ -313,7 +319,10 @@ export default defineComponent({
             }
           });
       } catch (err) {
-        console.log(err);
+        $q.notify({
+          type: "negative",
+          message: "Error while fetching field values",
+        });
       }
     };
 
@@ -440,18 +449,18 @@ export default defineComponent({
       height: 100%;
       right: 0;
       top: 0;
-      background-color: #ffffff;
-      border-radius: 6px;
+      z-index: 5;
+      background-color: #e8e8e8;
       padding: 0 6px;
       visibility: hidden;
       display: flex;
       align-items: center;
-      transition: all 0.3s linear;
+      transition: all 0.1s linear;
 
       .q-icon {
         cursor: pointer;
         opacity: 0;
-        transition: all 0.3s linear;
+        transition: all 0.1s linear;
         margin: 0 1px;
       }
     }
@@ -462,26 +471,6 @@ export default defineComponent({
 
         .field_icons {
           opacity: 0;
-        }
-      }
-      &:hover {
-        .field_overlay {
-          box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
-          background-color: white;
-
-          .field_icons {
-            background-color: white;
-          }
-        }
-      }
-    }
-
-    &:hover {
-      .field_overlay {
-        visibility: visible;
-
-        .q-icon {
-          opacity: 1;
         }
       }
     }
@@ -543,8 +532,42 @@ export default defineComponent({
       .q-item {
         display: flex;
         align-items: center;
-        justify-content: space-between;
         padding-right: 4px;
+      }
+      .q-item__section--avatar {
+        min-width: 28px;
+        max-width: 28px;
+        padding-right: 8px;
+      }
+
+      .field-expansion-icon {
+        .q-icon {
+          font-size: 20px;
+        }
+      }
+
+      .q-item-type {
+        &:hover {
+          .field_overlay {
+            visibility: visible;
+
+            .q-icon {
+              opacity: 1;
+            }
+          }
+        }
+      }
+    }
+
+    .field_list {
+      &.selected {
+        .q-expansion-item {
+          background-color: rgba(89, 96, 178, 0.3);
+        }
+
+        .field_overlay {
+          background-color: #ffffff;
+        }
       }
     }
   }
