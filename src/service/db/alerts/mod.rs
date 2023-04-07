@@ -168,6 +168,5 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn reset() -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = "/alerts/";
-    db.delete(key, true).await?;
-    Ok(())
+    Ok(db.delete(key, true).await?)
 }

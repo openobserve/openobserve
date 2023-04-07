@@ -46,7 +46,7 @@ pub enum Error {
 
 #[derive(ThisError, Debug)]
 pub enum DbError {
-    #[error("key:{0} not exists")]
+    #[error("key {0} does not exist")]
     KeyNotExists(String),
 }
 
@@ -191,14 +191,22 @@ impl ErrorCodes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use expect_test::expect;
 
     #[test]
     fn test_error() {
-        let err = Error::Message("test".to_string());
-        assert_eq!(err.to_string(), "Error# test");
+        let err = Error::Message("Ni! Try again.".to_string());
+        expect![["Error# Ni! Try again."]].assert_eq(&err.to_string());
 
-        let err = Error::from(DbError::KeyNotExists("test".to_string()));
-        assert_eq!(err.to_string(), "DbError# key:test not exists");
-        assert_eq!(format!("{:?}", err), "DbError(KeyNotExists(\"test\"))");
+        let err = Error::from(DbError::KeyNotExists("/another/shrubbery".to_string()));
+        expect![["DbError# key /another/shrubbery does not exist"]].assert_eq(&err.to_string());
+        expect![[r#"
+            DbError(
+                KeyNotExists(
+                    "/another/shrubbery",
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&err);
     }
 }
