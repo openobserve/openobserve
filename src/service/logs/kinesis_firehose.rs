@@ -20,6 +20,7 @@ use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::meta::ingestion::AWSRecordType;
 use crate::meta::ingestion::KinesisFHData;
 use crate::meta::ingestion::KinesisFHIngestionResponse;
 use crate::meta::ingestion::KinesisFHRequest;
@@ -113,10 +114,10 @@ pub async fn process(
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     for record in request.records {
         match decode_and_decompress(&record.data) {
-            Ok((decompressed_data, is_json)) => {
+            Ok((decompressed_data, record_type)) => {
                 let mut value = json::Value::Null;
                 let mut timestamp = 0;
-                if !is_json {
+                if record_type.eq(&AWSRecordType::Cloudwatch) {
                     let kfh_data: KinesisFHData = json::from_str(&decompressed_data)?;
 
                     for event in kfh_data.log_events.iter() {
@@ -349,13 +350,15 @@ pub async fn process(
     }))
 }
 
-fn decode_and_decompress(encoded_data: &str) -> Result<(String, bool), Box<dyn std::error::Error>> {
+fn decode_and_decompress(
+    encoded_data: &str,
+) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
     let decoded_data = crate::common::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
     match gz.read_to_string(&mut decompressed_data) {
-        Ok(_) => Ok((decompressed_data, false)),
-        Err(_) => Ok((String::from_utf8(decoded_data)?, true)),
+        Ok(_) => Ok((decompressed_data, AWSRecordType::Cloudwatch)),
+        Err(_) => Ok((String::from_utf8(decoded_data)?, AWSRecordType::JSON)),
     }
 }
 

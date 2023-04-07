@@ -213,3 +213,10 @@ pub struct KinesisFHIngestionResponse {
     pub error_message: Option<String>,
     pub timestamp: i64,
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AWSRecordType {
+    JSON,
+    Cloudwatch,
+}
