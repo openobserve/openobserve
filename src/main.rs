@@ -143,12 +143,14 @@ async fn main() -> Result<(), anyhow::Error> {
             let app = if CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
-                    .service(router::dispatch)
+                    .service(router::api)
+                    .service(router::aws)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
-                        .service(router::dispatch)
+                        .service(router::api)
+                        .service(router::aws)
                         .configure(get_basic_routes),
                 )
             };

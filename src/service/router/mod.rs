@@ -47,7 +47,30 @@ fn check_search_route(path: &str) -> bool {
     method = "PUT",
     method = "DELETE"
 )]
-pub async fn dispatch(
+pub async fn api(
+    req: HttpRequest,
+    payload: web::Payload,
+    client: web::Data<Client>,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload, client).await
+}
+
+#[route(
+    "/aws/{path:.*}",
+    method = "GET",
+    method = "POST",
+    method = "PUT",
+    method = "DELETE"
+)]
+pub async fn aws(
+    req: HttpRequest,
+    payload: web::Payload,
+    client: web::Data<Client>,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload, client).await
+}
+
+async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
     client: web::Data<Client>,
