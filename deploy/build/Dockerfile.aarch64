@@ -4,7 +4,7 @@ WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
-RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
+RUN NODE_OPTIONS="--max-old-space-size=8192" VITE_ZINCOBSERVE_CLOUD=false npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
