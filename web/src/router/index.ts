@@ -15,13 +15,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, useLocalToken, getPath } from "@/utils/zincutils";
 
-import Organizations from "../components/cloud/organizations/Organization.vue";
-
-import Billing from "../components/cloud/billings/Billing.vue";
-import Plans from "../components/cloud/billings/plans.vue";
-import InvoiceHistory from "../components/cloud/billings/invoiceHistory.vue";
-import Usage from "../components/cloud/billings/usage.vue";
-
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
