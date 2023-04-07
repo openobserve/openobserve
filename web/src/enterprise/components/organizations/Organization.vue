@@ -148,11 +148,11 @@ import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import organizationsService from "../../../services/organizations";
+import organizationsService from "@/services/organizations";
 import AddUpdateOrganization from "./AddUpdateOrganization.vue";
 import JoinOrganization from "./JoinOrganization.vue";
-import QTablePagination from "../../../components/shared/grid/Pagination.vue";
-import NoData from "../../../components/shared/grid/NoData.vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 
 export default defineComponent({

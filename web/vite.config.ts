@@ -16,12 +16,13 @@ import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import vueJsx from "@vitejs/plugin-vue-jsx";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
 import dotenv from "dotenv";
-import fs from "fs";
+import fs from "fs-extra";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -32,9 +33,33 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
+const componentResolverPlugin = {
+  name: "mixins-resolver",
+  async resolveId(source) {
+    if (source.startsWith("@zo/")) {
+      const fileName = source.replace("@zo/", "");
+
+      const enterprisePath = path.resolve(
+        __dirname,
+        `./src/enterprise/${fileName}`
+      );
+      const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
+
+      if (
+        process.env.VITE_ZINCOBSERVE_CLOUD == "true" &&
+        (await fs.pathExists(enterprisePath))
+      ) {
+        return enterprisePath;
+      }
+
+      return defaultPath;
+    }
+  },
+};
+
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
-const filePath = path.resolve(process.cwd(), "src/enterprise");
+// const filePath = path.resolve(process.cwd(), "src/enterprise");
 // }
 
 // const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
@@ -71,26 +96,13 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
+    componentResolverPlugin,
+    vueJsx(),
   ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      // Check if the file exists in the enterprise folder before creating the alias
-      // "@enterprise": fileURLToPath(
-        // new URL("./src", import.meta.url)
-      // ),
-      // Use a default alias for the src folder
-      // "@both$": fileURLToPath(new URL("./src", import.meta.url)),
-      // "@both": (filePath) => {
-      //   console.log(filePath)
-      //   const enterpriseFile = path.resolve(enterprisePath, filePath);
-      //   if (fs.existsSync(enterpriseFile)) {
-      //     return enterpriseFile;
-      //   } else {
-      //     const srcFile = path.resolve(srcPath, filePath);
-      //     return fs.existsSync(srcFile) ? srcFile : null;
-      //   }
-      // },
+      "@enterprise": fileURLToPath(new URL("./src/enterprise", import.meta.url)),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",
