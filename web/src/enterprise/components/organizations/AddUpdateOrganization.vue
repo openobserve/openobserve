@@ -99,11 +99,10 @@
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import organizationService from "../../../services/organizations";
+import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import type organizations from "../../../services/organizations";
 
 const defaultValue = () => {
   return {

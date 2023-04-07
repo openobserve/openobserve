@@ -30,14 +30,11 @@ import { getUserInfo, getDecodedUserInfo, getPath } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
-import MainLayout from "@/layouts/MainLayout.vue";
 import segment from "@/services/segment_analytics";
 import moment from "moment";
 
 export default defineComponent({
   name: "PageLoginCallback",
-  // eslint-disable-next-line vue/no-unused-components
-  components: { MainLayout },
   setup() {
     const store = useStore();
     const q = useQuasar();

@@ -29,7 +29,7 @@ import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
 
-const useCloudRoutes = () => {
+const useEnvRoutes = () => {
   const parentRoutes = [
     {
       path: "/login",
@@ -94,4 +94,4 @@ const useCloudRoutes = () => {
   return { parentRoutes, homeChildRoutes };
 };
 
-export default useCloudRoutes;
+export default useEnvRoutes;
