@@ -45,6 +45,7 @@
     <div class="index-table q-mt-xs">
       <q-table
         v-model="searchObj.data.stream.selectedFields"
+        :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
@@ -67,16 +68,64 @@
                   : ''
               "
             >
+              <div
+                v-if="props.row.ftsKey"
+                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm q-py-sm"
+                :title="props.row.name"
+              >
+                <div class="field_label ellipsis">
+                  {{ props.row.name }}
+                </div>
+                <div class="field_overlay">
+                  <q-icon
+                    :name="
+                      'img:' + getImageURL('images/common/search_icon.svg')
+                    "
+                    style="margin-right: 0.375rem"
+                    size="1rem"
+                    @click.stop="addToFilter(props.row.name)"
+                  />
+                  <q-icon
+                    v-if="
+                      !searchObj.data.stream.selectedFields.includes(
+                        props.row.name
+                      )
+                    "
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    size="1rem"
+                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                  <q-icon
+                    v-if="
+                      searchObj.data.stream.selectedFields.includes(
+                        props.row.name
+                      )
+                    "
+                    :name="
+                      'img:' + getImageURL('images/common/remove_icon.svg')
+                    "
+                    size="1rem"
+                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                </div>
+              </div>
               <q-expansion-item
+                v-else
                 dense
                 switch-toggle-side
                 :label="props.row.name"
                 expand-icon-class="field-expansion-icon"
-                @before-show="openFilterCreator(props.row.name)"
+                :expand-icon="
+                  'img:' + getImageURL('images/common/down-solid.svg')
+                "
+                :expanded-icon="
+                  'img:' + getImageURL('images/common/up-solid.svg')
+                "
+                @before-show="(event: any) => openFilterCreator(event, props.row)"
               >
                 <template v-slot:header>
                   <div
-                    class="field-container flex content-center ellipsis"
+                    class="flex content-center ellipsis"
                     :title="props.row.name"
                   >
                     <div class="field_label ellipsis">
@@ -119,7 +168,7 @@
                   </div>
                 </template>
                 <q-card>
-                  <q-card-section class="q-pl-sm q-pr-xs q-py-xs">
+                  <q-card-section class="q-pl-md q-pr-xs q-py-xs">
                     <div class="filter-values-container">
                       <div
                         v-show="!fieldValues[props.row.name]?.length"
@@ -218,10 +267,9 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import { getImageURL } from "../../utils/zincutils";
-import FilterCreatorPopup from "@/components/shared/filter/FilterCreatorPopup.vue";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
-import { q } from "msw/lib/SetupApi-8ab693f7";
+import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
 
 interface Filter {
   fieldName: string;
@@ -282,7 +330,13 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
-    const openFilterCreator = (fieldName: string) => {
+    const openFilterCreator = (event: any, { name, ftsKey }: any) => {
+      console.log(ftsKey);
+      if (ftsKey) {
+        event.stopPropagation();
+        event.preventDefault();
+        return;
+      }
       const timestamps = getConsumableDateTime(searchObj.data.datetime);
       const startISOTimestamp: any =
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
@@ -295,14 +349,14 @@ export default defineComponent({
             stream_name: searchObj.data.stream.selectedStream.value,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
-            fields: [fieldName],
+            fields: [name],
             size: 10,
           })
           .then((res: any) => {
-            fieldValues.value[fieldName] = [];
+            fieldValues.value[name] = [];
             if (res.data.hits.length) {
-              fieldValues.value[fieldName] = res.data.hits
-                .find((field: any) => field.field === fieldName)
+              fieldValues.value[name] = res.data.hits
+                .find((field: any) => field.field === name)
                 .values.map((value: any) => {
                   return {
                     key: value.key,
@@ -448,12 +502,10 @@ export default defineComponent({
       visibility: hidden;
       display: flex;
       align-items: center;
-      transition: all 0.1s linear;
 
       .q-icon {
         cursor: pointer;
         opacity: 0;
-        transition: all 0.1s linear;
         margin: 0 1px;
       }
     }
@@ -465,6 +517,11 @@ export default defineComponent({
         .field_icons {
           opacity: 0;
         }
+      }
+    }
+    &:hover {
+      .field-container {
+        background-color: #e8e8e8;
       }
     }
   }
@@ -526,19 +583,23 @@ export default defineComponent({
         display: flex;
         align-items: center;
         padding-right: 4px;
+        padding-left: 0;
       }
       .q-item__section--avatar {
-        min-width: 28px;
-        max-width: 28px;
-        padding-right: 8px;
+        min-width: 12px;
+        max-width: 12px;
+        margin-right: 8px;
       }
 
-      .field-expansion-icon {
-        .q-icon {
-          font-size: 20px;
+      .filter-values-container {
+        .q-item {
+          padding-left: 4px;
+
+          .q-focus-helper {
+            background: none !important;
+          }
         }
       }
-
       .q-item-type {
         &:hover {
           .field_overlay {
@@ -547,6 +608,24 @@ export default defineComponent({
             .q-icon {
               opacity: 1;
             }
+          }
+        }
+      }
+      .field-expansion-icon {
+        img {
+          width: 12px;
+          height: 12px;
+        }
+      }
+    }
+
+    .field-container {
+      &:hover {
+        .field_overlay {
+          visibility: visible;
+
+          .q-icon {
+            opacity: 1;
           }
         }
       }
