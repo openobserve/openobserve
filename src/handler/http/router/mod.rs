@@ -15,13 +15,14 @@
 use actix_cors::Cors;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{body::MessageBody, http::header, web, HttpResponse};
+
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
 use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
-use super::auth::validator;
+use super::auth::{validator, validator_aws};
 use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
@@ -167,5 +168,26 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(kv::set)
             .service(kv::delete)
             .service(kv::list),
+    );
+}
+
+pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
+    let amz_auth = HttpAuthentication::with_fn(validator_aws);
+    let cors = Cors::default()
+        .send_wildcard()
+        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::ACCEPT,
+            header::CONTENT_TYPE,
+        ])
+        .allow_any_origin()
+        .max_age(3600);
+    let cors = Arc::new(cors);
+    cfg.service(
+        web::scope("/aws")
+            .wrap(cors)
+            .wrap(amz_auth)
+            .service(logs::ingest::handle_kinesis_request),
     );
 }

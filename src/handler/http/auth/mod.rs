@@ -19,7 +19,10 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
-use crate::common::auth::{get_hash, is_root_user};
+use crate::common::{
+    self,
+    auth::{get_hash, is_root_user},
+};
 use crate::infra::config::CONFIG;
 use crate::meta::ingestion::INGESTION_EP;
 use crate::meta::user::UserRole;
@@ -130,6 +133,42 @@ pub async fn validate_user(user_id: &str, user_password: &str) -> Result<bool, E
             }
         }
         Err(_) => Err(ErrorForbidden("Not allowed")),
+    }
+}
+
+pub async fn validator_aws(
+    req: ServiceRequest,
+    _credentials: Option<BasicAuth>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let path = req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/aws/", CONFIG.common.base_uri).as_str())
+        .unwrap_or(req.request().path());
+
+    match req.headers().get("X-Amz-Firehose-Access-Key") {
+        Some(val) => match val.to_str() {
+            Ok(val) => {
+                let amz_creds = common::base64::decode(val).unwrap();
+                let creds = amz_creds
+                    .split(':')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
+
+                match validate_credentials(&creds[0], &creds[1], path).await {
+                    Ok(res) => {
+                        if res {
+                            Ok(req)
+                        } else {
+                            Err((ErrorUnauthorized("Unauthorized Access"), req))
+                        }
+                    }
+                    Err(err) => Err((err, req)),
+                }
+            }
+            Err(_) => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+        },
+        None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
     }
 }
 

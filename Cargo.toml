@@ -70,6 +70,7 @@ dotenv_config = "0.1.5"
 dotenvy = "0.15.6"
 env_logger = "0.10"
 etcd-client = { version = "0.10.2", features = ["tls"] }
+flate2 = { version = "1.0", features = ["zlib"] }
 flatten-json-object = "0.6.1"
 futures = "0.3"
 get_if_addrs = "0.5.3"
@@ -139,7 +140,7 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e
 vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
 vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
 walkdir = "2"
-zstd = "0.12.1"
+zstd = "0.12.3"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
