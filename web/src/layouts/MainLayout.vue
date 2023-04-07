@@ -58,8 +58,8 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs"
-class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -136,8 +136,8 @@ class="warning" />{{
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md"
-color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -160,9 +160,8 @@ color="grey" text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple
-v-close-popup clickable
-@click="signout">
+              <q-item v-ripple v-close-popup
+clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -441,12 +440,7 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     //additional links based on environment and conditions
-    if (
-      store.state.zoConfig.functions_enabled &&
-      config.isZincObserveCloud == "false"
-    ) {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
-    } else if (config.isZincObserveCloud == "true") {
+    if (config.isZincObserveCloud == "true") {
       linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList);
     }
 
@@ -565,6 +559,14 @@ export default defineComponent({
       await configService
         .get_config()
         .then((res: any) => {
+          if (
+            store.state.zoConfig.functions_enabled &&
+            config.isZincObserveCloud == "false"
+          ) {
+            linksList.value = mainLayoutMixin
+              .setup()
+              .leftNavigationLinks(linksList);
+          }
           store.dispatch("setConfig", res.data);
         })
         .catch((error) => console.log(error));
