@@ -71,7 +71,7 @@
               <!-- TODO OK : Repeated code make seperate component to display field  -->
               <div
                 v-if="props.row.ftsKey"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm q-py-sm"
+                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
                 <div class="field_label ellipsis">
@@ -178,13 +178,29 @@
                   <q-card-section class="q-pl-md q-pr-xs q-py-xs">
                     <div class="filter-values-container">
                       <div
-                        v-show="!fieldValues[props.row.name]?.length"
-                        class="q-pl-md q-py-sm text-subtitle2"
+                        v-show="fieldValues[props.row.name]?.isLoading"
+                        class="q-pl-md q-py-xs"
+                        style="height: 60px"
+                      >
+                        <q-inner-loading
+                          size="xs"
+                          :showing="fieldValues[props.row.name]?.isLoading"
+                          label="Fetching values..."
+                          label-style="font-size: 1.1em"
+                        />
+                      </div>
+                      <div
+                        v-show="
+                          !fieldValues[props.row.name]?.values?.length &&
+                          !fieldValues[props.row.name]?.isLoading
+                        "
+                        class="q-pl-md q-py-xs text-subtitle2"
                       >
                         No values found
                       </div>
                       <div
-                        v-for="value in fieldValues[props.row.name]"
+                        v-for="value in fieldValues[props.row.name]?.values ||
+                        []"
                         :key="value.key"
                       >
                         <q-list dense>
@@ -293,7 +309,10 @@ export default defineComponent({
     const { searchObj, updatedLocalLogFilterField } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
-      [key: string | number]: { key: string; count: string }[] | [];
+      [key: string | number]: {
+        isLoading: boolean;
+        values: { key: string; count: string }[];
+      };
     }> = ref({});
 
     const filterStreamFn = (val: string, update: any) => {
@@ -348,6 +367,11 @@ export default defineComponent({
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
       const endISOTimestamp: any =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+
+      fieldValues.value[name] = {
+        isLoading: true,
+        values: [],
+      };
       try {
         streamService
           .fieldValues({
@@ -359,9 +383,8 @@ export default defineComponent({
             size: 10,
           })
           .then((res: any) => {
-            fieldValues.value[name] = [];
             if (res.data.hits.length) {
-              fieldValues.value[name] = res.data.hits
+              fieldValues.value[name]["values"] = res.data.hits
                 .find((field: any) => field.field === name)
                 .values.map((value: any) => {
                   return {
@@ -370,6 +393,9 @@ export default defineComponent({
                   };
                 });
             }
+          })
+          .finally(() => {
+            fieldValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
         $q.notify({
@@ -498,6 +524,10 @@ export default defineComponent({
       // text-transform: capitalize;
     }
 
+    .field-container {
+      height: 25px;
+    }
+
     .field_overlay {
       position: absolute;
       height: 100%;
@@ -589,8 +619,9 @@ export default defineComponent({
       .q-item {
         display: flex;
         align-items: center;
-        padding-right: 4px;
-        padding-left: 0;
+        padding: 0;
+        height: 25px !important;
+        min-height: 25px !important;
       }
       .q-item__section--avatar {
         min-width: 12px;
