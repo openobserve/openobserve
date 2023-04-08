@@ -30,6 +30,7 @@ const stream = {
     }
     return http().get(url);
   },
+
   schema: (org_identifier: string, stream_name: string, type: string) => {
     let url = `/api/${org_identifier}/${stream_name}/schema`;
 
@@ -38,6 +39,7 @@ const stream = {
     }
     return http().get(url);
   },
+
   updateSettings: (
     org_identifier: string,
     stream_name: string,
@@ -51,6 +53,20 @@ const stream = {
     }
     return http().post(url, data);
   },
+
+  fieldValues: ({
+    org_identifier,
+    stream_name,
+    fields,
+    size,
+    start_time,
+    end_time,
+  }: any) => {
+    const fieldsString = fields.join(",");
+    const url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
+    return http().get(url);
+  },
+
   delete: (org_identifier: string, stream_name: string) => {
     return http().delete(`/api/${org_identifier}/${stream_name}`);
   },
