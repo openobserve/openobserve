@@ -18,31 +18,60 @@
 <template>
   <q-page class="logPage" id="logPage">
     <div id="secondLevel">
-      <search-bar ref="searchBarRef" v-show="searchObj.data.stream.streamLists.length > 0"
-        :key="searchObj.data.stream.streamLists.length" @searchdata="searchData" />
-      <div id="thirdLevel" class="row scroll" style="width: 100%" v-if="searchObj.data.stream.streamLists.length > 0">
+      <search-bar
+        ref="searchBarRef"
+        v-show="searchObj.data.stream.streamLists.length > 0"
+        :key="searchObj.data.stream.streamLists.length"
+        @searchdata="searchData"
+      />
+      <div
+        id="thirdLevel"
+        class="row scroll"
+        style="width: 100%"
+        v-if="searchObj.data.stream.streamLists.length > 0"
+      >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-        <q-splitter v-model="searchObj.config.splitterModel" :limits="searchObj.config.splitterLimit" style="width: 100%">
+        <q-splitter
+          v-model="searchObj.config.splitterModel"
+          :limits="searchObj.config.splitterLimit"
+          style="width: 100%"
+        >
           <template #before v-if="searchObj.meta.showFields">
             <index-list :key="searchObj.data.stream.streamLists" />
           </template>
           <template #separator>
-            <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator" style="top: 10px" />
+            <q-avatar
+              color="primary"
+              text-color="white"
+              size="20px"
+              icon="drag_indicator"
+              style="top: 10px"
+            />
           </template>
           <template #after>
-            <div v-if="
-              searchObj.data.errorMsg !== '' && searchObj.loading == false
-            ">
+            <div
+              v-if="
+                searchObj.data.errorMsg !== '' && searchObj.loading == false
+              "
+            >
               <h5 class="text-center">
                 <div v-if="searchObj.data.errorCode == 0">
                   Result not found.
                 </div>
                 <div v-html="searchObj.data.errorMsg"></div>
                 <div v-if="parseInt(searchObj.data.errorCode) == 20003">
-                  <q-btn no-caps unelevated size="sm" bg-secondary class="no-border bg-secondary text-white" :to="
-                    '/logstreams?dialog=' +
-                    searchObj.data.stream.selectedStream.label
-                  ">Click here</q-btn>
+                  <q-btn
+                    no-caps
+                    unelevated
+                    size="sm"
+                    bg-secondary
+                    class="no-border bg-secondary text-white"
+                    :to="
+                      '/logstreams?dialog=' +
+                      searchObj.data.stream.selectedStream.label
+                    "
+                    >Click here</q-btn
+                  >
                   to configure a full text search field to the stream.
                 </div>
                 <br />
@@ -54,26 +83,38 @@
             <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
               <h5 class="text-center">No stream selected.</h5>
             </div>
-            <div v-else-if="
-              searchObj.data.queryResults.hasOwnProperty('total') &&
-              searchObj.data.queryResults.hits.length == 0 &&
-              searchObj.loading == false
-            ">
+            <div
+              v-else-if="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length == 0 &&
+                searchObj.loading == false
+              "
+            >
               <h5 class="text-center">No result found.</h5>
             </div>
-            <div v-show="
-              searchObj.data.queryResults.hasOwnProperty('total') &&
-              searchObj.data.queryResults.hits.length !== 0 &&
-              searchObj.loading == false
-            ">
-              <search-result ref="searchResultRef" @update:datetime="searchData" @update:scroll="getMoreData"
-                @search:timeboxed="searchAroundData" />
+            <div
+              v-show="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length !== 0 &&
+                searchObj.loading == false
+              "
+            >
+              <search-result
+                ref="searchResultRef"
+                @update:datetime="searchData"
+                @update:scroll="getMoreData"
+                @search:timeboxed="searchAroundData"
+              />
             </div>
           </template>
         </q-splitter>
       </div>
       <div v-else-if="searchObj.loading == true">
-        <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; display: block" />
+        <q-spinner-dots
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
       </div>
       <div v-else>
         <h5 class="text-center">
@@ -152,12 +193,12 @@ export default defineComponent({
         this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.from &&
+          this.searchObj.data.queryResults.from &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.size &&
+          this.searchObj.data.queryResults.size &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.size +
-        this.searchObj.data.queryResults.from
+          this.searchObj.data.queryResults.size +
+            this.searchObj.data.queryResults.from
       ) {
         this.searchObj.loading = true;
         this.getQueryData();
@@ -391,8 +432,8 @@ export default defineComponent({
           } else {
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
-              " " +
-              searchObj.data.datetime.absolute.startTime
+                " " +
+                searchObj.data.datetime.absolute.startTime
             );
           }
           if (
@@ -403,8 +444,8 @@ export default defineComponent({
           } else {
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
-              " " +
-              searchObj.data.datetime.absolute.endTime
+                " " +
+                searchObj.data.datetime.absolute.endTime
             );
           }
           const rVal = {
@@ -721,10 +762,17 @@ export default defineComponent({
         if (searchObj.data.streamResults.list.length > 0) {
           const queryResult = [];
           const tempFieldsName = [];
+          const ignoreFields = ["_timestamp"];
+          let ftsKeys;
 
           searchObj.data.streamResults.list.forEach((stream: any) => {
-            if (searchObj.data.stream.selectedStream.value == stream.name)
+            if (searchObj.data.stream.selectedStream.value == stream.name) {
               queryResult.push(...stream.schema);
+              ftsKeys = new Set([
+                ...stream.settings.full_text_search_keys,
+                ...ignoreFields,
+              ]);
+            }
           });
 
           queryResult.forEach((field: any) => {
@@ -749,6 +797,7 @@ export default defineComponent({
               fields[row.name] = {};
               searchObj.data.stream.selectedStreamFields.push({
                 name: row.name,
+                ftsKey: ftsKeys.has(row.name),
               });
             }
             // }
@@ -769,7 +818,7 @@ export default defineComponent({
             : {};
         const logFieldSelectedValue =
           logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+            `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
           ];
         const selectedFields = (logFilterField && logFieldSelectedValue) || [];
         if (
@@ -856,7 +905,10 @@ export default defineComponent({
 
       if (searchObj.data.queryResults.aggs) {
         searchObj.data.queryResults.aggs.histogram.map(
-          (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
+          (bucket: {
+            zo_sql_key: string | number | Date;
+            zo_sql_num: string;
+          }) => {
             unparsed_x_data.push(bucket.zo_sql_key);
             let histDate = new Date(bucket.zo_sql_key + "Z");
             xData.push(Math.floor(histDate.getTime()));
@@ -868,9 +920,9 @@ export default defineComponent({
       const totalRecords =
         (searchObj.data.resultGrid.currentPage + 1) *
           searchObj.meta.resultGrid.rowsPerPage <
-          searchObj.data.queryResults.hits.length
+        searchObj.data.queryResults.hits.length
           ? (searchObj.data.resultGrid.currentPage + 1) *
-          searchObj.meta.resultGrid.rowsPerPage
+            searchObj.meta.resultGrid.rowsPerPage
           : searchObj.data.queryResults.hits.length;
       const chartParams = {
         title:

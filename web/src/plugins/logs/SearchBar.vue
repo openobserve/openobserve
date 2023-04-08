@@ -276,19 +276,30 @@ export default defineComponent({
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
         let currentQuery = this.searchObj.data.editorValue.split("|");
+        let filter = this.searchObj.data.stream.addToFilter;
+
+        const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+
+        if (isFilterValueNull) {
+          filter = filter
+            .replace(/=|!=/, (match) => {
+              return match === "=" ? " is " : " is not ";
+            })
+            .replace(/'null'/, "null");
+        }
 
         if (currentQuery.length > 1) {
           if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + this.searchObj.data.stream.addToFilter;
+            currentQuery[1] += " and " + filter;
           } else {
-            currentQuery[1] = this.searchObj.data.stream.addToFilter;
+            currentQuery[1] = filter;
           }
           this.searchObj.data.query = currentQuery.join("| ");
         } else {
           if (currentQuery != "") {
-            currentQuery += " and " + this.searchObj.data.stream.addToFilter;
+            currentQuery += " and " + filter;
           } else {
-            currentQuery = this.searchObj.data.stream.addToFilter;
+            currentQuery = filter;
           }
           this.searchObj.data.query = currentQuery;
         }
