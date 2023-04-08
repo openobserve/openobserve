@@ -68,6 +68,7 @@
                   : ''
               "
             >
+              <!-- TODO OK : Repeated code make seperate component to display field  -->
               <div
                 v-if="props.row.ftsKey"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm q-py-sm"
@@ -78,9 +79,7 @@
                 </div>
                 <div class="field_overlay">
                   <q-icon
-                    :name="
-                      'img:' + getImageURL('images/common/search_icon.svg')
-                    "
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
                     style="margin-right: 0.375rem"
                     size="1rem"
                     @click.stop="addToFilter(props.row.name)"
@@ -91,8 +90,11 @@
                         props.row.name
                       )
                     "
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                    size="1rem"
+                    :name="
+                      'img:' + getImageURL('images/common/visibility_on.svg')
+                    "
+                    size="1.1rem"
+                    title="Add field to table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
                   />
                   <q-icon
@@ -102,9 +104,10 @@
                       )
                     "
                     :name="
-                      'img:' + getImageURL('images/common/remove_icon.svg')
+                      'img:' + getImageURL('images/common/visibility_off.svg')
                     "
-                    size="1rem"
+                    size="1.1rem"
+                    title="Remove field from table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
                   />
                 </div>
@@ -134,7 +137,7 @@
                     <div class="field_overlay">
                       <q-icon
                         :name="
-                          'img:' + getImageURL('images/common/search_icon.svg')
+                          'img:' + getImageURL('images/common/add_icon.svg')
                         "
                         style="margin-right: 0.375rem"
                         size="1rem"
@@ -147,9 +150,11 @@
                           )
                         "
                         :name="
-                          'img:' + getImageURL('images/common/add_icon.svg')
+                          'img:' +
+                          getImageURL('images/common/visibility_on.svg')
                         "
-                        size="1rem"
+                        size="1.1rem"
+                        title="Add field to table"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                       <q-icon
@@ -159,9 +164,11 @@
                           )
                         "
                         :name="
-                          'img:' + getImageURL('images/common/remove_icon.svg')
+                          'img:' +
+                          getImageURL('images/common/visibility_off.svg')
                         "
-                        size="1rem"
+                        title="Remove field from table"
+                        size="1.1rem"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                     </div>
@@ -266,7 +273,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, validateEmail } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
@@ -331,7 +338,6 @@ export default defineComponent({
     }
 
     const openFilterCreator = (event: any, { name, ftsKey }: any) => {
-      console.log(ftsKey);
       if (ftsKey) {
         event.stopPropagation();
         event.preventDefault();
@@ -359,7 +365,7 @@ export default defineComponent({
                 .find((field: any) => field.field === name)
                 .values.map((value: any) => {
                   return {
-                    key: value.key,
+                    key: value.key ? value.key : "null",
                     count: formatNumberWithPrefix(value.num),
                   };
                 });
@@ -387,6 +393,7 @@ export default defineComponent({
 
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
+      console.log(term);
       searchObj.data.stream.addToFilter = term;
     };
 
