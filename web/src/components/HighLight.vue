@@ -79,7 +79,7 @@ export default defineComponent({
       let arr = [
         {
           isKeyWord: false,
-          text: content,
+          text: typeof content === "number" ? content.toString() : content,
         },
       ];
       for (let i = 0; i < keywords.length; i++) {
@@ -89,7 +89,6 @@ export default defineComponent({
           let rec = arr[j];
           let record =
             rec.text != undefined ? rec.text.split(keyword) : undefined;
-
           if (
             record != undefined &&
             typeof record == "object" &&
