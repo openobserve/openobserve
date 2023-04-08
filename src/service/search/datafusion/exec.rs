@@ -364,12 +364,8 @@ pub async fn merge(
 }
 
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
-    let work_dir = format!(
-        "{}/zinc/observe/merge/{}/",
-        std::env::temp_dir().to_str().unwrap(),
-        chrono::Utc::now().timestamp_micros()
-    );
-    tmpfs::create_dir_all(&work_dir).unwrap();
+    let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
+    let work_dir = tmpfs::canonicalize(&work_dir)?;
     for (i, item) in batches.iter().enumerate() {
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
@@ -380,6 +376,8 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
         writer.close().unwrap();
         tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
     }
+
+    println!("merge_write_recordbatch work_dir: {}", work_dir);
 
     Ok(work_dir)
 }

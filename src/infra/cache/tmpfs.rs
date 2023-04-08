@@ -157,6 +157,29 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
     std::fs::remove_file(path)
 }
 
+pub fn canonicalize(path: &str) -> Result<String, std::io::Error> {
+    #[cfg(feature = "tmpcache")]
+    {
+        create_dir_all(path)?;
+        Ok(path.to_string())
+    }
+
+    #[cfg(not(feature = "tmpcache"))]
+    {
+        let mut path = format!("{}{}", crate::infra::config::CONFIG.common.data_dir, path);
+        std::fs::create_dir_all(&path)?;
+        path = std::fs::canonicalize(&path)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        if path.starts_with("\\\\?\\") {
+            path = path[4..].to_string() + "\\";
+        }
+        Ok(path.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
