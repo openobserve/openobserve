@@ -28,7 +28,6 @@ use super::StreamMeta;
 use crate::common::json;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::meta::alert::Alert;
 #[cfg(feature = "zo_functions")]
