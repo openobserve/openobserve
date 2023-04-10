@@ -14,7 +14,6 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
@@ -306,63 +305,21 @@ pub async fn ingest(
         }
     }
 
-    //let mut response_vec: Vec<StreamStatus> = Vec::new();
     for (stream_name, stream_data) in stream_data_map {
         // write to file
         let mut stream_file_name = "".to_string();
-        let mut write_buf = BytesMut::new();
-        for (key, entry) in stream_data.data {
-            if entry.is_empty() {
-                continue;
-            }
-            write_buf.clear();
-            for row in &entry {
-                write_buf.put(row.as_bytes());
-                write_buf.put("\n".as_bytes());
-            }
-            let file = file_lock::get_or_create(
-                *thread_id.as_ref(),
-                org_id,
-                &stream_name,
-                StreamType::Logs,
-                &key,
-                CONFIG.common.wal_memory_mode_enabled,
-            );
-            if stream_file_name.is_empty() {
-                stream_file_name = file.full_name();
-            }
-            file.write(write_buf.as_ref());
-
-            // metrics
-            metrics::INGEST_RECORDS
-                .with_label_values(&[org_id, &stream_name, StreamType::Logs.to_string().as_str()])
-                .add(entry.len() as i64);
-            metrics::INGEST_BYTES
-                .with_label_values(&[org_id, &stream_name, StreamType::Logs.to_string().as_str()])
-                .add(write_buf.len() as i64);
-        }
+        super::write_file(
+            stream_data.data,
+            thread_id.clone(),
+            org_id,
+            &stream_name,
+            &mut stream_file_name,
+        );
     }
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in &stream_trigger_map {
-        let mut alerts = stream_alerts_map
-            .get(&format!(
-                "{}/{}/{}",
-                entry.org,
-                StreamType::Logs,
-                entry.stream
-            ))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&entry.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                entry.clone(),
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
+        super::evaluate_trigger(Some(entry.clone()), stream_alerts_map.clone()).await;
     }
 
     let time = start.elapsed().as_secs_f64();

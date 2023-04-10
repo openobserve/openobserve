@@ -19,10 +19,12 @@ use datafusion::arrow::datatypes::Schema;
 use crate::common;
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
+use crate::infra::metrics;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
 use crate::meta::ingestion::RecordStatus;
 use crate::meta::StreamType;
 use crate::service::schema::check_for_schema;
+use bytes::{BufMut, BytesMut};
 
 pub mod bulk;
 pub mod json;
@@ -316,6 +318,68 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
         field.name(),
         field.data_type()
     ));
+}
+
+pub fn write_file(
+    buf: AHashMap<String, Vec<String>>,
+    thread_id: actix_web::web::Data<usize>,
+    org_id: &str,
+    stream_name: &str,
+    stream_file_name: &mut String,
+) {
+    let mut write_buf = BytesMut::new();
+    for (key, entry) in buf {
+        if entry.is_empty() {
+            continue;
+        }
+        write_buf.clear();
+        for row in &entry {
+            write_buf.put(row.as_bytes());
+            write_buf.put("\n".as_bytes());
+        }
+        let file = crate::infra::file_lock::get_or_create(
+            *thread_id.as_ref(),
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &key,
+            CONFIG.common.wal_memory_mode_enabled,
+        );
+        if stream_file_name.is_empty() {
+            *stream_file_name = file.full_name();
+        }
+        file.write(write_buf.as_ref());
+
+        // metrics
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
+            .add(entry.len() as i64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
+            .add(write_buf.len() as i64);
+    }
+}
+
+async fn evaluate_trigger(
+    trigger: Option<Trigger>,
+    stream_alerts_map: AHashMap<String, Vec<Alert>>,
+) {
+    if trigger.is_some() {
+        let val = trigger.unwrap();
+        let mut alerts = stream_alerts_map
+            .get(&format!("{}/{}/{}", val.org, StreamType::Logs, val.stream))
+            .unwrap()
+            .clone();
+
+        alerts.retain(|alert| alert.name.eq(&val.alert_name));
+        if !alerts.is_empty() {
+            crate::service::ingestion::send_ingest_notification(
+                val.clone(),
+                alerts.first().unwrap().clone(),
+            )
+            .await;
+        }
+    }
 }
 
 struct StreamMeta {
