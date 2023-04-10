@@ -55,8 +55,8 @@ pub async fn register_function(
             }
 
             trans.stream_type = s_type;
-            let js_func = trans.function.to_owned();
-            if trans.trans_type == 0 && !js_func.contains('(') && !js_func.contains(')') {
+            let func = trans.function.to_owned();
+            if trans.trans_type == 0 && !func.contains('(') && !func.contains(')') {
                 msg.push_str(" not valid function");
                 is_err = true;
             }
@@ -70,11 +70,8 @@ pub async fn register_function(
             } else {
                 trans.stream_name = stream_name.to_string();
                 trans.name = name.to_string();
-                if trans.trans_type == 0 {
-                    extract_num_args(&mut trans);
-                } else {
-                    trans.num_args = 1;
-                }
+                extract_num_args(&mut trans);
+
                 db::functions::set(
                     org_id.as_str(),
                     Some(stream_name.to_string()),
@@ -93,16 +90,12 @@ pub async fn register_function(
         None => {
             let mut is_err = false;
             trans.name = name.to_string();
-            let js_func = trans.function.to_owned();
-            if trans.trans_type == 0 && !js_func.contains('(') && !js_func.contains(')') {
+            let func = trans.function.to_owned();
+            if trans.trans_type == 0 && !func.contains('(') && !func.contains(')') {
                 is_err = true;
             }
             if !is_err {
-                if trans.trans_type == 0 {
-                    extract_num_args(&mut trans);
-                } else {
-                    trans.num_args = 2;
-                }
+                extract_num_args(&mut trans);
                 db::functions::set(org_id.as_str(), None, None, name.as_str(), trans)
                     .await
                     .unwrap();
@@ -158,10 +151,10 @@ pub async fn delete_function(
 }
 
 fn extract_num_args(trans: &mut Transform) {
-    let js_func = trans.function.to_owned();
-    let start_stream = js_func.find('(').unwrap();
-    let end_stream = js_func.find(')').unwrap();
-    let args = &js_func[start_stream + 1..end_stream].trim();
+    let func = trans.function.to_owned();
+    let start_stream = func.find('(').unwrap();
+    let end_stream = func.find(')').unwrap();
+    let args = &func[start_stream + 1..end_stream].trim();
     if args.is_empty() {
         trans.num_args = 0;
     } else {
