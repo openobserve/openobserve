@@ -27,7 +27,9 @@ use uuid::Uuid;
 use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, QUERY_FUNCTIONS, ROOT_USER};
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::QUERY_FUNCTIONS;
+use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
@@ -113,7 +115,7 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
         }
 
         #[cfg(feature = "zo_functions")]
-        apply_query_fn(&req, &mut sources);
+        let sources = apply_query_fn(&req, &sources);
 
         for source in sources {
             response.add_hit(&source);
@@ -568,7 +570,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
 
         #[cfg(feature = "zo_functions")]
-        apply_query_fn(&req, &mut sources);
+        let sources = apply_query_fn(&req, &sources);
 
         for source in sources {
             result.add_hit(&source);
@@ -722,7 +724,8 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 }
 
 #[cfg(feature = "zo_functions")]
-fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &mut [json::Value]) {
+fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
+    let mut ret_resp = vec![];
     let applicable_query_fn = req.query.as_ref().unwrap().query_fn.to_lowercase();
     if !applicable_query_fn.is_empty() {
         if let Some(query_fn_src) =
@@ -733,10 +736,15 @@ fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &mut [json::Value]) {
             if let Some(program) =
                 super::ingestion::compile_vrl_function(query_fn_src.value().function.as_str())
             {
-                for hit in resp.iter_mut() {
-                    *hit = super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
+                for hit in resp {
+                    let ret_val =
+                        super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
+                    if !ret_val.eq(&json::Value::Null) {
+                        ret_resp.push(ret_val);
+                    }
                 }
             }
         };
     };
+    ret_resp
 }
