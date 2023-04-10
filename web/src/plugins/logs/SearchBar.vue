@@ -40,11 +40,10 @@
       <div class="float-right col-auto">
         <q-btn
           v-if="searchObj.data.queryResults.hits"
-          class="q-mr-sm float-left"
+          class="q-mr-sm float-left download-logs-btn"
           size="sm"
           icon="download"
           title="Download logs"
-          style="height: 30px"
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
@@ -458,6 +457,10 @@ export default defineComponent({
         color: #ffffff;
       }
     }
+  }
+
+  .download-logs-btn {
+    height: 30px;
   }
 }
 </style>
