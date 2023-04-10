@@ -79,6 +79,7 @@ pub async fn save_alert(
             track_total_hits: false,
             from: 0,
             size: 0,
+            query_fn: None,
         });
         alert.is_real_time = true;
 
@@ -231,6 +232,7 @@ mod test {
                 track_total_hits: false,
                 from: 0,
                 size: 0,
+                query_fn: None,
             }),
             condition: Condition {
                 column: "occurance".to_owned(),
