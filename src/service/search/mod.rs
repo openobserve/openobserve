@@ -744,7 +744,10 @@ fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec
                     }
                 }
             }
+            return ret_resp;
         };
-    };
-    ret_resp
+        return resp.to_vec();
+    } else {
+        return resp.to_vec();
+    }
 }

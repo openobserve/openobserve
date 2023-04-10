@@ -81,7 +81,13 @@ fn get_udf_vrl(
     num_args: u8,
 ) -> datafusion::logical_expr::ScalarUDF {
     let local_fn_name = fn_name;
-    let local_js_func = js_func.to_owned();
+    let mut local_js_func = js_func.trim().to_owned();
+
+    if local_js_func.starts_with("function(") {
+        if let Some(idx) = local_js_func.find(')') {
+            local_js_func = local_js_func[idx + 1..].to_owned();
+        }
+    }
 
     let pow_calc = move |args: &[ArrayRef]| {
         let len = args[0].len();
@@ -95,7 +101,7 @@ fn get_udf_vrl(
                     .as_any()
                     .downcast_ref::<StringArray>()
                     .expect("cast failed");
-                obj_str.push_str(&format!("col{j} = \"{}\" \n", col.value(i)));
+                obj_str.push_str(&format!("col{} = \"{}\" \n", j + 1, col.value(i)));
             }
             obj_str.push_str(&format!(" \n {}", &local_js_func));
             let func = compile_vrl_function(&obj_str).unwrap();

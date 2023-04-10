@@ -70,11 +70,8 @@ pub async fn register_function(
             } else {
                 trans.stream_name = stream_name.to_string();
                 trans.name = name.to_string();
-                if trans.trans_type == 0 {
-                    extract_num_args(&mut trans);
-                } else {
-                    trans.num_args = 1;
-                }
+                extract_num_args(&mut trans);
+
                 db::functions::set(
                     org_id.as_str(),
                     Some(stream_name.to_string()),
@@ -98,11 +95,7 @@ pub async fn register_function(
                 is_err = true;
             }
             if !is_err {
-                if trans.trans_type == 0 {
-                    extract_num_args(&mut trans);
-                } else {
-                    trans.num_args = 2;
-                }
+                extract_num_args(&mut trans);
                 db::functions::set(org_id.as_str(), None, None, name.as_str(), trans)
                     .await
                     .unwrap();
