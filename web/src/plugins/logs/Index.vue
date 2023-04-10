@@ -95,8 +95,7 @@
             <div
               v-show="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults.hits.length !== 0 &&
-                searchObj.loading == false
+                searchObj.data.queryResults.hits.length !== 0
               "
             >
               <search-result
