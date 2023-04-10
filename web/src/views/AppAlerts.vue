@@ -10,10 +10,8 @@
  limitations under the License. 
 -->
 
-<!-- eslint-disable vue/v-on-event-hyphenation -->
-<!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -22,6 +20,7 @@
       <template v-slot:before>
         <div class="alerts-tabs">
           <q-tabs
+            data-test="alert-tabs"
             v-model="activeTab"
             indicator-color="transparent"
             class="text-secondary"
@@ -29,6 +28,7 @@
             vertical
           >
             <q-route-tab
+              data-test="alert-alerts-tab"
               name="alerts"
               :to="{
                 name: 'alertList',
@@ -40,6 +40,7 @@
               content-class="tab_content"
             />
             <q-route-tab
+              data-test="alert-destinations-tab"
               name="destinations"
               :to="{
                 name: 'alertDestinations',
@@ -51,6 +52,7 @@
               content-class="tab_content"
             />
             <q-route-tab
+              data-test="alert-templates-tab"
               name="templates"
               :to="{
                 name: 'alertTemplates',

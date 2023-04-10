@@ -12,7 +12,7 @@
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div class="col-12 items-center no-wrap q-pt-md">
-      <div class="col">
+      <div class="col" data-test="add-template-title">
         <div v-if="isUpdatingTemplate" class="text-h6">
           {{ t("alert_templates.updateTitle") }}
         </div>
@@ -33,6 +33,7 @@
         <div class="row q-pa-md">
           <div class="col-12 q-pb-md q-pt-sm">
             <q-input
+              data-test="add-template-name-input"
               v-model="formData.name"
               :label="t('alerts.name')"
               color="input-border"
@@ -49,10 +50,14 @@
             />
           </div>
           <div class="col-12 q-pb-md q-pt-xs">
-            <div class="q-pb-sm text-bold">
+            <div
+              class="q-pb-sm text-bold"
+              data-test="add-template-body-input-title"
+            >
               {{ t("alert_templates.body") }}
             </div>
             <div
+              data-test="add-template-body-input"
               ref="editorRef"
               id="editor"
               :label="t('alerts.sql')"
@@ -65,6 +70,7 @@
           </div>
           <div class="col-12 flex justify-center q-mt-lg">
             <q-btn
+              data-test="add-template-cancel-btn"
               v-close-popup
               class="q-mb-md text-bold no-border"
               :label="t('alerts.cancel')"
@@ -75,6 +81,7 @@
               @click="$emit('cancel:hideform')"
             />
             <q-btn
+              data-test="add-template-submit-btn"
               :label="t('alerts.save')"
               class="q-mb-md text-bold no-border q-ml-md"
               color="secondary"
@@ -281,13 +288,14 @@ const saveTemplate = () => {
     message: "Please wait...",
     timeout: 2000,
   });
+
   templateService
     .create({
       org_identifier: store.state.selectedOrganization.identifier,
       template_name: formData.value.name,
       data: {
         name: formData.value.name,
-        body: editorobj.getValue(),
+        body: formData.value.body,
       },
     })
     .then(() => {

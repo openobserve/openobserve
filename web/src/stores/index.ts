@@ -10,22 +10,29 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
 export default createStore({
   state: {
-    API_ENDPOINT: (import.meta.env.VITE_ZINCOBSERVE_ENDPOINT && import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith('/') ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1) : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT) || (window.location.origin != "http://localhost:8081" ? window.location.origin : "http://localhost:5080"),
+    API_ENDPOINT:
+      (import.meta.env.VITE_ZINCOBSERVE_ENDPOINT &&
+      import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith("/")
+        ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1)
+        : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT) ||
+      (window.location.origin != "http://localhost:8081"
+        ? window.location.origin
+        : "http://localhost:5080"),
     userInfo: {},
     loggedIn: false,
     loadingState: true,
     errorLoadingState: false,
     indexData: [],
-    selectedOrganization: (useLocalOrganization()) ? useLocalOrganization() : {},
+    selectedOrganization: useLocalOrganization() ? useLocalOrganization() : {},
     organizations: [],
-    currentuser: (useLocalCurrentUser()) ? useLocalCurrentUser() : {},
+    currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     organizationPasscode: "",
     // allCurrentDashboards: {},
@@ -43,8 +50,8 @@ export default createStore({
           selectedRelativePeriod: "Minutes",
           selectedRelativeValue: 15,
           selectedFullTime: false,
-        }
-      }
+        },
+      },
     },
     streamFields: [],
     quotaThresholdMsg: "",
@@ -92,7 +99,7 @@ export default createStore({
     //   state.currentSelectedDashboard = payload;
     // },
     setAllDashboardList(state, payload) {
-      state.allDashboardList = payload
+      state.allDashboardList = payload;
     },
     setSearch(state, payload) {
       state.search = payload;
@@ -145,7 +152,7 @@ export default createStore({
     //   context.commit('setCurrentSelectedDashboard', payload);
     // },
     setAllDashboardList(context, payload) {
-      context.commit('setAllDashboardList', payload)
+      context.commit("setAllDashboardList", payload);
     },
     setSearch(context, payload) {
       context.commit("setSearch", payload);

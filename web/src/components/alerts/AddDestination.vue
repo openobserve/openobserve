@@ -14,7 +14,7 @@
   <q-page class="q-pa-none q-pa-md" style="min-height: inherit">
     <div>
       <div class="col-12 items-center no-wrap">
-        <div class="col">
+        <div class="col" data-test="add-destination-title">
           <div v-if="destination" class="text-h6">
             {{ t("alert_destinations.updateTitle") }}
           </div>
@@ -27,6 +27,7 @@
       <div class="row q-col-gutter-sm q-pt-lg">
         <div class="col-6 q-py-xs">
           <q-input
+            data-test="add-destination-name-input"
             v-model="formData.name"
             :label="t('alerts.name')"
             color="input-border"
@@ -45,6 +46,7 @@
         <div class="col-6 row q-py-xs">
           <div class="col-12">
             <q-select
+              data-test="add-destination-template-select"
               v-model="formData.template"
               :label="t('alert_destinations.template')"
               :options="getFormattedTemplates"
@@ -62,6 +64,7 @@
         </div>
         <div class="col-6 q-py-xs">
           <q-input
+            data-test="add-destination-url-input"
             v-model="formData.url"
             :label="t('alert_destinations.url')"
             color="input-border"
@@ -77,6 +80,7 @@
         </div>
         <div class="col-6 q-py-xs destination-method-select">
           <q-select
+            data-test="add-destination-method-select"
             v-model="formData.method"
             :label="t('alert_destinations.method')"
             :options="apiMethods"
@@ -101,6 +105,7 @@
           >
             <div class="col-5 q-ml-none">
               <q-input
+                :data-test="`add-destination-header-${header['key']}-key-input`"
                 v-model="header.key"
                 color="input-border"
                 bg-color="input-bg"
@@ -115,6 +120,7 @@
             </div>
             <div class="col-5 q-ml-none">
               <q-input
+                :data-test="`add-destination-header-${header['key']}-value-input`"
                 v-model="header.value"
                 :placeholder="t('alert_destinations.api_header_value')"
                 color="input-border"
@@ -130,6 +136,7 @@
             </div>
             <div class="col-2 q-ml-none">
               <q-btn
+                :data-test="`add-destination-header-${header['key']}-delete-btn`"
                 icon="delete"
                 class="q-ml-xs iconHoverBtn"
                 padding="sm"
@@ -141,6 +148,7 @@
                 @click="deleteApiHeader(header)"
               />
               <q-btn
+                data-test="add-destination-add-header-btn"
                 v-if="index === apiHeaders.length - 1"
                 icon="add"
                 class="q-ml-xs iconHoverBtn"
@@ -159,6 +167,7 @@
     </div>
     <div class="flex justify-center q-mt-lg">
       <q-btn
+        data-test="add-destination-cancel-btn"
         v-close-popup
         class="q-mb-md text-bold no-border"
         :label="t('alerts.cancel')"
@@ -169,6 +178,7 @@
         @click="$emit('cancel:hideform')"
       />
       <q-btn
+        data-test="add-destination-submit-btn"
         :label="t('alerts.save')"
         class="q-mb-md text-bold no-border q-ml-md"
         color="secondary"

@@ -48,7 +48,10 @@
         </q-td>
       </template>
       <template #top="scope">
-        <div class="q-table__title full-width q-mb-md">
+        <div
+          class="q-table__title full-width q-mb-md"
+          data-test="user-title-text"
+        >
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">

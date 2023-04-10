@@ -18,7 +18,10 @@
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold text-dark">
+          <div
+            class="text-body1 text-bold text-dark"
+            data-test="log-detail-title-text"
+          >
             {{ t("search.rowDetail") }}
           </div>
         </div>
@@ -36,8 +39,8 @@
     <div class="row justify-between">
       <div class="col-10">
         <q-tabs v-model="tab" shrink align="left">
-          <q-tab name="table" label="Table" />
-          <q-tab name="json" label="JSON" />
+          <q-tab data-test="log-detail-table-tab" name="table" label="Table" />
+          <q-tab data-test="log-detail-json-tab" name="json" label="JSON" />
         </q-tabs>
       </div>
       <div
@@ -45,6 +48,7 @@
         class="col-2 flex justify-end align-center q-pr-md"
       >
         <q-toggle
+          data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           label="Wrap"
           color="primary"
@@ -56,9 +60,12 @@
 
     <q-separator />
 
-    <q-tab-panels v-model="tab" animated>
+    <q-tab-panels data-test="log-detail-tab-container" v-model="tab" animated>
       <q-tab-panel name="table">
-        <q-card-section class="q-pa-none q-mb-lg">
+        <q-card-section
+          class="q-pa-none q-mb-lg"
+          data-test="log-detail-table-content"
+        >
           <div
             v-if="rowData.length == 0"
             class="q-pt-md"
@@ -86,13 +93,18 @@
                 :key="'field_' + value"
                 class="list-item"
               >
-                <q-item-section class="col-3">{{ value }}</q-item-section>
+                <q-item-section
+                  :data-test="`log-detail-${value}-key`"
+                  class="col-3"
+                  >{{ value }}</q-item-section
+                >
                 <q-item-section
                   class="col-9"
                   :class="!shouldWrapValues ? 'ellipsis' : ''"
                   style="display: inline;relative"
                 >
                   <q-btn-dropdown
+                    data-test="log-details-include-exclude-field-btn"
                     size="0.5rem"
                     outlined
                     filled
@@ -104,6 +116,7 @@
                       <q-item clickable v-close-popup>
                         <q-item-section>
                           <q-item-label
+                            data-test="log-details-include-field-btn"
                             @click="
                               toggleIncludeSearchTerm(`${value}='${key}'`)
                             "
@@ -127,6 +140,7 @@
                       <q-item clickable v-close-popup>
                         <q-item-section>
                           <q-item-label
+                            data-test="log-details-exclude-field-btn"
                             @click="
                               toggleExcludeSearchTerm(`${value}!='${key}'`)
                             "
@@ -149,6 +163,7 @@
                     </q-list>
                   </q-btn-dropdown>
                   <pre
+                    :data-test="`log-detail-${value}-value`"
                     class="table-pre"
                     :style="{
                       'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
@@ -164,7 +179,10 @@
       </q-tab-panel>
 
       <q-tab-panel name="json" class="q-pa-none">
-        <q-card-section class="q-pa-none q-mb-lg">
+        <q-card-section
+          data-test="log-detail-json-content"
+          class="q-pa-none q-mb-lg"
+        >
           <div class="indexDetailsContainer">
             <pre class="json-pre">{{ rowData }}</pre>
           </div>
@@ -199,6 +217,7 @@
           </div>
           <div class="">
             <q-btn
+              data-test="logs-detail-table-search-around-btn"
               class="text-bold"
               text-color="light-text"
               no-caps
@@ -212,6 +231,7 @@
         </div>
         <div class="col-2 items-end">
           <q-btn
+            data-test="log-detail-next-detail-btn"
             class="text-bold"
             text-color="light-text"
             no-caps

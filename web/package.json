@@ -31,6 +31,7 @@
     "@sentry/tracing": "^7.17.4",
     "@sentry/vue": "^7.17.4",
     "aws-amplify": "4.3.43",
+    "jest-canvas-mock": "^2.5.0",
     "js-cookie": "^3.0.1",
     "jwt-decode": "^3.1.2",
     "lodash-es": "^4.17.21",
