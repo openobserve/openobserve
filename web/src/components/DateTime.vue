@@ -16,6 +16,7 @@
 <template>
   <div icon="info" class="justify-between">
     <q-btn
+      data-test="date-time-btn"
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
@@ -69,6 +70,7 @@
                   :key="item"
                 >
                   <q-btn
+                    :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     :class="
                       selectedDate.tab == 'relative' &&
                       selectedDate.relative.period.value == period.value &&
@@ -335,6 +337,7 @@ export default defineComponent({
         this.selectedDate.relative.value = 6;
         return false;
       }
+      return false;
     },
   },
 });

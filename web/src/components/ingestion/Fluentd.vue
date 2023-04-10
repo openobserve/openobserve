@@ -16,9 +16,10 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title">Fluentd</div>
+      <div class="title" data-test="fluentd-title-text">Fluentd</div>
       <div class="copy_action">
         <q-btn
+          data-test="fluentd-copy-btn"
           flat
           round
           size="0.5rem"
@@ -28,7 +29,7 @@
         />
       </div>
     </div>
-    <pre ref="fluentdContent">
+    <pre ref="fluentdContent" data-test="fluentd-content-text">
 &lt;source&gt;
   @type forward
   port 24224

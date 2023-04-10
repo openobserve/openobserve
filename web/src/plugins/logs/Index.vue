@@ -19,6 +19,7 @@
   <q-page class="logPage" id="logPage">
     <div id="secondLevel">
       <search-bar
+        data-test="logs-search-bar"
         ref="searchBarRef"
         v-show="searchObj.data.stream.streamLists.length > 0"
         :key="searchObj.data.stream.streamLists.length"
@@ -37,7 +38,10 @@
           style="width: 100%"
         >
           <template #before v-if="searchObj.meta.showFields">
-            <index-list :key="searchObj.data.stream.streamLists" />
+            <index-list
+              data-test="logs-search-index-list"
+              :key="searchObj.data.stream.streamLists"
+            />
           </template>
           <template #separator>
             <q-avatar
@@ -55,11 +59,20 @@
               "
             >
               <h5 class="text-center">
-                <div v-if="searchObj.data.errorCode == 0">
+                <div
+                  data-test="logs-search-result-not-found-text"
+                  v-if="searchObj.data.errorCode == 0"
+                >
                   Result not found.
                 </div>
-                <div v-html="searchObj.data.errorMsg"></div>
-                <div v-if="parseInt(searchObj.data.errorCode) == 20003">
+                <div
+                  data-test="logs-search-error-message"
+                  v-html="searchObj.data.errorMsg"
+                ></div>
+                <div
+                  data-test="logs-search-error-20003"
+                  v-if="parseInt(searchObj.data.errorCode) == 20003"
+                >
                   <q-btn
                     no-caps
                     unelevated
@@ -81,7 +94,12 @@
               </h5>
             </div>
             <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
-              <h5 class="text-center">No stream selected.</h5>
+              <h5
+                data-test="logs-search-no-stream-selected-text"
+                class="text-center"
+              >
+                No stream selected.
+              </h5>
             </div>
             <div
               v-else-if="
@@ -93,6 +111,7 @@
               <h5 class="text-center">No result found.</h5>
             </div>
             <div
+              data-test="logs-search-search-result"
               v-show="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
                 searchObj.data.queryResults.hits.length !== 0
@@ -116,7 +135,7 @@
         />
       </div>
       <div v-else>
-        <h5 class="text-center">
+        <h5 data-test="logs-search-error-message" class="text-center">
           <q-icon name="warning" color="warning" size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
@@ -275,22 +294,24 @@ export default defineComponent({
           false,
           "",
           store.state.selectedOrganization.identifier
-        ).then((res) => {
-          res.data.list.map((data: any) => {
-            let args: any = [];
-            for (let i = 0; i < parseInt(data.num_args); i++) {
-              args.push("'${1:value}'");
-            }
+        )
+          .then((res) => {
+            res.data.list.map((data: any) => {
+              let args: any = [];
+              for (let i = 0; i < parseInt(data.num_args); i++) {
+                args.push("'${1:value}'");
+              }
 
-            let itemObj = {
-              name: data.name,
-              args: "(" + args.join(",") + ")",
-            };
-            if (!data.stream_name) {
-              searchObj.data.stream.functions.push(itemObj);
-            }
-          });
-        });
+              let itemObj = {
+                name: data.name,
+                args: "(" + args.join(",") + ")",
+              };
+              if (!data.stream_name) {
+                searchObj.data.stream.functions.push(itemObj);
+              }
+            });
+          })
+          .catch((err) => console.log(err));
 
         return;
       } catch (e) {
@@ -915,7 +936,6 @@ export default defineComponent({
           }
         );
       }
-
       const totalRecords =
         (searchObj.data.resultGrid.currentPage + 1) *
           searchObj.meta.resultGrid.rowsPerPage <
@@ -923,6 +943,7 @@ export default defineComponent({
           ? (searchObj.data.resultGrid.currentPage + 1) *
             searchObj.meta.resultGrid.rowsPerPage
           : searchObj.data.queryResults.hits.length;
+
       const chartParams = {
         title:
           "Showing " +
@@ -941,7 +962,8 @@ export default defineComponent({
       searchObj.data.histogram = { xData, yData, chartParams };
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false
+        searchObj.meta.sqlMode == false &&
+        searchBarRef.value?.reDrawChart
       ) {
         searchResultRef.value.reDrawChart();
       }
@@ -1003,7 +1025,7 @@ export default defineComponent({
         router.currentRoute.value.path.indexOf("/logs") > -1
       ) {
         setTimeout(() => {
-          searchResultRef.value.reDrawChart();
+          if (searchResultRef.value) searchResultRef.value.reDrawChart();
         }, 1500);
       }
     });
@@ -1255,7 +1277,7 @@ export default defineComponent({
         this.searchObj.meta.sqlMode == false
       ) {
         setTimeout(() => {
-          this.searchResultRef.reDrawChart();
+          if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
       if (this.searchObj.config.splitterModel > 0) {
@@ -1276,7 +1298,7 @@ export default defineComponent({
         this.searchObj.meta.sqlMode == false
       ) {
         setTimeout(() => {
-          this.searchResultRef.reDrawChart();
+          if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
     },

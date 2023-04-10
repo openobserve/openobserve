@@ -752,6 +752,7 @@ mod tests {
             start_time: 1667978895416,
             end_time: 1667978900217,
             track_total_hits: false,
+            query_fn: None,
         };
 
         let req: crate::meta::search::Request = crate::meta::search::Request {
@@ -824,6 +825,7 @@ mod tests {
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 track_total_hits: true,
+                query_fn: None,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),
@@ -903,6 +905,7 @@ mod tests {
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 track_total_hits: true,
+                query_fn: None,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),

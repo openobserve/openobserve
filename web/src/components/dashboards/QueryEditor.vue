@@ -19,7 +19,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 export default defineComponent({
   props: {
@@ -315,7 +315,7 @@ export default defineComponent({
     watch(
       () => props.query,
       () => {
-        if(props.readOnly || !editorObj.hasWidgetFocus()) {
+        if (props.readOnly || !editorObj.hasWidgetFocus()) {
           editorObj.getModel().setValue(props.query);
         }
       }
