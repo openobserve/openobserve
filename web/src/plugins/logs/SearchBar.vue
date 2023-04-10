@@ -38,6 +38,14 @@
         <syntax-guide :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
       </div>
       <div class="float-right col-auto">
+        <q-btn
+          v-if="searchObj.data.queryResults.hits"
+          class="q-mr-sm float-left download-logs-btn"
+          size="sm"
+          icon="download"
+          title="Download logs"
+          @click="downloadLogs"
+        ></q-btn>
         <div class="float-left">
           <date-time @date-change="updateDateTime" />
         </div>
@@ -254,6 +262,22 @@ export default defineComponent({
       queryEditorRef.value.setValue(searchObj.data.query);
     };
 
+    const downloadLogs = () => {
+      const filename = "logs-data.txt";
+      const data = JSON.stringify(searchObj.data.queryResults.hits);
+      const file = new File([data], filename, {
+        type: "text/plain",
+      });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
     return {
       t,
       router,
@@ -265,6 +289,7 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       udpateQuery,
+      downloadLogs,
     };
   },
   computed: {
@@ -432,6 +457,10 @@ export default defineComponent({
         color: #ffffff;
       }
     }
+  }
+
+  .download-logs-btn {
+    height: 30px;
   }
 }
 </style>
