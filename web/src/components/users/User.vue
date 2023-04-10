@@ -90,7 +90,10 @@
         </q-td>
       </template>
       <template #top="scope">
-        <div class="q-table__title full-width q-mb-md">
+        <div
+          class="q-table__title full-width q-mb-md"
+          data-test="user-title-text"
+        >
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
@@ -174,8 +177,7 @@
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn

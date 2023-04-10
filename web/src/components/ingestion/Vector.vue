@@ -16,9 +16,10 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title">Vector</div>
+      <div class="title" data-test="vector-title-text">Vector</div>
       <div class="copy_action">
         <q-btn
+          data-test="vector-copy-btn"
           flat
           round
           size="0.5rem"
@@ -28,7 +29,7 @@
         />
       </div>
     </div>
-    <pre ref="vectorContent">
+    <pre ref="vectorContent" data-test="vector-content-text">
 [sinks.zinc]
 type = "http"
 inputs = [ source or transform id ]

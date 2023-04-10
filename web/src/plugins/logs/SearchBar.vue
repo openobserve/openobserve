@@ -19,23 +19,30 @@
     <div class="row q-my-xs">
       <div class="float-right col">
         <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showQuery"
           :label="t('search.showQueryLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-show-fields-toggle-btn"
           v-model="searchObj.meta.showFields"
           :label="t('search.showFieldLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
           v-bind:disable="searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
           :label="t('search.sqlModeLabel')"
         />
-        <syntax-guide :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
+        <syntax-guide
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        ></syntax-guide>
       </div>
       <div class="float-right col-auto">
         <q-btn
@@ -48,7 +55,10 @@
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
-          <date-time @date-change="updateDateTime" />
+          <date-time
+            data-test="logs-search-bar-date-time-dropdown"
+            @date-change="updateDateTime"
+          />
         </div>
         <div class="search-time q-pl-sm float-left">
           <q-btn-group spread>
@@ -59,11 +69,13 @@
               class="search-dropdown"
               no-caps
               :label="searchObj.meta.refreshIntervalLabel"
+              data-test="logs-search-refresh-interval-dropdown-btn"
             >
               <div class="refresh-rate-dropdown-container">
                 <div class="row">
                   <div class="col col-12 q-pa-sm" style="text-align: center">
                     <q-btn
+                      data-test="logs-search-off-refresh-interval"
                       no-caps
                       :flat="searchObj.meta.refreshInterval !== '0'"
                       size="md"
@@ -92,6 +104,7 @@
                     style="text-align: center"
                   >
                     <q-btn
+                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
                       no-caps
                       :flat="searchObj.meta.refreshInterval !== item.label"
                       size="md"
@@ -111,6 +124,7 @@
             </q-btn-dropdown>
             <q-separator vertical inset />
             <q-btn
+              data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
               flat
@@ -260,7 +274,9 @@ export default defineComponent({
     };
 
     const udpateQuery = () => {
-      queryEditorRef.value.setValue(searchObj.data.query);
+      // alert(searchObj.data.query);
+      if (queryEditorRef.value?.setValue)
+        queryEditorRef.value.setValue(searchObj.data.query);
     };
 
     const jsonToCsv = (jsonData) => {
@@ -345,8 +361,8 @@ export default defineComponent({
           this.searchObj.data.query = currentQuery;
         }
         this.searchObj.data.stream.addToFilter = "";
-
-        this.queryEditorRef.setValue(this.searchObj.data.query);
+        if (this.queryEditorRef?.setValue)
+          this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
   },

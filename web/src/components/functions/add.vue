@@ -202,8 +202,7 @@ end`;
           suffixCode.value = "";
         } else {
           prefixCode.value = `function()`;
-          suffixCode.value = `
-end`;
+          suffixCode.value = "";
         }
       }
 

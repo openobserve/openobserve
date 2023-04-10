@@ -19,12 +19,14 @@
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
       <BarChart
+        data-test="logs-search-result-bar-chart"
         ref="plotChart"
         v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
         @updated:chart="onChartUpdate"
       ></BarChart>
 
       <q-virtual-scroll
+        data-test="logs-search-result-logs-table"
         id="searchGridComponent"
         type="table"
         ref="searchTableRef"
@@ -43,9 +45,11 @@
                 v-for="(col, index) in searchObj.data.resultGrid.columns"
                 :key="'result_' + index"
                 class="table-header"
+                :data-test="`log-search-result-table-th-${col.label}`"
               >
                 <q-chip
                   v-if="col.closable"
+                  :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
                   :icon-remove="
                     'img:' + getImageURL('images/common/close_icon.svg')
                   "
@@ -67,6 +71,7 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
+            :data-test="`logs-search-result-detail-${row._timestamp}`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
@@ -232,11 +237,6 @@ export default defineComponent({
         this.$emit("update:scroll");
       }
     },
-    onCancel() {
-      if (this.searchObj.meta.showDetailTab) {
-        this.searchObj.meta.showDetailTab = false;
-      }
-    },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
@@ -261,7 +261,8 @@ export default defineComponent({
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0
+        searchObj.data.histogram.xData.length > 0 &&
+        plotChart.value?.redraw
       ) {
         plotChart.value.reDraw(
           searchObj.data.histogram.xData,

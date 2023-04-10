@@ -14,6 +14,7 @@
   <q-page class="q-pa-none" style="min-height: inherit">
     <div v-if="!showDestinationEditor">
       <q-table
+        data-test="alert-destinations-list-table"
         ref="qTable"
         :rows="destinations"
         :columns="columns"
@@ -29,6 +30,7 @@
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              :data-test="`alert-destination-list-${props.row.name}-update-destination`"
               icon="edit"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -40,6 +42,7 @@
               @click="editDestination(props.row)"
             ></q-btn>
             <q-btn
+              :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
               class="q-ml-xs iconHoverBtn"
               padding="sm"
@@ -53,7 +56,7 @@
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title">
+          <div class="q-table__title" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
           <q-input
@@ -69,6 +72,7 @@
             </template>
           </q-input>
           <q-btn
+            data-test="alert-destination-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"
@@ -108,7 +112,7 @@
     </div>
 
     <ConfirmDialog
-      title="Delete Alert"
+      title="Delete Destination"
       message="Are you sure you want to delete destination?"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
