@@ -114,8 +114,7 @@
               data-test="logs-search-search-result"
               v-show="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults.hits.length !== 0 &&
-                searchObj.loading == false
+                searchObj.data.queryResults.hits.length !== 0
               "
             >
               <search-result
