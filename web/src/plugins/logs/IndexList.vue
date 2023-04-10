@@ -17,6 +17,7 @@
   <div class="column index-menu">
     <div>
       <q-select
+        data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
         :label="
           searchObj.data.stream.selectedStream.label
@@ -44,6 +45,7 @@
     </div>
     <div class="index-table q-mt-xs">
       <q-table
+        data-test="log-search-index-list-fields-table"
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
@@ -80,11 +82,13 @@
                 <div class="field_overlay">
                   <q-icon
                     :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="1rem"
                     @click.stop="addToFilter(props.row.name)"
                   />
                   <q-icon
+                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
                     v-if="
                       !searchObj.data.stream.selectedFields.includes(
                         props.row.name
@@ -98,6 +102,7 @@
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
                   />
                   <q-icon
+                    :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
                     v-if="
                       searchObj.data.stream.selectedFields.includes(
                         props.row.name
@@ -136,6 +141,7 @@
                     </div>
                     <div class="field_overlay">
                       <q-icon
+                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :name="
                           'img:' + getImageURL('images/common/add_icon.svg')
                         "
@@ -144,6 +150,7 @@
                         @click.stop="addToFilter(props.row.name)"
                       />
                       <q-icon
+                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
                             props.row.name
@@ -158,6 +165,7 @@
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                       <q-icon
+                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
                         v-if="
                           searchObj.data.stream.selectedFields.includes(
                             props.row.name
@@ -263,6 +271,7 @@
         </template>
         <template #top-right>
           <q-input
+            data-test="log-search-index-list-field-search-input"
             v-model="searchObj.data.stream.filterField"
             data-cy="index-field-search-input"
             filled

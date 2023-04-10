@@ -18,6 +18,7 @@
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <q-table
+      data-test="log-stream-table"
       ref="qTable"
       v-model:selected="selected"
       :rows="logStream"
@@ -63,7 +64,9 @@
       </template>
 
       <template #top="scope">
-        <div class="q-table__title">{{ t("logStream.header") }}</div>
+        <div class="q-table__title" data-test="log-stream-title-text">
+          {{ t("logStream.header") }}
+        </div>
         <q-input
           v-model="filterQuery"
           borderless
@@ -77,6 +80,7 @@
           </template>
         </q-input>
         <q-btn
+          data-test="log-stream-refresh-stats-btn"
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
           color="secondary"
@@ -87,6 +91,7 @@
         />
 
         <QTablePagination
+          data-test="log-stream-table-pagination"
           :scope="scope"
           :pageTitle="t('logStream.header')"
           :resultTotal="resultTotal"
@@ -98,6 +103,7 @@
 
       <template #bottom="scope">
         <QTablePagination
+          data-test="log-stream-table-pagination"
           :scope="scope"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"

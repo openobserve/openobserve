@@ -16,9 +16,10 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title">CURL</div>
+      <div class="title" data-test="curl-title-text">CURL</div>
       <div class="copy_action">
         <q-btn
+          data-test="curl-copy-btn"
           flat
           round
           size="0.5rem"
@@ -28,7 +29,7 @@
         />
       </div>
     </div>
-    <pre ref="content">
+    <pre ref="content" data-test="curl-content-text">
 curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
         endpoint.url
       }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]

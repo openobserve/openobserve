@@ -72,19 +72,6 @@ export default defineConfig({
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
   },
-  test: {
-    global: true,
-    setupFiles: "src/test/unit/helpers/setupTests.ts",
-    coverage: {
-      reporter: ["text", "json", "html"],
-    },
-    environment: "happy-dom",
-    cache: false,
-    maxConcurrency: 20,
-    update: true,
-    // testNamePattern: "DateTime",
-    // ...
-  },
   server: {
     port: 8081,
   },
@@ -102,7 +89,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@enterprise": fileURLToPath(new URL("./src/enterprise", import.meta.url)),
+      "@enterprise": fileURLToPath(
+        new URL("./src/enterprise", import.meta.url)
+      ),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",
@@ -124,5 +113,37 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
+  },
+  test: {
+    enable: true,
+    global: true,
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
+    deps: {
+      inline: ["monaco-editor", "plotly.js"],
+    },
+    coverage: {
+      reporter: ["text", "json", "html"],
+      all: true,
+      exclude: [
+        "coverage/**",
+        "dist/**",
+        "packages/*/test{,s}/**",
+        "cypress/**",
+        "src/test/**",
+        "test{,s}/**",
+        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/__tests__/**",
+        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
+        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
+        "quasar.conf.js",
+        "env.d.ts",
+      ],
+    },
+    environment: "jsdom",
+    cache: false,
+    maxConcurrency: 20,
+    update: false,
   },
 });
