@@ -14,7 +14,6 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "zo_functions")]
@@ -26,7 +25,6 @@ use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -200,37 +198,8 @@ pub async fn ingest(
 
     // write to file
     let mut stream_file_name = "".to_string();
-    let mut write_buf = BytesMut::new();
-    for (key, entry) in buf {
-        if entry.is_empty() {
-            continue;
-        }
-        write_buf.clear();
-        for row in &entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
-        let file = file_lock::get_or_create(
-            *thread_id.as_ref(),
-            org_id,
-            stream_name,
-            StreamType::Logs,
-            &key,
-            CONFIG.common.wal_memory_mode_enabled,
-        );
-        if stream_file_name.is_empty() {
-            stream_file_name = file.full_name();
-        }
-        file.write(write_buf.as_ref());
 
-        // metrics
-        metrics::INGEST_RECORDS
-            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
-            .add(entry.len() as i64);
-        metrics::INGEST_BYTES
-            .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
-            .add(write_buf.len() as i64);
-    }
+    super::write_file(buf, thread_id, org_id, stream_name, &mut stream_file_name);
 
     if stream_file_name.is_empty() {
         return Ok(HttpResponse::Ok().json(IngestionResponse::new(
@@ -240,22 +209,7 @@ pub async fn ingest(
     }
 
     // only one trigger per request, as it updates etcd
-    if trigger.is_some() {
-        let val = trigger.unwrap();
-        let mut alerts = stream_alerts_map
-            .get(&format!("{}/{}/{}", val.org, StreamType::Logs, val.stream))
-            .unwrap()
-            .clone();
-
-        alerts.retain(|alert| alert.name.eq(&val.alert_name));
-        if !alerts.is_empty() {
-            crate::service::ingestion::send_ingest_notification(
-                val.clone(),
-                alerts.first().unwrap().clone(),
-            )
-            .await;
-        }
-    }
+    super::evaluate_trigger(trigger, stream_alerts_map).await;
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
