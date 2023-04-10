@@ -42,8 +42,9 @@
           v-if="searchObj.data.queryResults.hits"
           class="q-mr-sm float-left download-logs-btn"
           size="sm"
+          :disable="!searchObj.data.queryResults.hits.length"
           icon="download"
-          title="Download logs"
+          title="Export logs"
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
@@ -262,11 +263,26 @@ export default defineComponent({
       queryEditorRef.value.setValue(searchObj.data.query);
     };
 
+    const jsonToCsv = (jsonData) => {
+      const replacer = (key, value) => (value === null ? "" : value);
+      const header = Object.keys(jsonData[0]);
+      let csv = header.join(",") + "\r\n";
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = header
+          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
+          .join(",");
+        csv += row + "\r\n";
+      }
+
+      return csv;
+    };
+
     const downloadLogs = () => {
-      const filename = "logs-data.txt";
-      const data = JSON.stringify(searchObj.data.queryResults.hits);
+      const filename = "logs-data.csv";
+      const data = jsonToCsv(searchObj.data.queryResults.hits);
       const file = new File([data], filename, {
-        type: "text/plain",
+        type: "text/csv",
       });
       const url = URL.createObjectURL(file);
       const link = document.createElement("a");
