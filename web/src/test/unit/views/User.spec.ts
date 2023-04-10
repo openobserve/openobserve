@@ -2,8 +2,8 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
-import User from "../../../views/User.vue";
-import i18n from "../../../locales";
+import User from "@/views/User.vue";
+import i18n from "@/locales";
 import store from "../helpers/store";
 import router from "../helpers/router";
 

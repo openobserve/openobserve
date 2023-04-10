@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, shallowMount } from "@vue/test-utils";
 import { installQuasar } from "../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
@@ -30,11 +30,11 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("Search Result", async () => {
+describe("Main Layout", async () => {
   let wrapper: any;
   beforeEach(async () => {
     vi.useFakeTimers();
-    wrapper = mount(MainLayout, {
+    wrapper = shallowMount(MainLayout, {
       global: {
         provide: {
           store: store,

@@ -89,7 +89,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@enterprise": fileURLToPath(new URL("./src/enterprise", import.meta.url)),
+      "@enterprise": fileURLToPath(
+        new URL("./src/enterprise", import.meta.url)
+      ),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",

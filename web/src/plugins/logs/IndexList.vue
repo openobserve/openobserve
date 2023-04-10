@@ -141,6 +141,7 @@
                     </div>
                     <div class="field_overlay">
                       <q-icon
+                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :name="
                           'img:' + getImageURL('images/common/add_icon.svg')
                         "
@@ -149,6 +150,7 @@
                         @click.stop="addToFilter(props.row.name)"
                       />
                       <q-icon
+                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
                             props.row.name
@@ -163,6 +165,7 @@
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                       <q-icon
+                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
                         v-if="
                           searchObj.data.stream.selectedFields.includes(
                             props.row.name

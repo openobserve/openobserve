@@ -92,6 +92,47 @@ export const restHandlers = [
       return res(ctx.status(200), ctx.json(home.summary.get));
     }
   ),
+
+  rest.get(`${store.state.API_ENDPOINT}/config`, (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        version: "v0.3.2",
+        instance: "7049348417797095424",
+        commit_hash: "3cc381d699e28bcb1b6d74310be16ec060b37e0d",
+        build_date: "2023-04-05T11:01:23Z",
+        functions_enabled: true,
+        default_fts_keys: ["log", "message", "msg", "content", "data"],
+        telemetry_enabled: true,
+        default_functions: [
+          {
+            name: "match_all",
+            text: "match_all('v')",
+          },
+          {
+            name: "match_all_ignore_case",
+            text: "match_all_ignore_case('v')",
+          },
+          {
+            name: "str_match",
+            text: "match_all('v')",
+          },
+          {
+            name: "str_match_ignore_case",
+            text: "match_all_ignore_case('v')",
+          },
+          {
+            name: "re_match",
+            text: "re_match(field, 'pattern')",
+          },
+          {
+            name: "re_not_match",
+            text: "re_not_match(field, 'pattern')",
+          },
+        ],
+      })
+    );
+  }),
 ];
 const server = setupServer(...restHandlers);
 
