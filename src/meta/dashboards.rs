@@ -14,15 +14,16 @@
 
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::StreamType;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub dashboard_id: String,
@@ -30,13 +31,14 @@ pub struct Dashboard {
     pub description: String,
     pub role: String,
     pub owner: String,
+    #[schema(value_type = String, format = DateTime)]
     pub created: DateTime<FixedOffset>,
     pub panels: Vec<Panel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layouts: Option<Vec<Layout>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -49,7 +51,7 @@ pub struct Layout {
     pub is_static: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -61,7 +63,7 @@ pub struct Panel {
     pub custom_query: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -70,7 +72,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -81,7 +83,7 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -92,7 +94,7 @@ pub enum AggregationFunc {
     Avg,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
@@ -103,7 +105,7 @@ pub struct PanelFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
     title: String,
     description: String,
