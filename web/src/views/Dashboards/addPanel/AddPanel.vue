@@ -180,6 +180,8 @@ export default defineComponent({
         editMode.value = false;
         resetDashboardPanelData();
         chartData.value = {};
+        // set the value of the date time after the reset
+        updateDateTime(selectedDate.value)
       }
     });
 
