@@ -9,6 +9,7 @@ vi.mock("plotly.js", () => {
       addTraces: vi.fn(),
       restyle: vi.fn(),
       relayout: vi.fn(),
+      redraw: vi.fn(),
     },
   };
 });
