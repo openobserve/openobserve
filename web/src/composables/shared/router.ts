@@ -21,6 +21,7 @@ import AddPanel from "@/views/Dashboards/addPanel/AddPanel.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Search from "@/views/Search.vue";
 import AppMetrics from "@/views/AppMetrics.vue";
+import AppTraces from "@/views/AppTraces.vue";
 import LogStream from "@/views/LogStream.vue";
 import {
   FunctionList,
@@ -67,6 +68,14 @@ const useRoutes = () => {
       path: "metrics",
       name: "metrics",
       component: AppMetrics,
+      meta: {
+        keepAlive: true,
+      },
+    },
+    {
+      path: "traces",
+      name: "traces",
+      component: AppTraces,
       meta: {
         keepAlive: true,
       },
