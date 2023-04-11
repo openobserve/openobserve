@@ -457,7 +457,7 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
@@ -472,7 +472,7 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
@@ -488,7 +488,7 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
@@ -534,7 +534,7 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
@@ -549,7 +549,7 @@ export default defineComponent({
                 tickvals: xAxisDataWithTicks,
                 ticktext: textformat(xAxisDataWithTicks),
                 title: props.data.fields?.x[0].label,
-                tickangle: -20,
+                tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
                 automargin: true,
               },
               yaxis: {
