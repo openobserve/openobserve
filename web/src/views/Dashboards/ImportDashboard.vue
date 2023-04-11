@@ -61,7 +61,7 @@
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { getDashboard } from "../../utils/commons.ts";
+import { getAllDashboards } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -101,7 +101,13 @@ export default defineComponent({
                 message: `Dashboard Imported Successfully`,
               });
             })
+            .then(() => {
+              return getAllDashboards(store)
+            }).then(()=> {
+              router.push('/dashboards')
+            })
             .catch((err: any) => {
+              console.log(err)
               $q.notify({
                 type: "negative",
                 message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
