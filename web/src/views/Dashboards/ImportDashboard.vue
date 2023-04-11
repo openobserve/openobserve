@@ -87,30 +87,41 @@ export default defineComponent({
 
       var reader = new FileReader();
       reader.onload = function() {
-        const data = JSON.parse(reader.result)
+        try {
+          const data = JSON.parse(reader.result)
 
-        dashboardService.create(
-          store.state.selectedOrganization.identifier,
-          data
-        ).then((res: { data: any }) => {
-            jsonFile.value = null
-            dismiss();
-            $q.notify({
-              type: "positive",
-              message: `Dashboard Imported Successfully`,
+          dashboardService.create(
+            store.state.selectedOrganization.identifier,
+            data
+          ).then((res: { data: any }) => {
+              jsonFile.value = null
+              dismiss();
+              $q.notify({
+                type: "positive",
+                message: `Dashboard Imported Successfully`,
+              });
+            })
+            .catch((err: any) => {
+              $q.notify({
+                type: "negative",
+                message: JSON.stringify(
+                  err?.response?.data["error"] || 'Dashboard import failed'
+                ),
+              });
+              dismiss();
             });
-          })
-          .catch((err: any) => {
-            $q.notify({
+
+          dismiss();
+        } catch (error) {
+          
+          $q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["error"] || 'Dashboard import failed'
+                error?.response?.data["error"] || 'Invalid JSON file'
               ),
             });
             dismiss();
-          });
-
-        dismiss();
+        }
       };
       reader.readAsText(jsonFile.value);
     }

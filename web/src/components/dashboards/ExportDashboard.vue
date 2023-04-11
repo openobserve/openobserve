@@ -1,19 +1,5 @@
 <template>
-  <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="download">
-    <q-menu style="max-width: 200px;">
-      <q-card flat>
-        <q-card-section class="">
-          <div class="label">Export Dashboard</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="" style="max-width: 400px;">
-          <div>
-            Download the dashboard data to an external file so that you can import it later or share it with other people.
-          </div>
-          <q-btn no-caps color="primary" class="q-mt-md" @click="downloadDashboard()">Save as JSON file</q-btn>
-        </q-card-section>
-      </q-card>
-    </q-menu>
+  <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="download" @click="downloadDashboard()">
   </q-btn>
 </template>
 <script lang="ts">
