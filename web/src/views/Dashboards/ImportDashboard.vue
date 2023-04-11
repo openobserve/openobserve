@@ -104,9 +104,7 @@ export default defineComponent({
             .catch((err: any) => {
               $q.notify({
                 type: "negative",
-                message: JSON.stringify(
-                  err?.response?.data["error"] || 'Dashboard import failed'
-                ),
+                message: err?.response?.data["error"] ? JSON.stringify(err?.response?.data["error"]) : 'Dashboard import failed',
               });
               dismiss();
             });
@@ -116,9 +114,7 @@ export default defineComponent({
           
           $q.notify({
               type: "negative",
-              message: JSON.stringify(
-                error?.response?.data["error"] || 'Invalid JSON file'
-              ),
+              message: 'Invalid JSON format',
             });
             dismiss();
         }
