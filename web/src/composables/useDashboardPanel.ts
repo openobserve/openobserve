@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 import { reactive } from "vue";
-import queryService from "../services/search"
+import StreamService from '@/services/stream';
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
@@ -65,7 +65,7 @@ const getDefaultDashboardPanelData = () => (
         queryErrors: []
       },
       editorValue: "",
-      dateTime: {},
+      dateTime: {start_time: new Date(), end_time: new Date()},
       filterValue: <any>[],
       stream: {
         selectedStreamFields: [],
@@ -179,51 +179,38 @@ const useDashboardPanelData = () => {
       dashboardPanelData.meta.filterValue = [];
     }
 
-    if (
-      !dashboardPanelData.meta.filterValue.find(
-        (it: any) => it.column == name
-      )
-    ) {
-      let queryData = "SELECT ";
-
-      // get unique value of the selected fields
-      queryData += `${name} as value`;
-
-      //now add the selected stream
-      queryData += ` FROM '${dashboardPanelData.data.fields.stream}'`;
-
-      // console.log("queryData= ", queryData);
-      // add group by statement
-      queryData += ` GROUP BY value`;
-
-      const query = {
-        query: { sql: queryData, sql_mode: "full" },
-      };
-
-      queryService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier, 
-          query: query,
-          page_type: dashboardPanelData.data.fields.stream_type,
-        })
-        .then((res) => {
-
-          dashboardPanelData.meta.filterValue.push({
-            column: name,
-            value: res.data.hits
-              .map((it: any) => it.value)
-              .filter((it: any) => it),
-          });
-
-        })
-        .catch((error) => {
-          $q.notify({
-            type: "negative",
-            message: "Something went wrong!",
-            timeout: 5000,
-          });
-        });
+    // remove any existing data
+    const find = dashboardPanelData.meta.filterValue.findIndex((it: any) => it.column == name)
+    console.log('find: ' , find)
+    if (find >= 0) {
+      dashboardPanelData.meta.filterValue.splice(find, 1);
     }
+
+    StreamService
+      .fieldValues({
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name: dashboardPanelData.data.fields.stream,
+        start_time:  new Date(dashboardPanelData.meta.dateTime["start_time"].toISOString()).getTime() * 1000,
+        end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
+        fields: [name],
+        size: 10,
+      })
+      .then((res:any) => {
+        dashboardPanelData.meta.filterValue.push({
+          column: name,
+          value: res?.data?.hits?.[0]?.values
+            .map((it: any) => it.key)
+            .filter((it: any) => it),
+        });
+
+      })
+      .catch((error) => {
+        $q.notify({
+          type: "negative",
+          message: "Something went wrong!",
+          timeout: 5000,
+        });
+      });
   }
 
   const removeXYFilters = () => {
