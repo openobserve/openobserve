@@ -963,7 +963,7 @@ export default defineComponent({
       if (
         searchObj.meta.showHistogram == true &&
         searchObj.meta.sqlMode == false &&
-        searchBarRef.value?.reDrawChart
+        searchResultRef.value?.reDrawChart
       ) {
         searchResultRef.value.reDrawChart();
       }

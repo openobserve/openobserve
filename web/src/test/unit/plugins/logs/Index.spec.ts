@@ -34,7 +34,7 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("Alert List", async () => {
+describe("Logs Index", async () => {
   let wrapper: any;
   beforeEach(async () => {
     vi.useFakeTimers();
