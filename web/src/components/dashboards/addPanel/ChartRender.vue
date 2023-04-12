@@ -37,8 +37,9 @@
       >
       </q-table>
     </div>
-    <div v-else style="height: 100%;">
+    <div v-else style="height: 100%; position: relative;">
       <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
+      <div style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
     </div>
   </div>
 </template>
@@ -73,6 +74,7 @@ export default defineComponent({
       data: [],
       loading: false
     });
+    const noData = ref('')
 
     //render the plotly chart if the chart type is not table
     onUpdated(() => {
@@ -146,6 +148,10 @@ export default defineComponent({
             displayModeBar: false,
           }
         );
+
+        plotRef.value.on('plotly_afterplot',function() {
+          !searchQueryData.data.length ? noData.value = "No Data" : noData.value = ""
+        })
       } else {
         updateTableColumns()
       }
@@ -457,12 +463,13 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
+              fixedrange: true
             },
           };
         case "line":
@@ -472,12 +479,13 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
+              fixedrange: true
             },
           };
         case "scatter":
@@ -488,12 +496,13 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
+              fixedrange: true
             },
           };
         case "pie":
@@ -518,6 +527,7 @@ export default defineComponent({
               title: props.data.fields?.y[0].label,
               tickangle: -20,
               automargin: true,
+              fixedrange: true
             },
             yaxis: {
               tickmode: "array",
@@ -534,12 +544,13 @@ export default defineComponent({
               tickvals: xAxisDataWithTicks,
               ticktext: textformat(xAxisDataWithTicks),
               title: props.data.fields?.x[0].label,
-              tickangle: -20,
+              tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
               automargin: true,
             },
             yaxis: {
               title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
               automargin: true,
+              fixedrange: true
             },
           };
         default:
@@ -549,12 +560,13 @@ export default defineComponent({
                 tickvals: xAxisDataWithTicks,
                 ticktext: textformat(xAxisDataWithTicks),
                 title: props.data.fields?.x[0].label,
-                tickangle: -20,
+                tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram')? 0 :-20,
                 automargin: true,
               },
               yaxis: {
                 title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
                 automargin: true,
+                fixedrange: true
               },
           };
       }
@@ -568,7 +580,8 @@ export default defineComponent({
         rowsPerPage: 0,
       }),
       chartID,
-      tableColumn
+      tableColumn,
+      noData
     };
   },
 });
