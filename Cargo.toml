@@ -23,7 +23,6 @@ publish = false
 [features]
 default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
-tmpcache = ["dep:rsfs"]
 zo_functions = []
 
 [profile.release]
