@@ -16,8 +16,6 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-#[cfg(feature = "zo_functions")]
-use mlua::Lua;
 use std::io::Error;
 use std::time::Instant;
 
@@ -63,8 +61,7 @@ pub async fn ingest(
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
-    #[cfg(feature = "zo_functions")]
-    let lua = Lua::new();
+
     #[cfg(feature = "zo_functions")]
     let state = vrl::state::Runtime::default();
     #[cfg(feature = "zo_functions")]
@@ -85,13 +82,11 @@ pub async fn ingest(
 
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_lua_map, stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            org_id,
-            stream_name,
-            StreamType::Logs,
-            &lua,
-        );
+    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    );
     // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
@@ -125,8 +120,6 @@ pub async fn ingest(
         let value = crate::service::ingestion::apply_stream_transform(
             &local_tans,
             &value,
-            &lua,
-            &stream_lua_map,
             &stream_vrl_map,
             stream_name,
             &mut runtime,

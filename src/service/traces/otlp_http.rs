@@ -17,8 +17,6 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-#[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::fs::OpenOptions;
@@ -27,12 +25,8 @@ use tracing::info_span;
 
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
 use crate::meta::traces::Event;
 use crate::service::schema::{add_stream_schema, stream_schema_exists};
 use crate::{
@@ -109,31 +103,20 @@ pub async fn traces_json(
     crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
     // End get stream alert
 
-    #[cfg(feature = "zo_functions")]
-    let lua = Lua::new();
-    #[cfg(feature = "zo_functions")]
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
-
     let mut trigger: Option<Trigger> = None;
-    // Start Register Transfoms for stream
     #[cfg(feature = "zo_functions")]
-    let mut local_tans: Vec<Transform> = vec![];
+    let state = vrl::state::Runtime::default();
     #[cfg(feature = "zo_functions")]
-    let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
+    let mut runtime = vrl::Runtime::new(state);
     #[cfg(feature = "zo_functions")]
-    if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_tans = (*transforms.list).to_vec();
-        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        let mut func: Option<Function>;
-        for trans in &local_tans {
-            let func_key = format!("{}/{}", traces_stream_name, trans.name);
-            func = crate::service::ingestion::load_lua_transform(&lua, trans.function.clone());
-            if func.is_some() {
-                stream_lua_map.insert(func_key, func.unwrap().to_owned());
-            }
-        }
-    }
-    // End Register Transfoms for stream
+    // Start Register Transforms for stream
+    #[cfg(feature = "zo_functions")]
+    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+    );
+    // End Register Transforms for stream
 
     let mut service_name: String = traces_stream_name.to_string();
     let reader = BufReader::new(body.as_ref());
@@ -280,22 +263,21 @@ pub async fn traces_json(
                                 min_ts = timestamp as i64;
                             }
 
-                            #[cfg(feature = "zo_functions")]
-                            let mut value: json::Value = json::to_value(local_val).unwrap();
-                            #[cfg(not(feature = "zo_functions"))]
                             let value: json::Value = json::to_value(local_val).unwrap();
-                            #[cfg(feature = "zo_functions")]
                             // Start row based transform
-                            for trans in &local_tans {
-                                let func_key = format!("{traces_stream_name}/{}", trans.name);
-                                if stream_lua_map.contains_key(&func_key) {
-                                    value = crate::service::ingestion::lua_transform(
-                                        &lua,
-                                        &value,
-                                        stream_lua_map.get(&func_key).unwrap(),
-                                    );
-                                }
+                            #[cfg(feature = "zo_functions")]
+                            let value = crate::service::ingestion::apply_stream_transform(
+                                &local_tans,
+                                &value,
+                                &stream_vrl_map,
+                                traces_stream_name,
+                                &mut runtime,
+                            );
+                            #[cfg(feature = "zo_functions")]
+                            if value.is_null() || !value.is_object() {
+                                continue;
                             }
+                            // End row based transform
 
                             let value_str = json::to_string(&value).unwrap();
                             // get hour key

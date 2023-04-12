@@ -16,8 +16,6 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-#[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
@@ -31,7 +29,7 @@ use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 use crate::meta::alert::Alert;
 #[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
+use crate::meta::functions::StreamTransform;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{
     BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
@@ -72,13 +70,9 @@ pub async fn ingest(
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     #[cfg(feature = "zo_functions")]
-    let lua = Lua::new();
-    #[cfg(feature = "zo_functions")]
     let state = vrl::state::Runtime::default();
     #[cfg(feature = "zo_functions")]
     let mut runtime = vrl::Runtime::new(state);
-    #[cfg(feature = "zo_functions")]
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     #[cfg(feature = "zo_functions")]
     let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
 
@@ -86,7 +80,7 @@ pub async fn ingest(
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_data_map = AHashMap::new();
     #[cfg(feature = "zo_functions")]
-    let mut stream_tansform_map: AHashMap<String, Vec<Transform>> = AHashMap::new();
+    let mut stream_tansform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
     let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, Vec<String>)> =
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -132,9 +126,7 @@ pub async fn ingest(
                 org_id.to_owned(),
                 StreamType::Logs,
                 &mut stream_tansform_map,
-                &mut stream_lua_map,
                 &mut stream_vrl_map,
-                &lua,
             )
             .await;
             // End Register Transfoms for index
@@ -187,8 +179,6 @@ pub async fn ingest(
                 ret_value = crate::service::ingestion::apply_stream_transform(
                     transforms,
                     &ret_value,
-                    &lua,
-                    &stream_lua_map,
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,

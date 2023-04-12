@@ -23,7 +23,7 @@ publish = false
 [features]
 default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
-zo_functions = ["dep:mlua"]
+zo_functions = []
 
 [profile.release]
 debug = false
@@ -80,12 +80,6 @@ log = "0.4.17"
 lru = "0.8.1"
 memchr = "2.5.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-mlua = { version = "0.8.4", features = [
-  "send",
-  "luajit52",
-  "vendored",
-  "serialize",
-], optional = true }
 object_store = { version = "0.5.4", features = ["aws", "gcp"] }
 once_cell = "1.15.0"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }

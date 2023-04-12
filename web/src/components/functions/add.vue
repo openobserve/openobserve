@@ -20,40 +20,34 @@
         <div v-if="beingUpdated" class="text-h6">
           {{ t("function.updateTitle") }}
         </div>
-        <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
-      </div>
+      <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
     </div>
+  </div>
 
-    <q-separator />
-    <div>
-      <q-form ref="addJSTransformForm" @submit="onSubmit">
-        <q-toggle v-model="formData.ingest" :label="t('function.showQuery')" color="input-border" bg-color="input-bg"
-          class="q-py-md showLabelOnTop" stack-label outlined filled dense @update:model-value="updateEditorContent()" />
+  <q-separator />
+  <div>
+    <q-form ref="addJSTransformForm" @submit="onSubmit">
+
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
           <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
             class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
             v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
             tabindex="0" />
 
-          <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
-            :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
-            bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
-            @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
+          <!--  <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
+                    :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
+                    bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
+                    @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
 
-          <q-select v-if="formData.ingest" v-model="formData.stream_name" :loading="isFetchingStreams"
-            :options="indexOptions" :label="t('function.stream_name')" color="input-border" bg-color="input-bg"
-            class="col-4 q-py-md showLabelOnTop no-case" stack-label outlined filled dense />
+                  <q-select v-if="formData.ingest" v-model="formData.stream_name" :loading="isFetchingStreams"
+                    :options="indexOptions" :label="t('function.stream_name')" color="input-border" bg-color="input-bg"
+                    class="col-4 q-py-md showLabelOnTop no-case" stack-label outlined filled dense />-->
         </div>
 
-        <div class="q-gutter-sm">
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.trans_type"
-            :checked="formData.trans_type === '1'" val="1" :label="t('function.vrl')" class="q-ml-none"
-            @update:model-value="updateFunction" />
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.trans_type"
-            :checked="formData.trans_type === '0'" val="0" :label="t('function.lua')" class="q-ml-none"
-            @update:model-value="updateFunction" />
-
-        </div>
+        <q-input v-model="formData.params" :label="t('function.params')" color="input-border" bg-color="input-bg"
+          class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+          tabindex="0" />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
         <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
@@ -90,6 +84,7 @@ const defaultValue: any = () => {
   return {
     name: "",
     function: "",
+    params: "",
     stream_name: "",
     order: 1,
     ingest: false,
