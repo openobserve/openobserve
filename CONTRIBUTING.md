@@ -38,12 +38,34 @@ It is important that you build the web app every time you make any changes to ja
 
 ### Time to build the rust application now
 
-Make sure you are in zincobserve directory & not in zincobserve/web
+Make sure you are in zincobserve directory & not in zincobserve/web, and have 
+Rust toolchain installed:
 
-Simple:
+Install `protoc`:
+
+> Make sure the protoc is >= 3.15
+
+```
+# Linux
+wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+unzip protoc-21.12-linux-x86_64.zip -d protoc
+sudo cp protoc/bin/protoc /usr/local/bin/
+sudo cp -r protoc/include/google /usr/local/include/
+
+# Windows
+curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
+unzip protoc-21.12-win64.zip -d protoc
+cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
+cp -r protoc/include/google C:/windows/system32/
+
+# macOS
+brew install protobuf
+```
+
+Build the binary:
 
 ```shell
-cargo build --release # will build the zincobserve binary
+cargo build --release
 ```
 
 ## Developing
