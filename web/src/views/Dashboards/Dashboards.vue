@@ -10,7 +10,7 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
@@ -107,8 +107,8 @@
     </q-dialog>
     <ConfirmDialog
       title="Delete dashboard"
-      message="Are you sure you want to delete dashboard?"
-      @update:ok="removeDashboard"
+      message="Are you sure you want to delete the dashboard?"
+      @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
     />
@@ -276,19 +276,17 @@ export default defineComponent({
       });
     });
 
-    const removeDashboard = async () => {
+    const deleteDashboard = async () => {
       if (selectedDelete.value) {
         const dashboardId = selectedDelete.value.id;
         await dashboardService
           .delete(store.state.selectedOrganization.identifier, dashboardId)
           .then((res) => {
-            const dashboardList = JSON.parse(
-              JSON.stringify(toRaw(store.state.allDashboardList))
+            const dashboards = toRaw(store.state.allDashboardList);
+            const newDashboards = dashboards.filter(
+              (dashboard) => dashboard.dashboardId != dashboardId
             );
-            const newDashboardList = dashboardList.filter(
-              (dashboard) => dashboard.name != dashboardId
-            );
-            store.dispatch("setAllDashboardList", newDashboardList);
+            store.dispatch("setAllDashboardList", newDashboards);
             $q.notify({
               type: "positive",
               message: "Dashboard deleted successfully.",
@@ -339,7 +337,7 @@ export default defineComponent({
         }
         return filtered;
       },
-      removeDashboard,
+      deleteDashboard,
       getDashboards,
       getImageURL,
     };
