@@ -23,7 +23,7 @@ use sys_info::hostname;
 
 use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
-use crate::meta::functions::{FunctionList, Transform};
+use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
 use crate::meta::user::User;
 
@@ -52,7 +52,7 @@ lazy_static! {
 lazy_static! {
     pub static ref KVS: DashMap<String, bytes::Bytes> = DashMap::new();
     pub static ref STREAM_SCHEMAS: DashMap<String, Vec<Schema>> = DashMap::new();
-    pub static ref STREAM_FUNCTIONS: DashMap<String, FunctionList> = DashMap::new();
+    pub static ref STREAM_FUNCTIONS: DashMap<String, StreamFunctionsList> = DashMap::new();
     pub static ref QUERY_FUNCTIONS: DashMap<String, Transform> = DashMap::new();
     pub static ref USERS: DashMap<String, User> = DashMap::new();
     pub static ref ROOT_USER: DashMap<String, User> = DashMap::new();

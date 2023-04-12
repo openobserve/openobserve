@@ -17,63 +17,36 @@ use std::sync::Arc;
 use crate::common::json;
 use crate::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
 use crate::infra::db::Event;
-use crate::meta::functions::{FunctionList, Transform};
-use crate::meta::StreamType;
+use crate::meta::functions::{StreamFunctionsList, Transform};
 
-pub async fn set(
-    org_id: &str,
-    stream_name: Option<String>,
-    stream_type: Option<StreamType>,
-    name: &str,
-    js_func: Transform,
-) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
-    let key = match stream_name {
-        None => format!("/function/{org_id}/{name}"),
-        Some(stream_name) => format!(
-            "/function/{org_id}/{}/{stream_name}/{name}",
-            stream_type.unwrap()
-        ),
-    };
-    Ok(db.put(&key, json::to_vec(&js_func).unwrap().into()).await?)
-}
 
-pub async fn delete(
-    org_id: &str,
-    stream_name: Option<String>,
-    stream_type: Option<StreamType>,
-    name: &str,
-) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
-    let key = match stream_name {
-        None => format!("/function/{org_id}/{name}"),
-        Some(stream_name) => format!(
-            "/function/{org_id}/{}/{stream_name}/{name}",
-            stream_type.unwrap_or(StreamType::Logs)
-        ),
-    };
-    Ok(db.delete(&key, false).await?)
-}
-
-pub async fn list(
-    org_id: &str,
-    stream_name: Option<String>,
-    stream_type: Option<StreamType>,
-) -> Result<Vec<Transform>, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
-    let loc_stream_type = stream_type.unwrap_or(StreamType::Logs);
-    let key = match stream_name {
-        Some(stream_name) => format!("/function/{org_id}/{loc_stream_type}/{stream_name}"),
-        None => {
-            if stream_type.is_none() {
-                format!("/function/{org_id}")
-            } else {
-                format!("/function/{org_id}/{loc_stream_type}")
-            }
-        }
-    };
     Ok(db
-        .list(&key)
+        .put(
+            &format!("/function/{org_id}/{name}"),
+            json::to_vec(&js_func).unwrap().into(),
+        )
+        .await?)
+}
+
+pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let val = db.get(&format!("/function/{org_id}/{name}")).await?;
+    Ok(json::from_slice(&val).unwrap())
+}
+
+pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    Ok(db
+        .delete(&format!("/function/{org_id}/{name}"), false)
+        .await?)
+}
+
+pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    Ok(db
+        .list(&format!("/function/{org_id}"))
         .await?
         .values()
         .map(|val| json::from_slice(val).unwrap())
@@ -97,18 +70,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let trans_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
+                let org_id = &item_key[0..item_key.find('/').unwrap()];
                 let item_value: Transform = json::from_slice(&ev.value.unwrap()).unwrap();
-                if !item_value.stream_name.is_empty() {
-                    let mut group = STREAM_FUNCTIONS
-                        .entry(trans_key.to_string())
-                        .or_insert(FunctionList { list: vec![] });
-                    if group.list.contains(&item_value) {
-                        let stream_name =
-                            group.list.iter().position(|x| x.eq(&item_value)).unwrap();
-                        let _ = std::mem::replace(&mut group.list[stream_name], item_value);
-                    } else {
-                        group.list.push(item_value);
+                if item_value.streams.is_some() {
+                    for stream_fn in item_value.to_stream_transform() {
+                        let mut group = STREAM_FUNCTIONS
+                            .entry(format!(
+                                "{}/{}/{}",
+                                org_id, stream_fn.stream_type, stream_fn.stream
+                            ))
+                            .or_insert(StreamFunctionsList { list: vec![] });
+                        if group.list.contains(&stream_fn) {
+                            let stream_name =
+                                group.list.iter().position(|x| x.eq(&stream_fn)).unwrap();
+                            let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
+                        } else {
+                            group.list.push(stream_fn);
+                        }
                     }
                 } else {
                     QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
@@ -123,7 +101,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         .get(&trans_key.to_string())
                         .unwrap()
                         .clone();
-                    group.list.retain(|trans| !trans.name.eq(&item_name));
+                    group
+                        .list
+                        .retain(|trans| !trans.transform.name.eq(&item_name));
                     if group.list.is_empty() {
                         STREAM_FUNCTIONS.remove(&trans_key.to_string());
                     } else {
@@ -145,12 +125,20 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Transform = json::from_slice(&item_value).unwrap();
-        let stream_key = &item_key[0..item_key.rfind('/').unwrap()];
-        if !json_val.stream_name.is_empty() {
-            let mut group = STREAM_FUNCTIONS
-                .entry(stream_key.to_string())
-                .or_insert(FunctionList { list: vec![] });
-            group.list.push(json_val);
+        let org_id = &item_key[0..item_key.find('/').unwrap()];
+        if json_val.streams.is_some() {
+            for stream_fn in json_val.to_stream_transform() {
+                let mut group = STREAM_FUNCTIONS
+                    .entry(format!(
+                        "{}/{}/{}",
+                        org_id, stream_fn.stream_type, stream_fn.stream
+                    ))
+                    .or_insert(StreamFunctionsList { list: vec![] });
+                group.list.push(stream_fn);
+            }
+            let mut func = json_val.clone();
+            func.streams = None;
+            QUERY_FUNCTIONS.insert(item_key.to_string(), func);
         } else {
             QUERY_FUNCTIONS.insert(item_key.to_string(), json_val);
         }
