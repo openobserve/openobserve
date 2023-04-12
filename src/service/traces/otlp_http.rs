@@ -28,6 +28,7 @@ use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::traces::Event;
+use crate::service::ingestion::{format_stream_name, get_partition_key_record};
 use crate::service::schema::{add_stream_schema, stream_schema_exists};
 use crate::{
     common::json,
@@ -321,12 +322,12 @@ pub async fn traces_json(
                                 // End check for alert trigger
                             }
 
-                            hour_key.push_str(
-                                &crate::service::ingestion::get_partition_key_record(&format!(
-                                    "_service={}",
-                                    crate::service::ingestion::format_stream_name(&service_name)
-                                )),
-                            );
+                            let partition_key =
+                                format!("service={}", format_stream_name(&service_name));
+                            hour_key.push_str(&format!(
+                                "_{}",
+                                get_partition_key_record(&partition_key)
+                            ));
 
                             let hour_buf = data_buf.entry(hour_key.clone()).or_default();
 
