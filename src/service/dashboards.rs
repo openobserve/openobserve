@@ -43,8 +43,8 @@ pub async fn update_dashboard(
     let old_dashboard = match dashboard::get(org_id, dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(error) => {
-            tracing::info!(%error, dashboard_id, "Cannot find the dashboard");
-            return Ok(Response::NotFound { error: None }.into());
+            tracing::info!(%error, dashboard_id, "Dashboard not found");
+            return Ok(Response::NotFound.into());
         }
     };
 
@@ -72,18 +72,18 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
 
 #[instrument]
 pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    if let Ok(dashboard) = dashboard::get(org_id, dashboard_id).await {
-        return Ok(HttpResponse::Ok().json(dashboard));
-    }
-    Ok(Response::NotFound { error: None }.into())
+    let resp = if let Ok(dashboard) = dashboard::get(org_id, dashboard_id).await {
+        HttpResponse::Ok().json(dashboard)
+    } else {
+        Response::NotFound.into()
+    };
+    Ok(resp)
 }
 
 #[instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
-    let resp = if let Err(e) = dashboard::delete(org_id, dashboard_id).await {
-        Response::NotFound {
-            error: Some(e.to_string()),
-        }
+    let resp = if dashboard::delete(org_id, dashboard_id).await.is_err() {
+        Response::NotFound
     } else {
         Response::OkMessage("Dashboard deleted".to_owned())
     };
@@ -93,7 +93,7 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRe
 #[derive(Debug)]
 enum Response {
     OkMessage(String),
-    NotFound { error: Option<String> },
+    NotFound,
     InternalServerError(anyhow::Error),
 }
 
@@ -103,9 +103,9 @@ impl From<Response> for HttpResponse {
             Response::OkMessage(message) => {
                 Self::Ok().json(MetaHttpResponse::message(StatusCode::OK.into(), message))
             }
-            Response::NotFound { error } => Self::NotFound().json(MetaHttpResponse::error(
+            Response::NotFound => Self::NotFound().json(MetaHttpResponse::error(
                 StatusCode::NOT_FOUND.into(),
-                error.unwrap_or_else(|| "Dashboard not found".to_owned()),
+                "Dashboard not found".to_owned(),
             )),
             Response::InternalServerError(err) => Self::InternalServerError().json(
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),

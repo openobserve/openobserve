@@ -17,6 +17,35 @@ use std::io::Error;
 
 use crate::{meta::dashboards::Dashboard, service::dashboards};
 
+/// Create a dashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "CreateDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = Dashboard,
+        description = "Dashboard details",
+        example = json!({
+            "title": "Network Traffic Overview",
+            "dashboardId": "",
+            "description": "Traffic patterns and network performance of the infrastructure",
+            "role": "",
+            "owner": "root@example.com",
+            "created": "2023-04-11T18:28:18.658Z",
+            "panels": [],
+        }),
+    ),
+    responses(
+        (status = StatusCode::CREATED, description = "Dashboard created", body = Dashboard),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
+    ),
+)]
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
     path: web::Path<String>,
@@ -26,6 +55,37 @@ pub async fn create_dashboard(
     dashboards::create_dashboard(&org_id, details.into_inner()).await
 }
 
+/// Update a dashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "UpdateDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+    request_body(
+        content = Dashboard,
+        description = "Dashboard details",
+        example = json!({
+            "title": "Network Traffic Overview",
+            "dashboardId": "7051662927232892928",
+            "description": "Traffic patterns and network performance of the infrastructure",
+            "role": "",
+            "owner": "root@example.com",
+            "created": "2023-04-11T18:28:18.658Z",
+            "panels": [],
+        }),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Dashboard updated", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = HttpResponse),
+    ),
+)]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
 async fn update_dashboard(
     path: web::Path<(String, String)>,
@@ -35,17 +95,67 @@ async fn update_dashboard(
     dashboards::update_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
 }
 
+/// List dashboards
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "ListDashboards",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = Dashboards),
+    ),
+)]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
     dashboards::list_dashboards(&org_id.into_inner()).await
 }
 
+/// Get a dashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "GetDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+    request_body(content = Dashboard, description = "Dashboard details"),
+    responses(
+        (status = StatusCode::OK, body = Dashboard),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+    ),
+)]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
 async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     dashboards::get_dashboard(&org_id, &dashboard_id).await
 }
 
+/// Delete a dashboard
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "DeleteDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Dashboard deleted", body = HttpResponse),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+    ),
+)]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
 async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
