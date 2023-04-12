@@ -358,14 +358,13 @@ pub async fn merge(
     log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
 
     // clear temp file
-    tmpfs::remove_dir_all(work_dir).unwrap();
+    tmpfs::delete(&work_dir, true).unwrap();
 
     Ok(vec![batches])
 }
 
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
-    let work_dir = tmpfs::canonicalize(&work_dir)?;
     for (i, item) in batches.iter().enumerate() {
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
@@ -374,11 +373,8 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
             writer.write(row)?;
         }
         writer.close().unwrap();
-        tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
+        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-
-    println!("merge_write_recordbatch work_dir: {}", work_dir);
-
     Ok(work_dir)
 }
 
@@ -776,7 +772,7 @@ fn create_runtime_env() -> Result<RuntimeEnv> {
     let mem_url = url::Url::parse("mem:///").unwrap();
     object_store_registry.register_store(&mem_url, Arc::new(mem));
 
-    let tmpfs = super::storage::tmpfs::InMemory::new();
+    let tmpfs = super::storage::tmpfs::Tmpfs::new();
     let tmpfs = LimitStore::new(tmpfs, CONFIG.limit.query_thread_num);
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
