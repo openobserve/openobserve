@@ -28,6 +28,7 @@ use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::traces::Event;
+use crate::service::ingestion::{format_stream_name, get_partition_key_record};
 use crate::service::schema::{add_stream_schema, stream_schema_exists};
 use crate::{
     common::json,

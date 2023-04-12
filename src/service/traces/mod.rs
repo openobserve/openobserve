@@ -44,6 +44,7 @@ use crate::{
     },
 };
 
+use super::ingestion::{format_stream_name, get_partition_key_record};
 use super::schema::add_stream_schema;
 
 pub mod metadata;
