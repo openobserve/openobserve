@@ -75,6 +75,7 @@ pub fn delete(path: &str, prefix: bool) -> Result<()> {
     let path = format_key(path);
     if !prefix {
         FILES.remove(&path);
+        DATA.remove(&path);
         return Ok(());
     }
     let files = list(&path)?;
@@ -97,8 +98,8 @@ pub fn stats() -> Result<usize> {
 }
 
 fn format_key(path: &str) -> String {
-    if !path.is_empty() && !path.starts_with("/") {
-        format!("/{}", path)
+    if !path.is_empty() && !path.starts_with('/') {
+        format!("/{path}")
     } else {
         path.to_string()
     }
@@ -111,46 +112,46 @@ mod tests {
     #[test]
     fn test_set_get() {
         let data = Bytes::from("hello world");
-        set("hello", data.clone()).unwrap();
-        assert_eq!(get("hello").unwrap(), data);
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
     }
 
     #[test]
     fn test_delete() {
         let data = Bytes::from("hello world");
-        set("hello", data.clone()).unwrap();
-        assert_eq!(get("hello").unwrap(), data);
-        delete("hello", false).unwrap();
-        assert!(get("hello").is_err());
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        delete("/hello", false).unwrap();
+        assert!(get("/hello").is_err());
     }
 
     #[test]
     fn test_list() {
         let data = Bytes::from("hello world");
-        set("hello", data.clone()).unwrap();
-        assert_eq!(get("hello").unwrap(), data);
-        let files = list("hello").unwrap();
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        let files = list("/hello").unwrap();
         assert_eq!(files.len(), 1);
-        assert_eq!(files[0].location, "hello");
+        assert_eq!(files[0].location, "/hello");
     }
 
     #[test]
     fn test_delete_prefix() {
         let data = Bytes::from("hello world");
-        set("hello", data.clone()).unwrap();
-        assert_eq!(get("hello").unwrap(), data);
-        set("hello/world", data.clone()).unwrap();
-        assert_eq!(get("hello/world").unwrap(), data);
-        delete("hello", true).unwrap();
-        assert!(get("hello").is_err());
-        assert!(get("hello/world").is_err());
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        set("/hello/world", data.clone()).unwrap();
+        assert_eq!(get("/hello/world").unwrap(), data);
+        delete("/hello", true).unwrap();
+        assert!(get("/hello").is_err());
+        assert!(get("/hello/world").is_err());
     }
 
     #[test]
     fn test_stats() {
         let data = Bytes::from("hello world");
-        set("hello", data.clone()).unwrap();
-        assert_eq!(get("hello").unwrap(), data);
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
         let size = stats().unwrap();
         assert_eq!(size, 157);
     }
