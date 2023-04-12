@@ -63,6 +63,17 @@ pub trait Db: Sync + 'static {
     async fn get(&self, key: &str) -> Result<Bytes>;
     async fn put(&self, key: &str, value: Bytes) -> Result<()>;
     async fn delete(&self, key: &str, with_prefix: bool) -> Result<()>;
+
+    /// Contrary to `delete`, this call won't fail if `key` is missing.
+    async fn delete_if_exists(&self, key: &str, with_prefix: bool) -> Result<()> {
+        use crate::infra::errors::{DbError, Error};
+
+        match self.delete(key, with_prefix).await {
+            Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
     async fn list_use_channel(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<(String, Bytes)>>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
