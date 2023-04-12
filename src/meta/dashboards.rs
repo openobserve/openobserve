@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -26,16 +26,27 @@ pub struct Dashboards {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
+    #[serde(default)]
     pub dashboard_id: String,
     pub title: String,
     pub description: String,
+    #[serde(default)]
     pub role: String,
+    #[serde(default)]
     pub owner: String,
+    #[serde(default = "datetime_now")]
     #[schema(value_type = String, format = DateTime)]
     pub created: DateTime<FixedOffset>,
+    #[serde(default)]
     pub panels: Vec<Panel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layouts: Option<Vec<Layout>>,
+}
+
+fn datetime_now() -> DateTime<FixedOffset> {
+    Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
+        "BUG" // This can't possibly fail. Can it?
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
