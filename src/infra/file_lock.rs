@@ -241,7 +241,7 @@ impl RwFile {
                 .create(true)
                 .append(true)
                 .open(&file_path)
-                .expect(&format!("open file success: {file_path}"));
+                .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
         RwFile {
