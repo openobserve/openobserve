@@ -47,8 +47,7 @@
         />
         <q-input
           v-model="dashboardData.name"
-          :label="t('dashboard.name') + '*'"
-          :placeholder="t('dashboard.nameHolder')"
+          :label="t('dashboard.name') + ' *'"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -61,7 +60,6 @@
         <span>&nbsp;</span>
         <q-input
           v-model="dashboardData.description"
-          :placeholder="t('dashboard.typeHolder')"
           :label="t('dashboard.typeDesc')"
           color="input-border"
           bg-color="input-bg"
