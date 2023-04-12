@@ -23,19 +23,21 @@
     />
   </div>
   <div style="margin-top: -40px; height: calc(100% - 40px);">
-    <div v-if="props.data.type == 'table'" class="q-pa-md">
-      <q-table
-        class="my-sticky-virtscroll-table"
-        virtual-scroll
-        v-model:pagination="pagination"
-        :rows-per-page-options="[0]"
-        :virtual-scroll-sticky-size-start="48"
-        dense
-        :rows="searchQueryData?.data || []"
-        :columns="tableColumn"
-        row-key="id"
-      >
-      </q-table>
+    <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">
+      <div class="column" style="height: 100%; position: relative;">
+        <q-table
+          class="my-sticky-virtscroll-table"
+          virtual-scroll
+          v-model:pagination="pagination"
+          :rows-per-page-options="[0]"
+          :virtual-scroll-sticky-size-start="48"
+          dense
+          :rows="searchQueryData?.data || []"
+          :columns="tableColumn"
+          row-key="id"
+        >
+        </q-table>
+      </div>
     </div>
     <div v-else style="height: 100%; position: relative;">
       <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
@@ -590,25 +592,35 @@ export default defineComponent({
 <style lang="scss" scoped>
 .my-sticky-virtscroll-table {
   /* height or max-height is important */
-  height: 410px;
+  height: calc(100% - 1px);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
 
-  .q-table__top,
-  .q-table__bottom,
-  thead tr:first-child th {
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
     /* bg color is important for th; just specify one */
     background-color: #fff;
   }
-  thead tr th {
+  :deep(thead tr th) {
+    will-change: auto !important;
     position: sticky;
     z-index: 1;
   }
   /* this will be the loading indicator */
-  thead tr:last-child th {
+  :deep(thead tr:last-child th) {
     /* height of all previous header rows */
     top: 48px;
   }
-  thead tr:first-child th {
+  :deep(thead tr:first-child th) {
     top: 0;
+  }
+  :deep(.q-virtual-scroll) {
+    will-change: auto !important;
   }
 }
 </style>

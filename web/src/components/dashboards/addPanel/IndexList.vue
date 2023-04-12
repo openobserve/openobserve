@@ -364,7 +364,7 @@ export default defineComponent({
   }
 
   .q-select {
-    text-transform: capitalize;
+    // text-transform: capitalize;
   }
 
   .index-table {
