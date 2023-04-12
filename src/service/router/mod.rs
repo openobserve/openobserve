@@ -21,7 +21,7 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 4] = ["/_search", "/_around", "/_values", "/api/cache/status"];
+const QUERIER_ROUTES: [&str; 3] = ["/_search", "/_around", "/_values"];
 
 #[inline]
 pub fn is_router() -> bool {
@@ -131,7 +131,6 @@ mod tests {
     fn test_check_querier_route() {
         assert!(check_querier_route("/api/_search"));
         assert!(check_querier_route("/api/_around"));
-        assert!(check_querier_route("/api/cache/status"));
         assert!(!check_querier_route("/api/_bulk"));
     }
 }

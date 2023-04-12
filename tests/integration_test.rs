@@ -153,7 +153,6 @@ mod tests {
         // others
         e2e_health_check().await;
         e2e_config().await;
-        e2e_cache_status().await;
         e2e_100_tear_down().await;
     }
 
@@ -1310,25 +1309,6 @@ mod tests {
         .await;
         let req = test::TestRequest::get()
             .uri("/config")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-    }
-
-    async fn e2e_cache_status() {
-        let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/cache/status")
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

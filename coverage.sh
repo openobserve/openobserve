@@ -30,7 +30,6 @@ _cov_test() {
     RUSTFLAGS='-C target-cpu=native' \
         cargo llvm-cov test \
         --verbose \
-        --features zo_functions,tmpcache \
         --ignore-filename-regex job \
         --ignore-run-fail \
         "$@"

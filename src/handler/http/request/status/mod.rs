@@ -13,14 +13,11 @@
 // limitations under the License.
 
 use actix_web::{get, HttpResponse};
-use ahash::AHashMap;
 use serde::Serialize;
 use std::io::Error;
 use utoipa::ToSchema;
 
-use crate::common::json;
 use crate::infra::config::{self, CONFIG, INSTANCE_ID};
-use crate::infra::{cache, cluster};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
 
@@ -71,45 +68,4 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .collect(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
     }))
-}
-
-#[get("/cache/status")]
-pub async fn cache_status() -> Result<HttpResponse, Error> {
-    let mut stats: AHashMap<&str, json::Value> = AHashMap::new();
-    stats.insert(
-        "LOCAL_NODE_UUID",
-        json::json!(cluster::LOCAL_NODE_UUID.clone()),
-    );
-    stats.insert(
-        "LOCAL_NODE_NAME",
-        json::json!(&config::CONFIG.common.instance_name),
-    );
-    stats.insert(
-        "LOCAL_NODE_ROLE",
-        json::json!(&config::CONFIG.common.node_role),
-    );
-    stats.insert("NODES", json::json!(cluster::NODES.clone()));
-    stats.insert(
-        "STREAM_FUNCTIONS",
-        json::json!(config::STREAM_FUNCTIONS.clone()),
-    );
-    stats.insert(
-        "QUERY_FUNCTIONS",
-        json::json!(config::QUERY_FUNCTIONS.clone()),
-    );
-    stats.insert("STREAM_STATS", json::json!({"stream_num": cache::stats::get_stream_stats_len(), "mem_size": cache::stats::get_stream_stats_in_memory_size()}));
-
-    let (max_size, cur_size) = cache::file_data::stats();
-    stats.insert(
-        "FILE_DATA",
-        json::json!({"memory_limit":max_size,"mem_size": cur_size}),
-    );
-
-    let (file_list_num, files_num, mem_size) = cache::file_list::get_file_num().unwrap();
-    stats.insert(
-        "FILE_LIST",
-        json::json!({"file_list_num":file_list_num, "files_num":files_num, "mem_size":mem_size}),
-    );
-
-    Ok(HttpResponse::Ok().json(stats))
 }

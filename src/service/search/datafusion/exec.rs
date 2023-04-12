@@ -303,11 +303,7 @@ pub async fn merge(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-    let list_url = if cfg!(feature = "tmpcache") {
-        format!("tmpfs://{work_dir}")
-    } else {
-        format!("file://{work_dir}")
-    };
+    let list_url = format!("tmpfs://{work_dir}");
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
         Err(e) => {
@@ -358,18 +354,13 @@ pub async fn merge(
     log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
 
     // clear temp file
-    tmpfs::remove_dir_all(work_dir).unwrap();
+    tmpfs::delete(&work_dir, true).unwrap();
 
     Ok(vec![batches])
 }
 
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
-    let work_dir = format!(
-        "{}/zinc/observe/merge/{}/",
-        std::env::temp_dir().to_str().unwrap(),
-        chrono::Utc::now().timestamp_micros()
-    );
-    tmpfs::create_dir_all(&work_dir).unwrap();
+    let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     for (i, item) in batches.iter().enumerate() {
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
@@ -378,9 +369,8 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
             writer.write(row)?;
         }
         writer.close().unwrap();
-        tmpfs::write_file(file_name, &buf_parquet.to_vec())?;
+        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-
     Ok(work_dir)
 }
 
@@ -778,7 +768,7 @@ fn create_runtime_env() -> Result<RuntimeEnv> {
     let mem_url = url::Url::parse("mem:///").unwrap();
     object_store_registry.register_store(&mem_url, Arc::new(mem));
 
-    let tmpfs = super::storage::tmpfs::InMemory::new();
+    let tmpfs = super::storage::tmpfs::Tmpfs::new();
     let tmpfs = LimitStore::new(tmpfs, CONFIG.limit.query_thread_num);
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
