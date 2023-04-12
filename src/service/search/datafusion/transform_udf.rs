@@ -21,7 +21,6 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
-
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
@@ -75,13 +74,15 @@ pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::Sc
     udf_list
 }
 
-fn get_udf_vrl(
-    fn_name: String,
-    js_func: &str,
-    num_args: u8,
-) -> datafusion::logical_expr::ScalarUDF {
+fn get_udf_vrl(fn_name: String, func: &str, num_args: u8) -> datafusion::logical_expr::ScalarUDF {
     let local_fn_name = fn_name;
-    let local_js_func = js_func.to_owned();
+    let mut local_func = func.trim().to_owned();
+
+    if local_func.starts_with("function(") {
+        if let Some(idx) = local_func.find(')') {
+            local_func = local_func[idx + 1..].to_owned();
+        }
+    }
 
     let pow_calc = move |args: &[ArrayRef]| {
         let len = args[0].len();
@@ -95,9 +96,9 @@ fn get_udf_vrl(
                     .as_any()
                     .downcast_ref::<StringArray>()
                     .expect("cast failed");
-                obj_str.push_str(&format!("col{j} = \"{}\" \n", col.value(i)));
+                obj_str.push_str(&format!("col{} = \"{}\" \n", j + 1, col.value(i)));
             }
-            obj_str.push_str(&format!(" \n {}", &local_js_func));
+            obj_str.push_str(&format!(" \n {}", &local_func));
             let func = compile_vrl_function(&obj_str).unwrap();
             data_vec.insert(i, apply_vrl_fn(&mut runtime, func));
         }
@@ -156,18 +157,14 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
     }
 }
 
-fn get_udf_lua(
-    fn_name: String,
-    js_func: &str,
-    num_args: u8,
-) -> datafusion::logical_expr::ScalarUDF {
+fn get_udf_lua(fn_name: String, func: &str, num_args: u8) -> datafusion::logical_expr::ScalarUDF {
     let local_fn_name = fn_name;
-    let local_js_func = js_func.to_owned();
+    let local_func = func.to_owned();
     let pow_calc = move |args: &[ArrayRef]| {
         //Lua
         let lua = Lua::new();
         //Register Lua Function
-        let func = load_transform(&lua, local_js_func.to_string());
+        let func = load_transform(&lua, local_func.to_string());
         let len = args[0].len();
 
         let mut data_vec = vec![];
@@ -193,8 +190,8 @@ fn get_udf_lua(
     pow_udf
 }
 
-fn load_transform(lua: &Lua, js_func: String) -> Function {
-    lua.load(&js_func).eval().unwrap()
+fn load_transform(lua: &Lua, func: String) -> Function {
+    lua.load(&func).eval().unwrap()
 }
 
 fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -> String {

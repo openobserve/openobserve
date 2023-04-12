@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
@@ -34,7 +34,11 @@ const users = {
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
-  updateexistinguser: (data: any, org_identifier: string, user_email: string) => {
+  updateexistinguser: (
+    data: any,
+    org_identifier: string,
+    user_email: string
+  ) => {
     return http().post(`/api/${org_identifier}/users/${user_email}`, data);
   },
   delete: (org_identifier: string, user_email: string) => {
@@ -52,13 +56,18 @@ const users = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string,
+    org_identifier: string
   ) => {
     if (config.isZincObserveCloud === "true") {
-      return http().get(`/api/org_users/${org_identifier}?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`);
+      return http().get(
+        `/api/${org_identifier}/org_users?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      );
     } else {
       return http().get(`/api/${org_identifier}/users`);
     }
+  },
+  getRefreshToken: () => {
+    return http().get(`/api/auth/refresh_token`);
   },
 };
 

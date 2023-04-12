@@ -118,14 +118,19 @@ export function getConsumableDateTime(dateObj: any) {
 export const getAllDashboards = async (store: any) => {
   // api call
   return await dashboardService
-  .list(0, 1000, "name", false, "",store.state.selectedOrganization.identifier)
+  .list(0, 1000, "name", false, "", store.state.selectedOrganization.identifier)
   .then((res) => {
     // save to store
-    store.dispatch("setAllDashboardList", res.data.list);
+    store.dispatch("setAllDashboardList", res.data.dashboards);
   })
   .catch((error) => {
     // console.log(error);
   });
+}
+
+function findDashboard(dashboardId: string, store: any) {
+  const dashboards = store.state.allDashboardList;
+  return dashboards.find((it:any) => it.dashboardId === dashboardId);
 }
 
 export const addPanel = async (store: any, dashboardId: any, panelData: any) => {
@@ -136,9 +141,7 @@ export const addPanel = async (store: any, dashboardId: any, panelData: any) => 
   if(!store.state.allDashboardList || store.state.allDashboardList.length == 0) {
     await getAllDashboards(store)
   }
-  const dashboardList = store.state.allDashboardList
-  let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = currentDashboard.details
+  let currentDashboard = findDashboard(dashboardId, store);
   if(!currentDashboard.panels){
     currentDashboard.panels = []
   }
@@ -168,9 +171,6 @@ export const addPanel = async (store: any, dashboardId: any, panelData: any) => 
   }
   currentDashboard.layouts.push(newLayoutObj)
 
-  // console.log(currentDashboard);
-  
-
   return await updateDashboard(store, store.state.selectedOrganization.identifier, dashboardId, currentDashboard )
 }
 
@@ -178,9 +178,7 @@ export const deletePanel = async (store:any, dashboardId:any, panelId:any) => {
 // get the object of panel id
 // find the dashboard and remove the panel data to dashboard object
 // call the update dashboard function
-  const dashboardList = store.state.allDashboardList
-  let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = currentDashboard.details
+    let currentDashboard = findDashboard(dashboardId, store);
 
     //remove panel from current dashboard
     const panelIndex = currentDashboard.panels.findIndex(
@@ -203,9 +201,7 @@ export const updatePanel = async (store:any, dashboardId:any, panelData:any) => 
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
-    const dashboardList = store.state.allDashboardList
-    let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-    currentDashboard = currentDashboard.details
+      let currentDashboard = findDashboard(dashboardId, store);
   
       //remove panel from current dashboard
       const panelIndex = currentDashboard.panels.findIndex(
@@ -235,17 +231,13 @@ export const getDashboard = async (store: any, dashboardId: any) => {
   if(!store.state.allDashboardList || store.state.allDashboardList.length == 0) {
     await getAllDashboards(store)
   }
-  const dashboardList = store.state.allDashboardList
-  let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  return currentDashboard.details
+  return findDashboard(dashboardId, store)
 }
 
 export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   if(!store.state.allDashboardList || store.state.allDashboardList.length == 0) {
     await getAllDashboards(store)
   }
-  const dashboardList = store.state.allDashboardList
-  let currentDashboard = dashboardList.find((it:any)=>it.name === dashboardId )
-  currentDashboard = currentDashboard.details
+  let currentDashboard = findDashboard(dashboardId, store)
   return currentDashboard.panels?.find((it: any) => it.id == panelId)
 }

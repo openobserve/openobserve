@@ -18,7 +18,10 @@
     <q-card-section class="q-pa-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold text-dark">
+          <div
+            class="text-body1 text-bold text-dark"
+            data-test="schema-title-text"
+          >
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
@@ -43,9 +46,11 @@
           No data available.
         </div>
         <div v-else class="indexDetailsContainer">
-          <div class="title">{{ indexData.name }}</div>
+          <div class="title" data-test="schema-stream-title-text">
+            {{ indexData.name }}
+          </div>
           <div class="q-table__container q-table--cell-separator">
-            <table class="q-table">
+            <table class="q-table" data-test="schema-stream-meta-data-table">
               <thead>
                 <tr>
                   <th>{{ t("logStream.docsCount") }}</th>
@@ -91,7 +96,7 @@
 
           <q-separator class="q-mt-xl q-mb-lg" />
 
-          <div class="title">
+          <div class="title" data-test="schema-log-stream-mapping-title-text">
             {{ t("logStream.mapping") }}
             <label
               v-show="indexData.defaultFts"
@@ -107,7 +112,10 @@
             class="q-table__container q-table--cell-separator"
             style="height: calc(100vh - 460px); overflow: auto"
           >
-            <table class="q-table">
+            <table
+              class="q-table"
+              data-test="schema-log-stream-field-mapping-table"
+            >
               <thead>
                 <tr>
                   <th>{{ t("logStream.propertyName") }}</th>
@@ -125,10 +133,18 @@
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
                   <td class="text-center">
-                    <q-checkbox v-model="schema.ftsKey" size="sm" />
+                    <q-checkbox
+                      :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`"
+                      v-model="schema.ftsKey"
+                      size="sm"
+                    />
                   </td>
                   <td class="text-center">
-                    <q-checkbox v-model="schema.partitionKey" size="sm">
+                    <q-checkbox
+                      :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
+                      v-model="schema.partitionKey"
+                      size="sm"
+                    >
                       {{ schema.level }}</q-checkbox
                     >
                   </td>
@@ -144,6 +160,7 @@
         >
           <q-btn
             v-close-popup
+            data-test="schema-cancel-button"
             class="q-mb-md text-bold no-border"
             :label="t('logStream.cancel')"
             text-color="light-text"
@@ -152,6 +169,7 @@
             no-caps
           />
           <q-btn
+            data-test="schema-update-settings-button"
             :label="t('logStream.updateSettings')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -176,7 +194,7 @@ import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { getImageURL } from "../../utils/zincutils";
+// import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -328,7 +346,7 @@ export default defineComponent({
       onSubmit,
       updateSettingsForm,
       format,
-      getImageURL,
+      getImageURL: () => {},
     };
   },
   created() {

@@ -27,6 +27,8 @@ use uuid::Uuid;
 use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
+#[cfg(feature = "zo_functions")]
+use crate::infra::config::QUERY_FUNCTIONS;
 use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
@@ -51,6 +53,7 @@ pub async fn search(
     let root_span = info_span!("service:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
+
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
@@ -84,7 +87,7 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
     let span2 = info_span!("service:search:local:convert").entered();
 
     let mut response = Response::new(resp.from as usize, resp.size as usize);
-
+    //req.query.unwrap().query_fn = "vpc_flow".to_string();
     // convert hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
     if !resp.hits.is_empty() {
@@ -110,6 +113,9 @@ async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Er
         if query_type.eq("metrics") {
             sources = handle_metrics_response(sources);
         }
+
+        #[cfg(feature = "zo_functions")]
+        let sources = apply_query_fn(&req, &sources);
 
         for source in sources {
             response.add_hit(&source);
@@ -563,6 +569,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             sources = handle_metrics_response(sources);
         }
 
+        #[cfg(feature = "zo_functions")]
+        let sources = apply_query_fn(&req, &sources);
+
         for source in sources {
             result.add_hit(&source);
         }
@@ -711,5 +720,34 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
                 self.0.insert(key, val);
             }
         }
+    }
+}
+
+#[cfg(feature = "zo_functions")]
+fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
+    let mut ret_resp = vec![];
+    let applicable_query_fn = req.query.as_ref().unwrap().query_fn.to_lowercase();
+    if !applicable_query_fn.is_empty() {
+        if let Some(query_fn_src) =
+            QUERY_FUNCTIONS.get(format!("{}/{}", req.org_id, applicable_query_fn).as_str())
+        {
+            let state = vrl::state::Runtime::default();
+            let mut runtime = vrl::Runtime::new(state);
+            if let Some(program) =
+                super::ingestion::compile_vrl_function(query_fn_src.value().function.as_str())
+            {
+                for hit in resp {
+                    let ret_val =
+                        super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
+                    if !ret_val.eq(&json::Value::Null) {
+                        ret_resp.push(ret_val);
+                    }
+                }
+            }
+            return ret_resp;
+        };
+        resp.to_vec()
+    } else {
+        resp.to_vec()
     }
 }

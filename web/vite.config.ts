@@ -10,16 +10,60 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import vueJsx from "@vitejs/plugin-vue-jsx";
 import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
+import dotenv from "dotenv";
+import fs from "fs-extra";
+
+// Load environment variables from the appropriate .env file
+if (process.env.NODE_ENV === "production") {
+  dotenv.config({ path: ".env.production" });
+} else if (process.env.NODE_ENV === "devcloud") {
+  dotenv.config({ path: ".env.devcloud" });
+} else {
+  dotenv.config();
+}
+
+const enterpriseResolverPlugin = {
+  name: "enterprise-resolver",
+  async resolveId(source) {
+    if (source.startsWith("@zo/")) {
+      const fileName = source.replace("@zo/", "");
+
+      const enterprisePath = path.resolve(
+        __dirname,
+        `./src/enterprise/${fileName}`
+      );
+      const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
+
+      if (
+        process.env.VITE_ZINCOBSERVE_CLOUD == "true" &&
+        (await fs.pathExists(enterprisePath))
+      ) {
+        return enterprisePath;
+      }
+
+      return defaultPath;
+    }
+  },
+};
+
+// let filePath = path.resolve(process.cwd(), "src");
+// if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
+// const filePath = path.resolve(process.cwd(), "src/enterprise");
+// }
+
+// const enterprisePath = path.resolve(process.cwd(), 'src/enterprise');
+// const srcPath = path.resolve(process.cwd(), 'src');
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -27,19 +71,6 @@ export default defineConfig({
     __VUE_I18N_FULL_INSTALL__: true,
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
-  },
-  test: {
-    global: true,
-    setupFiles: 'src/test/unit/helpers/setupTests.ts',
-    coverage: {
-      reporter: ["text", "json", "html"],
-    },
-    environment: "happy-dom",
-    cache: false,
-    maxConcurrency: 20,
-    update: true,
-    // testNamePattern: "DateTime",
-    // ...
   },
   server: {
     port: 8081,
@@ -52,10 +83,15 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
+    enterpriseResolverPlugin,
+    vueJsx(),
   ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@enterprise": fileURLToPath(
+        new URL("./src/enterprise", import.meta.url)
+      ),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
       assert: "assert",
@@ -77,5 +113,37 @@ export default defineConfig({
       plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
       target: "es2020",
     },
+  },
+  test: {
+    enable: true,
+    global: true,
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
+    deps: {
+      inline: ["monaco-editor", "plotly.js"],
+    },
+    coverage: {
+      reporter: ["text", "json", "html"],
+      all: true,
+      exclude: [
+        "coverage/**",
+        "dist/**",
+        "packages/*/test{,s}/**",
+        "cypress/**",
+        "src/test/**",
+        "test{,s}/**",
+        "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}",
+        "**/__tests__/**",
+        "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
+        "**/.{eslint,mocha,prettier}rc.{js,cjs,yml}",
+        "quasar.conf.js",
+        "env.d.ts",
+      ],
+    },
+    environment: "jsdom",
+    cache: false,
+    maxConcurrency: 20,
+    update: false,
   },
 });

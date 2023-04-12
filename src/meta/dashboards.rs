@@ -18,23 +18,15 @@ use serde::{Deserialize, Serialize};
 use super::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DashboardList {
-    pub list: Vec<NamedDashboard>,
+pub struct Dashboards {
+    pub dashboards: Vec<Dashboard>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NamedDashboard {
-    // XXX-REVIEW: Do we need this field (and the encompassing struct) at all?
-    // AFAICS, name equals `Dashboard::dashboard_id`, so there's a duplication.
-    pub name: String,
-    pub details: Dashboard,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
-    pub title: String,
     pub dashboard_id: String,
+    pub title: String,
     pub description: String,
     pub role: String,
     pub owner: String,
@@ -44,7 +36,7 @@ pub struct Dashboard {
     pub layouts: Option<Vec<Layout>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -52,15 +44,12 @@ pub struct Layout {
     pub w: i64,
     pub h: i64,
     pub i: i64,
-    #[serde(rename = "panelId")]
     pub panel_id: String,
     #[serde(rename = "static")]
     pub is_static: bool,
 }
 
-// XXX-TODO: Move `Panel` and the associate structs into a separate module.
-// `meta::dashboard::panel` perhaps?
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -72,7 +61,7 @@ pub struct Panel {
     pub custom_query: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -81,7 +70,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -92,7 +81,7 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -103,18 +92,18 @@ pub enum AggregationFunc {
     Avg,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
-    pub typ: String, // HACK: use enum
-    pub values: Vec<()>,       // XXX-FIXME
-    pub column: String,        // HACK: use enum
-    pub operator: String,      // HACK: use enum
-    pub value: Option<String>, // XXX-REVIEW
+    pub typ: String,
+    pub values: Vec<String>,
+    pub column: String,
+    pub operator: Option<String>,
+    pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PanelConfig {
     title: String,
     description: String,
@@ -128,7 +117,7 @@ mod tests {
     use expect_test::expect;
 
     #[test]
-    fn test_dashboard_defs() {
+    fn test_de1() {
         let dashboard: Dashboard = json::from_str(r##"{
             "title": "b2",
             "dashboardId": "1501078512",
@@ -195,8 +184,8 @@ mod tests {
 
         expect![[r##"
             Dashboard {
-                title: "b2",
                 dashboard_id: "1501078512",
+                title: "b2",
                 description: "desc2",
                 role: "",
                 owner: "root@example.com",
@@ -237,7 +226,9 @@ mod tests {
                                     typ: "condition",
                                     values: [],
                                     column: "method",
-                                    operator: "Is Not Null",
+                                    operator: Some(
+                                        "Is Not Null",
+                                    ),
                                     value: None,
                                 },
                             ],
@@ -260,6 +251,169 @@ mod tests {
                             h: 13,
                             i: 1,
                             panel_id: "Panel_ID7857010",
+                            is_static: false,
+                        },
+                    ],
+                ),
+            }
+        "##]].assert_debug_eq(&dashboard);
+    }
+
+    #[test]
+    fn test_de2() {
+        let dashboard: Dashboard = json::from_str(r##"{
+            "dashboardId": "7049428968893710336",
+            "title": "board1",
+            "description": "",
+            "role": "",
+            "owner": "root@example.com",
+            "created": "2023-04-05T17:13:58.204+00:00",
+            "panels": [
+              {
+                "id": "Panel_ID1135310",
+                "type": "bar",
+                "fields": {
+                  "stream": "default",
+                  "stream_type": "logs",
+                  "x": [
+                    {
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram"
+                    }
+                  ],
+                  "y": [
+                    {
+                      "label": "Kubernetes Host",
+                      "alias": "y_axis_1",
+                      "column": "kubernetes_host",
+                      "color": "#5960b2",
+                      "aggregationFunction": "count"
+                    }
+                  ],
+                  "filter": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "log",
+                      "operator": "Is Not Null",
+                      "value": null
+                    },
+                    {
+                      "type": "list",
+                      "values": [
+                        "stdout",
+                        "stderr"
+                      ],
+                      "column": "stream",
+                      "operator": null,
+                      "value": null
+                    }
+                  ]
+                },
+                "config": {
+                  "title": "p1",
+                  "description": "",
+                  "show_legends": true
+                },
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                "customQuery": false
+              }
+            ],
+            "layouts": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 13,
+                "i": 1,
+                "panelId": "Panel_ID1135310",
+                "static": false
+              }
+            ]
+        }"##).unwrap();
+
+        expect![[r##"
+            Dashboard {
+                dashboard_id: "7049428968893710336",
+                title: "board1",
+                description: "",
+                role: "",
+                owner: "root@example.com",
+                created: 2023-04-05T17:13:58.204+00:00,
+                panels: [
+                    Panel {
+                        id: "Panel_ID1135310",
+                        typ: "bar",
+                        fields: PanelFields {
+                            stream: "default",
+                            stream_type: Logs,
+                            x: [
+                                AxisItem {
+                                    label: "Timestamp",
+                                    alias: "x_axis_1",
+                                    column: "_timestamp",
+                                    color: None,
+                                    aggregation_function: Some(
+                                        Histogram,
+                                    ),
+                                },
+                            ],
+                            y: [
+                                AxisItem {
+                                    label: "Kubernetes Host",
+                                    alias: "y_axis_1",
+                                    column: "kubernetes_host",
+                                    color: Some(
+                                        "#5960b2",
+                                    ),
+                                    aggregation_function: Some(
+                                        Count,
+                                    ),
+                                },
+                            ],
+                            filter: [
+                                PanelFilter {
+                                    typ: "condition",
+                                    values: [],
+                                    column: "log",
+                                    operator: Some(
+                                        "Is Not Null",
+                                    ),
+                                    value: None,
+                                },
+                                PanelFilter {
+                                    typ: "list",
+                                    values: [
+                                        "stdout",
+                                        "stderr",
+                                    ],
+                                    column: "stream",
+                                    operator: None,
+                                    value: None,
+                                },
+                            ],
+                        },
+                        config: PanelConfig {
+                            title: "p1",
+                            description: "",
+                            show_legends: true,
+                        },
+                        query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                        custom_query: false,
+                    },
+                ],
+                layouts: Some(
+                    [
+                        Layout {
+                            x: 0,
+                            y: 0,
+                            w: 12,
+                            h: 13,
+                            i: 1,
+                            panel_id: "Panel_ID1135310",
                             is_static: false,
                         },
                     ],

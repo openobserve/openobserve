@@ -14,12 +14,12 @@
 -->
 
 <template>
-  <div ref="editorRef" id="editor"></div>
+  <div data-test="query-editor" ref="editorRef" id="editor"></div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 export default defineComponent({
   props: {
@@ -224,7 +224,6 @@ export default defineComponent({
 
           let arr = textUntilPosition.trim().split(" ");
           let filteredSuggestions = [];
-
           filteredSuggestions = createDependencyProposals(range);
           filteredSuggestions = filteredSuggestions.filter((item) => {
             return item.label.toLowerCase().includes(word.word.toLowerCase());
@@ -305,7 +304,7 @@ export default defineComponent({
     });
 
     const setValue = (value: string) => {
-      editorObj.setValue(value);
+      if (editorObj?.setValue) editorObj.setValue(value);
     };
 
     return {

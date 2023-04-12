@@ -27,8 +27,13 @@
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'logstreams' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'logstreams' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -42,8 +47,13 @@
         </q-card-section>
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'functions' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'functions' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -57,8 +67,13 @@
         </q-card-section>
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
-            <router-link exact :to="{ name: 'alerts' }" class="absolute full-width full-height"></router-link>
+          <q-btn no-caps color="primary" flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'alerts' }"
+              class="absolute full-width full-height"
+            ></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -74,8 +89,12 @@
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" @click="() => $router.push('/ingestion/fluentbit')" flat>{{
-            t("home.findIngestion") }}
+          <q-btn
+            no-caps
+            color="primary"
+            @click="() => $router.push('/ingestion/fluentbit')"
+            flat
+            >{{ t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
       </q-card>

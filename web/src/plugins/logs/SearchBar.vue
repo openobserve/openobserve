@@ -19,27 +19,46 @@
     <div class="row q-my-xs">
       <div class="float-right col">
         <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showQuery"
           :label="t('search.showQueryLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-show-fields-toggle-btn"
           v-model="searchObj.meta.showFields"
           :label="t('search.showFieldLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
           v-bind:disable="searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
         <q-toggle
+          data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
           :label="t('search.sqlModeLabel')"
         />
-        <syntax-guide :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
+        <syntax-guide
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        ></syntax-guide>
       </div>
       <div class="float-right col-auto">
+        <q-btn
+          v-if="searchObj.data.queryResults.hits"
+          class="q-mr-sm float-left download-logs-btn"
+          size="sm"
+          :disable="!searchObj.data.queryResults.hits.length"
+          icon="download"
+          title="Export logs"
+          @click="downloadLogs"
+        ></q-btn>
         <div class="float-left">
-          <date-time @date-change="updateDateTime" />
+          <date-time
+            data-test="logs-search-bar-date-time-dropdown"
+            @date-change="updateDateTime"
+          />
         </div>
         <div class="search-time q-pl-sm float-left">
           <q-btn-group spread>
@@ -50,11 +69,13 @@
               class="search-dropdown"
               no-caps
               :label="searchObj.meta.refreshIntervalLabel"
+              data-test="logs-search-refresh-interval-dropdown-btn"
             >
               <div class="refresh-rate-dropdown-container">
                 <div class="row">
                   <div class="col col-12 q-pa-sm" style="text-align: center">
                     <q-btn
+                      data-test="logs-search-off-refresh-interval"
                       no-caps
                       :flat="searchObj.meta.refreshInterval !== '0'"
                       size="md"
@@ -83,6 +104,7 @@
                     style="text-align: center"
                   >
                     <q-btn
+                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
                       no-caps
                       :flat="searchObj.meta.refreshInterval !== item.label"
                       size="md"
@@ -102,6 +124,7 @@
             </q-btn-dropdown>
             <q-separator vertical inset />
             <q-btn
+              data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
               flat
@@ -140,14 +163,14 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
-import DateTime from "../../components/DateTime.vue";
-import useLogs from "../../composables/useLogs";
+import DateTime from "@/components/DateTime.vue";
+import useLogs from "@/composables/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser";
-import segment from "../../services/segment_analytics";
-import config from "../../aws-exports";
+import segment from "@/services/segment_analytics";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -189,11 +212,6 @@ export default defineComponent({
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery.from.length > 0) {
-          // alert(
-          //   searchObj.data.parsedQuery.from[0].table !==
-          //     searchObj.data.stream.selectedStream.value
-          // );
-          // alert(searchObj.data.parsedQuery.from[0].table !== streamName);
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&
@@ -257,7 +275,39 @@ export default defineComponent({
 
     const udpateQuery = () => {
       // alert(searchObj.data.query);
-      queryEditorRef.value.setValue(searchObj.data.query);
+      if (queryEditorRef.value?.setValue)
+        queryEditorRef.value.setValue(searchObj.data.query);
+    };
+
+    const jsonToCsv = (jsonData) => {
+      const replacer = (key, value) => (value === null ? "" : value);
+      const header = Object.keys(jsonData[0]);
+      let csv = header.join(",") + "\r\n";
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = header
+          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
+          .join(",");
+        csv += row + "\r\n";
+      }
+
+      return csv;
+    };
+
+    const downloadLogs = () => {
+      const filename = "logs-data.csv";
+      const data = jsonToCsv(searchObj.data.queryResults.hits);
+      const file = new File([data], filename, {
+        type: "text/csv",
+      });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     };
 
     return {
@@ -271,6 +321,7 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       udpateQuery,
+      downloadLogs,
     };
   },
   computed: {
@@ -282,25 +333,36 @@ export default defineComponent({
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
         let currentQuery = this.searchObj.data.editorValue.split("|");
+        let filter = this.searchObj.data.stream.addToFilter;
+
+        const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+
+        if (isFilterValueNull) {
+          filter = filter
+            .replace(/=|!=/, (match) => {
+              return match === "=" ? " is " : " is not ";
+            })
+            .replace(/'null'/, "null");
+        }
 
         if (currentQuery.length > 1) {
           if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + this.searchObj.data.stream.addToFilter;
+            currentQuery[1] += " and " + filter;
           } else {
-            currentQuery[1] = this.searchObj.data.stream.addToFilter;
+            currentQuery[1] = filter;
           }
           this.searchObj.data.query = currentQuery.join("| ");
         } else {
           if (currentQuery != "") {
-            currentQuery += " and " + this.searchObj.data.stream.addToFilter;
+            currentQuery += " and " + filter;
           } else {
-            currentQuery = this.searchObj.data.stream.addToFilter;
+            currentQuery = filter;
           }
           this.searchObj.data.query = currentQuery;
         }
         this.searchObj.data.stream.addToFilter = "";
-
-        this.queryEditorRef.setValue(this.searchObj.data.query);
+        if (this.queryEditorRef?.setValue)
+          this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
   },
@@ -427,6 +489,10 @@ export default defineComponent({
         color: #ffffff;
       }
     }
+  }
+
+  .download-logs-btn {
+    height: 30px;
   }
 }
 </style>

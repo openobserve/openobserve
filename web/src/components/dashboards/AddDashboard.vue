@@ -171,8 +171,6 @@ export default defineComponent({
       });
     },
     onSubmit() {
-      let newDashId = "";
-
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -188,10 +186,13 @@ export default defineComponent({
 
         if (dashboardId == "") {
           const obj = toRaw(this.dashboardData);
-          newDashId = this.getRandInteger().toString();
           const baseObj = {
             title: obj.name,
-            dashboardId: newDashId,
+            // NOTE: the dashboard ID is generated at the server side,
+            // in "Create a dashboard" request handler. The server
+            // doesn't care what value we put here as long as it's
+            // a string.
+            dashboardId: "",
             description: obj.description,
             role: "",
             owner: this.store.state.userInfo.name,
@@ -201,7 +202,6 @@ export default defineComponent({
 
           callDashboard = dashboardService.create(
             this.store.state.selectedOrganization.identifier,
-            baseObj.dashboardId,
             baseObj
           );
         }
@@ -215,8 +215,7 @@ export default defineComponent({
             };
 
             this.$emit("update:modelValue", data);
-            this.$emit("updated", newDashId);
-            // console.log("Done saving");
+            this.$emit("updated", data.dashboardId);
             this.addDashboardForm.resetValidation();
             dismiss();
           })
@@ -227,7 +226,6 @@ export default defineComponent({
                 err.response.data["error"] || "Dashboard creation failed."
               ),
             });
-            // console.log(err);
             dismiss();
           });
       });

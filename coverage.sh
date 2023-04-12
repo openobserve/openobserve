@@ -1,48 +1,116 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -eu -o pipefail
+# set -x
+export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-if [ -z $(cargo --list|grep llvm-cov) ]; then
-    cargo install -f cargo-llvm-cov
-fi
+export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-65}
+export COVERAGE_LINES=${COVERAGE_LINES:-55}
+export COVERAGE_REGIONS=${COVERAGE_REGIONS:-43}
 
-# cargo llvm-cov >report.json && ls -l | grep TOTAL report.json | xargs > coverage.txt
-RUSTFLAGS='-C target-cpu=native' cargo llvm-cov --ignore-filename-regex job >report.json
-if [ $? -ne 0 ]; then
-    echo "Failed to run cargo llvm-cov"
-    exit 1
-fi
+usage() {
+    cat <<EOF
+Usage: $0 [-h | --help] [<command>]
 
-summary="$(grep TOTAL report.json | xargs)"
-echo "Coverage Summary $summary %"
+Commands:
+  check [TESTNAME]  Run 'cargo llvm-cov test' and verify that code coverage statistics
+                    are greater than or equal to the thresholds. Test name filtering
+                    is supported.
+  help              Show this help and exit.
+  html              Generate coverage report in HTML format and open it in the default
+                    browser.
+  show-env          Show the coverage thresholds.
 
-region_cov="$(cut -d' ' -f4 <<<"$summary")"
-region_cov=${region_cov//%/}
-func_cov="$(cut -d' ' -f7 <<<"$summary")"
-func_cov=${func_cov//%/}
-line_cov="$(cut -d' ' -f10 <<<"$summary")"
-line_cov=${line_cov//%/}
+Omitted <command> defaults to 'check'.
+EOF
+}
 
-echo "func_cov $func_cov"
-echo "line_cov $line_cov"
-echo "region_cov $region_cov"
+_cov_test() {
+    cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
 
-# enable threshold
-#COVERAGE_THRESHOLD=80
-FUNC_COV_THRESHOLD=65
-LINE_COV_THRESHOLD=55
-REGION_COV_THRESHOLD=45
+    RUSTFLAGS='-C target-cpu=native' \
+        cargo llvm-cov test \
+        --verbose \
+        --ignore-filename-regex job \
+        --ignore-run-fail \
+        "$@"
+}
 
-# clean up
-# find ./target -name llvm-cov-target -type d|xargs rm -fR
-# clean up finished
+cmd_html() {
+    _cov_test --html "$@"
+    open target/llvm-cov/html/index.html  # HACK: `open` is not portable
+}
 
-func_diff=$(echo "$func_cov < $FUNC_COV_THRESHOLD" | bc)
-line_diff=$(echo "$line_cov < $LINE_COV_THRESHOLD" | bc)
-region_diff=$(echo "$region_cov < $REGION_COV_THRESHOLD" | bc)
+cmd_show_env() {
+    cat <<EOF
+COVERAGE_FUNCTIONS=$COVERAGE_FUNCTIONS
+COVERAGE_LINES=$COVERAGE_LINES
+COVERAGE_REGIONS=$COVERAGE_REGIONS
+EOF
+}
 
-if [ $func_diff -eq 1 ] || [ $line_diff -eq 1 ] || [ $region_diff -eq 1 ]; then
-    echo "Coverage is below threshold of function coverage $FUNC_COV_THRESHOLD% or line coverage $LINE_COV_THRESHOLD% or region coverage $REGION_COV_THRESHOLD%"
-    exit 1
-else
-    echo "Coverage is above threshold of function coverage $FUNC_COV_THRESHOLD% & line coverage $LINE_COV_THRESHOLD% & region coverage $REGION_COV_THRESHOLD%"
-    exit 0
-fi
+cmd_check() {
+    _cov_test --json --summary-only --output-path report.json "$@"
+
+    python3 <(
+    cat <<'EOF'
+import json
+import os
+import sys
+
+thresholds = {
+    'functions': float(os.environ['COVERAGE_FUNCTIONS']),
+    'lines': float(os.environ['COVERAGE_LINES']),
+    'regions': float(os.environ['COVERAGE_REGIONS']),
+}
+
+with open('report.json') as f:
+    report = json.load(f)
+
+totals = report['data'][0]['totals']
+
+ret = None
+for k, threshold in thresholds.items():
+    actual = totals[k]['percent']
+    k = k.capitalize()
+    if actual >= threshold:
+        print(f'✅ {k} coverage: {actual:.2f}%', file=sys.stderr)
+    else:
+        print(
+            f'❌ {k} coverage is below threshold: {actual:.2f}% < {threshold}%',
+            file=sys.stderr,
+        )
+        ret = 1
+
+sys.exit(ret)
+EOF
+)
+}
+
+main() {
+    case "${1:-}" in
+        '')
+            cmd_check
+            ;;
+        check)
+            shift
+            cmd_check "$@"
+            ;;
+        html)
+            shift
+            cmd_html "$@"
+            ;;
+        show-env)
+            cmd_show_env
+            ;;
+        -h|--help|help)
+            usage
+            ;;
+        *)
+            echo >&2 "Invalid argument: $1"
+            echo >&2 "Type '$0 --help' for usage"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { createApp } from "vue";
 import { Notify, Dialog, Quasar } from "quasar";
@@ -26,15 +26,12 @@ import App from "./App.vue";
 import createRouter from "./router";
 import i18n from "./locales";
 import "./styles/quasar-overrides.scss";
-// import { config } from "process";
-// import { config } from "./constants/config";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
 
 const app = createApp(App);
 const router = createRouter(store);
-
 
 app
   .use(Quasar, {
@@ -49,7 +46,7 @@ app.use(SearchPlugin);
 const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
-    config.enableAnalytics = res.data.telemetry_enabled.toString();;
+    config.enableAnalytics = res.data.telemetry_enabled.toString();
     if (res.data.telemetry_enabled == true) {
       Sentry.init({
         app,
@@ -72,7 +69,7 @@ const getConfig = async () => {
       });
     }
   });
-}
+};
 
 getConfig();
 

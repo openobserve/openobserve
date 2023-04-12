@@ -252,9 +252,8 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         )
         .then((res) => {
-          resultTotal.value = res.data.list.length;
-          store.dispatch("setAllDashboardList", res.data.list);
-
+          resultTotal.value = res.data.dashboards.length;
+          store.dispatch("setAllDashboardList", res.data.dashboards);
           dismiss();
         })
         .catch((error) => {
@@ -263,8 +262,7 @@ export default defineComponent({
     };
     const dashboards = computed(function () {
       const dashboardList = toRaw(store.state.allDashboardList);
-      return dashboardList.map((data: any, index) => {
-        const board = data.details;
+      return dashboardList.map((board: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
           id: board.dashboardId,

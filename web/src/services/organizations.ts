@@ -14,6 +14,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
+import config from "../aws-exports";
 
 const organizations = {
   os_list: (
@@ -24,9 +25,15 @@ const organizations = {
     name: string,
     org_identifier: string
   ) => {
-    return http().get(
-      `/api/${org_identifier}/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
-    );
+    if (config.isZincObserveCloud === "true") {
+      return http().get(
+        `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      );
+    } else {
+      return http().get(
+        `/api/${org_identifier}/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      );
+    }
   },
   list: (
     page_num: number,

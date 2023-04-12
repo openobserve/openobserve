@@ -19,12 +19,14 @@
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
       <BarChart
+        data-test="logs-search-result-bar-chart"
         ref="plotChart"
         v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
         @updated:chart="onChartUpdate"
       ></BarChart>
 
       <q-virtual-scroll
+        data-test="logs-search-result-logs-table"
         id="searchGridComponent"
         type="table"
         ref="searchTableRef"
@@ -43,9 +45,11 @@
                 v-for="(col, index) in searchObj.data.resultGrid.columns"
                 :key="'result_' + index"
                 class="table-header"
+                :data-test="`log-search-result-table-th-${col.label}`"
               >
                 <q-chip
                   v-if="col.closable"
+                  :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
                   :icon-remove="
                     'img:' + getImageURL('images/common/close_icon.svg')
                   "
@@ -67,6 +71,7 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
+            :data-test="`logs-search-result-detail-${row._timestamp}`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
@@ -79,6 +84,7 @@
             <q-td
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
+              class="field_list"
             >
               <high-light
                 :content="
@@ -102,6 +108,28 @@
                     : ''
                 "
               ></high-light>
+              <div
+                v-if="column.closable && row[column.name]"
+                class="field_overlay"
+                :title="row.name"
+              >
+                <q-icon
+                  :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                  size="1rem"
+                  title="Add to search query"
+                  @click.prevent.stop="
+                    addSearchTerm(`${column.name}='${row[column.name]}'`)
+                  "
+                />
+                <q-icon
+                  :name="'img:' + getImageURL('images/common/remove_icon.svg')"
+                  size="1rem"
+                  title="Add to search query"
+                  @click.prevent.stop="
+                    addSearchTerm(`${column.name}!='${row[column.name]}'`)
+                  "
+                />
+              </div>
             </q-td> </q-tr
         ></template>
       </q-virtual-scroll>
@@ -209,11 +237,6 @@ export default defineComponent({
         this.$emit("update:scroll");
       }
     },
-    onCancel() {
-      if (this.searchObj.meta.showDetailTab) {
-        this.searchObj.meta.showDetailTab = false;
-      }
-    },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
@@ -283,8 +306,6 @@ export default defineComponent({
     const removeSearchTerm = (term: string) => {
       emit("remove:searchTerm", term);
     };
-
-    removeSearchTerm;
 
     return {
       t,
@@ -449,5 +470,44 @@ export default defineComponent({
 
 .tfoot-sticky tr:first-child > * {
   bottom: 0;
+}
+
+.field_list {
+  padding: 0px;
+  margin-bottom: 0.125rem;
+  position: relative;
+  overflow: visible;
+  cursor: default;
+
+  .field_overlay {
+    position: absolute;
+    height: 100%;
+    right: 0;
+    top: 0;
+    background-color: #ffffff;
+    border-radius: 6px;
+    padding: 0 6px;
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s linear;
+
+    .q-icon {
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.3s linear;
+      margin: 0 1px;
+    }
+  }
+
+  &:hover {
+    .field_overlay {
+      visibility: visible;
+
+      .q-icon {
+        opacity: 1;
+      }
+    }
+  }
 }
 </style>

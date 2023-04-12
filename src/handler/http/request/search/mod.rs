@@ -277,7 +277,7 @@ pub async fn around(
     let req = meta::search::Request {
         query: meta::search::Query {
             sql: format!(
-                "SELECT * FROM {} ORDER BY {} DESC",
+                "SELECT * FROM \"{}\" ORDER BY {} DESC",
                 stream_name, CONFIG.common.time_stamp_col
             ),
             from: 0,
@@ -287,6 +287,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
+            query_fn: None,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -329,7 +330,7 @@ pub async fn around(
     let req = meta::search::Request {
         query: meta::search::Query {
             sql: format!(
-                "SELECT * FROM {} ORDER BY {} ASC",
+                "SELECT * FROM \"{}\" ORDER BY {} ASC",
                 stream_name, CONFIG.common.time_stamp_col
             ),
             from: 0,
@@ -339,6 +340,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
+            query_fn: None,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -498,7 +500,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT * FROM {stream_name}"),
+            sql: format!("SELECT * FROM \"{stream_name}\""),
             from: 0,
             size: 0,
             start_time,
@@ -506,6 +508,7 @@ pub async fn values(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
+            query_fn: None,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
