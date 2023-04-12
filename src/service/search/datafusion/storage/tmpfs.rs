@@ -38,25 +38,25 @@ enum Error {
 impl From<Error> for object_store::Error {
     fn from(source: Error) -> Self {
         Self::Generic {
-            store: "InMemory",
+            store: "tmpfs",
             source: Box::new(source),
         }
     }
 }
 
-/// In-memory storage suitable for testing or for opting out of using a cloud
+/// Tmpfs storage suitable for testing or for opting out of using a cloud
 /// storage provider.
 #[derive(Debug, Default)]
-pub struct InMemory {}
+pub struct Tmpfs {}
 
-impl std::fmt::Display for InMemory {
+impl std::fmt::Display for Tmpfs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "InMemory")
+        write!(f, "tmpfs")
     }
 }
 
 #[async_trait]
-impl ObjectStore for InMemory {
+impl ObjectStore for Tmpfs {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         log::info!("get: {}", location);
         let data = self.get_bytes(location).await?;
@@ -110,7 +110,7 @@ impl ObjectStore for InMemory {
         // log::info!("list: {:?}", prefix);
         let mut values = Vec::new();
         let key = prefix.unwrap().to_string();
-        let objects = tmpfs::read_dir(key).unwrap();
+        let objects = tmpfs::list(&key).unwrap();
         for file in objects {
             values.push(Ok(ObjectMeta {
                 location: file.location.into(),
@@ -128,7 +128,7 @@ impl ObjectStore for InMemory {
         log::info!("list_with_delimiter: {:?}", prefix);
         let mut values = Vec::new();
         let key = prefix.unwrap().to_string();
-        let objects = tmpfs::read_dir(key).unwrap();
+        let objects = tmpfs::list(&key).unwrap();
         for file in objects {
             values.push(ObjectMeta {
                 location: file.location.into(),
@@ -176,17 +176,16 @@ impl ObjectStore for InMemory {
     }
 }
 
-impl InMemory {
-    /// Create new in-memory storage.
+impl Tmpfs {
     pub fn new() -> Self {
         Self::default()
     }
 
     async fn get_bytes(&self, location: &Path) -> Result<Bytes> {
-        //  log::info!("get_bytes: {}", &file);
+        // log::info!("get_bytes: {}", &location);
         let file = location.to_string();
-        match tmpfs::read_file(file) {
-            Ok(data) => Ok(Bytes::from(data)),
+        match tmpfs::get(&file) {
+            Ok(data) => Ok(data),
             Err(e) => Err(object_store::Error::NotFound {
                 path: location.to_string(),
                 source: e.into(),

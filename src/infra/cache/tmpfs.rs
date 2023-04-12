@@ -12,149 +12,97 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
-#[cfg(feature = "tmpcache")]
-use parking_lot::RwLock;
-#[cfg(feature = "tmpcache")]
-use rsfs::*;
-#[cfg(feature = "tmpcache")]
-use std::io::{Read, Write};
-use std::path::Path;
+use dashmap::DashMap;
 
-pub struct TmpDirEntry {
-    pub location: String,
-    pub last_modified: DateTime<Utc>,
-    pub size: usize,
-}
+use crate::infra::errors::*;
 
-#[cfg(feature = "tmpcache")]
 lazy_static! {
-    pub static ref FS: RwLock<mem::FS> = RwLock::new(mem::FS::new());
+    pub static ref FILES: DashMap<String, File> = DashMap::new();
+    pub static ref DATA: DashMap<String, Bytes> = DashMap::new();
 }
 
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
-    let mut f = FS.write().create_file(path)?;
-    f.write_all(data)?;
+const STRING_SIZE: usize = std::mem::size_of::<String>();
+const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
+const FILE_SIZE: usize = std::mem::size_of::<File>();
+
+#[derive(Clone)]
+pub struct File {
+    pub location: String,
+    pub size: usize,
+    pub last_modified: DateTime<Utc>,
+}
+
+pub fn list(path: &str) -> Result<Vec<File>> {
+    let path = format_key(path);
+    Ok(FILES
+        .iter()
+        .filter_map(|x| {
+            if x.key().starts_with(&path) {
+                Some(x.value().clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<File>>())
+}
+
+pub fn get(path: &str) -> Result<Bytes> {
+    let path = format_key(path);
+    match DATA.get(&path) {
+        Some(data) => Ok(data.to_owned()),
+        None => Err(Error::from(DbError::KeyNotExists(path.to_string()))),
+    }
+}
+
+pub fn set(path: &str, data: Bytes) -> Result<()> {
+    let path = format_key(path);
+    let size = data.len();
+    DATA.insert(path.clone(), data);
+    FILES.insert(
+        path.clone(),
+        File {
+            location: path,
+            size,
+            last_modified: Utc::now(),
+        },
+    );
     Ok(())
 }
 
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
-    let mut file = FS.write().open_file(path)?;
-    let mut buf = vec![];
-    file.read_to_end(&mut buf)?;
-    Ok(buf)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    FS.write().create_dir(path)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    FS.write().create_dir_all(path)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
-    let mut values = Vec::with_capacity(2);
-    let files = FS.read().read_dir(path)?;
-    for file in files {
-        let file = file.unwrap();
-        let file_path = file.path();
-        let file_metadata = file.metadata().unwrap();
-        values.push(TmpDirEntry {
-            location: file_path.to_str().unwrap().to_string(),
-            last_modified: file_metadata.modified().unwrap().into(),
-            size: file_metadata.len() as usize,
-        });
+pub fn delete(path: &str, prefix: bool) -> Result<()> {
+    let path = format_key(path);
+    if !prefix {
+        FILES.remove(&path);
+        DATA.remove(&path);
+        return Ok(());
     }
-    Ok(values)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    FS.write().remove_dir(path)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    FS.write().remove_dir_all(path)
-}
-
-#[inline(always)]
-#[cfg(feature = "tmpcache")]
-pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    FS.write().remove_file(path)
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn write_file<P: AsRef<Path>>(path: P, data: &[u8]) -> Result<(), std::io::Error> {
-    crate::common::file::put_file_contents(path.as_ref().to_str().unwrap(), data)
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
-    crate::common::file::get_file_contents(path.as_ref().to_str().unwrap())
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    std::fs::create_dir(path)
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    std::fs::create_dir_all(path)
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<Vec<TmpDirEntry>, std::io::Error> {
-    let mut values = Vec::with_capacity(2);
-    let files = std::fs::read_dir(path)?;
-    for file in files {
-        let file = file.unwrap();
-        let file_path = file.path();
-        let file_metadata = file.metadata().unwrap();
-        values.push(TmpDirEntry {
-            location: file_path.to_str().unwrap().to_string(),
-            last_modified: file_metadata.modified().unwrap().into(),
-            size: file_metadata.len() as usize,
-        });
+    let files = list(&path)?;
+    for f in files {
+        FILES.remove(&f.location);
+        DATA.remove(&f.location);
     }
-    Ok(values)
+    Ok(())
 }
 
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    std::fs::remove_dir(path)
+pub fn stats() -> Result<usize> {
+    let mut size = 0;
+    FILES.iter().for_each(|x| {
+        size += x.key().len() + x.value().location.len() + STRING_SIZE + FILE_SIZE;
+    });
+    DATA.iter().for_each(|x| {
+        size += x.key().len() + x.value().len() + STRING_SIZE + BYTES_SIZE;
+    });
+    Ok(size)
 }
 
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    std::fs::remove_dir_all(path)
-}
-
-#[inline(always)]
-#[cfg(not(feature = "tmpcache"))]
-pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
-    std::fs::remove_file(path)
+fn format_key(path: &str) -> String {
+    if !path.is_empty() && !path.starts_with('/') {
+        format!("/{path}")
+    } else {
+        path.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -162,19 +110,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn create_read_file() {
-        let path = "/tmp/test.txt";
-        let _ = write_file(path, b"hello world").unwrap();
-        assert_eq!(read_file(path).unwrap(), b"hello world");
-        remove_file(path).unwrap();
+    fn test_set_get() {
+        let data = Bytes::from("hello world");
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
     }
 
     #[test]
-    fn create_read_directory() {
-        assert!(create_dir("/tmp/test_dir/abc/cde/").is_err());
-        create_dir_all("/tmp/test_dir/abc/").unwrap();
-        create_dir("/tmp/test_dir/abc/cde/").unwrap();
-        remove_dir("/tmp/test_dir/abc/cde/").unwrap();
-        remove_dir_all("/tmp/test_dir/").unwrap();
+    fn test_delete() {
+        let data = Bytes::from("hello world");
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        delete("/hello", false).unwrap();
+        assert!(get("/hello").is_err());
+    }
+
+    #[test]
+    fn test_list() {
+        let data = Bytes::from("hello world");
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        let files = list("/hello").unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].location, "/hello");
+    }
+
+    #[test]
+    fn test_delete_prefix() {
+        let data = Bytes::from("hello world");
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        set("/hello/world", data.clone()).unwrap();
+        assert_eq!(get("/hello/world").unwrap(), data);
+        delete("/hello", true).unwrap();
+        assert!(get("/hello").is_err());
+        assert!(get("/hello/world").is_err());
+    }
+
+    #[test]
+    fn test_stats() {
+        let data = Bytes::from("hello world");
+        set("/hello", data.clone()).unwrap();
+        assert_eq!(get("/hello").unwrap(), data);
+        let size = stats().unwrap();
+        assert_eq!(size, 157);
     }
 }

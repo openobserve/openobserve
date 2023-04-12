@@ -21,9 +21,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["tmpcache", "zo_functions"]
+default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
-tmpcache = ["dep:rsfs"]
 zo_functions = ["dep:mlua"]
 
 [profile.release]
@@ -112,7 +111,6 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
 ] }
 rs-snowflake = "0.6.0"
-rsfs = { git = "https://github.com/zinclabs/rsfs.git", optional = true }
 rust-embed-for-web = "11.1.1"
 segment = "0.2.2"
 serde = { version = "1", features = ["derive"] }

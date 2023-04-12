@@ -118,7 +118,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .wrap(auth)
             .wrap(cors)
-            .service(status::cache_status)
             .service(logs::ingest::bulk)
             .service(logs::ingest::multi)
             .service(logs::ingest::json)

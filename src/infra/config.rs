@@ -171,7 +171,7 @@ pub struct Common {
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
     pub telemetry_url: String,
-    #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = false)]
+    #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
@@ -183,7 +183,7 @@ pub struct Limit {
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 10)] // MB
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 32)] // MB
     pub max_file_size_on_disk: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,

@@ -4434,14 +4434,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e60ef3b82994702bbe4e134d98aadca4b49ed04440148985678d415c68127666"
 
 [[package]]
-name = "rsfs"
-version = "0.4.1"
-source = "git+https://github.com/zinclabs/rsfs.git#5f7baccabbddc8b70f1b41514e07031812fe4ec8"
-dependencies = [
- "parking_lot 0.12.1",
-]
-
-[[package]]
 name = "rust-embed"
 version = "6.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6262,7 +6254,6 @@ dependencies = [
  "regex-syntax",
  "reqwest",
  "rs-snowflake",
- "rsfs",
  "rust-embed-for-web",
  "segment",
  "serde",
