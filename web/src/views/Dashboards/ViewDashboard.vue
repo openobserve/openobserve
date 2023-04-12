@@ -42,6 +42,7 @@
         <AutoRefreshInterval v-model="refreshInterval" @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="refresh" @click="refreshData">
         </q-btn>
+        <ExportDashboard :dashboardId="list?.[0]?.dashboardId"/>
       </div>
     </div>
     <q-separator></q-separator>
@@ -100,6 +101,7 @@ import { useRoute } from "vue-router";
 import { deletePanel, updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
+import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -109,7 +111,8 @@ export default defineComponent({
     DateTimePicker,
     PanelContainer,
     NoPanel,
-    AutoRefreshInterval
+    AutoRefreshInterval,
+    ExportDashboard
   },
   setup() {
     const { t } = useI18n();

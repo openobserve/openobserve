@@ -35,6 +35,7 @@ import {
   TemplateList,
   DestinationList,
 } from "@/components/alerts/index";
+import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -92,6 +93,15 @@ const useRoutes = () => {
       path: "/dashboards/view",
       name: "viewDashboard",
       component: ViewDashboard,
+      props: true,
+      meta: {
+        keepAlive: true,
+      },
+    },
+    {
+      path: "/dashboards/import",
+      name: "importDashboard",
+      component: ImportDashboard,
       props: true,
       meta: {
         keepAlive: true,

@@ -250,7 +250,8 @@
         "actions": "Actions",
         "nameRequired": "Name is required",
         "id": "Id",
-        "goBackToDashboard": "Go back to Dashboard"
+        "goBackToDashboard": "Go back to Dashboard",
+        "import": "Import"
     },
     "panel": {
         "header": "Panel",

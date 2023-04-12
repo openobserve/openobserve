@@ -64,6 +64,14 @@
             <q-icon name="search" />
           </template>
         </q-input>
+        <q-btn
+          class="q-ml-md q-mb-xs text-bold"
+          padding="sm lg"
+          outline
+          no-caps
+          :label="t(`dashboard.import`)"
+          @click="importDashboard"
+        />
         <!-- add dashboard button -->
         <q-btn
           class="q-ml-md q-mb-xs text-bold no-border"
@@ -231,6 +239,11 @@ export default defineComponent({
     const addDashboard = () => {
       showAddDashboardDialog.value = true;
     };
+    const importDashboard = () => {
+      router.push({
+        path: "/dashboards/import",
+      });
+    };
     const routeToViewD = (row) => {
       return router.push({
         path: "/dashboards/view",
@@ -316,6 +329,7 @@ export default defineComponent({
       columns,
       showAddDashboardDialog,
       addDashboard,
+      importDashboard,
       pagination,
       resultTotal,
       perPageOptions,
