@@ -90,17 +90,17 @@ mod tests {
 
         // functions
         #[cfg(feature = "zo_functions")]
-        e2e_post_query_functions().await;
+        e2e_post_function().await;
         #[cfg(feature = "zo_functions")]
-        e2e_post_stream_functions().await;
+        e2e_add_stream_function().await;
         #[cfg(feature = "zo_functions")]
         e2e_list_functions().await;
         #[cfg(feature = "zo_functions")]
         e2e_list_stream_functions().await;
         #[cfg(feature = "zo_functions")]
-        e2e_delete_query_functions().await;
+        e2e_remove_stream_function().await;
         #[cfg(feature = "zo_functions")]
-        e2e_delete_stream_functions().await;
+        e2e_delete_function().await;
 
         // search
         e2e_search().await;
@@ -329,9 +329,13 @@ mod tests {
     }
 
     #[cfg(feature = "zo_functions")]
-    async fn e2e_post_query_functions() {
+    async fn e2e_post_function() {
         let auth = setup();
-        let body_str = "{\"function\": \"function square(row){const obj = JSON.parse(row);obj['square'] = obj.Year*obj.Year;  return JSON.stringify(obj);}\"  }";
+        let body_str = r#"{
+            "name": "e2etestfn",
+            "function":".sqNew,err = .Year*.Year \n .",
+            "params":"row"
+        }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -341,7 +345,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/functions/{}", "e2e", "query"))
+            .uri(&format!("/api/{}/functions", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -351,12 +355,11 @@ mod tests {
     }
 
     #[cfg(feature = "zo_functions")]
-    async fn e2e_post_stream_functions() {
+    async fn e2e_add_stream_function() {
         let auth = setup();
-        let body_str = "{
-                                \"function\": \"function square(row){const obj = JSON.parse(row);obj['square'] = obj.Year*obj.Year;  return JSON.stringify(obj);}\",
-                                \"order\":1
-                               }";
+        let body_str = r#"{
+                                "order":1  
+                            }"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -368,7 +371,7 @@ mod tests {
         let req = test::TestRequest::post()
             .uri(&format!(
                 "/api/{}/{}/functions/{}",
-                "e2e", "olympics_schema", "concat"
+                "e2e", "olympics_schema", "e2etestfn"
             ))
             .insert_header(ContentType::json())
             .append_header(auth)
@@ -410,7 +413,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/{}/functions", "e2e", "olympics"))
+            .uri(&format!("/api/{}/{}/functions", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -419,7 +422,7 @@ mod tests {
     }
 
     #[cfg(feature = "zo_functions")]
-    async fn e2e_delete_query_functions() {
+    async fn e2e_delete_function() {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -430,7 +433,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/functions/{}", "e2e", "query"))
+            .uri(&format!("/api/{}/functions/{}", "e2e", "e2etestfn"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -439,7 +442,7 @@ mod tests {
     }
 
     #[cfg(feature = "zo_functions")]
-    async fn e2e_delete_stream_functions() {
+    async fn e2e_remove_stream_function() {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -452,7 +455,7 @@ mod tests {
         let req = test::TestRequest::delete()
             .uri(&format!(
                 "/api/{}/{}/functions/{}",
-                "e2e", "olympics_schema", "concat"
+                "e2e", "olympics_schema", "e2etestfn"
             ))
             .insert_header(ContentType::json())
             .append_header(auth)

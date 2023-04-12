@@ -17,149 +17,241 @@ use actix_web::{
     HttpResponse,
 };
 use std::io::Error;
-use tracing::info_span;
+use tracing::instrument;
 
-use crate::meta::functions::Transform;
-use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
+use crate::meta::{
+    functions::{StreamFunctionsList, StreamOrder},
+    http::HttpResponse as MetaHttpResponse,
+};
 use crate::service::db;
+use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
 use crate::{meta::functions::FunctionList, meta::StreamType};
 
-const SUCCESS: &str = "Function saved successfully";
-const SPECIFY: &str = "Please specify ";
-const STREAM: &str = "stream name ";
-const ORDER: &str = "function order ";
-const DELETED: &str = "Function deleted";
+const FN_SUCCESS: &str = "Function saved successfully";
+const FN_NOT_FOUND: &str = "Function not found";
+const FN_ADDED: &str = "Function applied to stream";
+const FN_REMOVED: &str = "Function removed from stream";
+const FN_DELETED: &str = "Function deleted";
+const FN_ALREADY_EXIST: &str = "Function already exist";
+const FN_IN_USE: &str =
+    "Function is used in a stream. Please remove it from the stream before deleting.";
 
-pub async fn register_function(
-    org_id: String,
-    stream_name: Option<String>,
-    s_type: Option<StreamType>,
-    name: String,
-    mut trans: Transform,
-) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:functions:register");
-    let _guard = loc_span.enter();
-    match stream_name {
-        Some(stream_name) => {
-            let mut is_err = false;
-            let mut msg: String = String::from(SPECIFY);
-            let stream_name = stream_name.trim();
-
-            if stream_name.is_empty() {
-                msg.push_str(STREAM);
-                is_err = true;
-            }
-            if trans.order == 0 {
-                msg.push_str(ORDER);
-                is_err = true;
-            }
-
-            trans.stream_type = s_type;
-            let func = trans.function.to_owned();
-            if trans.trans_type == 0 && !func.contains('(') && !func.contains(')') {
-                msg.push_str(" not valid function");
-                is_err = true;
-            }
-            if is_err {
-                Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        msg.to_string(),
-                    )),
-                )
-            } else {
-                trans.stream_name = stream_name.to_string();
-                trans.name = name.to_string();
-                extract_num_args(&mut trans);
-
-                db::functions::set(
-                    org_id.as_str(),
-                    Some(stream_name.to_string()),
-                    s_type,
-                    name.as_str(),
-                    trans,
-                )
-                .await
-                .unwrap();
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    SUCCESS.to_string(),
-                )))
-            }
+#[instrument(skip(func))]
+pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+    if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.into(),
+            FN_ALREADY_EXIST.to_string(),
+        )))
+    } else {
+        extract_num_args(&mut func);
+        let name = func.name.to_owned();
+        if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            );
         }
-        None => {
-            let mut is_err = false;
-            trans.name = name.to_string();
-            let func = trans.function.to_owned();
-            if trans.trans_type == 0 && !func.contains('(') && !func.contains(')') {
-                is_err = true;
-            }
-            if !is_err {
-                extract_num_args(&mut trans);
-                db::functions::set(org_id.as_str(), None, None, name.as_str(), trans)
-                    .await
-                    .unwrap();
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    SUCCESS.to_string(),
-                )))
-            } else {
-                Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Not valid function".to_string(),
-                    )),
-                )
-            }
-        }
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            FN_SUCCESS.to_string(),
+        )))
     }
 }
 
-pub async fn list_functions(
+#[instrument(skip(func))]
+pub async fn update_function(
     org_id: String,
-    stream_name: Option<String>,
-    stream_type: Option<StreamType>,
+    fn_name: String,
+    mut func: Transform,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:functions:list");
-    let _guard = loc_span.enter();
-    let udf_list = db::functions::list(org_id.as_str(), stream_name, stream_type)
-        .await
-        .unwrap();
-    Ok(HttpResponse::Ok().json(FunctionList { list: udf_list }))
+    let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+        Some(function) => function,
+        None => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                FN_NOT_FOUND.to_string(),
+            )));
+        }
+    };
+    if func == existing_fn {
+        return Ok(HttpResponse::Ok().json(func));
+    }
+
+    extract_num_args(&mut func);
+    let name = func.name.to_owned();
+    if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        );
+    }
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        http::StatusCode::OK.into(),
+        FN_SUCCESS.to_string(),
+    )))
 }
 
-pub async fn delete_function(
-    org_id: String,
-    stream_name: Option<String>,
-    stream_type: Option<StreamType>,
-    name: String,
-) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:functions:delete");
-    let _guard = loc_span.enter();
-    let result =
-        db::functions::delete(org_id.as_str(), stream_name, stream_type, name.as_str()).await;
+#[instrument()]
+pub async fn list_functions(org_id: String) -> Result<HttpResponse, Error> {
+    if let Ok(functions) = db::functions::list(org_id.as_str()).await {
+        Ok(HttpResponse::Ok().json(FunctionList { list: functions }))
+    } else {
+        Ok(HttpResponse::Ok().json(FunctionList { list: vec![] }))
+    }
+}
+
+#[instrument()]
+pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
+    let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+        Some(function) => function,
+        None => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                FN_NOT_FOUND.to_string(),
+            )));
+        }
+    };
+    if let Some(val) = existing_fn.streams {
+        if !val.is_empty() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                FN_IN_USE.to_string(),
+            )));
+        }
+    }
+    let result = db::functions::delete(org_id.as_str(), fn_name.as_str()).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
-            DELETED.to_string(),
+            FN_DELETED.to_string(),
         ))),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
-            e.to_string(),
+            FN_NOT_FOUND.to_string(),
         ))),
     }
 }
 
-fn extract_num_args(trans: &mut Transform) {
-    let func = trans.function.to_owned();
-    let start_stream = func.find('(').unwrap();
-    let end_stream = func.find(')').unwrap();
-    let args = &func[start_stream + 1..end_stream].trim();
-    if args.is_empty() {
-        trans.num_args = 0;
+#[instrument()]
+pub async fn list_stream_functions(
+    org_id: String,
+    stream_type: StreamType,
+    stream_name: String,
+) -> Result<HttpResponse, Error> {
+    if let Some(val) = STREAM_FUNCTIONS.get(&format!("{}/{}/{}", org_id, stream_type, stream_name))
+    {
+        Ok(HttpResponse::Ok().json(val.value()))
     } else {
-        let args_vec = args.split(',');
-        trans.num_args = args_vec.into_iter().count() as u8;
+        Ok(HttpResponse::Ok().json(StreamFunctionsList { list: vec![] }))
+    }
+}
+
+#[instrument()]
+pub async fn delete_stream_function(
+    org_id: String,
+    stream_type: StreamType,
+    stream_name: String,
+    fn_name: String,
+) -> Result<HttpResponse, Error> {
+    let mut existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+        Some(function) => function,
+        None => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                FN_NOT_FOUND.to_string(),
+            )));
+        }
+    };
+
+    if let Some(val) = existing_fn.streams.clone() {
+        if val.len() == 1 && val.first().unwrap().stream == stream_name {
+            existing_fn.streams = None;
+        } else {
+            existing_fn.streams = Some(
+                val.into_iter()
+                    .filter(|x| x.stream != stream_name)
+                    .collect::<Vec<StreamOrder>>(),
+            );
+        }
+        if let Err(error) = db::functions::set(org_id.as_str(), fn_name.as_str(), existing_fn).await
+        {
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            )
+        } else {
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                FN_REMOVED.to_string(),
+            )))
+        }
+    } else {
+        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            FN_NOT_FOUND.to_string(),
+        )))
+    }
+}
+
+#[instrument()]
+pub async fn add_function_to_stream(
+    org_id: String,
+    stream_type: StreamType,
+    stream_name: String,
+    fn_name: String,
+    mut stream_order: StreamOrder,
+) -> Result<HttpResponse, Error> {
+    let mut existing_fn = match check_existing_fn(&org_id, &fn_name).await {
+        Some(function) => function,
+        None => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                FN_NOT_FOUND.to_string(),
+            )));
+        }
+    };
+
+    stream_order.stream = stream_name;
+    stream_order.stream_type = stream_type;
+
+    if let Some(mut val) = existing_fn.streams {
+        val.push(stream_order);
+        existing_fn.streams = Some(val);
+    } else {
+        existing_fn.streams = Some(vec![stream_order]);
+    }
+
+    if let Err(error) = db::functions::set(org_id.as_str(), fn_name.as_str(), existing_fn).await {
+        Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        )
+    } else {
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            FN_ADDED.to_string(),
+        )))
+    }
+}
+
+fn extract_num_args(func: &mut Transform) {
+    let params = func.params.to_owned();
+    func.num_args = params.split(',').collect::<Vec<&str>>().len() as u8;
+}
+
+async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
+    match db::functions::get(org_id, fn_name).await {
+        Ok(function) => Some(function),
+        Err(_) => None,
     }
 }
 
@@ -173,29 +265,18 @@ mod test {
             function: "function (row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
                 .to_owned(),
             name: "dummyfn".to_owned(),
-            order: 1,
-            stream_name: "Test".to_owned(),
+            params: "row".to_owned(),
+            streams: None,
             num_args: 0,
             trans_type: 1,
-            stream_type: None,
         };
-        let res =
-            register_function("nexus".to_owned(), None, None, trans.name.to_owned(), trans).await;
+        let res = save_function("nexus".to_owned(), trans).await;
         assert!(res.is_ok());
 
-        let list_resp = list_functions("nexus".to_string(), Some("Test".to_string()), None).await;
+        let list_resp = list_functions("nexus".to_string()).await;
         assert!(list_resp.is_ok());
 
-        let list_resp = list_functions("nexus".to_string(), None, None).await;
-        assert!(list_resp.is_ok());
-
-        let del_resp = delete_function(
-            "nexus".to_string(),
-            Some("Test".to_string()),
-            None,
-            "dummyfn".to_owned(),
-        )
-        .await;
+        let del_resp = delete_function("nexus".to_string(), "dummyfn".to_owned()).await;
         assert!(del_resp.is_ok());
     }
 }

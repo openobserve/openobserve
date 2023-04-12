@@ -17,15 +17,13 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-#[cfg(feature = "zo_functions")]
 use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
 
 use super::triggers;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
-use crate::meta::functions::Transform;
+use crate::meta::functions::StreamTransform;
 #[cfg(feature = "zo_functions")]
 use crate::meta::StreamType;
 use crate::{
@@ -33,15 +31,6 @@ use crate::{
     infra::config::STREAM_ALERTS,
     meta::alert::{Alert, Trigger},
 };
-
-#[cfg(feature = "zo_functions")]
-pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
-    if let Ok(val) = lua.load(&js_func).eval() {
-        val
-    } else {
-        None
-    }
-}
 
 #[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str) -> Option<Program> {
@@ -56,19 +45,6 @@ pub fn compile_vrl_function(func: &str) -> Option<Program> {
         Err(e) => {
             log::info!("Error compiling vrl {:?}", e);
             None
-        }
-    }
-}
-#[cfg(feature = "zo_functions")]
-pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
-    let input = lua.to_value(&row).unwrap();
-    let _res = func.call::<_, LuaValue>(input);
-    match _res {
-        Ok(res) => lua.from_value(res).unwrap(),
-        Err(err) => {
-            log::error!("Err from lua {:?}", err.to_string());
-            //Value::Null
-            row.clone()
         }
     }
 }
@@ -99,23 +75,16 @@ pub async fn get_stream_transforms<'a>(
     stream_name: String,
     org_id: String,
     stream_type: StreamType,
-    stream_transform_map: &mut AHashMap<String, Vec<Transform>>,
-    stream_lua_map: &mut AHashMap<String, Function<'a>>,
+    stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut AHashMap<String, Program>,
-    lua: &'a Lua,
 ) {
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
     if stream_transform_map.contains_key(&key) {
         return;
     }
-    let mut _local_tans: Vec<Transform> = vec![];
-    (_local_tans, *stream_lua_map, *stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            &org_id,
-            &stream_name,
-            stream_type,
-            lua,
-        );
+    let mut _local_tans: Vec<StreamTransform> = vec![];
+    (_local_tans, *stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(&org_id, &stream_name, stream_type);
     stream_transform_map.insert(key, _local_tans);
 }
 
@@ -213,18 +182,12 @@ pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn register_stream_transforms<'a>(
+pub fn register_stream_transforms(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    lua: &'a Lua,
-) -> (
-    Vec<Transform>,
-    AHashMap<String, Function<'a>>,
-    AHashMap<String, Program>,
-) {
+) -> (Vec<StreamTransform>, AHashMap<String, Program>) {
     let mut local_tans = vec![];
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
@@ -232,36 +195,28 @@ pub fn register_stream_transforms<'a>(
         local_tans = (*transforms.list).to_vec();
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
         for trans in &local_tans {
-            let func_key = format!("{}/{}", &stream_name, trans.name);
-            if trans.trans_type == 0 {
-                if let Some(local_fn) = load_lua_transform(lua, trans.function.clone()) {
-                    stream_lua_map.insert(func_key, local_fn.to_owned());
-                }
-            } else if let Some(program) = compile_vrl_function(&trans.function) {
+            let func_key = format!("{}/{}", &stream_name, trans.transform.name);
+            if let Some(program) = compile_vrl_function(&trans.transform.function) {
                 stream_vrl_map.insert(func_key, program.to_owned());
             }
         }
     }
 
-    (local_tans, stream_lua_map, stream_vrl_map)
+    (local_tans, stream_vrl_map)
 }
 
 #[cfg(feature = "zo_functions")]
 pub fn apply_stream_transform<'a>(
-    local_tans: &Vec<Transform>,
+    local_tans: &Vec<StreamTransform>,
     value: &'a Value,
-    lua: &'a Lua,
-    stream_lua_map: &'a AHashMap<String, Function>,
     stream_vrl_map: &'a AHashMap<String, Program>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Value {
     let mut value = value.clone();
     for trans in local_tans {
-        let func_key = format!("{stream_name}/{}", trans.name);
-        if stream_lua_map.contains_key(&func_key) {
-            value = lua_transform(lua, &value, stream_lua_map.get(&func_key).unwrap());
-        } else if stream_vrl_map.contains_key(&func_key) {
+        let func_key = format!("{stream_name}/{}", trans.transform.name);
+        if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             value = apply_vrl_fn(
                 runtime,
                 stream_vrl_map.get(&func_key).unwrap().clone(),

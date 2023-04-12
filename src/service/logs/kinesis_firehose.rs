@@ -3,8 +3,6 @@ use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
-#[cfg(feature = "zo_functions")]
-use mlua::Lua;
 use std::io::prelude::*;
 use std::io::Error;
 use std::time::Instant;
@@ -56,8 +54,6 @@ pub async fn process(
     }
 
     #[cfg(feature = "zo_functions")]
-    let lua = Lua::new();
-    #[cfg(feature = "zo_functions")]
     let state = vrl::state::Runtime::default();
     #[cfg(feature = "zo_functions")]
     let mut runtime = vrl::Runtime::new(state);
@@ -79,13 +75,11 @@ pub async fn process(
 
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_lua_map, stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            org_id,
-            stream_name,
-            StreamType::Logs,
-            &lua,
-        );
+    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    );
     // End Register Transforms for stream
 
     let stream_schema = crate::service::schema::stream_schema_exists(
@@ -191,8 +185,6 @@ pub async fn process(
                 let value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
-                    &lua,
-                    &stream_lua_map,
                     &stream_vrl_map,
                     stream_name,
                     &mut runtime,

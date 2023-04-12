@@ -12,37 +12,81 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use vrl::{TimeZone, VrlRuntime};
 
+use super::StreamType;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Transform {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "is_zero")]
-    pub order: u32,
     pub function: String,
     #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub stream_name: String,
-    #[serde(default)]
     pub name: String,
+    pub params: String,
     #[serde(default)]
     pub num_args: u8,
     #[serde(default)]
     pub trans_type: u8,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_type: Option<StreamType>,
+    pub streams: Option<Vec<StreamOrder>>,
 }
 
-fn is_zero(b: impl std::borrow::Borrow<u32>) -> bool {
-    b.borrow() <= &0
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamOrder {
+    #[serde(default)]
+    pub stream: String,
+    #[serde(default)]
+    pub order: u8,
+    #[serde(default)]
+    pub stream_type: StreamType,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct StreamTransform {
+    #[serde(flatten)]
+    pub transform: Transform,
+    #[serde(default)]
+    pub stream: String,
+    #[serde(default)]
+    pub order: u8,
+    #[serde(default)]
+    pub stream_type: StreamType,
+}
+
+impl PartialEq for StreamTransform {
+    fn eq(&self, other: &Self) -> bool {
+        self.stream == other.stream
+            && self.transform.name == other.transform.name
+            && self.stream_type == other.stream_type
+    }
+}
+
+impl Transform {
+    pub fn to_stream_transform(&self) -> Vec<StreamTransform> {
+        let mut ret: Vec<StreamTransform> = vec![];
+        if let Some(streams) = &self.streams {
+            let mut func = self.clone();
+            func.streams = None;
+            for stream in streams {
+                ret.push(StreamTransform {
+                    transform: func.clone(),
+                    stream: stream.stream.clone(),
+                    order: stream.order,
+                    stream_type: stream.stream_type,
+                })
+            }
+        }
+        ret
+    }
 }
 
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.stream_name == other.stream_name
+        self.name == other.name && self.function == other.function
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -54,6 +98,11 @@ pub struct ZoFunction<'a> {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct FunctionList {
     pub list: Vec<Transform>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct StreamFunctionsList {
+    pub list: Vec<StreamTransform>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,23 +119,25 @@ mod tests {
     #[test]
     fn test_functions() {
         let trans = Transform {
-            order: 0,
             function: "function jsconcat(a,b){return a+b}".to_string(),
-            stream_name: "olympics".to_string(),
             name: "jsconcat".to_string(),
-            num_args: 2,
             trans_type: 1,
-            stream_type: None,
+            params: "row".to_string(),
+            num_args: 1,
+            streams: Some(vec![StreamOrder {
+                stream: "test".to_string(),
+                order: 1,
+                stream_type: StreamType::Logs,
+            }]),
         };
 
         let mod_trans = Transform {
-            order: 0,
-            function: "function jsconcat(a,b){return a..b}".to_string(),
-            stream_name: "olympics".to_string(),
+            function: "function jsconcat(a,b){return a+b}".to_string(),
             name: "jsconcat".to_string(),
-            num_args: 2,
             trans_type: 1,
-            stream_type: None,
+            params: "row".to_string(),
+            num_args: 1,
+            streams: None,
         };
         assert_eq!(trans, mod_trans);
 
