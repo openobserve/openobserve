@@ -33,7 +33,7 @@ jobs:
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
-            features: "--no-default-features --features tmpcache"
+            features: "--no-default-features"
             file_name: zincobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
