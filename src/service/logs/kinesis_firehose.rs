@@ -28,11 +28,13 @@ use super::StreamMeta;
 
 pub async fn process(
     org_id: &str,
-    stream_name: &str,
+    in_stream_name: &str,
     request: KinesisFHRequest,
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
+
+    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
