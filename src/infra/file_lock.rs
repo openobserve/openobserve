@@ -240,8 +240,8 @@ impl RwFile {
                 .write(true)
                 .create(true)
                 .append(true)
-                .open(file_path)
-                .unwrap();
+                .open(&file_path)
+                .expect(&format!("open file success: {file_path}"));
             (Some(RwLock::new(f)), None)
         };
         RwFile {
