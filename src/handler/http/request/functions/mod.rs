@@ -17,14 +17,12 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 use actix_web::{http, HttpRequest};
 #[cfg(feature = "zo_functions")]
 use std::collections::HashMap;
-#[cfg(feature = "zo_functions")]
 use std::io::Error;
 
 #[cfg(feature = "zo_functions")]
 use crate::meta;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::StreamOrder;
-#[cfg(feature = "zo_functions")]
 use crate::meta::functions::Transform;
 
 /** createFunction*/
@@ -273,18 +271,17 @@ pub async fn add_function_to_stream(
     .await
 }
 
-/** Create new query function*/
+/** createFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionSave",
+    operation_id = "createFunction",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("name" = String, Path, description = "Function name"),
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
     responses(
@@ -292,25 +289,20 @@ pub async fn add_function_to_stream(
         (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/functions/{name}")]
+#[post("/{org_id}/functions")]
 pub async fn save_function(
     _path: web::Path<(String, String)>,
     _js_func: web::Json<Transform>,
 ) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
-            actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Functions support is not enabled".to_string(),
-        )),
-    )
+    fn_not_supported_error()
 }
 
-/** List all functions for an organization */
+/** listFunctions */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionList",
+    operation_id = "listFunctions",
     security(
         ("Authorization"= [])
     ),
@@ -323,20 +315,15 @@ pub async fn save_function(
 )]
 #[get("/{org_id}/functions")]
 async fn list_functions(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
-            actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Functions support is not enabled".to_string(),
-        )),
-    )
+    fn_not_supported_error()
 }
 
-/** Delete a query function by name */
+/** deleteFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionDelete",
+    operation_id = "deleteFunction",
     security(
         ("Authorization"= [])
     ),
@@ -351,20 +338,15 @@ async fn list_functions(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
 )]
 #[delete("/{org_id}/functions/{name}")]
 async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
-            actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Functions support is not enabled".to_string(),
-        )),
-    )
+    fn_not_supported_error()
 }
 
-/** Create new ingest time function */
+/** updateFunction */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionSaveForStream",
+    operation_id = "updateFunction",
     security(
         ("Authorization"= [])
     ),
@@ -379,25 +361,48 @@ async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpRespo
         (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/functions/{name}")]
-pub async fn save_stream_function(
-    _path: web::Path<(String, String, String)>,
-    _js_func: web::Json<Transform>,
+#[put("/{org_id}/functions/{name}")]
+pub async fn update_function(
+    _path: web::Path<(String, String)>,
+    _func: web::Json<Transform>,
 ) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
-            actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Functions support is not enabled".to_string(),
-        )),
-    )
+    fn_not_supported_error()
 }
 
-/** List all ingest time functions for a stream*/
+/** applyFunctionToStream */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionListForStream",
+    operation_id = "applyFunctionToStream",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("name" = String, Path, description = "Function name"),
+    ),
+    request_body(content = StreamOrder, description = "Function data", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/{stream_name}/functions/{name}")]
+pub async fn add_function_to_stream(
+    _path: web::Path<(String, String, String)>,
+    _js_func: web::Json<Transform>,
+) -> Result<HttpResponse, Error> {
+    fn_not_supported_error()
+}
+
+/** listStreamFunctions */
+#[cfg(not(feature = "zo_functions"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "listStreamFunctions",
     security(
         ("Authorization"= [])
     ),
@@ -406,25 +411,20 @@ pub async fn save_stream_function(
         ("stream_name" = String, Path, description = "Stream name"),
     ),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = FunctionList),
+        (status = 200, description="Success", content_type = "application/json", body = StreamFunctionsList),
     )
 )]
 #[get("/{org_id}/{stream_name}/functions")]
-async fn list_stream_function(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(
-        HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
-            actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
-            "Functions support is not enabled".to_string(),
-        )),
-    )
+async fn list_stream_functions(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    fn_not_supported_error()
 }
 
-/** Delete ingest time function by name */
+/** removeStreamFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "FunctionDeleteForStream",
+    operation_id = "removeStreamFunction",
     security(
         ("Authorization"= [])
     ),
@@ -442,6 +442,11 @@ async fn list_stream_function(_path: web::Path<(String, String)>) -> Result<Http
 async fn delete_stream_function(
     _path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
+    fn_not_supported_error()
+}
+
+#[cfg(not(feature = "zo_functions"))]
+fn fn_not_supported_error() -> Result<HttpResponse, Error> {
     Ok(
         HttpResponse::NotImplemented().json(crate::meta::http::HttpResponse::message(
             actix_web::http::StatusCode::NOT_IMPLEMENTED.into(),
