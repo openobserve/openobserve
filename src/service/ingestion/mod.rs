@@ -227,6 +227,10 @@ pub fn apply_stream_transform<'a>(
     value
 }
 
+pub fn format_stream_name(stream_name: &str) -> String {
+    stream_name.replace('/', "_").replace('=', "-")
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

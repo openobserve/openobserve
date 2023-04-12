@@ -43,7 +43,7 @@ fn get_stream_name_action(v: &Value) -> (String, String) {
     if local_val.contains_key("index") {
         (
             "index".to_owned(),
-            String::from(
+            super::ingestion::format_stream_name(
                 local_val
                     .get("index")
                     .unwrap()
@@ -58,7 +58,7 @@ fn get_stream_name_action(v: &Value) -> (String, String) {
     } else {
         (
             "create".to_owned(),
-            String::from(
+            super::ingestion::format_stream_name(
                 local_val
                     .get("create")
                     .unwrap()
