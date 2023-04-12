@@ -232,12 +232,8 @@ pub async fn handle_trace_request(
                     // End check for alert trigger
                 }
 
-                hour_key.push_str(&crate::service::ingestion::get_partition_key_record(
-                    &format!(
-                        "_service={}",
-                        crate::service::ingestion::format_stream_name(&service_name)
-                    ),
-                ));
+                let partition_key = format!("service={}", format_stream_name(&service_name));
+                hour_key.push_str(&format!("_{}", get_partition_key_record(&partition_key)));
 
                 let hour_buf = data_buf.entry(hour_key.clone()).or_default();
 
