@@ -92,6 +92,8 @@
                     ? column.prop(row)
                     : column.prop(row, column.name).length > 100
                     ? column.prop(row, column.name).substr(0, 100) + '...'
+                    : column.name === 'duration'
+                    ? column.format(row[column.name])
                     : column.name != '@timestamp'
                     ? row[column.name]
                     : column.prop(row, column.name)
@@ -171,7 +173,7 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import DetailTable from "./DetailTable.vue";
-import useLogs from "../../composables/useLogs";
+import useTraces from "../../composables/useTraces";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
 
@@ -250,7 +252,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
 
-    const { searchObj, updatedLocalLogFilterField } = useLogs();
+    const { searchObj, updatedLocalLogFilterField } = useTraces();
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);

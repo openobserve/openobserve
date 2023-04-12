@@ -297,7 +297,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import useLogs from "../../composables/useLogs";
+import useTraces from "../../composables/useTraces";
 import { getImageURL, validateEmail } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
@@ -315,7 +315,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj, updatedLocalLogFilterField } = useLogs();
+    const { searchObj, updatedLocalLogFilterField } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -381,37 +381,37 @@ export default defineComponent({
         isLoading: true,
         values: [],
       };
-      try {
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            fields: [name],
-            size: 10,
-          })
-          .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
-                .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
-                    key: value.key ? value.key : "null",
-                    count: formatNumberWithPrefix(value.num),
-                  };
-                });
-            }
-          })
-          .finally(() => {
-            fieldValues.value[name]["isLoading"] = false;
+      streamService
+        .fieldValues({
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+          fields: [name],
+          size: 10,
+          type: "traces",
+        })
+        .then((res: any) => {
+          if (res.data.hits.length) {
+            fieldValues.value[name]["values"] = res.data.hits
+              .find((field: any) => field.field === name)
+              .values.map((value: any) => {
+                return {
+                  key: value.key ? value.key : "null",
+                  count: formatNumberWithPrefix(value.num),
+                };
+              });
+          }
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: `Error while fetching values for ${name}`,
           });
-      } catch (err) {
-        $q.notify({
-          type: "negative",
-          message: "Error while fetching field values",
+        })
+        .finally(() => {
+          fieldValues.value[name]["isLoading"] = false;
         });
-      }
     };
 
     function formatNumberWithPrefix(number: number) {
@@ -428,7 +428,6 @@ export default defineComponent({
 
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
-      console.log(term);
       searchObj.data.stream.addToFilter = term;
     };
 

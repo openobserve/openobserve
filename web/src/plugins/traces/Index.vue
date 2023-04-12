@@ -27,79 +27,105 @@
       />
       <div
         id="thirdLevel"
-        class="row scroll flex flex-center"
+        class="row scroll"
         style="width: 100%"
         v-if="searchObj.data.stream.streamLists.length > 0"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-
-        <div
-          v-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+        <q-splitter
+          v-model="searchObj.config.splitterModel"
+          :limits="searchObj.config.splitterLimit"
+          style="width: 100%"
         >
-          <h5 class="text-center">
+          <template #before v-if="searchObj.meta.showFields">
+            <index-list
+              data-test="logs-search-index-list"
+              :key="searchObj.data.stream.streamLists"
+            />
+          </template>
+          <template #separator>
+            <q-avatar
+              color="primary"
+              text-color="white"
+              size="20px"
+              icon="drag_indicator"
+              style="top: 10px"
+            />
+          </template>
+          <template #after>
             <div
-              data-test="logs-search-result-not-found-text"
-              v-if="searchObj.data.errorCode == 0"
+              v-if="
+                searchObj.data.errorMsg !== '' && searchObj.loading == false
+              "
             >
-              Result not found.
+              <h5 class="text-center">
+                <div
+                  data-test="logs-search-result-not-found-text"
+                  v-if="searchObj.data.errorCode == 0"
+                >
+                  Result not found.
+                </div>
+                <div
+                  data-test="logs-search-error-message"
+                  v-html="searchObj.data.errorMsg"
+                ></div>
+                <div
+                  data-test="logs-search-error-20003"
+                  v-if="parseInt(searchObj.data.errorCode) == 20003"
+                >
+                  <q-btn
+                    no-caps
+                    unelevated
+                    size="sm"
+                    bg-secondary
+                    class="no-border bg-secondary text-white"
+                    :to="
+                      '/logstreams?dialog=' +
+                      searchObj.data.stream.selectedStream.label
+                    "
+                    >Click here</q-btn
+                  >
+                  to configure a full text search field to the stream.
+                </div>
+                <br />
+                <q-item-label>{{
+                  searchObj.data.additionalErrorMsg
+                }}</q-item-label>
+              </h5>
             </div>
-            <div
-              data-test="logs-search-error-message"
-              v-html="searchObj.data.errorMsg"
-            ></div>
-            <div
-              data-test="logs-search-error-20003"
-              v-if="parseInt(searchObj.data.errorCode) == 20003"
-            >
-              <q-btn
-                no-caps
-                unelevated
-                size="sm"
-                bg-secondary
-                class="no-border bg-secondary text-white"
-                :to="
-                  '/logstreams?dialog=' +
-                  searchObj.data.stream.selectedStream.label
-                "
-                >Click here</q-btn
+            <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
+              <h5
+                data-test="logs-search-no-stream-selected-text"
+                class="text-center"
               >
-              to configure a full text search field to the stream.
+                No stream selected.
+              </h5>
             </div>
-            <br />
-            <q-item-label>{{ searchObj.data.additionalErrorMsg }}</q-item-label>
-          </h5>
-        </div>
-        <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
-          <h5
-            data-test="logs-search-no-stream-selected-text"
-            class="text-center"
-          >
-            No stream selected.
-          </h5>
-        </div>
-        <div
-          v-else-if="
-            searchObj.data.queryResults.hasOwnProperty('total') &&
-            searchObj.data.queryResults.hits.length == 0 &&
-            searchObj.loading == false
-          "
-        >
-          <h5 class="text-center">No result found.</h5>
-        </div>
-        <div
-          data-test="logs-search-search-result"
-          v-show="
-            searchObj.data.queryResults.hasOwnProperty('total') &&
-            searchObj.data.queryResults.hits.length !== 0
-          "
-        >
-          <search-result
-            ref="searchResultRef"
-            @update:datetime="searchData"
-            @update:scroll="getMoreData"
-            @search:timeboxed="searchAroundData"
-          />
-        </div>
+            <div
+              v-else-if="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length == 0 &&
+                searchObj.loading == false
+              "
+            >
+              <h5 class="text-center">No result found.</h5>
+            </div>
+            <div
+              data-test="logs-search-search-result"
+              v-show="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length !== 0
+              "
+            >
+              <search-result
+                ref="searchResultRef"
+                @update:datetime="searchData"
+                @update:scroll="getMoreData"
+                @search:timeboxed="searchAroundData"
+              />
+            </div>
+          </template>
+        </q-splitter>
       </div>
       <div v-else-if="searchObj.loading == true">
         <q-spinner-dots
@@ -137,7 +163,7 @@ import { useRouter } from "vue-router";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
-import useLogs from "@/composables/useLogs";
+import useTraces from "@/composables/useTraces";
 import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser";
 
@@ -147,11 +173,13 @@ import TransformService from "@/services/jstransform";
 import {
   useLocalLogsObj,
   b64EncodeUnicode,
-  useLocalLogFilterField,
+  useLocalTraceFilterField,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { number } from "@intlify/core-base";
+import { stringLiteral } from "@babel/types";
 
 export default defineComponent({
   name: "PageSearch",
@@ -212,7 +240,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useLogs();
+    const { searchObj, resetSearchObj } = useTraces();
     let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
@@ -296,7 +324,7 @@ export default defineComponent({
     function getStreamList() {
       try {
         streamService
-          .nameList(store.state.selectedOrganization.identifier, "logs", true)
+          .nameList(store.state.selectedOrganization.identifier, "traces", true)
           .then((res) => {
             searchObj.data.streamResults = res.data;
 
@@ -807,8 +835,8 @@ export default defineComponent({
         searchObj.data.resultGrid.columns = [];
 
         const logFilterField: any =
-          useLocalLogFilterField()?.value != null
-            ? useLocalLogFilterField()?.value
+          useLocalTraceFilterField()?.value != null
+            ? useLocalTraceFilterField()?.value
             : {};
         const logFieldSelectedValue =
           logFilterField[
@@ -840,31 +868,32 @@ export default defineComponent({
           sortable: true,
         });
         if (searchObj.data.stream.selectedFields.length == 0) {
-          // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
-          //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-          //     if (
-          //       (field.name == "log" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf("log") ==
-          //           -1) ||
-          //       (field.name == "message" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf(
-          //           "message"
-          //         ) == -1)
-          //     ) {
-          //       searchObj.data.stream.selectedFields.push(field.name);
-          //     }
-          //   });
-          // }
-
           searchObj.meta.resultGrid.manualRemoveFields = false;
           if (searchObj.data.stream.selectedFields.length == 0) {
             searchObj.data.resultGrid.columns.push({
-              name: "source",
-              field: (row: any) => JSON.stringify(row),
-              prop: (row: any) => JSON.stringify(row),
-              label: "source",
+              name: "service_name",
+              field: (row: any) => row.service_name,
+              prop: (row: any) => row.service_name,
+              label: "Service",
               align: "left",
               sortable: true,
+            });
+            searchObj.data.resultGrid.columns.push({
+              name: "operation_name",
+              field: (row: any) => row.operation_name,
+              prop: (row: any) => row.operation_name,
+              label: "Operation",
+              align: "left",
+              sortable: true,
+            });
+            searchObj.data.resultGrid.columns.push({
+              name: "duration",
+              field: (row: any) => row.duration,
+              prop: (row: any) => row.duration,
+              label: "Duration",
+              align: "left",
+              sortable: true,
+              format: (val) => formatTimeWithSuffix(val),
             });
           }
         } else {
@@ -889,6 +918,16 @@ export default defineComponent({
         if (searchObj.data.queryResults.aggs) reDrawGrid();
       } catch (e) {
         throw new ErrorException(e.message);
+      }
+    }
+
+    function formatTimeWithSuffix(ns) {
+      if (ns < 1000) {
+        return `${ns} ns`;
+      } else if (ns < 10000000) {
+        return `${(ns / 1000000).toFixed(2)} ms`;
+      } else {
+        return `${(ns / 1000000000).toFixed(2)} s`;
       }
     }
 

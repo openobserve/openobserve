@@ -164,7 +164,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
-import useLogs from "@/composables/useLogs";
+import useTraces from "@/composables/useTraces";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -194,7 +194,7 @@ export default defineComponent({
     const $q = useQuasar();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useLogs();
+    const { searchObj } = useTraces();
     const queryEditorRef = ref(null);
 
     const parser = new Parser();
