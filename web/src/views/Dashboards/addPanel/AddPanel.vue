@@ -98,10 +98,12 @@
 								<Layout/>
 							</div>
 							<q-separator vertical />
-							<div class="col scroll " style="height:100%">
-								<SearchBar />
-								<q-separator />
-								<ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
+							<div class="col scroll" style="height:100%;">
+                <div class="column">
+                  <SearchBar />
+                  <q-separator />
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
+                </div>
 							</div>
 						</div>
 					</template>
