@@ -33,13 +33,14 @@ use crate::service::schema::stream_schema_exists;
 
 pub async fn ingest(
     org_id: &str,
-    stream_name: &str,
+    in_stream_name: &str,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
-    // let loc_span = info_span!("service:logs:json:ingest");
-    // let _guard = loc_span.enter();
+
+    let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
+
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
