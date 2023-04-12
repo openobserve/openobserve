@@ -231,7 +231,10 @@ pub async fn handle_trace_request(
                     // End check for alert trigger
                 }
 
-                hour_key.push_str(&format!("_service={}", service_name.clone()));
+                hour_key.push_str(&format!(
+                    "_service={}",
+                    crate::service::ingestion::format_stream_name(&service_name)
+                ));
 
                 let hour_buf = data_buf.entry(hour_key.clone()).or_default();
 
