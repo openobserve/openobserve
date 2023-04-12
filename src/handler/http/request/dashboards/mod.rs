@@ -33,12 +33,7 @@ use crate::{meta::dashboards::Dashboard, service::dashboards};
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
-            "dashboardId": "",
             "description": "Traffic patterns and network performance of the infrastructure",
-            "role": "",
-            "owner": "root@example.com",
-            "created": "2023-04-11T18:28:18.658Z",
-            "panels": [],
         }),
     ),
     responses(
@@ -70,15 +65,6 @@ pub async fn create_dashboard(
     request_body(
         content = Dashboard,
         description = "Dashboard details",
-        example = json!({
-            "title": "Network Traffic Overview",
-            "dashboardId": "7051662927232892928",
-            "description": "Traffic patterns and network performance of the infrastructure",
-            "role": "",
-            "owner": "root@example.com",
-            "created": "2023-04-11T18:28:18.658Z",
-            "panels": [],
-        }),
     ),
     responses(
         (status = StatusCode::OK, description = "Dashboard updated", body = HttpResponse),
