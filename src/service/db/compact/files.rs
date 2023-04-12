@@ -51,12 +51,7 @@ pub async fn del_offset(
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name);
-    if let Err(e) = db.delete(&key, false).await {
-        if !e.to_string().contains("not exists") {
-            return Err(anyhow::anyhow!(e));
-        }
-    }
-    Ok(())
+    db.delete_if_exists(&key, false).await.map_err(Into::into)
 }
 
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {

@@ -40,12 +40,7 @@ pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
 pub async fn del_delete(key: &str) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/compact/file_list/delete/{key}");
-    if let Err(e) = db.delete(&key, false).await {
-        if !e.to_string().contains("not exists") {
-            return Err(anyhow::anyhow!(e));
-        }
-    }
-    Ok(())
+    db.delete_if_exists(&key, false).await.map_err(Into::into)
 }
 
 pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {

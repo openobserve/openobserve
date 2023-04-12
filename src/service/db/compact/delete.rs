@@ -78,12 +78,9 @@ pub async fn delete_stream_done(
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    let db_key = format!("/compact/delete/{key}");
-    if let Err(e) = db.delete(&db_key, false).await {
-        if !e.to_string().contains("not exists") {
-            return Err(anyhow::anyhow!(e));
-        }
-    }
+    db.delete_if_exists(&format!("/compact/delete/{key}"), false)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
 
     // remove in cache
     CACHE.remove(&key);
