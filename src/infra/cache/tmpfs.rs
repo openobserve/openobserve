@@ -15,13 +15,12 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use once_cell::sync::Lazy;
 
 use crate::infra::errors::*;
 
-lazy_static! {
-    pub static ref FILES: DashMap<String, File> = DashMap::new();
-    pub static ref DATA: DashMap<String, Bytes> = DashMap::new();
-}
+static FILES: Lazy<DashMap<String, File>> = Lazy::new(DashMap::new);
+static DATA: Lazy<DashMap<String, Bytes>> = Lazy::new(DashMap::new);
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
