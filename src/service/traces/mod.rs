@@ -197,6 +197,10 @@ pub async fn handle_trace_request(
                 };
 
                 let value: json::Value = json::to_value(local_val).unwrap();
+
+                //JSON Flattening
+                let value = json::flatten_json_and_format_field(&value);
+
                 let value_str = json::to_string(&value).unwrap();
                 // get hour key
                 let mut hour_key = super::ingestion::get_hour_key(
