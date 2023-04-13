@@ -217,7 +217,8 @@
     "vrl": "VRL",
     "lua": "Lua",
     "params": "Parameters",
-    "associatedWithStream": "Stream Association"
+    "associatedWithStream": "Stream Association",
+    "paramsHint":"param1, param2,..."
   },
   "confirmDialog": {
     "cancel": "Cancel",

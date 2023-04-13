@@ -29,7 +29,13 @@ var jstransform = {
   },
   create: (org_identifier: string, data: any) => {
     return http().post(
-      `/api/${org_identifier}/functions/${data.name}?type=${data.stream_type}`,
+      `/api/${org_identifier}/functions`,
+      data
+    );
+  },
+  update: (org_identifier: string, data: any) => {
+    return http().put(
+      `/api/${org_identifier}/functions/${data.name}`,
       data
     );
   },

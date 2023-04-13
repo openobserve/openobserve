@@ -39,9 +39,9 @@
             />
             <q-route-tab
               data-test="function-stream-tab"
-              name="functionAssociatedStreams"
+              name="streamFunctions"
               :to="{
-                name: 'functionAssociatedStreams',
+                name: 'streamFunctions',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
