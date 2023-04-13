@@ -33,6 +33,8 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
+const isTesting = process.env.NODE_ENV === "test";
+
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
   async resolveId(source) {
@@ -56,6 +58,21 @@ const enterpriseResolverPlugin = {
     }
   },
 };
+
+function monacoEditorTestResolver() {
+  return {
+    name: "monaco-editor-test-resolver",
+    enforce: "pre",
+    resolveId(id) {
+      if (id === "monaco-editor") {
+        return {
+          id: "monaco-editor/esm/vs/editor/editor.api",
+        };
+      }
+      return null;
+    },
+  };
+}
 
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
@@ -85,7 +102,8 @@ export default defineConfig({
     }),
     enterpriseResolverPlugin,
     vueJsx(),
-  ],
+    isTesting && monacoEditorTestResolver(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
