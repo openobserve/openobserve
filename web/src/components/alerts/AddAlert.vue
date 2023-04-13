@@ -315,7 +315,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, type Ref } from "vue";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import * as monaco from "monaco-editor";
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";

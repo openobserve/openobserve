@@ -19,7 +19,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import * as monaco from "monaco-editor";
 
 export default defineComponent({
   props: {
