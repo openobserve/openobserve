@@ -45,7 +45,7 @@ pub struct Dashboard {
 
 fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
-        "BUG" // This can't possibly fail. Can it?
+        "BUG", // This can't possibly fail. Can it?
     ))
 }
 

@@ -12,64 +12,81 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use once_cell::sync::Lazy;
 
 use super::json;
 
-#[inline(always)]
-pub fn parse_str_to_time(s: &str) -> Result<DateTime<FixedOffset>, anyhow::Error> {
-    if s.contains('T') && !s.contains(' ') {
-        if s.len() == 19 {
-            let fmt = "%Y-%m-%dT%H:%M:%S";
-            let ret = Utc.datetime_from_str(s, fmt)?;
-            Ok(ret.into())
-        } else {
-            Ok(chrono::DateTime::parse_from_rfc3339(s)?)
-        }
-    } else if s.contains(' ') && s.len() == 19 {
-        let fmt = "%Y-%m-%d %H:%M:%S";
-        let ret = Utc.datetime_from_str(s, fmt)?;
-        Ok(ret.into())
-    } else {
-        Ok(chrono::DateTime::parse_from_rfc2822(s)?)
-    }
-}
+// BASE_TIME is the time when the timestamp is 1 year, used to check a timestamp is in seconds or milliseconds or microseconds or nanoseconds
+static BASE_TIME: Lazy<DateTime<Utc>> =
+    Lazy::new(|| Utc.with_ymd_and_hms(1971, 1, 1, 0, 0, 0).unwrap());
 
-#[inline(always)]
-pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
-    let n: i64 = match v.parse() {
-        Ok(i) => i,
-        Err(_) => match parse_str_to_time(v) {
-            Ok(v) => {
-                return Ok(v.timestamp_micros());
-            }
-            Err(_) => {
-                return Err(anyhow::anyhow!("invalid time format [string]"));
-            }
-        },
-    };
-    parse_i64_to_timestamp_micros(n)
-}
+// check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
+static TIME_UNITS: [(char, u64); 7] = [
+    ('!', 1), // ms
+    ('s', 1000),
+    ('m', 60 * 1000),
+    ('h', 3600 * 1000),
+    ('d', 24 * 3600 * 1000),
+    ('w', 7 * 24 * 3600 * 1000),
+    ('y', 365 * 24 * 3600 * 1000),
+];
 
 #[inline(always)]
 pub fn parse_i64_to_timestamp_micros(v: i64) -> Result<i64, anyhow::Error> {
     if v == 0 {
         return Ok(0);
     }
-    if v > (1e18 as i64) {
+    let mut duration = v;
+    if duration > BASE_TIME.timestamp_nanos() {
         // nanoseconds
-        Ok(v / 1000)
-    } else if v > (1e15 as i64) {
+        duration /= 1000;
+    } else if duration > BASE_TIME.timestamp_micros() {
         // microseconds
-        Ok(v)
-    } else if v > (1e12 as i64) {
+        // noop
+    } else if duration > BASE_TIME.timestamp_millis() {
         // milliseconds
-        Ok(v * 1000)
-    } else if v > (1e9 as i64) {
-        // seconds
-        Ok(v * 1000 * 1000)
+        duration *= 1000;
     } else {
-        Err(anyhow::anyhow!("Invalid time format [timestamp:value]"))
+        // seconds
+        duration *= 1_000_000;
+    }
+    Ok(duration)
+}
+
+#[inline(always)]
+pub fn parse_str_to_time(s: &str) -> Result<DateTime<Utc>, anyhow::Error> {
+    if let Ok(v) = s.parse::<f64>() {
+        let v = parse_i64_to_timestamp_micros(v as i64)?;
+        return Ok(Utc.timestamp_nanos(v * 1000));
+    }
+
+    let ret = if s.contains(' ') && s.len() == 19 {
+        let fmt = "%Y-%m-%d %H:%M:%S";
+        Utc.datetime_from_str(s, fmt)?
+    } else if s.contains('T') && !s.contains(' ') {
+        if s.len() == 19 {
+            let fmt = "%Y-%m-%dT%H:%M:%S";
+            Utc.datetime_from_str(s, fmt)?
+        } else {
+            let t = chrono::DateTime::parse_from_rfc3339(s)?;
+            t.into()
+        }
+    } else {
+        let t = chrono::DateTime::parse_from_rfc2822(s)?;
+        t.into()
+    };
+    Ok(ret)
+}
+
+#[inline(always)]
+pub fn parse_str_to_timestamp_micros(v: &str) -> Result<i64, anyhow::Error> {
+    match v.parse() {
+        Ok(i) => parse_i64_to_timestamp_micros(i),
+        Err(_) => match parse_str_to_time(v) {
+            Ok(v) => Ok(v.timestamp_micros()),
+            Err(_) => Err(anyhow::anyhow!("invalid time format [string]")),
+        },
     }
 }
 
@@ -93,9 +110,78 @@ pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<i64, anyhow::
     parse_i64_to_timestamp_micros(n)
 }
 
+pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
+    let chars = s.chars().collect::<Vec<char>>();
+
+    // without unit, default is second
+    if chars.iter().all(|c| c.is_ascii_digit()) {
+        return Ok(s.parse::<u64>().unwrap_or(0) * 1000);
+    }
+
+    let mut unit_pos = TIME_UNITS.len();
+    let mut start = 0;
+    let mut total = 0;
+
+    let chars_count = chars.len();
+    let mut i = 0;
+    while i < chars_count {
+        let c = chars.get(i).unwrap();
+        if c.is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        if i == 0 {
+            return Err(anyhow::anyhow!("Invalid time format: {c}"));
+        }
+        let step_value = chars[start..i]
+            .iter()
+            .collect::<String>()
+            .parse::<u64>()
+            .unwrap_or(0);
+        start = i + 1;
+        // check unit
+        let pos = TIME_UNITS[..unit_pos].iter().position(|&x| x.0 == *c);
+        if pos.is_none() && *c != 'm' {
+            return Err(anyhow::anyhow!("Invalid time format: {c}"));
+        }
+        // check unit: ms
+        let cur_unit = if *c == 'm' && i + 1 < chars_count && chars.get(i + 1).unwrap() == &'s' {
+            i += 1;
+            unit_pos = 0;
+            &TIME_UNITS[unit_pos]
+        } else {
+            unit_pos = pos.unwrap();
+            &TIME_UNITS[unit_pos]
+        };
+        // calc
+        total += step_value * cur_unit.1;
+        i += 1;
+    }
+    Ok(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros() {
+        let v = 1609459200000000000;
+        let t = parse_i64_to_timestamp_micros(v).unwrap();
+        assert_eq!(t, v / 1000);
+
+        let v = 1609459200000000;
+        let t = parse_i64_to_timestamp_micros(v).unwrap();
+        assert_eq!(t, v);
+
+        let v = 1609459200000;
+        let t = parse_i64_to_timestamp_micros(v).unwrap();
+        assert_eq!(t, v * 1000);
+
+        let v = 1609459200;
+        let t = parse_i64_to_timestamp_micros(v).unwrap();
+        assert_eq!(t, v * 1_000_000);
+    }
 
     #[test]
     fn test_parse_str_to_time() {
@@ -130,18 +216,6 @@ mod tests {
         let s = "Wed, 8 Mar 2023 16:46:51 CST";
         let t = parse_str_to_time(s).unwrap();
         assert_eq!(t.timestamp_micros(), 1678315611000000);
-
-        // let s = "Wed, 8 Mar 2023 16:46:51 GMT+8";
-        // let t = parse_str_to_time(s).unwrap();
-        // assert_eq!(t.timestamp_micros(), 1678315611000000);
-
-        // let s = "Wed Mar  8 16:46:51 CST 2023";
-        // let t = parse_str_to_time(s).unwrap();
-        // assert_eq!(t.timestamp_micros(), 1678315611000000);
-
-        // let s = "Mar 8, 2023, 2:29 PM GMT+8";
-        // let t = parse_str_to_time(s).unwrap();
-        // assert_eq!(t.timestamp_micros(), 1609459200000000);
     }
 
     #[test]
@@ -180,21 +254,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_i64_to_timestamp_micros() {
-        let n = 1609459200000000;
-        let t = parse_i64_to_timestamp_micros(n).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let n = 1609459200000;
-        let t = parse_i64_to_timestamp_micros(n).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let n = 1609459200;
-        let t = parse_i64_to_timestamp_micros(n).unwrap();
-        assert_eq!(t, 1609459200000000);
-    }
-
-    #[test]
     fn test_parse_timestamp_micro_from_value() {
         let v = json::json!(1609459200000000i64);
         let t = parse_timestamp_micro_from_value(&v).unwrap();
@@ -227,5 +286,27 @@ mod tests {
         let v = json::json!("Wed, 8 Mar 2023 16:46:51 CST");
         let t = parse_timestamp_micro_from_value(&v).unwrap();
         assert_eq!(t, 1678315611000000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_without_unit() {
+        assert_eq!(parse_milliseconds("123").unwrap(), 123000);
+        assert_eq!(parse_milliseconds("0").unwrap(), 0);
+        assert_eq!(parse_milliseconds("").unwrap(), 0);
+        assert!(parse_milliseconds("abc").is_err());
+    }
+
+    #[test]
+    fn test_parse_milliseconds_with_unit() {
+        assert_eq!(parse_milliseconds("1s").unwrap(), 1000);
+        assert_eq!(parse_milliseconds("1m").unwrap(), 60 * 1000);
+        assert_eq!(parse_milliseconds("1h").unwrap(), 3600 * 1000);
+        assert_eq!(parse_milliseconds("1d").unwrap(), 24 * 3600 * 1000);
+        assert_eq!(parse_milliseconds("1w").unwrap(), 7 * 24 * 3600 * 1000);
+        assert_eq!(parse_milliseconds("1y").unwrap(), 365 * 24 * 3600 * 1000);
+        assert_eq!(parse_milliseconds("1h10m30s").unwrap(), 4230000);
+        assert_eq!(parse_milliseconds("1h10m30s10ms").unwrap(), 4230010);
+        assert!(parse_milliseconds("s").is_err());
+        assert!(parse_milliseconds("10z").is_err());
     }
 }
