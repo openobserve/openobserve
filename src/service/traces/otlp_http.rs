@@ -280,6 +280,9 @@ pub async fn traces_json(
                             }
                             // End row based transform
 
+                            //JSON Flattening
+                            let value = json::flatten_json_and_format_field(&value);
+
                             let value_str = json::to_string(&value).unwrap();
                             // get hour key
                             let mut hour_key = crate::service::ingestion::get_hour_key(
@@ -323,7 +326,7 @@ pub async fn traces_json(
                             }
 
                             let partition_key =
-                                format!("service={}", format_stream_name(&service_name));
+                                format!("service_name={}", format_stream_name(&service_name));
                             hour_key.push_str(&format!(
                                 "_{}",
                                 get_partition_key_record(&partition_key)
