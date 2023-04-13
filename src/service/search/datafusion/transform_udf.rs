@@ -27,7 +27,7 @@ use vrl::{CompilationResult, Program, Runtime};
 
 use crate::infra::config::QUERY_FUNCTIONS;
 
-fn create_user_df(
+fn _create_user_df(
     fn_name: &str,
     num_args: u8,
     pow_scalar: ScalarFunctionImplementation,
@@ -46,13 +46,13 @@ fn create_user_df(
     )
 }
 
-pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
+pub async fn _get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
     let mut udf;
     let mut udf_list = Vec::new();
     for transform in QUERY_FUNCTIONS.iter() {
         let key = transform.key();
         if key.contains(org_id) {
-            udf = get_udf_vrl(
+            udf = _get_udf_vrl(
                 transform.name.to_owned(),
                 transform.function.to_owned().as_str(),
                 &transform.params,
@@ -65,7 +65,7 @@ pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::Sc
     udf_list
 }
 
-fn get_udf_vrl(
+fn _get_udf_vrl(
     fn_name: String,
     func: &str,
     params: &str,
@@ -96,8 +96,8 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Some(func) = compile_vrl_function(&obj_str) {
-                data_vec.insert(i, apply_vrl_fn(&mut runtime, func));
+            if let Some(func) = _compile_vrl_function(&obj_str) {
+                data_vec.insert(i, _apply_vrl_fn(&mut runtime, func));
             } else {
                 data_vec.insert(i, "".to_string());
             }
@@ -116,11 +116,11 @@ fn get_udf_vrl(
     // * give it a name so that it shows nicely when the plan is printed
     // * declare what input it expects
     // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+    let pow_udf = _create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
     pow_udf
 }
 
-pub fn compile_vrl_function(func: &str) -> Option<Program> {
+pub fn _compile_vrl_function(func: &str) -> Option<Program> {
     let result = vrl::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
@@ -135,7 +135,7 @@ pub fn compile_vrl_function(func: &str) -> Option<Program> {
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
+pub fn _apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
     let obj_str = String::from("");
 
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
@@ -159,8 +159,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    use crate::service::search::datafusion::transform_udf::_get_udf_vrl;
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -193,7 +192,7 @@ mod tests {
         // declare a new context. In spark API, this corresponds to a new spark SQLsession
         let ctx = SessionContext::new();
 
-        let vrl_udf = get_udf_vrl(
+        let vrl_udf = _get_udf_vrl(
             "vrlconcat".to_string(),
             ". = col1  + col2 \n .",
             "col1,col2",

@@ -131,6 +131,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(functions::save_function)
             .service(functions::list_functions)
             .service(functions::delete_function)
+            .service(functions::update_function)
             .service(functions::add_function_to_stream)
             .service(functions::list_stream_functions)
             .service(functions::delete_stream_function)

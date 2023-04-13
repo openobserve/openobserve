@@ -86,7 +86,7 @@ impl Transform {
 
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.function == other.function
+        self.name == other.name && self.function == other.function && self.params == other.params
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
