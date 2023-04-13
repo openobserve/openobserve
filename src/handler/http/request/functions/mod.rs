@@ -109,7 +109,6 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
         ("name" = String, Path, description = "Function name"),
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
@@ -352,7 +351,6 @@ async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpRespo
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
         ("name" = String, Path, description = "Function name"),
     ),
     request_body(content = Transform, description = "Function data", content_type = "application/json"),
