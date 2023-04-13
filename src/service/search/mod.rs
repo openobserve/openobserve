@@ -20,7 +20,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use std::{cmp::min, time::Duration};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
-use tracing::{info_span, Instrument};
+use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -61,25 +61,25 @@ pub async fn search(
     search_in_cluster(req).instrument(root_span).await
 }
 
-//XXX #[tracing::instrument(name = "service:search:cluster", skip(req))]
+#[instrument]
+async fn get_queue_lock() -> Result<etcd::Locker, Error> {
+    let mut lock = etcd::Locker::new("search/cluster_queue");
+    lock.lock(0)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    Ok(lock)
+}
+
+#[instrument(name = "service:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
-    //XXX let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
 
     // get a cluster search queue lock
-    let mut locker = None;
-    if !CONFIG.common.local_mode {
-        let mut lock = etcd::Locker::new("search/cluster_queue");
-        match lock.lock(0).await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
-        locker = Some(lock);
-    }
+    let locker = if CONFIG.common.local_mode {
+        None
+    } else {
+        Some(get_queue_lock().await?)
+    };
 
     //XXX span1.exit(); // drop span1
     //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
