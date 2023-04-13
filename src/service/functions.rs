@@ -80,6 +80,9 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
+    // UI mostly like in 1st version wont send streams, so we need to add them back from existing function
+    func.streams = existing_fn.streams;
+
     extract_num_args(&mut func);
     let name = func.name.to_owned();
     if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
