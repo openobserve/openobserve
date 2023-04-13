@@ -48,9 +48,11 @@ pub async fn handle_triggers(trigger: Trigger) {
         Err(_) => log::error!("[ALERT MANAGER] Error fetching alert"),
         Ok(result) => {
             if let Some(alert) = result {
-                if TRIGGERS_IN_PROCESS.clone().contains_key(&trigger.alert_name) {
-                    let mut curr_time =
-                        TRIGGERS_IN_PROCESS.get_mut(&trigger.alert_name).unwrap();
+                if TRIGGERS_IN_PROCESS
+                    .clone()
+                    .contains_key(&trigger.alert_name)
+                {
+                    let mut curr_time = TRIGGERS_IN_PROCESS.get_mut(&trigger.alert_name).unwrap();
                     let delay = trigger.timestamp - curr_time.updated_at;
                     if delay > 0 {
                         log::info!(

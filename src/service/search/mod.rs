@@ -70,6 +70,62 @@ async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     Ok(lock)
 }
 
+async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
+    let (mut time_min, mut time_max) = sql.meta.time_range.unwrap();
+    if time_min == 0 {
+        // get created_at from schema
+        let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type))
+            .await
+            .unwrap_or_else(|_| Schema::empty());
+        if schema != Schema::empty() {
+            time_min = schema
+                .metadata
+                .get("created_at")
+                .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+        }
+    }
+    if time_max == 0 {
+        time_max = chrono::Utc::now().timestamp_micros();
+    }
+    (time_min, time_max)
+}
+
+#[instrument(skip_all)]
+async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
+    let (time_min, time_max) = get_times(sql, stream_type).await;
+    match file_list::get_file_list(
+        &sql.org_id,
+        &sql.stream_name,
+        Some(stream_type),
+        time_min,
+        time_max,
+    )
+    .await
+    {
+        Err(_) => vec![],
+        Ok(file_list) => {
+            let mut files = Vec::with_capacity(file_list.len());
+            if (time_max - time_min) >= 3_600_000_000 {
+                // over than 1 hour, just filter by partition key
+                files.extend(
+                    file_list
+                        .into_iter()
+                        .filter(|file| sql.filter_source_by_partition_key(file)),
+                );
+            } else {
+                // less than 1 hour, use file meta reduce file list
+                for file in file_list {
+                    if sql.match_source(&file, false, stream_type).await {
+                        files.push(file.clone());
+                    }
+                }
+            }
+            files.sort();
+            files
+        }
+    }
+}
+
 #[instrument(name = "service:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
@@ -85,108 +141,43 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
-    let mut querier = Vec::new();
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
-    nodes.sort_by(|a, b| a.id.cmp(&b.id));
-    for node in nodes.iter() {
-        let role = node.role.clone();
-        if cluster::is_querier(&role.to_vec()) {
-            querier.push(node.clone());
-            continue;
-        }
-    }
+    nodes.sort_by_key(|x| x.id);
+    let nodes = nodes;
+
+    let querier_num = match nodes
+        .iter()
+        .filter(|node| cluster::is_querier(&node.role))
+        .count()
+    {
+        0 => 1,
+        n => n,
+    };
 
     // handle request time range
-    let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
-    let sub_req = req.clone();
-    let meta = sql::Sql::new(&sub_req).await;
-    if meta.is_err() {
-        // search done, release lock
-        if locker.is_some() {
-            if let Err(e) = locker.unwrap().unlock().await {
-                log::error!("search in cluster unlock error: {}", e);
+    let stream_type = StreamType::from(req.stream_type.as_str());
+    let meta = match sql::Sql::new(&req).await {
+        Ok(meta) => meta,
+        Err(err) => {
+            // search done, release lock
+            if locker.is_some() {
+                if let Err(e) = locker.unwrap().unlock().await {
+                    log::error!("search in cluster unlock error: {}", e);
+                }
             }
+            return Err(err);
         }
-        return Err(meta.err().unwrap());
-    }
-    let meta = meta.unwrap();
-
-    let now = chrono::Utc::now().timestamp_micros();
-    let (mut time_min, mut time_max) = meta.meta.time_range.unwrap();
-    if time_min == 0 {
-        // get created_at from schema
-        let schema = match db::schema::get(&meta.org_id, &meta.stream_name, Some(stream_type)).await
-        {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
-        if schema != Schema::empty() {
-            let def_val = String::from("0");
-            time_min = schema
-                .metadata
-                .get("created_at")
-                .unwrap_or(&def_val)
-                .parse::<i64>()
-                .unwrap();
-        }
-    }
-    if time_max == 0 {
-        time_max = now;
-    }
-    let querier_num = match querier.len() {
-        0 => 1,
-        _ => querier.len(),
     };
 
-    //XXX span2.exit(); // drop span2
-    //XXX let span3 = info_span!("service:search:cluster:prepare_filelist").entered();
-
-    // partition by file_list
-    let mut file_list = match file_list::get_file_list(
-        &req.org_id,
-        &meta.stream_name,
-        Some(stream_type),
-        time_min,
-        time_max,
-    )
-    .await
-    {
-        Ok(file_list) => match (time_max - time_min) >= 3600_1000_1000 {
-            true => {
-                // over than 1 hour, just filter by partition key
-                let mut files = Vec::with_capacity(file_list.len());
-                for file in file_list {
-                    if meta.filter_source_by_partition_key(&file).await {
-                        files.push(file.clone());
-                    }
-                }
-                files
-            }
-            false => {
-                // less than 1 hour, use file meta reduce file list
-                let mut files = Vec::with_capacity(file_list.len());
-                for file in file_list {
-                    if meta.match_source(&file, false, stream_type).await {
-                        files.push(file.clone());
-                    }
-                }
-                files
-            }
-        },
-        Err(_) => Vec::new(),
-    };
-    file_list.sort();
+    let file_list = partition_by_file_list(&meta, stream_type).await;
     let file_num = file_list.len();
-    let offset = match querier_num >= file_num {
-        true => 1,
-        false => (file_num / querier_num) + 1,
+    let offset = if querier_num >= file_num {
+        1
+    } else {
+        (file_num / querier_num) + 1
     };
-    log::info!(
-        "[TRACE] search->file_list: num: {}, offset: {}",
-        file_num,
-        offset
-    );
+    log::info!("[TRACE] search->file_list: num: {file_num}, offset: {offset}");
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     let mut session_id = Uuid::new_v4().to_string();

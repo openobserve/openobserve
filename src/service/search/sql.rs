@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
-use crate::common::str;
+use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
@@ -525,7 +525,7 @@ impl Sql {
         }
 
         log::info!(
-            "[TRACE] sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}", 
+            "[TRACE] sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
             sql.stream_name,
             sql.meta.fields,
             sql.meta.quick_text,
@@ -558,7 +558,7 @@ impl Sql {
         }
 
         // check partition key
-        if !self.filter_source_by_partition_key(source).await {
+        if !self.filter_source_by_partition_key(source) {
             return false;
         }
 
@@ -591,28 +591,22 @@ impl Sql {
         true
     }
 
-    /// filter source by partition key
-    pub async fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        // check partition key
-        for key in &self.meta.quick_text {
-            let field = logs::get_partition_key_query(format!("{}=", key.0).as_str());
-            let value = logs::get_partition_key_query(format!("{}={}", key.0, key.1).as_str());
-            if str::find(source, &format!("/{field}")) && !str::find(source, &format!("/{value}/"))
-            {
-                return false;
-            }
-        }
-        true
+    pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
+        !self.meta.quick_text.iter().any(|(k, v, _)| {
+            let field = logs::get_partition_key_query(&format!("{k}="));
+            let value = logs::get_partition_key_query(&format!("{k}={v}"));
+            find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
+        })
     }
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
-    if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
+    if find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
         return true;
     }
     for (_, sql) in sql.aggs.iter() {
-        if str::find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
+        if find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
             return true;
         }
     }
@@ -935,6 +929,35 @@ mod tests {
                     assert_eq!(resp.meta.limit, query.size);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_filter_source_by_partition_key() {
+        let data = "/some/prefix/color=purple";
+        let samples = [
+            (true, vec![]),
+            (false, vec![("color", "")]),
+            (false, vec![("color", "blue")]),
+            (false, vec![("color", "purple")]),
+            (true, vec![("colour", "purple")]),
+        ];
+        for (i, (expected, input)) in samples.into_iter().enumerate() {
+            assert_eq!(old(&input, data), expected, "#{i}");
+            assert_eq!(new(&input, data), expected, "#{i}");
+        }
+
+        let data = "/some/prefix/color=purple/";
+        let samples = [
+            (true, vec![]),
+            (false, vec![("color", "")]),
+            (false, vec![("color", "blue")]),
+            (true, vec![("color", "purple")]),
+            (true, vec![("colour", "purple")]),
+        ];
+        for (i, (expected, input)) in samples.into_iter().enumerate() {
+            assert_eq!(old(&input, data), expected, "#{i}");
+            assert_eq!(new(&input, data), expected, "#{i}");
         }
     }
 }
