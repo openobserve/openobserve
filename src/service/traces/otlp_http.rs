@@ -326,7 +326,7 @@ pub async fn traces_json(
                             }
 
                             let partition_key =
-                                format!("service={}", format_stream_name(&service_name));
+                                format!("service_name={}", format_stream_name(&service_name));
                             hour_key.push_str(&format!(
                                 "_{}",
                                 get_partition_key_record(&partition_key)

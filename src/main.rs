@@ -55,7 +55,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     if CONFIG.common.tracing_enabled {
-        let service_name = format!("zincobserve/{}", CONFIG.common.instance_name);
+        let service_name = format!("zo-{}", CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
         let mut headers = HashMap::new();
         headers.insert(
