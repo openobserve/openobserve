@@ -67,8 +67,8 @@ const stream = {
     return http().get(url);
   },
 
-  delete: (org_identifier: string, stream_name: string) => {
-    return http().delete(`/api/${org_identifier}/${stream_name}`);
+  delete: (org_identifier: string, stream_name: string, stream_type: string) => {
+    return http().delete(`/api/${org_identifier}/${stream_name}?type=${stream_type}`);
   },
 };
 

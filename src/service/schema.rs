@@ -316,6 +316,16 @@ pub async fn add_stream_schema(
         None => HashMap::new(),
     };
     metadata.insert("created_at".to_string(), min_ts.to_string());
+    if stream_type == StreamType::Traces {
+        let settings = crate::meta::stream::StreamSettings {
+            partition_keys: vec!["service_name".to_string()],
+            full_text_search_keys: vec![],
+        };
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap_or_default(),
+        );
+    }
     db::schema::set(
         org_id,
         stream_name,
