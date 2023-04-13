@@ -61,10 +61,10 @@ pub async fn search(
     search_in_cluster(req).instrument(root_span).await
 }
 
-#[tracing::instrument(name = "service:search:cluster", skip(req))]
+//XXX #[tracing::instrument(name = "service:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
-    let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
+    //XXX let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
 
     // get a cluster search queue lock
     let mut locker = None;
@@ -81,8 +81,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         locker = Some(lock);
     }
 
-    span1.exit(); // drop span1
-    let span2 = info_span!("service:search:cluster:prepare_base").entered();
+    //XXX span1.exit(); // drop span1
+    //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
     let mut querier = Vec::new();
@@ -139,8 +139,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         _ => querier.len(),
     };
 
-    span2.exit(); // drop span2
-    let span3 = info_span!("service:search:cluster:prepare_filelist").entered();
+    //XXX span2.exit(); // drop span2
+    //XXX let span3 = info_span!("service:search:cluster:prepare_filelist").entered();
 
     // partition by file_list
     let mut file_list = match file_list::get_file_list(
@@ -197,8 +197,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         partition: 0,
     };
 
-    span3.exit(); // drop span3
-    let span4 = info_span!("service:search:cluster:do_search").entered();
+    //XXX span3.exit(); // drop span3
+    //XXX let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
@@ -348,8 +348,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span4.exit(); // drop span4
-    let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
+    //XXX span4.exit(); // drop span4
+    //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -358,8 +358,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span6.exit(); // drop span6
-    let span7 = info_span!("service:search:cluster:merge_result").entered();
+    //XXX span6.exit(); // drop span6
+    //XXX let span7 = info_span!("service:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
@@ -429,8 +429,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span7.exit(); // drop span7
-    let _span8 = info_span!("service:search:cluster:response").entered();
+    //XXX span7.exit(); // drop span7
+    //XXX let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
