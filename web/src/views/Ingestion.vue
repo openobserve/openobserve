@@ -100,6 +100,20 @@
             label="Vector"
             content-class="tab_content"
           />
+          <q-route-tab
+            name="kinesisfirehose"
+            :to="{
+              name: 'kinesisfirehose',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :icon="
+              'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')
+            "
+            label="Kinesis Firehose"
+            content-class="tab_content"
+          />
         </q-tabs>
       </template>
 
@@ -144,6 +158,16 @@
           <q-tab-panel name="vector">
             <router-view
               title="Vector"
+              :currOrgIdentifier="currentOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+              @copy-to-clipboard-fn="copyToClipboardFn"
+            >
+            </router-view>
+          </q-tab-panel>
+
+          <q-tab-panel name="kinesisfirehose">
+            <router-view
+              title="Kinesis Firehose"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -294,7 +318,7 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(170),
+      splitterModel: ref(200),
       getOrganizationPasscode,
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
