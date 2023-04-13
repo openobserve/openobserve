@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import Home from "@/views/HomeView.vue";
 import Tickets from "@/views/TicketsView.vue";
@@ -30,6 +30,7 @@ import FluentBit from "@/components/ingestion/FluentBit.vue";
 import Fluentd from "@/components/ingestion/Fluentd.vue";
 import Vector from "@/components/ingestion/Vector.vue";
 import Curl from "@/components/ingestion/Curl.vue";
+import KinesisFirehose from "@/components/ingestion/KinesisFirehose.vue";
 import {
   AlertList,
   TemplateList,
@@ -164,6 +165,11 @@ const useRoutes = () => {
           path: "vector",
           name: "vector",
           component: Vector,
+        },
+        {
+          path: "kinesisfirehose",
+          name: "kinesisfirehose",
+          component: KinesisFirehose,
         },
       ],
     },
