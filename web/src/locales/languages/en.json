@@ -216,7 +216,8 @@
     "stream_type": "Stream Type",
     "vrl": "VRL",
     "lua": "Lua",
-    "params": "Parameters"
+    "params": "Parameters",
+    "associatedWithStream": "Stream Association"
   },
   "confirmDialog": {
     "cancel": "Cancel",
