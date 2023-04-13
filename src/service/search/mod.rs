@@ -193,14 +193,12 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
-    let credentials = Credentials::new(&user.email, &user.token);
-    let credentials = credentials.as_http_header();
+    let credentials = Credentials::new(&user.email, &user.token).as_http_header();
 
     // make cluster request
-    let mut results = Vec::new();
     let mut tasks = Vec::new();
     let mut offset_start: usize = 0;
-    for (partition_no, node) in nodes.clone().into_iter().enumerate() {
+    for (partition_no, node) in nodes.iter().cloned().enumerate() {
         let mut req = req.clone();
         let mut job = job.clone();
         job.partition = partition_no as i32;
@@ -314,19 +312,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         tasks.push(task);
     }
 
+    let mut results = Vec::new();
     for task in tasks {
-        let result = match task.await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
+        let result = task
+            .await
+            .map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())))?;
         match result {
-            Ok(res) => {
-                results.push(res);
-            }
+            Ok(res) => results.push(res),
             Err(err) => {
                 // search done, release lock
                 if locker.is_some() {
