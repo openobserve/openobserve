@@ -501,11 +501,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 pub fn get_parquet_compression() -> parquet::basic::Compression {
     match CONFIG.common.parquet_compression.to_lowercase().as_str() {
         "snappy" => parquet::basic::Compression::SNAPPY,
-        "gzip" => parquet::basic::Compression::GZIP,
-        "brotli" => parquet::basic::Compression::BROTLI,
+        "gzip" => parquet::basic::Compression::GZIP(parquet::basic::GzipLevel::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(parquet::basic::BrotliLevel::default()),
         "lz4" => parquet::basic::Compression::LZ4_RAW,
-        "zstd" => parquet::basic::Compression::ZSTD,
-        _ => parquet::basic::Compression::ZSTD,
+        "zstd" => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
+        _ => parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap()),
     }
 }
 
@@ -536,7 +536,10 @@ mod tests {
         assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
 
         cfg.common.parquet_compression = "zstd".to_string();
-        assert_eq!(get_parquet_compression(), parquet::basic::Compression::ZSTD);
+        assert_eq!(
+            get_parquet_compression(),
+            parquet::basic::Compression::ZSTD(parquet::basic::ZstdLevel::try_new(3).unwrap())
+        );
 
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
