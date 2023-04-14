@@ -96,29 +96,25 @@
             <table class="q-table" data-test="schema-log-stream-field-mapping-table">
               <thead>
                 <tr>
-                <th>{{ t("logStream.propertyName") }}</th>
-                <th>{{ t("logStream.propertyType") }}</th>
-                <th>{{ t("logStream.streamftsKey") }}</th>
-                <th>{{ t("logStream.streamPartitionKey") }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(schema, index) in indexData.schema" :key="index + '_' + schema.name" class="list-item">
+                  <th>{{ t("logStream.propertyName") }}</th>
+                  <th>{{ t("logStream.propertyType") }}</th>
+                  <th>{{ t("logStream.streamftsKey") }}</th>
+                  <th>{{ t("logStream.streamPartitionKey") }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(schema, index) in indexData.schema" :key="index + '_' + schema.name" class="list-item">
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
                   <td class="text-center">
                     <q-checkbox :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`" v-model="schema.ftsKey"
                       size="sm" />
                   </td>
-                  <!--<td class="text-center">
-                      <q-checkbox
-                        :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
-                        v-model="schema.partitionKey"
-                        size="sm"
-                      >
-                        {{ schema.level }}</q-checkbox
-                      >
-                    </td>-->
+                  <td class="text-center">
+                    <q-checkbox :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
+                      v-model="schema.partitionKey" size="sm">
+                    </q-checkbox>
+                  </td>
                 </tr>
               </tbody>
             </table>
