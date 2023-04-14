@@ -64,9 +64,7 @@ pub async fn search(
 #[instrument]
 async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
-    lock.lock(0)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    lock.lock(0).await.map_err(server_internal_error)?;
     Ok(lock)
 }
 
@@ -261,9 +259,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                             node.id,
                             err
                         );
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "connect search node error".to_string(),
-                        )));
+                        return Err(server_internal_error("connect search node error"));
                     }
                 };
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
@@ -286,13 +282,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                             node.id,
                             err
                         );
-                        if err.code().eq(&tonic::Code::Internal) {
+                        if err.code() == tonic::Code::Internal {
                             let err = ErrorCodes::from_json(err.message())?;
                             return Err(Error::ErrorCode(err));
                         }
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            "search node error".to_string(),
-                        )));
+                        return Err(server_internal_error("search node error"));
                     }
                 };
 
@@ -384,7 +378,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 
         // merge all batches
         for (name, batch) in batches.iter_mut() {
-            let merge_sql = if name.eq("query") {
+            let merge_sql = if name == "query" {
                 sql.origin_sql.clone()
             } else {
                 sql.aggs
@@ -438,7 +432,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             json_rows.into_iter().map(json::Value::Object).collect();
 
         // handle metrics response
-        if query_type.eq("metrics") {
+        if query_type == "metrics" {
             sources = handle_metrics_response(sources);
         }
 
@@ -452,7 +446,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 
     // aggs
     for (name, batch) in batches {
-        if name.eq("query") || batch.is_empty() {
+        if name == "query" || batch.is_empty() {
             continue;
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
@@ -482,7 +476,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     result.set_file_count(file_count as usize);
     result.set_scan_size(scan_size as usize);
 
-    if query_type.eq("metrics") {
+    if query_type == "metrics" {
         result.response_type = "matrix".to_string();
     }
 
@@ -504,7 +498,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if !k.eq(&CONFIG.common.time_stamp_col) && !k.eq("value") {
+            if *k != CONFIG.common.time_stamp_col && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
@@ -623,4 +617,8 @@ fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec
     } else {
         resp.to_vec()
     }
+}
+
+fn server_internal_error(error: impl ToString) -> Error {
+    Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }

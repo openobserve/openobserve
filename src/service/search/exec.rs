@@ -27,12 +27,8 @@ pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
     let start = std::time::Instant::now();
-    let sql = super::sql::Sql::new(req).await;
-    if sql.is_err() {
-        return Err(sql.err().unwrap());
-    }
-    let sql = Arc::new(sql.unwrap());
-    let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
+    let sql = Arc::new(super::sql::Sql::new(req).await?);
+    let stream_type = StreamType::from(req.stream_type.as_str());
     let session_id = req.job.as_ref().unwrap().session_id.to_string();
     let session_id = Arc::new(session_id);
 
@@ -47,13 +43,8 @@ pub async fn search(
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let task1 = tokio::task::spawn(
-        async move {
-            match super::cache::search(&session_id1, sql1, stream_type).await {
-                Ok(res) => Ok(res),
-                Err(err) => Err(err),
-            }
-        }
-        .instrument(span1),
+        async move { super::cache::search(&session_id1, sql1, stream_type).await }
+            .instrument(span1),
     );
 
     let span2 = info_span!("service:search:exec:in_storage");
@@ -68,12 +59,7 @@ pub async fn search(
             if req_stype == cluster_rpc::SearchType::CacheOnly as i32 {
                 Ok((HashMap::new(), 0, 0))
             } else {
-                match super::storage::search(&session_id2, sql2, file_list.as_slice(), stream_type)
-                    .await
-                {
-                    Ok(res) => Ok(res),
-                    Err(err) => Err(err),
-                }
+                super::storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
             }
         }
         .instrument(span2),
@@ -137,7 +123,7 @@ pub async fn search(
         (0, sql.meta.offset + sql.meta.limit)
     };
     for (name, batches) in results.iter_mut() {
-        let merge_sql = if name.eq("query") {
+        let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
             sql.aggs
@@ -169,10 +155,7 @@ pub async fn search(
 
     // final result
     let mut hits_buf = Vec::new();
-    let result_query = match results.get("query") {
-        Some(batches) => batches.to_owned(),
-        None => Vec::new(),
-    };
+    let result_query = results.get("query").cloned().unwrap_or_default();
     if !result_query.is_empty() && !result_query[0].is_empty() {
         let schema = result_query[0][0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
@@ -193,7 +176,7 @@ pub async fn search(
     // finally aggs result
     let mut aggs_buf = Vec::new();
     for (key, batches) in results {
-        if key.eq("query") || batches.is_empty() {
+        if key == "query" || batches.is_empty() {
             continue;
         }
         let mut buf = Vec::new();
