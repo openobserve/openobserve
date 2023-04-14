@@ -262,7 +262,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     )
     .await
     {
-        Ok(file_list) => match (time_max - time_min) >= 3600_1000_1000 {
+        Ok(file_list) => match (time_max - time_min) >= 3_600_000_000 {
             true => {
                 // over than 1 hour, just filter by partition key
                 let mut files = Vec::with_capacity(file_list.len());
