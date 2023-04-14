@@ -58,8 +58,7 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -136,8 +135,7 @@ size="xs" class="warning" />{{
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey"
-text-color="white">
+                <q-avatar size="md" color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -160,8 +158,7 @@ text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup
-clickable @click="signout">
+              <q-item v-ripple v-close-popup clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -339,6 +336,11 @@ export default defineComponent({
         link: "/logs",
       },
       {
+        title: t("menu.metrics"),
+        icon: "img:" + getImageURL("images/left_nav/search_icon.svg"),
+        link: "/metrics",
+      },
+      {
         title: t("menu.dashboard"),
         icon: "img:" + getImageURL("images/left_nav/dashb2.svg"),
         link: "/dashboards",
@@ -441,7 +443,9 @@ export default defineComponent({
 
     //additional links based on environment and conditions
     if (config.isZincObserveCloud == "true") {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+      linksList.value = mainLayoutMixin
+        .setup()
+        .leftNavigationLinks(linksList, t);
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
@@ -563,7 +567,9 @@ export default defineComponent({
             res.data.functions_enabled &&
             config.isZincObserveCloud == "false"
           ) {
-            linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+            linksList.value = mainLayoutMixin
+              .setup()
+              .leftNavigationLinks(linksList, t);
           }
           store.dispatch("setConfig", res.data);
         })
