@@ -592,30 +592,27 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 
 #[cfg(feature = "zo_functions")]
 fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
-    let mut ret_resp = vec![];
     let applicable_query_fn = req.query.as_ref().unwrap().query_fn.to_lowercase();
-    if !applicable_query_fn.is_empty() {
-        if let Some(query_fn_src) =
-            QUERY_FUNCTIONS.get(format!("{}/{}", req.org_id, applicable_query_fn).as_str())
-        {
+    if applicable_query_fn.is_empty() {
+        return resp.to_vec();
+    }
+    match QUERY_FUNCTIONS.get(&format!("{}/{}", req.org_id, applicable_query_fn)) {
+        None => resp.to_vec(),
+        Some(query_fn_src) => {
             let state = vrl::state::Runtime::default();
             let mut runtime = vrl::Runtime::new(state);
-            if let Some(program) =
-                super::ingestion::compile_vrl_function(query_fn_src.value().function.as_str())
-            {
-                for hit in resp {
-                    let ret_val =
-                        super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
-                    if !ret_val.eq(&json::Value::Null) {
-                        ret_resp.push(ret_val);
-                    }
-                }
+            match super::ingestion::compile_vrl_function(&query_fn_src.value().function) {
+                None => vec![],
+                Some(program) => resp
+                    .iter()
+                    .filter_map(|hit| {
+                        let ret_val =
+                            super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
+                        (!ret_val.is_null()).then_some(ret_val)
+                    })
+                    .collect(),
             }
-            return ret_resp;
-        };
-        resp.to_vec()
-    } else {
-        resp.to_vec()
+        }
     }
 }
 
