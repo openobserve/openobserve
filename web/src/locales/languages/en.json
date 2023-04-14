@@ -398,5 +398,8 @@
     "api_header": "Header",
     "api_header_value": "Value",
     "add_template": "New Template"
+  },
+  "metrics": {
+    "searchMetric": "Search for a Metric"
   }
 }

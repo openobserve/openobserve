@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
+  <q-page class="metrics-page" id="logPage">
     <div id="secondLevel">
       <div
         id="thirdLevel"
@@ -46,6 +46,30 @@
             />
           </template>
           <template #after>
+            <div
+              class="text-right q-px-lg q-pt-sm flex align-center justify-end metrics-date-time"
+            >
+              <date-time
+                data-test="logs-search-bar-date-time-dropdown"
+                @date-change="updateDateTime"
+              />
+              <auto-refresh-interval
+                class="q-pr-sm"
+                v-model="searchObj.meta.refreshInterval"
+              />
+              <q-btn
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                icon="refresh"
+                title="Refresh"
+                class="q-pa-none no-border refresh-button text-capitalize q-px-sm"
+                rounded
+                size="md"
+                color="primary"
+                @click="refreshMetricData"
+              />
+            </div>
             <div
               v-if="
                 searchObj.data.errorMsg !== '' && searchObj.loading == false
@@ -155,8 +179,7 @@ import { useRouter } from "vue-router";
 
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
-import useLogs from "@/composables/useLogs";
-import { deepKeys, byString } from "@/utils/json";
+import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
@@ -166,12 +189,16 @@ import { useLocalLogsObj, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import DateTime from "@/components/DateTime.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 
 export default defineComponent({
   name: "AppMetrics",
   components: {
     IndexList,
     SearchResult,
+    DateTime,
+    AutoRefreshInterval,
   },
   methods: {
     searchData() {
@@ -225,7 +252,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useLogs();
+    const { searchObj, resetSearchObj } = useMetrics();
     let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
@@ -374,9 +401,12 @@ export default defineComponent({
               selectedStreamItemObj = itemObj;
             }
           });
-
           if (selectedStreamItemObj.label != undefined) {
             searchObj.data.stream.selectedStream = selectedStreamItemObj;
+            searchObj.data.stream.selectedMetrics = [];
+            searchObj.data.stream.selectedMetrics.push(
+              selectedStreamItemObj.value
+            );
           } else {
             searchObj.loading = false;
             searchObj.data.queryResults = {};
@@ -473,7 +503,6 @@ export default defineComponent({
     function buildSearch() {
       try {
         let query = searchObj.data.editorValue;
-
         var req: any = {
           query: {
             sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
@@ -503,24 +532,6 @@ export default defineComponent({
             new Date(timestamps.start_time.toISOString()).getTime() * 1000;
           const endISOTimestamp: any =
             new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          // let timeRangeFilter: String =
-          //   "(_timestamp >= [START_TIME] AND _timestamp < [END_TIME])";
-          // // let timeRangeFilter: String =
-          // //   "time_range(\"_timestamp\", '[START_TIME]','[END_TIME]')";
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[START_TIME]",
-          //   startISOTimestamp
-          // );
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[END_TIME]",
-          //   endISOTimestamp
-          // );
-
-          // if (query.trim() != "") {
-          //   query += " and " + timeRangeFilter;
-          // } else {
-          //   query = timeRangeFilter;
-          // }
 
           req.query.start_time = startISOTimestamp;
           req.query.end_time = endISOTimestamp;
@@ -578,85 +589,16 @@ export default defineComponent({
           return false;
         }
 
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL = parser.astify(searchObj.data.query);
-          if (parsedSQL.limit != null) {
-            req.query.size = parsedSQL.limit.value[0].value;
+        req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+        req.query.sql = req.query.sql.replace("[QUERY_FUNCTIONS]", "");
 
-            if (parsedSQL.limit.seperator == "offset") {
-              req.query.from = parsedSQL.limit.value[1].value || 0;
-            }
-
-            parsedSQL.limit = null;
-
-            query = parser.sqlify(parsedSQL);
-
-            //replace backticks with \" for sql_mode
-            query = query.replace(/`/g, '"');
-            searchObj.loading = true;
-            searchObj.data.queryResults.hits = [];
-            searchObj.data.queryResults.total = 0;
-          }
-
-          req.query.sql = query;
-          req.query["sql_mode"] = "full";
-          delete req.aggs;
-        } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
-
-          if (whereClause.trim() != "") {
-            whereClause = whereClause
-              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-            whereClause = whereClause
-              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
-            });
-
-            whereClause = parsedSQL.join(" ");
-
-            req.query.sql = req.query.sql.replace(
-              "[WHERE_CLAUSE]",
-              " WHERE " + whereClause
-            );
-          } else {
-            req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          }
-
-          req.query.sql = req.query.sql.replace(
-            "[QUERY_FUNCTIONS]",
-            queryFunctions
-          );
-
-          req.query.sql = req.query.sql.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream.value
-          );
-          // const parsedSQL = parser.astify(req.query.sql);
-          // const unparsedSQL = parser.sqlify(parsedSQL);
-          // console.log(unparsedSQL);
-        }
+        req.query.sql = req.query.sql.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedMetrics[0]
+        );
+        // const parsedSQL = parser.astify(req.query.sql);
+        // const unparsedSQL = parser.sqlify(parsedSQL);
+        // console.log(unparsedSQL);
 
         if (searchObj.data.resultGrid.currentPage > 0) {
           delete req.aggs;
@@ -669,7 +611,6 @@ export default defineComponent({
         ) {
           req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
         }
-
         return req;
       } catch (e) {
         throw new ErrorException(e.message);
@@ -985,7 +926,7 @@ export default defineComponent({
     const refreshData = () => {
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
+        router.currentRoute.value.name == "metrics"
       ) {
         refreshIntervalID = setInterval(() => {
           runQueryFn();
@@ -1111,6 +1052,31 @@ export default defineComponent({
       }
     };
 
+    const updateDateTime = (value: any) => {
+      searchObj.data.datetime = value;
+
+      if (config.isZincObserveCloud == "true" && value.userChangedValue) {
+        let dateTimeVal;
+        if (value.tab === "relative") {
+          dateTimeVal = value.relative;
+        } else {
+          dateTimeVal = value.absolute;
+        }
+
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: dateTimeVal,
+          metric_name: searchObj.data.stream.selectedMetrics[0],
+          page: "Search Metrics",
+        });
+      }
+    };
+
+    const refreshMetricData = () => {
+      runQueryFn();
+    };
+
     return {
       store,
       router,
@@ -1128,6 +1094,8 @@ export default defineComponent({
       setQuery,
       useLocalLogsObj,
       searchAroundData,
+      updateDateTime,
+      refreshMetricData,
     };
   },
   computed: {
@@ -1146,8 +1114,8 @@ export default defineComponent({
     changeOrganization() {
       return this.store.state.selectedOrganization.identifier;
     },
-    changeStream() {
-      return this.searchObj.data.stream.selectedStream;
+    selectedMetrics() {
+      return this.searchObj.data.stream.selectedMetrics;
     },
     changeRelativeDate() {
       return (
@@ -1209,19 +1177,22 @@ export default defineComponent({
       }
     },
     changeOrganization() {
-      if (this.router.currentRoute.value.name == "logs") {
+      if (this.router.currentRoute.value.name == "metrics") {
         this.searchObj.data.query = "";
         this.setQuery("");
         this.searchObj.meta.sqlMode = false;
         this.loadPageData();
       }
     },
-    changeStream() {
-      if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-        setTimeout(() => {
-          this.runQueryFn();
-        }, 500);
-      }
+    selectedMetrics: {
+      deep: true,
+      handler: function () {
+        if (this.searchObj.data.stream.selectedMetrics.length > 0) {
+          setTimeout(() => {
+            this.runQueryFn();
+          }, 500);
+        }
+      },
     },
     changeRelativeDate() {
       if (this.searchObj.data.datetime.tab == "relative") {
@@ -1254,7 +1225,7 @@ export default defineComponent({
 div.plotly-notifier {
   visibility: hidden;
 }
-.logPage {
+.metrics-page {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
@@ -1298,6 +1269,21 @@ div.plotly-notifier {
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .refresh-button {
+    .q-icon {
+      font-size: 18px;
+      padding-right: 2px;
+    }
+  }
+
+  .metrics-date-time {
+    .date-time-button {
+      height: 100%;
+      padding: 0 8px;
+      background-color: #ffffff !important;
+    }
   }
 }
 </style>

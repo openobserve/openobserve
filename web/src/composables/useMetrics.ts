@@ -79,6 +79,7 @@ const defaultObject = {
       filterField: "",
       addToFilter: "",
       functions: [],
+      selectedMetrics: [],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -126,7 +127,7 @@ const defaultObject = {
 let searchObj = reactive(Object.assign({}, defaultObject));
 // }
 
-const useLogs = () => {
+const useMetrics = () => {
   const resetSearchObj = () => {
     // delete searchObj.data;
     searchObj = reactive(Object.assign({}, defaultObject));
@@ -135,4 +136,4 @@ const useLogs = () => {
   return { searchObj, resetSearchObj };
 };
 
-export default useLogs;
+export default useMetrics;

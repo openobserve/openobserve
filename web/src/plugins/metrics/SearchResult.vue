@@ -16,8 +16,11 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div ref="resultContainer" class="col column oveflow-hidden">
-    <div class="search-list q-pa-md" style="width: 100%">
+  <div ref="resultContainer" class="col column oveflow-hidden q-px-md q-pt-sm">
+    <div class="text-semi-bold text-h6 q-pl-sm q-pb-sm">
+      {{ searchObj.data.stream.selectedMetrics[0] }}
+    </div>
+    <div class="search-list" style="width: 100%">
       <MetricLineChart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
@@ -34,10 +37,12 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
-import useLogs from "../../composables/useLogs";
+import useMetrics from "../../composables/useMetrics";
 import { getImageURL } from "../../utils/zincutils";
 import MetricLineChart from "../../components/MetricLineChart.vue";
 import { computed } from "vue";
+import config from "@/aws-exports";
+import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "SearchResult",
@@ -51,19 +56,6 @@ export default defineComponent({
     "search:timeboxed",
   ],
   methods: {
-    closeColumn(col: any) {
-      const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
-      this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
-
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name
-      );
-
-      this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
-      this.searchObj.organizationIdetifier =
-        this.store.state.selectedOrganization.identifier;
-      this.updatedLocalLogFilterField();
-    },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.runQuery = true;
@@ -112,7 +104,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
 
-    const { searchObj, updatedLocalLogFilterField } = useLogs();
+    const { searchObj } = useMetrics();
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);
@@ -121,13 +113,7 @@ export default defineComponent({
 
     const resultContainer = ref(null);
 
-    const getContainerWidth = computed(() => {
-      console.log("getContainerWidth");
-      return resultContainer.value?.clientWidth || 0;
-    });
-
     const reDrawChart = () => {
-      console.log("redraw chart"), resultContainer.value;
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
@@ -143,7 +129,6 @@ export default defineComponent({
       }
     };
     onMounted(() => {
-      console.log("onMounted", getContainerWidth.value);
       reDrawChart();
     });
 
@@ -187,7 +172,6 @@ export default defineComponent({
       store,
       plotChart,
       searchObj,
-      updatedLocalLogFilterField,
       byString,
       searchTableRef,
       addSearchTerm,
@@ -199,7 +183,6 @@ export default defineComponent({
       reDrawChart,
       getImageURL,
       resultContainer,
-      getContainerWidth,
     };
   },
 });

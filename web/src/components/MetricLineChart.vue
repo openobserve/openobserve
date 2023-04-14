@@ -66,7 +66,7 @@ export default defineComponent({
       margin: {
         l: 32,
         r: 16,
-        t: 38,
+        t: 15,
         b: 32,
       },
       xaxis: {
