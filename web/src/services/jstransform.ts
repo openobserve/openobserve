@@ -61,6 +61,34 @@ var jstransform = {
       `/api/${org_identifier}/${stream_name}/functions/${transform_name}`
     );
   },
+  stream_function:(
+    org_identifier: string,
+    stream_name: string
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/${stream_name}/functions`
+    );
+  },
+  apply_stream_function:(
+    org_identifier: string,
+    stream_name: string,
+    function_name: string,
+    data: any
+  ) => {
+    return http().post(
+      `/api/${org_identifier}/${stream_name}/functions/${function_name}`,
+      data
+    );
+  },
+  remove_stream_function:(
+    org_identifier: string,
+    stream_name: string,
+    function_name: string,
+  )=>{
+    return http().delete(
+      `/api/${org_identifier}/${stream_name}/functions/${function_name}`
+    );
+  }
 };
 
 export default jstransform;
