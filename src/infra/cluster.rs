@@ -282,62 +282,38 @@ pub async fn leave() -> Result<()> {
     Ok(())
 }
 
-#[inline(always)]
-pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
-    if NODES.len() == 0 {
+fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
+    if NODES.is_empty() {
         return None;
     }
-    let mut node_list = Vec::new();
-    for node in NODES.iter() {
-        if node.status.eq(&NodeStatus::Online) {
-            node_list.push(node.value().clone());
-        }
-    }
-    Some(node_list)
+    Some(
+        NODES
+            .iter()
+            .filter_map(|node| cond(&node).then(|| node.clone()))
+            .collect(),
+    )
 }
 
 #[inline(always)]
-pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
-    if NODES.len() == 0 {
-        return None;
-    }
-    let mut node_list = Vec::new();
-    for node in NODES.iter() {
-        if node.status.eq(&NodeStatus::Online)
-            && (is_querier(&node.value().role) || is_ingester(&node.value().role))
-        {
-            node_list.push(node.value().clone());
-        }
-    }
-    Some(node_list)
+pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online)
 }
 
 #[inline]
 pub fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
-    if NODES.len() == 0 {
-        return None;
-    }
-    let mut node_list = Vec::new();
-    for node in NODES.iter() {
-        if node.status.eq(&NodeStatus::Online) && is_ingester(&node.value().role) {
-            node_list.push(node.value().clone());
-        }
-    }
-    Some(node_list)
+    get_cached_nodes(|node| node.status == NodeStatus::Online && is_ingester(&node.role))
 }
 
 #[inline]
 pub fn get_cached_online_querier_nodes() -> Option<Vec<Node>> {
-    if NODES.len() == 0 {
-        return None;
-    }
-    let mut node_list = Vec::new();
-    for node in NODES.iter() {
-        if node.status.eq(&NodeStatus::Online) && is_querier(&node.value().role) {
-            node_list.push(node.value().clone());
-        }
-    }
-    Some(node_list)
+    get_cached_nodes(|node| node.status == NodeStatus::Online && is_querier(&node.role))
+}
+
+#[inline(always)]
+pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| {
+        node.status == NodeStatus::Online && (is_querier(&node.role) || is_ingester(&node.role))
+    })
 }
 
 /// List nodes from cluster or local cache
@@ -431,34 +407,22 @@ pub fn load_local_node_role() -> Vec<Role> {
         .clone()
         .split(',')
         .map(|s| s.parse().unwrap())
-        .collect::<Vec<Role>>()
+        .collect()
 }
 
 #[inline(always)]
 pub fn is_ingester(role: &[Role]) -> bool {
-    if role.contains(&Role::All) {
-        return true;
-    }
-    if role.contains(&Role::Ingester) {
-        return true;
-    }
-    false
+    role.contains(&Role::Ingester) || role.contains(&Role::All)
 }
 
 #[inline(always)]
 pub fn is_querier(role: &[Role]) -> bool {
-    if role.contains(&Role::All) {
-        return true;
-    }
-    if role.contains(&Role::Querier) {
-        return true;
-    }
-    false
+    role.contains(&Role::Querier) || role.contains(&Role::All)
 }
 
 #[inline(always)]
 pub fn is_compactor(role: &[Role]) -> bool {
-    role.contains(&Role::All) || role.contains(&Role::Compactor)
+    role.contains(&Role::Compactor) || role.contains(&Role::All)
 }
 
 #[inline(always)]
@@ -468,7 +432,7 @@ pub fn is_router(role: &[Role]) -> bool {
 
 #[inline(always)]
 pub fn is_alert_manager(role: &[Role]) -> bool {
-    role.contains(&Role::All) || role.contains(&Role::AlertManager)
+    role.contains(&Role::AlertManager) || role.contains(&Role::All)
 }
 
 #[inline(always)]
@@ -489,13 +453,9 @@ pub fn ge_node_by_uuid(uuid: &str) -> Option<Node> {
 #[inline(always)]
 pub fn get_node_ip() -> String {
     for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        if adapter.is_loopback() {
-            continue;
+        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
+            return adapter.ip().to_string();
         }
-        match adapter.ip() {
-            IpAddr::V4(_) => return adapter.ip().to_string(),
-            IpAddr::V6(_) => (),
-        };
     }
     String::new()
 }
