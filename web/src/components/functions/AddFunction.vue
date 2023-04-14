@@ -177,7 +177,7 @@
             }
 console.log("isbeignUpdated",beingUpdated );
 
-            if(!beingUpdated){
+            if(!beingUpdated.value){
               callTransform = jsTransformService.create(
                 store.state.selectedOrganization.identifier,
                 formData.value
