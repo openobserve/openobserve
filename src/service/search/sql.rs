@@ -592,7 +592,7 @@ impl Sql {
     }
 
     pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        !path_matches_by_partition_key(
+        path_matches_by_partition_key(
             source,
             self.meta
                 .quick_text
