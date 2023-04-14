@@ -337,7 +337,7 @@ export default defineComponent({
       },
       {
         title: t("menu.metrics"),
-        icon: "img:" + getImageURL("images/left_nav/search_icon.svg"),
+        icon: "img:" + getImageURL("images/left_nav/metrics.svg"),
         link: "/metrics",
       },
       {
