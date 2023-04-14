@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http::{self, StatusCode};
+use actix_web::http::StatusCode;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use std::collections::HashMap;
@@ -104,29 +104,16 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
-        }
+        Err(e) => return Ok(bad_request(e)),
     };
 
     // handle encoding for query and aggs
     let mut req: meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
-        }
+        Err(e) => return Ok(bad_request(e)),
     };
     if let Err(e) = req.decode() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            e.to_string(),
-        )));
+        return Ok(bad_request(e));
     }
 
     // get a local search queue lock
@@ -245,27 +232,16 @@ pub async fn around(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
-        }
+        Err(e) => return Ok(bad_request(e)),
     };
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "around key is empty".to_string(),
-            )))
-        }
+        None => return Ok(bad_request("around key is empty")),
     };
-    let around_size = match query.get("size") {
-        Some(v) => v.parse::<usize>().unwrap_or(0),
-        None => 10,
-    };
+    let around_size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
 
     // get a local search queue lock
     let locker = LOCKER
@@ -458,41 +434,25 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
-        }
+        Err(e) => return Ok(bad_request(e)),
     };
 
     let fields = match query.get("fields") {
-        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<String>>(),
-        None => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "fields is empty".to_string(),
-            )))
-        }
+        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
+        None => return Ok(bad_request("fields is empty")),
     };
-    let size = match query.get("size") {
-        Some(v) => v.parse::<usize>().unwrap_or(0),
-        None => 10,
-    };
-    let start_time = match query.get("start_time") {
-        Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => 0,
-    };
-    let mut end_time = match query.get("end_time") {
-        Some(v) => v.parse::<i64>().unwrap_or(0),
-        None => 0,
-    };
+    let size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+    let start_time = query
+        .get("start_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if start_time == 0 {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "start_time is empty".to_string(),
-        )));
+        return Ok(bad_request("start_time is empty"));
     }
+    let mut end_time = query
+        .get("end_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
         end_time = chrono::Utc::now().timestamp_micros();
     }
@@ -590,4 +550,11 @@ pub async fn values(
         .inc();
 
     Ok(HttpResponse::Ok().json(resp))
+}
+
+fn bad_request(error: impl ToString) -> HttpResponse {
+    HttpResponse::BadRequest().json(MetaHttpResponse::error(
+        StatusCode::BAD_REQUEST.into(),
+        error.to_string(),
+    ))
 }
