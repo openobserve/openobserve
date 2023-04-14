@@ -20,7 +20,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use std::{cmp::min, time::Duration};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
-use tracing::{info_span, Instrument};
+use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -58,245 +58,126 @@ pub async fn search(
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
 
-    let result = std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .thread_name("zinc-search")
-            .thread_stack_size(3 * 1024 * 1024)
-            .enable_all()
-            .build()
-            .unwrap();
-        rt.block_on(async move {
-            if CONFIG.common.local_mode {
-                search_in_local(req).instrument(root_span).await
-            } else {
-                search_in_cluster(req).instrument(root_span).await
-            }
-        })
-    })
-    .join();
-    result.map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(format!("{err:?}"))))?
+    search_in_cluster(req).instrument(root_span).await
 }
 
-#[tracing::instrument(name = "service:search:local", skip(req))]
-async fn search_in_local(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
-    let resp = match exec::search(&req).await {
-        Ok(res) => res,
-        Err(err) => return Err(err),
-    };
-
-    let span2 = info_span!("service:search:local:convert").entered();
-
-    let mut response = Response::new(resp.from as usize, resp.size as usize);
-    //req.query.unwrap().query_fn = "vpc_flow".to_string();
-    // convert hits
-    let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
-    if !resp.hits.is_empty() {
-        let buf = Cursor::new(resp.hits);
-        let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-        log::info!(
-            "search_in_local: query num_batches: {:?}",
-            reader.num_batches()
-        );
-        let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
-        let mut sources: Vec<json::Value> =
-            json_rows.into_iter().map(json::Value::Object).collect();
-
-        // handle metrics response
-        if query_type.eq("metrics") {
-            sources = handle_metrics_response(sources);
-        }
-
-        #[cfg(feature = "zo_functions")]
-        let sources = apply_query_fn(&req, &sources);
-
-        for source in sources {
-            response.add_hit(&source);
-        }
-    }
-
-    // convert aggs
-    if !resp.aggs.is_empty() {
-        for agg in resp.aggs {
-            let buf = Cursor::new(agg.hits);
-            let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-            log::info!(
-                "search_in_local: aggs:{} num_batches: {:?}",
-                agg.name,
-                reader.num_batches()
-            );
-            let batches = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-            let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches[..]) {
-                Ok(res) => res,
-                Err(err) => {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
-                }
-            };
-            let sources: Vec<json::Value> =
-                json_rows.into_iter().map(json::Value::Object).collect();
-            for source in sources {
-                response.add_agg(&agg.name, &source);
-            }
-        }
-    }
-
-    span2.exit();
-    let _span3 = info_span!("service:search:local:response").entered();
-
-    // handle count
-    let total = match response.aggs.get("_count") {
-        Some(v) => v.get(0).unwrap().get("num").unwrap().as_u64().unwrap() as usize,
-        None => response.hits.len(),
-    };
-    response.aggs.remove("_count");
-
-    response.set_total(total);
-    response.set_took(resp.took as usize);
-    response.set_file_count(resp.file_count as usize);
-    response.set_scan_size(resp.scan_size as usize);
-
-    if query_type.eq("metrics") {
-        response.response_type = "matrix".to_string();
-    }
-
-    Ok(response)
+#[instrument]
+async fn get_queue_lock() -> Result<etcd::Locker, Error> {
+    let mut lock = etcd::Locker::new("search/cluster_queue");
+    lock.lock(0)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    Ok(lock)
 }
 
-#[tracing::instrument(name = "service:search:cluster", skip(req))]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
-    let start = std::time::Instant::now();
-    let span1 = info_span!("service:search:cluster:get_queue_lock").entered();
-
-    // get a cluster search queue lock
-    let mut locker = None;
-    if !CONFIG.common.local_mode {
-        let mut lock = etcd::Locker::new("search/cluster_queue");
-        match lock.lock(0).await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
-        locker = Some(lock);
-    }
-
-    span1.exit(); // drop span1
-    let span2 = info_span!("service:search:cluster:prepare_base").entered();
-
-    // get nodes from cluster
-    let mut querier = Vec::new();
-    let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
-    nodes.sort_by(|a, b| a.id.cmp(&b.id));
-    for node in nodes.iter() {
-        let role = node.role.clone();
-        if cluster::is_querier(&role.to_vec()) {
-            querier.push(node.clone());
-            continue;
-        }
-    }
-
-    // handle request time range
-    let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
-    let sub_req = req.clone();
-    let meta = sql::Sql::new(&sub_req).await;
-    if meta.is_err() {
-        // search done, release lock
-        if locker.is_some() {
-            if let Err(e) = locker.unwrap().unlock().await {
-                log::error!("search in cluster unlock error: {}", e);
-            }
-        }
-        return Err(meta.err().unwrap());
-    }
-    let meta = meta.unwrap();
-
-    let now = chrono::Utc::now().timestamp_micros();
-    let (mut time_min, mut time_max) = meta.meta.time_range.unwrap();
+async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
+    let (mut time_min, mut time_max) = sql.meta.time_range.unwrap();
     if time_min == 0 {
         // get created_at from schema
-        let schema = match db::schema::get(&meta.org_id, &meta.stream_name, Some(stream_type)).await
-        {
-            Ok(schema) => schema,
-            Err(_) => Schema::empty(),
-        };
+        let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type))
+            .await
+            .unwrap_or_else(|_| Schema::empty());
         if schema != Schema::empty() {
-            let def_val = String::from("0");
             time_min = schema
                 .metadata
                 .get("created_at")
-                .unwrap_or(&def_val)
-                .parse::<i64>()
-                .unwrap();
+                .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
         }
     }
     if time_max == 0 {
-        time_max = now;
+        time_max = chrono::Utc::now().timestamp_micros();
     }
-    let querier_num = match querier.len() {
-        0 => 1,
-        _ => querier.len(),
-    };
+    (time_min, time_max)
+}
 
-    span2.exit(); // drop span2
-    let span3 = info_span!("service:search:cluster:prepare_filelist").entered();
-
-    // partition by file_list
-    let mut file_list = match file_list::get_file_list(
-        &req.org_id,
-        &meta.stream_name,
+#[instrument(skip_all)]
+async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
+    let (time_min, time_max) = get_times(sql, stream_type).await;
+    match file_list::get_file_list(
+        &sql.org_id,
+        &sql.stream_name,
         Some(stream_type),
         time_min,
         time_max,
     )
     .await
     {
-        Ok(file_list) => match (time_max - time_min) >= 3_600_000_000 {
-            true => {
+        Err(_) => vec![],
+        Ok(file_list) => {
+            let mut files = Vec::with_capacity(file_list.len());
+            if (time_max - time_min) >= 3_600_000_000 {
                 // over than 1 hour, just filter by partition key
-                let mut files = Vec::with_capacity(file_list.len());
-                for file in file_list {
-                    if meta.filter_source_by_partition_key(&file).await {
-                        files.push(file.clone());
-                    }
-                }
-                files
-            }
-            false => {
+                files.extend(
+                    file_list
+                        .into_iter()
+                        .filter(|file| sql.filter_source_by_partition_key(file)),
+                );
+            } else {
                 // less than 1 hour, use file meta reduce file list
-                let mut files = Vec::with_capacity(file_list.len());
                 for file in file_list {
-                    if meta.match_source(&file, false, stream_type).await {
+                    if sql.match_source(&file, false, stream_type).await {
                         files.push(file.clone());
                     }
                 }
-                files
             }
-        },
-        Err(_) => Vec::new(),
+            files.sort();
+            files
+        }
+    }
+}
+
+#[instrument(name = "service:search:cluster", skip(req))]
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
+    let start = std::time::Instant::now();
+
+    // get a cluster search queue lock
+    let locker = if CONFIG.common.local_mode {
+        None
+    } else {
+        Some(get_queue_lock().await?)
     };
-    file_list.sort();
+
+    //XXX span1.exit(); // drop span1
+    //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
+
+    // get nodes from cluster
+    let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
+    // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by_key(|x| x.id);
+    let nodes = nodes;
+
+    let querier_num = match nodes
+        .iter()
+        .filter(|node| cluster::is_querier(&node.role))
+        .count()
+    {
+        0 => 1,
+        n => n,
+    };
+
+    // handle request time range
+    let stream_type = StreamType::from(req.stream_type.as_str());
+    let meta = match sql::Sql::new(&req).await {
+        Ok(meta) => meta,
+        Err(err) => {
+            // search done, release lock
+            if locker.is_some() {
+                if let Err(e) = locker.unwrap().unlock().await {
+                    log::error!("search in cluster unlock error: {}", e);
+                }
+            }
+            return Err(err);
+        }
+    };
+
+    let file_list = partition_by_file_list(&meta, stream_type).await;
     let file_num = file_list.len();
-    let offset = match querier_num >= file_num {
-        true => 1,
-        false => (file_num / querier_num) + 1,
+    let offset = if querier_num >= file_num {
+        1
+    } else {
+        (file_num / querier_num) + 1
     };
-    log::info!(
-        "[TRACE] search->file_list: num: {}, offset: {}",
-        file_num,
-        offset
-    );
+    log::info!("[TRACE] search->file_list: num: {file_num}, offset: {offset}");
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     let mut session_id = Uuid::new_v4().to_string();
@@ -307,19 +188,17 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         partition: 0,
     };
 
-    span3.exit(); // drop span3
-    let span4 = info_span!("service:search:cluster:do_search").entered();
+    //XXX span3.exit(); // drop span3
+    //XXX let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
-    let credentials = Credentials::new(&user.email, &user.token);
-    let credentials = credentials.as_http_header();
+    let credentials = Credentials::new(&user.email, &user.token).as_http_header();
 
     // make cluster request
-    let mut results = Vec::new();
     let mut tasks = Vec::new();
     let mut offset_start: usize = 0;
-    for (partition_no, node) in nodes.clone().into_iter().enumerate() {
+    for (partition_no, node) in nodes.iter().cloned().enumerate() {
         let mut req = req.clone();
         let mut job = job.clone();
         job.partition = partition_no as i32;
@@ -433,19 +312,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         tasks.push(task);
     }
 
+    let mut results = Vec::new();
     for task in tasks {
-        let result = match task.await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
+        let result = task
+            .await
+            .map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())))?;
         match result {
-            Ok(res) => {
-                results.push(res);
-            }
+            Ok(res) => results.push(res),
             Err(err) => {
                 // search done, release lock
                 if locker.is_some() {
@@ -458,8 +331,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span4.exit(); // drop span4
-    let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
+    //XXX span4.exit(); // drop span4
+    //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -468,8 +341,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span6.exit(); // drop span6
-    let span7 = info_span!("service:search:cluster:merge_result").entered();
+    //XXX span6.exit(); // drop span6
+    //XXX let span7 = info_span!("service:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
@@ -539,8 +412,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     }
 
-    span7.exit(); // drop span7
-    let _span8 = info_span!("service:search:cluster:response").entered();
+    //XXX span7.exit(); // drop span7
+    //XXX let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
