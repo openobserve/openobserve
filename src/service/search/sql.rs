@@ -592,11 +592,13 @@ impl Sql {
     }
 
     pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        !self.meta.quick_text.iter().any(|(k, v, _)| {
-            let field = logs::get_partition_key_query(&format!("{k}="));
-            let value = logs::get_partition_key_query(&format!("{k}={v}"));
-            find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
-        })
+        !path_matches_by_partition_key(
+            source,
+            self.meta
+                .quick_text
+                .iter()
+                .map(|(k, v, _)| (k.as_str(), v.as_str())),
+        )
     }
 }
 
@@ -728,6 +730,25 @@ fn split_sql_token(text: &str) -> Vec<String> {
     tokens
 }
 
+/// Whether we should search this `path`, given the search criteria.
+///
+/// `partitions` is a list of partition key-value pairs.
+///
+/// For example, the `path` argument may look something like
+/// `"files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet"`.
+///
+/// The corresponding SQL query:
+/// `"SELECT * FROM gke_fluentbit WHERE kubernetes_host='gke-dev1' AND kubernetes_namespace_name='ziox-qqx'"`.
+fn path_matches_by_partition_key<'a>(
+    path: &str,
+    partitions: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> bool {
+    !partitions.into_iter().any(|(k, v)| {
+        let field = logs::get_partition_key_query(&format!("{k}="));
+        let value = logs::get_partition_key_query(&format!("{k}={v}"));
+        find(path, &format!("/{field}")) && !find(path, &format!("/{value}/"))
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -933,31 +954,58 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_source_by_partition_key() {
-        let data = "/some/prefix/color=purple";
-        let samples = [
-            (true, vec![]),
-            (false, vec![("color", "")]),
-            (false, vec![("color", "blue")]),
-            (false, vec![("color", "purple")]),
-            (true, vec![("colour", "purple")]),
-        ];
-        for (i, (expected, input)) in samples.into_iter().enumerate() {
-            assert_eq!(old(&input, data), expected, "#{i}");
-            assert_eq!(new(&input, data), expected, "#{i}");
-        }
-
-        let data = "/some/prefix/color=purple/";
-        let samples = [
-            (true, vec![]),
-            (false, vec![("color", "")]),
-            (false, vec![("color", "blue")]),
-            (true, vec![("color", "purple")]),
-            (true, vec![("colour", "purple")]),
-        ];
-        for (i, (expected, input)) in samples.into_iter().enumerate() {
-            assert_eq!(old(&input, data), expected, "#{i}");
-            assert_eq!(new(&input, data), expected, "#{i}");
-        }
+    fn test_matches_by_partition_key() {
+        let f = path_matches_by_partition_key;
+        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet";
+        assert!(f(path, vec![]));
+        assert!(!f(path, vec![("kubernetes_host", "")]));
+        assert!(f(path, vec![("kubernetes_host", "gke-dev1")]));
+        assert!(!f(&path, vec![("kubernetes_host", "gke-dev2")]));
+        assert!(
+            f(path, vec![("some_other_key", "no-matter")]),
+            "Partition key was not found ==> the Parquet file has to be searched"
+        );
+        assert!(f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
     }
 }
