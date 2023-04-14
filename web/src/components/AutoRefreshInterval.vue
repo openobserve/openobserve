@@ -124,7 +124,7 @@ export default defineComponent({
     // computed label based on the selected value
     const selectedLabel = computed(
       () =>
-        refreshTimes.find((it: any) => it.value == selectedValue.value)
+        refreshTimes.flat().find((it: any) => it.value == selectedValue.value)
           ?.label || generateDurationLabel(selectedValue.value)
     );
 

@@ -79,7 +79,7 @@ const defaultObject = {
       filterField: "",
       addToFilter: "",
       functions: [],
-      selectedMetrics: [],
+      selectedMetrics: [] as string[],
     },
     resultGrid: {
       currentDateTime: new Date(),
