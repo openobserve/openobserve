@@ -16,6 +16,7 @@ use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::sync::atomic::AtomicU8;
 use std::time::Duration;
@@ -36,35 +37,34 @@ pub static HAS_FUNCTIONS: bool = true;
 pub static HAS_FUNCTIONS: bool = false;
 pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 
-lazy_static! {
-    pub static ref CONFIG: Config = init();
-    pub static ref LOCKER: DashMap<String, std::sync::Mutex<bool>> = DashMap::new();
-    pub static ref INSTANCE_ID: DashMap<String, String> = DashMap::new();
-    pub static ref TELEMETRY_CLIENT: segment::HttpClient = segment::HttpClient::new(
+pub static CONFIG: Lazy<Config> = Lazy::new(init);
+pub static LOCKER: Lazy<DashMap<String, std::sync::Mutex<bool>>> = Lazy::new(DashMap::new);
+pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
+pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
+    segment::HttpClient::new(
         Client::builder()
             .connect_timeout(Duration::new(10, 0))
             .build()
             .unwrap(),
-        CONFIG.common.telemetry_url.clone()
-    );
-}
+        CONFIG.common.telemetry_url.clone(),
+    )
+});
 
-lazy_static! {
-    pub static ref KVS: DashMap<String, bytes::Bytes> = DashMap::new();
-    pub static ref STREAM_SCHEMAS: DashMap<String, Vec<Schema>> = DashMap::new();
-    pub static ref STREAM_FUNCTIONS: DashMap<String, StreamFunctionsList> = DashMap::new();
-    pub static ref QUERY_FUNCTIONS: DashMap<String, Transform> = DashMap::new();
-    pub static ref USERS: DashMap<String, User> = DashMap::new();
-    pub static ref ROOT_USER: DashMap<String, User> = DashMap::new();
-    pub static ref PASSWORD_HASH: DashMap<String, String> = DashMap::new();
-    pub static ref METRIC_CLUSTER_MAP: DashMap<String, Vec<String>> = DashMap::new();
-    pub static ref METRIC_CLUSTER_LEADER: DashMap<String, ClusterLeader> = DashMap::new();
-    pub static ref STREAM_ALERTS: DashMap<String, AlertList> = DashMap::new();
-    pub static ref TRIGGERS: DashMap<String, Trigger> = DashMap::new();
-    pub static ref TRIGGERS_IN_PROCESS: DashMap<String, TriggerTimer> = DashMap::new();
-    pub static ref ALERTS_TEMPLATES: DashMap<String, DestinationTemplate> = DashMap::new();
-    pub static ref ALERTS_DESTINATIONS: DashMap<String, AlertDestination> = DashMap::new();
-}
+// global cache variables
+pub static KVS: Lazy<DashMap<String, bytes::Bytes>> = Lazy::new(DashMap::new);
+pub static STREAM_SCHEMAS: Lazy<DashMap<String, Vec<Schema>>> = Lazy::new(DashMap::new);
+pub static STREAM_FUNCTIONS: Lazy<DashMap<String, StreamFunctionsList>> = Lazy::new(DashMap::new);
+pub static QUERY_FUNCTIONS: Lazy<DashMap<String, Transform>> = Lazy::new(DashMap::new);
+pub static USERS: Lazy<DashMap<String, User>> = Lazy::new(DashMap::new);
+pub static ROOT_USER: Lazy<DashMap<String, User>> = Lazy::new(DashMap::new);
+pub static PASSWORD_HASH: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
+pub static METRIC_CLUSTER_MAP: Lazy<DashMap<String, Vec<String>>> = Lazy::new(DashMap::new);
+pub static METRIC_CLUSTER_LEADER: Lazy<DashMap<String, ClusterLeader>> = Lazy::new(DashMap::new);
+pub static STREAM_ALERTS: Lazy<DashMap<String, AlertList>> = Lazy::new(DashMap::new);
+pub static TRIGGERS: Lazy<DashMap<String, Trigger>> = Lazy::new(DashMap::new);
+pub static TRIGGERS_IN_PROCESS: Lazy<DashMap<String, TriggerTimer>> = Lazy::new(DashMap::new);
+pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::new(DashMap::new);
+pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
 
 #[derive(EnvConfig)]
 pub struct Config {

@@ -16,7 +16,7 @@ use segment::{message::Track, Client, Message};
 use std::collections::HashMap;
 
 use crate::common::json;
-use crate::infra::cache::stats::STATS;
+use crate::infra::cache::stats;
 use crate::infra::config::*;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
@@ -157,7 +157,7 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     }
     let mut streams_orig_size: f64 = 0.0;
     let mut streams_compressed_size: f64 = 0.0;
-    for stats in STATS.iter().clone() {
+    for stats in stats::get_stats().iter() {
         streams_orig_size += stats.storage_size;
         streams_compressed_size += stats.compressed_size
     }

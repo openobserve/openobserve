@@ -14,12 +14,11 @@
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use dashmap::DashMap;
+use once_cell::sync::Lazy;
 
 use crate::meta::{common::FileMeta, StreamType};
 
-lazy_static! {
-    pub static ref FILES: DashMap<String, Box<FileList>> = DashMap::new();
-}
+static FILES: Lazy<DashMap<String, Box<FileList>>> = Lazy::new(DashMap::new);
 
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<Box<FileList>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<Option<FileMeta>>();
