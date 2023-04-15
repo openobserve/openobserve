@@ -14,6 +14,7 @@
 
 use dashmap::DashMap;
 use etcd_client::PutOptions;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -27,16 +28,14 @@ use crate::common::json;
 use crate::infra::db::{etcd, Event};
 use crate::service::db;
 
-pub static mut LOCAL_NODE_ID: i32 = 0;
-pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
-pub static LOCAL_NODE_KEY_TTL: i64 = 10; // node ttl, seconds
-pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
+static LOCAL_NODE_KEY_TTL: i64 = 10; // node ttl, seconds
+static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
+static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 
-lazy_static! {
-    pub static ref LOCAL_NODE_UUID: String = load_local_node_uuid();
-    pub static ref LOCAL_NODE_ROLE: Vec<Role> = load_local_node_role();
-    pub static ref NODES: DashMap<String, Node> = DashMap::new();
-}
+pub static mut LOCAL_NODE_ID: i32 = 0;
+pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
+pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
+static NODES: Lazy<DashMap<String, Node>> = Lazy::new(DashMap::new);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {

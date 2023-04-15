@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use bytes::{Bytes, BytesMut};
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -23,10 +24,9 @@ use crate::infra::ider;
 use crate::infra::metrics;
 use crate::meta::StreamType;
 
-lazy_static! {
-    pub static ref LOCKER: Locker = Locker::new();
-    pub static ref FILES: RwLock<HashMap<String, Bytes>> = RwLock::new(HashMap::with_capacity(16));
-}
+static LOCKER: Lazy<Locker> = Lazy::new(Locker::new);
+pub static FILES: Lazy<RwLock<HashMap<String, Bytes>>> =
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(16)));
 
 pub struct Locker {
     data: Arc<Vec<RwData>>,

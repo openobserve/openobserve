@@ -80,7 +80,12 @@ log = "0.4"
 lru = "0.8"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-object_store = { version = "0.5", features = ["aws", "gcp"] }
+object_store = { version = "0.5", features = [
+  "aws",
+  "aws_profile",
+  "azure",
+  "gcp",
+] }
 once_cell = "1.17"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
