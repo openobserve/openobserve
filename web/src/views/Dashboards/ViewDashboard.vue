@@ -39,7 +39,7 @@
           ref="refDateTime"
           v-model="selectedDate"
         />
-        <AutoRefreshInterval v-model="refreshInterval" @trigger="refreshData"/>
+        <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="refresh" @click="refreshData">
         </q-btn>
         <ExportDashboard :dashboardId="list?.[0]?.dashboardId"/>

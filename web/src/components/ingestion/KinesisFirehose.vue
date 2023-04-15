@@ -72,7 +72,6 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
     const accessKey = computed(() => {
-      console.log(`${props.currUserEmail}:${store.state.organizationPasscode}`);
       return b64EncodeUnicode(
         `${props.currUserEmail}:${store.state.organizationPasscode}`
       );
