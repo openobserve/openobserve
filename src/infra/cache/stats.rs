@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use dashmap::DashMap;
+use once_cell::sync::Lazy;
 
 use crate::meta::common::FileMeta;
 use crate::meta::stream::StreamStats;
 use crate::meta::StreamType;
 
-lazy_static! {
-    pub static ref STATS: DashMap<String, StreamStats> = DashMap::with_capacity(2);
-}
+static STATS: Lazy<DashMap<String, StreamStats>> = Lazy::new(DashMap::new);
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 

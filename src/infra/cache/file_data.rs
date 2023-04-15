@@ -14,6 +14,7 @@
 
 use bytes::Bytes;
 use lru::LruCache;
+use once_cell::sync::Lazy;
 use std::cmp::max;
 use std::sync::RwLock;
 
@@ -21,9 +22,7 @@ use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 use crate::infra::storage;
 
-lazy_static! {
-    pub static ref FILES: RwLock<FileData> = RwLock::new(FileData::new());
-}
+static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
 
 pub struct FileData {
     max_size: usize,

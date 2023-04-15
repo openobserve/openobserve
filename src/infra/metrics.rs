@@ -1,4 +1,5 @@
 use actix_web_prometheus::{PrometheusMetrics, PrometheusMetricsBuilder};
+use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
@@ -8,226 +9,350 @@ use super::config::CONFIG;
 
 pub const NAMESPACE: &str = "zo";
 
-lazy_static! {
-    // http latency
-    pub static ref HTTP_INCOMING_REQUESTS: IntCounterVec = IntCounterVec::new(
-        Opts::new( "http_incoming_requests",  "HTTP incoming requests")
+// http latency
+pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new("http_incoming_requests", "HTTP incoming requests")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref HTTP_RESPONSE_TIME: HistogramVec = HistogramVec::new(
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream",
+            "stream_type",
+        ],
+    )
+    .expect("Metric created")
+});
+pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
         HistogramOpts::new("http_response_time", "HTTP response time")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["endpoint","status", "organization", "stream", "stream_type"],
-    ).expect("Metric created");
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream",
+            "stream_type",
+        ],
+    )
+    .expect("Metric created")
+});
 
-    // grpc latency
-    pub static ref GRPC_INCOMING_REQUESTS: IntCounterVec = IntCounterVec::new(
+// grpc latency
+pub static GRPC_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("grpc_incoming_requests", "gRPC incoming requests")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref GRPC_RESPONSE_TIME: HistogramVec = HistogramVec::new(
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream",
+            "stream_type",
+        ],
+    )
+    .expect("Metric created")
+});
+pub static GRPC_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
         HistogramOpts::new("grpc_response_time", "gRPC response time")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["endpoint", "status", "organization", "stream", "stream_type"],
-    ).expect("Metric created");
+        &[
+            "endpoint",
+            "status",
+            "organization",
+            "stream",
+            "stream_type",
+        ],
+    )
+    .expect("Metric created")
+});
 
-    // ingester stats
-    pub static ref INGEST_RECORDS: IntGaugeVec = IntGaugeVec::new(
+// ingester stats
+pub static INGEST_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("ingest_records", "Ingested records")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref INGEST_BYTES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static INGEST_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("ingest_bytes", "Ingested bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref INGEST_WAL_USED_BYTES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("ingest_wal_used_bytes", "Ingestor WAL used bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref INGEST_WAL_WRITE_BYTES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("ingest_wal_write_bytes", "Ingestor WAL write bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref INGEST_WAL_READ_BYTES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("ingest_wal_read_bytes", "Ingestor WAL read bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
+    )
+    .expect("Metric created")
+});
 
-    // querier stats
-    pub static ref QUERY_CACHE_LIMIT_BYTES: IntGaugeVec = IntGaugeVec::new(
+// querier stats
+pub static QUERY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("query_cache_limit_bytes", "Querier cache limit bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
-    ).expect("Metric created");
-    pub static ref QUERY_CACHE_USED_BYTES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static QUERY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("query_cache_used_bytes", "Querier cache used bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref QUERY_CACHE_FILES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static QUERY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("query_cache_files", "Querier cached files")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref QUERY_CACHE_RECORDS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static QUERY_CACHE_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("query_cache_records", "Querier cached records")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
+    )
+    .expect("Metric created")
+});
 
-    // compactor stats
-    pub static ref COMPACT_USED_TIME: CounterVec = CounterVec::new(
+// compactor stats
+pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
         Opts::new("compact_used_time", "Compactor used time")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref COMPACT_MERGED_FILES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static COMPACT_MERGED_FILES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("compact_merged_files", "Compactor merged files")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref COMPACT_MERGED_BYTES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static COMPACT_MERGED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("compact_merged_bytes", "Compactor merged bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref COMPACT_DELAY_HOURS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static COMPACT_DELAY_HOURS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("compact_delay_hours", "Compactor delay hours")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    // TODO deletion / archiving stats
+    )
+    .expect("Metric created")
+});
+// TODO deletion / archiving stats
 
-    // storage stats
-    pub static ref STORAGE_ORIGINAL_BYTES: IntGaugeVec = IntGaugeVec::new(
+// storage stats
+pub static STORAGE_ORIGINAL_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("storage_original_bytes", "Storage original bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_COMPRESSED_BYTES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_COMPRESSED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("storage_compressed_bytes", "Storage compressed bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_FILES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("storage_files", "Storage files")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_RECORDS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("storage_records", "Storage records")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_WRITE_BYTES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("storage_write_bytes", "Storage write bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_READ_BYTES: IntCounterVec = IntCounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("storage_read_bytes", "Storage read bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref STORAGE_TIME: CounterVec = CounterVec::new(
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_TIME: Lazy<CounterVec> = Lazy::new(|| {
+    CounterVec::new(
         Opts::new("storage_time", "Storage response time")
-          .namespace(NAMESPACE)
-          .const_labels(create_const_labels()),
-          &["organization", "stream", "stream_type", "method_type"],
-    ).expect("Metric created");
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["organization", "stream", "stream_type", "method_type"],
+    )
+    .expect("Metric created")
+});
 
-    // metadata stats
-    pub static ref META_STORAGE_BYTES: IntGaugeVec = IntGaugeVec::new(
+// metadata stats
+pub static META_STORAGE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_storage_bytes", "Metadata storage used bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
-    ).expect("Metric created");
-    pub static ref META_STORAGE_KEYS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_STORAGE_KEYS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_storage_keys", "Metadata storage item keys")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
-    ).expect("Metric created");
-    pub static ref META_NUM_NODES: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_NODES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_nodes", "Metadata node nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["node_role"],
-    ).expect("Metric created");
-    pub static ref META_NUM_ORGANIZATIONS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_ORGANIZATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_organizations", "Metadata organization nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
-    ).expect("Metric created");
-    pub static ref META_NUM_STREAMS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_streams", "Metadata stream nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream_type"],
-    ).expect("Metric created");
-    pub static ref META_NUM_USERS_TOTAL: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_USERS_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_users_total", "Metadata user total")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &[],
-    ).expect("Metric created");
-    pub static ref META_NUM_USERS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_USERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_users", "Metadata user nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
-    ).expect("Metric created");
-    pub static ref META_NUM_FUNCTIONS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_FUNCTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_functions", "Metadata function nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type", "function_type"],
-    ).expect("Metric created");
-    pub static ref META_NUM_ALERTS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_alerts", "Metadata alert nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
-    ).expect("Metric created");
-    pub static ref META_NUM_DASHBOARDS: IntGaugeVec = IntGaugeVec::new(
+    )
+    .expect("Metric created")
+});
+pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
         Opts::new("meta_num_dashboards", "Metadata dashboard nums")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["organization"],
-    ).expect("Metric created");
-}
+    )
+    .expect("Metric created")
+});
 
 fn register_metrics(registry: &Registry) {
     // http latency
