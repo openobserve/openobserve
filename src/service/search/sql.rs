@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
-use crate::common::str;
+use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
@@ -525,7 +525,7 @@ impl Sql {
         }
 
         log::info!(
-            "[TRACE] sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}", 
+            "[TRACE] sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
             sql.stream_name,
             sql.meta.fields,
             sql.meta.quick_text,
@@ -558,7 +558,7 @@ impl Sql {
         }
 
         // check partition key
-        if !self.filter_source_by_partition_key(source).await {
+        if !self.filter_source_by_partition_key(source) {
             return false;
         }
 
@@ -591,28 +591,24 @@ impl Sql {
         true
     }
 
-    /// filter source by partition key
-    pub async fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        // check partition key
-        for key in &self.meta.quick_text {
-            let field = logs::get_partition_key_query(format!("{}=", key.0).as_str());
-            let value = logs::get_partition_key_query(format!("{}={}", key.0, key.1).as_str());
-            if str::find(source, &format!("/{field}")) && !str::find(source, &format!("/{value}/"))
-            {
-                return false;
-            }
-        }
-        true
+    pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
+        path_matches_by_partition_key(
+            source,
+            self.meta
+                .quick_text
+                .iter()
+                .map(|(k, v, _)| (k.as_str(), v.as_str())),
+        )
     }
 }
 
 fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
-    if str::find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
+    if find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
         return true;
     }
     for (_, sql) in sql.aggs.iter() {
-        if str::find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
+        if find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
             return true;
         }
     }
@@ -734,6 +730,25 @@ fn split_sql_token(text: &str) -> Vec<String> {
     tokens
 }
 
+/// Whether we should search this `path`, given the search criteria.
+///
+/// `partitions` is a list of partition key-value pairs.
+///
+/// For example, the `path` argument may look something like
+/// `"files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet"`.
+///
+/// The corresponding SQL query:
+/// `"SELECT * FROM gke_fluentbit WHERE kubernetes_host='gke-dev1' AND kubernetes_namespace_name='ziox-qqx'"`.
+fn path_matches_by_partition_key<'a>(
+    path: &str,
+    partitions: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> bool {
+    !partitions.into_iter().any(|(k, v)| {
+        let field = logs::get_partition_key_query(&format!("{k}="));
+        let value = logs::get_partition_key_query(&format!("{k}={v}"));
+        find(path, &format!("/{field}")) && !find(path, &format!("/{value}/"))
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -936,5 +951,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_matches_by_partition_key() {
+        let f = path_matches_by_partition_key;
+        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet";
+        assert!(f(path, vec![]));
+        assert!(!f(path, vec![("kubernetes_host", "")]));
+        assert!(f(path, vec![("kubernetes_host", "gke-dev1")]));
+        assert!(!f(&path, vec![("kubernetes_host", "gke-dev2")]));
+        assert!(
+            f(path, vec![("some_other_key", "no-matter")]),
+            "Partition key was not found ==> the Parquet file has to be searched"
+        );
+        assert!(f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+        assert!(!f(
+            path,
+            vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
     }
 }
