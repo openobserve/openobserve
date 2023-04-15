@@ -174,6 +174,8 @@ pub async fn delete_stream_function(
     if let Some(val) = existing_fn.streams.clone() {
         if val.len() == 1 && val.first().unwrap().stream == stream_name {
             existing_fn.streams = None;
+            // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
+            STREAM_FUNCTIONS.remove(&format!("{}/{}/{}", org_id, stream_type, stream_name));
         } else {
             existing_fn.streams = Some(
                 val.into_iter()
