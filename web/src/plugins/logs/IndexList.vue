@@ -428,7 +428,6 @@ export default defineComponent({
 
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
-      console.log(term);
       searchObj.data.stream.addToFilter = term;
     };
 

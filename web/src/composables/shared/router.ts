@@ -20,6 +20,7 @@ import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import AddPanel from "@/views/Dashboards/addPanel/AddPanel.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Search from "@/views/Search.vue";
+import AppMetrics from "@/views/AppMetrics.vue";
 import LogStream from "@/views/LogStream.vue";
 import Functions from "@/views/Functions.vue";
 import Alerts from "@/views/AppAlerts.vue";
@@ -54,6 +55,14 @@ const useRoutes = () => {
       path: "logs",
       name: "logs",
       component: Search,
+      meta: {
+        keepAlive: true,
+      },
+    },
+    {
+      path: "metrics",
+      name: "metrics",
+      component: AppMetrics,
       meta: {
         keepAlive: true,
       },

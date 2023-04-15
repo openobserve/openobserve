@@ -26,19 +26,17 @@ use crate::service::triggers;
 
 #[cfg_attr(coverage_nightly, no_coverage)]
 pub async fn run() -> Result<(), anyhow::Error> {
-    for item in TRIGGERS.iter() {
-        if !item.is_ingest_time {
-            let local_item = item.clone();
-            tokio::task::spawn(async move {
-                handle_triggers(&local_item.alert_name.clone(), local_item.clone()).await
-            });
+    for trigger in TRIGGERS.iter() {
+        if !trigger.is_ingest_time {
+            let trigger = trigger.clone();
+            tokio::task::spawn(async move { handle_triggers(trigger).await });
         }
     }
     Ok(())
 }
 
 #[cfg_attr(coverage_nightly, no_coverage)]
-pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
+pub async fn handle_triggers(trigger: Trigger) {
     match super::db::alerts::get(
         &trigger.org,
         &trigger.stream,
@@ -47,11 +45,14 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
     )
     .await
     {
+        Err(_) => log::error!("[ALERT MANAGER] Error fetching alert"),
         Ok(result) => {
             if let Some(alert) = result {
-                if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {
-                    let mut curr_time =
-                        TRIGGERS_IN_PROCESS.get_mut(&alert_name.to_owned()).unwrap();
+                if TRIGGERS_IN_PROCESS
+                    .clone()
+                    .contains_key(&trigger.alert_name)
+                {
+                    let mut curr_time = TRIGGERS_IN_PROCESS.get_mut(&trigger.alert_name).unwrap();
                     let delay = trigger.timestamp - curr_time.updated_at;
                     if delay > 0 {
                         log::info!(
@@ -66,29 +67,25 @@ pub async fn handle_triggers(alert_name: &str, trigger: Trigger) {
                         Utc::now().timestamp_micros() + get_micros_from_min(alert.duration); // * 60 * 1000000;
                     log::info!("Setting timeout for trigger to {}", expires_at);
                     TRIGGERS_IN_PROCESS.insert(
-                        alert_name.to_owned(),
+                        trigger.alert_name.clone(),
                         TriggerTimer {
                             updated_at: trigger.timestamp,
                             expires_at,
                         },
                     );
-                    handle_trigger(alert_name, alert.frequency).await;
+                    handle_trigger(&trigger.alert_name, alert.frequency).await;
                 }
             }
         }
-        Err(_) => log::error!("[ALERT MANAGER] Error fetching alert",),
     }
 }
 
 #[cfg_attr(coverage_nightly, no_coverage)]
-pub async fn handle_trigger(alert_name: &str, frequency: i64) {
-    let mut interval = time::interval(time::Duration::from_secs(
-        (frequency * 60).try_into().unwrap(),
-    ));
+async fn handle_trigger(alert_name: &str, frequency: i64) {
+    let mut interval = time::interval(time::Duration::from_secs((frequency * 60) as _));
 
     loop {
         interval.tick().await;
-        //let curr_ts = Utc::now().timestamp_micros();
         let loc_triggers = TRIGGERS.clone();
         let trigger = loc_triggers.get(&alert_name.to_owned()).unwrap();
         if TRIGGERS_IN_PROCESS.clone().contains_key(alert_name) {

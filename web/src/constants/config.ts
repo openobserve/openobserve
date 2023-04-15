@@ -10,14 +10,14 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 export const config = {
- userPoolsId : import.meta.env.VITE_USER_POOLS_ID,
- webClientId : import.meta.env.VITE_WEB_CLIENT_ID,
- oAuthDomain : import.meta.env.VITE_OAUTH_DOMAIN,
- redirectSignIn: import.meta.env.VITE_REDIRECT_SIGNIN,
- redirectSignOut: import.meta.env.VITE_REDIRECT_SIGNOUT,
- responseType: "CODE",
- scope: "",
+  userPoolsId: import.meta.env.VITE_USER_POOLS_ID,
+  webClientId: import.meta.env.VITE_WEB_CLIENT_ID,
+  oAuthDomain: import.meta.env.VITE_OAUTH_DOMAIN,
+  redirectSignIn: import.meta.env.VITE_REDIRECT_SIGNIN,
+  redirectSignOut: import.meta.env.VITE_REDIRECT_SIGNOUT,
+  responseType: "CODE",
+  scope: "",
 };
