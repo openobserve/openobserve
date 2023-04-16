@@ -20,6 +20,7 @@ use crate::common::file::put_file_contents;
 use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 
+#[derive(Default)]
 pub struct Local {}
 
 #[async_trait]
