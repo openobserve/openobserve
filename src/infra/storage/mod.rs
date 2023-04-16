@@ -19,7 +19,7 @@ use chrono::{TimeZone, Utc};
 use crate::{common::utils::is_local_disk_storage, infra::ider, meta::StreamType};
 
 pub mod local;
-pub mod s3;
+pub mod remote;
 
 #[async_trait]
 pub trait FileStorage: Sync + 'static {
@@ -37,7 +37,7 @@ pub fn default() -> Box<dyn FileStorage> {
     if is_local_disk_storage() {
         Box::<local::Local>::default()
     } else {
-        Box::<s3::S3>::default()
+        Box::<remote::Remote>::default()
     }
 }
 

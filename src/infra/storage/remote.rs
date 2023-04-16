@@ -22,14 +22,14 @@ use super::FileStorage;
 use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 
-static S3CLIENT: Lazy<Arc<Box<dyn object_store::ObjectStore>>> =
-    Lazy::new(|| Arc::new(init_s3_client()));
+static CLIENT: Lazy<Arc<Box<dyn object_store::ObjectStore>>> =
+    Lazy::new(|| Arc::new(init_client()));
 
 #[derive(Default)]
-pub struct S3 {}
+pub struct Remote {}
 
 #[async_trait]
-impl FileStorage for S3 {
+impl FileStorage for Remote {
     async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
         let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
             && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
@@ -38,7 +38,7 @@ impl FileStorage for S3 {
         } else {
             prefix.to_string()
         };
-        let client = S3CLIENT.clone();
+        let client = CLIENT.clone();
         let list_stream = client
             .list(Some(&(prefix.into())))
             .await
@@ -59,7 +59,7 @@ impl FileStorage for S3 {
             } else {
                 file.to_string()
             };
-        let object = match S3CLIENT.clone().get(&(key.into())).await {
+        let object = match CLIENT.clone().get(&(key.into())).await {
             Ok(ret) => ret,
             Err(e) => {
                 log::error!("s3 get object {} error: {:?}", file, e);
@@ -93,7 +93,7 @@ impl FileStorage for S3 {
                 file.to_string()
             };
         let data_size = data.len();
-        match S3CLIENT.clone().put(&(key.into()), data).await {
+        match CLIENT.clone().put(&(key.into()), data).await {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
@@ -125,7 +125,7 @@ impl FileStorage for S3 {
         let start_time = Instant::now();
         let columns = files[0].split('/').collect::<Vec<&str>>();
 
-        let client = S3CLIENT.clone();
+        let client = CLIENT.clone();
         for file in files {
             let key = if !CONFIG.s3.bucket_prefix.is_empty()
                 && !file.starts_with(&CONFIG.s3.bucket_prefix)
@@ -205,7 +205,7 @@ fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStora
         .build()
 }
 
-fn init_s3_client() -> Box<dyn object_store::ObjectStore> {
+fn init_client() -> Box<dyn object_store::ObjectStore> {
     if CONFIG.common.print_key_config {
         log::info!("s3 init config: {:?}", CONFIG.s3);
     }
