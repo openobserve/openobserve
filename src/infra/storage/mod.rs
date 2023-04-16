@@ -35,9 +35,9 @@ lazy_static! {
 
 pub fn default() -> Box<dyn FileStorage> {
     if is_local_disk_storage() {
-        Box::new(local::Local {})
+        Box::<local::Local>::default()
     } else {
-        Box::new(s3::S3 {})
+        Box::<s3::S3>::default()
     }
 }
 

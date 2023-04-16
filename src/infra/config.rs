@@ -293,12 +293,10 @@ pub struct S3 {
     pub bucket_name: String,
     #[env_config(name = "ZO_S3_BUCKET_PREFIX", default = "")]
     pub bucket_prefix: String,
+    #[env_config(name = "ZO_S3_CONNECT_TIMEOUT", default = 10)] // seconds
+    pub connect_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
-    #[env_config(name = "ZO_S3_FEATURE_LIST_OBJECTS_V2", default = false)]
-    pub feature_list_objects_v2: bool,
-    #[env_config(name = "ZO_S3_FEATURE_DELETE_OBJECTS", default = false)]
-    pub feature_delete_objects: bool,
 }
 
 pub fn init() -> Config {
@@ -468,28 +466,18 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     match cfg.s3.provider.as_str() {
         "aws" => {
             cfg.s3.feature_force_path_style = false;
-            cfg.s3.feature_list_objects_v2 = true;
-            cfg.s3.feature_delete_objects = true;
         }
         "gcs" => {
             cfg.s3.feature_force_path_style = false;
-            cfg.s3.feature_list_objects_v2 = true;
-            cfg.s3.feature_delete_objects = false;
         }
         "oss" => {
             cfg.s3.feature_force_path_style = false;
-            cfg.s3.feature_list_objects_v2 = true;
-            cfg.s3.feature_delete_objects = true;
         }
         "minio" => {
             cfg.s3.feature_force_path_style = true;
-            cfg.s3.feature_list_objects_v2 = true;
-            cfg.s3.feature_delete_objects = true;
         }
         "swift" => {
             cfg.s3.feature_force_path_style = true;
-            cfg.s3.feature_list_objects_v2 = true;
-            cfg.s3.feature_delete_objects = true;
             std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
         }
         _ => {}
