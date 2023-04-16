@@ -13,20 +13,28 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use futures::TryStreamExt;
-use once_cell::sync::Lazy;
-use std::sync::Arc;
+use futures::{StreamExt, TryStreamExt};
+use object_store::limit::LimitStore;
+use object_store::ObjectStore;
 use std::time::Instant;
 
 use super::FileStorage;
 use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 
-static CLIENT: Lazy<Arc<Box<dyn object_store::ObjectStore>>> =
-    Lazy::new(|| Arc::new(init_client()));
+const CONCURRENT_REQUESTS: usize = 1000;
 
-#[derive(Default)]
-pub struct Remote {}
+pub struct Remote {
+    client: LimitStore<Box<dyn object_store::ObjectStore>>,
+}
+
+impl Default for Remote {
+    fn default() -> Self {
+        Self {
+            client: LimitStore::new(init_client(), CONCURRENT_REQUESTS),
+        }
+    }
+}
 
 #[async_trait]
 impl FileStorage for Remote {
@@ -38,8 +46,8 @@ impl FileStorage for Remote {
         } else {
             prefix.to_string()
         };
-        let client = CLIENT.clone();
-        let list_stream = client
+        let list_stream = self
+            .client
             .list(Some(&(prefix.into())))
             .await
             .expect("Error listing files");
@@ -59,7 +67,7 @@ impl FileStorage for Remote {
             } else {
                 file.to_string()
             };
-        let object = match CLIENT.clone().get(&(key.into())).await {
+        let object = match self.client.get(&(key.into())).await {
             Ok(ret) => ret,
             Err(e) => {
                 log::error!("s3 get object {} error: {:?}", file, e);
@@ -93,7 +101,7 @@ impl FileStorage for Remote {
                 file.to_string()
             };
         let data_size = data.len();
-        match CLIENT.clone().put(&(key.into()), data).await {
+        match self.client.put(&(key.into()), data).await {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
@@ -125,18 +133,26 @@ impl FileStorage for Remote {
         let start_time = Instant::now();
         let columns = files[0].split('/').collect::<Vec<&str>>();
 
-        let client = CLIENT.clone();
-        for file in files {
-            let key = if !CONFIG.s3.bucket_prefix.is_empty()
-                && !file.starts_with(&CONFIG.s3.bucket_prefix)
-            {
-                format!("{}{}", CONFIG.s3.bucket_prefix, file)
-            } else {
-                file.to_string()
-            };
-            client.delete(&(key.into())).await?;
-            tokio::task::yield_now().await; // yield to other tasks
-        }
+        let files = files
+            .iter()
+            .map(|file| {
+                if !CONFIG.s3.bucket_prefix.is_empty()
+                    && !file.starts_with(&CONFIG.s3.bucket_prefix)
+                {
+                    format!("{}{}", CONFIG.s3.bucket_prefix, file)
+                } else {
+                    file.to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+        let files_stream = futures::stream::iter(files);
+        files_stream
+            .for_each_concurrent(None, |file| async {
+                if let Err(e) = self.client.delete(&(file.into())).await {
+                    log::error!("s3 Failed to delete object: {:?}", e);
+                }
+            })
+            .await;
 
         if columns[0] == "files" {
             let time = start_time.elapsed().as_secs_f64();
