@@ -464,14 +464,8 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
     match cfg.s3.provider.as_str() {
-        "aws" => {
-            cfg.s3.feature_force_path_style = false;
-        }
-        "gcs" => {
-            cfg.s3.feature_force_path_style = false;
-        }
         "oss" => {
-            cfg.s3.feature_force_path_style = false;
+            cfg.s3.feature_force_path_style = true;
         }
         "minio" => {
             cfg.s3.feature_force_path_style = true;

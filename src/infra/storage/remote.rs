@@ -175,33 +175,32 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
 }
 
 fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
-    object_store::azure::MicrosoftAzureBuilder::new()
+    let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout)),
         )
-        .with_account(&CONFIG.s3.access_key)
-        .with_access_key(&CONFIG.s3.secret_key)
-        .with_container_name(&CONFIG.s3.bucket_name)
-        .build()
+        .with_container_name(&CONFIG.s3.bucket_name);
+    if !CONFIG.s3.access_key.is_empty() {
+        builder = builder.with_account(&CONFIG.s3.access_key);
+    }
+    if !CONFIG.s3.secret_key.is_empty() {
+        builder = builder.with_access_key(&CONFIG.s3.secret_key);
+    }
+    builder.build()
 }
 
 fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
-    object_store::gcp::GoogleCloudStorageBuilder::new()
+    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout)),
         )
-        .with_service_account_key(
-            r#"{
-    "gcs_base_url": "https://localhost:4443",
-    "disable_oauth": true,
-    "client_email": "",
-    "private_key": ""
- }"#,
-        )
-        .with_bucket_name(&CONFIG.s3.bucket_name)
-        .build()
+        .with_bucket_name(&CONFIG.s3.bucket_name);
+    if !CONFIG.s3.access_key.is_empty() {
+        builder = builder.with_service_account_path(&CONFIG.s3.access_key);
+    }
+    builder.build()
 }
 
 fn init_client() -> Box<dyn object_store::ObjectStore> {
@@ -222,7 +221,7 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
                 panic!("azure init config error: {:?}", e);
             }
         },
-        "gcs" => match init_gcp_config() {
+        "gcs" | "gcp" => match init_gcp_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
                 panic!("gcp init config error: {:?}", e);
