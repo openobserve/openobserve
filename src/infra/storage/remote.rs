@@ -149,30 +149,29 @@ impl FileStorage for Remote {
     }
 }
 
-fn init_aws_env_config() -> object_store::Result<object_store::aws::AmazonS3> {
-    object_store::aws::AmazonS3Builder::from_env()
-        .with_bucket_name(&CONFIG.s3.bucket_name)
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout)),
-        )
-        .build()
-}
-
 fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
-    object_store::aws::AmazonS3Builder::new()
+    let mut builder = object_store::aws::AmazonS3Builder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
                 .with_allow_http(true),
         )
-        .with_endpoint(&CONFIG.s3.server_url)
-        .with_region(&CONFIG.s3.region_name)
-        .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style)
-        .with_access_key_id(&CONFIG.s3.access_key)
-        .with_secret_access_key(&CONFIG.s3.secret_key)
+        .with_profile("default")
         .with_bucket_name(&CONFIG.s3.bucket_name)
-        .build()
+        .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style);
+    if !CONFIG.s3.server_url.is_empty() {
+        builder = builder.with_endpoint(&CONFIG.s3.server_url);
+    }
+    if !CONFIG.s3.region_name.is_empty() {
+        builder = builder.with_region(&CONFIG.s3.region_name);
+    }
+    if !CONFIG.s3.access_key.is_empty() {
+        builder = builder.with_access_key_id(&CONFIG.s3.access_key);
+    }
+    if !CONFIG.s3.secret_key.is_empty() {
+        builder = builder.with_secret_access_key(&CONFIG.s3.secret_key);
+    }
+    builder.build()
 }
 
 fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
@@ -211,7 +210,7 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
     }
 
     match CONFIG.s3.provider.as_str() {
-        "aws" | "s3" => match init_aws_env_config() {
+        "aws" | "s3" => match init_aws_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
                 panic!("s3 init config error: {:?}", e);

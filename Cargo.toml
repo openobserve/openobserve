@@ -79,6 +79,7 @@ memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 object_store = { version = "0.5", features = [
   "aws",
+  "aws_profile",
   "azure",
   "gcp",
 ] }
