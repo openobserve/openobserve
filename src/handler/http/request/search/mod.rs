@@ -18,11 +18,10 @@ use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
 use std::time::Instant;
-use tokio::sync::Mutex;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, LOCKER};
+use crate::infra::config::CONFIG;
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -115,14 +114,6 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(bad_request(e));
     }
-
-    log::info!("get search request before lock: {:?}", in_req.path());
-    // get a local search queue lock
-    let locker = LOCKER
-        .entry("search/local_queue".to_string())
-        .or_insert(Mutex::new(true));
-    let _locker = locker.lock().await;
-    log::info!("get search request after lock: {:?}", in_req.path());
 
     // do search
     match SearchService::search(&org_id, stream_type, &req).await {
@@ -244,12 +235,6 @@ pub async fn around(
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
-
-    // get a local search queue lock
-    let locker = LOCKER
-        .entry("search/local_queue".to_string())
-        .or_insert(Mutex::new(true));
-    let _locker = locker.lock();
 
     // search forward
     let req = meta::search::Request {
