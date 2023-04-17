@@ -325,8 +325,12 @@
                   timeout: 2000,
                 });
               }
+            }).catch((err) => {
+              $q.notify({
+                type: "negative",
+                message: JSON.stringify(err.response.data["message"])  || "Function deletion failed.",
             });
-        // }
+          });
   
         segment.track("Button Click", {
           button: "Delete Function",
