@@ -48,50 +48,19 @@ const defaultObject = {
   meta: {
     refreshInterval: "0",
     refreshIntervalLabel: "Off",
-    showFields: true,
-    showQuery: true,
-    showHistogram: true,
-    showDetailTab: false,
-    sqlMode: false,
-    resultGrid: {
-      wrapCells: false,
-      manualRemoveFields: false,
-      rowsPerPage: 150,
-      chartInterval: "1 second",
-      chartKeyFormat: "HH:mm:ss",
-      navigation: {
-        currentRowIndex: 0,
-      },
-    },
-    scrollInfo: {},
+    totalMetricValues: 1000,
   },
   data: {
-    query: "",
-    parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
     additionalErrorMsg: "",
-    stream: {
-      streamLists: [],
-      selectedStream: { label: "", value: "" },
-      selectedStreamFields: [],
-      selectedFields: <string[]>[],
-      filterField: "",
-      addToFilter: "",
-      functions: [],
+    metrics: {
+      metricList: [],
       selectedMetrics: [] as string[],
     },
-    resultGrid: {
-      currentDateTime: new Date(),
-      currentPage: 0,
-      columns: <any>[],
-    },
-    transforms: <any>[],
     queryResults: <any>[],
-    sortedQueryResults: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
-    editorValue: "",
     datetime: {
       tab: "relative",
       relative: {
@@ -109,11 +78,6 @@ const defaultObject = {
         startTime: "00:00",
         endTime: "23:59",
       },
-    },
-    searchAround: {
-      indexTimestamp: 0,
-      size: <number>10,
-      histogramHide: false,
     },
   },
 };

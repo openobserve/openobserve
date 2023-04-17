@@ -16,7 +16,7 @@
 <template>
   <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Kinesis Firehose</div>
+      <div class="title" data-test="vector-title-text">KINESIS FIREHOSE</div>
       <div class="copy_action">
         <q-btn
           data-test="kinesisfirehose-copy-btn"
@@ -30,8 +30,10 @@
       </div>
     </div>
     <pre ref="kinesisFirehoseContent" data-test="vector-content-text">
-URL: {{ endpoint.url }}/aws/{{ currOrgIdentifier }}/default/_kinesis_firehose
-X-Amz-Firehose-Access-Key: {{ accessKey }}
+HTTP Endpoint: {{ endpoint.url }}/aws/{{
+        currOrgIdentifier
+      }}/default/_kinesis_firehose
+Access Key: {{ accessKey }}
 </pre
     >
   </div>

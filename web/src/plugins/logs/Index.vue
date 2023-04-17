@@ -327,9 +327,7 @@ export default defineComponent({
             searchObj.data.streamResults = res.data;
 
             if (res.data.list.length > 0) {
-              if (config.isZincObserveCloud == "true") {
-                getQueryTransform();
-              }
+              getQueryTransform();
 
               //extract stream data from response
               loadStreamLists();
