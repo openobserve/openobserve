@@ -19,7 +19,7 @@
               (modelValue.toString() === '0' ? 'selected' : '')
             "
             v-close-popup
-            @click="onItemClick(0)"
+            @click="onItemClick({ label: 'Off', value: 0 })"
           >
             Off
           </q-btn>
