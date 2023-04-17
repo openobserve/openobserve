@@ -40,15 +40,15 @@
             {{ col.value }}
           </q-td>
         </q-tr>
-        <q-tr v-show="expandedRow == props.row.name" :props="props"
-          style="height: min-content; background-color: #e8e8e8">
+        <q-tr v-show="expandedRow == props.row.name" :props="props" no-hover
+          style="height: min-content; background-color: white; border: 1px solid black;">
           <q-td colspan="100%">
             <div v-show="loadingFunctions == props.row.name" class="q-pl-md q-py-xs" style="height: 60px">
               <q-inner-loading size="sm" :showing="loadingFunctions == props.row.name" label="Fetching functions..."
                 label-style="font-size: 1.1em" />
             </div>
             <div v-show="loadingFunctions != props.row.name">
-              <q-table :rows="functionsList" :columns="functionsColumns" :title="t('function.associatedFunctionHeader')">
+              <q-table class="border" hide-bottom bordered :rows="functionsList" :columns="functionsColumns" :title="t('function.associatedFunctionHeader')">
                 <template v-slot:body="props">
                   <q-tr :props="props">
                     <q-td key="#" :props="props"> {{ props.pageIndex + 1 }} </q-td>
@@ -84,17 +84,23 @@
                     <q-td></q-td>
                   </q-tr>
                 </template>
-                <template v-slot:bottom>
-                  <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                <template v-slot:top>
+                  <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
+                    <div class="q-table__title row items-center" data-test="log-stream-title-text">
+                      {{ t('function.associatedFunctionHeader') }}
+                    </div>
+                    <q-btn color="secondary" class="q-ml-md q-mb-xs text-bold no-border"
+                     @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                  </div>
                 </template>
                 <template v-slot:no-data>
                 <div style="width:100%; display: flex; flex-direction: column;">
                   <div v-if="!functionsList.length && !addFunctionInProgress" style="width: 100%; text-align: center;">
                     No functions found
                   </div>
-                  <div>
+                  <!-- <div>
                     <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
-                  </div>
+                  </div> -->
                 </div>
                 </template>
               </q-table>
