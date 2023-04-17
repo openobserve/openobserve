@@ -31,7 +31,7 @@
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
           <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
             class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+            v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
             tabindex="0" />
         </div>
 

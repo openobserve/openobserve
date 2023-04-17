@@ -26,7 +26,7 @@
                 <template v-slot:body-cell-actions="props">
                     <q-td :props="props">
                         <q-btn icon="transform" class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
-                            :title="t('function.add')" @click="showAddUpdateFn(props)"></q-btn>
+                            :title="t('function.updateTitle')" @click="showAddUpdateFn(props)"></q-btn>
                         <q-btn :icon="'img:' + getImageURL('images/common/delete_icon.svg')" class="q-ml-xs iconHoverBtn"
                             padding="sm" unelevated size="sm" round flat :title="t('function.delete')"
                             @click="showDeleteDialogFn(props)"></q-btn>

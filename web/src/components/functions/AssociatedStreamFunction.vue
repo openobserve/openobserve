@@ -41,23 +41,23 @@
           </q-td>
         </q-tr>
         <q-tr v-show="expandedRow == props.row.name" :props="props"
-          style="height: min-content; background-color: lightgray">
+          style="height: min-content; background-color: #e8e8e8">
           <q-td colspan="100%">
             <div v-show="loadingFunctions == props.row.name" class="q-pl-md q-py-xs" style="height: 60px">
               <q-inner-loading size="sm" :showing="loadingFunctions == props.row.name" label="Fetching functions..."
                 label-style="font-size: 1.1em" />
             </div>
             <div v-show="loadingFunctions != props.row.name">
-              <q-table :rows="functionsList" :columns="functionsColumns">
+              <q-table :rows="functionsList" :columns="functionsColumns" :title="t('function.associatedFunctionHeader')">
                 <template v-slot:body="props">
-                  <q-tr v-for="(item, index) in functionsList" :key="item.name">
-                    <q-td> {{ index + 1 }} </q-td>
-                    <q-td> {{ item.name }} </q-td>
-                    <q-td> {{ item.order }} </q-td>
-                    <q-td>
+                  <q-tr :props="props">
+                    <q-td key="#" :props="props"> {{ props.pageIndex + 1 }} </q-td>
+                    <q-td key="name" :props="props"> {{ props.row.name }} </q-td>
+                    <q-td key="order" :props="props"> {{ props.row.order }} </q-td>
+                    <q-td key="actions" :props="props">
                       <q-btn 
                         :icon="'img:' + getImageURL('images/common/delete_icon.svg')" :title="t('dashboard.delete')"
-                        class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat @click.stop="deleteFunctionFromStream(item.name)"></q-btn>
+                        class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat @click.stop="deleteFunctionFromStream(props.row.name)"></q-btn>
                     </q-td>
                   </q-tr>
                 </template>
@@ -65,8 +65,20 @@
                   <q-tr v-if="addFunctionInProgress">
                     <q-td></q-td>
                     <q-td>
-                      <q-select v-model="selectedFunction" option-value="name" option-label="name"
-                        :options="allFunctionsList" :loading="addFunctionInProgressLoading" :disable="addFunctionInProgressLoading" dense></q-select>
+                      <q-select v-model="selectedFunction"
+                        option-value="name"
+                        option-label="name"
+                        label="Select function..."
+                        :options="filterFunctions"
+                        :loading="addFunctionInProgressLoading"
+                        :disable="addFunctionInProgressLoading"
+                        filled
+                        borderless
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        @filter = 'filterFn'></q-select>
                     </q-td>
                     <q-td></q-td>
                     <q-td></q-td>
@@ -235,6 +247,7 @@ export default defineComponent({
     const expandedRow = ref(null)
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any|null>(null);
+    const filterFunctions = ref([])
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
@@ -300,6 +313,15 @@ export default defineComponent({
       });
     };
 
+    const filterFn = (val: string, update: any) => {
+      update(() => {
+        const needle = val.toLowerCase();
+        filterFunctions.value = allFunctionsList.value.filter(
+          (v: any) => v.name.toLowerCase().indexOf(needle) > -1
+        );
+      });
+    };
+
     getLogStream();
 
     const getAllFunctions = () => {
@@ -314,6 +336,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           allFunctionsList.value = res.data?.list || []
+          filterFunctions.value = res.data?.list || []
         }).catch((err) => {
           $q.notify({
             type: "negative",
@@ -326,10 +349,14 @@ export default defineComponent({
     watch([selectedFunction], async () => {
       console.log('selected function value triggered')
       if(selectedFunction.value) {
-      console.log('selected function save triggered')
+      console.log('selected function save triggered', functionsList.value )
         // save it
+        const order = functionsList.value.reduce((prev: any, current:any) => {
+           return (prev == null || prev.order < current.order) ? current : prev
+        }, null)?.order || 0
+
         const apiData = {
-          order: functionsList.value.reduce((prev: any, current:any) => (prev == null || prev.value < current.value) ? current : prev, null)?.order || 1
+          order: order + 1
         }
         console.log(apiData)
         addFunctionInProgressLoading.value = true
@@ -499,6 +526,8 @@ export default defineComponent({
       addFunctionInProgress,
       allFunctionsList,
       selectedFunction,
+      filterFn,
+      filterFunctions,
       addFunctionInProgressLoading,
       toggleStreamRow,
       filterData(rows: any, terms: any) {
@@ -539,12 +568,15 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
+<style lang="scss" scoped>
+:deep(.q-table__top) {
+  border-bottom: 1px solid $border-color;
+  justify-content: flex-start !important;
+}
+
+:deep(.q-table__title) {
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .confirmBody {
