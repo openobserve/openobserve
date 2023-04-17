@@ -1,0 +1,617 @@
+<!-- Copyright 2022 Zinc Labs Inc. and Contributors
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http:www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License. 
+-->
+
+<!-- eslint-disable vue/v-on-event-hyphenation -->
+<!-- eslint-disable vue/attribute-hyphenation -->
+<template>
+  <q-page class="q-pa-none" style="min-height: inherit">
+    <q-table data-test="log-stream-table" ref="qTable" v-model:selected="selected" :rows="logStream" :columns="columns"
+      row-key="name" :pagination="pagination" :filter="filterQuery" :filter-method="filterData" style="width: 100%">
+      <template #no-data>
+        <NoData />
+      </template>
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th auto-width />
+          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
+      <template v-slot:body="props">
+        <q-tr :props="props" style="cursor: pointer;" @click="toggleStreamRow(props)">
+          <q-td auto-width>
+            <q-btn dense flat size="xs"
+              :icon="expandedRow != props.row.name ? 'img:' + getImageURL('images/common/down-solid.svg') : 'img:' + getImageURL('images/common/up-solid.svg')" />
+          </q-td>
+          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+            {{ col.value }}
+          </q-td>
+        </q-tr>
+        <q-tr v-show="expandedRow == props.row.name" :props="props"
+          style="height: min-content; background-color: #e8e8e8">
+          <q-td colspan="100%">
+            <div v-show="loadingFunctions == props.row.name" class="q-pl-md q-py-xs" style="height: 60px">
+              <q-inner-loading size="sm" :showing="loadingFunctions == props.row.name" label="Fetching functions..."
+                label-style="font-size: 1.1em" />
+            </div>
+            <div v-show="loadingFunctions != props.row.name">
+              <q-table :rows="functionsList" :columns="functionsColumns" :title="t('function.associatedFunctionHeader')">
+                <template v-slot:body="props">
+                  <q-tr :props="props">
+                    <q-td key="#" :props="props"> {{ props.pageIndex + 1 }} </q-td>
+                    <q-td key="name" :props="props"> {{ props.row.name }} </q-td>
+                    <q-td key="order" :props="props"> {{ props.row.order }} </q-td>
+                    <q-td key="actions" :props="props">
+                      <q-btn 
+                        :icon="'img:' + getImageURL('images/common/delete_icon.svg')" :title="t('dashboard.delete')"
+                        class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat @click.stop="deleteFunctionFromStream(props.row.name)"></q-btn>
+                    </q-td>
+                  </q-tr>
+                </template>
+                <template v-slot:bottom-row>
+                  <q-tr v-if="addFunctionInProgress">
+                    <q-td></q-td>
+                    <q-td>
+                      <q-select v-model="selectedFunction"
+                        option-value="name"
+                        option-label="name"
+                        label="Select function..."
+                        :options="filterFunctions"
+                        :loading="addFunctionInProgressLoading"
+                        :disable="addFunctionInProgressLoading"
+                        filled
+                        borderless
+                        dense
+                        use-input
+                        hide-selected
+                        fill-input
+                        @filter = 'filterFn'></q-select>
+                    </q-td>
+                    <q-td></q-td>
+                    <q-td></q-td>
+                  </q-tr>
+                </template>
+                <template v-slot:bottom>
+                  <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                </template>
+                <template v-slot:no-data>
+                <div style="width:100%; display: flex; flex-direction: column;">
+                  <div v-if="!functionsList.length && !addFunctionInProgress" style="width: 100%; text-align: center;">
+                    No functions found
+                  </div>
+                  <div>
+                    <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                  </div>
+                </div>
+                </template>
+              </q-table>
+            </div>
+          </q-td>
+
+        </q-tr>
+      </template>
+
+      <template #top="scope">
+        <div class="q-table__title" data-test="log-stream-title-text">
+          {{ t("logStream.header") }}
+        </div>
+        <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
+          :placeholder="t('logStream.search')">
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+        <q-btn data-test="log-stream-refresh-stats-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
+          color="secondary" no-caps icon="refresh" :label="t(`logStream.refreshStats`)" @click="getLogStream" />
+
+        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :pageTitle="t('logStream.header')"
+          :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="top"
+          @update:changeRecordPerPage="changePagination" />
+      </template>
+
+      <template #bottom="scope">
+        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions" position="bottom" @update:changeRecordPerPage="changePagination" />
+      </template>
+    </q-table>
+    <q-dialog v-model="showIndexSchemaDialog" position="right" full-height maximized>
+      <SchemaIndex v-model="schemaData" />
+    </q-dialog>
+
+  </q-page>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, onActivated, onMounted, watch } from "vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar, type QTableProps } from "quasar";
+import { useI18n } from "vue-i18n";
+import jsTransformService from "../../services/jstransform"
+
+import QTablePagination from "../shared/grid/Pagination.vue";
+import streamService from "../../services/stream";
+import SchemaIndex from "../logstream/schema.vue";
+import NoData from "../shared/grid/NoData.vue";
+import segment from "../../services/segment_analytics";
+import { getImageURL } from "../../utils/zincutils";
+
+export default defineComponent({
+  name: "PageLogStream",
+  components: { QTablePagination, SchemaIndex, NoData },
+  emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
+  setup(props, { emit }) {
+    const store = useStore();
+    const { t } = useI18n();
+    const $q = useQuasar();
+    const router = useRouter();
+    const logStream = ref([]);
+    const showIndexSchemaDialog = ref(false);
+    const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
+    const resultTotal = ref<number>(0);
+    const selected = ref<any>([]);
+    const orgData: any = ref(store.state.selectedOrganization);
+    const qTable: any = ref(null);
+    const previousOrgIdentifier = ref("");
+    const functionsList = ref<any>([])
+    const columns = ref<QTableProps["columns"]>([
+      {
+        name: "#",
+        label: "#",
+        field: "#",
+        align: "left",
+      },
+      {
+        name: "name",
+        field: "name",
+        label: t("logStream.name"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "stream_type",
+        field: "stream_type",
+        label: t("logStream.type"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "doc_num",
+        field: "doc_num",
+        label: t("logStream.docNum"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "storage_size",
+        field: "storage_size",
+        label: t("logStream.storageSize"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "compressed_size",
+        field: "compressed_size",
+        label: t("logStream.compressedSize"),
+        align: "left",
+        sortable: true,
+      },
+      // {
+      //   name: "actions",
+      //   field: "actions",
+      //   label: t("user.actions"),
+      //   align: "center",
+      // },
+    ]);
+    const addFunctionInProgress = ref(false)
+    const addFunctionInProgressLoading = ref(false)
+
+    const functionsColumns = ref<QTableProps["columns"]>([
+      {
+        name: "#",
+        label: "#",
+        field: "#",
+        align: "left",
+      },
+      {
+        name: "name",
+        field: "name",
+        label: t("logStream.name"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "order",
+        field: "order",
+        label: "Order",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "left",
+      },
+    ]);
+
+    let deleteStreamName = "";
+    let deleteStreamType = "";
+    const loadingFunctions = ref(false)
+    const expandedRow = ref(null)
+    const allFunctionsList = ref([]);
+    const selectedFunction = ref<any|null>(null);
+    const filterFunctions = ref([])
+
+    const getLogStream = () => {
+      if (store.state.selectedOrganization != null) {
+        previousOrgIdentifier.value =
+          store.state.selectedOrganization.identifier;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while loading streams...",
+        });
+
+        streamService
+          .nameList(store.state.selectedOrganization.identifier, "", false)
+          .then((res) => {
+            let counter = 1;
+            let doc_num = "";
+            let storage_size = "";
+            let compressed_size = "";
+            resultTotal.value = res.data.list.length;
+            logStream.value = res.data.list.map((data: any) => {
+              doc_num = "--";
+              storage_size = "--";
+              if (data.stats) {
+                doc_num = data.stats.doc_num;
+                storage_size = data.stats.storage_size + " MB";
+                compressed_size = data.stats.compressed_size + " MB";
+              }
+              return {
+                "#": counter <= 9 ? `0${counter++}` : counter++,
+                name: data.name,
+                doc_num: doc_num,
+                storage_size: storage_size,
+                compressed_size: compressed_size,
+                storage_type: data.storage_type,
+                actions: "action buttons",
+                schema: data.schema ? data.schema : [],
+                stream_type: data.stream_type,
+              };
+            });
+
+            // logStream.value.forEach((element: any) => {
+            //   if (element.name == router.currentRoute.value.query.dialog) {
+            //     listSchema({ row: element });
+            //   }
+            // });
+
+            dismiss();
+          })
+          .catch((err) => {
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message: "Error while pulling stream.",
+              timeout: 2000,
+            });
+          });
+      }
+
+      segment.track("Button Click", {
+        button: "Refresh Streams",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Streams",
+      });
+    };
+
+    const filterFn = (val: string, update: any) => {
+      update(() => {
+        const needle = val.toLowerCase();
+        filterFunctions.value = allFunctionsList.value.filter(
+          (v: any) => v.name.toLowerCase().indexOf(needle) > -1
+        );
+      });
+    };
+
+    getLogStream();
+
+    const getAllFunctions = () => {
+      jsTransformService
+        .list(
+          1,
+          100000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier
+        )
+        .then((res: any) => {
+          allFunctionsList.value = res.data?.list || []
+          filterFunctions.value = res.data?.list || []
+        }).catch((err) => {
+          $q.notify({
+            type: "negative",
+            message: JSON.stringify(err.response.data["error"]) || "Function fetching failed",
+            timeout: 2000,
+          });
+        })
+    }
+
+    watch([selectedFunction], async () => {
+      console.log('selected function value triggered')
+      if(selectedFunction.value) {
+      console.log('selected function save triggered', functionsList.value )
+        // save it
+        const order = functionsList.value.reduce((prev: any, current:any) => {
+           return (prev == null || prev.order < current.order) ? current : prev
+        }, null)?.order || 0
+
+        const apiData = {
+          order: order + 1
+        }
+        console.log(apiData)
+        addFunctionInProgressLoading.value = true
+        await jsTransformService.apply_stream_function(
+          store.state.selectedOrganization.identifier,
+          expandedRow.value || "",
+          selectedFunction.value.name,
+          apiData
+        ).then(() => {
+          return getStreamFunctions(expandedRow.value)
+        }).finally(() => {
+          addFunctionInProgressLoading.value = false
+          addFunctionInProgress.value = false
+          selectedFunction.value = null
+        })
+      }
+    })
+
+    const toggleStreamRow = (props: any) => {
+      if (expandedRow.value == props.row.name) {
+        expandedRow.value = null
+      } else {
+        expandedRow.value = props.row.name
+      }
+      if (expandedRow.value) {
+        addFunctionInProgress.value = false
+        getStreamFunctions(props.row.name)
+      }
+    }
+
+    const getStreamFunctions = async(stream_name: any) => {
+      loadingFunctions.value = stream_name
+        await jsTransformService.stream_function(
+          store.state.selectedOrganization.identifier,
+          stream_name
+        ).then((res: any) => {
+          functionsList.value = res.data?.list || []
+        }).catch((err) => {
+          $q.notify({
+            type: "negative",
+            message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
+            timeout: 2000,
+          });
+        })
+          .finally(() => {
+            loadingFunctions.value = false
+          })
+    }
+
+    const deleteFunctionFromStream = async(functionName: any) => {
+      console.log("000",functionName)
+      await jsTransformService.remove_stream_function(
+          store.state.selectedOrganization.identifier,
+          expandedRow.value || "",
+          functionName,
+        ).then(() => {
+          return getStreamFunctions(expandedRow.value)
+        }).finally(() => {
+          addFunctionInProgressLoading.value = false
+        })
+    }
+
+    // const listSchema = (props: any) => {
+    //   schemaData.value.name = props.row.name;
+    //   schemaData.value.schema = props.row.schema;
+    //   schemaData.value.stream_type = props.row.stream_type;
+    //   showIndexSchemaDialog.value = true;
+
+    //   segment.track("Button Click", {
+    //     button: "Actions",
+    //     user_org: store.state.selectedOrganization.identifier,
+    //     user_id: store.state.userInfo.email,
+    //     stream_name: props.row.name,
+    //     page: "Streams",
+    //   });
+    // };
+
+    const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+    const maxRecordToReturn = ref<number>(100);
+    const selectedPerPage = ref<number>(20);
+    const pagination: any = ref({
+      rowsPerPage: 20,
+    });
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value.setPagination(pagination.value);
+    };
+    const changeMaxRecordToReturn = (val: any) => {
+      maxRecordToReturn.value = val;
+    };
+
+    const deleteStream = () => {
+      streamService
+        .delete(store.state.selectedOrganization.identifier, deleteStreamName, deleteStreamType)
+        .then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              color: "positive",
+              message: "Stream deleted successfully.",
+            });
+            getLogStream();
+          }
+        })
+        .catch((err: any) => {
+          $q.notify({
+            color: "negative",
+            message: "Error while deleting stream.",
+          });
+        });
+    };
+
+    onMounted(() => {
+      getAllFunctions();
+    })
+
+    onActivated(() => {
+      // if (logStream.value.length > 0) {
+      //   logStream.value.forEach((element: any) => {
+      //     if (element.name == router.currentRoute.value.query.dialog) {
+      //       listSchema({ row: element });
+      //     }
+      //   });
+      // }
+      getAllFunctions();
+      if (
+        previousOrgIdentifier.value !=
+        store.state.selectedOrganization.identifier
+      ) {
+        getLogStream();
+      }
+    });
+
+    return {
+      t,
+      qTable,
+      router,
+      store,
+      logStream: logStream,
+      columns,
+      selected,
+      orgData,
+      getLogStream: getLogStream,
+      pagination,
+      resultTotal,
+      // listSchema,
+      deleteStream,
+      schemaData,
+      perPageOptions,
+      selectedPerPage,
+      changePagination,
+      maxRecordToReturn,
+      showIndexSchemaDialog,
+      changeMaxRecordToReturn,
+      getStreamFunctions,
+      functionsList,
+      expandedRow,
+      filterQuery: ref(""),
+      functionsColumns,
+      deleteFunctionFromStream,
+      addFunctionInProgress,
+      allFunctionsList,
+      selectedFunction,
+      filterFn,
+      filterFunctions,
+      addFunctionInProgressLoading,
+      toggleStreamRow,
+      filterData(rows: any, terms: any) {
+        var filtered = [];
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            rows[i]["stream_type"].toLowerCase().includes(terms)
+          ) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      },
+      getImageURL,
+      loadingFunctions
+    };
+  },
+  computed: {
+    selectedOrg() {
+      return this.store.state.selectedOrganization.identifier;
+    },
+  },
+  watch: {
+    selectedOrg(newVal: any, oldVal: any) {
+      this.orgData = newVal;
+      if (
+        (newVal != oldVal || this.logStream.values == undefined) &&
+        this.router.currentRoute.value.name == "logstreams"
+      ) {
+        this.logStream = [];
+        this.resultTotal = 0;
+        this.getLogStream();
+      }
+    },
+  },
+});
+</script>
+
+<style lang="scss" scoped>
+:deep(.q-table__top) {
+  border-bottom: 1px solid $border-color;
+  justify-content: flex-start !important;
+}
+
+:deep(.q-table__title) {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.confirmBody {
+  padding: 11px 1.375rem 0;
+  font-size: 0.875rem;
+  text-align: center;
+  font-weight: 700;
+
+  .head {
+    line-height: 2.125rem;
+    margin-bottom: 0.5rem;
+    color: $dark-page;
+  }
+
+  .para {
+    color: $light-text;
+  }
+}
+
+.confirmActions {
+  justify-content: center;
+  padding: 1.25rem 1.375rem 1.625rem;
+  display: flex;
+
+  .q-btn {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+</style>
