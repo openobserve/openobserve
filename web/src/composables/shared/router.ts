@@ -22,7 +22,10 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Search from "@/views/Search.vue";
 import AppMetrics from "@/views/AppMetrics.vue";
 import LogStream from "@/views/LogStream.vue";
-import Functions from "@/views/Functions.vue";
+import {
+  FunctionList,
+  AssociatedStreamFunction
+} from "../../components/functions/index"
 import Alerts from "@/views/AppAlerts.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import Error404 from "@/views/Error404.vue";
@@ -38,6 +41,7 @@ import {
   DestinationList,
 } from "@/components/alerts/index";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
+import Functions from "../../views/Functions.vue";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -146,9 +150,18 @@ const useRoutes = () => {
       path: "functions",
       name: "functions",
       component: Functions,
-      meta: {
-        keepAlive: true,
-      },
+      children: [
+        {
+          path: "functions",
+          name: "functionList",
+          component: FunctionList,
+        },
+        {
+          path: "stream-association",
+          name: "streamFunctions",
+          component: AssociatedStreamFunction,
+        }
+      ]
     },
     {
       path: "ingestion",
