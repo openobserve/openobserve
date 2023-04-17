@@ -307,7 +307,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         tasks.push(task);
     }
 
-    println!("search in cluster, prepare to get response from grpc");
     let mut results = Vec::new();
     for task in tasks {
         let result = task
@@ -330,7 +329,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     //XXX span4.exit(); // drop span4
     //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
-    println!("search in cluster, prepare to release lock");
     // search done, release lock
     if locker.is_some() {
         if let Err(e) = locker.unwrap().unlock().await {

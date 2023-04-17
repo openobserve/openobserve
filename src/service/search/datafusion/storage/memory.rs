@@ -173,7 +173,6 @@ impl InMemory {
     async fn get_bytes(&self, location: &Path) -> Result<Bytes> {
         let file = location.to_string();
         let data = file_data::get(&file);
-        tokio::task::yield_now().await;
         if data.is_ok() {
             return Ok(data.unwrap());
         }
