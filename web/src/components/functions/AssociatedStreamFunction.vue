@@ -88,7 +88,14 @@
                   <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
                 </template>
                 <template v-slot:no-data>
-                  <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                <div style="width:100%; display: flex; flex-direction: column;">
+                  <div v-if="!functionsList.length && !addFunctionInProgress" style="width: 100%; text-align: center;">
+                    No functions found
+                  </div>
+                  <div>
+                    <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                  </div>
+                </div>
                 </template>
               </q-table>
             </div>
@@ -382,6 +389,7 @@ export default defineComponent({
         expandedRow.value = props.row.name
       }
       if (expandedRow.value) {
+        addFunctionInProgress.value = false
         getStreamFunctions(props.row.name)
       }
     }
