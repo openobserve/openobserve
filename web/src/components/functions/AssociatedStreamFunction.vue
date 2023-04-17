@@ -329,9 +329,9 @@ export default defineComponent({
     const filterFn = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
-        filterFunctions.value = allFunctionsList.value.filter(
-          (v: any) => v.name.toLowerCase().indexOf(needle) > -1
-        );
+        filterFunctions.value = allFunctionsList.value
+          .filter((item: any) => !functionsList.value.some((obj: any) => obj.name === item.name)) // filter existing applied functions 
+          .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
       });
     };
 
