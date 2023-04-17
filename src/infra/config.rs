@@ -21,6 +21,7 @@ use reqwest::Client;
 use std::sync::atomic::AtomicU8;
 use std::time::Duration;
 use sys_info::hostname;
+use tokio::sync::Mutex;
 
 use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
@@ -38,7 +39,7 @@ pub static HAS_FUNCTIONS: bool = false;
 pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static LOCKER: Lazy<DashMap<String, std::sync::Mutex<bool>>> = Lazy::new(DashMap::new);
+pub static LOCKER: Lazy<DashMap<String, Mutex<bool>>> = Lazy::new(DashMap::new);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(

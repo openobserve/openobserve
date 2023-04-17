@@ -17,8 +17,8 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
-use std::sync::Mutex;
 use std::time::Instant;
+use tokio::sync::Mutex;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
@@ -116,11 +116,13 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
+    log::info!("get search request before lock: {:?}", in_req.path());
     // get a local search queue lock
     let locker = LOCKER
         .entry("search/local_queue".to_string())
         .or_insert(Mutex::new(true));
-    let _locker = locker.lock();
+    let _locker = locker.lock().await;
+    log::info!("get search request after lock: {:?}", in_req.path());
 
     // do search
     match SearchService::search(&org_id, stream_type, &req).await {

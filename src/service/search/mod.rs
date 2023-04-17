@@ -61,7 +61,6 @@ pub async fn search(
     search_in_cluster(req).instrument(root_span).await
 }
 
-#[instrument]
 async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
     lock.lock(0).await.map_err(server_internal_error)?;
@@ -128,12 +127,14 @@ async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
 
+    log::info!("enter cluster search before lock");
     // get a cluster search queue lock
     let locker = if CONFIG.common.local_mode {
         None
     } else {
         Some(get_queue_lock().await?)
     };
+    log::info!("enter cluster search after lock");
 
     //XXX span1.exit(); // drop span1
     //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();

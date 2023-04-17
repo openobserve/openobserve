@@ -566,14 +566,17 @@ impl Locker {
                     }
                 }
             };
+            tokio::task::yield_now().await; // yield to other tasks
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("etcd connect error: {err}")));
+            return Err(Error::Message(format!("etcd lock error: {err}")));
         }
+        log::info!("etcd locker locked: {:?}", self.lock_id);
         Ok(())
     }
 
     pub async fn unlock(&mut self) -> Result<()> {
+        log::info!("etcd locker unlocked: {:?}", self.lock_id);
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
@@ -581,8 +584,8 @@ impl Locker {
         match client.unlock(self.lock_id.as_str()).await {
             Ok(_) => {}
             Err(err) => {
-                log::error!("unlock error: {}, key: {}", err, self.key);
-                return Err(Error::Message("unlock error".to_string()));
+                log::error!("etcd unlock error: {}, key: {}", err, self.key);
+                return Err(Error::Message("etcd unlock error".to_string()));
             }
         };
         self.state.store(2, Ordering::SeqCst);
