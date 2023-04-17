@@ -440,7 +440,6 @@ export default defineComponent({
         searchObj.data.errorMsg = "";
         searchObj.data.errorCode = 0;
 
-        console.log("metrics search", queryReq);
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -448,7 +447,6 @@ export default defineComponent({
             page_type: "metrics",
           })
           .then((res) => {
-            console.log("metrics res", res.data);
             searchObj.data.queryResults = { ...res.data };
             generateHistogramData();
             //update grid columns
