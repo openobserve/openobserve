@@ -50,7 +50,7 @@
             <div v-show="loadingFunctions != props.row.name">
               <q-table :rows="functionsList" :columns="functionsColumns">
                 <template v-slot:body="props">
-                  <q-tr v-for="(item: any, index: number) in functionsList" :key="item.name">
+                  <q-tr v-for="(item, index) in functionsList" :key="item.name">
                     <q-td> {{ index + 1 }} </q-td>
                     <q-td> {{ item.name }} </q-td>
                     <q-td> {{ item.order }} </q-td>
@@ -147,7 +147,7 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
-    const functionsList = ref([])
+    const functionsList = ref<any>([])
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -234,7 +234,7 @@ export default defineComponent({
     const loadingFunctions = ref(false)
     const expandedRow = ref(null)
     const allFunctionsList = ref([]);
-    const selectedFunction = ref(null);
+    const selectedFunction = ref<any|null>(null);
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
@@ -329,7 +329,7 @@ export default defineComponent({
       console.log('selected function save triggered')
         // save it
         const apiData = {
-          order: functionsList.value.reduce((prev, current) => (prev == null || prev.value < current.value) ? current : prev, null)?.order || 1
+          order: functionsList.value.reduce((prev: any, current:any) => (prev == null || prev.value < current.value) ? current : prev, null)?.order || 1
         }
         console.log(apiData)
         addFunctionInProgressLoading.value = true

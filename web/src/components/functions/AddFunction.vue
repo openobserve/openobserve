@@ -35,10 +35,10 @@
             tabindex="0" />
         </div>
 
-        <q-input v-model="formData.params" :label="t('function.params')"  :placeholder="t('function.paramsHint')" color="input-border" bg-color="input-bg"
+        <!-- <q-input v-model="formData.params" :label="t('function.params')"  :placeholder="t('function.paramsHint')" color="input-border" bg-color="input-bg"
           class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
           v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-          tabindex="0" />
+          tabindex="0" /> -->
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
         <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
@@ -75,7 +75,7 @@
     return {
       name: "",
       function: "",
-      params: "",
+      params: "row",
     };
   };
   
@@ -168,14 +168,11 @@
           timeout: 2000,
         });
             
-        console.log('validate', addJSTransformForm)
-        console.log('validate', formData.value)
         addJSTransformForm.value.validate().then((valid: any) => {
           console.log('valid? ' , valid)
             if (!valid) {
                 return false;
             }
-console.log("isbeignUpdated",beingUpdated );
 
             if(!beingUpdated.value){
               callTransform = jsTransformService.create(
@@ -214,9 +211,7 @@ console.log("isbeignUpdated",beingUpdated );
             button: "Save Function",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,
-            // stream_name: formData.stream_name,
             function_name: formData.name,
-            // is_ingest_fn: formData.ingest,
             page: "Add/Update Function",
           });
         });
