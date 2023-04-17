@@ -61,7 +61,6 @@ pub async fn search(
     search_in_cluster(req).instrument(root_span).await
 }
 
-#[instrument]
 async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
     lock.lock(0).await.map_err(server_internal_error)?;

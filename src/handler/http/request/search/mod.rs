@@ -17,12 +17,11 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
-use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, LOCKER};
+use crate::infra::config::CONFIG;
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -115,12 +114,6 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(bad_request(e));
     }
-
-    // get a local search queue lock
-    let locker = LOCKER
-        .entry("search/local_queue".to_string())
-        .or_insert(Mutex::new(true));
-    let _locker = locker.lock();
 
     // do search
     match SearchService::search(&org_id, stream_type, &req).await {
@@ -242,12 +235,6 @@ pub async fn around(
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
-
-    // get a local search queue lock
-    let locker = LOCKER
-        .entry("search/local_queue".to_string())
-        .or_insert(Mutex::new(true));
-    let _locker = locker.lock();
 
     // search forward
     let req = meta::search::Request {
