@@ -209,14 +209,17 @@
     "cancel": "Cancel",
     "addTitle": "Add Function",
     "updateTitle": "Update Function",
-    "delete": "Delete",
+    "delete": "Delete Function",
     "ok": "Ok",
     "type": "Function Type",
     "showQuery": "Is Ingest Time Function?",
     "stream_type": "Stream Type",
     "vrl": "VRL",
     "lua": "Lua",
-    "params": "Parameters"
+    "params": "Parameters",
+    "associatedWithStream": "Stream Association",
+    "paramsHint":"param1, param2,...",
+    "associatedFunctionHeader": "Associated Functions"
   },
   "confirmDialog": {
     "cancel": "Cancel",

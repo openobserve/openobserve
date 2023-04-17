@@ -19,6 +19,7 @@
 
 <script lang="ts">
 import Plotly from "plotly.js";
+import { cloneDeep } from "lodash-es";
 
 import { defineComponent, onMounted, onUpdated, ref } from "vue";
 
@@ -34,23 +35,55 @@ export default defineComponent({
       type: Number,
       default: 600,
     },
+    data: {
+      type: Array,
+      default: () => null,
+    },
+    title: {
+      type: String,
+      default: "",
+    },
   },
   setup(props, { emit }) {
     const plotref: any = ref(null);
     const zoomFlag: any = ref(false);
-    const trace: any = {
-      x: [],
-      y: [],
-      unparsed_x: [],
-      name: "linechart",
-      type: "line",
-      marker: {
-        color: "#5960b2",
-        opacity: 0.8,
+    let traces: any = [
+      {
+        x: [],
+        y: [],
+        unparsed_x: [],
+        name: "Min",
+        type: "line",
+        marker: {
+          color: "#5960b2",
+          opacity: 0.8,
+        },
       },
-    };
+      {
+        x: [],
+        y: [],
+        unparsed_x: [],
+        name: "Max",
+        type: "line",
+        marker: {
+          color: "#5960b2",
+          opacity: 0.8,
+        },
+      },
+      {
+        x: [],
+        y: [],
+        unparsed_x: [],
+        name: "Avg",
+        type: "line",
+        marker: {
+          color: "#5960b2",
+          opacity: 0.8,
+        },
+      },
+    ];
 
-    const layout: any = {
+    let layout: any = {
       title: {
         text: "",
         font: {
@@ -61,12 +94,12 @@ export default defineComponent({
       autosize: true,
       height: 400,
       legend: {
-        bgcolor: "red",
+        bgcolor: "white",
       },
       margin: {
         l: 32,
         r: 16,
-        t: 15,
+        t: 32,
         b: 32,
       },
       xaxis: {
@@ -115,7 +148,9 @@ export default defineComponent({
       },
     };
     onMounted(async () => {
-      await Plotly.newPlot(plotref.value, [trace], layout, {
+      if (props.title) layout.title.text = props.title;
+      traces = [...props.data];
+      await Plotly.newPlot(plotref.value, traces, layout, {
         responsive: true,
         displayModeBar: false,
       });
@@ -133,17 +168,11 @@ export default defineComponent({
       }
     });
 
-    const reDraw: any = (
-      x: any,
-      y: any,
-      params: { title: any; unparsed_x_data: any }
-    ) => {
-      trace.x = x;
-      trace.y = y;
-      layout.title.text = params.title || "";
-      trace.unparsed_x = params.unparsed_x_data;
+    const reDraw = (chart: any) => {
+      traces = [...chart.data];
+      layout.title.text = chart.layout.title;
       if (document.getElementById("plotly_chart") != null) {
-        Plotly.redraw("plotly_chart");
+        Plotly.react("plotly_chart", traces, layout);
       }
     };
 
