@@ -18,12 +18,14 @@
 <template>
   <div ref="resultContainer" class="col column oveflow-hidden q-px-md q-pt-sm">
     <div class="text-semi-bold text-h6 q-pl-sm q-pb-sm">
-      {{ searchObj.data.stream.selectedMetrics[0] }}
+      {{ searchObj.data.metrics.selectedMetrics[0] }}
     </div>
     <div class="search-list" style="width: 100%">
       <MetricLineChart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
+        :data="searchObj.data.histogram.data"
+        :title="searchObj.data.histogram.layout.title"
         @updated:chart="onChartUpdate"
       ></MetricLineChart>
     </div>
@@ -31,8 +33,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch } from "vue";
-import { useQuasar, date } from "quasar";
+import { defineComponent, onMounted, ref } from "vue";
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -40,12 +42,9 @@ import { byString } from "../../utils/json";
 import useMetrics from "../../composables/useMetrics";
 import { getImageURL } from "../../utils/zincutils";
 import MetricLineChart from "../../components/MetricLineChart.vue";
-import { computed } from "vue";
-import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 
 export default defineComponent({
-  name: "SearchResult",
+  name: "MetricsViewer",
   components: {
     MetricLineChart,
   },
@@ -57,8 +56,6 @@ export default defineComponent({
   ],
   methods: {
     onChartUpdate({ start, end }: { start: any; end: any }) {
-      this.searchObj.meta.showDetailTab = false;
-      this.searchObj.runQuery = true;
       this.searchObj.data.datetime.tab = "absolute";
       this.searchObj.data.datetime.absolute.date.from = start.split(" ")[0];
       this.searchObj.data.datetime.absolute.date.to = end.split(" ")[0];
@@ -75,26 +72,7 @@ export default defineComponent({
         ":" +
         end.split(" ")[1].split(":")[2];
 
-      this.searchObj.runQuery = true;
       this.$emit("update:datetime");
-    },
-    onScroll(info: any) {
-      this.searchObj.meta.scrollInfo = info;
-      if (
-        info.ref.items.length / info.index <= 2 &&
-        this.searchObj.loading == false &&
-        this.searchObj.data.resultGrid.currentPage <=
-          this.searchObj.data.queryResults.from /
-            this.searchObj.meta.resultGrid.rowsPerPage
-      ) {
-        this.searchObj.data.resultGrid.currentPage += 1;
-        this.$emit("update:scroll");
-      }
-    },
-    onTimeBoxed(obj: any) {
-      this.searchObj.meta.showDetailTab = false;
-      this.searchObj.data.searchAround.indexTimestamp = obj.key;
-      this.$emit("search:timeboxed", obj);
     },
   },
   setup(props, { emit }) {
@@ -114,58 +92,15 @@ export default defineComponent({
     const resultContainer = ref(null);
 
     const reDrawChart = () => {
-      if (
-        // eslint-disable-next-line no-prototype-builtins
-        searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0
-      ) {
-        searchObj.data.histogram.chartParams.title = "";
-        plotChart.value.reDraw(
-          searchObj.data.histogram.xData,
-          searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
-        );
+      if (searchObj.data.histogram.data.length) {
+        plotChart.value.reDraw(searchObj.data.histogram);
         plotChart.value.forceReLayout();
       }
     };
+
     onMounted(() => {
       reDrawChart();
     });
-
-    const changeMaxRecordToReturn = (val: any) => {
-      // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
-    };
-
-    const expandRowDetail = (props: any, index: number) => {
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-    };
-
-    const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
-      if (next) {
-        return oldIndex + 1;
-      } else {
-        return oldIndex - 1;
-      }
-    };
-
-    const navigateRowDetail = (isNext: boolean, isPrev: boolean) => {
-      const newIndex = getRowIndex(
-        isNext,
-        isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
-      );
-      searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
-    };
-
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
-    };
-
-    const removeSearchTerm = (term: string) => {
-      emit("remove:searchTerm", term);
-    };
 
     return {
       t,
@@ -174,11 +109,6 @@ export default defineComponent({
       searchObj,
       byString,
       searchTableRef,
-      addSearchTerm,
-      removeSearchTerm,
-      expandRowDetail,
-      changeMaxRecordToReturn,
-      navigateRowDetail,
       totalHeight,
       reDrawChart,
       getImageURL,

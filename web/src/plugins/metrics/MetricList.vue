@@ -37,7 +37,7 @@
         :key="metric.label"
         class="metric-container flex content-center ellipsis q-py-sm q-px-sm cursor-pointer q-my-xs"
         :class="
-          searchObj.data.stream.selectedMetrics.includes(metric.label)
+          searchObj.data.metrics.selectedMetrics.includes(metric.label)
             ? 'selected'
             : ''
         "
@@ -60,18 +60,16 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { getImageURL } from "../../utils/zincutils";
-import streamService from "../../services/stream";
-import { getConsumableDateTime } from "@/utils/commons";
 
 export default defineComponent({
-  name: "ComponentSearchIndexSelect",
+  name: "MetricsList",
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
     const { searchObj } = useMetrics();
-    const streamOptions: any = ref(searchObj.data.stream.streamLists);
+    const streamOptions: any = ref(searchObj.data.metrics.metricList);
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
@@ -83,101 +81,18 @@ export default defineComponent({
 
     const filterMetrics = () => {
       if (!searchMetricValue.value) {
-        streamOptions.value = [...searchObj.data.stream.streamLists];
+        streamOptions.value = [...searchObj.data.metrics.metricList];
         return;
       }
       const value = searchMetricValue.value.toLowerCase();
-      streamOptions.value = searchObj.data.stream.streamLists.filter(
+      streamOptions.value = searchObj.data.metrics.metricList.filter(
         (column: any) => column.label.toLowerCase().indexOf(value) > -1
       );
     };
 
-    const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-      return filtered;
-    };
-
-    const addToFilter = (field: any) => {
-      searchObj.data.stream.addToFilter = field;
-    };
-
-    const openFilterCreator = (event: any, { name, ftsKey }: any) => {
-      if (ftsKey) {
-        event.stopPropagation();
-        event.preventDefault();
-        return;
-      }
-      const timestamps = getConsumableDateTime(searchObj.data.datetime);
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-
-      fieldValues.value[name] = {
-        isLoading: true,
-        values: [],
-      };
-      try {
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            fields: [name],
-            size: 10,
-          })
-          .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
-                .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
-                    key: value.key ? value.key : "null",
-                    count: formatNumberWithPrefix(value.num),
-                  };
-                });
-            }
-          })
-          .finally(() => {
-            fieldValues.value[name]["isLoading"] = false;
-          });
-      } catch (err) {
-        $q.notify({
-          type: "negative",
-          message: "Error while fetching field values",
-        });
-      }
-    };
-
-    function formatNumberWithPrefix(number: number) {
-      if (number >= 1000000000) {
-        return (number / 1000000000).toFixed(1) + "B";
-      } else if (number >= 1000000) {
-        return (number / 1000000).toFixed(1) + "M";
-      } else if (number >= 1000) {
-        return (number / 1000).toFixed(1) + "K";
-      } else {
-        return number.toString();
-      }
-    }
-
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
-    };
-
     const updateSelectedMetrics = (metric: any) => {
-      searchObj.data.stream.selectedMetrics = [];
-      searchObj.data.stream.selectedMetrics.push(metric);
+      searchObj.data.metrics.selectedMetrics = [];
+      searchObj.data.metrics.selectedMetrics.push(metric);
     };
 
     return {
@@ -186,11 +101,8 @@ export default defineComponent({
       router,
       searchObj,
       streamOptions,
-      addToFilter,
       getImageURL,
       filterMetrics,
-      openFilterCreator,
-      addSearchTerm,
       fieldValues,
       updateSelectedMetrics,
       searchMetricValue,
