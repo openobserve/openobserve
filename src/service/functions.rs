@@ -20,7 +20,7 @@ use std::io::Error;
 use tracing::instrument;
 
 use crate::meta::{
-    functions::{StreamFunctionsList, StreamOrder},
+    functions::{StreamFunctionsList, StreamOrder, StreamTransform},
     http::HttpResponse as MetaHttpResponse,
 };
 use crate::service::db;
@@ -174,8 +174,27 @@ pub async fn delete_stream_function(
     if let Some(val) = existing_fn.streams.clone() {
         if val.len() == 1 && val.first().unwrap().stream == stream_name {
             existing_fn.streams = None;
+
             // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
-            STREAM_FUNCTIONS.remove(&format!("{}/{}/{}", org_id, stream_type, stream_name));
+            let val = STREAM_FUNCTIONS
+                .get(&format!("{}/{}/{}", org_id, stream_type, stream_name))
+                .unwrap()
+                .value()
+                .clone();
+
+            if val.list.len() > 1 {
+                let final_list = val
+                    .list
+                    .into_iter()
+                    .filter(|x| x.transform.name != fn_name)
+                    .collect::<Vec<StreamTransform>>();
+                STREAM_FUNCTIONS.insert(
+                    format!("{}/{}/{}", org_id, stream_type, stream_name),
+                    StreamFunctionsList { list: final_list },
+                );
+            } else {
+                STREAM_FUNCTIONS.remove(&format!("{}/{}/{}", org_id, stream_type, stream_name));
+            }
         } else {
             existing_fn.streams = Some(
                 val.into_iter()
