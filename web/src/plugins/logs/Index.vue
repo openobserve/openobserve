@@ -327,9 +327,7 @@ export default defineComponent({
             searchObj.data.streamResults = res.data;
 
             if (res.data.list.length > 0) {
-              if (config.isZincObserveCloud == "true") {
-                getQueryTransform();
-              }
+              getQueryTransform();
 
               //extract stream data from response
               loadStreamLists();
@@ -722,6 +720,7 @@ export default defineComponent({
           return false;
         }
 
+        console.log("logs search", queryReq);
         searchObj.data.errorCode = 0;
         searchService
           .search({
@@ -730,6 +729,7 @@ export default defineComponent({
             page_type: "logs",
           })
           .then((res) => {
+            console.log("logs res", res.data);
             searchObj.loading = false;
             if (res.data.from > 0) {
               searchObj.data.queryResults.from = res.data.from;
