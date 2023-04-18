@@ -136,7 +136,8 @@ impl Request {
 #[schema(as = SearchResponse)]
 pub struct Response {
     pub took: usize,
-    pub took_detail: ResponseTook,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub took_detail: Option<ResponseTook>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
@@ -152,7 +153,6 @@ pub struct Response {
     pub response_type: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
-#[schema(as = SearchResponseTook)]
 pub struct ResponseTook {
     pub total: usize,
     pub wait_queue: usize,
@@ -164,7 +164,7 @@ impl Response {
     pub fn new(from: usize, size: usize) -> Self {
         Response {
             took: 0,
-            took_detail: ResponseTook::default(),
+            took_detail: None,
             total: 0,
             from,
             size,
@@ -188,13 +188,19 @@ impl Response {
 
     pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
         self.took = val - wait;
-        self.took_detail.cluster_total = val;
-        self.took_detail.cluster_wait_queue = wait;
+        self.took_detail = Some(ResponseTook {
+            total: 0,
+            wait_queue: 0,
+            cluster_total: val,
+            cluster_wait_queue: wait,
+        });
     }
 
     pub fn set_local_took(&mut self, val: usize, wait: usize) {
-        self.took_detail.total = val;
-        self.took_detail.wait_queue = wait;
+        if self.took_detail.is_some() {
+            self.took_detail.as_mut().unwrap().total = val;
+            self.took_detail.as_mut().unwrap().wait_queue = wait;
+        }
     }
 
     pub fn set_total(&mut self, val: usize) {
