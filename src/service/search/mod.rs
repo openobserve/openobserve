@@ -50,14 +50,12 @@ pub async fn search(
     stream_type: StreamType,
     req: &meta::search::Request,
 ) -> Result<Response, Error> {
-    let root_span = info_span!("service:search:enter");
+    let root_span = info_span!("srv:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
-
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
-
     search_in_cluster(req).instrument(root_span).await
 }
 
@@ -123,7 +121,7 @@ async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<
     }
 }
 
-#[instrument(name = "service:search:cluster", skip(req))]
+#[instrument(name = "srv:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
 
@@ -133,9 +131,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     } else {
         Some(get_queue_lock().await?)
     };
+    let took_wait = start.elapsed().as_millis() as usize;
 
     //XXX span1.exit(); // drop span1
-    //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
+    //XXX let span2 = info_span!("srv:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -186,7 +185,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     };
 
     //XXX span3.exit(); // drop span3
-    //XXX let span4 = info_span!("service:search:cluster:do_search").entered();
+    //XXX let span4 = info_span!("srv:search:cluster:do_search").entered();
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
@@ -226,7 +225,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             req_file_list_end,
         );
 
-        let grpc_span = info_span!("service:search:cluster:grpc_search");
+        let grpc_span = info_span!("srv:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
         let credentials_str = credentials.clone();
@@ -325,7 +324,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span4.exit(); // drop span4
-    //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
+    //XXX let span6 = info_span!("srv:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -335,7 +334,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span6.exit(); // drop span6
-    //XXX let span7 = info_span!("service:search:cluster:merge_result").entered();
+    //XXX let span7 = info_span!("srv:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
@@ -406,7 +405,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span7.exit(); // drop span7
-    //XXX let _span8 = info_span!("service:search:cluster:response").entered();
+    //XXX let _span8 = info_span!("srv:search:cluster:response").entered();
 
     // final result
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
@@ -471,7 +470,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     result.aggs.remove("_count");
 
     result.set_total(total);
-    result.set_took(start.elapsed().as_millis() as usize);
+    result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(file_count as usize);
     result.set_scan_size(scan_size as usize);
 

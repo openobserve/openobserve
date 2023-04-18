@@ -19,8 +19,10 @@ use dotenvy::dotenv;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use std::sync::atomic::AtomicU8;
+use std::sync::Arc;
 use std::time::Duration;
 use sys_info::hostname;
+use tokio::sync::Mutex;
 
 use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
@@ -39,6 +41,8 @@ pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
+
+pub static SEARCH_LOCKER: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::const_new(false)));
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         Client::builder()
