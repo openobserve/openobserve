@@ -260,7 +260,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_fn: Some("aws".to_string()),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -313,7 +313,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_fn: Some("aws".to_string()),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -434,10 +434,13 @@ pub async fn values(
         Err(e) => return Ok(bad_request(e)),
     };
 
-    let fields = match query.get("fields") {
+    let mut fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
+
+    fields.push("test".to_string());
+
     let size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
@@ -461,7 +464,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT * FROM \"{stream_name}\""),
+            sql: format!("SELECT aws(message) as test FROM \"fhdata-1\" "),
             from: 0,
             size: 0,
             start_time,
@@ -478,7 +481,7 @@ pub async fn values(
         req.aggs.insert(
             field.clone(),
             format!(
-                "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
+                "SELECT  aws(*)  as test ,{field} AS key, COUNT(*) , AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
             ),
         );
     }

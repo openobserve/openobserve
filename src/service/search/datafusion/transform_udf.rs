@@ -315,9 +315,8 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn time_range() {
-        //let data_time = parse_time("2021-01-01T00:00:00.000Z").unwrap();
-        let sql = "select *, luaconcat(log,pod_id) as c ,vrlconcat(log,pod_id) as d from t ";
+    async fn vrl_udf_test() {
+        let sql = "select temp.d['account_id'] as acc , temp.pod_id from (select *, vrltest(log) as d from t) as temp";
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -342,8 +341,8 @@ mod tests {
 
         let vrl_udf = get_udf_vrl(
             "vrltest".to_string(),
-            //" . = parse_aws_vpc_flow_log!(col1) \n .http_code=200 \n .",
-            " . =  col1 + 10 \n .",
+            " . = parse_aws_vpc_flow_log!(col1) \n .http_code=200 \n .",
+            //" . =  col1 + 10 \n .",
             "col1",
             1,
         );

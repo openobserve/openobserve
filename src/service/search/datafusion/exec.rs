@@ -195,6 +195,7 @@ pub async fn sql(
     // aggs
     for (name, sql) in sql.aggs.iter() {
         // Debug SQL
+        println!("Query agg sql: {}", sql.0);
         log::info!("Query agg sql: {}", sql.0);
         let mut df = match ctx.sql(&sql.0).await {
             Ok(df) => df,
