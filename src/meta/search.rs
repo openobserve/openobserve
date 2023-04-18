@@ -136,6 +136,7 @@ impl Request {
 #[schema(as = SearchResponse)]
 pub struct Response {
     pub took: usize,
+    pub took_detail: ResponseTook,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
@@ -150,11 +151,20 @@ pub struct Response {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+#[schema(as = SearchResponseTook)]
+pub struct ResponseTook {
+    pub total: usize,
+    pub wait_queue: usize,
+    pub cluster_total: usize,
+    pub cluster_wait_queue: usize,
+}
 
 impl Response {
     pub fn new(from: usize, size: usize) -> Self {
         Response {
             took: 0,
+            took_detail: ResponseTook::default(),
             total: 0,
             from,
             size,
@@ -176,8 +186,15 @@ impl Response {
         val.push(hit.to_owned());
     }
 
-    pub fn set_took(&mut self, val: usize) {
-        self.took = val;
+    pub fn set_cluster_took(&mut self, val: usize, wait: usize) {
+        self.took = val - wait;
+        self.took_detail.cluster_total = val;
+        self.took_detail.cluster_wait_queue = wait;
+    }
+
+    pub fn set_local_took(&mut self, val: usize, wait: usize) {
+        self.took_detail.total = val;
+        self.took_detail.wait_queue = wait;
     }
 
     pub fn set_total(&mut self, val: usize) {

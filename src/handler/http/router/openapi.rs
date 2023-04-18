@@ -99,6 +99,7 @@ use crate::meta;
             meta::search::Request,
             meta::search::RequestEncoding,
             meta::search::Response,
+            meta::search::ResponseTook,
             meta::alert::Alert,
             meta::alert::AlertList,
             meta::alert::Condition,

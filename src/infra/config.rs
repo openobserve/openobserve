@@ -42,7 +42,7 @@ pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
 
-pub static SEARCH_LOCKER: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::new(false)));
+pub static SEARCH_LOCKER: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::const_new(false)));
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         Client::builder()
