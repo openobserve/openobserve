@@ -58,7 +58,8 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -135,7 +136,8 @@
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -316,7 +318,11 @@ export default defineComponent({
       "img:" + getImageURL("images/language_flags/en-gb.svg")
     );
     const zoBackendUrl = store.state.API_ENDPOINT;
-    const customOrganization = router.currentRoute.value.query.org_identifier;
+    const customOrganization = router.currentRoute.value.query.hasOwnProperty(
+      "org_identifier"
+    )
+      ? router.currentRoute.value.query.org_identifier
+      : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
 
     const orgOptions = ref([{ label: Number, value: String }]);
@@ -449,13 +455,15 @@ export default defineComponent({
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
-    if (
-      mainLayoutMixin.setup().customOrganization != undefined &&
-      mainLayoutMixin.setup().customOrganization !=
-        store.state.selectedOrganization.identifier
-    ) {
-      useLocalOrganization("");
-      store.dispatch("setSelectedOrganization", {});
+    if (store.state.selectedOrganization != null) {
+      if (
+        mainLayoutMixin.setup().customOrganization != undefined &&
+        mainLayoutMixin.setup().customOrganization !=
+          store.state.selectedOrganization.identifier
+      ) {
+        useLocalOrganization("");
+        store.dispatch("setSelectedOrganization", {});
+      }
     }
 
     if (
