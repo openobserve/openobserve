@@ -176,24 +176,20 @@ pub async fn delete_stream_function(
             existing_fn.streams = None;
 
             // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
-            let val = STREAM_FUNCTIONS
-                .get(&format!("{}/{}/{}", org_id, stream_type, stream_name))
-                .unwrap()
-                .value()
-                .clone();
+            let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
-            if val.list.len() > 1 {
-                let final_list = val
-                    .list
-                    .into_iter()
-                    .filter(|x| x.transform.name != fn_name)
-                    .collect::<Vec<StreamTransform>>();
-                STREAM_FUNCTIONS.insert(
-                    format!("{}/{}/{}", org_id, stream_type, stream_name),
-                    StreamFunctionsList { list: final_list },
-                );
-            } else {
-                STREAM_FUNCTIONS.remove(&format!("{}/{}/{}", org_id, stream_type, stream_name));
+            if let Some(val) = STREAM_FUNCTIONS.get(&key) {
+                if val.list.len() > 1 {
+                    let final_list = val
+                        .clone()
+                        .list
+                        .into_iter()
+                        .filter(|x| x.transform.name != fn_name)
+                        .collect::<Vec<StreamTransform>>();
+                    STREAM_FUNCTIONS.insert(key, StreamFunctionsList { list: final_list });
+                } else {
+                    STREAM_FUNCTIONS.remove(&key);
+                }
             }
         } else {
             existing_fn.streams = Some(
