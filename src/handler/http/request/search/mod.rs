@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, SEARCH_LOCKER};
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -114,6 +114,10 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(bad_request(e));
     }
+
+    // get a local search queue lock
+    let locker = SEARCH_LOCKER.clone();
+    let _locker = locker.lock().await;
 
     // do search
     match SearchService::search(&org_id, stream_type, &req).await {
@@ -235,6 +239,10 @@ pub async fn around(
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
+
+    // get a local search queue lock
+    let locker = SEARCH_LOCKER.clone();
+    let _locker = locker.lock().await;
 
     // search forward
     let req = meta::search::Request {
@@ -443,6 +451,10 @@ pub async fn values(
     if end_time == 0 {
         end_time = chrono::Utc::now().timestamp_micros();
     }
+
+    // get a local search queue lock
+    let locker = SEARCH_LOCKER.clone();
+    let _locker = locker.lock().await;
 
     // search
     let mut req = meta::search::Request {
