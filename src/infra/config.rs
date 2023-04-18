@@ -38,7 +38,6 @@ pub static HAS_FUNCTIONS: bool = false;
 pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static LOCKER: Lazy<DashMap<String, std::sync::Mutex<bool>>> = Lazy::new(DashMap::new);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(

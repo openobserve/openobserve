@@ -568,7 +568,7 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("etcd connect error: {err}")));
+            return Err(Error::Message(format!("etcd lock error: {err}")));
         }
         Ok(())
     }
@@ -581,8 +581,8 @@ impl Locker {
         match client.unlock(self.lock_id.as_str()).await {
             Ok(_) => {}
             Err(err) => {
-                log::error!("unlock error: {}, key: {}", err, self.key);
-                return Err(Error::Message("unlock error".to_string()));
+                log::error!("etcd unlock error: {}, key: {}", err, self.key);
+                return Err(Error::Message("etcd unlock error".to_string()));
             }
         };
         self.state.store(2, Ordering::SeqCst);
