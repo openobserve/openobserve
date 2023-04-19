@@ -35,7 +35,7 @@
             tabindex="0" />
         </div>
 
-        <div class="q-gutter-sm">
+        <div v-if="store.state.zoConfig.lua_fn_enabled" class="q-gutter-sm">
           <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
             :checked="formData.transType === '0'" val="0" :label="t('function.vrl')" class="q-ml-none"
             @update:model-value="updateEditorContent" />
@@ -47,7 +47,7 @@
         <q-input v-if="formData.transType === '0'" v-model="formData.params" :label="t('function.params')"
           :placeholder="t('function.paramsHint')" color="input-border" bg-color="input-bg"
           class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!',]" tabindex="0" />
+          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]" tabindex="0" />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
         <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
@@ -166,8 +166,8 @@ export default defineComponent({
     });
 
     const isValidParam = () => {
-      const methodPattern = /(\s*[^,]+)(?=,|$)/g;
-      return methodPattern.test(formData.value.name) || "Invalid params.";
+      const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;
+      return methodPattern.test(formData.value.params) || "Invalid params.";
     }
 
     const isValidMethodName = () => {
