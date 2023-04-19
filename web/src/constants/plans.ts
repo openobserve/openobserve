@@ -39,9 +39,9 @@ const Plans = [
     price: "$1000 or 10% of monthly spend, whichever is greater",
     duration: "monthly",
     included: {
-      rule1: "Developer Plan Features",
-      rule2: "Additional Ingestion ($0.50/GB)",
-      rule3: "Additional Query Volume ($5/GB)",
+      rule1: "Additional Ingestion ($0.50/GB)",
+      rule2: "Additional Query Volume ($5/TB)",
+      rule3: "",
     },
     basic: false,
     pro: true,
