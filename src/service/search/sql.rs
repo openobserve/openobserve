@@ -312,16 +312,19 @@ impl Sql {
         let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
         let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
         for token in &where_tokens {
-            if !token.to_lowercase().starts_with("match_all") {
-                continue;
-            }
-            for cap in re1.captures_iter(token) {
-                // println!("match_all: {}, {}", &cap[0], &cap[1]);
-                fulltext.push((cap[0].to_string(), cap[1].to_string()));
-            }
-            for cap in re2.captures_iter(token) {
-                // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
-                fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+            let tokens = split_sql_token_unwrap_brace(token);
+            for token in &tokens {
+                if !token.to_lowercase().starts_with("match_all") {
+                    continue;
+                }
+                for cap in re1.captures_iter(token) {
+                    // println!("match_all: {}, {}", &cap[0], &cap[1]);
+                    fulltext.push((cap[0].to_string(), cap[1].to_string()));
+                }
+                for cap in re2.captures_iter(token) {
+                    // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
+                    fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
+                }
             }
         }
         // fetch fts fields
@@ -667,6 +670,16 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
     "1 second".to_string()
 }
 
+fn split_sql_token_unwrap_brace(s: &str) -> Vec<String> {
+    if s.is_empty() {
+        return vec![];
+    }
+    if s.starts_with('(') && s.ends_with(')') {
+        return split_sql_token_unwrap_brace(&s[1..s.len() - 1]);
+    }
+    split_sql_token(s)
+}
+
 fn split_sql_token(text: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let text_chars = text.chars().collect::<Vec<char>>();
@@ -816,6 +829,14 @@ mod tests {
             ),
             (
                 "select * from table1 where log='[2023-03-19T05:23:14Z INFO  zincobserve::service::search::datafusion::exec] Query sql: select * FROM tbl WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000)   ORDER BY _timestamp DESC LIMIT 150' AND time_range(_timestamp, 1679202494333000, 1679203394333000) order by _timestamp desc",
+                true, (1679202494333000, 1679203394333000),
+            ),
+            (
+                "select * from table1 WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000 AND str_match(log, 's')) order by _timestamp desc",
+                true, (1679202494333000, 1679203394333000),
+            ),
+            (
+                "select * from table1 WHERE (_timestamp >= 1679202494333000 AND _timestamp < 1679203394333000 AND str_match(log, 's') AND str_match_IGNORE_CASE(log, 's')) order by _timestamp desc",
                 true, (1679202494333000, 1679203394333000),
             ),
             (
