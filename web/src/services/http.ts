@@ -21,14 +21,7 @@ import config from "../aws-exports";
 const http = () => {
   const instance = axios.create({
     // timeout: 10000,
-    baseURL:
-      (import.meta.env.VITE_ZINCOBSERVE_ENDPOINT &&
-        import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith("/")
-        ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1)
-        : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT) ||
-      (window.location.origin != "http://localhost:8081"
-        ? window.location.origin
-        : "http://localhost:5080"),
+    baseURL: store.state.API_ENDPOINT,
     headers: {
       Authorization:
         config.isZincObserveCloud == "true"
