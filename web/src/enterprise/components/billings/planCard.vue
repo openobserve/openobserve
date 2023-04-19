@@ -76,6 +76,9 @@
       <div class="text-body1 text-weight-bold q-mt-md">
         {{ t("billing.whatIsIncluded") }}
       </div>
+      <div class="text-body1 text-weight-bold q-mt-md" v-if="planData.type == 'pro'">
+          {{ t("billing.everythingDeveloperPlan") }}
+      </div>
       <div class="q-mt-lg q-mb-xl">
         <div class="q-mt-sm">
           <q-icon name="check_circle" size="20px"
@@ -91,7 +94,7 @@
             planData.included.rule2
           }}</span>
         </div>
-        <div class="q-mt-sm">
+        <div class="q-mt-sm" v-if="planData.included.rule3 != ''">
           <q-icon name="check_circle" size="20px"
 :color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{
