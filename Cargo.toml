@@ -21,7 +21,6 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-#default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
 zo_functions = ["dep:mlua"]
 
@@ -77,6 +76,7 @@ log = "0.4"
 lru = "0.8"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
+mlua = { version = "0.8.4", features = ["luau", "serialize"], optional = true }
 object_store = { version = "0.5", features = [
   "aws",
   "aws_profile",
@@ -135,7 +135,6 @@ vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = 
 vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
 walkdir = "2"
 zstd = "0.12"
-mlua = { version = "0.8.4", features = ["luau","serialize"], optional = true }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

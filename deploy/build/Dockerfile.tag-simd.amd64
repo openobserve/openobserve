@@ -3,7 +3,7 @@ WORKDIR /web
 COPY ./web /web/
 
 RUN npm install
-RUN NODE_OPTIONS="--max-old-space-size=8192" VITE_ZINCOBSERVE_CLOUD=false npm run build
+RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
@@ -20,7 +20,7 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
 # RUN cargo build --release
-RUN RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build --release --target x86_64-unknown-linux-gnu
+RUN RUSTFLAGS='-C target-feature=+aes,+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build --release --features zo_functions --target x86_64-unknown-linux-gnu
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
 
 FROM gcr.io/distroless/cc as runtime
