@@ -210,12 +210,22 @@ end`;
 
         if (!beingUpdated.value) {
           formData.value.transType = parseInt(formData.value.transType)
+          //trans type is lua remove params from form
+          if (formData.value.transType == 1){
+             formData.value.params = ""
+          }
+          
           callTransform = jsTransformService.create(
             store.state.selectedOrganization.identifier,
             formData.value
           );
         } else {
           formData.value.transType = parseInt(formData.value.transType)
+          //trans type is lua remove params from form
+          if (formData.value.transType == 1){
+            formData.value.params = "" 
+          }
+
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
             formData.value
