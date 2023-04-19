@@ -15,16 +15,16 @@
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
-const API_ENDPOINT =
-  import.meta.env.VITE_ZINCOBSERVE_CLOUD &&
-  import.meta.env.VITE_ZINCOBSERVE_CLOUD == "true"
-    ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT &&
-      import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith("/")
-      ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1)
-      : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT
-    : window.location.origin != "http://localhost:8081"
-    ? window.location.origin
-    : "http://localhost:5080";
+const pos = window.location.pathname.indexOf("/web/");
+const API_ENDPOINT = import.meta.env.VITE_ZINCOBSERVE_ENDPOINT
+  ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith("/")
+    ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1)
+    : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT
+  : window.location.origin == "http://localhost:8081"
+  ? "/"
+  : pos > -1
+  ? window.location.pathname.slice(0, pos)
+  : window.location.pathname;
 
 export default createStore({
   state: {
