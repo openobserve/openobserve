@@ -38,13 +38,14 @@ const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is used in a stream. Please remove it from the stream before deleting.";
+const LUA_FN_DISABLED: &str = "Lua functions are disabled";
 
 #[instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
-            "Lua functions are disabled".to_string(),
+            LUA_FN_DISABLED.to_string(),
         )));
     }
 
@@ -80,7 +81,7 @@ pub async fn update_function(
     if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
-            "Lua functions are disabled".to_string(),
+            LUA_FN_DISABLED.to_string(),
         )));
     }
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {

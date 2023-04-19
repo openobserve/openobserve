@@ -21,13 +21,14 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
+use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::sync::Arc;
 use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
 use vrl::{CompilationResult, Program, Runtime};
 
 use crate::infra::config::QUERY_FUNCTIONS;
 
-fn _create_user_df(
+fn create_user_df(
     fn_name: &str,
     num_args: u8,
     pow_scalar: ScalarFunctionImplementation,
@@ -46,18 +47,27 @@ fn _create_user_df(
     )
 }
 
-pub async fn _get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
+pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
     let mut udf;
     let mut udf_list = Vec::new();
     for transform in QUERY_FUNCTIONS.iter() {
         let key = transform.key();
+        //do not register ingest_time transforms
         if key.contains(org_id) {
-            udf = _get_udf_vrl(
-                transform.name.to_owned(),
-                transform.function.to_owned().as_str(),
-                &transform.params,
-                transform.num_args,
-            );
+            if transform.trans_type.unwrap() == 1 {
+                udf = get_udf_lua(
+                    transform.name.to_owned(),
+                    transform.function.to_owned().as_str(),
+                    transform.num_args,
+                );
+            } else {
+                udf = get_udf_vrl(
+                    transform.name.to_owned(),
+                    transform.function.to_owned().as_str(),
+                    &transform.params,
+                    transform.num_args,
+                );
+            }
 
             udf_list.push(udf);
         }
@@ -65,7 +75,7 @@ pub async fn _get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::S
     udf_list
 }
 
-fn _get_udf_vrl(
+fn get_udf_vrl(
     fn_name: String,
     func: &str,
     params: &str,
@@ -96,8 +106,8 @@ fn _get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Some(func) = _compile_vrl_function(&obj_str) {
-                data_vec.insert(i, _apply_vrl_fn(&mut runtime, func));
+            if let Some(func) = compile_vrl_function(&obj_str) {
+                data_vec.insert(i, apply_vrl_fn(&mut runtime, func));
             } else {
                 data_vec.insert(i, "".to_string());
             }
@@ -116,11 +126,11 @@ fn _get_udf_vrl(
     // * give it a name so that it shows nicely when the plan is printed
     // * declare what input it expects
     // * declare its return type
-    let pow_udf = _create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
     pow_udf
 }
 
-pub fn _compile_vrl_function(func: &str) -> Option<Program> {
+pub fn compile_vrl_function(func: &str) -> Option<Program> {
     let result = vrl::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
@@ -135,7 +145,7 @@ pub fn _compile_vrl_function(func: &str) -> Option<Program> {
     }
 }
 
-pub fn _apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
     let obj_str = String::from("");
 
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
@@ -157,9 +167,70 @@ pub fn _apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
     }
 }
 
+fn get_udf_lua(fn_name: String, func: &str, num_args: u8) -> datafusion::logical_expr::ScalarUDF {
+    let local_fn_name = fn_name;
+    let local_func = func.to_owned();
+    let pow_calc = move |args: &[ArrayRef]| {
+        //Lua
+        let lua = Lua::new();
+        //Register Lua Function
+        let func = load_transform(&lua, local_func.to_string());
+        let len = args[0].len();
+
+        let mut data_vec = vec![];
+
+        for i in 0..len {
+            data_vec.insert(i, lua_transform(&lua, &func, args, i));
+        }
+        let result = StringArray::from(data_vec);
+
+        // `Ok` because no error occurred during the calculation (we should add one if exponent was [0, 1[ and the base < 0 because that panics!)
+        // `Arc` because arrays are immutable, thread-safe, trait objects.
+        Ok(Arc::new(result) as ArrayRef)
+    };
+    // the function above expects an `ArrayRef`, but DataFusion may pass a scalar to a UDF.
+    // thus, we use `make_scalar_function` to decorare the closure so that it can handle both Arrays and Scalar values.
+    let pow_scalar = make_scalar_function(pow_calc);
+
+    // Next:
+    // * give it a name so that it shows nicely when the plan is printed
+    // * declare what input it expects
+    // * declare its return type
+    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+    pow_udf
+}
+
+fn load_transform(lua: &Lua, func: String) -> Function {
+    lua.load(&func).eval().unwrap()
+}
+
+fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -> String {
+    let mut input_vec = vec![];
+
+    for (_i, arg) in args.iter().enumerate() {
+        let col = arg
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast failed");
+
+        input_vec.push(lua.to_value(&col.value(stream)).unwrap());
+    }
+
+    let input = MultiValue::from_vec(input_vec);
+    let _res = func.call::<_, String>(input);
+    match _res {
+        Ok(res) => res,
+        Err(err) => {
+            log::error!("lua_transform execute error: {}", err);
+            "".to_string()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::service::search::datafusion::transform_udf::_get_udf_vrl;
+    use super::*;
+
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -171,7 +242,7 @@ mod tests {
     #[tokio::test]
     async fn time_range() {
         //let data_time = parse_time("2021-01-01T00:00:00.000Z").unwrap();
-        let sql = "select *, vrlconcat(log,pod_id) as d from t ";
+        let sql = "select *, luaconcat(log,pod_id) as c ,vrlconcat(log,pod_id) as d from t ";
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -192,13 +263,16 @@ mod tests {
         // declare a new context. In spark API, this corresponds to a new spark SQLsession
         let ctx = SessionContext::new();
 
-        let vrl_udf = _get_udf_vrl(
+        let lua_udf = get_udf_lua("luaconcat".to_string(), "function(a, b) return a..b end", 2);
+
+        let vrl_udf = get_udf_vrl(
             "vrlconcat".to_string(),
-            ". = col1  + col2 \n .",
+            ". = col0  + col1 \n .",
             "col1,col2",
             2,
         );
 
+        ctx.register_udf(lua_udf.clone());
         ctx.register_udf(vrl_udf.clone());
         // declare a table in memory. In spark API, this corresponds to createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
