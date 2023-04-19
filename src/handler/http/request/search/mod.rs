@@ -464,7 +464,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT aws(message) as test FROM \"fhdata-1\" "),
+            sql: format!("SELECT * FROM \"{stream_name}\""),
             from: 0,
             size: 0,
             start_time,
@@ -481,7 +481,7 @@ pub async fn values(
         req.aggs.insert(
             field.clone(),
             format!(
-                "SELECT  aws(*)  as test ,{field} AS key, COUNT(*) , AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
+                "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
             ),
         );
     }

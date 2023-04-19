@@ -272,7 +272,7 @@ fn get_udf_lua(fn_name: String, func: &str, num_args: u8) -> datafusion::logical
     // * give it a name so that it shows nicely when the plan is printed
     // * declare what input it expects
     // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar, vec![]);
     pow_udf
 }
 
@@ -305,7 +305,7 @@ fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -
 
 #[cfg(test)]
 mod tests {
-    use crate::service::search::datafusion::transform_udf::get_udf_vrl;
+    use crate::service::search::datafusion::transform_udf::{get_udf_lua, get_udf_vrl};
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -316,7 +316,7 @@ mod tests {
 
     #[tokio::test]
     async fn vrl_udf_test() {
-        let sql = "select temp.d['account_id'] as acc , temp.pod_id from (select *, vrltest(log) as d from t) as temp";
+        let sql = "select temp.d['account_id'] as acc , temp.pod_id ,temp.lua_test from (select *, vrltest(log) as d ,luaconcat(log,pod_id) as lua_test from t) as temp";
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -354,7 +354,6 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let df = ctx.sql(sql).await.unwrap();
-        df.clone().show().await.unwrap();
 
         let result = df.collect().await.unwrap();
         /* datafusion::assert_batches_sorted_eq!(
