@@ -35,13 +35,23 @@
             tabindex="0" />
 
           <!--  <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
-                    :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
-                    bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
-                    @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
+                                :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
+                                bg-color="input-bg" class="col-4 q-py-sm showLabelOnTop" stack-label outlined filled dense
+                                @update:model-value="updateStreams" :rules="[(val: any) => !!val || 'Field is required!']" />
 
-                  <q-select v-if="formData.ingest" v-model="formData.stream_name" :loading="isFetchingStreams"
-                    :options="indexOptions" :label="t('function.stream_name')" color="input-border" bg-color="input-bg"
-                    class="col-4 q-py-md showLabelOnTop no-case" stack-label outlined filled dense />-->
+                              <q-select v-if="formData.ingest" v-model="formData.stream_name" :loading="isFetchingStreams"
+                                :options="indexOptions" :label="t('function.stream_name')" color="input-border" bg-color="input-bg"
+                                class="col-4 q-py-md showLabelOnTop no-case" stack-label outlined filled dense />-->
+        </div>
+
+        <div class="q-gutter-sm">
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
+            :checked="formData.transType === '0'" val="0" :label="t('function.vrl')" class="q-ml-none"
+            @update:model-value="updateFunction" />
+          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
+            :checked="formData.transType === '1'" val="1" :label="t('function.lua')" class="q-ml-none"
+            @update:model-value="updateFunction" />
+
         </div>
 
         <q-input v-model="formData.params" :label="t('function.params')" color="input-border" bg-color="input-bg"
@@ -89,7 +99,7 @@ const defaultValue: any = () => {
     order: 1,
     ingest: false,
     stream_type: "logs",
-    trans_type: "1",
+    transType: "1",
   };
 };
 
@@ -180,7 +190,7 @@ export default defineComponent({
           .trim();
       }
 
-      if (formData.value.trans_type == "0") {
+      if (formData.value.transType == "1") {
 
         if (formData.value.ingest) {
           prefixCode.value = `function(row)`;
@@ -316,7 +326,7 @@ end`;
         }
 
         this.formData.order = parseInt(this.formData.order);
-        this.formData.trans_type = parseInt(this.formData.trans_type);
+        this.formData.transType = parseInt(this.formData.transType);
         if (this.formData.ingest) {
           callTransform = jsTransformService.create_with_index(
             this.store.state.selectedOrganization.identifier,

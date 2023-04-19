@@ -36,6 +36,7 @@ struct ConfigResponse<'a> {
     default_fts_keys: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
+    lua_fn_enabled: bool,
 }
 
 /** healthz */
@@ -67,5 +68,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .map(|s| s.to_string())
             .collect(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
+        lua_fn_enabled: CONFIG.common.lua_fn_enabled,
     }))
 }

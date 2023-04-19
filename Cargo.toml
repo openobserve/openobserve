@@ -21,9 +21,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
-zo_functions = []
+zo_functions = ["dep:mlua"]
 
 [profile.release]
 debug = false
@@ -77,6 +76,7 @@ log = "0.4"
 lru = "0.8"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
+mlua = { version = "0.8.4", features = ["luau", "serialize"], optional = true }
 object_store = { version = "0.5", features = [
   "aws",
   "aws_profile",

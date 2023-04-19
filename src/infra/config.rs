@@ -178,6 +178,8 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
+    #[env_config(name = "ZO_LUA_FN_ENABLED", default = false)]
+    pub lua_fn_enabled: bool,
 }
 
 #[derive(EnvConfig)]

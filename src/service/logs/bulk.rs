@@ -16,6 +16,8 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+#[cfg(feature = "zo_functions")]
+use mlua::Function;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
@@ -70,12 +72,11 @@ pub async fn ingest(
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     #[cfg(feature = "zo_functions")]
-    let state = vrl::state::Runtime::default();
-    #[cfg(feature = "zo_functions")]
-    let mut runtime = vrl::Runtime::new(state);
+    let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
     #[cfg(feature = "zo_functions")]
     let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
-
+    #[cfg(feature = "zo_functions")]
+    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     let mut stream_file_map: AHashMap<String, String> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_data_map = AHashMap::new();
@@ -127,6 +128,8 @@ pub async fn ingest(
                 StreamType::Logs,
                 &mut stream_tansform_map,
                 &mut stream_vrl_map,
+                &mut stream_lua_map,
+                &lua,
             )
             .await;
             // End Register Transfoms for index
@@ -179,6 +182,8 @@ pub async fn ingest(
                 ret_value = crate::service::ingestion::apply_stream_transform(
                     transforms,
                     &ret_value,
+                    &lua,
+                    &stream_lua_map,
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,

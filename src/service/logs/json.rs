@@ -64,9 +64,7 @@ pub async fn ingest(
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     #[cfg(feature = "zo_functions")]
-    let state = vrl::state::Runtime::default();
-    #[cfg(feature = "zo_functions")]
-    let mut runtime = vrl::Runtime::new(state);
+    let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -83,11 +81,13 @@ pub async fn ingest(
 
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
-        org_id,
-        stream_name,
-        StreamType::Logs,
-    );
+    let (local_tans, stream_lua_map, stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &lua,
+        );
     // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
@@ -121,6 +121,8 @@ pub async fn ingest(
         let value = crate::service::ingestion::apply_stream_transform(
             &local_tans,
             &value,
+            &lua,
+            &stream_lua_map,
             &stream_vrl_map,
             stream_name,
             &mut runtime,
