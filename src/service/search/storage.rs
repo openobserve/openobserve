@@ -57,11 +57,10 @@ pub async fn search(
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
-        let span = info_span!("service:search:storage:load_files");
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(
-            async move {
+        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
+            tokio::task::spawn(async move {
                 if !file_data::exist(&file).unwrap_or_default() {
                     if let Err(e) = file_data::download(&file).await {
                         log::error!("storage->search: load file {}, err: {}", &file, e);
@@ -69,9 +68,7 @@ pub async fn search(
                 };
                 drop(permit);
                 Ok(())
-            }
-            .instrument(span),
-        );
+            });
         tasks.push(task);
     }
 
