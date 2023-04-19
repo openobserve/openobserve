@@ -27,22 +27,24 @@
       </div>
       <div class="card-text text-weight-bold">
         <q-icon
-          name="img:/assets/images/common/master_card_icon.svg"
+          :name="'img:' + getImageURL('images/common/master_card_icon.svg')"
           size="34px"
         />
         {{ cardData.number }}
       </div>
 
       <div class="card-icon">
-        <q-icon name="do_not_disturb_on" size="20px" color="white" />
+        <q-icon name="do_not_disturb_on" size="20px"
+color="white" />
       </div>
     </q-card-section>
   </q-card>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from "@vue/runtime-core";
+import { computed, defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PlaymentCard",
@@ -53,7 +55,9 @@ export default defineComponent({
     const cardColor = ref(props.card.color);
 
     const bgImage = computed(() => {
-      return `background-image: url("img:assets/images/common/secondary_card_bg.svg");`;
+      return `background-image: url("img:${getImageURL(
+        "images/common/secondary_card_bg.svg"
+      )}");`;
     });
 
     return {
@@ -61,6 +65,7 @@ export default defineComponent({
       cardData,
       cardColor,
       bgImage,
+      getImageURL,
     };
   },
 });

@@ -23,7 +23,7 @@
             default
             name="usage"
             :to="'/billings/usage'"
-            icon="img:/assets/images/common/usage_icon.svg"
+            :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
             label="Usage"
             content-class="tab_content"
           />
@@ -31,7 +31,7 @@
             exact
             name="plans"
             :to="'/billings/plans'"
-            icon="img:/assets/images/common/plan_icon.svg"
+            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
             label="Plans"
             content-class="tab_content"
           />
@@ -46,7 +46,7 @@
             exact
             name="invoice_history"
             :to="'/billings/invoice_history'"
-            icon="img:/assets/images/common/invoice_icon.svg"
+            :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
             label="Invoice History"
             content-class="tab_content"
           />
@@ -55,31 +55,6 @@
 
       <template v-slot:after>
         <router-view title=""> </router-view>
-        <!-- <q-tab-panels
-          v-model="billingtab"
-          animated
-          swipeable
-          vertical
-          transition-prev="jump-up"
-          transition-next="jump-up"
-          keep-alive-include="usage,plans,invoice_history"
-        >
-          <q-tab-panel name="usage">
-            <router-view title=""> </router-view>
-          </q-tab-panel>
-
-          <q-tab-panel name="plans">
-            <router-view title=""> </router-view>
-          </q-tab-panel> -->
-
-        <!-- <q-tab-panel name="payment_methods">
-            <router-view title="Payment Methods"> </router-view>
-          </q-tab-panel> -->
-
-        <!-- <q-tab-panel name="invoice_history">
-            <router-view title=""> </router-view>
-          </q-tab-panel>
-        </q-tab-panels> -->
       </template>
     </q-splitter>
   </q-page>
@@ -95,6 +70,7 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -107,7 +83,7 @@ export default defineComponent({
     const billingtab = ref("usage");
 
     onMounted(() => {
-      if (router.currentRoute.value.name == "billing") {
+      if (router.currentRoute.value.name == "billings") {
         billingtab.value = "usage";
         router.push({ path: "/billings/usage" });
       } else {
@@ -123,6 +99,7 @@ export default defineComponent({
       router,
       config,
       billingtab,
+      getImageURL,
       splitterModel: ref(200),
     };
   },

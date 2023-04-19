@@ -16,7 +16,11 @@ const MainLayoutCloudMixin = {
     const router = useRouter();
 
     //check if organization identifier is present in query params
-    const customOrganization = router.currentRoute.value.query.org_identifier;
+    const customOrganization = router.currentRoute.value.query.hasOwnProperty(
+      "org_identifier"
+    )
+      ? router.currentRoute.value.query.org_identifier
+      : undefined;
     //if present, set it as selected organization
     const selectedOrg = ref(store.state.selectedOrganization);
     const orgOptions = ref([{ label: Number, value: String }]);
@@ -49,6 +53,11 @@ const MainLayoutCloudMixin = {
         title: t("menu.organizations"),
         icon: "img:" + getImageURL("images/left_nav/organization_icon.svg"),
         link: "/organizations",
+      });
+      linksList.value.splice(10, 0, {
+        title: t("menu.billings"),
+        icon: "payments",
+        link: "/billings",
       });
 
       return linksList.value;
