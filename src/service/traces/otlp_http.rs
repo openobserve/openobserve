@@ -106,17 +106,16 @@ pub async fn traces_json(
 
     let mut trigger: Option<Trigger> = None;
     #[cfg(feature = "zo_functions")]
-    let state = vrl::state::Runtime::default();
-    #[cfg(feature = "zo_functions")]
-    let mut runtime = vrl::Runtime::new(state);
-    #[cfg(feature = "zo_functions")]
+    let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
-        org_id,
-        traces_stream_name,
-        StreamType::Traces,
-    );
+    let (local_tans, stream_lua_map, stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(
+            org_id,
+            traces_stream_name,
+            StreamType::Traces,
+            &lua,
+        );
     // End Register Transforms for stream
 
     let mut service_name: String = traces_stream_name.to_string();
@@ -270,6 +269,8 @@ pub async fn traces_json(
                             let value = crate::service::ingestion::apply_stream_transform(
                                 &local_tans,
                                 &value,
+                                &lua,
+                                &stream_lua_map,
                                 &stream_vrl_map,
                                 traces_stream_name,
                                 &mut runtime,

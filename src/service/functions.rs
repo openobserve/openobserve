@@ -19,11 +19,14 @@ use actix_web::{
 use std::io::Error;
 use tracing::instrument;
 
-use crate::meta::{
-    functions::{StreamFunctionsList, StreamOrder, StreamTransform},
-    http::HttpResponse as MetaHttpResponse,
-};
 use crate::service::db;
+use crate::{
+    infra::config::CONFIG,
+    meta::{
+        functions::{StreamFunctionsList, StreamOrder, StreamTransform},
+        http::HttpResponse as MetaHttpResponse,
+    },
+};
 use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
 use crate::{meta::functions::FunctionList, meta::StreamType};
 
@@ -38,6 +41,13 @@ const FN_IN_USE: &str =
 
 #[instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+    if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.into(),
+            "Lua functions are disabled".to_string(),
+        )));
+    }
+
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
@@ -67,6 +77,12 @@ pub async fn update_function(
     fn_name: String,
     mut func: Transform,
 ) -> Result<HttpResponse, Error> {
+    if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.into(),
+            "Lua functions are disabled".to_string(),
+        )));
+    }
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
@@ -178,7 +194,7 @@ pub async fn delete_stream_function(
             // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
             let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
-            if let Some(val) = STREAM_FUNCTIONS.get(&key) {
+            if let Some(val) = STREAM_FUNCTIONS.clone().get(&key) {
                 if val.list.len() > 1 {
                     let final_list = val
                         .clone()
@@ -264,8 +280,20 @@ pub async fn add_function_to_stream(
 }
 
 fn extract_num_args(func: &mut Transform) {
-    let params = func.params.to_owned();
-    func.num_args = params.split(',').collect::<Vec<&str>>().len() as u8;
+    if func.trans_type.unwrap() == 1 {
+        let src: String = func.function.to_owned();
+        let start_stream = src.find('(').unwrap();
+        let end_stream = src.find(')').unwrap();
+        let args = &src[start_stream + 1..end_stream].trim();
+        if args.is_empty() {
+            func.num_args = 0;
+        } else {
+            func.num_args = args.split(',').collect::<Vec<&str>>().len() as u8;
+        }
+    } else {
+        let params = func.params.to_owned();
+        func.num_args = params.split(',').collect::<Vec<&str>>().len() as u8;
+    }
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
@@ -288,7 +316,7 @@ mod test {
             params: "row".to_owned(),
             streams: None,
             num_args: 0,
-            trans_type: 1,
+            trans_type: Some(1),
         };
         let res = save_function("nexus".to_owned(), trans).await;
         assert!(res.is_ok());

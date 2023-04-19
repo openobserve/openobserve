@@ -24,11 +24,12 @@ pub struct Transform {
     pub function: String,
     #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub params: String,
     #[serde(default)]
     pub num_args: u8,
-    #[serde(default)]
-    pub trans_type: u8,
+    #[serde(default = "default_trans_type")]
+    pub trans_type: Option<u8>, // 0=vrl 1=lua
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streams: Option<Vec<StreamOrder>>,
@@ -111,6 +112,10 @@ pub struct VRLConfig {
     pub timezone: TimeZone,
 }
 
+fn default_trans_type() -> Option<u8> {
+    Some(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,7 +126,7 @@ mod tests {
         let trans = Transform {
             function: "function jsconcat(a,b){return a+b}".to_string(),
             name: "jsconcat".to_string(),
-            trans_type: 1,
+            trans_type: Some(1),
             params: "row".to_string(),
             num_args: 1,
             streams: Some(vec![StreamOrder {
@@ -134,7 +139,7 @@ mod tests {
         let mod_trans = Transform {
             function: "function jsconcat(a,b){return a+b}".to_string(),
             name: "jsconcat".to_string(),
-            trans_type: 1,
+            trans_type: Some(1),
             params: "row".to_string(),
             num_args: 1,
             streams: None,
