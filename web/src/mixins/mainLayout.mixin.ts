@@ -1,3 +1,4 @@
+import { onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 
@@ -31,14 +32,20 @@ const MainLayoutOpenSourceMixin = {
           "id",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          "default"
         )
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
         });
     };
 
-    getDefaultOrganization();
+    onActivated(() => {
+      getDefaultOrganization();
+    });
+
+    onMounted(() => {
+      getDefaultOrganization();
+    });
 
     return {
       leftNavigationLinks,
