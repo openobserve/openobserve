@@ -44,7 +44,7 @@
     "alerts": "Alerts",
     "openapi": "OpenAPI",
     "docs": "Docs",
-    "billings": "Billings"
+    "billings": "Billing"
   },
   "about": {
     "name": "ZincObserve",
@@ -349,7 +349,8 @@
     "action": "Action",
     "usage": "Usage",
     "manageCards": "Manage Cards",
-    "subscriptionCheckout": "Subscription checkout"
+    "subscriptionCheckout": "Subscription checkout",
+    "everythingDeveloperPlan": "Everything in Developer Plan, plus:"
   },
   "message": {
     "ServerInternalError": "Error: Something wrong went. Internal server error.",
