@@ -210,17 +210,16 @@ pub async fn prometheus_write_proto(
                 // End get stream alert
 
                 #[cfg(feature = "zo_functions")]
-                let state = vrl::state::Runtime::default();
-                #[cfg(feature = "zo_functions")]
-                let mut runtime = vrl::Runtime::new(state);
+                let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
 
                 // Start Register Transforms for stream
                 #[cfg(feature = "zo_functions")]
-                let (local_tans, stream_vrl_map) =
+                let (local_tans, stream_lua_map, stream_vrl_map) =
                     crate::service::ingestion::register_stream_transforms(
                         org_id,
                         &metric_name,
                         StreamType::Metrics,
+                        &lua,
                     );
                 // End Register Transforms for stream
 
@@ -231,6 +230,8 @@ pub async fn prometheus_write_proto(
                 let value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
+                    &lua,
+                    &stream_lua_map,
                     &stream_vrl_map,
                     &metric_name,
                     &mut runtime,
