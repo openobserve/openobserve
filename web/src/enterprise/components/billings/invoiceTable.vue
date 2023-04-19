@@ -28,7 +28,7 @@
           size="sm"
           round
           flat
-          icon="img:/assets/images/common/download.svg"
+          :icon="'img:' + getImageURL('images/common/download.svg')"
         />
       </q-td>
     </template>
@@ -54,6 +54,7 @@ import { useQuasar, date } from "quasar";
 import NoData from "@/components/shared/grid/NoData.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import BillingService from "@/services/billings";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "InvoiceHistory",
@@ -211,6 +212,7 @@ export default defineComponent({
       changeMaxRecordToReturn,
       perPageOptions,
       getInvoiceHistory,
+      getImageURL,
     };
   },
   computed: {

@@ -20,13 +20,13 @@
         <div class="row">
           <div v-if="planData.for == 'individuals'">
             <q-icon
-              name="img:/assets/images/common/basic_plan_icon.svg"
+              :name="'img:' + getImageURL('images/common/basic-icon.svg')"
               size="72px"
             />
           </div>
           <div v-if="planData.for == 'startups'">
             <q-icon
-              name="img:/assets/images/common/pro_plan_icon.svg"
+              :name="'img:' + getImageURL('images/common/pro_plan_icon.svg')"
               size="72px"
             />
           </div>
@@ -60,7 +60,7 @@
       <!-- <div class="q-mt-md text-body1 text-weight-redular">
         {{ planData.description }}
       </div> -->
-      <div class="row q-mt-md items-center">
+      <!-- <div class="row q-mt-md items-center" :v-show="1 == 0">
         <span
           class="text-weight-bold free"
           :class="{
@@ -72,34 +72,31 @@
         <span class="text-weight-regular text-h6">
           &nbsp;&nbsp;/&nbsp;{{ planData.duration }}
         </span>
-      </div>
-      <div class="text-body1 text-weight-bold">
+      </div> -->
+      <div class="text-body1 text-weight-bold q-mt-md">
         {{ t("billing.whatIsIncluded") }}
       </div>
       <div class="q-mt-lg q-mb-xl">
         <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px" :color="cardColor" />
+          <q-icon name="check_circle" size="20px"
+:color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{
             planData.included.rule1
           }}</span>
         </div>
         <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px" :color="cardColor" />
+          <q-icon name="check_circle" size="20px"
+:color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{
             planData.included.rule2
           }}</span>
         </div>
         <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px" :color="cardColor" />
+          <q-icon name="check_circle" size="20px"
+:color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{
             planData.included.rule3
           }}</span>
-        </div>
-        <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px" :color="cardColor" />
-          <span class="q-ml-sm text-body1 text-weight-redular">
-            {{ planData.included.rule4 }}
-          </span>
         </div>
       </div>
       <q-btn
@@ -135,10 +132,11 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from "@vue/runtime-core";
+import { computed, defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PlanCard",
@@ -159,7 +157,7 @@ export default defineComponent({
       loading.value = true;
       if (planData.value.for == "startups") {
         emit("update:proSubscription");
-      } else if (isProPlan && planData.value.for == "individuals") {
+      } else if (isProPlan.value && planData.value.for == "individuals") {
         emit("update:freeSubscription");
       }
     };
@@ -171,6 +169,7 @@ export default defineComponent({
       isProPlan,
       onGetStartedSubscription,
       loading,
+      getImageURL,
     };
   },
 });
