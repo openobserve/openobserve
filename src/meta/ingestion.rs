@@ -84,7 +84,7 @@ pub struct BulkResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct BulkResponseItem {
     pub _index: String,
-    pub _id: u64,
+    pub _id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _version: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -136,13 +136,14 @@ impl BulkResponseError {
 impl BulkResponseItem {
     pub fn new_failed(
         _index: String,
+        _id: String,
         error: BulkResponseError,
         orig_record: json::Value,
         stream_name: String,
     ) -> Self {
         BulkResponseItem {
             _index: stream_name,
-            _id: 1,
+            _id,
             _version: None,
             result: None,
             _shards: None,
@@ -154,10 +155,15 @@ impl BulkResponseItem {
         }
     }
 
-    pub fn new(_index: String, _orig_record: json::Value, stream_name: String) -> Self {
+    pub fn new(
+        _index: String,
+        _id: String,
+        _orig_record: json::Value,
+        stream_name: String,
+    ) -> Self {
         BulkResponseItem {
             _index: stream_name,
-            _id: 1,
+            _id,
             _version: Some(1),
             result: Some("created".to_owned()),
             _shards: Some(ShardResponse {

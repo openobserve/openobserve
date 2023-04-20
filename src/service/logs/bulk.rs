@@ -88,7 +88,7 @@ pub async fn ingest(
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
-    let mut _id = String::from("");
+    let mut doc_id = String::from("");
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
 
     let mut next_line_is_data = false;
@@ -108,7 +108,7 @@ pub async fn ingest(
             if ret.is_none() {
                 continue; // skip
             }
-            (action, stream_name, _id) = ret.unwrap();
+            (action, stream_name, doc_id) = ret.unwrap();
             next_line_is_data = true;
 
             // check if we are allowed to ingest
@@ -195,6 +195,7 @@ pub async fn ingest(
                     bulk_res.errors = true;
                     add_record_status(
                         stream_name.clone(),
+                        doc_id.clone(),
                         action.clone(),
                         value,
                         &mut bulk_res,
@@ -214,8 +215,8 @@ pub async fn ingest(
             // get json object
             let local_val = value.as_object_mut().unwrap();
             // set _id
-            if !_id.is_empty() {
-                local_val.insert("_id".to_string(), json::Value::String(_id.clone()));
+            if !doc_id.is_empty() {
+                local_val.insert("_id".to_string(), json::Value::String(doc_id.clone()));
             }
 
             // handle timestamp
@@ -226,6 +227,7 @@ pub async fn ingest(
                         bulk_res.errors = true;
                         add_record_status(
                             stream_name.clone(),
+                            doc_id.clone(),
                             action.clone(),
                             value,
                             &mut bulk_res,
@@ -244,6 +246,7 @@ pub async fn ingest(
                 let failure_reason = Some(super::get_upto_discard_error());
                 add_record_status(
                     stream_name.clone(),
+                    doc_id.clone(),
                     action.clone(),
                     value,
                     &mut bulk_res,
@@ -286,6 +289,7 @@ pub async fn ingest(
                 bulk_res.errors = true;
                 add_record_status(
                     stream_name.clone(),
+                    doc_id.clone(),
                     action.clone(),
                     value,
                     &mut bulk_res,
@@ -295,6 +299,7 @@ pub async fn ingest(
             } else {
                 add_record_status(
                     stream_name.clone(),
+                    doc_id.clone(),
                     action.clone(),
                     value,
                     &mut bulk_res,
@@ -348,6 +353,7 @@ pub async fn ingest(
 
 fn add_record_status(
     stream_name: String,
+    doc_id: String,
     action: String,
     value: json::Value,
     bulk_res: &mut BulkResponse,
@@ -367,13 +373,19 @@ fn add_record_status(
 
             item.insert(
                 action,
-                BulkResponseItem::new_failed(stream_name.clone(), bulk_err, value, stream_name),
+                BulkResponseItem::new_failed(
+                    stream_name.clone(),
+                    doc_id,
+                    bulk_err,
+                    value,
+                    stream_name,
+                ),
             );
         }
         None => {
             item.insert(
                 action,
-                BulkResponseItem::new(stream_name.clone(), value, stream_name),
+                BulkResponseItem::new(stream_name.clone(), doc_id, value, stream_name),
             );
         }
     }
@@ -392,8 +404,9 @@ mod tests {
             items: vec![],
         };
         add_record_status(
-            "olympics".to_owned(),
-            "create".to_owned(),
+            "olympics".to_string(),
+            "1".to_string(),
+            "create".to_string(),
             json::Value::Null,
             &mut bulk_res,
             None,
