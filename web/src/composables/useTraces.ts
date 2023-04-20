@@ -53,6 +53,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
+    showTraceDetails: false,
     sqlMode: false,
     resultGrid: {
       wrapCells: false,
@@ -114,6 +115,11 @@ const defaultObject = {
       indexTimestamp: 0,
       size: <number>10,
       histogramHide: false,
+    },
+    traceDetails: {
+      traceId: "",
+      spanList: [],
+      loading: false,
     },
   },
 };

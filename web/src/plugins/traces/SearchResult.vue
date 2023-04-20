@@ -136,12 +136,12 @@
         ></template>
       </q-virtual-scroll>
       <q-dialog
-        v-model="searchObj.meta.showDetailTab"
+        v-model="searchObj.meta.showTraceDetails"
         position="right"
         full-height
         full-width
-        persistent
         maximized
+        @hide="searchObj.meta.showTraceDetails = false"
       >
         <trace-details />
       </q-dialog>
@@ -174,6 +174,7 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "get:traceDetails",
   ],
   methods: {
     closeColumn(col: any) {
@@ -264,8 +265,8 @@ export default defineComponent({
     };
 
     const expandRowDetail = (props: any, index: number) => {
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+      searchObj.meta.showTraceDetails = true;
+      emit("get:traceDetails", props.trace_id);
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {

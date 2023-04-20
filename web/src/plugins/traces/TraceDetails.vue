@@ -15,32 +15,62 @@
 
 <template>
   <div
-    class="trace-details"
+    class="trace-details q-py-md q-px-md"
     :style="{ width: '90vw !important', background: '#ffffff' }"
   >
-    <div></div>
+    <div v-if="traceTree.length && !searchObj.data.traceDetails.loading">
+      <div>
+        <div class="q-pb-sm flex items-center justify-start">
+          <div class="text-h6 q-mr-lg">
+            {{ traceTree[0]["operationName"] }}
+          </div>
+          <div>Spans: {{ spanList.length - 1 }}</div>
+        </div>
+        <div
+          v-for="(span, index) in traceTree"
+          :key="span.spanId"
+          class="relative-position"
+        >
+          <SpanRenderer
+            :isCollapsed="collapseMapping[span.spanId]"
+            :collapseMapping="collapseMapping"
+            :span="span"
+            :index="index"
+            :baseTracePosition="baseTracePosition"
+            ref="traceRootSpan"
+          />
+        </div>
+      </div>
+      <div v-if="false">
+        <trace-details-sidebar />
+      </div>
+    </div>
     <div
-      v-for="(span, index) in traceTree"
-      :key="span.span_id"
-      class="q-mx-sm relative-position"
+      v-else-if="searchObj.data.traceDetails.loading"
+      class="flex column items-center justify-center"
+      :style="{ height: '100%' }"
     >
-      <SpanRenderer
-        :isCollapsed="collapseMapping[span.span_id]"
-        :collapseMapping="collapseMapping"
-        :span="span"
-        :index="index"
-        :baseTracePosition="baseTracePosition"
-        ref="traceRootSpan"
-      />
+      <q-spinner color="primary" size="3em" :thickness="2" />
+      <div class="q-pt-sm">Getting trace data</div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, type Ref, onMounted } from "vue";
-import spans from "./sample.json";
+import {
+  defineComponent,
+  ref,
+  onBeforeMount,
+  type Ref,
+  onMounted,
+  watch,
+  nextTick,
+} from "vue";
 import { cloneDeep } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
+import useTraces from "@/composables/useTraces";
+import { computed } from "vue";
+import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -50,91 +80,124 @@ export default defineComponent({
       default: "",
     },
   },
+  components: { SpanRenderer, TraceDetailsSidebar },
+
   setup() {
     const traceTree: any = ref([]);
     const spanMapping: any = ref({});
+    const isSidebarOpen: any = ref(false);
+    const { searchObj } = useTraces();
     onBeforeMount(() => {
       buildTracesTree();
     });
     const baseTracePosition: any = ref({});
-    onMounted(() => {
-      console.log(traceRootSpan.value[0].$el.clientWidth);
-      baseTracePosition.value["width"] = traceRootSpan.value[0].$el.clientWidth;
-      baseTracePosition.value["per_pixel_ms"] = Number(
-        traceTree.value[0].duration / traceRootSpan.value[0].$el.clientWidth
-      );
-      baseTracePosition.value["start_time"] = traceTree.value[0].start_time;
-    });
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
-    const sampleTrace = ref([
-      { span_id: 1, reference_parent_span_id: 0 },
-      { span_id: 2, reference_parent_span_id: 1 },
-      { span_id: 3, reference_parent_span_id: 1 },
-      { span_id: 4, reference_parent_span_id: 2 },
-      { span_id: 5, reference_parent_span_id: 3 },
-      { span_id: 6, reference_parent_span_id: 3 },
-      { span_id: 7, reference_parent_span_id: 5 },
-      { span_id: 8, reference_parent_span_id: 6 },
-      { span_id: 9, reference_parent_span_id: 4 },
-      { span_id: 10, reference_parent_span_id: 7 },
-    ]);
-    const convertTime = (time) => {
-      return time / 1000000;
-    };
-    // Find out spans who has reference_parent_span_id as span_id of first span in sampleTrace
-    const buildTracesTree = () => {
-      const traceTreeMock: any = {};
-      spanMapping[spans[0].span_id] = spans[0];
-      const inProcessSpans = [];
-      for (let i = 1; i < spans.length; i++) {
-        const span = spans[i];
-        let nextSpan = spans[i + 1];
 
-        if (nextSpan && nextSpan.start_time === span.end_time) {
-          // In-process span
-          span["is_in_process"] = true;
-          inProcessSpans.push(span);
-        }
+    const spanList = computed(() => {
+      return searchObj.data.traceDetails.spanList;
+    });
 
-        spanMapping[spans[i].span_id] = cloneDeep(spans[i]);
-        spans[i].index = i;
-        collapseMapping.value[spans[i].span_id] = false;
-        if (!traceTreeMock[span.reference_parent_span_id]) {
-          traceTreeMock[span.reference_parent_span_id] = [];
-        }
-        if (!traceTreeMock[span.span_id]) traceTreeMock[span.span_id] = [];
-        if (!span["child_spans"])
-          span["child_spans"] = traceTreeMock[span.span_id];
-        traceTreeMock[span.reference_parent_span_id].push(
-          getFormattedSpan(span)
-        );
-      }
-      console.log(traceTreeMock);
-      traceTree.value = [];
-      traceTree.value.push(cloneDeep(getFormattedSpan(spans[0])));
-      traceTree.value[0]["index"] = 0;
-      traceTree.value[0]["child_spans"] = cloneDeep(
-        traceTreeMock[spans[0]["span_id"]]
+    watch(
+      () => spanList.value.length,
+      () => {
+        console.log("spanlist watch triggered");
+        if (spanList.value.length) {
+          buildTracesTree();
+        } else traceTree.value = [];
+      },
+      { immediate: true }
+    );
+
+    const calculateTracePosition = () => {
+      console.log("calculateTracePosition");
+      console.log("traceRootSpan", traceRootSpan.value);
+      baseTracePosition.value["width"] = traceRootSpan.value[0].$el.clientWidth;
+      baseTracePosition.value["perPixelMs"] = Number(
+        traceTree.value[0].durationMs / traceRootSpan.value[0].$el.clientWidth
       );
-      console.log(inProcessSpans);
+      baseTracePosition.value["startTimeMs"] = traceTree.value[0].startTimeMs;
     };
-    const getFormattedSpan = (span) => {
-      const timing = calculateTiming(span);
+
+    // Find out spans who has reference_parent_span_id as span_id of first span in sampleTrace
+    const buildTracesTree = async () => {
+      console.log("buildTracesTree", spanList.value);
+      const traceTreeMock: any = {};
+      spanMapping[spanList.value[0].span_id] = spanList.value[0];
+
+      for (let i = 1; i < spanList.value.length; i++) {
+        spanMapping[spanList.value[i].span_id] = cloneDeep(spanList.value[i]);
+
+        const span = getFormattedSpan(spanList.value[i]);
+
+        span.index = i;
+
+        collapseMapping.value[span.spanId] = false;
+
+        if (!traceTreeMock[span.parentId]) {
+          traceTreeMock[span.parentId] = [];
+        }
+
+        if (!traceTreeMock[span.spanId]) traceTreeMock[span.spanId] = [];
+
+        if (!span["spans"]) span["spans"] = traceTreeMock[span.spanId];
+
+        traceTreeMock[span.parentId].push(span);
+      }
+
+      traceTree.value = [];
+      traceTree.value.push(getFormattedSpan(spanList.value[0]));
+      traceTree.value[0]["index"] = 0;
+      traceTree.value[0]["spans"] = cloneDeep(
+        traceTreeMock[spanList.value[0]["span_id"]] || []
+      );
+      setTimeout(() => {
+        calculateTracePosition();
+      }, 2000);
+    };
+
+    // Convert span object to required format
+    // Converting ns to ms
+    const getFormattedSpan = (span: any) => {
       return {
-        timing: {
-          busy_ms: span.busy_ns,
-          idle_ms: span.idle_ns,
-          start_time: span.start_time,
-          end_time: span.end_time,
-          busy_per: timing.busyPercentage.toFixed(2) + "%",
-          idle_per: timing.idlePercentage.toFixed(2) + "%",
-        },
-        ...span,
-        start_time: convertTime(span.start_time),
-        duration: convertTime(span.duration),
+        _timestamp: span._timestamp,
+        startTimeMs: converTimeFromNsToMs(span.start_time),
+        endTimeMs: converTimeFromNsToMs(span.end_time),
+        durationMs: convertTime(span.duration),
+        idleMs: convertTime(span.idle_ns),
+        busyMs: convertTime(span.busy_ns),
+        spanId: span.span_id,
+        operationName: span.operation_name,
+        serviceName: span.service_name,
+        spanKind: getSpanKind(span.span_kind.toString()),
+        parentId: span.reference_parent_span_id,
+        spans: null,
+        index: 0,
       };
     };
+
+    const convertTime = (time) => {
+      return Number(time / 1000000).toFixed(2);
+    };
+
+    const converTimeFromNsToMs = (time: number) => {
+      const nanoseconds = time;
+      const milliseconds = Math.floor(nanoseconds / 1000000);
+      const date = new Date(milliseconds);
+      return date.getTime();
+    };
+
+    const getSpanKind = (spanKind: string) => {
+      const spanKindMapping: { [key: string]: string } = {
+        "1": "Client",
+        "2": "Server",
+        "3": "Producer",
+        "4": "Consumer",
+        "5": "Internal",
+      };
+      return spanKindMapping[spanKind];
+    };
+
     const getMsInPixels = (ms) => {
       console.log(ms, (ms / baseTracePosition.value.per_pixel_ms).toFixed(2));
       return (ms / baseTracePosition.value.per_pixel_ms).toFixed(2);
@@ -157,9 +220,10 @@ export default defineComponent({
       collapseMapping,
       traceRootSpan,
       baseTracePosition,
+      searchObj,
+      spanList,
     };
   },
-  components: { SpanRenderer },
 });
 </script>
 

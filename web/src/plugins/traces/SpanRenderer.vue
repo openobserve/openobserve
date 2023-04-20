@@ -15,72 +15,74 @@
 
 <template>
   <div>
-    <div
-      v-if="!span?.child_spans?.length || depth < 2"
-      class="q-my-xs normal-header"
-    >
+    <div v-if="!span?.spans?.length || depth < 2" class="q-my-xs normal-header">
       <div
-        class="flex justify-between align-center"
+        class="flex justify-between align-center q-pb-xs"
         :style="{
-          paddingLeft: 15 * depth + 10 + 'px',
+          paddingLeft: depth ? 15 * depth + 10 + 'px' : 0,
         }"
       >
-        <div>{{ span.service_name }}</div>
-        <div>{{ span.is_in_process }}</div>
-        <div>{{ formatTimeWithSuffix(span.duration) }}</div>
+        <div class="text-bold">{{ span.operationName }}</div>
+        <div>{{ formatTimeWithSuffix(span.durationMs) }}</div>
       </div>
-      <div :style="{ width: '100%', backgroundColor: '#ececec' }">
+      <div
+        :style="{ width: '100%', backgroundColor: '#ececec' }"
+        class="q-mb-md"
+      >
         <div
           :style="{
-            width: span?.duration / baseTracePosition?.per_pixel_ms + 'px',
+            width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
             backgroundColor: '#6c83ee',
-            height: '8px',
+            height: '10px',
             borderRadius: '2px',
             left:
-              (span.start_time - baseTracePosition['start_time']) /
-                baseTracePosition?.per_pixel_ms +
+              (span.startTimeMs - baseTracePosition['startTimeMs']) /
+                baseTracePosition?.perPixelMs +
               'px',
             position: 'relative',
           }"
         />
       </div>
       <div
-        v-for="childSpan in span['child_spans']"
-        :key="childSpan.span_id"
-        :class="childSpan.span_id"
+        v-for="childSpan in span['spans']"
+        :key="childSpan.spanId"
+        :class="childSpan.spanId"
       >
         <span-renderer
           :depth="depth + 1"
           :baseTracePosition="baseTracePosition"
           :span="childSpan"
-          :isCollapsed="collapseMapping[childSpan.span_id]"
+          :isCollapsed="collapseMapping[childSpan.spanId]"
           :collapseMapping="collapseMapping"
         />
       </div>
     </div>
     <app-collapse
       v-else
-      :isCollapsed="collapseMapping[span.span_id]"
       class="app-collapse"
       :headerStyle="{ paddingLeft: 15 * depth + 'px' }"
-      @update:collapse="updateCollapse"
     >
       <template v-slot:header>
-        <div class="flex justify-between align-center">
-          <div>{{ span.service_name }}</div>
-          <div>{{ span.is_in_process }}</div>
-          <div>{{ formatTimeWithSuffix(span.duration) }}</div>
+        <div
+          class="flex justify-between align-center"
+          :style="{ width: `calc(100% - ${15 * depth + 24}px)` }"
+        >
+          <div class="text-bold">{{ span.operationName }}</div>
+          <div>{{ formatTimeWithSuffix(span.durationMs) }}</div>
         </div>
-        <div :style="{ width: '100%', backgroundColor: '#ececec' }">
+        <div
+          :style="{ width: '100%', backgroundColor: '#ececec' }"
+          class="q-mb-md"
+        >
           <div
             :style="{
-              width: span?.duration / baseTracePosition?.per_pixel_ms + 'px',
+              width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
               backgroundColor: '#6c83ee',
               height: '8px',
               borderRadius: '2px',
               left:
-                (span.start_time - baseTracePosition['start_time']) /
-                  baseTracePosition?.per_pixel_ms +
+                (span.startTimeMs - baseTracePosition['startTimeMs']) /
+                  baseTracePosition?.perPixelMs +
                 'px',
               position: 'relative',
             }"
@@ -89,16 +91,14 @@
       </template>
       <template v-slot:content>
         <div
-          v-for="childSpan in span['child_spans']"
-          :key="childSpan.span_id"
-          :class="childSpan.span_id"
+          v-for="childSpan in span['spans']"
+          :key="childSpan.spanId"
+          :class="childSpan.spanId"
         >
           <span-renderer
             :depth="depth + 1"
             :baseTracePosition="baseTracePosition"
             :span="childSpan"
-            :isCollapsed="collapseMapping[childSpan.span_id]"
-            :collapseMapping="collapseMapping"
           />
         </div>
       </template>
@@ -142,10 +142,8 @@ export default defineComponent({
         return `${(ns / 1000).toFixed(2)} s`;
       }
     }
-    function updateCollapse() {}
     return {
       formatTimeWithSuffix,
-      updateCollapse,
     };
   },
   components: { AppCollapse },

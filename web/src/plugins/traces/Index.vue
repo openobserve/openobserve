@@ -122,6 +122,7 @@
                 @update:datetime="searchData"
                 @update:scroll="getMoreData"
                 @search:timeboxed="searchAroundData"
+                @get:traceDetails="getTraceDetails"
               />
             </div>
           </template>
@@ -481,112 +482,110 @@ export default defineComponent({
       }
     }
 
+    const getDefaultRequest = () => {
+      return {
+        query: {
+          sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
+          from: 0,
+          size: 0,
+        },
+        aggs: {
+          histogram:
+            "select histogram(_timestamp, '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+        },
+        encoding: "base64",
+      };
+    };
+
+    const getISOTimestamp = (date: any) => {
+      return new Date(date.toISOString()).getTime() * 1000;
+    };
+
+    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}
+    const getChartSettings = (timestamps: {
+      start_time: number | string;
+      end_time: number | string;
+    }) => {
+      if (
+        timestamps.start_time != "Invalid Date" &&
+        timestamps.end_time != "Invalid Date"
+      ) {
+        const chartSettings = {
+          chartInterval: "1 second",
+          chartKeyFormat: "HH:mm:ss",
+        };
+
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+          chartSettings.chartInterval = "3 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+          chartSettings.chartInterval = "5 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+          chartSettings.chartInterval = "10 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+          chartSettings.chartInterval = "15 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+          chartSettings.chartInterval = "30 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+          chartSettings.chartInterval = "1 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+          chartSettings.chartInterval = "5 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+          chartSettings.chartInterval = "30 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+          chartSettings.chartInterval = "1 hour";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+          chartSettings.chartInterval = "1 day";
+          chartSettings.chartKeyFormat = "YYYY-MM-DD";
+        }
+        return chartSettings;
+      } else {
+        return false;
+      }
+    };
+
     function buildSearch() {
       try {
         let query = searchObj.data.editorValue;
-
-        var req: any = {
-          query: {
-            sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-            start_time: (new Date().getTime() - 900000) * 1000,
-            end_time: new Date().getTime() * 1000,
-            from:
-              searchObj.data.resultGrid.currentPage *
-              searchObj.meta.resultGrid.rowsPerPage,
-            size: parseInt(searchObj.meta.resultGrid.rowsPerPage, 10),
-          },
-          aggs: {
-            histogram:
-              "select histogram(_timestamp, '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
-          },
-          encoding: "base64",
-        };
+        var req = getDefaultRequest();
+        req.query.from =
+          searchObj.data.resultGrid.currentPage *
+          searchObj.meta.resultGrid.rowsPerPage;
+        req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
         var timestamps: any = getConsumableDateTime();
+        req.query.start_time = getISOTimestamp(timestamps.start_time);
+        req.query.end_time = getISOTimestamp(timestamps.end_time);
 
-        if (
-          timestamps.start_time != "Invalid Date" &&
-          timestamps.end_time != "Invalid Date"
-        ) {
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-
-          const startISOTimestamp: any =
-            new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-          const endISOTimestamp: any =
-            new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          // let timeRangeFilter: String =
-          //   "(_timestamp >= [START_TIME] AND _timestamp < [END_TIME])";
-          // // let timeRangeFilter: String =
-          // //   "time_range(\"_timestamp\", '[START_TIME]','[END_TIME]')";
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[START_TIME]",
-          //   startISOTimestamp
-          // );
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[END_TIME]",
-          //   endISOTimestamp
-          // );
-
-          // if (query.trim() != "") {
-          //   query += " and " + timeRangeFilter;
-          // } else {
-          //   query = timeRangeFilter;
-          // }
-
-          req.query.start_time = startISOTimestamp;
-          req.query.end_time = endISOTimestamp;
-
-          searchObj.meta.resultGrid.chartInterval = "1 second";
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-            searchObj.meta.resultGrid.chartInterval = "3 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-            searchObj.meta.resultGrid.chartInterval = "5 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-            searchObj.meta.resultGrid.chartInterval = "10 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-            searchObj.meta.resultGrid.chartInterval = "15 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-            searchObj.meta.resultGrid.chartInterval = "30 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-            searchObj.meta.resultGrid.chartInterval = "1 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-            searchObj.meta.resultGrid.chartInterval = "5 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-            searchObj.meta.resultGrid.chartInterval = "30 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-            searchObj.meta.resultGrid.chartInterval = "1 hour";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (
-            timestamps.end_time - timestamps.start_time >=
-            1000 * 86400 * 30
-          ) {
-            searchObj.meta.resultGrid.chartInterval = "1 day";
-            searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-          }
+        const chartSettings = getChartSettings(timestamps);
+        if (chartSettings) {
+          searchObj.meta.resultGrid.chartKeyFormat =
+            chartSettings.chartKeyFormat;
+          searchObj.meta.resultGrid.chartInterval = chartSettings.chartInterval;
 
           req.aggs.histogram = req.aggs.histogram.replaceAll(
             "[INTERVAL]",
             searchObj.meta.resultGrid.chartInterval
           );
-        } else {
-          return false;
         }
 
         if (searchObj.meta.sqlMode == true) {
@@ -686,6 +685,40 @@ export default defineComponent({
         throw new ErrorException(e.message);
       }
     }
+
+    const getTraceDetails = (traceId: string) => {
+      searchObj.data.traceDetails.loading = true;
+      const req = buildTraceSearchQuery(traceId);
+      delete req.aggs;
+
+      searchService
+        .search({
+          org_identifier: searchObj.organizationIdetifier,
+          query: req,
+          page_type: "traces",
+        })
+        .then((res) => {
+          searchObj.data.traceDetails.spanList = res.data?.hits || [];
+        })
+        .finally(() => {
+          searchObj.data.traceDetails.loading = false;
+        });
+    };
+
+    const buildTraceSearchQuery = (traceId: string) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1000;
+      var timestamps: any = getConsumableDateTime();
+      req.query.start_time = getISOTimestamp(timestamps.start_time);
+      req.query.end_time = getISOTimestamp(timestamps.end_time);
+
+      req.query.sql = b64EncodeUnicode(
+        `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${traceId}' ORDER BY start_time`
+      );
+
+      return req;
+    };
 
     function getQueryData() {
       try {
@@ -1243,6 +1276,7 @@ export default defineComponent({
       setQuery,
       useLocalLogsObj,
       searchAroundData,
+      getTraceDetails,
     };
   },
   computed: {

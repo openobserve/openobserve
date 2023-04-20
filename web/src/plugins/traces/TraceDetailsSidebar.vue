@@ -15,23 +15,8 @@
 
 <template>
   <div>
-    <div class="flex items-start">
-      <div :style="headerStyle">
-        <q-btn
-          dense
-          flat
-          round
-          size="sm"
-          icon="chevron_right"
-          @click="updateCollapse"
-          :style="{ rotate: isOpen ? '90deg' : '0deg' }"
-        />
-      </div>
-      <slot name="header" />
-    </div>
-    <div v-if="isOpen">
-      <slot name="content"></slot>
-    </div>
+    <div>Span Details</div>
+    <div v-for="key in span"></div>
   </div>
 </template>
 
@@ -39,15 +24,11 @@
 import { defineComponent, ref } from "vue";
 
 export default defineComponent({
-  name: "AppCollapse",
+  name: "TraceDetailsSidebar",
   props: {
-    open: {
+    span: {
       type: Object,
       default: () => null,
-    },
-    headerStyle: {
-      type: Object,
-      default: () => {},
     },
   },
   setup(props, { emit }) {
