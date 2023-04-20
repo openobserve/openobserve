@@ -49,11 +49,11 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
                 Some(v) => v.as_str().unwrap().to_string(),
                 None => return None,
             };
-            let _id = match local_val.get("_id") {
+            let doc_id = match local_val.get("_id") {
                 Some(v) => v.as_str().unwrap().to_string(),
                 None => String::from(""),
             };
-            return Some((action.to_string(), index, _id));
+            return Some((action.to_string(), index, doc_id));
         };
     }
     None
