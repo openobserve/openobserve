@@ -139,26 +139,11 @@
         v-model="searchObj.meta.showDetailTab"
         position="right"
         full-height
+        full-width
+        persistent
         maximized
       >
-        <DetailTable
-          :key="
-            'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex
-          "
-          v-model="
-            searchObj.data.queryResults.hits[
-              searchObj.meta.resultGrid.navigation.currentRowIndex
-            ]
-          "
-          style="margin-bottom: 15px"
-          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
-          :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
-          @showNextDetail="navigateRowDetail"
-          @showPrevDetail="navigateRowDetail"
-          @add:searchterm="addSearchTerm"
-          @remove:searchterm="removeSearchTerm"
-          @search:timeboxed="onTimeBoxed"
-        />
+        <trace-details />
       </q-dialog>
     </div>
   </div>
@@ -172,17 +157,17 @@ import { useI18n } from "vue-i18n";
 
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
-import DetailTable from "./DetailTable.vue";
 import useTraces from "../../composables/useTraces";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
+import TraceDetails from "./TraceDetails.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     HighLight,
     BarChart,
-    DetailTable,
+    TraceDetails,
   },
   emits: [
     "update:scroll",
@@ -251,7 +236,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
-
+    const showTraceDetails = ref(true);
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const totalHeight = ref(0);
 
@@ -325,6 +310,7 @@ export default defineComponent({
       totalHeight,
       reDrawChart,
       getImageURL,
+      showTraceDetails,
     };
   },
 });
