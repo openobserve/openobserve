@@ -31,6 +31,8 @@ pub mod json;
 pub mod kinesis_firehose;
 pub mod multi;
 
+static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
+
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
         "Too old data,only last {} hours data can be ingested. Data discarded.",
@@ -38,38 +40,31 @@ pub(crate) fn get_upto_discard_error() -> String {
     )
 }
 
-fn get_stream_name_action(v: &Value) -> (String, String) {
+fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
     let local_val = v.as_object().unwrap();
-    if local_val.contains_key("index") {
-        (
-            "index".to_owned(),
-            super::ingestion::format_stream_name(
-                local_val
-                    .get("index")
-                    .unwrap()
-                    .as_object()
-                    .unwrap()
-                    .get("_index")
-                    .unwrap()
-                    .as_str()
-                    .unwrap(),
-            ),
-        )
+    let mut action = String::new();
+    let mut index = String::new();
+    let mut _id = String::new();
+    for opt in BULK_OPERATORS {
+        if local_val.contains_key(opt) {
+            action = opt.to_string();
+            let local_val = match local_val.get(opt) {
+                Some(v) => v.as_object().unwrap(),
+                None => return None,
+            };
+            if let Some(v) = local_val.get("_index") {
+                index = v.as_str().unwrap().to_string();
+            }
+            if let Some(v) = local_val.get("_id") {
+                _id = v.as_str().unwrap().to_string();
+            }
+            break;
+        };
+    }
+    if action.is_empty() {
+        None
     } else {
-        (
-            "create".to_owned(),
-            super::ingestion::format_stream_name(
-                local_val
-                    .get("create")
-                    .unwrap()
-                    .as_object()
-                    .unwrap()
-                    .get("_index")
-                    .unwrap()
-                    .as_str()
-                    .unwrap(),
-            ),
-        )
+        Some((action, index, _id))
     }
 }
 

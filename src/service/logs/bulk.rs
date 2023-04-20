@@ -86,8 +86,9 @@ pub async fn ingest(
         AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
 
-    let mut stream_name = String::from("");
     let mut action = String::from("");
+    let mut stream_name = String::from("");
+    let mut _id = String::from("");
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
 
     let mut next_line_is_data = false;
@@ -103,11 +104,12 @@ pub async fn ingest(
         let value: json::Value = json::from_slice(line.as_bytes())?;
         if !next_line_is_data {
             // check bulk operate
-            if value.get("delete").is_some() {
-                continue; // skip, we don't support delete
+            let ret = super::parse_bulk_index(&value);
+            if ret.is_none() {
+                continue; // skip
             }
+            (action, stream_name, _id) = ret.unwrap();
             next_line_is_data = true;
-            (action, stream_name) = super::get_stream_name_action(&value);
 
             // check if we are allowed to ingest
             if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
@@ -211,6 +213,10 @@ pub async fn ingest(
             let mut value = json::flatten_json_and_format_field(&value);
             // get json object
             let local_val = value.as_object_mut().unwrap();
+            // set _id
+            if !_id.is_empty() {
+                local_val.insert("_id".to_string(), json::Value::String(_id.clone()));
+            }
 
             // handle timestamp
             let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
