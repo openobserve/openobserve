@@ -31,6 +31,8 @@ pub mod json;
 pub mod kinesis_firehose;
 pub mod multi;
 
+static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
+
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
         "Too old data,only last {} hours data can be ingested. Data discarded.",
@@ -38,39 +40,23 @@ pub(crate) fn get_upto_discard_error() -> String {
     )
 }
 
-fn get_stream_name_action(v: &Value) -> (String, String) {
+fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
     let local_val = v.as_object().unwrap();
-    if local_val.contains_key("index") {
-        (
-            "index".to_owned(),
-            super::ingestion::format_stream_name(
-                local_val
-                    .get("index")
-                    .unwrap()
-                    .as_object()
-                    .unwrap()
-                    .get("_index")
-                    .unwrap()
-                    .as_str()
-                    .unwrap(),
-            ),
-        )
-    } else {
-        (
-            "create".to_owned(),
-            super::ingestion::format_stream_name(
-                local_val
-                    .get("create")
-                    .unwrap()
-                    .as_object()
-                    .unwrap()
-                    .get("_index")
-                    .unwrap()
-                    .as_str()
-                    .unwrap(),
-            ),
-        )
+    for action in BULK_OPERATORS {
+        if local_val.contains_key(action) {
+            let local_val = local_val.get(action).unwrap().as_object().unwrap();
+            let index = match local_val.get("_index") {
+                Some(v) => v.as_str().unwrap().to_string(),
+                None => return None,
+            };
+            let _id = match local_val.get("_id") {
+                Some(v) => v.as_str().unwrap().to_string(),
+                None => String::from(""),
+            };
+            return Some((action.to_string(), index, _id));
+        };
     }
+    None
 }
 
 // generate partition key for query
