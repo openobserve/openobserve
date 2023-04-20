@@ -42,30 +42,21 @@ pub(crate) fn get_upto_discard_error() -> String {
 
 fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
     let local_val = v.as_object().unwrap();
-    let mut action = String::new();
-    let mut index = String::new();
-    let mut _id = String::new();
-    for opt in BULK_OPERATORS {
-        if local_val.contains_key(opt) {
-            action = opt.to_string();
-            let local_val = match local_val.get(opt) {
-                Some(v) => v.as_object().unwrap(),
+    for action in BULK_OPERATORS {
+        if local_val.contains_key(action) {
+            let local_val = local_val.get(action).unwrap().as_object().unwrap();
+            let index = match local_val.get("_index") {
+                Some(v) => v.as_str().unwrap().to_string(),
                 None => return None,
             };
-            if let Some(v) = local_val.get("_index") {
-                index = v.as_str().unwrap().to_string();
-            }
-            if let Some(v) = local_val.get("_id") {
-                _id = v.as_str().unwrap().to_string();
-            }
-            break;
+            let _id = match local_val.get("_id") {
+                Some(v) => v.as_str().unwrap().to_string(),
+                None => String::from(""),
+            };
+            return Some((action.to_string(), index, _id));
         };
     }
-    if action.is_empty() {
-        None
-    } else {
-        Some((action, index, _id))
-    }
+    None
 }
 
 // generate partition key for query
