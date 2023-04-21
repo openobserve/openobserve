@@ -168,8 +168,14 @@ pub async fn sql(
     if used_fns.len() > 0 {
         match where_regex.captures(&sql.origin_sql) {
             Some(caps) => {
-                sql_parts.insert(0, caps.get(0).unwrap().as_str().to_string());
-                sql_parts.insert(1, caps.get(1).unwrap().as_str().to_string());
+                println!("{:?}", caps);
+                sql_parts.insert(
+                    0,
+                    sql.origin_sql
+                        .strip_suffix(caps.get(0).unwrap().as_str())
+                        .unwrap(),
+                );
+                sql_parts.insert(1, caps.get(1).unwrap().as_str());
             }
             None => {}
         };
