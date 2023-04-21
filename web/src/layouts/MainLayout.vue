@@ -160,7 +160,8 @@ text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup clickable @click="signout">
+              <q-item v-ripple v-close-popup
+clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -255,6 +256,7 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
+import Tracker from "@openreplay/tracker";
 
 let mainLayoutMixin: any = null;
 if (config.isZincObserveCloud == "true") {
@@ -481,7 +483,7 @@ export default defineComponent({
 
       if (config.isZincObserveCloud == "true") {
         setTimeout(() => {
-          mainLayoutMixin.setup().getRefreshToken();
+          mainLayoutMixin.setup().getRefreshToken(store);
         }, timeout);
       }
     }
@@ -560,6 +562,13 @@ export default defineComponent({
           }
         );
       }
+
+      if (
+        selectedOrg.value.identifier != "" &&
+        config.isZincObserveCloud == "true"
+      ) {
+        mainLayoutMixin.setup().getOrganizationThreshold(store);
+      }
     };
 
     /**
@@ -585,6 +594,16 @@ export default defineComponent({
     };
 
     getConfig();
+
+    if (config.isZincObserveCloud == "true") {
+      mainLayoutMixin.setup().getDefaultOrganization(store);
+
+      const tracker = new Tracker({
+        projectKey: config.openReplayKey,
+      });
+      tracker.start();
+      tracker.setUserID(store.state.userInfo.email);
+    }
 
     return {
       t,
@@ -616,19 +635,11 @@ export default defineComponent({
     };
   },
   computed: {
-    quota() {
-      return this.store.state.selectedOrganization;
-    },
     changeOrganization() {
       return this.store.state.organizations;
     },
   },
   watch: {
-    quota() {
-      if (this.config.isZincObserveCloud == "true") {
-        mainLayoutMixin.setup().getOrganizationThreshold();
-      }
-    },
     changeOrganization() {
       setTimeout(() => {
         this.setSelectedOrganization();

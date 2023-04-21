@@ -221,8 +221,9 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      } else {
+        getOrganizationPasscode();
       }
-      getOrganizationPasscode();
     });
 
     const getOrganizationPasscode = () => {
