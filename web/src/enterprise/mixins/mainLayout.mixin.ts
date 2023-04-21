@@ -1,5 +1,4 @@
-import { ref, onActivated, onMounted } from "vue";
-import { useStore } from "vuex";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 
@@ -8,30 +7,10 @@ import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
 
-import Tracker from "@openreplay/tracker";
-
 const MainLayoutCloudMixin = {
   setup() {
-    const store: any = useStore();
     const router = useRouter();
-
-    //check if organization identifier is present in query params
-    const customOrganization = router.currentRoute.value.query.hasOwnProperty(
-      "org_identifier"
-    )
-      ? router.currentRoute.value.query.org_identifier
-      : undefined;
-    //if present, set it as selected organization
-    const selectedOrg = ref(store.state.selectedOrganization);
     const orgOptions = ref([{ label: Number, value: String }]);
-
-    if (config.enableAnalytics == "true") {
-      const tracker = new Tracker({
-        projectKey: config.openReplayKey,
-      });
-      tracker.start();
-      tracker.setUserID(store.state.userInfo.email);
-    }
 
     /**
      * Add function & organization menu in left navigation
@@ -66,7 +45,7 @@ const MainLayoutCloudMixin = {
     /**
      * Get default organization
      */
-    const getDefaultOrganization = async () => {
+    const getDefaultOrganization = async (store:any) => {
       await organizationService
         .list(0, 1000, "id", false, "")
         .then((res: any) => {
@@ -80,7 +59,7 @@ const MainLayoutCloudMixin = {
      * if plan is free, get the threshold and extract search and ingest threshold
      * if one of the threshold exceed the threshold, show the warning message else show error message
      */
-    const getOrganizationThreshold = async () => {
+    const getOrganizationThreshold = async (store:any) => {
       const organization: {
         identifier: "";
         subscription_type: "Free-Plan-USD-Monthly";
@@ -159,7 +138,7 @@ const MainLayoutCloudMixin = {
     /**
      * Get refresh token
      */
-    const getRefreshToken = () => {
+    const getRefreshToken = (store:any) => {
       userService
         .getRefreshToken()
         .then((res) => {
@@ -188,23 +167,13 @@ const MainLayoutCloudMixin = {
         });
     };
 
-    onActivated(() => {
-      getDefaultOrganization();
-      getOrganizationThreshold();
-    });
-
-    onMounted(() => {
-      getDefaultOrganization();
-      getOrganizationThreshold();
-    });
-
     return {
       orgOptions,
-      selectedOrg,
-      customOrganization,
       getImageURL,
       leftNavigationLinks,
       getRefreshToken,
+      getDefaultOrganization,
+      getOrganizationThreshold,
     };
   },
 };
