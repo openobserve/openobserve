@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, http, put, route, web, HttpResponse, Responder, Result};
+use actix_web::{get, http, put, route, web, HttpRequest, HttpResponse, Responder, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::collections::HashSet;
 use std::io::Error;
@@ -182,10 +182,21 @@ async fn update_user_passcode(
 }
 
 #[route("/{org_id}/", method = "GET", method = "HEAD")]
-async fn org_es_index(_org_id: web::Path<String>) -> impl Responder {
+async fn org_es_index(_org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     // eg.1: User-Agent:[elastic-transport-ruby/8.0.1 (RUBY_VERSION: 3.1.2; linux x86_64; Faraday v1.10.0)]
     // eg.2: Elastic-filebeat/7.17.1 (linux; arm64; 1d05ba86138cfc9a5ae5c0acc64a57b8d81678ff; 2022-02-24 01:00:19 +0000 UTC)
-    let version = "8.1.0";
+    let mut version = "7.17.1";
+    let user_agent = match req.headers().get("User-Agent") {
+        Some(user_agent) => user_agent.to_str().unwrap(),
+        None => "",
+    };
+    if user_agent.to_lowercase().contains("elastic") {
+        let re = regex::Regex::new(r"(\d+\.\d+\.\d+)").unwrap();
+        version = match re.captures(user_agent) {
+            Some(caps) => caps.get(1).unwrap().as_str(),
+            None => "8.1.0",
+        };
+    }
     let es_info = r#"{"name":"opensearch","cluster_name":"opensearch-cluster","cluster_uuid":"h3nGzoJ1R12fZz","version":{"number":"0.0.0","build_flavor":"default","build_hash":"0","build_date":"0","build_snapshot":false,"lucene_version":"8.9.0","minimum_wire_version":"7.10.0","minimum_index_compatibility":"8.1.0"},"tagline":"You Know, for Search"}"#;
     let es_info = es_info.replace("0.0.0", version);
     HttpResponse::Ok()
