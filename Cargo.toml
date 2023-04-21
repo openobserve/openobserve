@@ -76,7 +76,12 @@ log = "0.4"
 lru = "0.8"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-mlua = { version = "0.8.4", features = ["luau", "serialize"], optional = true }
+mlua = { version = "0.8.4", features = [
+  "send",
+  "luajit52",
+  "vendored",
+  "serialize",
+], optional = true }
 object_store = { version = "0.5", features = [
   "aws",
   "aws_profile",
