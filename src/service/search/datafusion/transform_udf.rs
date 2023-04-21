@@ -316,8 +316,9 @@ mod tests {
 
     #[tokio::test]
     async fn vrl_udf_test() {
-        let sql = "select temp.d['account_id'] as acc , temp.pod_id ,temp.lua_test from (select *, vrltest(log) as d ,luaconcat(log,pod_id) as lua_test from t) as temp";
+        //let sql = "select temp.d['account_id'] as acc , temp.pod_id ,temp.lua_test from (select *, vrltest(log) ,luaconcat(log,pod_id) as lua_test from t) as temp";
 
+        let sql = "select vrltest(log)['account_id']  from (select *, vrltest(log) ,luaconcat(log,pod_id) as lua_test from t) as temp";
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
             Field::new("log", DataType::Utf8, false),
@@ -354,8 +355,12 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let df = ctx.sql(sql).await.unwrap();
-
+        df.clone().show().await.unwrap();
+        df.schema().fields().iter().for_each(|f| {
+            println!("field: {:?}", f);
+        });
         let result = df.collect().await.unwrap();
+
         /* datafusion::assert_batches_sorted_eq!(
             vec![
                 "+-----+--------+----+------+",

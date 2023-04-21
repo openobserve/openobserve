@@ -161,7 +161,7 @@ pub async fn sql(
         }
         for field in &sql.meta.fields {
             if field.starts_with(&format!("{fn_name}(")) {
-                replace_alias.push(field.replace("(", "_").replace(")", "_"));
+                replace_alias.push(field.replace("(", "_tbl_").replace(")", "_"));
             }
         }
     }
@@ -238,7 +238,7 @@ pub async fn sql(
         df = df.select(exprs)?;
     }
 
-    if !used_fns.is_empty() {
+    if used_fns.is_empty() {
         let batches = df.clone().collect().await?;
         result.insert("query".to_string(), batches);
         log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
@@ -252,12 +252,12 @@ pub async fn sql(
         let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
         let additional_clause = if sql.meta.field_alias.is_empty() {
             for replace_pat in &replace_alias {
-                replace_in_query(replace_pat, &mut where_query);
+                replace_in_query(replace_pat, &mut where_query, false);
             }
             where_query.clone()
         } else {
             for alias in &sql.meta.field_alias {
-                replace_in_query(&alias.1, &mut where_query);
+                replace_in_query(&alias.1, &mut where_query, true);
             }
             where_query.clone()
         };
@@ -338,13 +338,21 @@ pub async fn sql(
     Ok(result)
 }
 
-fn replace_in_query(replace_pat: &String, where_query: &mut String) {
+fn replace_in_query(replace_pat: &String, where_query: &mut String, is_alias: bool) {
     let re1 = Regex::new(&format!("(?i){}_([a-zA-Z0-9_-]*)", replace_pat)).unwrap();
     match re1.captures(&*where_query) {
         Some(caps) => {
             let cap_str = caps.get(0).unwrap().as_str();
             let field = caps.get(1).unwrap().as_str();
-            *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
+            if is_alias {
+                *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
+            } else {
+                let local_pattern = replace_pat
+                    .replace("tbl_", "")
+                    .replacen("_", "(", 1)
+                    .replace("_", ")");
+                *where_query = where_query.replace(cap_str, &format!("{local_pattern}['{field}']"));
+            }
         }
         None => {}
     }
