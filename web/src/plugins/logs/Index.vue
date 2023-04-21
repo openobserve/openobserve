@@ -432,7 +432,6 @@ export default defineComponent({
               searchObj.data.resultGrid.currentPage *
               searchObj.meta.resultGrid.rowsPerPage,
             size: parseInt(searchObj.meta.resultGrid.rowsPerPage, 10),
-            query_fn: "aws",
           },
           aggs: {
             histogram:

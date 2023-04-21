@@ -115,6 +115,10 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
+    /*   req.query.sql =
+    "select aws(message) as d , _timestamp from \"fhdata\" where d['bytes']='12973' "
+        .to_string(); */
+
     // get a local search queue lock
     let locker = SEARCH_LOCKER.clone();
     let _locker = locker.lock().await;
@@ -238,6 +242,16 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(bad_request("around key is empty")),
     };
+
+    let default_sql = format!(
+        "SELECT * FROM \"{}\" ORDER BY {} DESC",
+        stream_name, CONFIG.common.time_stamp_col
+    );
+    let around_sql = match query.get("sql") {
+        Some(v) => crate::common::base64::decode(v).unwrap_or(default_sql),
+        None => default_sql,
+    };
+
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
@@ -249,10 +263,7 @@ pub async fn around(
     // search forward
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!(
-                "SELECT * FROM \"{}\" ORDER BY {} DESC",
-                stream_name, CONFIG.common.time_stamp_col
-            ),
+            sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
             start_time: around_key - Duration::seconds(300).num_microseconds().unwrap(),
@@ -260,7 +271,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: Some("aws".to_string()),
+            query_context: None,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -302,10 +313,7 @@ pub async fn around(
     // search backward
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!(
-                "SELECT * FROM \"{}\" ORDER BY {} ASC",
-                stream_name, CONFIG.common.time_stamp_col
-            ),
+            sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
             start_time: around_key,
@@ -313,7 +321,7 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: Some("aws".to_string()),
+            query_context: None,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -434,12 +442,25 @@ pub async fn values(
         Err(e) => return Ok(bad_request(e)),
     };
 
-    let mut fields = match query.get("fields") {
+    let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
 
-    fields.push("test".to_string());
+    let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let (base_sql, apply_fn) = match query.get("sql") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => (v, true),
+            Err(_) => (default_sql.clone(), false),
+        },
+        None => (default_sql.clone(), false),
+    };
+
+    let query_context = if apply_fn {
+        Some(base_sql.clone())
+    } else {
+        None
+    };
 
     let size = query
         .get("size")
@@ -464,7 +485,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT * FROM \"{stream_name}\""),
+            sql: default_sql,
             from: 0,
             size: 0,
             start_time,
@@ -472,16 +493,23 @@ pub async fn values(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_context,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
     for field in &fields {
+        let fn_field = if apply_fn {
+            let mut temp_field = field.replacen("_", "['", 1);
+            temp_field.push_str("']");
+            temp_field
+        } else {
+            field.clone()
+        };
         req.aggs.insert(
             field.clone(),
             format!(
-                "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
+                "SELECT {fn_field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
             ),
         );
     }

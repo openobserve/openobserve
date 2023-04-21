@@ -42,14 +42,13 @@ use super::storage::file_list;
 use super::transform_udf::get_all_transform;
 use crate::common::json;
 use crate::infra::cache::tmpfs;
-use crate::infra::config::{get_parquet_compression, CONFIG};
+use crate::infra::config::{get_parquet_compression, CONFIG, QUERY_FUNCTIONS};
 use crate::meta::common::FileMeta;
 use crate::meta::{self, StreamType};
 use crate::service::search::sql::Sql;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
 
-#[tracing::instrument(name = "service:search:datafusion:exec:sql", skip_all)]
 pub async fn sql(
     session: &meta::search::Session,
     stream_type: StreamType,
@@ -62,7 +61,6 @@ pub async fn sql(
     if files.is_empty() {
         return Ok(HashMap::new());
     }
-
     let start = Instant::now();
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
@@ -149,17 +147,56 @@ pub async fn sql(
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+
+    // get all UDF
+    let mut used_fns = vec![];
+    let mut replace_alias = vec![];
+
+    let mut sql_parts = vec![];
+    let re = Regex::new("(?i)where").unwrap();
+
+    for fn_name in get_all_transform_keys(&sql.org_id).await {
+        if sql.origin_sql.contains(&fn_name) {
+            used_fns.push(fn_name.clone());
+        }
+        for field in &sql.meta.fields {
+            if field.starts_with(&format!("{fn_name}(")) {
+                replace_alias.push(field.replace("(", "_").replace(")", "_"));
+            }
+        }
+    }
+    if used_fns.len() > 0 {
+        let captures = re.captures(&sql.origin_sql);
+        sql_parts = sql.origin_sql.split("where").collect::<Vec<&str>>();
+    }
     log::info!(
         "Register table took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
-    // Debug SQL
-    log::info!("Query sql: {}", sql.origin_sql);
-
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     // query
-    let mut df = match ctx.sql(&sql.origin_sql).await {
+
+    let query = if !&sql.query_context.is_empty() {
+        sql.query_context.replace(&sql.stream_name, "tbl").clone()
+    } else if !used_fns.is_empty() && sql_parts.len() > 0 {
+        match sql.meta.time_range {
+            Some(ts_range) => format!(
+                "{} where _timestamp >= {} AND _timestamp < {}",
+                sql_parts[0].to_string(),
+                ts_range.0,
+                ts_range.1
+            ),
+            None => sql_parts[0].to_string(),
+        }
+    } else {
+        sql.origin_sql.clone()
+    };
+
+    // Debug SQL
+    log::info!("Query sql: {}", query);
+
+    let mut df = match ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
@@ -189,21 +226,65 @@ pub async fn sql(
         }
         df = df.select(exprs)?;
     }
-    let batches = df.collect().await?;
-    result.insert("query".to_string(), batches);
-    log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
-    // aggs
-    for (name, sql) in sql.aggs.iter() {
+
+    if !used_fns.is_empty() {
+        let batches = df.clone().collect().await?;
+        result.insert("query".to_string(), batches);
+        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+    }
+
+    if !&sql.query_context.is_empty() || !used_fns.is_empty() {
+        ctx.register_table("tbl_temp", df.into_view())?;
+    }
+
+    if !used_fns.is_empty() && !sql_parts[1].is_empty() {
+        let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
+        let additional_clause = if sql.meta.field_alias.is_empty() {
+            for replace_pat in &replace_alias {
+                replace_in_query(replace_pat, &mut where_query);
+            }
+            where_query.clone()
+        } else {
+            for alias in &sql.meta.field_alias {
+                replace_in_query(&alias.1, &mut where_query);
+            }
+            where_query.clone()
+        };
+
+        println!("where_query: {}", additional_clause);
+
+        let df = match ctx.sql(&additional_clause).await {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!(
+                    "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                    session,
+                    sql.origin_sql,
+                    e
+                );
+                return Err(e);
+            }
+        };
+        let batches = df.clone().collect().await?;
+        result.insert("query".to_string(), batches);
+        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+    }
+
+    for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        println!("Query agg sql: {}", sql.0);
-        log::info!("Query agg sql: {}", sql.0);
-        let mut df = match ctx.sql(&sql.0).await {
+        log::info!("Query agg sql: {}", orig_agg_sql.0);
+        let agg_sql = if !&sql.query_context.is_empty() {
+            orig_agg_sql.0.replace("tbl", "tbl_temp")
+        } else {
+            orig_agg_sql.0.clone()
+        };
+        let mut df = match ctx.sql(&agg_sql).await {
             Ok(df) => df,
             Err(e) => {
                 log::error!(
                     "aggs sql execute failed, session: {:?}, sql: {}, err: {:?}",
                     session,
-                    sql.0,
+                    agg_sql,
                     e
                 );
                 return Err(e);
@@ -237,12 +318,25 @@ pub async fn sql(
 
     // drop table
     ctx.deregister_table("tbl")?;
+    ctx.deregister_table("tbl_temp")?;
     log::info!(
         "Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
     Ok(result)
+}
+
+fn replace_in_query(replace_pat: &String, where_query: &mut String) {
+    let re1 = Regex::new(&format!("(?i){}_([a-zA-Z0-9_-]*)", replace_pat)).unwrap();
+    match re1.captures(&*where_query) {
+        Some(caps) => {
+            let cap_str = caps.get(0).unwrap().as_str();
+            let field = caps.get(1).unwrap().as_str();
+            *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
+        }
+        None => {}
+    }
 }
 
 pub async fn merge(
@@ -792,6 +886,21 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
             ctx.register_udf(udf.clone());
         }
     }
+}
+
+pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
+    let mut fn_list = Vec::new();
+    for transform in QUERY_FUNCTIONS.iter() {
+        let key = transform.key();
+        if key.contains(org_id) {
+            fn_list.push(
+                key.strip_prefix(&format!("{}/", org_id).to_owned())
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+    }
+    fn_list
 }
 
 #[cfg(test)]

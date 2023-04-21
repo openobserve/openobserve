@@ -24,7 +24,7 @@ use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::json;
+use crate::common::json::{self};
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
 #[cfg(feature = "zo_functions")]
@@ -434,11 +434,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             sources = handle_metrics_response(sources);
         }
 
-        #[cfg(feature = "zo_functions")]
-        let sources = apply_query_fn(&req, &sources);
+        /*  #[cfg(feature = "zo_functions")]
+        let sources = apply_query_fn(&req, &sources); */
 
         for source in sources {
-            result.add_hit(&source);
+            result.add_hit(&json::flatten_json_and_format_field(&source));
         }
     }
 
@@ -589,8 +589,8 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 }
 
 #[cfg(feature = "zo_functions")]
-fn apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
-    let applicable_query_fn = req.query.as_ref().unwrap().query_fn.to_lowercase();
+fn _apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
+    let applicable_query_fn = req.query.as_ref().unwrap().query_context.to_lowercase();
     if applicable_query_fn.is_empty() {
         return resp.to_vec();
     }
