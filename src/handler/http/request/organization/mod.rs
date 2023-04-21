@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, head, http, put, route, web, HttpRequest, HttpResponse, Responder, Result};
+use actix_web::{get, http, put, route, web, HttpResponse, Responder, Result};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::collections::HashSet;
 use std::io::Error;
