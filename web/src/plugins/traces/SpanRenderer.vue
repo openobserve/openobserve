@@ -15,7 +15,7 @@
 
 <template>
   <div>
-    <div v-if="!span?.spans?.length || depth < 2" class="q-my-xs normal-header">
+    <div v-if="!span?.spans?.length" class="q-my-xs normal-header">
       <span-block
         :span="span"
         :depth="depth"
@@ -41,6 +41,7 @@
     <app-collapse
       v-else
       class="app-collapse"
+      :open="depth < 3"
       :headerStyle="{ paddingLeft: 15 * depth + 'px' }"
     >
       <template v-slot:header>

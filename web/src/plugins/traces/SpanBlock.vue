@@ -31,14 +31,15 @@
   >
     <div
       :style="{
-        width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
+        width: (span?.durationMs / baseTracePosition?.durationMs) * 100 + '%',
         backgroundColor: '#6c83ee',
         height: '10px',
         borderRadius: '2px',
         left:
-          (span.startTimeMs - baseTracePosition['startTimeMs']) /
-            baseTracePosition?.perPixelMs +
-          'px',
+          ((span.startTimeMs - baseTracePosition['startTimeMs']) /
+            baseTracePosition?.durationMs) *
+            100 +
+          '%',
         position: 'relative',
       }"
     />

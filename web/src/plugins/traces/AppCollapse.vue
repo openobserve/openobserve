@@ -42,8 +42,8 @@ export default defineComponent({
   name: "AppCollapse",
   props: {
     open: {
-      type: Object,
-      default: () => null,
+      type: Boolean,
+      default: () => false,
     },
     headerStyle: {
       type: Object,

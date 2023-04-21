@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="flex justify-end">
+  <div class="flex justify-end q-px-md q-pt-sm">
     <q-btn
       dense
       icon="close"
@@ -32,8 +32,8 @@
       <q-tab name="tags" label="Tags" />
       <q-tab name="details" label="Details" />
     </q-tabs>
-    <q-seperator />
-    <q-tab-panels v-model="activeTab">
+    <q-separator style="width: 100%" />
+    <q-tab-panels v-model="activeTab" class="tab-panels">
       <q-tab-panel name="tags">
         <div v-for="key in Object.keys(span)" :key="key">
           <div class="row q-py-sm q-px-sm border-bottom">
@@ -74,4 +74,10 @@ export default defineComponent({
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.tab-panels {
+  height: calc(100vh - 130px);
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+</style>

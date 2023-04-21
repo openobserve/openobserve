@@ -15,36 +15,44 @@
 
 <template>
   <div
-    class="trace-details q-py-md q-px-md"
+    class="trace-details"
     :style="{ width: '90vw !important', background: '#ffffff' }"
   >
     <div
       class="row"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
-      <div :class="isSidebarOpen ? 'col-8' : 'col-12'">
-        <div class="q-pb-sm flex items-center justify-start">
+      <div
+        :class="
+          isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
+        "
+        class="q-py-md"
+      >
+        <div class="q-pb-sm q-px-md flex items-center justify-start">
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
           <div>Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <div
-          v-for="(span, index) in traceTree"
-          :key="span.spanId"
-          class="relative-position"
-        >
-          <SpanRenderer
-            :isCollapsed="collapseMapping[span.spanId]"
-            :collapseMapping="collapseMapping"
-            :span="span"
-            :index="index"
-            :baseTracePosition="baseTracePosition"
-            ref="traceRootSpan"
-          />
+        <div class="histogram-spans-container q-px-md">
+          <div
+            v-for="(span, index) in traceTree"
+            :key="span.spanId"
+            class="relative-position"
+          >
+            <SpanRenderer
+              :isCollapsed="collapseMapping[span.spanId]"
+              :collapseMapping="collapseMapping"
+              :span="span"
+              :index="index"
+              :baseTracePosition="baseTracePosition"
+              ref="traceRootSpan"
+            />
+          </div>
         </div>
       </div>
-      <div v-if="isSidebarOpen && selectedSpanId" class="col-4">
+      <q-separator vertical />
+      <div v-if="isSidebarOpen && selectedSpanId" class="histogram-sidebar">
         <trace-details-sidebar
           :span="spanMapping[selectedSpanId]"
           @close="closeSidebar"
@@ -140,6 +148,7 @@ export default defineComponent({
       baseTracePosition.value["perPixelMs"] = Number(
         traceTree.value[0].durationMs / traceRootSpan.value[0].$el.clientWidth
       );
+      baseTracePosition.value["durationMs"] = traceTree.value[0].durationMs;
       baseTracePosition.value["startTimeMs"] = traceTree.value[0].startTimeMs;
     };
 
@@ -261,34 +270,30 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.searchdetaildialog {
-  width: 60vw;
+<style scoped lang="scss">
+$sidebarWidth: 350px;
+$seperatorWidth: 2px;
+
+.trace-details {
+  height: 100vh;
+  overflow: auto;
+}
+.histogram-container-full {
+  width: 100%;
+}
+.histogram-container {
+  width: calc(100% - $sidebarWidth - $seperatorWidth);
 }
 
-.q-item__section {
-  word-break: break-all;
+.histogram-sidebar {
+  width: $sidebarWidth;
+  height: 100vh;
+  overflow-y: scroll;
+  overflow-x: hidden;
 }
 
-.indexDetailsContainer .q-list .q-item {
-  height: auto;
-}
-
-.q-icon {
-  cursor: pointer;
-}
-
-.table-pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  display: inline;
-  font-weight: normal;
-  font-family: Nunito Sans, sans-serif;
-}
-
-.json-pre {
-  height: calc(100vh - 290px);
-  white-space: pre-wrap;
-  word-wrap: break-word;
+.histogram-spans-container {
+  height: calc(100vh - 73px);
+  overflow-y: auto;
 }
 </style>
