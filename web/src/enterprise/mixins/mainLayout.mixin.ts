@@ -159,7 +159,7 @@ const MainLayoutCloudMixin = {
           const timeout =
             (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
           setTimeout(() => {
-            getRefreshToken();
+            getRefreshToken(store);
           }, timeout);
         })
         .catch((e) => {
