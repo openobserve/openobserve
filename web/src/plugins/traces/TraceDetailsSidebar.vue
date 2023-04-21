@@ -14,9 +14,38 @@
 -->
 
 <template>
+  <div class="flex justify-end">
+    <q-btn
+      dense
+      icon="close"
+      class="align-right no-border"
+      size="sm"
+      @click="closeSidebar"
+    ></q-btn>
+  </div>
+  <div class="q-pb-sm">
+    <div class="q-px-md q-pb-none text-h6">{{ span.operation_name }}</div>
+    <div class="q-px-md text-body2">{{ span.service_name }}</div>
+  </div>
   <div>
-    <div>Span Details</div>
-    <div v-for="key in span"></div>
+    <q-tabs v-model="activeTab" dense inline-label class="text-bold q-mx-md">
+      <q-tab name="tags" label="Tags" />
+      <q-tab name="details" label="Details" />
+    </q-tabs>
+    <q-seperator />
+    <q-tab-panels v-model="activeTab">
+      <q-tab-panel name="tags">
+        <div v-for="key in Object.keys(span)" :key="key">
+          <div class="row q-py-sm q-px-sm border-bottom">
+            <div class="col-12 text-subtitle2 text-grey-8">{{ key }}</div>
+            <div class="col-12 text-subtitle2">{{ span[key] }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
+      <q-tab-panel name="details">
+        <div>Details</div>
+      </q-tab-panel>
+    </q-tab-panels>
   </div>
 </template>
 
@@ -31,14 +60,15 @@ export default defineComponent({
       default: () => null,
     },
   },
+  emits: ["close"],
   setup(props, { emit }) {
-    const isOpen: any = ref(props.open);
-    function updateCollapse() {
-      isOpen.value = !isOpen.value;
-    }
+    const activeTab = ref("tags");
+    const closeSidebar = () => {
+      emit("close");
+    };
     return {
-      isOpen,
-      updateCollapse,
+      activeTab,
+      closeSidebar,
     };
   },
 });

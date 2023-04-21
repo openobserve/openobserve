@@ -16,33 +16,14 @@
 <template>
   <div>
     <div v-if="!span?.spans?.length || depth < 2" class="q-my-xs normal-header">
-      <div
-        class="flex justify-between align-center q-pb-xs"
-        :style="{
+      <span-block
+        :span="span"
+        :depth="depth"
+        :baseTracePosition="baseTracePosition"
+        :styleObj="{
           paddingLeft: depth ? 15 * depth + 10 + 'px' : 0,
         }"
-      >
-        <div class="text-bold">{{ span.operationName }}</div>
-        <div>{{ formatTimeWithSuffix(span.durationMs) }}</div>
-      </div>
-      <div
-        :style="{ width: '100%', backgroundColor: '#ececec' }"
-        class="q-mb-md"
-      >
-        <div
-          :style="{
-            width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
-            backgroundColor: '#6c83ee',
-            height: '10px',
-            borderRadius: '2px',
-            left:
-              (span.startTimeMs - baseTracePosition['startTimeMs']) /
-                baseTracePosition?.perPixelMs +
-              'px',
-            position: 'relative',
-          }"
-        />
-      </div>
+      />
       <div
         v-for="childSpan in span['spans']"
         :key="childSpan.spanId"
@@ -63,31 +44,12 @@
       :headerStyle="{ paddingLeft: 15 * depth + 'px' }"
     >
       <template v-slot:header>
-        <div
-          class="flex justify-between align-center"
-          :style="{ width: `calc(100% - ${15 * depth + 24}px)` }"
-        >
-          <div class="text-bold">{{ span.operationName }}</div>
-          <div>{{ formatTimeWithSuffix(span.durationMs) }}</div>
-        </div>
-        <div
-          :style="{ width: '100%', backgroundColor: '#ececec' }"
-          class="q-mb-md"
-        >
-          <div
-            :style="{
-              width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
-              backgroundColor: '#6c83ee',
-              height: '8px',
-              borderRadius: '2px',
-              left:
-                (span.startTimeMs - baseTracePosition['startTimeMs']) /
-                  baseTracePosition?.perPixelMs +
-                'px',
-              position: 'relative',
-            }"
-          />
-        </div>
+        <span-block
+          :span="span"
+          :depth="depth"
+          :baseTracePosition="baseTracePosition"
+          :styleObj="{ width: `calc(100% - ${15 * depth + 24}px)` }"
+        />
       </template>
       <template v-slot:content>
         <div
@@ -109,6 +71,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import AppCollapse from "./AppCollapse.vue";
+import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
   name: "SpanRenderer",
@@ -146,7 +109,7 @@ export default defineComponent({
       formatTimeWithSuffix,
     };
   },
-  components: { AppCollapse },
+  components: { AppCollapse, SpanBlock },
 });
 </script>
 

@@ -120,6 +120,8 @@ const defaultObject = {
       traceId: "",
       spanList: [],
       loading: false,
+      selectedSpanId: null,
+      showSpanDetails: false,
     },
   },
 };

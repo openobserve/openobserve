@@ -15,15 +15,20 @@
 
 <template>
   <div
-    class="flex justify-between align-center q-pb-xs"
-    :style="{
-      paddingLeft: depth ? 15 * depth + 10 + 'px' : 0,
-    }"
+    class="flex justify-between align-center q-pb-xs cursor-pointer span-block"
+    :style="styleObj"
+    :class="!isSpanSelected ? 'defocus' : ''"
+    @click="selectSpan"
   >
     <div class="text-bold">{{ span.operationName }}</div>
     <div>{{ formatTimeWithSuffix(span.durationMs) }}</div>
   </div>
-  <div :style="{ width: '100%', backgroundColor: '#ececec' }" class="q-mb-md">
+  <div
+    :style="{ width: '100%', backgroundColor: '#ececec' }"
+    class="q-mb-md cursor-pointer"
+    :class="!isSpanSelected ? 'defocus' : ''"
+    @click="selectSpan"
+  >
     <div
       :style="{
         width: span?.durationMs / baseTracePosition?.perPixelMs + 'px',
@@ -41,7 +46,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import useTraces from "@/composables/useTraces";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -58,8 +64,13 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    styleObj: {
+      type: Object,
+      default: () => {},
+    },
   },
-  setup() {
+  setup(props) {
+    const { searchObj } = useTraces();
     function formatTimeWithSuffix(ns: number) {
       if (ns < 10000) {
         return `${ns} ms`;
@@ -67,11 +78,25 @@ export default defineComponent({
         return `${(ns / 1000).toFixed(2)} s`;
       }
     }
+    const isSpanSelected = computed(() => {
+      if (!searchObj.data.traceDetails.selectedSpanId) return true;
+      return searchObj.data.traceDetails.selectedSpanId === props.span.spanId;
+    });
+    const selectSpan = () => {
+      searchObj.data.traceDetails.showSpanDetails = true;
+      searchObj.data.traceDetails.selectedSpanId = props.span.spanId;
+    };
     return {
       formatTimeWithSuffix,
+      selectSpan,
+      isSpanSelected,
     };
   },
 });
 </script>
 
-<style scoped></style>
+<style scoped lang="scss">
+.defocus {
+  opacity: 0.3;
+}
+</style>

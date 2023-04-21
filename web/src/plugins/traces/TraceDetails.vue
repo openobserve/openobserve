@@ -18,8 +18,11 @@
     class="trace-details q-py-md q-px-md"
     :style="{ width: '90vw !important', background: '#ffffff' }"
   >
-    <div v-if="traceTree.length && !searchObj.data.traceDetails.loading">
-      <div>
+    <div
+      class="row"
+      v-if="traceTree.length && !searchObj.data.traceDetails.loading"
+    >
+      <div :class="isSidebarOpen ? 'col-8' : 'col-12'">
         <div class="q-pb-sm flex items-center justify-start">
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
@@ -41,8 +44,11 @@
           />
         </div>
       </div>
-      <div v-if="false">
-        <trace-details-sidebar />
+      <div v-if="isSidebarOpen && selectedSpanId" class="col-4">
+        <trace-details-sidebar
+          :span="spanMapping[selectedSpanId]"
+          @close="closeSidebar"
+        />
       </div>
     </div>
     <div
@@ -65,6 +71,7 @@ import {
   onMounted,
   watch,
   nextTick,
+  onActivated,
 } from "vue";
 import { cloneDeep } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -85,11 +92,7 @@ export default defineComponent({
   setup() {
     const traceTree: any = ref([]);
     const spanMapping: any = ref({});
-    const isSidebarOpen: any = ref(false);
     const { searchObj } = useTraces();
-    onBeforeMount(() => {
-      buildTracesTree();
-    });
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -98,16 +101,37 @@ export default defineComponent({
       return searchObj.data.traceDetails.spanList;
     });
 
+    onActivated(() => {
+      buildTracesTree();
+      if (traceRootSpan.value) {
+        calculateTracePosition();
+      }
+    });
+
+    onMounted(() => {
+      buildTracesTree();
+      if (traceRootSpan.value) {
+        calculateTracePosition();
+      }
+    });
+
     watch(
       () => spanList.value.length,
       () => {
-        console.log("spanlist watch triggered");
         if (spanList.value.length) {
           buildTracesTree();
         } else traceTree.value = [];
       },
       { immediate: true }
     );
+
+    const isSidebarOpen = computed(() => {
+      return searchObj.data.traceDetails.showSpanDetails;
+    });
+
+    const selectedSpanId = computed(() => {
+      return searchObj.data.traceDetails.selectedSpanId;
+    });
 
     const calculateTracePosition = () => {
       console.log("calculateTracePosition");
@@ -123,10 +147,12 @@ export default defineComponent({
     const buildTracesTree = async () => {
       console.log("buildTracesTree", spanList.value);
       const traceTreeMock: any = {};
-      spanMapping[spanList.value[0].span_id] = spanList.value[0];
+      spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
 
       for (let i = 1; i < spanList.value.length; i++) {
-        spanMapping[spanList.value[i].span_id] = cloneDeep(spanList.value[i]);
+        spanMapping.value[spanList.value[i].span_id] = cloneDeep(
+          spanList.value[i]
+        );
 
         const span = getFormattedSpan(spanList.value[i]);
 
@@ -215,6 +241,10 @@ export default defineComponent({
         idlePercentage,
       };
     };
+    const closeSidebar = () => {
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = null;
+    };
     return {
       traceTree,
       collapseMapping,
@@ -222,6 +252,10 @@ export default defineComponent({
       baseTracePosition,
       searchObj,
       spanList,
+      isSidebarOpen,
+      selectedSpanId,
+      spanMapping,
+      closeSidebar,
     };
   },
 });
