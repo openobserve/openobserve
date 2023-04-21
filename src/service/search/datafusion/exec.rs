@@ -153,7 +153,7 @@ pub async fn sql(
     let mut replace_alias = vec![];
 
     let mut sql_parts = vec![];
-    let re = Regex::new("(?i)where").unwrap();
+    let where_regex = Regex::new(r"(?i) where (.*)").unwrap();
 
     for fn_name in get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
@@ -166,8 +166,13 @@ pub async fn sql(
         }
     }
     if used_fns.len() > 0 {
-        let captures = re.captures(&sql.origin_sql);
-        sql_parts = sql.origin_sql.split("where").collect::<Vec<&str>>();
+        match where_regex.captures(&sql.origin_sql) {
+            Some(caps) => {
+                sql_parts.insert(0, caps.get(0).unwrap().as_str().to_string());
+                sql_parts.insert(1, caps.get(1).unwrap().as_str().to_string());
+            }
+            None => {}
+        };
     }
     log::info!(
         "Register table took {:.3} seconds.",
