@@ -109,6 +109,7 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
+          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
 
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
