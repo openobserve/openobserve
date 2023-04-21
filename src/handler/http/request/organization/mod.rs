@@ -181,7 +181,7 @@ async fn update_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
-#[get("/{org_id}/")]
+#[route("/{org_id}/", method = "GET", method = "HEAD")]
 async fn org_es_index(_org_id: web::Path<String>) -> impl Responder {
     // eg.1: User-Agent:[elastic-transport-ruby/8.0.1 (RUBY_VERSION: 3.1.2; linux x86_64; Faraday v1.10.0)]
     // eg.2: Elastic-filebeat/7.17.1 (linux; arm64; 1d05ba86138cfc9a5ae5c0acc64a57b8d81678ff; 2022-02-24 01:00:19 +0000 UTC)
