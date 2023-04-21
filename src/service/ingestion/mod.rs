@@ -280,7 +280,7 @@ pub fn format_stream_name(stream_name: &str) -> String {
 #[cfg(feature = "zo_functions")]
 pub fn init_functions_runtime() -> (Lua, vrl::Runtime) {
     let lua = Lua::new();
-    lua.sandbox(true).unwrap();
+    // lua.sandbox(true).unwrap();
     let state = vrl::state::Runtime::default();
     let runtime = vrl::Runtime::new(state);
     (lua, runtime)
