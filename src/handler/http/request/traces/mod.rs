@@ -20,7 +20,7 @@ use crate::{meta, service::traces::otlp_http};
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
 
-/** ingestion endpoint for traces */
+/** ingest traces */
 #[utoipa::path(
     context_path = "/api",
     tag = "Traces",

@@ -19,7 +19,7 @@ use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
 use crate::{meta::alert::AlertDestination, service::alerts::destinations};
 
-/** Create new alert destination */
+/** createDestination */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -60,7 +60,7 @@ pub async fn save_destination(
     }
 }
 
-/** List all destinations */
+/** listDestinations */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -81,7 +81,7 @@ async fn list_destinations(path: web::Path<String>) -> impl Responder {
     destinations::list_destinations(org_id).await
 }
 
-/** Get alert destination by name */
+/** getDestination */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -104,7 +104,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> impl Responder {
     destinations::get_destination(org_id, name).await
 }
 
-/** Delete alert destination by name */
+/** deleteDestination */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
