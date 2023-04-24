@@ -104,6 +104,8 @@
                             :options="triggerOperatorsWithHistogram"
                             dense
                             filled
+                            emit-value
+                            map-options
                             label="Aggregation"
                           >
                             <template v-slot:append>
@@ -230,6 +232,8 @@
                             :options="triggerOperators"
                             dense
                             filled
+                            emit-value
+                            map-options
                             label="Aggregation"
                           ></q-select>
                         </div>
@@ -535,8 +539,15 @@ export default defineComponent({
       removeFilterItem,
       addFilteredItem,
     } = useDashboardPanelData();
-    const triggerOperators: any = ref(["count", "sum", "avg", "min", "max"]);
-    const triggerOperatorsWithHistogram: any = ref(["histogram"]);
+    const triggerOperators = [
+      {label: "Count", value: "count"},
+      {label: "Sum", value: "sum"},
+      {label: "Avg", value: "avg"},
+      {label: "Min", value: "min"},
+      {label: "Max", value: "max"},
+      {label: "Count (Distinct)", value: "count-distinct"},
+    ]
+    const triggerOperatorsWithHistogram: any = [ {label: "Histogram", value: "histogram"} ]
 
     watch(() => dashboardPanelData.meta.dragAndDrop.dragging, (newVal: boolean, oldVal: boolean) => {
       if(oldVal == false && newVal == true) {
@@ -558,9 +569,9 @@ export default defineComponent({
       dashboardPanelData.meta.dragAndDrop.dragElement = null
 
       if(dragItem && area == 'x') {
-        addXAxisItem(dragItem?.name)
+        addXAxisItem(dragItem)
       }else if(dragItem && area == 'y'){
-        addYAxisItem(dragItem?.name)
+        addYAxisItem(dragItem)
       }else if(dragItem && area == 'f'){
         addFilteredItem(dragItem?.name)
       }else{

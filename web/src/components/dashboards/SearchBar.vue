@@ -131,9 +131,17 @@ export default defineComponent({
         const filter = [...dashboardPanelData.data.fields?.filter]
         const array = fields.map((field, i) => {
           let selector = ""
+
           // TODO: add aggregator
           if(field.aggregationFunction) {
-            selector += `${field.aggregationFunction}(${field.column})`
+            switch(field.aggregationFunction) {
+              case "count-distinct":
+                selector += `count(distinct(${field.column}))`
+                break;
+              default:
+                selector += `${field.aggregationFunction}(${field.column})`
+                break;
+            }
           } else {
             selector += `${field.column}`
           }
