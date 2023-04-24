@@ -30,19 +30,17 @@
             <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator" style="top: 10px" />
           </template>
           <template #after>
-            <div v-if="
-              searchObj.data.errorMsg !== '' && searchObj.loading == false
-            ">
+            <div v-if="searchObj.data.errorMsg !== '' && searchObj.loading == false
+              ">
               <h5 class="text-center">
                 <div data-test="logs-search-result-not-found-text" v-if="searchObj.data.errorCode == 0">
                   Result not found.
                 </div>
                 <div data-test="logs-search-error-message" v-html="searchObj.data.errorMsg"></div>
                 <div data-test="logs-search-error-20003" v-if="parseInt(searchObj.data.errorCode) == 20003">
-                  <q-btn no-caps unelevated size="sm" bg-secondary class="no-border bg-secondary text-white" :to="
-                    '/logstreams?dialog=' +
+                  <q-btn no-caps unelevated size="sm" bg-secondary class="no-border bg-secondary text-white" :to="'/logstreams?dialog=' +
                     searchObj.data.stream.selectedStream.label
-                  ">Click here</q-btn>
+                    ">Click here</q-btn>
                   to configure a full text search field to the stream.
                 </div>
                 <br />
@@ -56,17 +54,15 @@
                 No stream selected.
               </h5>
             </div>
-            <div v-else-if="
-              searchObj.data.queryResults.hasOwnProperty('total') &&
-              searchObj.data.queryResults.hits.length == 0 &&
-              searchObj.loading == false
-            ">
+            <div v-else-if="searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length == 0 &&
+                searchObj.loading == false
+                ">
               <h5 class="text-center">No result found.</h5>
             </div>
-            <div data-test="logs-search-search-result" v-show="
-              searchObj.data.queryResults.hasOwnProperty('total') &&
-              searchObj.data.queryResults.hits.length !== 0
-            ">
+            <div data-test="logs-search-search-result" v-show="searchObj.data.queryResults.hasOwnProperty('total') &&
+                searchObj.data.queryResults.hits.length !== 0
+                ">
               <search-result ref="searchResultRef" @update:datetime="searchData" @update:scroll="getMoreData"
                 @search:timeboxed="searchAroundData" />
             </div>
@@ -1076,12 +1072,41 @@ export default defineComponent({
       try {
         dismiss = Notify();
         searchObj.data.errorCode = 0;
+        let query_context = "";
+        let query = searchObj.data.query;
+        if (searchObj.meta.sqlMode == true) {
+          const parsedSQL = parser.astify(query);
+          //hack add time stamp column to parsedSQL if not already added
+          if (parsedSQL.columns.filter(e => e.expr.column === '_timestamp').length === 0) {
+            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
+            parsedSQL.columns.push(ts_col);
+          }
+          parsedSQL.where = null;
+          query_context = b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"'))
+        } else {
+          let parseQuery = query.split("|");
+          let queryFunctions = "";
+          let whereClause = "";
+          if (parseQuery.length > 1) {
+            queryFunctions = "," + parseQuery[0].trim();
+            whereClause = "";
+          } else {
+            whereClause = "";
+          }
+          query_context =
+            `SELECT *${queryFunctions} FROM "` +
+            searchObj.data.stream.selectedStream.value +
+            `" `;
+          query_context = b64EncodeUnicode(query_context);
+        }
+
         searchService
           .search_around({
             org_identifier: searchObj.organizationIdetifier,
             index: searchObj.data.stream.selectedStream.value,
             key: obj.key,
             size: obj.size,
+            query_context: query_context
           })
           .then((res) => {
             searchObj.loading = false;
