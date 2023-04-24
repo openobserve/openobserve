@@ -150,7 +150,6 @@ pub async fn sql(
 
     // get all UDF
     let mut used_fns = vec![];
-    let mut replace_alias = vec![];
 
     let mut sql_parts = vec![];
     let where_regex = Regex::new(r"(?i) where (.*)").unwrap();
@@ -158,11 +157,6 @@ pub async fn sql(
     for fn_name in get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
             used_fns.push(fn_name.clone());
-        }
-        for field in &sql.meta.fields {
-            if field.starts_with(&format!("{fn_name}(")) {
-                replace_alias.push(field.replace('(', "_tbl_").replace(')', "_"));
-            }
         }
     }
     if !used_fns.is_empty() {
@@ -244,17 +238,11 @@ pub async fn sql(
 
     if !used_fns.is_empty() && !sql_parts[1].is_empty() {
         let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
-        let additional_clause = if sql.meta.field_alias.is_empty() {
-            for replace_pat in &replace_alias {
-                replace_in_query(replace_pat, &mut where_query, false);
-            }
-            where_query.clone()
-        } else {
-            for alias in &sql.meta.field_alias {
-                replace_in_query(&alias.1, &mut where_query, true);
-            }
-            where_query.clone()
-        };
+
+        for alias in &sql.meta.field_alias {
+            replace_in_query(&alias.1, &mut where_query, true);
+        }
+        let additional_clause = where_query.clone();
 
         let df = match ctx.sql(&additional_clause).await {
             Ok(df) => df,
