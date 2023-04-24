@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::{meta::dashboards::Dashboard, service::dashboards};
 
-/// Create a dashboard
+/** createDashboard */
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -50,7 +50,7 @@ pub async fn create_dashboard(
     dashboards::create_dashboard(&org_id, details.into_inner()).await
 }
 
-/// Update a dashboard
+/// updateDashboard
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -81,7 +81,7 @@ async fn update_dashboard(
     dashboards::update_dashboard(&org_id, &dashboard_id, &details.into_inner()).await
 }
 
-/// List dashboards
+/// listDashboards
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -101,7 +101,7 @@ async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
     dashboards::list_dashboards(&org_id.into_inner()).await
 }
 
-/// Get a dashboard
+/// getDashboard
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",
@@ -125,7 +125,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     dashboards::get_dashboard(&org_id, &dashboard_id).await
 }
 
-/// Delete a dashboard
+/// deleteDashboard
 #[utoipa::path(
     context_path = "/api",
     tag = "Dashboards",

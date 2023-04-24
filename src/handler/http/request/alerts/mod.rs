@@ -23,7 +23,7 @@ use crate::{
     service::alerts,
 };
 
-/** Create new alert for a stream */
+/** createAlert */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -73,7 +73,7 @@ pub async fn save_alert(
     )
     .await
 }
-/** List all alerts of a stream */
+/** listStreamAlerts */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -110,7 +110,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
     alerts::list_alert(org_id, Some(stream_name.as_str()), stream_type).await
 }
 
-/** List all alerts of an organization */
+/** listAlerts */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -146,7 +146,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> impl Responde
     alerts::list_alert(org_id, None, stream_type).await
 }
 
-/** Get alert by alert name */
+/** getAlertByName */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -185,7 +185,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
     alerts::get_alert(org_id, stream_name, stream_type.unwrap(), name).await
 }
 
-/** Delete alert by alert name */
+/** deleteAlert */
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
