@@ -99,6 +99,12 @@
                     color="grey-13"
                     class="drag_indicator q-mr-xs"
                   />
+
+                  <q-icon
+                    :name="props.row.type == 'Utf8'? 'text_fields' : props.row.type == 'Int64'? 'tag' : 'toggle_off'"
+                    color="grey-6"
+                    class="q-mr-xs"
+                  />
                   {{ props.row.name }}
                 </div>
                 <div class="field_icons">
@@ -111,7 +117,7 @@
                         ? true
                         : false
                     "
-                    @click="addXAxisItem(props.row.name)"
+                    @click="addXAxisItem(props.row)"
                   >
                     <div>
                       {{
@@ -129,7 +135,7 @@
                         ? true
                         : false
                     "
-                    @click="addYAxisItem(props.row.name)"
+                    @click="addYAxisItem(props.row)"
                   >
                     <div>
                       {{
