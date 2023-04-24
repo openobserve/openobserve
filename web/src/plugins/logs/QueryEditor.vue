@@ -21,6 +21,7 @@
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
 import * as monaco from "monaco-editor";
 import { useStore } from "vuex";
+import { getPath } from "@/utils/zincutils";
 
 export default defineComponent({
   props: {
@@ -30,11 +31,11 @@ export default defineComponent({
     },
     fields: {
       type: Array,
-      default: [],
+      default: () => [],
     },
     functions: {
       type: Array,
-      default: [],
+      default: () => [],
     },
   },
   emits: ["update-query", "run-query"],
@@ -191,7 +192,12 @@ export default defineComponent({
 
     onMounted(async () => {
       //   editorRef.value.addEventListener("keyup", onKeyUp);
-
+      window.MonacoEnvironment = {
+        getWorker: function (moduleId, label) {
+          console.log(moduleId, label);
+          return new Worker(`${getPath()}src/workers/editor.worker.ts`);
+        },
+      };
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
