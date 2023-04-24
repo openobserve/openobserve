@@ -101,9 +101,9 @@
                   />
 
                   <q-icon
-                    :name="props.row.type == 'Utf8'? 'text_fields' : props.row.type == 'Int64'? '123' : 'done'"
-                    color="grey-13"
-                    class="drag_indicator q-mr-xs"
+                    :name="props.row.type == 'Utf8'? 'text_fields' : props.row.type == 'Int64'? 'tag' : 'toggle_off'"
+                    color="grey-6"
+                    class="q-mr-xs"
                   />
                   {{ props.row.name }}
                 </div>

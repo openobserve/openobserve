@@ -569,9 +569,9 @@ export default defineComponent({
       dashboardPanelData.meta.dragAndDrop.dragElement = null
 
       if(dragItem && area == 'x') {
-        addXAxisItem(dragItem?.name)
+        addXAxisItem(dragItem)
       }else if(dragItem && area == 'y'){
-        addYAxisItem(dragItem?.name)
+        addYAxisItem(dragItem)
       }else if(dragItem && area == 'f'){
         addFilteredItem(dragItem?.name)
       }else{
