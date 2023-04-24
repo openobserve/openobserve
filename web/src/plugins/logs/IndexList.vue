@@ -183,6 +183,7 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+    const parser = new Parser();
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -224,7 +225,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
     }
-    const parser = new Parser();
+
 
     const openFilterCreator = (event: any, { name, ftsKey }: any) => {
       if (ftsKey) {
@@ -246,14 +247,14 @@ export default defineComponent({
         let query_context = "";
         let query = searchObj.data.query;
         if (searchObj.meta.sqlMode == true) {
-          const parsedSQL = parser.astify(query);
+          const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (!parsedSQL.columns === "*" && parsedSQL.columns.filter(e => e.expr.column === '_timestamp').length === 0) {
+          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === '_timestamp').length === 0) {
             const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
             parsedSQL.columns.push(ts_col);
           }
           parsedSQL.where = null;
-          query_context = b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"'))
+          query_context = b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
         } else {
           let parseQuery = query.split("|");
           let queryFunctions = "";
@@ -268,7 +269,7 @@ export default defineComponent({
             `SELECT *${queryFunctions} FROM "` +
             searchObj.data.stream.selectedStream.value +
             `" `;
-          query_context = b64EncodeUnicode(query_context);
+          query_context = b64EncodeUnicode(query_context) || "";
         }
 
         streamService
