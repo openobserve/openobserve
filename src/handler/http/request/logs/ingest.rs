@@ -114,8 +114,8 @@ pub async fn json(
     ),
     request_body(content = KinesisFHRequest, description = "Ingest data (json array)", content_type = "application/json"),
     responses(
-        (status = 200, description="Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599 as i64})),
-        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599 as i64, "errorMessage": "error processing request"})),
+        (status = 200, description="Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
     )
 )]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
