@@ -136,7 +136,7 @@ export default defineComponent({
           if(field.aggregationFunction) {
             switch(field.aggregationFunction) {
               case "count-distinct":
-                selector += `count(distinct ${field.column})`
+                selector += `count(distinct(${field.column}))`
                 break;
               default:
                 selector += `${field.aggregationFunction}(${field.column})`

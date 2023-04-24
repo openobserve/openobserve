@@ -93,7 +93,7 @@ const useDashboardPanelData = () => {
     return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
 
-  const addXAxisItem = (name: string) => {
+  const addXAxisItem = (row: any) => {
     if(!dashboardPanelData.data.fields.x) {
       dashboardPanelData.data.fields.x = []
     }
@@ -104,29 +104,29 @@ const useDashboardPanelData = () => {
     // } 
 
     // check for existing field
-    if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == name)) {
+    if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == row.name)) {
       dashboardPanelData.data.fields.x.push({
-        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(name) : name,
-        alias: !dashboardPanelData.data.customQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : name,
-        column: name,
+        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
+        alias: !dashboardPanelData.data.customQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : row.name,
+        column: row.name,
         color: null,
-        aggregationFunction: (name == '_timestamp') ? 'histogram' : null
+        aggregationFunction: (row.name == '_timestamp') ? 'histogram' : null
       })
     }
   }
 
-  const addYAxisItem = (name: string) => {
+  const addYAxisItem = (row: any) => {
     if(!dashboardPanelData.data.fields.y) {
       dashboardPanelData.data.fields.y = []
     }
 
-    if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == name)) {
+    if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == row.name)) {
       dashboardPanelData.data.fields.y.push({
-        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(name) : name,
-        alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : name,
-        column: name,
+        label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
+        alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : row.name,
+        column: row.name,
         color: colors[dashboardPanelData.data.fields.y.length % colors.length],
-        aggregationFunction: 'count'
+        aggregationFunction: row.type == 'Utf8' ? 'count-distinct' : row.type == 'Int64' ? 'sum' : 'count'
       })
     }
   }
