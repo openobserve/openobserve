@@ -14,8 +14,7 @@
 -->
 
 <template>
-  <div data-test="query-editor" ref="editorRef"
-id="editor"></div>
+  <div data-test="query-editor" ref="editorRef" id="editor"></div>
 </template>
 
 <script lang="ts">
