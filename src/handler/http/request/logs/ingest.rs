@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::{meta::ingestion::KinesisFHRequest, service::logs};
 
-/** ES compatible _bulk ingestion API */
+/** _bulk ES compatible ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -44,7 +44,7 @@ pub async fn bulk(
     logs::bulk::ingest(&org_id, body, thread_id).await
 }
 
-/** ndjson multi ingestion API */
+/** _multi ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -72,7 +72,7 @@ pub async fn multi(
     logs::multi::ingest(&org_id, &stream_name, body, thread_id).await
 }
 
-/** json ingestion API */
+/** _json ingestion API */
 #[utoipa::path(
     context_path = "/api",
     tag = "Logs",
@@ -100,6 +100,24 @@ pub async fn json(
     logs::json::ingest(&org_id, &stream_name, body, thread_id).await
 }
 
+/** _kinesis_firehose ingestion API*/
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Logs",
+    operation_id = "AWSLogsIngestion",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    request_body(content = KinesisFHRequest, description = "Ingest data (json array)", content_type = "application/json"),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = KinesisFHIngestionResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+    )
+)]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
 pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
