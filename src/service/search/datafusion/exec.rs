@@ -262,8 +262,6 @@ pub async fn sql(
             where_query.clone()
         };
 
-        println!("where_query: {}", additional_clause);
-
         let df = match ctx.sql(&additional_clause).await {
             Ok(df) => df,
             Err(e) => {
