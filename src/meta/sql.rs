@@ -190,11 +190,8 @@ impl<'a> TryFrom<Projection<'a>> for Vec<(String, String)> {
     fn try_from(projection: Projection<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         for item in projection.0 {
-            match item {
-                SelectItem::ExprWithAlias { expr, alias } => {
-                    fields.push((expr.to_string(), alias.to_string()))
-                }
-                _ => {}
+            if let SelectItem::ExprWithAlias { expr, alias } = item {
+                fields.push((expr.to_string(), alias.to_string()))
             }
         }
         Ok(fields)

@@ -161,23 +161,19 @@ pub async fn sql(
         }
         for field in &sql.meta.fields {
             if field.starts_with(&format!("{fn_name}(")) {
-                replace_alias.push(field.replace("(", "_tbl_").replace(")", "_"));
+                replace_alias.push(field.replace('(', "_tbl_").replace(')', "_"));
             }
         }
     }
-    if used_fns.len() > 0 {
-        match where_regex.captures(&sql.origin_sql) {
-            Some(caps) => {
-                println!("{:?}", caps);
-                sql_parts.insert(
-                    0,
-                    sql.origin_sql
-                        .strip_suffix(caps.get(0).unwrap().as_str())
-                        .unwrap(),
-                );
-                sql_parts.insert(1, caps.get(1).unwrap().as_str());
-            }
-            None => {}
+    if !used_fns.is_empty() {
+        if let Some(caps) = where_regex.captures(&sql.origin_sql) {
+            sql_parts.insert(
+                0,
+                sql.origin_sql
+                    .strip_suffix(caps.get(0).unwrap().as_str())
+                    .unwrap(),
+            );
+            sql_parts.insert(1, caps.get(1).unwrap().as_str());
         };
     }
     log::info!(
@@ -190,15 +186,13 @@ pub async fn sql(
 
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if !used_fns.is_empty() && sql_parts.len() > 0 {
+    } else if !used_fns.is_empty() && !sql_parts.is_empty() {
         match sql.meta.time_range {
             Some(ts_range) => format!(
                 "{} where _timestamp >= {} AND _timestamp < {}",
-                sql_parts[0].to_string(),
-                ts_range.0,
-                ts_range.1
+                sql_parts[0], ts_range.0, ts_range.1
             ),
-            None => sql_parts[0].to_string(),
+            None => sql_parts[0].to_owned(),
         }
     } else {
         sql.origin_sql.clone()
@@ -338,21 +332,18 @@ pub async fn sql(
 
 fn replace_in_query(replace_pat: &String, where_query: &mut String, is_alias: bool) {
     let re1 = Regex::new(&format!("(?i){}_([a-zA-Z0-9_-]*)", replace_pat)).unwrap();
-    match re1.captures(&*where_query) {
-        Some(caps) => {
-            let cap_str = caps.get(0).unwrap().as_str();
-            let field = caps.get(1).unwrap().as_str();
-            if is_alias {
-                *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
-            } else {
-                let local_pattern = replace_pat
-                    .replace("tbl_", "")
-                    .replacen("_", "(", 1)
-                    .replace("_", ")");
-                *where_query = where_query.replace(cap_str, &format!("{local_pattern}['{field}']"));
-            }
+    if let Some(caps) = re1.captures(&*where_query) {
+        let cap_str = caps.get(0).unwrap().as_str();
+        let field = caps.get(1).unwrap().as_str();
+        if is_alias {
+            *where_query = where_query.replace(cap_str, &format!("{replace_pat}['{field}']"));
+        } else {
+            let local_pattern = replace_pat
+                .replace("tbl_", "")
+                .replacen('_', "(", 1)
+                .replace('_', ")");
+            *where_query = where_query.replace(cap_str, &format!("{local_pattern}['{field}']"));
         }
-        None => {}
     }
 }
 

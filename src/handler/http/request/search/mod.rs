@@ -500,7 +500,7 @@ pub async fn values(
     };
     for field in &fields {
         let fn_field = if apply_fn {
-            let mut temp_field = field.replacen("_", "['", 1);
+            let mut temp_field = field.replacen('_', "['", 1);
             temp_field.push_str("']");
             temp_field
         } else {
