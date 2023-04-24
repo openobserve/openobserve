@@ -248,7 +248,7 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (parsedSQL.columns.filter(e => e.expr.column === '_timestamp').length === 0) {
+          if (!parsedSQL.columns === "*" && parsedSQL.columns.filter(e => e.expr.column === '_timestamp').length === 0) {
             const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
             parsedSQL.columns.push(ts_col);
           }

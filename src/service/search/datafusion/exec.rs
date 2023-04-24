@@ -273,14 +273,25 @@ pub async fn sql(
         log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
     }
 
+    //get alias from context query for agg sql
+    let meta_sql = meta::sql::Sql::new(&sql.query_context);
+
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         log::info!("Query agg sql: {}", orig_agg_sql.0);
-        let agg_sql = if !&sql.query_context.is_empty() {
+
+        let mut agg_sql = if !&sql.query_context.is_empty() {
             orig_agg_sql.0.replace("tbl", "tbl_temp")
         } else {
             orig_agg_sql.0.clone()
         };
+
+        if meta_sql.is_ok() {
+            for alias in &meta_sql.as_ref().unwrap().field_alias {
+                replace_in_query(&alias.1, &mut agg_sql, true);
+            }
+        }
+
         let mut df = match ctx.sql(&agg_sql).await {
             Ok(df) => df,
             Err(e) => {

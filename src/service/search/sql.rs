@@ -46,6 +46,7 @@ pub struct Sql {
     pub sql_mode: SqlMode,
     pub schema: Schema,
     pub query_context: String,
+    pub uses_zo_fn: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -514,8 +515,8 @@ impl Sql {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
                 for fn_name in get_all_transform_keys(&org_id).await {
-                    let cnt = origin_sql.matches(&fn_name).count();
-                    for _ in 0..cnt {
+                    let count = origin_sql.matches(&fn_name).count();
+                    for _ in 0..count {
                         used_fns.push(fn_name.clone());
                     }
                 }
@@ -542,6 +543,7 @@ impl Sql {
             sql_mode,
             schema,
             query_context: req_query.query_context.clone(),
+            uses_zo_fn: req_query.uses_zo_fn,
         };
 
         // calculate all needs fields
@@ -821,6 +823,7 @@ mod tests {
             end_time: 1667978900217,
             track_total_hits: false,
             query_context: None,
+            uses_zo_fn: false,
         };
 
         let req: crate::meta::search::Request = crate::meta::search::Request {
@@ -902,6 +905,7 @@ mod tests {
                 end_time: 1667978900217,
                 track_total_hits: true,
                 query_context: None,
+                uses_zo_fn: false,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),
@@ -982,6 +986,7 @@ mod tests {
                 end_time: 1667978900217,
                 track_total_hits: true,
                 query_context: None,
+                uses_zo_fn: false,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),

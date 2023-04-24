@@ -191,7 +191,7 @@ impl<'a> TryFrom<Projection<'a>> for Vec<(String, String)> {
         let mut fields = Vec::new();
         for item in projection.0 {
             if let SelectItem::ExprWithAlias { expr, alias } = item {
-                fields.push((expr.to_string(), alias.to_string()))
+                fields.push((expr.to_string(), alias.to_string().replace('"', "")))
             }
         }
         Ok(fields)

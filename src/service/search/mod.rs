@@ -27,8 +27,7 @@ use uuid::Uuid;
 use crate::common::json::{self};
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-#[cfg(feature = "zo_functions")]
-use crate::infra::config::QUERY_FUNCTIONS;
+
 use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
@@ -437,8 +436,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         /*  #[cfg(feature = "zo_functions")]
         let sources = apply_query_fn(&req, &sources); */
 
-        for source in sources {
-            result.add_hit(&json::flatten_json_and_format_field(&source));
+        if sql.uses_zo_fn {
+            for source in sources {
+                result.add_hit(&json::flatten_json_and_format_field(&source));
+            }
+        } else {
+            for source in sources {
+                result.add_hit(&source);
+            }
         }
     }
 
@@ -583,32 +588,6 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
         if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
             if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
                 self.0.insert(key, val);
-            }
-        }
-    }
-}
-
-#[cfg(feature = "zo_functions")]
-fn _apply_query_fn(req: &cluster_rpc::SearchRequest, resp: &[json::Value]) -> Vec<json::Value> {
-    let applicable_query_fn = req.query.as_ref().unwrap().query_context.to_lowercase();
-    if applicable_query_fn.is_empty() {
-        return resp.to_vec();
-    }
-    match QUERY_FUNCTIONS.get(&format!("{}/{}", req.org_id, applicable_query_fn)) {
-        None => resp.to_vec(),
-        Some(query_fn_src) => {
-            let state = vrl::state::Runtime::default();
-            let mut runtime = vrl::Runtime::new(state);
-            match super::ingestion::compile_vrl_function(&query_fn_src.value().function) {
-                None => vec![],
-                Some(program) => resp
-                    .iter()
-                    .filter_map(|hit| {
-                        let ret_val =
-                            super::ingestion::apply_vrl_fn(&mut runtime, program.clone(), hit);
-                        (!ret_val.is_null()).then_some(ret_val)
-                    })
-                    .collect(),
             }
         }
     }

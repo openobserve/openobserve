@@ -36,7 +36,8 @@ message SearchQuery {
     int64          end_time = 6;
     bool   track_total_hits = 7;
     string       query_type = 8;
-    string       query_context = 9;
+    string    query_context = 9;
+    bool        uses_zo_fn = 10;
 }
 
 // Search request
