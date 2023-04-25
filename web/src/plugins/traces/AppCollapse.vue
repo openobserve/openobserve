@@ -16,17 +16,6 @@
 <template>
   <div>
     <div class="flex items-start">
-      <div :style="headerStyle">
-        <q-btn
-          dense
-          flat
-          round
-          size="sm"
-          icon="chevron_right"
-          @click="updateCollapse"
-          :style="{ rotate: isOpen ? '90deg' : '0deg' }"
-        />
-      </div>
       <slot name="header" />
     </div>
     <div v-if="isOpen">

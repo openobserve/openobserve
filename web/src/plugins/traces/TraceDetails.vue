@@ -34,21 +34,15 @@
           </div>
           <div>Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <div class="histogram-spans-container q-px-md">
-          <div
-            v-for="(span, index) in traceTree"
-            :key="span.spanId"
-            class="relative-position"
-          >
-            <SpanRenderer
-              :isCollapsed="collapseMapping[span.spanId]"
-              :collapseMapping="collapseMapping"
-              :span="span"
-              :index="index"
-              :baseTracePosition="baseTracePosition"
-              ref="traceRootSpan"
-            />
-          </div>
+        <div class="histogram-spans-container q-mx-md">
+          <SpanRenderer
+            :collapseMapping="collapseMapping"
+            :spans="spanPositionList"
+            :baseTracePosition="baseTracePosition"
+            :spanDimensions="spanDimensions"
+            ref="traceRootSpan"
+            @toggle-collapse="toggleSpanCollapse"
+          />
         </div>
       </div>
       <q-separator vertical />
@@ -104,6 +98,38 @@ export default defineComponent({
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
+    const spanPositionList: Ref<any[]> = ref([]);
+    const spanDimensions = {
+      height: 40,
+      barHeight: 10,
+      textHeight: 30,
+      gap: 40,
+      collapseHeight: 20,
+      collapseWidth: 30,
+      connectorPadding: 2,
+      paddingLeft: 8,
+      hConnectorWidth: 20,
+      dotConnectorWidth: 6,
+      dotConnectorHeight: 6,
+      colors: [
+        "cyan",
+        "yellow",
+        "lime",
+        "orange",
+        "brown",
+        "blue-grey",
+        "amber",
+        "light-green",
+        "grey",
+        "teal",
+        "pink",
+        "purple",
+        "light-blue",
+        "deep-purple",
+        "indigo",
+        "blue",
+      ],
+    };
 
     const spanList = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -142,11 +168,9 @@ export default defineComponent({
     });
 
     const calculateTracePosition = () => {
-      console.log("calculateTracePosition");
-      console.log("traceRootSpan", traceRootSpan.value);
-      baseTracePosition.value["width"] = traceRootSpan.value[0].$el.clientWidth;
+      baseTracePosition.value["width"] = traceRootSpan.value.$el.clientWidth;
       baseTracePosition.value["perPixelMs"] = Number(
-        traceTree.value[0].durationMs / traceRootSpan.value[0].$el.clientWidth
+        traceTree.value[0].durationMs / traceRootSpan.value.$el.clientWidth
       );
       baseTracePosition.value["durationMs"] = traceTree.value[0].durationMs;
       baseTracePosition.value["startTimeMs"] = traceTree.value[0].startTimeMs;
@@ -154,41 +178,91 @@ export default defineComponent({
 
     // Find out spans who has reference_parent_span_id as span_id of first span in sampleTrace
     const buildTracesTree = async () => {
-      console.log("buildTracesTree", spanList.value);
-      const traceTreeMock: any = {};
-      spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
+      spanMapping.value = {};
+      traceTree.value = [];
+      spanPositionList.value = [];
+      collapseMapping.value = {};
 
-      for (let i = 1; i < spanList.value.length; i++) {
+      const traceTreeMock: any = {};
+      const serviceColorMapping: any = {};
+      if (!spanList.value?.length) return;
+      spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
+      let colorIndex = 0;
+      for (let i = 0; i < spanList.value.length; i++) {
         spanMapping.value[spanList.value[i].span_id] = cloneDeep(
           spanList.value[i]
         );
 
         const span = getFormattedSpan(spanList.value[i]);
 
+        if (span.serviceName && !serviceColorMapping[span.serviceName]) {
+          serviceColorMapping[span.serviceName] =
+            spanDimensions.colors[colorIndex];
+          colorIndex++;
+        }
+
+        span.style.color = serviceColorMapping[span.serviceName];
+
         span.index = i;
 
-        collapseMapping.value[span.spanId] = false;
+        collapseMapping.value[span.spanId] = true;
 
-        if (!traceTreeMock[span.parentId]) {
+        if (span.parentId && !traceTreeMock[span.parentId]) {
           traceTreeMock[span.parentId] = [];
         }
+
+        if (span.parentId) traceTreeMock[span.parentId].push(span);
 
         if (!traceTreeMock[span.spanId]) traceTreeMock[span.spanId] = [];
 
         if (!span["spans"]) span["spans"] = traceTreeMock[span.spanId];
-
-        traceTreeMock[span.parentId].push(span);
       }
 
       traceTree.value = [];
       traceTree.value.push(getFormattedSpan(spanList.value[0]));
       traceTree.value[0]["index"] = 0;
+      traceTree.value[0].style.color =
+        serviceColorMapping[traceTree.value[0].serviceName];
       traceTree.value[0]["spans"] = cloneDeep(
         traceTreeMock[spanList.value[0]["span_id"]] || []
       );
+
+      addSpansPositions(traceTree.value[0], 0);
       setTimeout(() => {
         calculateTracePosition();
       }, 2000);
+    };
+    let index = 0;
+    const addSpansPositions = (span, depth) => {
+      if (!span.index) index = 0;
+      span.depth = depth;
+      spanPositionList.value.push(
+        Object.assign(span, {
+          style: {
+            color: span.style.color,
+            top: index * spanDimensions.height + "px",
+            left: spanDimensions.gap * depth + "px",
+          },
+          hasChildSpans: !!span.spans.length,
+          currentIndex: index,
+        })
+      );
+      if (collapseMapping.value[span.spanId]) {
+        if (span.spans.length) {
+          span.spans.forEach((childSpan: any) => {
+            index = index + 1;
+            childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
+          });
+          span.totalSpans = span.spans.reduce(
+            (acc, span) =>
+              acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
+            0
+          );
+        }
+        return (span?.spans?.length || 0) + (span?.totalSpans || 0);
+      } else {
+        return 0;
+      }
     };
 
     // Convert span object to required format
@@ -208,6 +282,7 @@ export default defineComponent({
         parentId: span.reference_parent_span_id,
         spans: null,
         index: 0,
+        style: {},
       };
     };
 
@@ -233,26 +308,15 @@ export default defineComponent({
       return spanKindMapping[spanKind];
     };
 
-    const getMsInPixels = (ms) => {
-      console.log(ms, (ms / baseTracePosition.value.per_pixel_ms).toFixed(2));
-      return (ms / baseTracePosition.value.per_pixel_ms).toFixed(2);
-    };
-    const calculateTiming = (span) => {
-      const start_time = span.start_time;
-      const end_time = span.end_time;
-      const busy = span.busy_ns;
-      const idle = span.idle_ns;
-      const total = end_time - start_time;
-      const busyPercentage = (busy / total) * 100;
-      const idlePercentage = (idle / total) * 100;
-      return {
-        busyPercentage,
-        idlePercentage,
-      };
-    };
     const closeSidebar = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = null;
+    };
+    const toggleSpanCollapse = (spanId: number | string) => {
+      collapseMapping.value[spanId] = !collapseMapping.value[spanId];
+      index = 0;
+      spanPositionList.value = [];
+      addSpansPositions(traceTree.value[0], 0);
     };
     return {
       traceTree,
@@ -265,6 +329,9 @@ export default defineComponent({
       selectedSpanId,
       spanMapping,
       closeSidebar,
+      toggleSpanCollapse,
+      spanPositionList,
+      spanDimensions,
     };
   },
 });
@@ -295,5 +362,6 @@ $seperatorWidth: 2px;
 .histogram-spans-container {
   height: calc(100vh - 73px);
   overflow-y: auto;
+  position: relative;
 }
 </style>

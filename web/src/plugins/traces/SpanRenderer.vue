@@ -14,72 +14,36 @@
 -->
 
 <template>
-  <div>
-    <div v-if="!span?.spans?.length" class="q-my-xs normal-header">
+  <template v-if="spans?.length">
+    <template v-for="span in spans" :key="span.spanId">
       <span-block
         :span="span"
         :depth="depth"
         :baseTracePosition="baseTracePosition"
         :styleObj="{
-          paddingLeft: depth ? 15 * depth + 10 + 'px' : 0,
+          position: 'absolute',
+          top: span.style.top,
+          left: span.style.left,
+          height: '60px',
         }"
+        :spanDimensions="spanDimensions"
+        :isCollapsed="collapseMapping[span.spanId]"
+        @toggle-collapse="toggleSpanCollapse"
       />
-      <div
-        v-for="childSpan in span['spans']"
-        :key="childSpan.spanId"
-        :class="childSpan.spanId"
-      >
-        <span-renderer
-          :depth="depth + 1"
-          :baseTracePosition="baseTracePosition"
-          :span="childSpan"
-          :isCollapsed="collapseMapping[childSpan.spanId]"
-          :collapseMapping="collapseMapping"
-        />
-      </div>
-    </div>
-    <app-collapse
-      v-else
-      class="app-collapse"
-      :open="depth < 3"
-      :headerStyle="{ paddingLeft: 15 * depth + 'px' }"
-    >
-      <template v-slot:header>
-        <span-block
-          :span="span"
-          :depth="depth"
-          :baseTracePosition="baseTracePosition"
-          :styleObj="{ width: `calc(100% - ${15 * depth + 24}px)` }"
-        />
-      </template>
-      <template v-slot:content>
-        <div
-          v-for="childSpan in span['spans']"
-          :key="childSpan.spanId"
-          :class="childSpan.spanId"
-        >
-          <span-renderer
-            :depth="depth + 1"
-            :baseTracePosition="baseTracePosition"
-            :span="childSpan"
-          />
-        </div>
-      </template>
-    </app-collapse>
-  </div>
+    </template>
+  </template>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import AppCollapse from "./AppCollapse.vue";
 import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
   name: "SpanRenderer",
   props: {
-    span: {
-      type: Object,
-      default: () => null,
+    spans: {
+      type: Array,
+      default: () => [],
     },
     isCollapsed: {
       type: Boolean,
@@ -97,8 +61,13 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    spanDimensions: {
+      type: Object,
+      default: () => {},
+    },
   },
-  setup() {
+  emits: ["toggleCollapse"],
+  setup(props, { emit }) {
     function formatTimeWithSuffix(ns: number) {
       if (ns < 10000) {
         return `${ns} ms`;
@@ -106,12 +75,20 @@ export default defineComponent({
         return `${(ns / 1000).toFixed(2)} s`;
       }
     }
+    function toggleSpanCollapse(spanId: number | string) {
+      emit("toggleCollapse", spanId);
+    }
     return {
       formatTimeWithSuffix,
+      toggleSpanCollapse,
     };
   },
-  components: { AppCollapse, SpanBlock },
+  components: { SpanBlock },
 });
 </script>
 
-<style scoped></style>
+<style scoped lang="scss">
+.spans-container {
+  position: relative;
+}
+</style>
