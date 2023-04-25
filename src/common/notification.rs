@@ -143,7 +143,8 @@ mod tests {
                 sql_mode: "full".to_string(),
                 query_type: "logs".to_string(),
                 track_total_hits: false,
-                query_fn: None,
+                query_context: None,
+                uses_zo_fn: false,
             }),
             condition: Condition {
                 column: "Country".to_string(),
