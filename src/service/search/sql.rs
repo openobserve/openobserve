@@ -22,7 +22,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, QUERY_FUNCTIONS};
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
 use crate::meta::StreamType;
@@ -45,6 +45,8 @@ pub struct Sql {
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub schema: Schema,
+    pub query_context: String,
+    pub uses_zo_fn: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -508,6 +510,28 @@ impl Sql {
             aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
         }
 
+        let sql_meta = MetaSql::new(origin_sql.clone().as_str());
+        match &sql_meta {
+            Ok(sql_meta) => {
+                let mut used_fns = vec![];
+                for fn_name in get_all_transform_keys(&org_id).await {
+                    let count = origin_sql.matches(&fn_name).count();
+                    for _ in 0..count {
+                        used_fns.push(fn_name.clone());
+                    }
+                }
+                if sql_meta.field_alias.len() < used_fns.len() {
+                    return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                        "Please use alias for function used in query.".to_string(),
+                    )));
+                }
+            }
+            Err(e) => {
+                log::error!("parse sql error: {}, sql: {}", e, origin_sql);
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
+            }
+        }
+
         let mut sql = Sql {
             origin_sql,
             org_id,
@@ -518,6 +542,8 @@ impl Sql {
             fields: vec![],
             sql_mode,
             schema,
+            query_context: req_query.query_context.clone(),
+            uses_zo_fn: req_query.uses_zo_fn,
         };
 
         // calculate all needs fields
@@ -762,6 +788,22 @@ fn path_matches_by_partition_key<'a>(
         find(path, &format!("/{field}")) && !find(path, &format!("/{value}/"))
     })
 }
+
+pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
+    let mut fn_list = Vec::new();
+    for transform in QUERY_FUNCTIONS.iter() {
+        let key = transform.key();
+        if key.contains(org_id) {
+            fn_list.push(
+                key.strip_prefix(&format!("{}/", org_id).to_owned())
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+    }
+    fn_list
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -780,7 +822,8 @@ mod tests {
             start_time: 1667978895416,
             end_time: 1667978900217,
             track_total_hits: false,
-            query_fn: None,
+            query_context: None,
+            uses_zo_fn: false,
         };
 
         let req: crate::meta::search::Request = crate::meta::search::Request {
@@ -861,7 +904,8 @@ mod tests {
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 track_total_hits: true,
-                query_fn: None,
+                query_context: None,
+                uses_zo_fn: false,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),
@@ -941,7 +985,8 @@ mod tests {
                 start_time: 1667978895416,
                 end_time: 1667978900217,
                 track_total_hits: true,
-                query_fn: None,
+                query_context: None,
+                uses_zo_fn: false,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),

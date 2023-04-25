@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
+use arrow::array::StructArray;
+use arrow_schema::Field;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringArray},
@@ -26,25 +29,40 @@ use std::sync::Arc;
 use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
 use vrl::{CompilationResult, Program, Runtime};
 
-use crate::infra::config::QUERY_FUNCTIONS;
+use crate::{common::json, infra::config::QUERY_FUNCTIONS, service::logs::get_value};
 
 fn create_user_df(
     fn_name: &str,
     num_args: u8,
     pow_scalar: ScalarFunctionImplementation,
+    mut output_cols: Vec<String>,
 ) -> ScalarUDF {
     let mut input_vec = vec![];
     for _i in 0..num_args {
         input_vec.push(DataType::Utf8);
     }
-
-    create_udf(
-        fn_name,
-        input_vec,
-        Arc::new(DataType::Utf8),
-        Volatility::Immutable,
-        pow_scalar,
-    )
+    if output_cols.is_empty() {
+        create_udf(
+            fn_name,
+            input_vec,
+            Arc::new(DataType::Utf8),
+            Volatility::Immutable,
+            pow_scalar,
+        )
+    } else {
+        let mut output_type: Vec<Field> = vec![];
+        output_cols.sort();
+        for col in output_cols {
+            output_type.push(Field::new(col, DataType::Utf8, false));
+        }
+        create_udf(
+            fn_name,
+            input_vec,
+            Arc::new(DataType::Struct(output_type)),
+            Volatility::Immutable,
+            pow_scalar,
+        )
+    }
 }
 
 pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::ScalarUDF> {
@@ -85,12 +103,27 @@ fn get_udf_vrl(
     let local_func = func.trim().to_owned();
     let local_fn_params = params.to_owned();
 
+    //pre computation stage
+    let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
+    let mut in_obj_str = String::from("");
+    for param in in_params {
+        in_obj_str.push_str(&format!(" {} = \"{}\" \n", param, ""));
+    }
+    in_obj_str.push_str(&format!(" \n {}", &local_func));
+    let res_cols = match compile_vrl_function(&in_obj_str) {
+        Some((_, cols)) => cols,
+        None => vec![],
+    };
+    // end pre computation stage
+
     let pow_calc = move |args: &[ArrayRef]| {
         let len = args[0].len();
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
-        let mut data_vec = vec![];
+        let mut is_multi_value = false;
+        let mut res_data_vec = vec![];
         let state = vrl::state::Runtime::default();
         let mut runtime = vrl::Runtime::new(state);
+        let mut col_val_map: AHashMap<String, Vec<String>> = AHashMap::new();
 
         for i in 0..len {
             let mut obj_str = String::from("");
@@ -106,17 +139,49 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Some(func) = compile_vrl_function(&obj_str) {
-                data_vec.insert(i, apply_vrl_fn(&mut runtime, func));
-            } else {
-                data_vec.insert(i, "".to_string());
+            if let Some(mut func) = compile_vrl_function(&obj_str) {
+                let result = apply_vrl_fn(&mut runtime, func.0);
+
+                if result != json::Value::Null {
+                    if result.is_object() {
+                        is_multi_value = true;
+                        let res_map = result.as_object().unwrap();
+                        func.1.sort();
+                        for col in func.1 {
+                            let field_builder =
+                                col_val_map.entry(col.to_string()).or_insert_with(Vec::new);
+                            if res_map.contains_key(&col) {
+                                field_builder.insert(i, get_value(res_map.get(&col).unwrap()));
+                            } else {
+                                field_builder.insert(i, "".to_string());
+                            }
+                        }
+                    } else {
+                        res_data_vec.insert(i, get_value(&result));
+                    }
+                }
             }
         }
-        let result = StringArray::from(data_vec);
+        if is_multi_value {
+            let mut data_vec = vec![];
+            for (k, v) in col_val_map {
+                data_vec.push((
+                    Field::new(k, DataType::Utf8, false),
+                    Arc::new(StringArray::from(v)) as ArrayRef,
+                ));
+            }
+
+            data_vec.sort_by(|a, b| a.0.name().cmp(b.0.name()));
+
+            let result = StructArray::from(data_vec);
+            Ok(Arc::new(result) as ArrayRef)
+        } else {
+            let result = StringArray::from(res_data_vec);
+            Ok(Arc::new(result) as ArrayRef)
+        }
 
         // `Ok` because no error occurred during the calculation (we should add one if exponent was [0, 1[ and the base < 0 because that panics!)
         // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(Arc::new(result) as ArrayRef)
     };
     // the function above expects an `ArrayRef`, but DataFusion may pass a scalar to a UDF.
     // thus, we use `make_scalar_function` to decorare the closure so that it can handle both Arrays and Scalar values.
@@ -126,26 +191,37 @@ fn get_udf_vrl(
     // * give it a name so that it shows nicely when the plan is printed
     // * declare what input it expects
     // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+
+    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar, res_cols);
     pow_udf
 }
 
-pub fn compile_vrl_function(func: &str) -> Option<Program> {
+pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
+    let mut fields = vec![];
     let result = vrl::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
             program,
             warnings: _,
             config: _,
-        }) => Some(program),
+        }) => {
+            let state = program.final_type_state();
+            if let Some(ext) = state.external.target_kind().as_object() {
+                for k in ext.known().keys() {
+                    fields.push(k.name.to_owned())
+                }
+            }
+            Some((program, fields))
+        }
         Err(e) => {
+            println!("Error compiling vrl {:?}", e);
             log::info!("Error compiling vrl {:?}", e);
             None
         }
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> json::Value {
     let obj_str = String::from("");
 
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
@@ -159,10 +235,10 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> String {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
-        Ok(res) => vrl_value::Value::to_string(&res),
+        Ok(res) => res.try_into().unwrap(),
         Err(err) => {
             log::error!("vrl_transform execute error: {}", err);
-            "".to_string()
+            json::Value::Null
         }
     }
 }
@@ -196,7 +272,7 @@ fn get_udf_lua(fn_name: String, func: &str, num_args: u8) -> datafusion::logical
     // * give it a name so that it shows nicely when the plan is printed
     // * declare what input it expects
     // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar);
+    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar, vec![]);
     pow_udf
 }
 
@@ -229,8 +305,7 @@ fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    use crate::service::search::datafusion::transform_udf::{get_udf_lua, get_udf_vrl};
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -240,10 +315,10 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn time_range() {
-        //let data_time = parse_time("2021-01-01T00:00:00.000Z").unwrap();
-        let sql = "select *, luaconcat(log,pod_id) as c ,vrlconcat(log,pod_id) as d from t ";
+    async fn vrl_udf_test() {
+        //let sql = "select temp.d['account_id'] as acc , temp.pod_id ,temp.lua_test from (select *, vrltest(log) ,luaconcat(log,pod_id) as lua_test from t) as temp";
 
+        let sql = "select vrltest(log)['account_id']  from (select *, vrltest(log) ,luaconcat(log,pod_id) as lua_test from t) as temp";
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
             Field::new("log", DataType::Utf8, false),
@@ -254,7 +329,7 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from_slice(&["a", "b", "c", "d"])),
+                Arc::new(StringArray::from_slice(&["2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"])),
                 Arc::new(Int64Array::from_slice(&[1, 2, 1, 2])),
             ],
         )
@@ -266,10 +341,11 @@ mod tests {
         let lua_udf = get_udf_lua("luaconcat".to_string(), "function(a, b) return a..b end", 2);
 
         let vrl_udf = get_udf_vrl(
-            "vrlconcat".to_string(),
-            ". = col0  + col1 \n .",
-            "col1,col2",
-            2,
+            "vrltest".to_string(),
+            " . = parse_aws_vpc_flow_log!(col1) \n .http_code=200 \n .",
+            //" . =  col1 + 10 \n .",
+            "col1",
+            1,
         );
 
         ctx.register_udf(lua_udf.clone());
@@ -279,7 +355,12 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         let df = ctx.sql(sql).await.unwrap();
+        df.clone().show().await.unwrap();
+        df.schema().fields().iter().for_each(|f| {
+            println!("field: {:?}", f);
+        });
         let result = df.collect().await.unwrap();
+
         /* datafusion::assert_batches_sorted_eq!(
             vec![
                 "+-----+--------+----+------+",

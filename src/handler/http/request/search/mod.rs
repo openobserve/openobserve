@@ -21,13 +21,13 @@ use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, SEARCH_LOCKER};
+use crate::infra::config::{CONFIG, QUERY_FUNCTIONS, SEARCH_LOCKER};
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
 use crate::service::search as SearchService;
 
-/** Search stream data using SQL*/
+/** searchStreamData*/
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -115,6 +115,13 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
+    for fn_name in get_all_transform_keys(&org_id).await {
+        if req.query.sql.contains(&fn_name) {
+            req.query.uses_zo_fn = true;
+            break;
+        }
+    }
+
     // get a local search queue lock
     let locker = SEARCH_LOCKER.clone();
     let _locker = locker.lock().await;
@@ -178,7 +185,7 @@ pub async fn search(
     }
 }
 
-/** Search around a record*/
+/** searchAroundRecord*/
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -227,6 +234,7 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
+    let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -238,6 +246,31 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(bad_request("around key is empty")),
     };
+
+    let default_sql = format!(
+        "SELECT * FROM \"{}\" ORDER BY {} DESC",
+        stream_name, CONFIG.common.time_stamp_col
+    );
+    let around_sql = match query.get("sql") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => {
+                for fn_name in get_all_transform_keys(&org_id).await {
+                    if v.contains(&fn_name) {
+                        uses_fn = true;
+                        break;
+                    }
+                }
+                if uses_fn {
+                    v
+                } else {
+                    default_sql
+                }
+            }
+            Err(_) => default_sql,
+        },
+        None => default_sql,
+    };
+
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
@@ -245,14 +278,16 @@ pub async fn around(
     // get a local search queue lock
     let locker = SEARCH_LOCKER.clone();
     let _locker = locker.lock().await;
+    let query_context = if uses_fn {
+        Some(around_sql.clone())
+    } else {
+        None
+    };
 
     // search forward
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!(
-                "SELECT * FROM \"{}\" ORDER BY {} DESC",
-                stream_name, CONFIG.common.time_stamp_col
-            ),
+            sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
             start_time: around_key - Duration::seconds(300).num_microseconds().unwrap(),
@@ -260,7 +295,8 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_context: query_context.clone(),
+            uses_zo_fn: uses_fn,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -302,10 +338,7 @@ pub async fn around(
     // search backward
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!(
-                "SELECT * FROM \"{}\" ORDER BY {} ASC",
-                stream_name, CONFIG.common.time_stamp_col
-            ),
+            sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
             start_time: around_key,
@@ -313,7 +346,8 @@ pub async fn around(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_context,
+            uses_zo_fn: uses_fn,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -391,7 +425,7 @@ pub async fn around(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-/** Search topN keys for fields */
+/** searchTopNValues */
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",
@@ -427,6 +461,7 @@ pub async fn values(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
+    let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -438,6 +473,28 @@ pub async fn values(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
+
+    let default_sql = format!("SELECT * FROM \"{stream_name}\"");
+    let query_context = match query.get("sql") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => {
+                for fn_name in get_all_transform_keys(&org_id).await {
+                    if v.contains(&fn_name) {
+                        uses_fn = true;
+                        break;
+                    }
+                }
+                if uses_fn {
+                    Some(v)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        },
+        None => None,
+    };
+
     let size = query
         .get("size")
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
@@ -461,7 +518,7 @@ pub async fn values(
     // search
     let mut req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT * FROM \"{stream_name}\""),
+            sql: default_sql.clone(),
             from: 0,
             size: 0,
             start_time,
@@ -469,12 +526,21 @@ pub async fn values(
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_context,
+            uses_zo_fn: uses_fn,
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
+
     for field in &fields {
+        /*  let fn_field = if uses_fn {
+            let mut temp_field = field.replacen('_', "['", 1);
+            temp_field.push_str("']");
+            temp_field
+        } else {
+            field.clone()
+        }; */
         req.aggs.insert(
             field.clone(),
             format!(
@@ -558,4 +624,19 @@ fn bad_request(error: impl ToString) -> HttpResponse {
         StatusCode::BAD_REQUEST.into(),
         error.to_string(),
     ))
+}
+
+pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
+    let mut fn_list = Vec::new();
+    for transform in QUERY_FUNCTIONS.iter() {
+        let key = transform.key();
+        if key.contains(org_id) {
+            fn_list.push(
+                key.strip_prefix(&format!("{}/", org_id).to_owned())
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+    }
+    fn_list
 }

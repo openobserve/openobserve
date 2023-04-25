@@ -16,26 +16,11 @@
 <template>
   <div class="column index-menu">
     <div>
-      <q-select
-        data-test="log-search-index-list-select-stream"
-        v-model="searchObj.data.stream.selectedStream"
-        :label="
-          searchObj.data.stream.selectedStream.label
-            ? ''
-            : t('search.selectIndex')
-        "
-        :options="streamOptions"
-        data-cy="index-dropdown"
-        input-debounce="0"
-        behavior="menu"
-        filled
-        borderless
-        dense
-        use-input
-        hide-selected
-        fill-input
-        @filter="filterStreamFn"
-      >
+      <q-select data-test="log-search-index-list-select-stream" v-model="searchObj.data.stream.selectedStream" :label="searchObj.data.stream.selectedStream.label
+          ? ''
+          : t('search.selectIndex')
+        " :options="streamOptions" data-cy="index-dropdown" input-debounce="0" behavior="menu" filled borderless dense
+        use-input hide-selected fill-input @filter="filterStreamFn">
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -44,220 +29,102 @@
       </q-select>
     </div>
     <div class="index-table q-mt-xs">
-      <q-table
-        data-test="log-search-index-list-fields-table"
-        v-model="searchObj.data.stream.selectedFields"
-        :visible-columns="['name']"
-        :rows="searchObj.data.stream.selectedStreamFields"
-        row-key="name"
-        :filter="searchObj.data.stream.filterField"
-        :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
-        hide-header
-        hide-bottom
-        :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="field-table"
-        id="fieldList"
-      >
+      <q-table data-test="log-search-index-list-fields-table" v-model="searchObj.data.stream.selectedFields"
+        :visible-columns="['name']" :rows="searchObj.data.stream.selectedStreamFields" row-key="name"
+        :filter="searchObj.data.stream.filterField" :filter-method="filterFieldFn" :pagination="{ rowsPerPage: 10000 }"
+        hide-header hide-bottom :wrap-cells="searchObj.meta.resultGrid.wrapCells" class="field-table" id="fieldList">
         <template #body-cell-name="props">
           <q-tr :props="props">
-            <q-td
-              :props="props"
-              class="field_list"
-              :class="
-                searchObj.data.stream.selectedFields.includes(props.row.name)
-                  ? 'selected'
-                  : ''
-              "
-            >
+            <q-td :props="props" class="field_list" :class="searchObj.data.stream.selectedFields.includes(props.row.name)
+                ? 'selected'
+                : ''
+              ">
               <!-- TODO OK : Repeated code make seperate component to display field  -->
-              <div
-                v-if="props.row.ftsKey"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
-                :title="props.row.name"
-              >
+              <div v-if="props.row.ftsKey" class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                :title="props.row.name">
                 <div class="field_label ellipsis">
                   {{ props.row.name }}
                 </div>
                 <div class="field_overlay">
-                  <q-icon
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    style="margin-right: 0.375rem"
-                    size="1rem"
-                    @click.stop="addToFilter(props.row.name)"
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                    v-if="
-                      !searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="
-                      'img:' + getImageURL('images/common/visibility_on.svg')
-                    "
-                    size="1.1rem"
-                    title="Add field to table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                    v-if="
-                      searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="
-                      'img:' + getImageURL('images/common/visibility_off.svg')
-                    "
-                    size="1.1rem"
-                    title="Remove field from table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
+                  <q-icon :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`" style="margin-right: 0.375rem"
+                    size="1rem" @click.stop="addToFilter(props.row.name)" />
+                  <q-icon :data-test="`log-search-index-list-add-${props.row.name}-field-btn`" v-if="!searchObj.data.stream.selectedFields.includes(
+                      props.row.name
+                    )
+                    " :name="'img:' + getImageURL('images/common/visibility_on.svg')
+    " size="1.1rem" title="Add field to table" @click.stop="clickFieldFn(props.row, props.pageIndex)" />
+                  <q-icon :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`" v-if="searchObj.data.stream.selectedFields.includes(
+                      props.row.name
+                    )
+                    " :name="'img:' + getImageURL('images/common/visibility_off.svg')
+    " size="1.1rem" title="Remove field from table" @click.stop="clickFieldFn(props.row, props.pageIndex)" />
                 </div>
               </div>
-              <q-expansion-item
-                v-else
-                dense
-                switch-toggle-side
-                :label="props.row.name"
-                expand-icon-class="field-expansion-icon"
-                :expand-icon="
-                  'img:' + getImageURL('images/common/down-solid.svg')
-                "
-                :expanded-icon="
-                  'img:' + getImageURL('images/common/up-solid.svg')
-                "
-                @before-show="(event: any) => openFilterCreator(event, props.row)"
-              >
+              <q-expansion-item v-else dense switch-toggle-side :label="props.row.name"
+                expand-icon-class="field-expansion-icon" :expand-icon="'img:' + getImageURL('images/common/down-solid.svg')
+                  " :expanded-icon="'img:' + getImageURL('images/common/up-solid.svg')
+    " @before-show="(event: any) => openFilterCreator(event, props.row)">
                 <template v-slot:header>
-                  <div
-                    class="flex content-center ellipsis"
-                    :title="props.row.name"
-                  >
+                  <div class="flex content-center ellipsis" :title="props.row.name">
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
                     <div class="field_overlay">
-                      <q-icon
-                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :name="
-                          'img:' + getImageURL('images/common/add_icon.svg')
-                        "
-                        style="margin-right: 0.375rem"
-                        size="1rem"
-                        @click.stop="addToFilter(props.row.name)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                        v-if="
-                          !searchObj.data.stream.selectedFields.includes(
-                            props.row.name
-                          )
-                        "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_on.svg')
-                        "
-                        size="1.1rem"
-                        title="Add field to table"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                        v-if="
-                          searchObj.data.stream.selectedFields.includes(
-                            props.row.name
-                          )
-                        "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_off.svg')
-                        "
-                        title="Remove field from table"
-                        size="1.1rem"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
+                      <q-icon :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`" :name="'img:' + getImageURL('images/common/add_icon.svg')
+                        " style="margin-right: 0.375rem" size="1rem" @click.stop="addToFilter(props.row.name)" />
+                      <q-icon :data-test="`log-search-index-list-add-${props.row.name}-field-btn`" v-if="!searchObj.data.stream.selectedFields.includes(
+                          props.row.name
+                        )
+                        " :name="'img:' +
+    getImageURL('images/common/visibility_on.svg')
+    " size="1.1rem" title="Add field to table" @click.stop="clickFieldFn(props.row, props.pageIndex)" />
+                      <q-icon :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`" v-if="searchObj.data.stream.selectedFields.includes(
+                          props.row.name
+                        )
+                        " :name="'img:' +
+    getImageURL('images/common/visibility_off.svg')
+    " title="Remove field from table" size="1.1rem" @click.stop="clickFieldFn(props.row, props.pageIndex)" />
                     </div>
                   </div>
                 </template>
                 <q-card>
                   <q-card-section class="q-pl-md q-pr-xs q-py-xs">
                     <div class="filter-values-container">
-                      <div
-                        v-show="fieldValues[props.row.name]?.isLoading"
-                        class="q-pl-md q-py-xs"
-                        style="height: 60px"
-                      >
-                        <q-inner-loading
-                          size="xs"
-                          :showing="fieldValues[props.row.name]?.isLoading"
-                          label="Fetching values..."
-                          label-style="font-size: 1.1em"
-                        />
+                      <div v-show="fieldValues[props.row.name]?.isLoading" class="q-pl-md q-py-xs" style="height: 60px">
+                        <q-inner-loading size="xs" :showing="fieldValues[props.row.name]?.isLoading"
+                          label="Fetching values..." label-style="font-size: 1.1em" />
                       </div>
-                      <div
-                        v-show="
-                          !fieldValues[props.row.name]?.values?.length &&
-                          !fieldValues[props.row.name]?.isLoading
-                        "
-                        class="q-pl-md q-py-xs text-subtitle2"
-                      >
+                      <div v-show="!fieldValues[props.row.name]?.values?.length &&
+                        !fieldValues[props.row.name]?.isLoading
+                        " class="q-pl-md q-py-xs text-subtitle2">
                         No values found
                       </div>
-                      <div
-                        v-for="value in fieldValues[props.row.name]?.values ||
-                        []"
-                        :key="value.key"
-                      >
+                      <div v-for="value in fieldValues[props.row.name]?.values ||
+                        []" :key="value.key">
                         <q-list dense>
                           <q-item tag="label" class="q-pr-none">
-                            <div
-                              class="flex row wrap justify-between"
-                              style="width: calc(100% - 36px)"
-                            >
-                              <div
-                                :title="value.key"
-                                class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
-                              >
+                            <div class="flex row wrap justify-between" style="width: calc(100% - 36px)">
+                              <div :title="value.key" class="ellipsis q-pr-xs" style="width: calc(100% - 50px)">
                                 {{ value.key }}
                               </div>
-                              <div
-                                :title="value.count"
-                                class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
-                              >
+                              <div :title="value.count" class="ellipsis text-right q-pr-sm" style="width: 50px">
                                 {{ value.count }}
                               </div>
                             </div>
                             <div class="flex row">
-                              <q-icon
-                                :name="
-                                  'img:' +
-                                  getImageURL('images/common/add_icon.svg')
-                                "
-                                class="q-mr-xs"
-                                size="1rem"
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}='${value.key}'`
-                                  )
-                                "
-                              />
-                              <q-icon
-                                :name="
-                                  'img:' +
-                                  getImageURL('images/common/remove_icon.svg')
-                                "
-                                size="1rem"
-                                @click="
-                                  addSearchTerm(
-                                    `${props.row.name}!='${value.key}'`
-                                  )
-                                "
-                              />
+                              <q-icon :name="'img:' +
+                                getImageURL('images/common/add_icon.svg')
+                                " class="q-mr-xs" size="1rem" @click="addSearchTerm(
+      `${props.row.name}='${value.key}'`
+    )
+    " />
+                              <q-icon :name="'img:' +
+                                getImageURL('images/common/remove_icon.svg')
+                                " size="1rem" @click="addSearchTerm(
+      `${props.row.name}!='${value.key}'`
+    )
+    " />
                             </div>
                           </q-item>
                         </q-list>
@@ -270,17 +137,9 @@
           </q-tr>
         </template>
         <template #top-right>
-          <q-input
-            data-test="log-search-index-list-field-search-input"
-            v-model="searchObj.data.stream.filterField"
-            data-cy="index-field-search-input"
-            filled
-            borderless
-            dense
-            clearable
-            debounce="1"
-            :placeholder="t('search.searchField')"
-          >
+          <q-input data-test="log-search-index-list-field-search-input" v-model="searchObj.data.stream.filterField"
+            data-cy="index-field-search-input" filled borderless dense clearable debounce="1"
+            :placeholder="t('search.searchField')">
             <template #prepend>
               <q-icon name="search" />
             </template>
@@ -298,10 +157,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import { getImageURL, validateEmail } from "../../utils/zincutils";
+import { b64EncodeUnicode, getImageURL, validateEmail } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
+import { Parser } from "node-sql-parser";
 
 interface Filter {
   fieldName: string;
@@ -323,6 +183,7 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+    const parser = new Parser();
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -365,6 +226,7 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
+
     const openFilterCreator = (event: any, { name, ftsKey }: any) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -382,6 +244,34 @@ export default defineComponent({
         values: [],
       };
       try {
+        let query_context = "";
+        let query = searchObj.data.query;
+        if (searchObj.meta.sqlMode == true) {
+          const parsedSQL: any = parser.astify(query);
+          //hack add time stamp column to parsedSQL if not already added
+          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === '_timestamp').length === 0) {
+            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
+            parsedSQL.columns.push(ts_col);
+          }
+          parsedSQL.where = null;
+          query_context = b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
+        } else {
+          let parseQuery = query.split("|");
+          let queryFunctions = "";
+          let whereClause = "";
+          if (parseQuery.length > 1) {
+            queryFunctions = "," + parseQuery[0].trim();
+            whereClause = "";
+          } else {
+            whereClause = "";
+          }
+          query_context =
+            `SELECT *${queryFunctions} FROM "` +
+            searchObj.data.stream.selectedStream.value +
+            `" `;
+          query_context = b64EncodeUnicode(query_context) || "";
+        }
+
         streamService
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -390,6 +280,7 @@ export default defineComponent({
             end_time: endISOTimestamp,
             fields: [name],
             size: 10,
+            query_context: query_context
           })
           .then((res: any) => {
             if (res.data.hits.length) {
@@ -460,6 +351,7 @@ export default defineComponent({
     padding: 0.5rem;
   }
 }
+
 .index-menu {
   width: 100%;
 
@@ -473,6 +365,7 @@ export default defineComponent({
         padding-top: 0px !important;
       }
     }
+
     &__native :first-of-type {
       padding-top: 0.25rem;
     }
@@ -486,9 +379,11 @@ export default defineComponent({
       display: table;
       table-layout: fixed !important;
     }
+
     tr {
       margin-bottom: 1px;
     }
+
     tbody,
     tr,
     td {
@@ -502,6 +397,7 @@ export default defineComponent({
     label.q-field {
       width: 100%;
     }
+
     .q-table thead tr,
     .q-table tbody td {
       height: auto;
@@ -511,6 +407,7 @@ export default defineComponent({
       border-bottom: unset;
     }
   }
+
   .field-table {
     width: 100%;
   }
@@ -564,6 +461,7 @@ export default defineComponent({
         }
       }
     }
+
     &:hover {
       .field-container {
         background-color: #e8e8e8;
@@ -581,28 +479,30 @@ export default defineComponent({
     font-size: 0.75rem;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper {
+  &.q-manual-focusable--focused>.q-focus-helper {
     background: none !important;
     opacity: 0.3 !important;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
+  &.q-manual-focusable--focused>.q-focus-helper,
   &--active {
     background-color: $selected-list-bg !important;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
+  &.q-manual-focusable--focused>.q-focus-helper,
   &:hover,
   &--active {
     color: $primary;
   }
 }
+
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
   height: auto;
   line-height: auto;
 }
+
 .q-field__native,
 .q-field__input {
   padding: 0px 0px 0px 0px;
@@ -611,6 +511,7 @@ export default defineComponent({
 .q-field--dense .q-field__label {
   top: 5px;
 }
+
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;
@@ -631,6 +532,7 @@ export default defineComponent({
         height: 25px !important;
         min-height: 25px !important;
       }
+
       .q-item__section--avatar {
         min-width: 12px;
         max-width: 12px;
@@ -646,6 +548,7 @@ export default defineComponent({
           }
         }
       }
+
       .q-item-type {
         &:hover {
           .field_overlay {
@@ -657,6 +560,7 @@ export default defineComponent({
           }
         }
       }
+
       .field-expansion-icon {
         img {
           width: 12px;

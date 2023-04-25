@@ -82,7 +82,9 @@ pub struct Query {
     #[serde(default)]
     pub track_total_hits: bool,
     #[serde(default)]
-    pub query_fn: Option<String>,
+    pub query_context: Option<String>,
+    #[serde(default)]
+    pub uses_zo_fn: bool,
 }
 
 fn default_size() -> usize {
@@ -100,7 +102,8 @@ impl Default for Query {
             sql_mode: "context".to_string(),
             query_type: "logs".to_string(),
             track_total_hits: false,
-            query_fn: None,
+            query_context: None,
+            uses_zo_fn: false,
         }
     }
 }

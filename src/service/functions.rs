@@ -310,7 +310,7 @@ mod test {
 
     #[actix_web::test]
     async fn test_functions() {
-        let trans = Transform {
+        let mut trans = Transform {
             function: "function (row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
                 .to_owned(),
             name: "dummyfn".to_owned(),
@@ -319,13 +319,35 @@ mod test {
             num_args: 0,
             trans_type: Some(1),
         };
+
+        let mut vrl_trans = Transform {
+            name: "vrl_trans".to_owned(),
+            function: ". = parse_aws_vpc_flow_log!(row.message) \n .".to_owned(),
+            trans_type: Some(1),
+            params: "row".to_owned(),
+            num_args: 0,
+            streams: Some(vec![StreamOrder {
+                stream: "test".to_owned(),
+                stream_type: StreamType::Logs,
+                order: 0,
+            }]),
+        };
+
+        extract_num_args(&mut trans);
+        extract_num_args(&mut vrl_trans);
+        assert_eq!(trans.num_args, 1);
+        assert_eq!(vrl_trans.num_args, 1);
+
+        assert_eq!(trans.num_args, 1);
+
         let res = save_function("nexus".to_owned(), trans).await;
         assert!(res.is_ok());
 
         let list_resp = list_functions("nexus".to_string()).await;
         assert!(list_resp.is_ok());
 
-        let del_resp = delete_function("nexus".to_string(), "dummyfn".to_owned()).await;
-        assert!(del_resp.is_ok());
+        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
+            .await
+            .is_ok());
     }
 }
