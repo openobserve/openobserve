@@ -21,6 +21,7 @@
       </div>
       <div>
         <q-btn
+          v-if="listSubscriptionResponse.hasOwnProperty('card')"
           class="q-ml-md q-mb-xs text-bold"
           outline
           padding="sm lg"
