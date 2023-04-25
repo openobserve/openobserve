@@ -18,7 +18,6 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
@@ -117,11 +116,7 @@ pub async fn search(
     let guard3 = span3.enter();
 
     // merge all batches
-    let (offset, limit) = if CONFIG.common.local_mode {
-        (sql.meta.offset, sql.meta.limit)
-    } else {
-        (0, sql.meta.offset + sql.meta.limit)
-    };
+    let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
     for (name, batches) in results.iter_mut() {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
