@@ -312,10 +312,8 @@ pub async fn merge(
             )));
         }
     };
-    let prefixes = vec![prefix];
 
-    let mut config =
-        ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
+    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
     config = config.infer_schema(&ctx.state()).await.unwrap();
 
     let table = ListingTable::try_new(config)?;
