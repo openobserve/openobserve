@@ -99,9 +99,9 @@ const useDashboardPanelData = () => {
     }
 
     // TODO: condition for all chart type
-    if(dashboardPanelData.data.fields.x.length >= 1){
-      return;
-    } 
+    // if(dashboardPanelData.data.fields.x.length >= 1){
+    //   return;
+    // } 
 
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == row.name)) {

@@ -113,7 +113,8 @@
                     padding="sm"
                     text-color="black"
                     :disabled="
-                      dashboardPanelData.data.fields.x.length >= 1
+                      dashboardPanelData.data.fields.x.length >= 1 &&
+                      dashboardPanelData.data.type == 'pie'
                         ? true
                         : false
                     "
