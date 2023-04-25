@@ -35,7 +35,8 @@ pub struct Sql {
     pub(crate) limit: usize,
     pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
     pub(crate) full_text: Vec<(String, SqlOperator)>, // fulltext: value1 and value2, and: true / false
-    pub(crate) time_range: Option<(i64, i64)>,        // time range: min, max
+    pub(crate) time_range: Option<(i64, i64)>,
+    pub(crate) field_alias: Vec<(String, String)>, // alias for select field
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -133,6 +134,7 @@ impl TryFrom<&Statement> for Sql {
 
                 let fields = Projection(projection).try_into()?;
                 let selection = selection.as_ref().cloned();
+                let field_alias: Vec<(String, String)> = Projection(projection).try_into()?;
 
                 let quick_text: Vec<(String, String, SqlOperator)> =
                     Quicktext(&selection).try_into()?;
@@ -150,6 +152,7 @@ impl TryFrom<&Statement> for Sql {
                     quick_text,
                     full_text,
                     time_range,
+                    field_alias,
                 })
             }
             _ => Err(anyhow::anyhow!("We only support Query at the moment")),
@@ -175,6 +178,20 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
                 }
                 // _ => return Err(anyhow::anyhow!("We only support UnnamedExpr at the moment")),
                 _ => {}
+            }
+        }
+        Ok(fields)
+    }
+}
+
+impl<'a> TryFrom<Projection<'a>> for Vec<(String, String)> {
+    type Error = anyhow::Error;
+
+    fn try_from(projection: Projection<'a>) -> Result<Self, Self::Error> {
+        let mut fields = Vec::new();
+        for item in projection.0 {
+            if let SelectItem::ExprWithAlias { expr, alias } = item {
+                fields.push((expr.to_string(), alias.to_string().replace('"', "")))
             }
         }
         Ok(fields)
