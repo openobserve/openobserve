@@ -533,6 +533,12 @@ impl Sql {
             }
         }
 
+        let query_fn = if req_query.query_fn.is_empty() {
+            None
+        } else {
+            Some(req_query.query_fn.clone())
+        };
+
         let mut sql = Sql {
             origin_sql,
             org_id,
@@ -545,7 +551,7 @@ impl Sql {
             schema,
             query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
-            query_fn: Some(req_query.query_fn.clone()),
+            query_fn,
         };
 
         // calculate all needs fields
