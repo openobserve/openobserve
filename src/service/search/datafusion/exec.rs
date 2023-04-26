@@ -968,8 +968,7 @@ fn apply_query_fn(
     let state = vrl::state::Runtime::default();
     let mut runtime = vrl::Runtime::new(state);
     match crate::service::ingestion::compile_vrl_function(&query_fn_src) {
-        None => Ok(None),
-        Some(program) => {
+        Ok(program) => {
             let rows_val: Vec<json::Value> = in_batch
                 .iter()
                 .filter_map(|hit| {
@@ -996,6 +995,7 @@ fn apply_query_fn(
             }
             Ok(Some(resp))
         }
+        Err(_) => Ok(None),
     }
 }
 
