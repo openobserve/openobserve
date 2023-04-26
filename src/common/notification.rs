@@ -145,6 +145,7 @@ mod tests {
                 track_total_hits: false,
                 query_context: None,
                 uses_zo_fn: false,
+                query_fn: None,
             }),
             condition: Condition {
                 column: "Country".to_string(),

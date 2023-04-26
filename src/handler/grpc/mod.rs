@@ -36,6 +36,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             track_total_hits: req.query.track_total_hits,
             query_context: req.query.query_context.unwrap_or("".to_string()),
             uses_zo_fn: req.query.uses_zo_fn,
+            query_fn: req.query.query_fn.unwrap_or("".to_string()),
         };
 
         let job = cluster_rpc::Job {
@@ -131,6 +132,7 @@ mod test {
                 track_total_hits: false,
                 query_context: None,
                 uses_zo_fn: false,
+                query_fn: None,
             },
             aggs: HashMap::new(),
             encoding: "base64".into(),
