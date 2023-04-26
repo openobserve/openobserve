@@ -47,6 +47,7 @@ pub struct Sql {
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
+    pub query_fn: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -544,6 +545,7 @@ impl Sql {
             schema,
             query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
+            query_fn: Some(req_query.query_fn.clone()),
         };
 
         // calculate all needs fields
@@ -824,6 +826,7 @@ mod tests {
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,
+            query_fn: None,
         };
 
         let req: crate::meta::search::Request = crate::meta::search::Request {
@@ -906,6 +909,7 @@ mod tests {
                 track_total_hits: true,
                 query_context: None,
                 uses_zo_fn: false,
+                query_fn: None,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),
@@ -987,6 +991,7 @@ mod tests {
                 track_total_hits: true,
                 query_context: None,
                 uses_zo_fn: false,
+                query_fn: None,
             };
             let req: crate::meta::search::Request = crate::meta::search::Request {
                 query: query.clone(),
@@ -1073,5 +1078,10 @@ mod tests {
                 ("some_other_key", "no-matter")
             ],
         ));
+    }
+    #[actix_web::test]
+    async fn test_get_all_transform_keys() {
+        let keys = get_all_transform_keys("nexus").await;
+        assert!(keys.is_empty());
     }
 }

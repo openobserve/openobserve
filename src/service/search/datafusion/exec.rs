@@ -145,21 +145,27 @@ pub async fn sql(
     let table = ListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
 
+    log::info!(
+        "Register table took {:.3} seconds.",
+        start.elapsed().as_secs_f64()
+    );
+
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
 
-    // get all UDF
-    let mut used_fns = vec![];
+    // get used UDF
+    let mut field_fns = vec![];
 
     let mut sql_parts = vec![];
     let where_regex = Regex::new(r"(?i) where (.*)").unwrap();
 
     for fn_name in get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
-            used_fns.push(fn_name.clone());
+            field_fns.push(fn_name.clone());
         }
     }
-    if !used_fns.is_empty() {
+
+    if !field_fns.is_empty() || sql.query_fn.is_some() {
         if let Some(caps) = where_regex.captures(&sql.origin_sql) {
             sql_parts.insert(
                 0,
@@ -170,17 +176,13 @@ pub async fn sql(
             sql_parts.insert(1, caps.get(1).unwrap().as_str());
         };
     }
-    log::info!(
-        "Register table took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     // query
 
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if !used_fns.is_empty() && !sql_parts.is_empty() {
+    } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
         match sql.meta.time_range {
             Some(ts_range) => format!(
                 "{} where _timestamp >= {} AND _timestamp < {}",
@@ -226,17 +228,37 @@ pub async fn sql(
         df = df.select(exprs)?;
     }
 
-    if used_fns.is_empty() {
+    let mut resp = None;
+    if field_fns.is_empty() || sql.query_fn.is_some() {
         let batches = df.clone().collect().await?;
-        result.insert("query".to_string(), batches);
-        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+        if sql.query_fn.is_some() {
+            resp = handle_query_fn(sql.query_fn.clone().unwrap(), &sql.org_id, batches);
+        } else {
+            result.insert("query".to_string(), batches);
+            log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+        }
     }
 
-    if !&sql.query_context.is_empty() || !used_fns.is_empty() {
+    if !&sql.query_context.is_empty() || !field_fns.is_empty() {
         ctx.register_table("tbl_temp", df.into_view())?;
+    } else if sql.query_fn.is_some() {
+        match resp {
+            Some(resp) => {
+                let mem_table = datafusion::datasource::MemTable::try_new(
+                    resp.first().unwrap().schema(),
+                    vec![resp],
+                )?;
+                ctx.register_table("tbl_temp", Arc::new(mem_table))?;
+            }
+            None => {
+                return Err(datafusion::error::DataFusionError::Execution(
+                    "Error applying query function".to_string(),
+                ));
+            }
+        }
     }
 
-    if !used_fns.is_empty() && !sql_parts[1].is_empty() {
+    if (!field_fns.is_empty() && !sql_parts[1].is_empty()) || sql.query_fn.is_some() {
         let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
 
         for alias in &sql.meta.field_alias {
@@ -268,7 +290,7 @@ pub async fn sql(
         // Debug SQL
         log::info!("Query agg sql: {}", orig_agg_sql.0);
 
-        let mut agg_sql = if !&sql.query_context.is_empty() {
+        let mut agg_sql = if !&sql.query_context.is_empty() || sql.query_fn.is_some() {
             orig_agg_sql.0.replace("tbl", "tbl_temp")
         } else {
             orig_agg_sql.0.clone()
@@ -906,6 +928,74 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
         }
     }
     fn_list
+}
+
+#[cfg(not(feature = "zo_functions"))]
+fn handle_query_fn(
+    _query_fn: String,
+    _org_id: &str,
+    _batches: Vec<RecordBatch>,
+) -> Option<Vec<RecordBatch>> {
+    None
+}
+
+#[cfg(feature = "zo_functions")]
+fn handle_query_fn(
+    query_fn: String,
+    org_id: &str,
+    batches: Vec<RecordBatch>,
+) -> Option<Vec<RecordBatch>> {
+    match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
+        Some(query_fn_src) => {
+            match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
+                Ok(json_rows) => {
+                    apply_query_fn(query_fn_src.function.to_owned(), json_rows).unwrap_or(None)
+                }
+                Err(_) => None,
+            }
+        }
+        None => None,
+    }
+}
+
+#[cfg(feature = "zo_functions")]
+fn apply_query_fn(
+    query_fn_src: String,
+    in_batch: Vec<json::Map<String, json::Value>>,
+) -> Result<Option<Vec<RecordBatch>>> {
+    let mut resp = vec![];
+    let state = vrl::state::Runtime::default();
+    let mut runtime = vrl::Runtime::new(state);
+    match crate::service::ingestion::compile_vrl_function(&query_fn_src) {
+        None => Ok(None),
+        Some(program) => {
+            let rows_val: Vec<json::Value> = in_batch
+                .iter()
+                .filter_map(|hit| {
+                    let ret_val = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        program.clone(),
+                        &json::Value::Object(hit.clone()),
+                    );
+                    (!ret_val.is_null()).then_some(ret_val)
+                })
+                .collect();
+
+            let first_rec = json::to_string(&rows_val.first()).unwrap();
+            let mut schema_reader = std::io::BufReader::new(first_rec.as_bytes());
+            let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?;
+            let mut decoder =
+                arrow::json::RawReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
+
+            for value in rows_val {
+                decoder
+                    .decode(json::to_string(&value).unwrap().as_bytes())
+                    .unwrap();
+                resp.push(decoder.flush()?.unwrap());
+            }
+            Ok(Some(resp))
+        }
+    }
 }
 
 #[cfg(test)]

@@ -246,6 +246,7 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(bad_request("around key is empty")),
     };
+    let query_fn = query.get("query_fn");
 
     let default_sql = format!(
         "SELECT * FROM \"{}\" ORDER BY {} DESC",
@@ -297,6 +298,7 @@ pub async fn around(
             track_total_hits: false,
             query_context: query_context.clone(),
             uses_zo_fn: uses_fn,
+            query_fn: query_fn.cloned(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -348,6 +350,7 @@ pub async fn around(
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,
+            query_fn: query_fn.cloned(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -473,6 +476,7 @@ pub async fn values(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
+    let query_fn = query.get("query_fn");
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
     let query_context = match query.get("sql") {
@@ -528,6 +532,7 @@ pub async fn values(
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,
+            query_fn: query_fn.cloned(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,

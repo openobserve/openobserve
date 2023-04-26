@@ -311,7 +311,7 @@ mod test {
     #[actix_web::test]
     async fn test_functions() {
         let mut trans = Transform {
-            function: "function (row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
+            function: "function(row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
                 .to_owned(),
             name: "dummyfn".to_owned(),
             params: "row".to_owned(),
