@@ -40,14 +40,15 @@
             :checked="formData.transType === '0'" val="0" :label="t('function.vrl')" class="q-ml-none"
             @update:model-value="updateEditorContent" />
           <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
-          :checked="formData.transType === '1'" val="1" :label="t('function.lua')" class="q-ml-none"
+            :checked="formData.transType === '1'" val="1" :label="t('function.lua')" class="q-ml-none"
             @update:model-value="updateEditorContent" />
         </div>
 
         <q-input v-if="formData.transType === '0'" v-model="formData.params" :label="t('function.params')"
           :placeholder="t('function.paramsHint')" color="input-border" bg-color="input-bg"
           class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]" tabindex="0" />
+          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
+          tabindex="0" />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
         <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
@@ -56,7 +57,7 @@
 
         <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
-
+        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{ compilationErr }}</pre>
         <div class="flex justify-center q-mt-lg">
           <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('function.cancel')" text-color="light-text"
             padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
@@ -117,6 +118,8 @@ export default defineComponent({
     let editorobj: any = null;
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+
+    let compilationErr = ref("");
 
     const beingUpdated = computed(() => props.isUpdated)
 
@@ -211,10 +214,10 @@ end`;
         if (!beingUpdated.value) {
           formData.value.transType = parseInt(formData.value.transType)
           //trans type is lua remove params from form
-          if (formData.value.transType == 1){
-             formData.value.params = ""
+          if (formData.value.transType == 1) {
+            formData.value.params = ""
           }
-          
+
           callTransform = jsTransformService.create(
             store.state.selectedOrganization.identifier,
             formData.value
@@ -222,8 +225,8 @@ end`;
         } else {
           formData.value.transType = parseInt(formData.value.transType)
           //trans type is lua remove params from form
-          if (formData.value.transType == 1){
-            formData.value.params = "" 
+          if (formData.value.transType == 1) {
+            formData.value.params = ""
           }
 
           callTransform = jsTransformService.update(
@@ -245,6 +248,7 @@ end`;
             message: res.data.message,
           });
         }).catch((err) => {
+          compilationErr.value = err.response.data["message"]
           $q.notify({
             type: "negative",
             message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
@@ -271,6 +275,7 @@ end`;
       formData,
       addJSTransformForm,
       store,
+      compilationErr,
       indexOptions,
       editorRef,
       editorobj,

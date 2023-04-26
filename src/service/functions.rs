@@ -30,6 +30,8 @@ use crate::{
 use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
 use crate::{meta::functions::FunctionList, meta::StreamType};
 
+use super::ingestion::compile_vrl_function;
+
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
 const FN_ADDED: &str = "Function applied to stream";
@@ -55,6 +57,17 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             FN_ALREADY_EXIST.to_string(),
         )))
     } else {
+        if func.trans_type.unwrap() == 0 {
+            match compile_vrl_function(func.function.as_str()) {
+                Ok(_) => {}
+                Err(error) => {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        StatusCode::BAD_REQUEST.into(),
+                        error.to_string(),
+                    )));
+                }
+            }
+        }
         extract_num_args(&mut func);
         let name = func.name.to_owned();
         if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
@@ -100,6 +113,17 @@ pub async fn update_function(
     // UI mostly like in 1st version wont send streams, so we need to add them back from existing function
     func.streams = existing_fn.streams;
 
+    if func.trans_type.unwrap() == 0 {
+        match compile_vrl_function(func.function.as_str()) {
+            Ok(_) => {}
+            Err(error) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.into(),
+                    error.to_string(),
+                )));
+            }
+        }
+    }
     extract_num_args(&mut func);
     let name = func.name.to_owned();
     if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {

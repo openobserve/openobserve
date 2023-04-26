@@ -35,19 +35,17 @@ use crate::{
 };
 
 #[cfg(feature = "zo_functions")]
-pub fn compile_vrl_function(func: &str) -> Option<Program> {
-    let result = vrl::compile(func, &vrl_stdlib::all());
-
-    match result {
+pub fn compile_vrl_function(func: &str) -> Result<Program, std::io::Error> {
+    match vrl::compile(func, &vrl_stdlib::all()) {
         Ok(CompilationResult {
             program,
             warnings: _,
             config: _,
-        }) => Some(program),
-        Err(e) => {
-            log::info!("Error compiling vrl {:?}", e);
-            None
-        }
+        }) => Ok(program),
+        Err(e) => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            vrl::diagnostic::Formatter::new(func, e).to_string(),
+        )),
     }
 }
 
@@ -238,8 +236,8 @@ pub fn register_stream_transforms<'a>(
                 if let Some(local_fn) = load_lua_transform(lua, trans.transform.function.clone()) {
                     stream_lua_map.insert(func_key, local_fn.to_owned());
                 }
-            } else if let Some(program) = compile_vrl_function(&trans.transform.function) {
-                stream_vrl_map.insert(func_key, program.to_owned());
+            } else if let Ok(program) = compile_vrl_function(&trans.transform.function) {
+                stream_vrl_map.insert(func_key, program);
             }
         }
     }
@@ -340,5 +338,15 @@ mod tests {
         stream_schema_map.insert("olympics".to_string(), schema);
         let keys = get_stream_partition_keys("olympics".to_string(), stream_schema_map).await;
         assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);
+    }
+
+    #[actix_web::test]
+    async fn test_compile_vrl_function() {
+        let result = compile_vrl_function(
+            r#"if .country == "USA" {
+                ..country = "United States"
+            }"#,
+        );
+        assert!(result.is_err())
     }
 }
