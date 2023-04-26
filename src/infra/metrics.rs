@@ -74,8 +74,8 @@ pub static GRPC_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
 });
 
 // ingester stats
-pub static INGEST_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
+pub static INGEST_RECORDS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("ingest_records", "Ingested records")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
@@ -83,8 +83,8 @@ pub static INGEST_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static INGEST_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
+pub static INGEST_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
         Opts::new("ingest_bytes", "Ingested bytes")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
