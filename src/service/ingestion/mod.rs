@@ -42,10 +42,10 @@ pub fn compile_vrl_function(func: &str) -> Result<Program, std::io::Error> {
             warnings: _,
             config: _,
         }) => Ok(program),
-        Err(e) => {
-            let msg = vrl::diagnostic::Formatter::new(func, e).to_string();
-            Err(std::io::Error::new(std::io::ErrorKind::Other, msg))
-        }
+        Err(e) => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            vrl::diagnostic::Formatter::new(func, e).to_string(),
+        )),
     }
 }
 
