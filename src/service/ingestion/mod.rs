@@ -347,9 +347,6 @@ mod tests {
                 ..country = "United States"
             }"#,
         );
-        match result {
-            Ok(_) => {}
-            Err(e) => println!("Error: {}", e),
-        }
+        assert!(result.is_err())
     }
 }
