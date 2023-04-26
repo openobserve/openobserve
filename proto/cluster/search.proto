@@ -38,6 +38,7 @@ message SearchQuery {
     string       query_type = 8;
     string    query_context = 9;
     bool        uses_zo_fn = 10;
+    string        query_fn = 11;
 }
 
 // Search request
