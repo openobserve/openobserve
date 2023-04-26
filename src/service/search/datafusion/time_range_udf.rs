@@ -51,7 +51,7 @@ pub fn time_range_expr_impl() -> ScalarFunctionImplementation {
     let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
         if args.len() != 3 {
             return Err(DataFusionError::SQL(ParserError::ParserError(
-                "time_range UDF expects three string".to_string(),
+                "UDF params should be: time_range(field, start, end)".to_string(),
             )));
         }
 
@@ -122,7 +122,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn time_range() {
+    async fn test_time_range() {
         let data_time = time::parse_str_to_timestamp_micros("2021-01-01T00:00:00.000Z").unwrap();
         let sql = "select * from t where time_range(time, '2021-01-01T00:00:00.000Z', '2021-01-02T00:00:00.000Z')";
 

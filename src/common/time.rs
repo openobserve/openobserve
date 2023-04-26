@@ -160,6 +160,36 @@ pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
     Ok(total)
 }
 
+pub fn parse_timezone_to_offset(offset: &str) -> i64 {
+    // let offset = "+08:00"; // or "-07:00" or "UTC"
+    let sign: i64;
+    let time: String;
+
+    if let Some(stripped) = offset.strip_prefix('+') {
+        sign = 1;
+        time = stripped.to_string();
+    } else if let Some(stripped) = offset.strip_prefix('-') {
+        sign = -1;
+        time = stripped.to_string();
+    } else if offset.to_uppercase() == "CST" {
+        sign = 1;
+        time = "+08:00".to_string();
+    } else if offset.to_uppercase() == "UTC" || offset.to_uppercase() == "" {
+        sign = 0;
+        time = "00:00".to_string();
+    } else {
+        panic!("Invalid time zone offset");
+    }
+
+    // convert time to seconds
+    let seconds: i64 = time
+        .split(':')
+        .map(|val| val.parse::<i64>().unwrap())
+        .fold(0, |acc, val| acc * 60 + val * 60);
+
+    sign * seconds
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,5 +338,14 @@ mod tests {
         assert_eq!(parse_milliseconds("1h10m30s10ms").unwrap(), 4230010);
         assert!(parse_milliseconds("s").is_err());
         assert!(parse_milliseconds("10z").is_err());
+    }
+
+    #[test]
+    fn test_parse_timezone_to_offset() {
+        assert_eq!(parse_timezone_to_offset(""), 0);
+        assert_eq!(parse_timezone_to_offset("UTC"), 0);
+        assert_eq!(parse_timezone_to_offset("CST"), 28800);
+        assert_eq!(parse_timezone_to_offset("+08:00"), 28800);
+        assert_eq!(parse_timezone_to_offset("-08:00"), -28800);
     }
 }
