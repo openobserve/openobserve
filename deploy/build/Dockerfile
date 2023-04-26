@@ -19,7 +19,7 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
-RUN cargo build --release --features zo_functions
+RUN cargo build --release
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bullseye-slim as runtime

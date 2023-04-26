@@ -339,10 +339,10 @@ pub fn write_file(
         // metrics
         metrics::INGEST_RECORDS
             .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
-            .add(entry.len() as i64);
+            .inc_by(entry.len() as u64);
         metrics::INGEST_BYTES
             .with_label_values(&[org_id, stream_name, StreamType::Logs.to_string().as_str()])
-            .add(write_buf.len() as i64);
+            .inc_by(write_buf.len() as u64);
     }
 }
 
