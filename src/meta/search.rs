@@ -85,6 +85,8 @@ pub struct Query {
     pub query_context: Option<String>,
     #[serde(default)]
     pub uses_zo_fn: bool,
+    #[serde(default)]
+    pub query_fn: Option<String>,
 }
 
 fn default_size() -> usize {
@@ -104,6 +106,7 @@ impl Default for Query {
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,
+            query_fn: None,
         }
     }
 }

@@ -81,6 +81,7 @@ pub async fn save_alert(
             size: 0,
             query_context: None,
             uses_zo_fn: false,
+            query_fn: None,
         });
         alert.is_real_time = true;
 
@@ -235,6 +236,7 @@ mod test {
                 size: 0,
                 query_context: None,
                 uses_zo_fn: false,
+                query_fn: None,
             }),
             condition: Condition {
                 column: "occurance".to_owned(),
