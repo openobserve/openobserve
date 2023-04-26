@@ -431,7 +431,7 @@ export default defineComponent({
           },
           aggs: {
             histogram:
-              "select histogram(_timestamp, '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+              "select histogram(" + store.state.zoConfig.timestamp_column + ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
           },
           encoding: "base64",
         };
@@ -718,7 +718,7 @@ export default defineComponent({
         if (searchObj.data.streamResults.list.length > 0) {
           const queryResult = [];
           const tempFieldsName = [];
-          const ignoreFields = ["_timestamp"];
+          const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
           searchObj.data.streamResults.list.forEach((stream: any) => {
@@ -789,12 +789,12 @@ export default defineComponent({
           name: "@timestamp",
           field: (row: any) =>
             date.formatDate(
-              Math.floor(row["_timestamp"] / 1000),
+              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             date.formatDate(
-              Math.floor(row["_timestamp"] / 1000),
+              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
           label: t("search.timestamp"),
@@ -1077,8 +1077,8 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter(e => e.expr.column === '_timestamp').length === 0) {
-            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
+          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter(e => e.expr.column === store.state.zoConfig.timestamp_column).length === 0) {
+            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": store.state.zoConfig.timestamp_column }, "as": null };
             parsedSQL.columns.push(ts_col);
           }
           parsedSQL.where = null;
