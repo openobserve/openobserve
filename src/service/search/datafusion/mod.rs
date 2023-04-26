@@ -14,6 +14,7 @@
 
 use crate::meta::functions::ZoFunction;
 
+mod date_format_udf;
 pub mod exec;
 mod match_udf;
 mod regexp_udf;
