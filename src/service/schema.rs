@@ -117,7 +117,7 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
                 }
                 new_field = false;
                 if merged_field.data_type() != field.data_type() {
-                    if !CONFIG.common.widening_schema_evoluation {
+                    if !CONFIG.common.widening_schema_evolution {
                         return Err(ArrowError::SchemaError(format!(
                             "Fail to merge schema due to conflicting data type[{}:{}].",
                             merged_field.data_type(),
@@ -228,7 +228,7 @@ pub async fn check_for_schema(
         .into_iter()
         .filter(|item| !inferred_fields.contains(item))
         .collect();
-    if !CONFIG.common.widening_schema_evoluation {
+    if !CONFIG.common.widening_schema_evolution {
         return (true, Some(field_datatype_delta));
     }
 
