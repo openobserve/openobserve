@@ -220,23 +220,6 @@ pub async fn delete_stream_function(
     if let Some(val) = existing_fn.streams.clone() {
         if val.len() == 1 && val.first().unwrap().stream == stream_name {
             existing_fn.streams = None;
-
-            // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
-            let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-
-            if let Some(val) = STREAM_FUNCTIONS.clone().get(&key) {
-                if val.list.len() > 1 {
-                    let final_list = val
-                        .clone()
-                        .list
-                        .into_iter()
-                        .filter(|x| x.transform.name != fn_name)
-                        .collect::<Vec<StreamTransform>>();
-                    STREAM_FUNCTIONS.insert(key, StreamFunctionsList { list: final_list });
-                } else {
-                    STREAM_FUNCTIONS.remove(&key);
-                }
-            }
         } else {
             existing_fn.streams = Some(
                 val.into_iter()
@@ -253,6 +236,9 @@ pub async fn delete_stream_function(
                 )),
             )
         } else {
+            // cant be removed from watcher of function as stream name & type wont be available , hence being removed here
+            let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+            remove_stream_fn_from_cache(key, fn_name);
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_REMOVED.to_string(),
@@ -330,6 +316,22 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
     match db::functions::get(org_id, fn_name).await {
         Ok(function) => Some(function),
         Err(_) => None,
+    }
+}
+
+fn remove_stream_fn_from_cache(key: String, fn_name: String) {
+    if let Some(val) = STREAM_FUNCTIONS.clone().get(&key) {
+        if val.list.len() > 1 {
+            let final_list = val
+                .clone()
+                .list
+                .into_iter()
+                .filter(|x| x.transform.name != fn_name)
+                .collect::<Vec<StreamTransform>>();
+            STREAM_FUNCTIONS.insert(key, StreamFunctionsList { list: final_list });
+        } else {
+            STREAM_FUNCTIONS.remove(&key);
+        }
     }
 }
 
