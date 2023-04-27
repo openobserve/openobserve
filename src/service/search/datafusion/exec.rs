@@ -185,8 +185,12 @@ pub async fn sql(
     } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
         match sql.meta.time_range {
             Some(ts_range) => format!(
-                "{} where _timestamp >= {} AND _timestamp < {}",
-                sql_parts[0], ts_range.0, ts_range.1
+                "{} where {} >= {} AND {} < {}",
+                sql_parts[0],
+                CONFIG.common.time_stamp_col,
+                ts_range.0,
+                CONFIG.common.time_stamp_col,
+                ts_range.1
             ),
             None => sql_parts[0].to_owned(),
         }
