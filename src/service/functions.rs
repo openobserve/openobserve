@@ -39,7 +39,7 @@ const FN_REMOVED: &str = "Function removed from stream";
 const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
-    "Function is used in a stream. Please remove it from the stream before deleting.";
+    "Function is used in streams , please remove it from the streams before deleting :";
 const LUA_FN_DISABLED: &str = "Lua functions are disabled";
 
 #[instrument(skip(func))]
@@ -162,9 +162,14 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     };
     if let Some(val) = existing_fn.streams {
         if !val.is_empty() {
+            let names = val
+                .iter()
+                .map(|stream| stream.stream.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
-                FN_IN_USE.to_string(),
+                format!("{} {}", FN_IN_USE.to_string(), names),
             )));
         }
     }

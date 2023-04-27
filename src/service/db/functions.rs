@@ -94,24 +94,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let trans_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_name = item_key[item_key.rfind('/').unwrap() + 1..].to_string();
-                if trans_key.contains('/') {
-                    let mut group = STREAM_FUNCTIONS
-                        .get(&trans_key.to_string())
-                        .unwrap()
-                        .clone();
-                    group
-                        .list
-                        .retain(|trans| !trans.transform.name.eq(&item_name));
-                    if group.list.is_empty() {
-                        STREAM_FUNCTIONS.remove(&trans_key.to_string());
-                    } else {
-                        STREAM_FUNCTIONS.insert(trans_key.to_string(), group);
-                    }
-                } else {
-                    STREAM_FUNCTIONS.remove(&trans_key.to_string());
-                }
+                QUERY_FUNCTIONS.remove(item_key);
             }
         }
     }
