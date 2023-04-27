@@ -38,7 +38,6 @@ pub struct Span {
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub service: AHashMap<String, json::Value>,
-    pub _timestamp: u64,
     pub events: String,
 }
 

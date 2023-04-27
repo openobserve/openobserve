@@ -23,7 +23,6 @@ pub struct Metric {
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub collection: AHashMap<String, String>,
-    pub _timestamp: i64,
     pub metric_type: String,
 }
 
@@ -45,7 +44,7 @@ impl Metric {
             name,
             value,
             collection,
-            _timestamp,
+
             metric_type,
         }
     }
