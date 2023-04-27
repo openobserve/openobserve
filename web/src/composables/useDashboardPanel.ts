@@ -110,7 +110,7 @@ const useDashboardPanelData = () => {
         alias: !dashboardPanelData.data.customQuery ? 'x_axis_' + (dashboardPanelData.data.fields.x.length + 1) : row.name,
         column: row.name,
         color: null,
-        aggregationFunction: (row.name == '_timestamp') ? 'histogram' : null
+        aggregationFunction: (row.name == store.state.zoConfig.timestamp_column) ? 'histogram' : null
       })
     }
   }

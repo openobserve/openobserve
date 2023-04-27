@@ -136,8 +136,8 @@
       </div>
       <div v-else>
         <h5 data-test="logs-search-error-message" class="text-center">
-          <q-icon name="warning" color="warning"
-size="10rem" /><br />{{
+          <q-icon name="warning"
+color="warning" size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
         </h5>
@@ -494,7 +494,9 @@ export default defineComponent({
           },
           aggs: {
             histogram:
-              "select histogram(" + store.state.zoConfig.timestamp_column + ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+              "select histogram(" +
+              store.state.zoConfig.timestamp_column +
+              ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
           },
           encoding: "base64",
         };
@@ -1149,11 +1151,11 @@ export default defineComponent({
           //hack add time stamp column to parsedSQL if not already added
           if (
             !(parsedSQL.columns === "*") &&
-            parsedSQL.columns.filter((e) => e.expr.column === "_timestamp")
+            parsedSQL.columns.filter((e) => e.expr.column === store.state.zoConfig.timestamp_column)
               .length === 0
           ) {
             const ts_col = {
-              expr: { type: "column_ref", table: null, column: "_timestamp" },
+              expr: { type: "column_ref", table: null, column: store.state.zoConfig.timestamp_column },
               as: null,
             };
             parsedSQL.columns.push(ts_col);

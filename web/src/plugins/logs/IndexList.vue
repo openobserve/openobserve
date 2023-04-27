@@ -249,8 +249,8 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === '_timestamp').length === 0) {
-            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
+          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === store.state.zoConfig.timestamp_column).length === 0) {
+            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": store.state.zoConfig.timestamp_column }, "as": null };
             parsedSQL.columns.push(ts_col);
           }
           parsedSQL.where = null;
