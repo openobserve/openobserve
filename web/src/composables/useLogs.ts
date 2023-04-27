@@ -19,11 +19,13 @@ const defaultObject = {
   organizationIdetifier: "",
   runQuery: false,
   loading: false,
-
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
+    fnSplitterModel: 60,
+    fnLastSplitterPosition: 0,
+    fnSplitterLimit: [40, 100],
     refreshTimes: [
       [
         { label: "5 sec", value: 5 },
@@ -53,6 +55,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
+    toggleFunction: true,
     sqlMode: false,
     resultGrid: {
       wrapCells: false,
@@ -115,6 +118,7 @@ const defaultObject = {
       size: <number>10,
       histogramHide: false,
     },
+    tempFunctionName: "",
   },
 };
 

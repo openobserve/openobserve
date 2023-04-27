@@ -71,12 +71,12 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
-            :data-test="`logs-search-result-detail-${row._timestamp}`"
+            :data-test="`logs-search-result-detail-${row[store.state.zoConfig.timestamp_column]}`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
             :style="
-              row._timestamp == searchObj.data.searchAround.indexTimestamp
+              row[store.state.zoConfig.timestamp_column] == searchObj.data.searchAround.indexTimestamp
                 ? 'background-color:lightgray'
                 : ''
             "
