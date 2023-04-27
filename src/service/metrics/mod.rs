@@ -147,7 +147,7 @@ pub async fn prometheus_write_proto(
                 name: main_lable[0].value.clone(),
                 value: sample_val,
                 collection: map.clone(),
-                _timestamp: timestamp,
+                //_timestamp: timestamp,
                 metric_type: metric_type.clone(),
             };
             /* let value_str = json::to_string(&metric).unwrap();
@@ -227,7 +227,7 @@ pub async fn prometheus_write_proto(
 
                 // Start row based transform
                 #[cfg(feature = "zo_functions")]
-                let value = crate::service::ingestion::apply_stream_transform(
+                let mut value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
                     &lua,
@@ -238,7 +238,16 @@ pub async fn prometheus_write_proto(
                 );
                 // End row based transform
 
-                let value_str = json::to_string(&value).unwrap();
+                // get json object
+                let val_map = value.as_object_mut().unwrap();
+
+                val_map.insert(
+                    CONFIG.common.time_stamp_col.clone(),
+                    json::Value::Number(timestamp.into()),
+                );
+
+                let value_str = crate::common::json::to_string(&val_map).unwrap();
+
                 // get hour key
                 let hour_key = crate::service::ingestion::get_hour_key(
                     timestamp,

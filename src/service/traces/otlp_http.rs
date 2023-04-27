@@ -256,7 +256,6 @@ pub async fn traces_json(
                                 attributes: span_att_map,
                                 service: service_att_map.clone(),
                                 flags: 1, //TODO add appropriate value
-                                _timestamp: timestamp,
                                 events: json::to_string(&events).unwrap(),
                             };
                             if timestamp < min_ts.try_into().unwrap() {
@@ -282,9 +281,17 @@ pub async fn traces_json(
                             // End row based transform
 
                             //JSON Flattening
-                            let value = json::flatten_json_and_format_field(&value);
+                            let mut value = json::flatten_json_and_format_field(&value);
 
-                            let value_str = json::to_string(&value).unwrap();
+                            // get json object
+                            let val_map = value.as_object_mut().unwrap();
+
+                            val_map.insert(
+                                CONFIG.common.time_stamp_col.clone(),
+                                json::Value::Number(timestamp.into()),
+                            );
+
+                            let value_str = crate::common::json::to_string(&val_map).unwrap();
                             // get hour key
                             let mut hour_key = crate::service::ingestion::get_hour_key(
                                 timestamp.try_into().unwrap(),
