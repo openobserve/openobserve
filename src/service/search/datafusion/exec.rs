@@ -159,7 +159,7 @@ pub async fn sql(
     let mut sql_parts = vec![];
     let where_regex = Regex::new(r"(?i) where (.*)").unwrap();
 
-    for fn_name in get_all_transform_keys(&sql.org_id).await {
+    for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
             field_fns.push(fn_name.clone());
         }
@@ -918,21 +918,6 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
             ctx.register_udf(udf.clone());
         }
     }
-}
-
-pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
-    let mut fn_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.iter() {
-        let key = transform.key();
-        if key.contains(org_id) {
-            fn_list.push(
-                key.strip_prefix(&format!("{}/", org_id).to_owned())
-                    .unwrap()
-                    .to_string(),
-            );
-        }
-    }
-    fn_list
 }
 
 #[cfg(not(feature = "zo_functions"))]
