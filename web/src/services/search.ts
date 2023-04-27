@@ -33,14 +33,19 @@ const search = {
     key,
     size,
     query_context,
+    query_fn,
   }: {
     org_identifier: string;
     index: string;
     key: string;
     size: string;
-    query_context: string
+    query_context: string;
+    query_fn: string;
   }) => {
-    const url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}`;
+    let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}`;
+    if (query_fn.trim() != "") {
+      url = url + `&query_fn=${query_fn}`;
+    }
     return http().get(url);
   },
 };

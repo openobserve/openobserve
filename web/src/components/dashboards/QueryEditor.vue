@@ -20,6 +20,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
 import * as monaco from "monaco-editor";
+import { useStore } from "vuex";
 
 export default defineComponent({
   props: {
@@ -42,6 +43,7 @@ export default defineComponent({
   },
   emits: ["update-query", "run-query", "update:query"],
   setup(props, { emit }) {
+    const store = useStore();
     const editorRef: any = ref();
     let editorObj: any = null;
 
@@ -162,7 +164,7 @@ export default defineComponent({
       ];
 
       props.fields.forEach((field: any) => {
-        if (field.name == "_timestamp") {
+        if (field.name == store.state.zoConfig.timestamp_column) {
           return;
         }
         let itemObj = {

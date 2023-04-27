@@ -114,7 +114,8 @@ export default defineComponent({
       };      
       const sqlQueryModified = modifySQLQuery(
         toRaw(unref(selectedTimeObj)),
-        panelDataElement.query[0]
+        panelDataElement.query[0],
+        store.state.zoConfig.timestamp_column
       );
       const query = {
         query: { sql: sqlQueryModified, sql_mode: "full" },

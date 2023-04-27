@@ -387,7 +387,7 @@ export default defineComponent({
       try {
         var req: any = {
           query: {
-            sql: 'select histogram(_timestamp, 1000) as zo_timestamp, max(value) as max, avg(value) as avg, min(value) as min from "[INDEX_NAME]" group by zo_timestamp ORDER BY zo_timestamp',
+            sql: `select histogram(${store.state.zoConfig.timestamp_column}, 1000) as zo_timestamp, max(value) as max, avg(value) as avg, min(value) as min from "[INDEX_NAME]" group by zo_timestamp ORDER BY zo_timestamp`,
             start_time: (new Date().getTime() - 900000) * 1000,
             end_time: new Date().getTime() * 1000,
             from: 0,

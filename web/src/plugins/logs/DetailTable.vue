@@ -251,6 +251,7 @@
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 
 const defaultValue: any = () => {
@@ -299,7 +300,7 @@ export default defineComponent({
     },
     searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {
-        key: rowData._timestamp,
+        key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
       });
     },
@@ -308,6 +309,7 @@ export default defineComponent({
     const { t } = useI18n();
     const rowData: any = ref({});
     const router = useRouter();
+    const store = useStore();
     const tab = ref("table");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
@@ -347,6 +349,7 @@ export default defineComponent({
 
     return {
       t,
+      store,
       router,
       rowData,
       tab,

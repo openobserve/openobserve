@@ -249,8 +249,8 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === '_timestamp').length === 0) {
-            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": "_timestamp" }, "as": null };
+          if (!(parsedSQL.columns === "*") && parsedSQL.columns.filter((e: { expr: { column: string; }; }) => e.expr.column === store.state.zoConfig.timestamp_column).length === 0) {
+            const ts_col = { "expr": { "type": "column_ref", "table": null, "column": store.state.zoConfig.timestamp_column }, "as": null };
             parsedSQL.columns.push(ts_col);
           }
           parsedSQL.where = null;
@@ -272,6 +272,13 @@ export default defineComponent({
           query_context = b64EncodeUnicode(query_context) || "";
         }
 
+        let query_fn = "";
+        if (
+          searchObj.data.tempFunctionName != "" &&
+          searchObj.meta.toggleFunction
+        ) {
+          query_fn = searchObj.data.tempFunctionName;
+        }
         streamService
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -280,7 +287,8 @@ export default defineComponent({
             end_time: endISOTimestamp,
             fields: [name],
             size: 10,
-            query_context: query_context
+            query_context: query_context,
+            query_fn: query_fn
           })
           .then((res: any) => {
             if (res.data.hits.length) {

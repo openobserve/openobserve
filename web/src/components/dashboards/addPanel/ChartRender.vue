@@ -370,7 +370,7 @@ export default defineComponent({
       let result : string[]= searchQueryData.data.map((item) => item[key]);
       // check for the histogram _timestamp field
        // If histogram _timestamp field is found, format the date labels
-        const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
+        const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
         if(field && field.alias == key) {
           // get the format
           const timestamps = selectedTimeObj.value

@@ -38,7 +38,7 @@
   Port {{ endpoint.port }}
   tls {{ endpoint.tls }}
   Format json
-  Json_date_key    _timestamp
+  Json_date_key    {{ store.state.zoConfig.timestamp_column }}
   Json_date_format iso8601
   HTTP_User {{ currUserEmail }}
   HTTP_Passwd {{ store.state.organizationPasscode }}</pre
