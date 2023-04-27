@@ -234,11 +234,11 @@ export default defineComponent({
     const queryEditorRef = ref(null);
 
     const parser = new Parser();
-    let streamName = "";
     const formData: any = ref(defaultValue());
 
     const fnEditorRef: any = ref(null);
     let fnEditorobj: any = null;
+    let streamName = "";
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
@@ -414,11 +414,16 @@ export default defineComponent({
     const saveTemporaryFunction = (content: string) => {
       let callTransform: Promise<{ data: any }>;
 
+      if (content == formData.value.function) {
+        return;
+      }
+
       if (content.trim() == "") {
         searchObj.data.tempFunctionName = "";
         $q.notify({
           type: "positive",
-          message: "Function no more applicable to the query.",
+          message:
+            "Function has been removed and no more applicable to the query.",
         });
         return;
       }
@@ -455,7 +460,9 @@ export default defineComponent({
           searchObj.data.tempFunctionName = formData.value.name;
           $q.notify({
             type: "positive",
-            message: res.data.message,
+            message: res.data.hasOwnProperty("message")
+              ? res.data.message
+              : "Function updated successfully.",
           });
         })
         .catch((err) => {
