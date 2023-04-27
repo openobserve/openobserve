@@ -14,21 +14,34 @@
 -->
 
 <template>
-  <div class="flex justify-end q-px-md q-pt-sm">
+  <div
+    class="flex justify-start items-center q-px-sm bg-grey-11"
+    :style="{ height: '30px' }"
+  >
+    <div :style="{ width: 'calc(100% - 22px)' }" class="q-pb-none ellipsis">
+      Span Details
+    </div>
     <q-btn
       dense
       icon="close"
-      class="align-right no-border"
-      size="sm"
+      class="align-right no-border q-pa-xs"
+      size="xs"
       @click="closeSidebar"
     ></q-btn>
   </div>
   <div class="q-pb-sm">
-    <div class="q-px-md q-pb-none text-h6">{{ span.operation_name }}</div>
-    <div class="q-px-md text-body2">{{ span.service_name }}</div>
+    <div
+      :title="span.operation_name"
+      class="q-px-sm q-pb-none text-h6 ellipsis non-selectable"
+    >
+      {{ span.operation_name }}
+    </div>
+    <div class="q-px-sm text-caption ellipsis non-selectable">
+      {{ span.service_name }}
+    </div>
   </div>
   <div>
-    <q-tabs v-model="activeTab" dense inline-label class="text-bold q-mx-md">
+    <q-tabs v-model="activeTab" dense inline-label class="text-bold q-mx-sm">
       <q-tab name="tags" label="Tags" />
       <q-tab name="details" label="Details" />
     </q-tabs>
@@ -74,10 +87,18 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .tab-panels {
   height: calc(100vh - 130px);
   overflow-y: scroll;
   overflow-x: hidden;
+}
+</style>
+
+<style lang="scss">
+.tab-panels {
+  .q-tab-panel {
+    padding: 8px;
+  }
 }
 </style>

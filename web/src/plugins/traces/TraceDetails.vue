@@ -16,33 +16,55 @@
 <template>
   <div
     class="trace-details"
-    :style="{ width: '90vw !important', background: '#ffffff' }"
+    :style="{
+      width: '97vw !important',
+      background: '#ffffff',
+    }"
   >
     <div
-      class="row"
+      class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
+      <div class="q-py-sm flex items-center justify-start col-12 toolbar">
+        <div class="text-h6 q-mr-lg">
+          {{ traceTree[0]["operationName"] }}
+        </div>
+        <div>Spans: {{ spanList.length - 1 }}</div>
+      </div>
+      <trace-chart ref="plotChart" :chart="traceChart" />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
         "
-        class="q-py-md"
       >
-        <div class="q-pb-sm q-px-md flex items-center justify-start">
-          <div class="text-h6 q-mr-lg">
-            {{ traceTree[0]["operationName"] }}
-          </div>
-          <div>Spans: {{ spanList.length - 1 }}</div>
-        </div>
-        <div class="histogram-spans-container q-mx-md">
-          <SpanRenderer
-            :collapseMapping="collapseMapping"
-            :spans="spanPositionList"
-            :baseTracePosition="baseTracePosition"
-            :spanDimensions="spanDimensions"
-            ref="traceRootSpan"
-            @toggle-collapse="toggleSpanCollapse"
-          />
+        <trace-header
+          :baseTracePosition="baseTracePosition"
+          :splitterWidth="splitterModel"
+        />
+        <div class="histogram-spans-container">
+          <q-splitter v-model="splitterModel" :style="{ height: '100%' }">
+            <template v-slot:before>
+              <div class="trace-tree-container">
+                <trace-tree
+                  :collapseMapping="collapseMapping"
+                  :spans="spanPositionList"
+                  :baseTracePosition="baseTracePosition"
+                  :spanDimensions="spanDimensions"
+                  class="trace-tree"
+                  @toggle-collapse="toggleSpanCollapse"
+                />
+              </div>
+            </template>
+            <template v-slot:after>
+              <SpanRenderer
+                :collapseMapping="collapseMapping"
+                :spans="spanPositionList"
+                :baseTracePosition="baseTracePosition"
+                :spanDimensions="spanDimensions"
+                ref="traceRootSpan"
+              />
+            </template>
+          </q-splitter>
         </div>
       </div>
       <q-separator vertical />
@@ -68,11 +90,9 @@
 import {
   defineComponent,
   ref,
-  onBeforeMount,
   type Ref,
   onMounted,
   watch,
-  nextTick,
   onActivated,
 } from "vue";
 import { cloneDeep } from "lodash";
@@ -80,6 +100,9 @@ import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
+import TraceTree from "./TraceTree.vue";
+import TraceHeader from "./TraceHeader.vue";
+import TraceChart from "./TraceChart.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -89,7 +112,13 @@ export default defineComponent({
       default: "",
     },
   },
-  components: { SpanRenderer, TraceDetailsSidebar },
+  components: {
+    SpanRenderer,
+    TraceDetailsSidebar,
+    TraceTree,
+    TraceHeader,
+    TraceChart,
+  },
 
   setup() {
     const traceTree: any = ref([]);
@@ -99,37 +128,28 @@ export default defineComponent({
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
     const spanPositionList: Ref<any[]> = ref([]);
+    const splitterModel = ref(25);
+    const traceTimeline: any = ref({});
     const spanDimensions = {
-      height: 40,
-      barHeight: 10,
-      textHeight: 30,
-      gap: 40,
-      collapseHeight: 20,
-      collapseWidth: 30,
+      height: 25,
+      barHeight: 8,
+      textHeight: 25,
+      gap: 15,
+      collapseHeight: 8,
+      collapseWidth: 8,
       connectorPadding: 2,
       paddingLeft: 8,
       hConnectorWidth: 20,
       dotConnectorWidth: 6,
       dotConnectorHeight: 6,
-      colors: [
-        "cyan",
-        "yellow",
-        "lime",
-        "orange",
-        "brown",
-        "blue-grey",
-        "amber",
-        "light-green",
-        "grey",
-        "teal",
-        "pink",
-        "purple",
-        "light-blue",
-        "deep-purple",
-        "indigo",
-        "blue",
-      ],
+      colors: ["#003f5c", "#5978dc", "#ffa600", "#bc5090", "#58508d"],
     };
+
+    const traceChart = ref({
+      data: [],
+      layout: {},
+    });
+    const plotChart = ref(null);
 
     const spanList = computed(() => {
       return searchObj.data.traceDetails.spanList;
@@ -168,12 +188,21 @@ export default defineComponent({
     });
 
     const calculateTracePosition = () => {
-      baseTracePosition.value["width"] = traceRootSpan.value.$el.clientWidth;
-      baseTracePosition.value["perPixelMs"] = Number(
-        traceTree.value[0].durationMs / traceRootSpan.value.$el.clientWidth
-      );
-      baseTracePosition.value["durationMs"] = traceTree.value[0].durationMs;
+      const tics = [];
+      baseTracePosition.value["durationMs"] = (
+        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
+      ).toFixed(2);
       baseTracePosition.value["startTimeMs"] = traceTree.value[0].startTimeMs;
+
+      const quarterMs = baseTracePosition.value["durationMs"] / 4;
+      for (let i = 0; i <= 4; i++) {
+        tics.push({
+          value: Number((quarterMs * i).toFixed(2)),
+          label: `${(quarterMs * i).toFixed(2)}ms`,
+          left: `${25 * i}%`,
+        });
+      }
+      baseTracePosition.value["tics"] = tics;
     };
 
     // Find out spans who has reference_parent_span_id as span_id of first span in sampleTrace
@@ -182,13 +211,26 @@ export default defineComponent({
       traceTree.value = [];
       spanPositionList.value = [];
       collapseMapping.value = {};
+      let lowestStartTime: number = spanList.value[0].start_time;
+      let highestEndTime: number = spanList.value[0].end_time;
 
       const traceTreeMock: any = {};
       const serviceColorMapping: any = {};
+
       if (!spanList.value?.length) return;
       spanMapping.value[spanList.value[0].span_id] = spanList.value[0];
       let colorIndex = 0;
+      let noParentSpans = [];
       for (let i = 0; i < spanList.value.length; i++) {
+        if (spanList.value[i].start_time < lowestStartTime) {
+          lowestStartTime = spanList.value[i].start_time;
+          console.log(i, lowestStartTime);
+        }
+        if (spanList.value[i].end_time > highestEndTime) {
+          console.log(i, highestEndTime);
+          highestEndTime = spanList.value[i].end_time;
+        }
+
         spanMapping.value[spanList.value[i].span_id] = cloneDeep(
           spanList.value[i]
         );
@@ -208,10 +250,15 @@ export default defineComponent({
         collapseMapping.value[span.spanId] = true;
 
         if (span.parentId && !traceTreeMock[span.parentId]) {
-          traceTreeMock[span.parentId] = [];
+          noParentSpans.push(span);
         }
 
-        if (span.parentId) traceTreeMock[span.parentId].push(span);
+        // if (span.parentId && !traceTreeMock[span.parentId]) {
+        //   traceTreeMock[span.parentId] = [];
+        // }
+
+        if (span.parentId && traceTreeMock[span.parentId])
+          traceTreeMock[span.parentId].push(span);
 
         if (!traceTreeMock[span.spanId]) traceTreeMock[span.spanId] = [];
 
@@ -221,16 +268,21 @@ export default defineComponent({
       traceTree.value = [];
       traceTree.value.push(getFormattedSpan(spanList.value[0]));
       traceTree.value[0]["index"] = 0;
+      traceTree.value[0].lowestStartTime =
+        converTimeFromNsToMs(lowestStartTime);
+      traceTree.value[0].highestEndTime = converTimeFromNsToMs(highestEndTime);
       traceTree.value[0].style.color =
         serviceColorMapping[traceTree.value[0].serviceName];
       traceTree.value[0]["spans"] = cloneDeep(
         traceTreeMock[spanList.value[0]["span_id"]] || []
       );
-
-      addSpansPositions(traceTree.value[0], 0);
-      setTimeout(() => {
-        calculateTracePosition();
-      }, 2000);
+      console.log([...noParentSpans]);
+      traceTree.value.push(...noParentSpans);
+      traceTree.value.forEach((span: any) => {
+        addSpansPositions(span, 0);
+      });
+      calculateTracePosition();
+      buildTraceChart();
     };
     let index = 0;
     const addSpansPositions = (span, depth) => {
@@ -287,7 +339,7 @@ export default defineComponent({
     };
 
     const convertTime = (time) => {
-      return Number(time / 1000000).toFixed(2);
+      return Number((time / 1000000).toFixed(2));
     };
 
     const converTimeFromNsToMs = (time: number) => {
@@ -316,7 +368,83 @@ export default defineComponent({
       collapseMapping.value[spanId] = !collapseMapping.value[spanId];
       index = 0;
       spanPositionList.value = [];
-      addSpansPositions(traceTree.value[0], 0);
+      traceTree.value.forEach((span: any) => {
+        addSpansPositions(span, 0);
+      });
+    };
+    const buildTraceChart = () => {
+      const layout = {
+        autosize: true,
+        scrollZoom: true,
+        title: {
+          text: "",
+          font: {
+            size: 12,
+          },
+        },
+        font: { size: 12 },
+        height: 200,
+        margin: {
+          l: 25,
+          r: 25,
+          t: 32,
+          b: 32,
+        },
+        xaxis: {
+          ticklen: 10,
+          nticks: 10,
+          tickvals: [],
+          type: "-",
+          ticksuffix: "ms",
+          showgrid: true,
+          zeroline: true,
+          rangeslider: {
+            visible: true,
+          },
+        },
+        yaxis: {
+          showgrid: false,
+          zeroline: false,
+          autorange: true,
+          showticklabels: false,
+        },
+        shapes: [],
+        hovermode: "closest",
+        showlegend: true,
+      };
+      const shapes: any = [];
+      let size = 0;
+      for (let i = spanPositionList.value.length - 1; i > -1; i--) {
+        const absoluteStartTime =
+          spanPositionList.value[i].startTimeMs -
+          traceTree.value[0].lowestStartTime;
+        shapes.push({
+          x0: absoluteStartTime,
+          x1: Number(
+            (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
+              2
+            )
+          ),
+          y0: size,
+          y1: size + 0.5,
+          line: {
+            width: 0,
+          },
+          type: "rect",
+          xref: "x",
+          yref: "y",
+          opacity: 1,
+          fillcolor: spanPositionList.value[i].style.color,
+        });
+        size += 0.5;
+      }
+      baseTracePosition.value.tics.forEach((tic) => {
+        layout.xaxis.tickvals.push(tic.value);
+      });
+      console.log(shapes);
+      layout.shapes = shapes;
+      traceChart.value.layout = layout;
+      if (plotChart.value) plotChart.value?.reDraw(searchObj.data.histogram);
     };
     return {
       traceTree,
@@ -332,15 +460,23 @@ export default defineComponent({
       toggleSpanCollapse,
       spanPositionList,
       spanDimensions,
+      splitterModel,
+      plotChart,
+      traceChart,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-$sidebarWidth: 350px;
+$sidebarWidth: 300px;
 $seperatorWidth: 2px;
-
+$toolbarHeight: 60px;
+$traceHeaderHeight: 30px;
+$traceChartHeight: 200px;
+.toolbar {
+  height: $toolbarHeight;
+}
 .trace-details {
   height: 100vh;
   overflow: auto;
@@ -354,14 +490,27 @@ $seperatorWidth: 2px;
 
 .histogram-sidebar {
   width: $sidebarWidth;
-  height: 100vh;
+  height: calc(100vh - $toolbarHeight - $traceChartHeight);
   overflow-y: scroll;
   overflow-x: hidden;
 }
 
 .histogram-spans-container {
-  height: calc(100vh - 73px);
+  height: calc(100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight);
   overflow-y: auto;
   position: relative;
+  overflow-x: hidden;
+}
+
+.trace-tree-container {
+  overflow: auto;
+}
+</style>
+<style lang="scss">
+.trace-details {
+  .q-splitter__before,
+  .q-splitter__after {
+    overflow: revert !important;
+  }
 }
 </style>

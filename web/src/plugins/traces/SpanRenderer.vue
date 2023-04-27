@@ -14,28 +14,30 @@
 -->
 
 <template>
-  <template v-if="spans?.length">
-    <template v-for="span in spans" :key="span.spanId">
-      <span-block
-        :span="span"
-        :depth="depth"
-        :baseTracePosition="baseTracePosition"
-        :styleObj="{
-          position: 'absolute',
-          top: span.style.top,
-          left: span.style.left,
-          height: '60px',
-        }"
-        :spanDimensions="spanDimensions"
-        :isCollapsed="collapseMapping[span.spanId]"
-        @toggle-collapse="toggleSpanCollapse"
-      />
+  <div class="relative-position q-pt-sm" :style="{ height: '100%' }">
+    <template v-if="spans?.length">
+      <template v-for="span in spans" :key="span.spanId">
+        <span-block
+          :span="span"
+          :depth="depth"
+          :baseTracePosition="baseTracePosition"
+          :styleObj="{
+            position: 'absolute',
+            top: span.style.top,
+            left: span.style.left,
+            height: '60px',
+          }"
+          :spanDimensions="spanDimensions"
+          :isCollapsed="collapseMapping[span.spanId]"
+          @toggle-collapse="toggleSpanCollapse"
+        />
+      </template>
     </template>
-  </template>
+  </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, onActivated, onBeforeMount, ref } from "vue";
 import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
@@ -70,14 +72,15 @@ export default defineComponent({
   setup(props, { emit }) {
     function formatTimeWithSuffix(ns: number) {
       if (ns < 10000) {
-        return `${ns} ms`;
+        return `${ns}ms`;
       } else {
-        return `${(ns / 1000).toFixed(2)} s`;
+        return `${(ns / 1000).toFixed(2)}s`;
       }
     }
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
+
     return {
       formatTimeWithSuffix,
       toggleSpanCollapse,
