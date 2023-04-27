@@ -512,13 +512,18 @@ impl Sql {
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
+
         match &sql_meta {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
                 for fn_name in get_all_transform_keys(&org_id).await {
-                    let count = origin_sql.matches(&fn_name).count();
-                    for _ in 0..count {
-                        used_fns.push(fn_name.clone());
+                    let str_re = format!(r"(?i){}[ ]*\(.*\)", fn_name);
+                    let re1 = Regex::new(&str_re).unwrap();
+                    let cap = re1.captures(&origin_sql);
+                    if cap.is_some() {
+                        for _ in 0..cap.unwrap().len() {
+                            used_fns.push(fn_name.clone());
+                        }
                     }
                 }
                 if sql_meta.field_alias.len() < used_fns.len() {
