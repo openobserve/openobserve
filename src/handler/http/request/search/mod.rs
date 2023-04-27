@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, QUERY_FUNCTIONS, SEARCH_LOCKER};
+use crate::infra::config::{CONFIG, SEARCH_LOCKER};
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -115,7 +115,7 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
-    for fn_name in get_all_transform_keys(&org_id).await {
+    for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
         if req.query.sql.contains(&fn_name) {
             req.query.uses_zo_fn = true;
             break;
@@ -255,7 +255,7 @@ pub async fn around(
     let around_sql = match query.get("sql") {
         Some(v) => match crate::common::base64::decode(v) {
             Ok(v) => {
-                for fn_name in get_all_transform_keys(&org_id).await {
+                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
                     if v.contains(&fn_name) {
                         uses_fn = true;
                         break;
@@ -482,7 +482,7 @@ pub async fn values(
     let query_context = match query.get("sql") {
         Some(v) => match crate::common::base64::decode(v) {
             Ok(v) => {
-                for fn_name in get_all_transform_keys(&org_id).await {
+                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
                     if v.contains(&fn_name) {
                         uses_fn = true;
                         break;
@@ -629,19 +629,4 @@ fn bad_request(error: impl ToString) -> HttpResponse {
         StatusCode::BAD_REQUEST.into(),
         error.to_string(),
     ))
-}
-
-pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
-    let mut fn_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.iter() {
-        let key = transform.key();
-        if key.contains(org_id) {
-            fn_list.push(
-                key.strip_prefix(&format!("{}/", org_id).to_owned())
-                    .unwrap()
-                    .to_string(),
-            );
-        }
-    }
-    fn_list
 }
