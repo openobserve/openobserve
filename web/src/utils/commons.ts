@@ -18,14 +18,12 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import moment from "moment";
-import { useStore } from "vuex";
 
 export const modifySQLQuery = (
   currentTimeObj: any,
   querySQL: String,
   timestampColumn: string
 ) => {
-  const store = useStore();
   const startTime = moment(String(currentTimeObj.start_time)).format(
     "YYYY-MM-DDThh:mm:ssZ"
   );
