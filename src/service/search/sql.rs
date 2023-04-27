@@ -22,7 +22,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::config::{CONFIG, QUERY_FUNCTIONS};
+use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
 use crate::meta::StreamType;
@@ -516,7 +516,7 @@ impl Sql {
         match &sql_meta {
             Ok(sql_meta) => {
                 let mut used_fns = vec![];
-                for fn_name in get_all_transform_keys(&org_id).await {
+                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
                     let str_re = format!(r"(?i){}[ ]*\(.*\)", fn_name);
                     let re1 = Regex::new(&str_re).unwrap();
                     let cap = re1.captures(&origin_sql);
@@ -802,21 +802,6 @@ fn path_matches_by_partition_key<'a>(
     })
 }
 
-pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
-    let mut fn_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.iter() {
-        let key = transform.key();
-        if key.contains(org_id) {
-            fn_list.push(
-                key.strip_prefix(&format!("{}/", org_id).to_owned())
-                    .unwrap()
-                    .to_string(),
-            );
-        }
-    }
-    fn_list
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1089,10 +1074,5 @@ mod tests {
                 ("some_other_key", "no-matter")
             ],
         ));
-    }
-    #[actix_web::test]
-    async fn test_get_all_transform_keys() {
-        let keys = get_all_transform_keys("nexus").await;
-        assert!(keys.is_empty());
     }
 }
