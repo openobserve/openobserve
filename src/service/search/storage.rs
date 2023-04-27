@@ -114,7 +114,7 @@ pub async fn search(
     let mut files_group: HashMap<usize, Vec<String>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_size = 0;
-    if !CONFIG.common.widening_schema_evoluation || schema_versions.len() == 1 {
+    if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         scan_size = match file_list::calculate_files_size(&files.to_vec()).await {
             Ok(size) => size,
             Err(err) => {
@@ -175,7 +175,7 @@ pub async fn search(
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
-        if CONFIG.common.widening_schema_evoluation && ver != schema_latest_id {
+        if CONFIG.common.widening_schema_evolution && ver != schema_latest_id {
             let group_fields = schema.fields();
             for field in group_fields {
                 if let Ok(v) = schema_latest.field_with_name(field.name()) {

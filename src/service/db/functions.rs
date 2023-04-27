@@ -46,7 +46,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     Ok(db
-        .list(&format!("/function/{org_id}"))
+        .list(&format!("/function/{org_id}/"))
         .await?
         .values()
         .map(|val| json::from_slice(val).unwrap())

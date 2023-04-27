@@ -335,7 +335,7 @@ async fn merge_files(
     let schema_versions = db::schema::get_versions(org_id, stream_name, Some(stream_type)).await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
-    if CONFIG.common.widening_schema_evoluation && schema_versions.len() > 1 {
+    if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
             let mut file_meta = file_list::get_file_meta(file).await.unwrap_or_default();

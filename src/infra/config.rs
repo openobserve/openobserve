@@ -147,7 +147,7 @@ pub struct Common {
     #[env_config(name = "ZO_TIME_STAMP_COL", default = "_timestamp")]
     pub time_stamp_col: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
-    pub widening_schema_evoluation: bool,
+    pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
