@@ -45,6 +45,12 @@
         ></syntax-guide>
       </div>
       <div class="float-right col-auto">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="searchObj.meta.toggleFunction"
+          :label="t('search.toggleFunctionLabel')"
+          class="float-left q-mr-sm"
+        />
         <q-btn
           v-if="searchObj.data.queryResults.hits"
           class="q-mr-sm float-left download-logs-btn"
@@ -140,17 +146,32 @@
         </div>
       </div>
     </div>
-    <div class="row" v-if="searchObj.meta.showQuery">
-      <div class="col">
-        <query-editor
-          ref="queryEditorRef"
-          class="monaco-editor"
-          v-model:query="searchObj.data.query"
-          v-model:fields="searchObj.data.stream.selectedStreamFields"
-          v-model:functions="searchObj.data.stream.functions"
-          @update-query="updateQueryValue"
-          @run-query="searchData"
-        ></query-editor>
+    <div class="row" v-show="searchObj.meta.showQuery">
+      <div class="col" style="border-top: 1px solid #dbdbdb">
+        <q-splitter
+          v-model="searchObj.config.fnSplitterModel"
+          :limits="searchObj.config.fnSplitterLimit"
+          style="width: 100%"
+        >
+          <template #before>
+            <b>Query Editor:</b>
+            <query-editor
+              ref="queryEditorRef"
+              class="monaco-editor"
+              v-model:query="searchObj.data.query"
+              v-model:fields="searchObj.data.stream.selectedStreamFields"
+              v-model:functions="searchObj.data.stream.functions"
+              @update-query="updateQueryValue"
+              @run-query="searchData"
+            ></query-editor>
+          </template>
+          <template #after>
+            <div v-show="searchObj.meta.toggleFunction">
+              <b>VRL Function Editor:</b>
+              <div ref="fnEditorRef" id="fnEditor"></div>
+            </div>
+          </template>
+        </q-splitter>
       </div>
     </div>
   </div>
@@ -158,19 +179,33 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
 import QueryEditor from "./QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
+import jsTransformService from "@/services/jstransform";
 
 import { Parser } from "node-sql-parser";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import search from "../../services/search";
+
+const defaultValue: any = () => {
+  return {
+    name: "",
+    function: "",
+    params: "row",
+    transType: "0",
+  };
+};
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -192,6 +227,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const store = useStore();
     const btnRefreshInterval = ref(null);
 
     const { searchObj } = useLogs();
@@ -199,6 +235,10 @@ export default defineComponent({
 
     const parser = new Parser();
     let streamName = "";
+    const formData: any = ref(defaultValue());
+
+    const fnEditorRef: any = ref(null);
+    let fnEditorobj: any = null;
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
@@ -310,9 +350,131 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
+    const initFunctionEditor = () => {
+      monaco.editor.defineTheme("myFnCustomTheme", {
+        base: "vs", // can also be vs-dark or hc-black
+        inherit: true, // can also be false to completely replace the builtin rules
+        rules: [
+          {
+            token: "comment",
+            foreground: "ffa500",
+            fontStyle: "italic underline",
+          },
+          { token: "comment.js", foreground: "008800", fontStyle: "bold" },
+          { token: "comment.css", foreground: "0000ff" }, // will inherit fontStyle from `comment` above
+        ],
+        colors: {
+          "editor.foreground": "#000000",
+        },
+      });
+      fnEditorobj = monaco.editor.create(fnEditorRef.value, {
+        value: ``,
+        language: "vrl",
+        minimap: {
+          enabled: false,
+        },
+        theme: "myFnCustomTheme",
+        showFoldingControls: "never",
+        wordWrap: "on",
+        lineNumbers: "on",
+        lineNumbersMinChars: 0,
+        overviewRulerLanes: 0,
+        fixedOverflowWidgets: false,
+        overviewRulerBorder: false,
+        lineDecorationsWidth: 15,
+        hideCursorInOverviewRuler: true,
+        renderLineHighlight: "none",
+        glyphMargin: false,
+        folding: false,
+        scrollBeyondLastColumn: 0,
+        scrollBeyondLastLine: true,
+        scrollbar: { horizontal: "auto", vertical: "visible" },
+        find: {
+          addExtraSpaceOnTop: false,
+          autoFindInSelection: "never",
+          seedSearchStringFromSelection: "never",
+        },
+      });
+
+      fnEditorobj.onDidBlurEditorText((e: any) => {
+        saveTemporaryFunction(fnEditorobj.getValue());
+      });
+
+      fnEditorobj.layout();
+    };
+
+    onMounted(async () => {
+      initFunctionEditor();
+
+      window.addEventListener("click", () => {
+        fnEditorobj.layout();
+      });
+    });
+
+    const saveTemporaryFunction = (content: string) => {
+      let callTransform: Promise<{ data: any }>;
+
+      if (content.trim() == "") {
+        searchObj.data.tempFunctionName = "";
+        $q.notify({
+          type: "positive",
+          message: "Function no more applicable to the query.",
+        });
+        return;
+      }
+
+      formData.value.params = "row";
+      formData.value.function = content;
+      formData.value.transType = 0;
+      if (searchObj.data.tempFunctionName == "") {
+        formData.value.name =
+          store.state.selectedOrganization.identifier +
+          "_" +
+          store.state.userInfo.email.slice(
+            0,
+            store.state.userInfo.email.indexOf("@")
+          ) +
+          "_" +
+          Math.floor(Date.now() / 1000);
+
+        callTransform = jsTransformService.create(
+          store.state.selectedOrganization.identifier,
+          formData.value
+        );
+      } else {
+        formData.value.name = searchObj.data.tempFunctionName;
+
+        callTransform = jsTransformService.update(
+          store.state.selectedOrganization.identifier,
+          formData.value
+        );
+      }
+
+      callTransform
+        .then((res: { data: any }) => {
+          searchObj.data.tempFunctionName = formData.value.name;
+          $q.notify({
+            type: "positive",
+            message: res.data.message,
+          });
+        })
+        .catch((err) => {
+          $q.notify({
+            type: "negative",
+            message:
+              JSON.stringify(err.response.data["message"]) ||
+              "Function creation failed",
+            timeout: 5000,
+          });
+        });
+    };
+
     return {
       t,
+      store,
       router,
+      fnEditorRef,
+      fnEditorobj,
       searchObj,
       queryEditorRef,
       btnRefreshInterval,
@@ -322,11 +484,15 @@ export default defineComponent({
       updateDateTime,
       udpateQuery,
       downloadLogs,
+      initFunctionEditor,
     };
   },
   computed: {
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
+    },
+    toggleFunction() {
+      return this.searchObj.meta.toggleFunction;
     },
   },
   watch: {
@@ -365,11 +531,24 @@ export default defineComponent({
           this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
+    toggleFunction(newVal) {
+      if (newVal == false) {
+        this.searchObj.config.fnSplitterModel = 100;
+      } else {
+        this.searchObj.config.fnSplitterModel = 60;
+      }
+    },
   },
 });
 </script>
 
 <style lang="scss">
+#fnEditor {
+  width: 100%;
+  min-height: 4rem;
+  border-radius: 5px;
+  border: 0px solid #dbdbdb;
+}
 .search-bar-component {
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;

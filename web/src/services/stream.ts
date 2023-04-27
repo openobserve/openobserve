@@ -61,10 +61,14 @@ const stream = {
     size,
     start_time,
     end_time,
-    query_context
+    query_context,
+    query_fn
   }: any) => {
     const fieldsString = fields.join(",");
-    const url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}&sql=${query_context}`;
+    let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}&sql=${query_context}`;
+    if (query_fn.trim() != "") {
+      url = url + `&query_fn=${query_fn}`;
+    }
     return http().get(url);
   },
 

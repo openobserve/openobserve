@@ -296,6 +296,10 @@ export default defineComponent({
         "ctrlenter"
       );
 
+      window.addEventListener("click", () => {
+        editorObj.layout();
+      });
+
       // editorObj.onDidBlurEditorWidget(() => {
       //   // onBlur();
       // });
@@ -318,6 +322,7 @@ export default defineComponent({
 
 <style>
 #editor {
+  width: 100%;
   min-height: 4rem;
   border-radius: 5px;
   border: 0px solid #dbdbdb;

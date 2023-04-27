@@ -17,10 +17,11 @@
     "sourceName": "Name",
     "sourceValue": "Value",
     "searchStream": "Search Stream",
-    "showQueryLabel": "Query",
+    "showQueryLabel": "Editors",
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
-    "sqlModeLabel": "SQL Mode"
+    "sqlModeLabel": "SQL Mode",
+    "toggleFunctionLabel": "Function"
   },
   "menu": {
     "home": "Home",

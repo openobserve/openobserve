@@ -272,6 +272,13 @@ export default defineComponent({
           query_context = b64EncodeUnicode(query_context) || "";
         }
 
+        let query_fn = "";
+        if (
+          searchObj.data.tempFunctionName != "" &&
+          searchObj.meta.toggleFunction
+        ) {
+          query_fn = searchObj.data.tempFunctionName;
+        }
         streamService
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -280,7 +287,8 @@ export default defineComponent({
             end_time: endISOTimestamp,
             fields: [name],
             size: 10,
-            query_context: query_context
+            query_context: query_context,
+            query_fn: query_fn
           })
           .then((res: any) => {
             if (res.data.hits.length) {

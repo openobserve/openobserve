@@ -14,7 +14,7 @@
 
 import http from "./http";
 
-var jstransform = {
+const jstransform = {
   list: (
     page_num: number,
     page_size: number,
@@ -28,16 +28,10 @@ var jstransform = {
     );
   },
   create: (org_identifier: string, data: any) => {
-    return http().post(
-      `/api/${org_identifier}/functions`,
-      data
-    );
+    return http().post(`/api/${org_identifier}/functions`, data);
   },
   update: (org_identifier: string, data: any) => {
-    return http().put(
-      `/api/${org_identifier}/functions/${data.name}`,
-      data
-    );
+    return http().put(`/api/${org_identifier}/functions/${data.name}`, data);
   },
   create_with_index: (
     org_identifier: string,
@@ -61,15 +55,10 @@ var jstransform = {
       `/api/${org_identifier}/${stream_name}/functions/${transform_name}`
     );
   },
-  stream_function:(
-    org_identifier: string,
-    stream_name: string
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/${stream_name}/functions`
-    );
+  stream_function: (org_identifier: string, stream_name: string) => {
+    return http().get(`/api/${org_identifier}/${stream_name}/functions`);
   },
-  apply_stream_function:(
+  apply_stream_function: (
     org_identifier: string,
     stream_name: string,
     function_name: string,
@@ -80,15 +69,15 @@ var jstransform = {
       data
     );
   },
-  remove_stream_function:(
+  remove_stream_function: (
     org_identifier: string,
     stream_name: string,
-    function_name: string,
-  )=>{
+    function_name: string
+  ) => {
     return http().delete(
       `/api/${org_identifier}/${stream_name}/functions/${function_name}`
     );
-  }
+  },
 };
 
 export default jstransform;
