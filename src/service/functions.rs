@@ -166,10 +166,10 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
                 .iter()
                 .map(|stream| stream.stream.to_string())
                 .collect::<Vec<_>>()
-                .join(",");
+                .join(" ,");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
-                format!("{} {}", FN_IN_USE.to_string(), names),
+                format!("{} {}", FN_IN_USE, names),
             )));
         }
     }
