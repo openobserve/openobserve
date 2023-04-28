@@ -369,7 +369,7 @@ export default defineComponent({
       });
       fnEditorobj = monaco.editor.create(fnEditorRef.value, {
         value: ``,
-        language: "vrl",
+        language: "ruby",
         minimap: {
           enabled: false,
         },
@@ -397,7 +397,9 @@ export default defineComponent({
       });
 
       fnEditorobj.onDidBlurEditorText((e: any) => {
-        saveTemporaryFunction(fnEditorobj.getValue());
+        searchObj.data.tempFunctionLoading = true;
+        searchObj.data.tempFunctionContent = fnEditorobj.getValue();
+        // saveTemporaryFunction(fnEditorobj.getValue());
       });
 
       fnEditorobj.layout();
@@ -415,6 +417,7 @@ export default defineComponent({
       let callTransform: Promise<{ data: any }>;
 
       if (content == formData.value.function) {
+        searchObj.data.tempFunctionLoading = false;
         return;
       }
 
@@ -425,6 +428,8 @@ export default defineComponent({
           message:
             "Function has been removed and no more applicable to the query.",
         });
+        searchObj.data.tempFunctionLoading = false;
+        formData.value.function = "";
         return;
       }
 
@@ -457,6 +462,7 @@ export default defineComponent({
 
       callTransform
         .then((res: { data: any }) => {
+          searchObj.data.tempFunctionLoading = false;
           searchObj.data.tempFunctionName = formData.value.name;
           $q.notify({
             type: "positive",
@@ -466,6 +472,7 @@ export default defineComponent({
           });
         })
         .catch((err) => {
+          searchObj.data.tempFunctionLoading = false;
           $q.notify({
             type: "negative",
             message:
@@ -474,6 +481,14 @@ export default defineComponent({
             timeout: 5000,
           });
         });
+    };
+
+    const resetFunctionContent = () => {
+      formData.value.function = "";
+      fnEditorobj.setValue("");
+      formData.value.name = "";
+      searchObj.data.tempFunctionLoading = false;
+      searchObj.data.tempFunctionName = "";
     };
 
     return {
@@ -492,6 +507,7 @@ export default defineComponent({
       udpateQuery,
       downloadLogs,
       initFunctionEditor,
+      resetFunctionContent,
     };
   },
   computed: {
@@ -501,6 +517,9 @@ export default defineComponent({
     toggleFunction() {
       return this.searchObj.meta.toggleFunction;
     },
+    // executeRunQuery() {
+    //   return this.searchObj.data.tempFunctionLoading;
+    // },
   },
   watch: {
     addSearchTerm() {
@@ -545,6 +564,11 @@ export default defineComponent({
         this.searchObj.config.fnSplitterModel = 60;
       }
     },
+    // executeRunQuery(newVal) {
+    //   if (newVal == false) {
+    //     this.$emit("run-query");
+    //   }
+    // },
   },
 });
 </script>
