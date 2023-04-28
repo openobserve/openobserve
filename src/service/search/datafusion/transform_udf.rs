@@ -121,8 +121,7 @@ fn get_udf_vrl(
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut is_multi_value = false;
         let mut res_data_vec = vec![];
-        let state = vrl::state::Runtime::default();
-        let mut runtime = vrl::Runtime::new(state);
+        let mut runtime = crate::common::functions::init_vrl_runtime();
         let mut col_val_map: AHashMap<String, Vec<String>> = AHashMap::new();
 
         for i in 0..len {
@@ -208,7 +207,7 @@ pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
             let state = program.final_type_state();
             if let Some(ext) = state.external.target_kind().as_object() {
                 for k in ext.known().keys() {
-                    fields.push(k.name.to_owned())
+                    fields.push(k.to_string());
                 }
             }
             Some((program, fields))
