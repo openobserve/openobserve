@@ -334,7 +334,7 @@ export default defineComponent({
         return trace;
       });
 
-      // console.log("Query: populating traces: ", traces);
+      console.log("Query: populating traces: ", traces);
 
       //generate the layout value of chart
       const layout: any = {
@@ -492,6 +492,7 @@ export default defineComponent({
         case "bar":
           return {
             barmode: "group",
+            // grid: {rows: 1, columns: 2, pattern: 'independent'},
             xaxis: {
               tickmode: "array",
               tickvals: xAxisDataWithTicks,

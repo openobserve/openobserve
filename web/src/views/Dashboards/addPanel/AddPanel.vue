@@ -141,6 +141,7 @@ import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
+import ChartRenderNew from "../../../components/dashboards/addPanel/ChartRenderNew.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -151,6 +152,7 @@ export default defineComponent({
     SearchBar,
     DateTimePicker,
     ChartRender,
+    ChartRenderNew
 },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
