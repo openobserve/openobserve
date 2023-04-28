@@ -1314,6 +1314,7 @@ export default defineComponent({
     },
     changeOrganization() {
       if (this.router.currentRoute.value.name == "logs") {
+        this.searchObj.data.tempFunctionContent = "";
         this.searchBarRef.resetFunctionContent();
         this.searchObj.data.query = "";
         this.setQuery("");
@@ -1323,6 +1324,7 @@ export default defineComponent({
     },
     changeStream() {
       if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
+        this.searchObj.data.tempFunctionContent = "";
         this.searchBarRef.resetFunctionContent();
         setTimeout(() => {
           this.runQueryFn();
