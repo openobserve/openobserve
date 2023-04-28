@@ -29,6 +29,7 @@
     "user": "Users",
     "index": "Streams",
     "search": "Logs",
+    "traces": "Traces",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
