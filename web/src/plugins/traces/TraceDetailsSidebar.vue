@@ -40,26 +40,24 @@
       {{ span.service_name }}
     </div>
   </div>
-  <div>
-    <q-tabs v-model="activeTab" dense inline-label class="text-bold q-mx-sm">
-      <q-tab name="tags" label="Tags" />
-      <q-tab name="details" label="Details" />
-    </q-tabs>
-    <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="tab-panels">
-      <q-tab-panel name="tags">
-        <div v-for="key in Object.keys(span)" :key="key">
-          <div class="row q-py-sm q-px-sm border-bottom">
-            <div class="col-12 text-subtitle2 text-grey-8">{{ key }}</div>
-            <div class="col-12 text-subtitle2">{{ span[key] }}</div>
-          </div>
+  <q-tabs v-model="activeTab" dense inline-label class="text-bold q-mx-sm">
+    <q-tab name="tags" label="Tags" />
+    <q-tab name="details" label="Details" />
+  </q-tabs>
+  <q-separator style="width: 100%" />
+  <q-tab-panels v-model="activeTab" class="tab-panels">
+    <q-tab-panel name="tags">
+      <div v-for="key in Object.keys(span)" :key="key">
+        <div class="row q-py-sm q-px-sm border-bottom">
+          <div class="col-12 text-subtitle2 text-grey-8">{{ key }}</div>
+          <div class="col-12 text-subtitle2">{{ span[key] }}</div>
         </div>
-      </q-tab-panel>
-      <q-tab-panel name="details">
-        <div>Details</div>
-      </q-tab-panel>
-    </q-tab-panels>
-  </div>
+      </div>
+    </q-tab-panel>
+    <q-tab-panel name="details">
+      <div>Details</div>
+    </q-tab-panel>
+  </q-tab-panels>
 </template>
 
 <script lang="ts">
@@ -89,7 +87,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .tab-panels {
-  height: calc(100vh - 130px);
+  height: calc(100% - 130px);
   overflow-y: scroll;
   overflow-x: hidden;
 }

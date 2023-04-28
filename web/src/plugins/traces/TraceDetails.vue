@@ -224,10 +224,8 @@ export default defineComponent({
       for (let i = 0; i < spanList.value.length; i++) {
         if (spanList.value[i].start_time < lowestStartTime) {
           lowestStartTime = spanList.value[i].start_time;
-          console.log(i, lowestStartTime);
         }
         if (spanList.value[i].end_time > highestEndTime) {
-          console.log(i, highestEndTime);
           highestEndTime = spanList.value[i].end_time;
         }
 
@@ -276,7 +274,6 @@ export default defineComponent({
       traceTree.value[0]["spans"] = cloneDeep(
         traceTreeMock[spanList.value[0]["span_id"]] || []
       );
-      console.log([...noParentSpans]);
       traceTree.value.push(...noParentSpans);
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -385,13 +382,13 @@ export default defineComponent({
         font: { size: 12 },
         height: 200,
         margin: {
-          l: 25,
-          r: 25,
-          t: 32,
-          b: 32,
+          l: 16,
+          r: 16,
+          t: 16,
+          b: 16,
         },
         xaxis: {
-          ticklen: 10,
+          ticklen: 5,
           nticks: 10,
           tickvals: [],
           type: "-",
@@ -441,7 +438,6 @@ export default defineComponent({
       baseTracePosition.value.tics.forEach((tic) => {
         layout.xaxis.tickvals.push(tic.value);
       });
-      console.log(shapes);
       layout.shapes = shapes;
       traceChart.value.layout = layout;
       if (plotChart.value) plotChart.value?.reDraw(searchObj.data.histogram);

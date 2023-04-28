@@ -141,7 +141,7 @@
         full-height
         full-width
         maximized
-        @hide="searchObj.meta.showTraceDetails = false"
+        @hide="closeTraceDetails"
       >
         <trace-details />
       </q-dialog>
@@ -295,6 +295,11 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
+    const closeTraceDetails = () => {
+      searchObj.meta.showTraceDetails = false;
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = null;
+    };
     return {
       t,
       store,
@@ -312,6 +317,7 @@ export default defineComponent({
       reDrawChart,
       getImageURL,
       showTraceDetails,
+      closeTraceDetails,
     };
   },
 });
