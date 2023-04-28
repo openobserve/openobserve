@@ -108,6 +108,7 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import TraceChart from "./TraceChart.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -132,10 +133,10 @@ export default defineComponent({
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
-    const spanPositionList: Ref<any[]> = ref([]);
+    const spanPositionList: any = ref([]);
     const splitterModel = ref(25);
-    const traceTimeline: any = ref({});
     const timeRange: any = ref({ start: 0, end: 0 });
+    const store = useStore();
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -155,9 +156,9 @@ export default defineComponent({
       data: [{}],
       layout: {},
     });
-    const plotChart = ref(null);
+    const plotChart: any = ref(null);
 
-    const spanList = computed(() => {
+    const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
     });
 
@@ -289,7 +290,7 @@ export default defineComponent({
       buildTraceChart();
     };
     let index = 0;
-    const addSpansPositions = (span, depth) => {
+    const addSpansPositions = (span: any, depth: number) => {
       if (!span.index) index = 0;
       span.depth = depth;
       spanPositionList.value.push(
@@ -310,7 +311,7 @@ export default defineComponent({
             childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
           });
           span.totalSpans = span.spans.reduce(
-            (acc, span) =>
+            (acc: number, span: any) =>
               acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
             0
           );
@@ -325,7 +326,8 @@ export default defineComponent({
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
       return {
-        _timestamp: span._timestamp,
+        [store.state.zoConfig.timestamp_column]:
+          span[store.state.zoConfig.timestamp_column],
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
         durationMs: convertTime(span.duration),
@@ -338,11 +340,13 @@ export default defineComponent({
         parentId: span.reference_parent_span_id,
         spans: null,
         index: 0,
-        style: {},
+        style: {
+          color: "",
+        },
       };
     };
 
-    const convertTime = (time) => {
+    const convertTime = (time: number) => {
       return Number((time / 1000000).toFixed(2));
     };
 
@@ -377,7 +381,7 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
-      const layout = {
+      const layout: any = {
         autosize: true,
         scrollZoom: true,
         title: {
@@ -442,7 +446,7 @@ export default defineComponent({
         });
         size += 0.5;
       }
-      baseTracePosition.value.tics.forEach((tic) => {
+      baseTracePosition.value.tics.forEach((tic: any) => {
         layout.xaxis.tickvals.push(tic.value);
       });
       layout.shapes = shapes;

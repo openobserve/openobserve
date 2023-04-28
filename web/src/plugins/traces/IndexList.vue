@@ -29,7 +29,7 @@
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
         class="field-table"
-        id="fieldList"
+        id="tracesFieldList"
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
@@ -44,7 +44,7 @@
             >
               <!-- TODO OK : Repeated code make seperate component to display field  -->
               <div
-                v-if="props.row.ftsKey"
+                v-if="props.row.ftsKey || !props.row.showValues"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >

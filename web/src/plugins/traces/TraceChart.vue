@@ -133,9 +133,9 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      layout = props.chart.layout;
-      traces = props.chart.data;
-      await Plotly.newPlot(plotref.value, traces, layout, {
+      layout = props.chart.layout || {};
+      traces = props.chart.data || [{}];
+      await Plotly.newPlot(props.id, traces, layout, {
         responsive: true,
         displayModeBar: false,
       });

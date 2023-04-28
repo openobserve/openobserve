@@ -16,7 +16,7 @@
 <template>
   <div class="relative-position q-pt-sm" :style="{ height: '100%' }">
     <template v-if="spans?.length">
-      <template v-for="span in spans" :key="span.spanId">
+      <template v-for="span in spans as any[]" :key="span.spanId">
         <span-block
           :span="span"
           :depth="depth"

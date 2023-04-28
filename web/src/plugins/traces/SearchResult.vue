@@ -28,7 +28,7 @@
 
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
-        id="searchGridComponent"
+        id="tracesSearchGridComponent"
         type="table"
         ref="searchTableRef"
         :virtual-scroll-item-size="25"
@@ -72,12 +72,15 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
-            :data-test="`logs-search-result-detail-${row._timestamp}`"
+            :data-test="`logs-search-result-detail-${
+              row[store.state.zoConfig.timestamp_column]
+            }`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
             :style="
-              row._timestamp == searchObj.data.searchAround.indexTimestamp
+              row[store.state.zoConfig.timestamp_column] ==
+              searchObj.data.searchAround.indexTimestamp
                 ? 'background-color:lightgray'
                 : ''
             "
@@ -249,7 +252,6 @@ export default defineComponent({
     const plotChart: any = ref(null);
 
     const reDrawChart = () => {
-      console.log("redraw chart", cloneDeep(searchObj.data.histogram));
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.data &&
@@ -257,7 +259,6 @@ export default defineComponent({
       ) {
         nextTick(() => {
           plotChart.value.reDraw();
-          console.log("redraw chart", cloneDeep(searchObj.data.histogram));
           plotChart.value.forceReLayout();
         });
       }

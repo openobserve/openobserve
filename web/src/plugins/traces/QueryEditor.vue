@@ -20,6 +20,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { useStore } from "vuex";
 
 export default defineComponent({
   props: {
@@ -40,6 +41,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const editorRef: any = ref();
     let editorObj: any = null;
+    const store = useStore();
 
     const createDependencyProposals = (range: any) => {
       const keywords = [
@@ -158,7 +160,7 @@ export default defineComponent({
       ];
 
       props.fields.forEach((field: any) => {
-        if (field.name == "_timestamp") {
+        if (field.name == store.state.zoConfig.timestamp_column) {
           return;
         }
         let itemObj = {

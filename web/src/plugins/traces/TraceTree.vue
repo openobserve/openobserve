@@ -15,7 +15,7 @@
 
 <template>
   <div class="q-pl-xs q-pt-sm">
-    <template v-for="span in spans" :key="span.spanId">
+    <template v-for="span in spans as any[]" :key="span.spanId">
       <div :style="{ position: 'relative', width: '100%', overflow: 'hidden' }">
         <div
           :style="{

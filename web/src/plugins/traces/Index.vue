@@ -16,8 +16,8 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
-    <div id="secondLevel">
+  <q-page class="tracePage" id="tracePage">
+    <div id="tracesSecondLevel">
       <search-bar
         data-test="logs-search-bar"
         ref="searchBarRef"
@@ -26,7 +26,7 @@
         @searchdata="searchData"
       />
       <div
-        id="thirdLevel"
+        id="tracesThirdLevel"
         class="row scroll"
         style="width: 100%"
         v-if="searchObj.data.stream.streamLists.length > 0"
@@ -484,7 +484,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: 'select min(_timestamp) as _timestamp, min(start_time) as start_time, max(service_name) as service_name, max(operation_name) as operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id',
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, max(service_name) as service_name, max(operation_name) as operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -777,7 +777,7 @@ export default defineComponent({
         if (searchObj.data.streamResults.list.length > 0) {
           const queryResult = [];
           const tempFieldsName = [];
-          const ignoreFields = ["_timestamp"];
+          const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
           searchObj.data.streamResults.list.forEach((stream: any) => {
@@ -803,27 +803,49 @@ export default defineComponent({
               }
             });
           }
+          const idFields = {
+            trace_id: 1,
+            span_id: 1,
+            reference_parent_span_id: 1,
+            reference_parent_trace_id: 1,
+            start_time: 1,
+          };
+          const importantFields = {
+            trace_id: 1,
+            span_id: 1,
+            reference_parent_span_id: 1,
+            reference_parent_trace_id: 1,
+            service_name: 1,
+            operation_name: 1,
+            start_time: 1,
+          };
 
+          // Ignoring timestamp as start time is present
           let fields: any = {};
-          const importantFields = ["service_name", "operation_name"];
-          importantFields.forEach((rowName) => {
+          Object.keys(importantFields).forEach((rowName) => {
             if (fields[rowName] == undefined) {
               fields[rowName] = {};
               searchObj.data.stream.selectedStreamFields.push({
                 name: rowName,
                 ftsKey: ftsKeys.has(rowName),
+                showValues: !idFields[rowName],
               });
             }
           });
+
           queryResult.forEach((row: any) => {
             // let keys = deepKeys(row);
             // for (let i in row) {
-            if (!importantFields.includes(row.name)) {
+            if (
+              !importantFields[row.name] &&
+              !ignoreFields.includes(row.name)
+            ) {
               if (fields[row.name] == undefined) {
                 fields[row.name] = {};
                 searchObj.data.stream.selectedStreamFields.push({
                   name: row.name,
                   ftsKey: ftsKeys.has(row.name),
+                  showValues: !idFields[row.name],
                 });
               }
             }
@@ -841,6 +863,24 @@ export default defineComponent({
         searchObj.data.stream.selectedFields = [];
 
         searchObj.meta.resultGrid.manualRemoveFields = false;
+
+        searchObj.data.resultGrid.columns.push({
+          name: "@timestamp",
+          field: (row: any) =>
+            date.formatDate(
+              Math.floor(row["start_time"] / 1000000),
+              "MMM DD, YYYY HH:mm:ss.SSS Z"
+            ),
+          prop: (row: any) =>
+            date.formatDate(
+              Math.floor(row["start_time"] / 1000000),
+              "MMM DD, YYYY HH:mm:ss.SSS Z"
+            ),
+          label: "Start Time",
+          align: "left",
+          sortable: true,
+        });
+
         searchObj.data.resultGrid.columns.push({
           name: "operation_name",
           field: (row: any) => row.operation_name,
@@ -860,23 +900,6 @@ export default defineComponent({
         });
 
         searchObj.data.resultGrid.columns.push({
-          name: "@timestamp",
-          field: (row: any) =>
-            date.formatDate(
-              Math.floor(row["start_time"] / 1000000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
-            ),
-          prop: (row: any) =>
-            date.formatDate(
-              Math.floor(row["start_time"] / 1000000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
-            ),
-          label: t("search.timestamp"),
-          align: "left",
-          sortable: true,
-        });
-
-        searchObj.data.resultGrid.columns.push({
           name: "duration",
           field: (row: any) => row.duration,
           prop: (row: any) => row.duration,
@@ -887,7 +910,7 @@ export default defineComponent({
         });
 
         searchObj.loading = false;
-        if (searchObj.data.queryResults.aggs) reDrawGrid();
+        reDrawGrid();
       } catch (e) {
         throw new ErrorException(e.message);
       }
@@ -942,11 +965,13 @@ export default defineComponent({
       if (searchObj.data.queryResults.hits) {
         searchObj.data.queryResults.hits.forEach(
           (bucket: {
-            _timestamp: string | number | Date;
+            [store.state.zoConfig.timestamp_column]: string | number | Date;
             duration: number | Date;
           }) => {
-            unparsed_x_data.push(bucket._timestamp);
-            let histDate = new Date(Math.floor(bucket._timestamp / 1000));
+            unparsed_x_data.push(bucket[store.state.zoConfig.timestamp_column]);
+            let histDate = new Date(
+              Math.floor(bucket[store.state.zoConfig.timestamp_column] / 1000)
+            );
             xData.push(Math.floor(histDate.getTime()));
             yData.push(Number((bucket.duration / 1000000).toFixed(2)));
           }
@@ -1039,8 +1064,7 @@ export default defineComponent({
       reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
-        router.currentRoute.value.path.indexOf("/logs") > -1
+        router.currentRoute.value.path.indexOf("/traces") > -1
       ) {
         setTimeout(() => {
           if (searchResultRef.value) searchResultRef.value.reDrawChart();
@@ -1052,7 +1076,7 @@ export default defineComponent({
       setTimeout(() => {
         let rect = {};
         const secondWrapperElement: any =
-          document.getElementById("secondLevel");
+          document.getElementById("tracesSecondLevel");
         if (secondWrapperElement != null) {
           rect = secondWrapperElement.getBoundingClientRect();
           secondWrapperElement.style.height = `calc(100vh - ${Math.round(
@@ -1060,7 +1084,8 @@ export default defineComponent({
           )}px)`;
         }
 
-        const thirdWrapperElement: any = document.getElementById("thirdLevel");
+        const thirdWrapperElement: any =
+          document.getElementById("tracesThirdLevel");
         if (thirdWrapperElement != null) {
           rect = thirdWrapperElement.getBoundingClientRect();
           thirdWrapperElement.style.height = `calc(100vh - ${Math.round(
@@ -1068,26 +1093,28 @@ export default defineComponent({
           )}px)`;
         }
 
-        const GridElement: any = document.getElementById("searchGridComponent");
+        const GridElement: any = document.getElementById(
+          "tracesSearchGridComponent"
+        );
         if (GridElement != null) {
           rect = GridElement.getBoundingClientRect();
           GridElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
         }
 
-        const FLElement = document.getElementById("fieldList");
+        const FLElement = document.getElementById("tracesFieldList");
         if (FLElement != null) {
           rect = FLElement.getBoundingClientRect();
           FLElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
         }
 
-        const logPagesecondWrapperElement: any =
-          document.getElementById("logPage");
-        if (logPagesecondWrapperElement != null) {
-          rect = logPagesecondWrapperElement.getBoundingClientRect();
-          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
+        const tracePagesecondWrapperElement: any =
+          document.getElementById("tracePage");
+        if (tracePagesecondWrapperElement != null) {
+          rect = tracePagesecondWrapperElement.getBoundingClientRect();
+          tracePagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
             rect.top
           )}px)`;
-          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
+          tracePagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
             rect.top + 20
           )}px)`;
         }
@@ -1384,7 +1411,7 @@ export default defineComponent({
 div.plotly-notifier {
   visibility: hidden;
 }
-.logPage {
+.tracePage {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
@@ -1401,19 +1428,19 @@ div.plotly-notifier {
   }
 
   .index-table :hover::-webkit-scrollbar,
-  #searchGridComponent:hover::-webkit-scrollbar {
+  #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 13px;
     width: 13px;
   }
 
   .index-table ::-webkit-scrollbar-track,
-  #searchGridComponent::-webkit-scrollbar-track {
+  #tracesSearchGridComponent::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
     border-radius: 10px;
   }
 
   .index-table ::-webkit-scrollbar-thumb,
-  #searchGridComponent::-webkit-scrollbar-thumb {
+  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
     border-radius: 10px;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }
