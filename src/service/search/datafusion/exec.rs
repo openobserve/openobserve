@@ -935,16 +935,15 @@ fn handle_query_fn(
     org_id: &str,
     batches: Vec<RecordBatch>,
 ) -> Option<Vec<RecordBatch>> {
-    match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
-        Some(query_fn_src) => {
-            match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
-                Ok(json_rows) => {
-                    apply_query_fn(query_fn_src.function.to_owned(), json_rows).unwrap_or(None)
-                }
-                Err(_) => None,
-            }
+    /* match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
+       Some(query_fn_src) => {
+    */
+    match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows).unwrap_or(None),
+        Err(_) => None,
+        /*  }
         }
-        None => None,
+        None => None, */
     }
 }
 

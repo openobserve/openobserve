@@ -277,7 +277,7 @@ export default defineComponent({
           searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
         streamService
           .fieldValues({
