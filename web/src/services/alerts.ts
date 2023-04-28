@@ -47,10 +47,12 @@ const alerts = {
       `/api/${org_identifier}/${stream_name}/alerts/${alert_name}`
     );
   },
-  delete: (org_identifier: string, stream_name: string, alert_name: string) => {
-    return http().delete(
-      `/api/${org_identifier}/${stream_name}/alerts/${alert_name}`
-    );
+  delete: (org_identifier: string, stream_name: string, alert_name: string, type: string,) => {
+    let url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}`;
+    if (type != "") {
+      url += "?type=" + type;
+    }
+    return http().delete(url);
   },
 };
 

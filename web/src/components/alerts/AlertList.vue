@@ -13,52 +13,21 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    data-test="alert-list-page"
-    class="q-pa-none"
-    style="min-height: inherit"
-  >
+  <q-page data-test="alert-list-page" class="q-pa-none" style="min-height: inherit">
     <div v-if="!showAddAlertDialog">
-      <q-table
-        data-test="alert-list-table"
-        ref="qTable"
-        :rows="alerts"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
-      >
+      <q-table data-test="alert-list-table" ref="qTable" :rows="alerts" :columns="columns" row-key="id"
+        :pagination="pagination" :filter="filterQuery" :filter-method="filterData" style="width: 100%">
         <template #no-data>
           <NoData />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-udpate-alert`"
-              icon="edit"
-              class="q-ml-xs iconHoverBtn"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
+            <q-btn :data-test="`alert-list-${props.row.name}-udpate-alert`" icon="edit" class="q-ml-xs iconHoverBtn"
+              padding="sm" unelevated size="sm" round flat :title="t('alerts.edit')"
+              @click="showAddUpdateFn(props)"></q-btn>
+            <q-btn :data-test="`alert-list-${props.row.name}-delete-alert`"
+              :icon="'img:' + getImageURL('images/common/delete_icon.svg')" class="q-ml-xs iconHoverBtn" padding="sm"
+              unelevated size="sm" round flat :title="t('alerts.delete')" @click="showDeleteDialogFn(props)"></q-btn>
           </q-td>
         </template>
 
@@ -74,65 +43,31 @@
           <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
-          <q-input
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')"
-          >
+          <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alerts.search')">
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
             </template>
           </q-input>
-          <q-btn
-            data-test="alert-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`alerts.add`)"
-            @click="showAddUpdateFn({})"
-          />
+          <q-btn data-test="alert-list-add-alert-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
+            color="secondary" no-caps :label="t(`alerts.add`)" @click="showAddUpdateFn({})" />
 
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('alerts.header')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <QTablePagination :scope="scope" :pageTitle="t('alerts.header')" :position="'top'" :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
         </template>
 
         <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <QTablePagination :scope="scope" :position="'bottom'" :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
         </template>
       </q-table>
     </div>
     <div v-else>
-      <AddAlert
-        v-model="formData"
-        :isUpdated="isUpdated"
-        :destinations="destinations"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-      />
+      <AddAlert v-model="formData" :isUpdated="isUpdated" :destinations="destinations" @update:list="refreshList"
+        @cancel:hideform="hideForm" />
     </div>
-    <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete alert?"
-      @update:ok="deleteAlert"
-      @update:cancel="confirmDelete = false"
-      v-model="confirmDelete"
-    />
+    <ConfirmDialog title="Delete Alert" message="Are you sure you want to delete alert?" @update:ok="deleteAlert"
+      @update:cancel="confirmDelete = false" v-model="confirmDelete" />
   </q-page>
 </template>
 
@@ -407,7 +342,8 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           selectedDelete.value.stream_name,
-          selectedDelete.value.name
+          selectedDelete.value.name,
+          selectedDelete.value.stream_type
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -515,24 +451,28 @@ export default defineComponent({
     justify-content: flex-end;
   }
 }
+
 .alerts-tabs {
   .q-tabs {
     &--vertical {
       margin: 1.5rem 1rem 0 0;
+
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
         color: $dark;
+
         &__content.tab_content {
           .q-tab {
-            &__icon + &__label {
+            &__icon+&__label {
               padding-left: 0.875rem;
               font-weight: 600;
             }
           }
         }
+
         &--active {
           background-color: $accent;
         }
