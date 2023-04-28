@@ -18,110 +18,52 @@
     <!-- {{ searchObj.data }} -->
     <div class="row q-my-xs">
       <div class="float-right col">
-        <q-toggle
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="searchObj.meta.showQuery"
-          :label="t('search.showQueryLabel')"
-        />
-        <q-toggle
-          data-test="logs-search-bar-show-fields-toggle-btn"
-          v-model="searchObj.meta.showFields"
-          :label="t('search.showFieldLabel')"
-        />
-        <q-toggle
-          data-test="logs-search-bar-show-histogram-toggle-btn"
-          v-bind:disable="searchObj.meta.sqlMode"
-          v-model="searchObj.meta.showHistogram"
-          :label="t('search.showHistogramLabel')"
-        />
-        <q-toggle
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
-        <syntax-guide
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          :sqlmode="searchObj.meta.sqlMode"
-        ></syntax-guide>
+        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.showQuery"
+          :label="t('search.showQueryLabel')" />
+        <q-toggle data-test="logs-search-bar-show-fields-toggle-btn" v-model="searchObj.meta.showFields"
+          :label="t('search.showFieldLabel')" />
+        <q-toggle data-test="logs-search-bar-show-histogram-toggle-btn" v-bind:disable="searchObj.meta.sqlMode"
+          v-model="searchObj.meta.showHistogram" :label="t('search.showHistogramLabel')" />
+        <q-toggle data-test="logs-search-bar-sql-mode-toggle-btn" v-model="searchObj.meta.sqlMode"
+          :label="t('search.sqlModeLabel')" />
+        <syntax-guide data-test="logs-search-bar-sql-mode-toggle-btn" :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
       </div>
       <div class="float-right col-auto">
-        <q-toggle
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="searchObj.meta.toggleFunction"
-          :label="t('search.toggleFunctionLabel')"
-          class="float-left q-mr-sm"
-        />
-        <q-btn
-          v-if="searchObj.data.queryResults.hits"
-          class="q-mr-sm float-left download-logs-btn"
-          size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
-          icon="download"
-          title="Export logs"
-          @click="downloadLogs"
-        ></q-btn>
+        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.toggleFunction"
+          :label="t('search.toggleFunctionLabel')" class="float-left q-mr-sm" />
+        <q-btn v-if="searchObj.data.queryResults.hits" class="q-mr-sm float-left download-logs-btn" size="sm"
+          :disable="!searchObj.data.queryResults.hits.length" icon="download" title="Export logs"
+          @click="downloadLogs"></q-btn>
         <div class="float-left">
-          <date-time
-            data-test="logs-search-bar-date-time-dropdown"
-            @date-change="updateDateTime"
-          />
+          <date-time data-test="logs-search-bar-date-time-dropdown" @date-change="updateDateTime" />
         </div>
         <div class="search-time q-pl-sm float-left">
           <q-btn-group spread>
-            <q-btn-dropdown
-              v-model="btnRefreshInterval"
-              data-cy="search-bar-button-dropdown"
-              flat
-              class="search-dropdown"
-              no-caps
-              :label="searchObj.meta.refreshIntervalLabel"
-              data-test="logs-search-refresh-interval-dropdown-btn"
-            >
+            <q-btn-dropdown v-model="btnRefreshInterval" data-cy="search-bar-button-dropdown" flat class="search-dropdown"
+              no-caps :label="searchObj.meta.refreshIntervalLabel" data-test="logs-search-refresh-interval-dropdown-btn">
               <div class="refresh-rate-dropdown-container">
                 <div class="row">
                   <div class="col col-12 q-pa-sm" style="text-align: center">
-                    <q-btn
-                      data-test="logs-search-off-refresh-interval"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== '0'"
-                      size="md"
-                      :class="
-                        'no-border full-width ' +
+                    <q-btn data-test="logs-search-off-refresh-interval" no-caps
+                      :flat="searchObj.meta.refreshInterval !== '0'" size="md" :class="'no-border full-width ' +
                         (searchObj.meta.refreshInterval === '0'
                           ? 'selected'
                           : '')
-                      "
-                      @click="refreshTimeChange({ label: 'Off', value: 0 })"
-                    >
+                        " @click="refreshTimeChange({ label: 'Off', value: 0 })">
                       Off
                     </q-btn>
                   </div>
                 </div>
                 <q-separator />
-                <div
-                  v-for="(items, i) in refreshTimes"
-                  :key="'row_' + i"
-                  class="row"
-                >
-                  <div
-                    v-for="(item, j) in items"
-                    :key="'col_' + i + '_' + j"
-                    class="col col-4 q-pa-sm"
-                    style="text-align: center"
-                  >
-                    <q-btn
-                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== item.label"
-                      size="md"
-                      :class="
-                        'no-border ' +
+                <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+                  <div v-for="(item, j) in items" :key="'col_' + i + '_' + j" class="col col-4 q-pa-sm"
+                    style="text-align: center">
+                    <q-btn :data-test="`logs-search-bar-refresh-time-${item.value}`" no-caps
+                      :flat="searchObj.meta.refreshInterval !== item.label" size="md" :class="'no-border ' +
                         (searchObj.meta.refreshInterval === item.label
                           ? 'selected'
                           : '')
-                      "
-                      @click="refreshTimeChange(item)"
-                    >
+                        " @click="refreshTimeChange(item)">
                       {{ item.label }}
                     </q-btn>
                   </div>
@@ -129,41 +71,23 @@
               </div>
             </q-btn-dropdown>
             <q-separator vertical inset />
-            <q-btn
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              title="Run query"
-              class="q-pa-none search-button"
-              @click="searchData"
-              :disable="
-                searchObj.loading || searchObj.data.streamResults.length == 0
-              "
-              >Run query</q-btn
-            >
+            <q-btn data-test="logs-search-bar-refresh-btn" data-cy="search-bar-refresh-button" dense flat
+              title="Run query" class="q-pa-none search-button" @click="searchData" :disable="searchObj.loading || searchObj.data.streamResults.length == 0
+                ">Run query</q-btn>
           </q-btn-group>
         </div>
       </div>
     </div>
     <div class="row" v-show="searchObj.meta.showQuery">
       <div class="col" style="border-top: 1px solid #dbdbdb">
-        <q-splitter
-          v-model="searchObj.config.fnSplitterModel"
-          :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%"
-        >
+        <q-splitter v-model="searchObj.config.fnSplitterModel" :limits="searchObj.config.fnSplitterLimit"
+          style="width: 100%">
           <template #before>
             <b>Query Editor:</b>
-            <query-editor
-              ref="queryEditorRef"
-              class="monaco-editor"
-              v-model:query="searchObj.data.query"
+            <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="searchObj.data.query"
               v-model:fields="searchObj.data.stream.selectedStreamFields"
-              v-model:functions="searchObj.data.stream.functions"
-              @update-query="updateQueryValue"
-              @run-query="searchData"
-            ></query-editor>
+              v-model:functions="searchObj.data.stream.functions" @update-query="updateQueryValue"
+              @run-query="searchData"></query-editor>
           </template>
           <template #after>
             <div v-show="searchObj.meta.toggleFunction">
@@ -254,7 +178,7 @@ export default defineComponent({
         if (searchObj.data.parsedQuery.from.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
-              searchObj.data.stream.selectedStream.value &&
+            searchObj.data.stream.selectedStream.value &&
             searchObj.data.parsedQuery.from[0].table !== streamName
           ) {
             let streamFound = false;
@@ -580,6 +504,7 @@ export default defineComponent({
   border-radius: 5px;
   border: 0px solid #dbdbdb;
 }
+
 .search-bar-component {
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
@@ -598,17 +523,21 @@ export default defineComponent({
     background-color: #d5d5d5;
     border-radius: 0px 3px 3px 0px;
   }
+
   .search-field .q-field {
     &__control {
       border-radius: 3px 0px 0px 3px !important;
     }
+
     &__native {
       font-weight: 600;
     }
   }
+
   .search-time {
     // width: 120px;
     margin-right: 10px;
+
     .q-btn-group {
       border-radius: 3px;
 
@@ -617,19 +546,24 @@ export default defineComponent({
       }
     }
   }
+
   .search-dropdown {
     padding: 0px;
+
     .block {
       color: $dark-page;
       font-weight: 600;
       font-size: 12px;
     }
+
     .q-btn-dropdown__arrow-container {
       color: $light-text2;
     }
   }
+
   .refresh-rate-dropdown-container {
     width: 220px;
+
     * .q-btn {
       font-size: 12px !important;
       padding-left: 8px;
@@ -674,9 +608,11 @@ export default defineComponent({
       }
     }
   }
+
   .fields_autocomplete {
     max-height: 250px;
   }
+
   .monaco-editor {
     width: 100% !important;
     height: 70px !important;
