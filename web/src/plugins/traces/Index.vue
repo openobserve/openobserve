@@ -485,15 +485,11 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          sql: 'select min(_timestamp) as _timestamp, min(start_time) as start_time, max(service_name) as service_name, max(operation_name) as operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
           size: 0,
-        },
-        aggs: {
-          histogram:
-            "select histogram(_timestamp, '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
         encoding: "base64",
       };
@@ -577,108 +573,74 @@ export default defineComponent({
         req.query.end_time = getISOTimestamp(timestamps.end_time);
 
         const chartSettings = getChartSettings(timestamps);
-        if (chartSettings) {
-          searchObj.meta.resultGrid.chartKeyFormat =
-            chartSettings.chartKeyFormat;
-          searchObj.meta.resultGrid.chartInterval = chartSettings.chartInterval;
+        // if (chartSettings) {
+        //   searchObj.meta.resultGrid.chartKeyFormat =
+        //     chartSettings.chartKeyFormat;
+        //   searchObj.meta.resultGrid.chartInterval = chartSettings.chartInterval;
 
-          req.aggs.histogram = req.aggs.histogram.replaceAll(
-            "[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval
-          );
-        }
+        //   req.aggs.histogram = req.aggs.histogram.replaceAll(
+        //     "[INTERVAL]",
+        //     searchObj.meta.resultGrid.chartInterval
+        //   );
+        // }
+        req.query["sql_mode"] = "full";
 
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL = parser.astify(searchObj.data.query);
-          if (parsedSQL.limit != null) {
-            req.query.size = parsedSQL.limit.value[0].value;
-
-            if (parsedSQL.limit.seperator == "offset") {
-              req.query.from = parsedSQL.limit.value[1].value || 0;
-            }
-
-            parsedSQL.limit = null;
-
-            query = parser.sqlify(parsedSQL);
-
-            //replace backticks with \" for sql_mode
-            query = query.replace(/`/g, '"');
-            searchObj.loading = true;
-            searchObj.data.queryResults.hits = [];
-            searchObj.data.queryResults.total = 0;
-          }
-
-          req.query.sql = query;
-          req.query["sql_mode"] = "full";
-          delete req.aggs;
+        let parseQuery = query.split("|");
+        let queryFunctions = "";
+        let whereClause = "";
+        if (parseQuery.length > 1) {
+          queryFunctions = "," + parseQuery[0].trim();
+          whereClause = parseQuery[1].trim();
         } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
+          whereClause = parseQuery[0].trim();
+        }
 
-          if (whereClause.trim() != "") {
-            whereClause = whereClause
-              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
+        if (whereClause.trim() != "") {
+          whereClause = whereClause
+            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
 
-            whereClause = whereClause
-              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+          whereClause = whereClause
+            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
+            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
+          const parsedSQL = whereClause.split(" ");
+          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+            parsedSQL.forEach((node: any, index: any) => {
+              if (node == field.name) {
+                node = node.replaceAll('"', "");
+                parsedSQL[index] = '"' + node + '"';
+              }
             });
+          });
 
-            whereClause = parsedSQL.join(" ");
-
-            req.query.sql = req.query.sql.replace(
-              "[WHERE_CLAUSE]",
-              " WHERE " + whereClause
-            );
-          } else {
-            req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          }
+          whereClause = parsedSQL.join(" ");
 
           req.query.sql = req.query.sql.replace(
-            "[QUERY_FUNCTIONS]",
-            queryFunctions
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause
           );
-
-          req.query.sql = req.query.sql.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream.value
-          );
-          // const parsedSQL = parser.astify(req.query.sql);
-          // const unparsedSQL = parser.sqlify(parsedSQL);
-          // console.log(unparsedSQL);
+        } else {
+          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
         }
 
-        if (searchObj.data.resultGrid.currentPage > 0) {
-          delete req.aggs;
-        }
+        req.query.sql = req.query.sql.replace(
+          "[QUERY_FUNCTIONS]",
+          queryFunctions
+        );
+
+        req.query.sql = req.query.sql.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+        // const parsedSQL = parser.astify(req.query.sql);
+        // const unparsedSQL = parser.sqlify(parsedSQL);
+        // console.log(unparsedSQL);
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        if (
-          !searchObj.meta.sqlMode &&
-          searchObj.data.resultGrid.currentPage == 0
-        ) {
-          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
-        }
 
         return req;
       } catch (e) {
@@ -781,7 +743,7 @@ export default defineComponent({
             //extract fields from query response
             extractFields();
 
-            generateHistogramData();
+            // generateHistogramData();
             //update grid columns
             updateGridColumns();
             dismiss();

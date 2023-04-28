@@ -61,82 +61,20 @@
           />
         </div>
         <div class="search-time q-pl-sm float-left">
-          <q-btn-group spread>
-            <q-btn-dropdown
-              v-model="btnRefreshInterval"
-              data-cy="search-bar-button-dropdown"
-              flat
-              class="search-dropdown"
-              no-caps
-              :label="searchObj.meta.refreshIntervalLabel"
-              data-test="logs-search-refresh-interval-dropdown-btn"
-            >
-              <div class="refresh-rate-dropdown-container">
-                <div class="row">
-                  <div class="col col-12 q-pa-sm" style="text-align: center">
-                    <q-btn
-                      data-test="logs-search-off-refresh-interval"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== '0'"
-                      size="md"
-                      :class="
-                        'no-border full-width ' +
-                        (searchObj.meta.refreshInterval === '0'
-                          ? 'selected'
-                          : '')
-                      "
-                      @click="refreshTimeChange({ label: 'Off', value: 0 })"
-                    >
-                      Off
-                    </q-btn>
-                  </div>
-                </div>
-                <q-separator />
-                <div
-                  v-for="(items, i) in refreshTimes"
-                  :key="'row_' + i"
-                  class="row"
-                >
-                  <div
-                    v-for="(item, j) in items"
-                    :key="'col_' + i + '_' + j"
-                    class="col col-4 q-pa-sm"
-                    style="text-align: center"
-                  >
-                    <q-btn
-                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== item.label"
-                      size="md"
-                      :class="
-                        'no-border ' +
-                        (searchObj.meta.refreshInterval === item.label
-                          ? 'selected'
-                          : '')
-                      "
-                      @click="refreshTimeChange(item)"
-                    >
-                      {{ item.label }}
-                    </q-btn>
-                  </div>
-                </div>
-              </div>
-            </q-btn-dropdown>
-            <q-separator vertical inset />
-            <q-btn
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              title="Run query"
-              class="q-pa-none search-button"
-              @click="searchData"
-              :disable="
-                searchObj.loading || searchObj.data.streamResults.length == 0
-              "
-              >Run query</q-btn
-            >
-          </q-btn-group>
+          <q-btn
+            data-test="logs-search-bar-refresh-btn"
+            data-cy="search-bar-refresh-button"
+            dense
+            rounded="sm"
+            flat
+            title="Run query"
+            class="q-pa-none search-button"
+            @click="searchData"
+            :disable="
+              searchObj.loading || searchObj.data.streamResults.length == 0
+            "
+            >Run query</q-btn
+          >
         </div>
       </div>
     </div>

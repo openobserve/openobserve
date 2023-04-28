@@ -87,34 +87,6 @@
                     size="1rem"
                     @click.stop="addToFilter(props.row.name)"
                   />
-                  <q-icon
-                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                    v-if="
-                      !searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="
-                      'img:' + getImageURL('images/common/visibility_on.svg')
-                    "
-                    size="1.1rem"
-                    title="Add field to table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
-                  <q-icon
-                    :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                    v-if="
-                      searchObj.data.stream.selectedFields.includes(
-                        props.row.name
-                      )
-                    "
-                    :name="
-                      'img:' + getImageURL('images/common/visibility_off.svg')
-                    "
-                    size="1.1rem"
-                    title="Remove field from table"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
                 </div>
               </div>
               <q-expansion-item
@@ -148,36 +120,6 @@
                         style="margin-right: 0.375rem"
                         size="1rem"
                         @click.stop="addToFilter(props.row.name)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                        v-if="
-                          !searchObj.data.stream.selectedFields.includes(
-                            props.row.name
-                          )
-                        "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_on.svg')
-                        "
-                        size="1.1rem"
-                        title="Add field to table"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
-                      <q-icon
-                        :data-test="`log-search-index-list-remove-${props.row.name}-field-btn`"
-                        v-if="
-                          searchObj.data.stream.selectedFields.includes(
-                            props.row.name
-                          )
-                        "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_off.svg')
-                        "
-                        title="Remove field from table"
-                        size="1.1rem"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
                       />
                     </div>
                   </div>
