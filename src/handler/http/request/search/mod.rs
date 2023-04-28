@@ -115,6 +115,14 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
+    req.query.query_fn = match req.query.query_fn.clone() {
+        Some(v) => match crate::common::base64::decode(&v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
+
     for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
         if req.query.sql.contains(&fn_name) {
             req.query.uses_zo_fn = true;
@@ -246,7 +254,13 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(bad_request("around key is empty")),
     };
-    let query_fn = query.get("query_fn");
+    let query_fn = match query.get("query_fn") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
 
     let default_sql = format!(
         "SELECT * FROM \"{}\" ORDER BY {} DESC",
@@ -298,7 +312,7 @@ pub async fn around(
             track_total_hits: false,
             query_context: query_context.clone(),
             uses_zo_fn: uses_fn,
-            query_fn: query_fn.cloned(),
+            query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -350,7 +364,7 @@ pub async fn around(
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,
-            query_fn: query_fn.cloned(),
+            query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
@@ -476,7 +490,14 @@ pub async fn values(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
-    let query_fn = query.get("query_fn");
+
+    let query_fn = match query.get("query_fn") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
     let query_context = match query.get("sql") {
@@ -532,7 +553,7 @@ pub async fn values(
             track_total_hits: false,
             query_context,
             uses_zo_fn: uses_fn,
-            query_fn: query_fn.cloned(),
+            query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
