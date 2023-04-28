@@ -136,8 +136,8 @@
       </div>
       <div v-else>
         <h5 data-test="logs-search-error-message" class="text-center">
-          <q-icon name="warning"
-color="warning" size="10rem" /><br />{{
+          <q-icon name="warning" color="warning"
+size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
         </h5>
@@ -692,6 +692,11 @@ export default defineComponent({
           return false;
         }
 
+        if (searchObj.data.tempFunctionLoading == true) {
+          //wait for VRL function request complete successfully
+          return;
+        }
+
         searchObj.data.searchAround.indexTimestamp = 0;
         searchObj.data.searchAround.size = 0;
         if (searchObj.data.searchAround.histogramHide) {
@@ -724,10 +729,12 @@ export default defineComponent({
         }
 
         if (
-          searchObj.data.tempFunctionName != "" &&
+          searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          queryReq.query["query_fn"] = searchObj.data.tempFunctionName;
+          queryReq.query["query_fn"] = b64EncodeUnicode(
+            searchObj.data.tempFunctionContent
+          );
         }
 
         searchObj.data.errorCode = 0;
@@ -1151,11 +1158,16 @@ export default defineComponent({
           //hack add time stamp column to parsedSQL if not already added
           if (
             !(parsedSQL.columns === "*") &&
-            parsedSQL.columns.filter((e) => e.expr.column === store.state.zoConfig.timestamp_column)
-              .length === 0
+            parsedSQL.columns.filter(
+              (e) => e.expr.column === store.state.zoConfig.timestamp_column
+            ).length === 0
           ) {
             const ts_col = {
-              expr: { type: "column_ref", table: null, column: store.state.zoConfig.timestamp_column },
+              expr: {
+                type: "column_ref",
+                table: null,
+                column: store.state.zoConfig.timestamp_column,
+              },
               as: null,
             };
             parsedSQL.columns.push(ts_col);
@@ -1183,10 +1195,10 @@ export default defineComponent({
 
         let query_fn = "";
         if (
-          searchObj.data.tempFunctionName != "" &&
+          searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          query_fn = searchObj.data.tempFunctionName;
+          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
         }
 
         searchService
@@ -1370,6 +1382,7 @@ export default defineComponent({
     },
     changeOrganization() {
       if (this.router.currentRoute.value.name == "logs") {
+        this.searchBarRef.resetFunctionContent();
         this.searchObj.data.query = "";
         this.setQuery("");
         this.searchObj.meta.sqlMode = false;
@@ -1378,6 +1391,7 @@ export default defineComponent({
     },
     changeStream() {
       if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
+        this.searchBarRef.resetFunctionContent();
         setTimeout(() => {
           this.runQueryFn();
         }, 500);

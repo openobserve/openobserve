@@ -42,7 +42,7 @@ use super::storage::file_list;
 use super::transform_udf::get_all_transform;
 use crate::common::json;
 use crate::infra::cache::tmpfs;
-use crate::infra::config::{get_parquet_compression, CONFIG, QUERY_FUNCTIONS};
+use crate::infra::config::{get_parquet_compression, CONFIG};
 use crate::meta::common::FileMeta;
 use crate::meta::{self, StreamType};
 use crate::service::search::sql::Sql;
@@ -236,7 +236,7 @@ pub async fn sql(
     if field_fns.is_empty() || sql.query_fn.is_some() {
         let batches = df.clone().collect().await?;
         if sql.query_fn.is_some() {
-            resp = handle_query_fn(sql.query_fn.clone().unwrap(), &sql.org_id, batches);
+            resp = handle_query_fn(sql.query_fn.clone().unwrap(), batches);
         } else {
             result.insert("query".to_string(), batches);
             log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
@@ -921,30 +921,21 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
 }
 
 #[cfg(not(feature = "zo_functions"))]
-fn handle_query_fn(
-    _query_fn: String,
-    _org_id: &str,
-    _batches: Vec<RecordBatch>,
-) -> Option<Vec<RecordBatch>> {
+fn handle_query_fn(_query_fn: String, _batches: Vec<RecordBatch>) -> Option<Vec<RecordBatch>> {
     None
 }
 
 #[cfg(feature = "zo_functions")]
-fn handle_query_fn(
-    query_fn: String,
-    org_id: &str,
-    batches: Vec<RecordBatch>,
-) -> Option<Vec<RecordBatch>> {
-    match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
-        Some(query_fn_src) => {
-            match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
-                Ok(json_rows) => {
-                    apply_query_fn(query_fn_src.function.to_owned(), json_rows).unwrap_or(None)
-                }
-                Err(_) => None,
-            }
+fn handle_query_fn(query_fn: String, batches: Vec<RecordBatch>) -> Option<Vec<RecordBatch>> {
+    /* match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
+       Some(query_fn_src) => {
+    */
+    match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows).unwrap_or(None),
+        Err(_) => None,
+        /*  }
         }
-        None => None,
+        None => None, */
     }
 }
 

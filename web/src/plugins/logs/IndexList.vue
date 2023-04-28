@@ -274,10 +274,10 @@ export default defineComponent({
 
         let query_fn = "";
         if (
-          searchObj.data.tempFunctionName != "" &&
+          searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          query_fn = searchObj.data.tempFunctionName;
+          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
         streamService
           .fieldValues({

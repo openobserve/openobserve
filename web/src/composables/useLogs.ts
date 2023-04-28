@@ -119,6 +119,8 @@ const defaultObject = {
       histogramHide: false,
     },
     tempFunctionName: "",
+    tempFunctionContent: "",
+    tempFunctionLoading: false,
   },
 };
 
