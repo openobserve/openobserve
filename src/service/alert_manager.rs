@@ -109,7 +109,9 @@ async fn handle_trigger(alert_name: &str, frequency: i64) {
                         encoding: meta::search::RequestEncoding::Empty,
                     };
                     // do search
-                    match SearchService::search(&trigger.org, meta::StreamType::Logs, &req).await {
+                    match SearchService::search(&trigger.org, alert.stream_type.unwrap(), &req)
+                        .await
+                    {
                         Ok(res) => {
                             if !res.hits.is_empty() {
                                 let record = res.hits.first().unwrap().as_object().unwrap();
