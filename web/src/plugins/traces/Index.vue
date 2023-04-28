@@ -247,6 +247,7 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
+    const tracesScatterChart = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -346,9 +347,8 @@ export default defineComponent({
               searchObj.data.queryResults = {};
               searchObj.data.sortedQueryResults = [];
               searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {},
+                layout: {},
+                data: [],
               };
             }
           })
@@ -395,9 +395,8 @@ export default defineComponent({
             searchObj.data.sortedQueryResults = [];
             searchObj.data.stream.selectedStreamFields = [];
             searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
+              layout: {},
+              data: [],
             };
             // reDrawGrid();
           }
@@ -704,9 +703,8 @@ export default defineComponent({
           searchObj.data.sortedQueryResults = [];
           // searchObj.data.streamResults = [];
           searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {},
+            layout: {},
+            data: [],
           };
           // searchObj.data.editorValue = "";
         }
@@ -743,7 +741,7 @@ export default defineComponent({
             //extract fields from query response
             extractFields();
 
-            // generateHistogramData();
+            generateHistogramData();
             //update grid columns
             updateGridColumns();
             dismiss();
@@ -807,17 +805,28 @@ export default defineComponent({
           }
 
           let fields: any = {};
+          const importantFields = ["service_name", "operation_name"];
+          importantFields.forEach((rowName) => {
+            if (fields[rowName] == undefined) {
+              fields[rowName] = {};
+              searchObj.data.stream.selectedStreamFields.push({
+                name: rowName,
+                ftsKey: ftsKeys.has(rowName),
+              });
+            }
+          });
           queryResult.forEach((row: any) => {
             // let keys = deepKeys(row);
             // for (let i in row) {
-            if (fields[row.name] == undefined) {
-              fields[row.name] = {};
-              searchObj.data.stream.selectedStreamFields.push({
-                name: row.name,
-                ftsKey: ftsKeys.has(row.name),
-              });
+            if (!importantFields.includes(row.name)) {
+              if (fields[row.name] == undefined) {
+                fields[row.name] = {};
+                searchObj.data.stream.selectedStreamFields.push({
+                  name: row.name,
+                  ftsKey: ftsKeys.has(row.name),
+                });
+              }
             }
-            // }
           });
         }
       } catch (e) {
@@ -829,85 +838,53 @@ export default defineComponent({
       try {
         searchObj.data.resultGrid.columns = [];
 
-        const logFilterField: any =
-          useLocalTraceFilterField()?.value != null
-            ? useLocalTraceFilterField()?.value
-            : {};
-        const logFieldSelectedValue =
-          logFilterField[
-            `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
-          ];
-        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
-        if (
-          !searchObj.data.stream.selectedFields.length &&
-          selectedFields.length
-        ) {
-          return (searchObj.data.stream.selectedFields = selectedFields);
-        }
-        searchObj.data.stream.selectedFields = selectedFields;
+        searchObj.data.stream.selectedFields = [];
+
+        searchObj.meta.resultGrid.manualRemoveFields = false;
+        searchObj.data.resultGrid.columns.push({
+          name: "operation_name",
+          field: (row: any) => row.operation_name,
+          prop: (row: any) => row.operation_name,
+          label: "Operation",
+          align: "left",
+          sortable: true,
+        });
+
+        searchObj.data.resultGrid.columns.push({
+          name: "service_name",
+          field: (row: any) => row.service_name,
+          prop: (row: any) => row.service_name,
+          label: "Service",
+          align: "left",
+          sortable: true,
+        });
 
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
           field: (row: any) =>
             date.formatDate(
-              Math.floor(row["_timestamp"] / 1000),
+              Math.floor(row["start_time"] / 1000000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             date.formatDate(
-              Math.floor(row["_timestamp"] / 1000),
+              Math.floor(row["start_time"] / 1000000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
           label: t("search.timestamp"),
           align: "left",
           sortable: true,
         });
-        if (searchObj.data.stream.selectedFields.length == 0) {
-          searchObj.meta.resultGrid.manualRemoveFields = false;
-          if (searchObj.data.stream.selectedFields.length == 0) {
-            searchObj.data.resultGrid.columns.push({
-              name: "service_name",
-              field: (row: any) => row.service_name,
-              prop: (row: any) => row.service_name,
-              label: "Service",
-              align: "left",
-              sortable: true,
-            });
-            searchObj.data.resultGrid.columns.push({
-              name: "operation_name",
-              field: (row: any) => row.operation_name,
-              prop: (row: any) => row.operation_name,
-              label: "Operation",
-              align: "left",
-              sortable: true,
-            });
-            searchObj.data.resultGrid.columns.push({
-              name: "duration",
-              field: (row: any) => row.duration,
-              prop: (row: any) => row.duration,
-              label: "Duration",
-              align: "left",
-              sortable: true,
-              format: (val) => formatTimeWithSuffix(val),
-            });
-          }
-        } else {
-          searchObj.data.stream.selectedFields.forEach((field: any) => {
-            searchObj.data.resultGrid.columns.push({
-              name: field,
-              field: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              prop: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              label: field,
-              align: "left",
-              sortable: true,
-              closable: true,
-            });
-          });
-        }
+
+        searchObj.data.resultGrid.columns.push({
+          name: "duration",
+          field: (row: any) => row.duration,
+          prop: (row: any) => row.duration,
+          label: "Duration",
+          align: "left",
+          sortable: true,
+          format: (val) => formatTimeWithSuffix(val),
+        });
 
         searchObj.loading = false;
         if (searchObj.data.queryResults.aggs) reDrawGrid();
@@ -931,46 +908,79 @@ export default defineComponent({
       const xData: string[] = [];
       const yData: number[] = [];
 
-      if (searchObj.data.queryResults.aggs) {
-        searchObj.data.queryResults.aggs.histogram.map(
+      var trace1 = {
+        x: xData,
+        y: yData,
+        name: "Gold",
+        type: "scatter",
+        mode: "markers",
+      };
+
+      var data = [trace1];
+
+      var layout = {
+        title: {
+          text: "",
+          font: {
+            size: 12,
+          },
+        },
+        margin: {
+          l: 50,
+          r: 50,
+          t: 22,
+          b: 50,
+        },
+        font: { size: 12 },
+        xaxis: { type: "date" },
+        yaxis: { ticksuffix: "ms" },
+        scattergap: 0.7,
+        height: 150,
+        autosize: true,
+      };
+
+      if (searchObj.data.queryResults.hits) {
+        searchObj.data.queryResults.hits.forEach(
           (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
+            _timestamp: string | number | Date;
+            duration: number | Date;
           }) => {
-            unparsed_x_data.push(bucket.zo_sql_key);
-            let histDate = new Date(bucket.zo_sql_key + "Z");
+            unparsed_x_data.push(bucket._timestamp);
+            let histDate = new Date(Math.floor(bucket._timestamp / 1000));
             xData.push(Math.floor(histDate.getTime()));
-            yData.push(parseInt(bucket.zo_sql_num, 10));
+            yData.push(Number((bucket.duration / 1000000).toFixed(2)));
           }
         );
       }
-      const totalRecords =
-        (searchObj.data.resultGrid.currentPage + 1) *
-          searchObj.meta.resultGrid.rowsPerPage <
-        searchObj.data.queryResults.hits.length
-          ? (searchObj.data.resultGrid.currentPage + 1) *
-            searchObj.meta.resultGrid.rowsPerPage
-          : searchObj.data.queryResults.hits.length;
 
-      const chartParams = {
-        title:
-          "Showing " +
-          (searchObj.data.queryResults.from == 0
-            ? searchObj.data.queryResults.size
-            : totalRecords) +
-          " out of " +
-          searchObj.data.queryResults.total.toLocaleString() +
-          " hits in " +
-          searchObj.data.queryResults.took +
-          " ms. (Scan Size: " +
-          searchObj.data.queryResults.scan_size +
-          "MB)",
-        unparsed_x_data: unparsed_x_data,
+      // const totalRecords =
+      //   (searchObj.data.resultGrid.currentPage + 1) *
+      //     searchObj.meta.resultGrid.rowsPerPage <
+      //   searchObj.data.queryResults.hits.length
+      //     ? (searchObj.data.resultGrid.currentPage + 1) *
+      //       searchObj.meta.resultGrid.rowsPerPage
+      //     : searchObj.data.queryResults.hits.length;
+
+      // layout.title.text =
+      //   "Showing " +
+      //   (searchObj.data.queryResults.from == 0
+      //     ? searchObj.data.queryResults.size
+      //     : totalRecords) +
+      //   " out of " +
+      //   searchObj.data.queryResults.total.toLocaleString() +
+      //   " hits in " +
+      //   searchObj.data.queryResults.took +
+      //   " ms. (Scan Size: " +
+      //   searchObj.data.queryResults.scan_size +
+      //   "MB)";
+
+      searchObj.data.histogram = {
+        data: data,
+        layout: layout,
       };
-      searchObj.data.histogram = { xData, yData, chartParams };
+
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
         searchResultRef.value?.reDrawChart
       ) {
         searchResultRef.value.reDrawChart();

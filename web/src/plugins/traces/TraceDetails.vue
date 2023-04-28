@@ -31,7 +31,11 @@
         </div>
         <div>Spans: {{ spanList.length - 1 }}</div>
       </div>
-      <trace-chart ref="plotChart" :chart="traceChart" />
+      <trace-chart
+        id="trace_details_gantt_chart"
+        ref="plotChart"
+        :chart="traceChart"
+      />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -146,7 +150,7 @@ export default defineComponent({
     };
 
     const traceChart = ref({
-      data: [],
+      data: [{}],
       layout: {},
     });
     const plotChart = ref(null);
@@ -440,7 +444,7 @@ export default defineComponent({
       });
       layout.shapes = shapes;
       traceChart.value.layout = layout;
-      if (plotChart.value) plotChart.value?.reDraw(searchObj.data.histogram);
+      if (plotChart.value) plotChart.value?.reDraw();
     };
     return {
       traceTree,

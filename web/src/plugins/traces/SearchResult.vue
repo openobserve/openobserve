@@ -18,12 +18,13 @@
 <template>
   <div class="col column oveflow-hidden">
     <div class="search-list" style="width: 100%">
-      <BarChart
+      <trace-chart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
-        v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
-        @updated:chart="onChartUpdate"
-      ></BarChart>
+        id="traces_scatter_chart"
+        v-show="searchObj.meta.showHistogram"
+        :chart="searchObj.data.histogram"
+      />
 
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
@@ -150,7 +151,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, nextTick, ref } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -158,16 +159,18 @@ import { useI18n } from "vue-i18n";
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
-import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
+import TraceChart from "./TraceChart.vue";
+import { redraw } from "plotly.js";
+import { cloneDeep } from "lodash";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     HighLight,
-    BarChart,
     TraceDetails,
+    TraceChart,
   },
   emits: [
     "update:scroll",
@@ -246,17 +249,17 @@ export default defineComponent({
     const plotChart: any = ref(null);
 
     const reDrawChart = () => {
+      console.log("redraw chart", cloneDeep(searchObj.data.histogram));
       if (
         // eslint-disable-next-line no-prototype-builtins
-        searchObj.data.histogram.hasOwnProperty("xData") &&
-        searchObj.data.histogram.xData.length > 0
+        searchObj.data.histogram.data &&
+        searchObj.data.histogram.layout
       ) {
-        plotChart.value.reDraw(
-          searchObj.data.histogram.xData,
-          searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
-        );
-        plotChart.value.forceReLayout();
+        nextTick(() => {
+          plotChart.value.reDraw();
+          console.log("redraw chart", cloneDeep(searchObj.data.histogram));
+          plotChart.value.forceReLayout();
+        });
       }
     };
 

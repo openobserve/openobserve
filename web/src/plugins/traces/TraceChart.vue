@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="plotref" id="traces_plotly_chart" style="width: 100%" />
+  <div ref="plotref" :id="id" style="width: 100%" />
 </template>
 
 <script lang="ts">
@@ -35,13 +35,13 @@ export default defineComponent({
       type: Number,
       default: 600,
     },
-    data: {
-      type: Array,
-      default: () => [],
-    },
     chart: {
       type: Object,
       default: () => {},
+    },
+    id: {
+      type: String,
+      default: "",
     },
   },
   setup(props, { emit }) {
@@ -134,6 +134,7 @@ export default defineComponent({
 
     onMounted(async () => {
       layout = props.chart.layout;
+      traces = props.chart.data;
       await Plotly.newPlot(plotref.value, traces, layout, {
         responsive: true,
         displayModeBar: false,
@@ -147,16 +148,16 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      if (document.getElementById("traces_plotly_chart") != null) {
+      if (document.getElementById(props.id) != null) {
         Plotly.relayout(plotref.value, update);
       }
     });
 
-    const reDraw = (chart: any) => {
+    const reDraw = () => {
       traces = props.chart.data;
       layout = props.chart.layout;
-      if (document.getElementById("traces_plotly_chart") != null) {
-        Plotly.react("traces_plotly_chart", traces, layout);
+      if (document.getElementById(props.id) != null) {
+        Plotly.react(props.id, traces, layout);
       }
     };
 
@@ -167,7 +168,7 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      if (document.getElementById("traces_plotly_chart") != null) {
+      if (document.getElementById(props.id) != null) {
         Plotly.relayout(plotref.value, update);
       }
     };

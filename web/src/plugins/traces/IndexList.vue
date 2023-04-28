@@ -15,34 +15,6 @@
 
 <template>
   <div class="column index-menu">
-    <div>
-      <q-select
-        data-test="log-search-index-list-select-stream"
-        v-model="searchObj.data.stream.selectedStream"
-        :label="
-          searchObj.data.stream.selectedStream.label
-            ? ''
-            : t('search.selectIndex')
-        "
-        :options="streamOptions"
-        data-cy="index-dropdown"
-        input-debounce="0"
-        behavior="menu"
-        filled
-        borderless
-        dense
-        use-input
-        hide-selected
-        fill-input
-        @filter="filterStreamFn"
-      >
-        <template #no-option>
-          <q-item>
-            <q-item-section> {{ t("search.noResult") }}</q-item-section>
-          </q-item>
-        </template>
-      </q-select>
-    </div>
     <div class="index-table q-mt-xs">
       <q-table
         data-test="log-search-index-list-fields-table"
@@ -240,16 +212,10 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useTraces from "../../composables/useTraces";
-import { getImageURL, validateEmail } from "../../utils/zincutils";
+import { getImageURL } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
-import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
 
-interface Filter {
-  fieldName: string;
-  selectedValues: string[];
-  selectedOperator: string;
-}
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   setup() {

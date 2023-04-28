@@ -34,11 +34,6 @@
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
-        <q-toggle
-          data-test="logs-search-bar-sql-mode-toggle-btn"
-          v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
