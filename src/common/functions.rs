@@ -14,7 +14,5 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
 
 #[cfg(feature = "zo_functions")]
 pub fn init_vrl_runtime() -> vrl::Runtime {
-    let state = vrl::state::RuntimeState::default();
-    let runtime = vrl::Runtime::new(state);
-    runtime
+    vrl::Runtime::new(vrl::state::RuntimeState::default())
 }
