@@ -187,11 +187,19 @@ export default defineComponent({
           let start_d = new Date(start);
           let end_d = new Date(end);
           emit("updated:chart", {
+            data: e,
             start: start_d.toLocaleString("sv-SE"),
             end: end_d.toLocaleString("sv-SE"),
           });
         }
+      } else if (e["xaxis.range"]) {
+        emit("updated:chart", {
+          data: e,
+        });
       } else {
+        emit("updated:chart", {
+          data: e,
+        });
         zoomFlag.value = false;
       }
     };

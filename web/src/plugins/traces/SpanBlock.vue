@@ -27,8 +27,9 @@
     <div
       :style="{
         width: '100%',
+        overflow: 'hidden',
       }"
-      class="cursor-pointer flex items-center no-wrap"
+      class="cursor-pointer flex items-center no-wrap position-relative"
       :class="!isSpanSelected ? 'defocus' : ''"
       @click="selectSpan"
     >
@@ -40,6 +41,7 @@
           left: getLeftPosition + '%',
           position: 'relative',
           backgroundColor: span.style?.color || '#58508d',
+          zIndex: 1,
         }"
       />
       <div
@@ -47,6 +49,7 @@
           position: 'absolute',
           ...getDurationStyle,
           transition: 'all 0.5s ease',
+          zIndex: 1,
         }"
         class="text-caption"
       >
@@ -126,11 +129,9 @@ export default defineComponent({
       emit("toggleCollapse", props.span.spanId);
     };
     const getLeftPosition = computed(() => {
-      return (
-        ((props.span.startTimeMs - props.baseTracePosition["startTimeMs"]) /
-          props.baseTracePosition?.durationMs) *
-        100
-      );
+      const left =
+        props.span.startTimeMs - props.baseTracePosition["startTimeMs"];
+      return (left / props.baseTracePosition?.durationMs) * 100;
     });
     const getWidth = computed(() => {
       return Number(

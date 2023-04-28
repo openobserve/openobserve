@@ -35,6 +35,7 @@
         id="trace_details_gantt_chart"
         ref="plotChart"
         :chart="traceChart"
+        @updated:chart="updateChart"
       />
       <div
         :class="
@@ -99,7 +100,7 @@ import {
   watch,
   onActivated,
 } from "vue";
-import { cloneDeep } from "lodash";
+import { cloneDeep, range } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
@@ -134,6 +135,7 @@ export default defineComponent({
     const spanPositionList: Ref<any[]> = ref([]);
     const splitterModel = ref(25);
     const traceTimeline: any = ref({});
+    const timeRange: any = ref({ start: 0, end: 0 });
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -146,7 +148,7 @@ export default defineComponent({
       hConnectorWidth: 20,
       dotConnectorWidth: 6,
       dotConnectorHeight: 6,
-      colors: ["#003f5c", "#5978dc", "#ffa600", "#bc5090", "#58508d"],
+      colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
 
     const traceChart = ref({
@@ -161,16 +163,10 @@ export default defineComponent({
 
     onActivated(() => {
       buildTracesTree();
-      if (traceRootSpan.value) {
-        calculateTracePosition();
-      }
     });
 
     onMounted(() => {
       buildTracesTree();
-      if (traceRootSpan.value) {
-        calculateTracePosition();
-      }
     });
 
     watch(
@@ -193,18 +189,18 @@ export default defineComponent({
 
     const calculateTracePosition = () => {
       const tics = [];
-      baseTracePosition.value["durationMs"] = (
-        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
-      ).toFixed(2);
-      baseTracePosition.value["startTimeMs"] = traceTree.value[0].startTimeMs;
-
-      const quarterMs = baseTracePosition.value["durationMs"] / 4;
+      baseTracePosition.value["durationMs"] = timeRange.value.end;
+      baseTracePosition.value["startTimeMs"] =
+        traceTree.value[0].startTimeMs + timeRange.value.start;
+      const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
+      let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
         tics.push({
-          value: Number((quarterMs * i).toFixed(2)),
-          label: `${(quarterMs * i).toFixed(2)}ms`,
+          value: Number(time.toFixed(2)),
+          label: `${time.toFixed(2)}ms`,
           left: `${25 * i}%`,
         });
+        time += quarterMs;
       }
       baseTracePosition.value["tics"] = tics;
     };
@@ -243,6 +239,7 @@ export default defineComponent({
           serviceColorMapping[span.serviceName] =
             spanDimensions.colors[colorIndex];
           colorIndex++;
+          if (colorIndex > spanDimensions.colors.length - 1) colorIndex = 0;
         }
 
         span.style.color = serviceColorMapping[span.serviceName];
@@ -282,6 +279,12 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
       });
+
+      timeRange.value.end = (
+        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
+      ).toFixed(2);
+      timeRange.value.start = 0;
+
       calculateTracePosition();
       buildTraceChart();
     };
@@ -446,6 +449,28 @@ export default defineComponent({
       traceChart.value.layout = layout;
       if (plotChart.value) plotChart.value?.reDraw();
     };
+    const updateChart = ({ data }: { data: any }) => {
+      let range1 = 0;
+      let range2 = 0;
+      if (data["xaxis.range[0]"] && data["xaxis.range[1]"]) {
+        range1 = data["xaxis.range[0]"];
+        range2 = data["xaxis.range[1]"];
+      } else if (data["xaxis.range"]?.length) {
+        range1 = data["xaxis.range"][0];
+        range2 = data["xaxis.range"][1];
+      } else {
+        timeRange.value.start = 0;
+        range2 = Number(
+          (
+            traceTree.value[0].highestEndTime -
+            traceTree.value[0].lowestStartTime
+          ).toFixed(2)
+        );
+      }
+      timeRange.value.start = range1;
+      timeRange.value.end = range2;
+      calculateTracePosition();
+    };
     return {
       traceTree,
       collapseMapping,
@@ -463,6 +488,7 @@ export default defineComponent({
       splitterModel,
       plotChart,
       traceChart,
+      updateChart,
     };
   },
 });
