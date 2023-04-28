@@ -16,28 +16,81 @@
 <template>
   <div class="search-bar-component" id="searchBarComponent">
     <!-- {{ searchObj.data }} -->
-    <div class="row q-my-xs">
+    <div class="row q-my-sm">
       <div class="float-right col">
-        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.showQuery"
-          :label="t('search.showQueryLabel')" />
-        <q-toggle data-test="logs-search-bar-show-fields-toggle-btn" v-model="searchObj.meta.showFields"
-          :label="t('search.showFieldLabel')" />
-        <q-toggle data-test="logs-search-bar-show-histogram-toggle-btn" v-bind:disable="searchObj.meta.sqlMode"
-          v-model="searchObj.meta.showHistogram" :label="t('search.showHistogramLabel')" />
-        <q-toggle data-test="logs-search-bar-sql-mode-toggle-btn" v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')" />
-        <syntax-guide data-test="logs-search-bar-sql-mode-toggle-btn" :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
+        <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
+          v-bind:disable="searchObj.meta.sqlMode"
+          v-model="searchObj.meta.showHistogram"
+          :label="t('search.showHistogramLabel')"
+        />
+        <q-toggle
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          v-model="searchObj.meta.sqlMode"
+          :label="t('search.sqlModeLabel')"
+        />
+        <syntax-guide
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        ></syntax-guide>
       </div>
       <div class="float-right col-auto">
-        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.toggleFunction"
-          :label="t('search.toggleFunctionLabel')" class="float-left q-mr-sm" />
-        <q-btn v-if="searchObj.data.queryResults.hits" class="q-mr-sm float-left download-logs-btn" size="sm"
-          :disable="!searchObj.data.queryResults.hits.length" icon="download" title="Export logs"
-          @click="downloadLogs"></q-btn>
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="searchObj.meta.toggleFunction"
+          icon="functions"
+          title="Toggle Function Editor"
+          class="float-left q-mr-sm"
+          size="32px"
+        />
+        <q-select
+          v-model="functionModel"
+          :options="functionOptions"
+          :display-value="`${functionModel ? functionModel: 'Select Function'}`"
+          data-cy="index-dropdown"
+          input-debounce="0"
+          behavior="menu"
+          dense
+          @filter="filterFn"
+          class="float-left function-dropdown q-mr-sm"
+        >
+        <template v-slot:append>
+          <q-icon
+            v-if="functionModel !== null"
+            class="cursor-pointer"
+            name="clear"
+            size="xs"
+            @click.stop.prevent="functionModel = null"
+          />
+        </template>
+          <template #no-option>
+            <q-item>
+              <q-item-section> {{ t("search.noResult") }}</q-item-section>
+            </q-item>
+          </template>
+        </q-select>
+        <q-btn
+          title="Save Function"
+          icon="save"
+          icon-right="functions"
+          size="sm"
+          class="q-px-xs q-mr-sm float-left download-logs-btn"
+        ></q-btn>
+        <q-btn
+          class="q-mr-sm download-logs-btn q-px-sm"
+          size="sm"
+          :disabled="
+            searchObj.data.queryResults.hasOwnProperty('hits') &&
+            !searchObj.data.queryResults.hits.length
+          "
+          icon="download"
+          title="Export logs"
+          @click="downloadLogs"
+        ></q-btn>
         <div class="float-left">
           <date-time data-test="logs-search-bar-date-time-dropdown" @date-change="updateDateTime" />
         </div>
-        <div class="search-time q-pl-sm float-left">
+        <div class="search-time q-pl-sm float-left q-mr-sm">
           <q-btn-group spread>
             <q-btn-dropdown v-model="btnRefreshInterval" data-cy="search-bar-button-dropdown" flat class="search-dropdown"
               no-caps :label="searchObj.meta.refreshIntervalLabel" data-test="logs-search-refresh-interval-dropdown-btn">
@@ -131,6 +184,8 @@ const defaultValue: any = () => {
   };
 };
 
+const stringOptions = ["Google", "Facebook", "Twitter", "Apple", "Oracle"];
+
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
@@ -159,6 +214,7 @@ export default defineComponent({
 
     const parser = new Parser();
     const formData: any = ref(defaultValue());
+    const functionOptions = ref(stringOptions);
 
     const fnEditorRef: any = ref(null);
     let fnEditorobj: any = null;
@@ -432,6 +488,20 @@ export default defineComponent({
       downloadLogs,
       initFunctionEditor,
       resetFunctionContent,
+      functionModel: ref(null),
+      functionOptions,
+      filterFn(val, update) {
+        update(() => {
+          if (val === "") {
+            functionOptions.value = stringOptions;
+          } else {
+            const needle = val.toLowerCase();
+            functionOptions.value = stringOptions.filter(
+              (v) => v.toLowerCase().indexOf(needle) > -1
+            );
+          }
+        });
+      },
     };
   },
   computed: {
@@ -509,6 +579,18 @@ export default defineComponent({
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
 
+  .function-dropdown {
+    width: 150px;
+    .q-field__native, .q-field__control{
+      min-height: 30px;
+      height: 30px;
+    }
+
+    .q-field__marginal {
+      height: 30px;
+    }
+  }
+
   .q-toggle__inner {
     font-size: 30px;
   }
@@ -536,8 +618,6 @@ export default defineComponent({
 
   .search-time {
     // width: 120px;
-    margin-right: 10px;
-
     .q-btn-group {
       border-radius: 3px;
 

@@ -25,7 +25,7 @@ const MainLayoutCloudMixin = {
       // });
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
-        icon: "transform",
+        icon: "functions",
         link: "/functions",
       });
       linksList.value.splice(7, 0, {
