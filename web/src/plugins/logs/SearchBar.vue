@@ -43,10 +43,23 @@
           class="float-left q-mr-sm"
           size="32px"
         />
+        <q-input
+          v-model="name"
+          v-if="!functionModel && searchObj.data.tempFunctionContent"
+          placeholder="Enter Function Name"
+          dense
+          :rules="[val => !!val || '']"
+          class="float-left function-dropdown q-mr-sm"
+        >
+
+        </q-input>
         <q-select
+          v-else
           v-model="functionModel"
           :options="functionOptions"
-          :display-value="`${functionModel ? functionModel: 'Select Function'}`"
+          :display-value="`${
+            functionModel ? functionModel : 'Select Function'
+          }`"
           data-cy="index-dropdown"
           input-debounce="0"
           behavior="menu"
@@ -54,15 +67,15 @@
           @filter="filterFn"
           class="float-left function-dropdown q-mr-sm"
         >
-        <template v-slot:append>
-          <q-icon
-            v-if="functionModel !== null"
-            class="cursor-pointer"
-            name="clear"
-            size="xs"
-            @click.stop.prevent="functionModel = null"
-          />
-        </template>
+          <template v-slot:append>
+            <q-icon
+              v-if="functionModel !== null"
+              class="cursor-pointer"
+              name="clear"
+              size="xs"
+              @click.stop.prevent="functionModel = null"
+            />
+          </template>
           <template #no-option>
             <q-item>
               <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -70,6 +83,7 @@
           </template>
         </q-select>
         <q-btn
+          :disable="!functionModel && !searchObj.data.tempFunctionContent"
           title="Save Function"
           icon="save"
           icon-right="functions"
@@ -88,35 +102,67 @@
           @click="downloadLogs"
         ></q-btn>
         <div class="float-left">
-          <date-time data-test="logs-search-bar-date-time-dropdown" @date-change="updateDateTime" />
+          <date-time
+            data-test="logs-search-bar-date-time-dropdown"
+            @date-change="updateDateTime"
+          />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
           <q-btn-group spread>
-            <q-btn-dropdown v-model="btnRefreshInterval" data-cy="search-bar-button-dropdown" flat class="search-dropdown"
-              no-caps :label="searchObj.meta.refreshIntervalLabel" data-test="logs-search-refresh-interval-dropdown-btn">
+            <q-btn-dropdown
+              v-model="btnRefreshInterval"
+              data-cy="search-bar-button-dropdown"
+              flat
+              class="search-dropdown"
+              no-caps
+              :label="searchObj.meta.refreshIntervalLabel"
+              data-test="logs-search-refresh-interval-dropdown-btn"
+            >
               <div class="refresh-rate-dropdown-container">
                 <div class="row">
                   <div class="col col-12 q-pa-sm" style="text-align: center">
-                    <q-btn data-test="logs-search-off-refresh-interval" no-caps
-                      :flat="searchObj.meta.refreshInterval !== '0'" size="md" :class="'no-border full-width ' +
+                    <q-btn
+                      data-test="logs-search-off-refresh-interval"
+                      no-caps
+                      :flat="searchObj.meta.refreshInterval !== '0'"
+                      size="md"
+                      :class="
+                        'no-border full-width ' +
                         (searchObj.meta.refreshInterval === '0'
                           ? 'selected'
                           : '')
-                        " @click="refreshTimeChange({ label: 'Off', value: 0 })">
+                      "
+                      @click="refreshTimeChange({ label: 'Off', value: 0 })"
+                    >
                       Off
                     </q-btn>
                   </div>
                 </div>
                 <q-separator />
-                <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
-                  <div v-for="(item, j) in items" :key="'col_' + i + '_' + j" class="col col-4 q-pa-sm"
-                    style="text-align: center">
-                    <q-btn :data-test="`logs-search-bar-refresh-time-${item.value}`" no-caps
-                      :flat="searchObj.meta.refreshInterval !== item.label" size="md" :class="'no-border ' +
+                <div
+                  v-for="(items, i) in refreshTimes"
+                  :key="'row_' + i"
+                  class="row"
+                >
+                  <div
+                    v-for="(item, j) in items"
+                    :key="'col_' + i + '_' + j"
+                    class="col col-4 q-pa-sm"
+                    style="text-align: center"
+                  >
+                    <q-btn
+                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
+                      no-caps
+                      :flat="searchObj.meta.refreshInterval !== item.label"
+                      size="md"
+                      :class="
+                        'no-border ' +
                         (searchObj.meta.refreshInterval === item.label
                           ? 'selected'
                           : '')
-                        " @click="refreshTimeChange(item)">
+                      "
+                      @click="refreshTimeChange(item)"
+                    >
                       {{ item.label }}
                     </q-btn>
                   </div>
@@ -124,23 +170,41 @@
               </div>
             </q-btn-dropdown>
             <q-separator vertical inset />
-            <q-btn data-test="logs-search-bar-refresh-btn" data-cy="search-bar-refresh-button" dense flat
-              title="Run query" class="q-pa-none search-button" @click="searchData" :disable="searchObj.loading || searchObj.data.streamResults.length == 0
-                ">Run query</q-btn>
+            <q-btn
+              data-test="logs-search-bar-refresh-btn"
+              data-cy="search-bar-refresh-button"
+              dense
+              flat
+              title="Run query"
+              class="q-pa-none search-button"
+              @click="searchData"
+              :disable="
+                searchObj.loading || searchObj.data.streamResults.length == 0
+              "
+              >Run query</q-btn
+            >
           </q-btn-group>
         </div>
       </div>
     </div>
     <div class="row" v-show="searchObj.meta.showQuery">
       <div class="col" style="border-top: 1px solid #dbdbdb">
-        <q-splitter v-model="searchObj.config.fnSplitterModel" :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%">
+        <q-splitter
+          v-model="searchObj.config.fnSplitterModel"
+          :limits="searchObj.config.fnSplitterLimit"
+          style="width: 100%"
+        >
           <template #before>
             <b>Query Editor:</b>
-            <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="searchObj.data.query"
+            <query-editor
+              ref="queryEditorRef"
+              class="monaco-editor"
+              v-model:query="searchObj.data.query"
               v-model:fields="searchObj.data.stream.selectedStreamFields"
-              v-model:functions="searchObj.data.stream.functions" @update-query="updateQueryValue"
-              @run-query="searchData"></query-editor>
+              v-model:functions="searchObj.data.stream.functions"
+              @update-query="updateQueryValue"
+              @run-query="searchData"
+            ></query-editor>
           </template>
           <template #after>
             <div v-show="searchObj.meta.toggleFunction">
@@ -234,7 +298,7 @@ export default defineComponent({
         if (searchObj.data.parsedQuery.from.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
-            searchObj.data.stream.selectedStream.value &&
+              searchObj.data.stream.selectedStream.value &&
             searchObj.data.parsedQuery.from[0].table !== streamName
           ) {
             let streamFound = false;
@@ -376,8 +440,11 @@ export default defineComponent({
         },
       });
 
+      fnEditorobj.onDidChangeModelContent((e: any) => {
+        searchObj.data.tempFunctionContent = fnEditorobj.getValue();
+      });
+
       fnEditorobj.onDidBlurEditorText((e: any) => {
-        searchObj.data.tempFunctionLoading = true;
         searchObj.data.tempFunctionContent = fnEditorobj.getValue();
         // saveTemporaryFunction(fnEditorobj.getValue());
       });
@@ -581,7 +648,9 @@ export default defineComponent({
 
   .function-dropdown {
     width: 150px;
-    .q-field__native, .q-field__control{
+    padding-bottom: 0px;
+    .q-field__native,
+    .q-field__control {
       min-height: 30px;
       height: 30px;
     }
