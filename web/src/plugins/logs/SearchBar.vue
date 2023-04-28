@@ -397,7 +397,6 @@ export default defineComponent({
       });
 
       fnEditorobj.onDidBlurEditorText((e: any) => {
-        searchObj.data.tempFunctionLoading = true;
         searchObj.data.tempFunctionContent = fnEditorobj.getValue();
         // saveTemporaryFunction(fnEditorobj.getValue());
       });
@@ -417,7 +416,6 @@ export default defineComponent({
       let callTransform: Promise<{ data: any }>;
 
       if (content == formData.value.function) {
-        searchObj.data.tempFunctionLoading = false;
         return;
       }
 
@@ -428,7 +426,6 @@ export default defineComponent({
           message:
             "Function has been removed and no more applicable to the query.",
         });
-        searchObj.data.tempFunctionLoading = false;
         formData.value.function = "";
         return;
       }
@@ -462,7 +459,6 @@ export default defineComponent({
 
       callTransform
         .then((res: { data: any }) => {
-          searchObj.data.tempFunctionLoading = false;
           searchObj.data.tempFunctionName = formData.value.name;
           $q.notify({
             type: "positive",
@@ -472,7 +468,6 @@ export default defineComponent({
           });
         })
         .catch((err) => {
-          searchObj.data.tempFunctionLoading = false;
           $q.notify({
             type: "negative",
             message:
@@ -487,7 +482,6 @@ export default defineComponent({
       formData.value.function = "";
       fnEditorobj.setValue("");
       formData.value.name = "";
-      searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
     };
 
@@ -517,9 +511,6 @@ export default defineComponent({
     toggleFunction() {
       return this.searchObj.meta.toggleFunction;
     },
-    // executeRunQuery() {
-    //   return this.searchObj.data.tempFunctionLoading;
-    // },
   },
   watch: {
     addSearchTerm() {
@@ -564,11 +555,6 @@ export default defineComponent({
         this.searchObj.config.fnSplitterModel = 60;
       }
     },
-    // executeRunQuery(newVal) {
-    //   if (newVal == false) {
-    //     this.$emit("run-query");
-    //   }
-    // },
   },
 });
 </script>

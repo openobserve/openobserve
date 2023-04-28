@@ -120,7 +120,6 @@ const defaultObject = {
     },
     tempFunctionName: "",
     tempFunctionContent: "",
-    tempFunctionLoading: false,
   },
 };
 
