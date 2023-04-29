@@ -16,54 +16,157 @@
 <template>
   <div class="search-bar-component" id="searchBarComponent">
     <!-- {{ searchObj.data }} -->
-    <div class="row q-my-xs">
-      <div class="float-right col">
-        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.showQuery"
-          :label="t('search.showQueryLabel')" />
-        <q-toggle data-test="logs-search-bar-show-fields-toggle-btn" v-model="searchObj.meta.showFields"
-          :label="t('search.showFieldLabel')" />
-        <q-toggle data-test="logs-search-bar-show-histogram-toggle-btn" v-bind:disable="searchObj.meta.sqlMode"
-          v-model="searchObj.meta.showHistogram" :label="t('search.showHistogramLabel')" />
-        <q-toggle data-test="logs-search-bar-sql-mode-toggle-btn" v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')" />
-        <syntax-guide data-test="logs-search-bar-sql-mode-toggle-btn" :sqlmode="searchObj.meta.sqlMode"></syntax-guide>
+    <div class="row">
+      <div class="float-right col q-mb-xs">
+        <q-toggle
+          data-test="logs-search-bar-show-histogram-toggle-btn"
+          v-bind:disable="searchObj.meta.sqlMode"
+          v-model="searchObj.meta.showHistogram"
+          :label="t('search.showHistogramLabel')"
+        />
+        <q-toggle
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          v-model="searchObj.meta.sqlMode"
+          :label="t('search.sqlModeLabel')"
+        />
+        <syntax-guide
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :sqlmode="searchObj.meta.sqlMode"
+        ></syntax-guide>
       </div>
-      <div class="float-right col-auto">
-        <q-toggle data-test="logs-search-bar-show-query-toggle-btn" v-model="searchObj.meta.toggleFunction"
-          :label="t('search.toggleFunctionLabel')" class="float-left q-mr-sm" />
-        <q-btn v-if="searchObj.data.queryResults.hits" class="q-mr-sm float-left download-logs-btn" size="sm"
-          :disable="!searchObj.data.queryResults.hits.length" icon="download" title="Export logs"
-          @click="downloadLogs"></q-btn>
+      <div class="float-right col-auto q-mb-xs">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="searchObj.meta.toggleFunction"
+          icon="functions"
+          title="Toggle Function Editor"
+          class="float-left q-mr-sm"
+          size="32px"
+        />
+        <q-select
+          v-model="functionModel"
+          :options="functionOptions"
+          option-label="name"
+          option-value="function"
+          placeholder="Select or create a function"
+          data-cy="index-dropdown"
+          input-debounce="10"
+          use-input
+          hide-selected
+          behavior="default"
+          fill-input
+          dense
+          :loading="false"
+          @filter="filterFn"
+          @new-value="createNewValue"
+          @blur="updateSelectedValue"
+          @update:model-value="populateFunctionImplementation"
+          class="float-left function-dropdown q-mr-sm"
+        >
+          <template v-slot:append>
+            <q-icon
+              v-if="functionModel !== null"
+              class="cursor-pointer"
+              name="clear"
+              size="xs"
+              @click.stop.prevent="functionModel = null"
+            />
+          </template>
+          <template #no-option>
+            <q-item>
+              <q-item-section class="text-xs"
+                >Press Tab/Enter button to apply new function
+                name.</q-item-section
+              >
+            </q-item>
+          </template>
+        </q-select>
+        <q-btn
+          :disable="
+            !functionModel ||
+            !searchObj.data.tempFunctionContent ||
+            functionModel.function == searchObj.data.tempFunctionContent
+          "
+          title="Save Function"
+          icon="save"
+          icon-right="functions"
+          size="sm"
+          class="q-px-xs q-mr-sm float-left download-logs-btn"
+          @click="saveFunction"
+        ></q-btn>
+        <q-btn
+          class="q-mr-sm download-logs-btn q-px-sm"
+          size="sm"
+          :disabled="
+            searchObj.data.queryResults.hasOwnProperty('hits') &&
+            !searchObj.data.queryResults.hits.length
+          "
+          icon="download"
+          title="Export logs"
+          @click="downloadLogs"
+        ></q-btn>
         <div class="float-left">
-          <date-time data-test="logs-search-bar-date-time-dropdown" @date-change="updateDateTime" />
+          <date-time
+            data-test="logs-search-bar-date-time-dropdown"
+            @date-change="updateDateTime"
+          />
         </div>
-        <div class="search-time q-pl-sm float-left">
+        <div class="search-time q-pl-sm float-left q-mr-sm">
           <q-btn-group spread>
-            <q-btn-dropdown v-model="btnRefreshInterval" data-cy="search-bar-button-dropdown" flat class="search-dropdown"
-              no-caps :label="searchObj.meta.refreshIntervalLabel" data-test="logs-search-refresh-interval-dropdown-btn">
+            <q-btn-dropdown
+              v-model="btnRefreshInterval"
+              data-cy="search-bar-button-dropdown"
+              flat
+              class="search-dropdown"
+              no-caps
+              :label="searchObj.meta.refreshIntervalLabel"
+              data-test="logs-search-refresh-interval-dropdown-btn"
+            >
               <div class="refresh-rate-dropdown-container">
                 <div class="row">
                   <div class="col col-12 q-pa-sm" style="text-align: center">
-                    <q-btn data-test="logs-search-off-refresh-interval" no-caps
-                      :flat="searchObj.meta.refreshInterval !== '0'" size="md" :class="'no-border full-width ' +
+                    <q-btn
+                      data-test="logs-search-off-refresh-interval"
+                      no-caps
+                      :flat="searchObj.meta.refreshInterval !== '0'"
+                      size="md"
+                      :class="
+                        'no-border full-width ' +
                         (searchObj.meta.refreshInterval === '0'
                           ? 'selected'
                           : '')
-                        " @click="refreshTimeChange({ label: 'Off', value: 0 })">
+                      "
+                      @click="refreshTimeChange({ label: 'Off', value: 0 })"
+                    >
                       Off
                     </q-btn>
                   </div>
                 </div>
                 <q-separator />
-                <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
-                  <div v-for="(item, j) in items" :key="'col_' + i + '_' + j" class="col col-4 q-pa-sm"
-                    style="text-align: center">
-                    <q-btn :data-test="`logs-search-bar-refresh-time-${item.value}`" no-caps
-                      :flat="searchObj.meta.refreshInterval !== item.label" size="md" :class="'no-border ' +
+                <div
+                  v-for="(items, i) in refreshTimes"
+                  :key="'row_' + i"
+                  class="row"
+                >
+                  <div
+                    v-for="(item, j) in items"
+                    :key="'col_' + i + '_' + j"
+                    class="col col-4 q-pa-sm"
+                    style="text-align: center"
+                  >
+                    <q-btn
+                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
+                      no-caps
+                      :flat="searchObj.meta.refreshInterval !== item.label"
+                      size="md"
+                      :class="
+                        'no-border ' +
                         (searchObj.meta.refreshInterval === item.label
                           ? 'selected'
                           : '')
-                        " @click="refreshTimeChange(item)">
+                      "
+                      @click="refreshTimeChange(item)"
+                    >
                       {{ item.label }}
                     </q-btn>
                   </div>
@@ -71,33 +174,67 @@
               </div>
             </q-btn-dropdown>
             <q-separator vertical inset />
-            <q-btn data-test="logs-search-bar-refresh-btn" data-cy="search-bar-refresh-button" dense flat
-              title="Run query" class="q-pa-none search-button" @click="searchData" :disable="searchObj.loading || searchObj.data.streamResults.length == 0
-                ">Run query</q-btn>
+            <q-btn
+              data-test="logs-search-bar-refresh-btn"
+              data-cy="search-bar-refresh-button"
+              dense
+              flat
+              title="Run query"
+              class="q-pa-none search-button"
+              @click="searchData"
+              :disable="
+                searchObj.loading || searchObj.data.streamResults.length == 0
+              "
+              >Run query</q-btn
+            >
           </q-btn-group>
         </div>
       </div>
     </div>
     <div class="row" v-show="searchObj.meta.showQuery">
-      <div class="col" style="border-top: 1px solid #dbdbdb">
-        <q-splitter v-model="searchObj.config.fnSplitterModel" :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%">
+      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
+        <q-splitter
+          no-scroll
+          v-model="searchObj.config.fnSplitterModel"
+          :limits="searchObj.config.fnSplitterLimit"
+          style="width: 100%; height: 100%"
+        >
           <template #before>
             <b>Query Editor:</b>
-            <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="searchObj.data.query"
+            <query-editor
+              ref="queryEditorRef"
+              class="monaco-editor"
+              v-model:query="searchObj.data.query"
               v-model:fields="searchObj.data.stream.selectedStreamFields"
-              v-model:functions="searchObj.data.stream.functions" @update-query="updateQueryValue"
-              @run-query="searchData"></query-editor>
+              v-model:functions="searchObj.data.stream.functions"
+              @update-query="updateQueryValue"
+              @run-query="searchData"
+            ></query-editor>
           </template>
           <template #after>
-            <div v-show="searchObj.meta.toggleFunction">
+            <div v-show="searchObj.meta.toggleFunction" style="height: 100%">
               <b>VRL Function Editor:</b>
-              <div ref="fnEditorRef" id="fnEditor"></div>
+              <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
             </div>
           </template>
         </q-splitter>
       </div>
     </div>
+
+    <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
+      <q-card>
+        <q-card-section>
+          {{ confirmMessage }}
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn label="Cancel"
+color="primary" @click="cancelConfirmDialog" />
+          <q-btn label="OK"
+color="positive" @click="confirmDialogOK" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -131,6 +268,8 @@ const defaultValue: any = () => {
   };
 };
 
+const stringOptions = ["Google", "Facebook", "Twitter", "Apple", "Oracle"];
+
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
@@ -146,6 +285,26 @@ export default defineComponent({
         this.$emit("searchdata");
       }
     },
+    changeFunctionName(value) {
+      // alert(value)
+      console.log(value);
+    },
+    createNewValue(inputValue, doneFn) {
+      // Do something with the new value
+      console.log(`New value created: ${inputValue}`);
+
+      // Call the doneFn with the new value
+      doneFn(inputValue);
+    },
+    updateSelectedValue() {
+      // Update the selected value with the newly created value
+      if (
+        this.functionModel &&
+        !this.functionOptions.includes(this.functionModel)
+      ) {
+        this.functionOptions.push(this.functionModel);
+      }
+    },
   },
   setup() {
     const router = useRouter();
@@ -159,8 +318,12 @@ export default defineComponent({
 
     const parser = new Parser();
     const formData: any = ref(defaultValue());
+    const functionOptions = ref(searchObj.data.transforms);
 
+    const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
+    const confirmDialogVisible: boolean = ref(false);
+    let confirmCallback;
     let fnEditorobj: any = null;
     let streamName = "";
 
@@ -178,7 +341,7 @@ export default defineComponent({
         if (searchObj.data.parsedQuery.from.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
-            searchObj.data.stream.selectedStream.value &&
+              searchObj.data.stream.selectedStream.value &&
             searchObj.data.parsedQuery.from[0].table !== streamName
           ) {
             let streamFound = false;
@@ -305,7 +468,7 @@ export default defineComponent({
         overviewRulerLanes: 0,
         fixedOverflowWidgets: false,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 15,
+        lineDecorationsWidth: 3,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
@@ -320,10 +483,13 @@ export default defineComponent({
         },
       });
 
-      fnEditorobj.onDidBlurEditorText((e: any) => {
-        searchObj.data.tempFunctionLoading = true;
+      fnEditorobj.onDidChangeModelContent((e: any) => {
         searchObj.data.tempFunctionContent = fnEditorobj.getValue();
-        // saveTemporaryFunction(fnEditorobj.getValue());
+      });
+
+      fnEditorobj.onDidBlurEditorText((e: any) => {
+        searchObj.data.tempFunctionContent = fnEditorobj.getValue();
+        // saveFunction(fnEditorobj.getValue());
       });
 
       fnEditorobj.layout();
@@ -337,82 +503,162 @@ export default defineComponent({
       });
     });
 
-    const saveTemporaryFunction = (content: string) => {
+    const saveFunction = () => {
       let callTransform: Promise<{ data: any }>;
+      const content = fnEditorobj.getValue();
 
-      if (content == formData.value.function) {
-        searchObj.data.tempFunctionLoading = false;
-        return;
+      let fnName = functionModel.value;
+      if (typeof functionModel.value == "object") {
+        fnName = functionModel.value.name;
       }
 
       if (content.trim() == "") {
-        searchObj.data.tempFunctionName = "";
         $q.notify({
-          type: "positive",
+          type: "warning",
           message:
-            "Function has been removed and no more applicable to the query.",
+            "The function field must contain a value and cannot be left empty.",
         });
-        searchObj.data.tempFunctionLoading = false;
-        formData.value.function = "";
+        return;
+      }
+
+      const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+      if (!pattern.test(fnName)) {
+        $q.notify({
+          type: "negative",
+          message: "Function name is not valid.",
+        });
         return;
       }
 
       formData.value.params = "row";
       formData.value.function = content;
       formData.value.transType = 0;
-      if (searchObj.data.tempFunctionName == "") {
-        formData.value.name =
-          store.state.selectedOrganization.identifier +
-          "_" +
-          store.state.userInfo.email.slice(
-            0,
-            store.state.userInfo.email.indexOf("@")
-          ) +
-          "_" +
-          Math.floor(Date.now() / 1000);
+      formData.value.name = fnName;
 
+      const result = functionOptions.value.find((obj) => obj.name === fnName);
+      if (!result) {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
           formData.value
         );
+
+        callTransform
+          .then((res: { data: any }) => {
+            searchObj.data.tempFunctionLoading = false;
+
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+            });
+
+            functionModel.value = {
+              name: formData.value.name,
+              function: formData.value.function,
+            };
+            functionOptions.value.push({
+              name: formData.value.name,
+              function: formData.value.function,
+              transType: 0,
+              params: "row",
+            });
+          })
+          .catch((err) => {
+            searchObj.data.tempFunctionLoading = false;
+            $q.notify({
+              type: "negative",
+              message:
+                JSON.stringify(err.response.data["message"]) ||
+                "Function creation failed",
+              timeout: 5000,
+            });
+          });
       } else {
-        formData.value.name = searchObj.data.tempFunctionName;
+        showConfirmDialog(() => {
+          callTransform = jsTransformService.update(
+            store.state.selectedOrganization.identifier,
+            formData.value
+          );
 
-        callTransform = jsTransformService.update(
-          store.state.selectedOrganization.identifier,
-          formData.value
-        );
-      }
+          callTransform
+            .then((res: { data: any }) => {
+              searchObj.data.tempFunctionLoading = false;
 
-      callTransform
-        .then((res: { data: any }) => {
-          searchObj.data.tempFunctionLoading = false;
-          searchObj.data.tempFunctionName = formData.value.name;
-          $q.notify({
-            type: "positive",
-            message: res.data.hasOwnProperty("message")
-              ? res.data.message
-              : "Function updated successfully.",
-          });
-        })
-        .catch((err) => {
-          searchObj.data.tempFunctionLoading = false;
-          $q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response.data["message"]) ||
-              "Function creation failed",
-            timeout: 5000,
-          });
+              $q.notify({
+                type: "positive",
+                message: "Function updated successfully.",
+              });
+
+              const transformIndex = searchObj.data.transforms.findIndex(
+                (obj) => obj.name === formData.value.name
+              );
+              if (transformIndex !== -1) {
+                searchObj.data.transforms[transformIndex].name =
+                  formData.value.name;
+                searchObj.data.transforms[transformIndex].function =
+                  formData.value.function;
+              }
+
+              functionOptions.value = searchObj.data.transforms;
+            })
+            .catch((err) => {
+              searchObj.data.tempFunctionLoading = false;
+              $q.notify({
+                type: "negative",
+                message:
+                  JSON.stringify(err.response.data["message"]) ||
+                  "Function updation failed",
+                timeout: 5000,
+              });
+            });
         });
+      }
     };
 
     const resetFunctionContent = () => {
       formData.value.function = "";
       fnEditorobj.setValue("");
       formData.value.name = "";
+      functionModel.value = "";
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
+      searchObj.data.tempFunctionContent = "";
+    };
+
+    const populateFunctionImplementation = (fnValue) => {
+      fnEditorobj.setValue(fnValue.function);
+      searchObj.data.tempFunctionName = fnValue.name;
+      searchObj.data.tempFunctionContent = fnValue.function;
+    };
+
+    const showConfirmDialog = (callback) => {
+      confirmDialogVisible.value = true;
+      confirmCallback = callback;
+    };
+
+    const cancelConfirmDialog = () => {
+      confirmDialogVisible.value = false;
+      confirmCallback = null;
+    };
+
+    const confirmDialogOK = () => {
+      if (confirmCallback) {
+        confirmCallback();
+      }
+      confirmDialogVisible.value = false;
+      confirmCallback = null;
+    };
+
+    const filterFn = (val, update) => {
+      update(() => {
+        if (val === "") {
+          functionOptions.value = searchObj.data.transforms;
+        } else {
+          const needle = val.toLowerCase();
+          functionOptions.value = searchObj.data.transforms.filter(
+            (v) => v.name.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
     };
 
     return {
@@ -424,14 +670,24 @@ export default defineComponent({
       searchObj,
       queryEditorRef,
       btnRefreshInterval,
+      confirmDialogVisible,
+      confirmCallback,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
       updateDateTime,
+      showConfirmDialog,
+      cancelConfirmDialog,
+      confirmDialogOK,
       udpateQuery,
       downloadLogs,
+      saveFunction,
       initFunctionEditor,
       resetFunctionContent,
+      populateFunctionImplementation,
+      functionModel,
+      functionOptions,
+      filterFn,
     };
   },
   computed: {
@@ -441,9 +697,12 @@ export default defineComponent({
     toggleFunction() {
       return this.searchObj.meta.toggleFunction;
     },
-    // executeRunQuery() {
-    //   return this.searchObj.data.tempFunctionLoading;
-    // },
+    selectFunction() {
+      return this.functionModel;
+    },
+    confirmMessage() {
+      return "Are you sure you want to update the function?";
+    },
   },
   watch: {
     addSearchTerm() {
@@ -484,15 +743,17 @@ export default defineComponent({
     toggleFunction(newVal) {
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 100;
+        this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
     },
-    // executeRunQuery(newVal) {
-    //   if (newVal == false) {
-    //     this.$emit("run-query");
-    //   }
-    // },
+    selectFunction(newVal) {
+      if (newVal != "") {
+        this.searchObj.config.fnSplitterModel = 60;
+        this.searchObj.meta.toggleFunction = true;
+      }
+    },
   },
 });
 </script>
@@ -500,14 +761,53 @@ export default defineComponent({
 <style lang="scss">
 #fnEditor {
   width: 100%;
-  min-height: 4rem;
+  height: 98% !important;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
+  overflow: hidden;
 }
 
+.q-field--standard .q-field__control:before,
+.q-field--standard .q-field__control:focus:before,
+.q-field--standard .q-field__control:hover:before {
+  border: 0px !important;
+  border-color: none;
+  transition: none;
+}
+
+.search-bar-component > .row:nth-child(2) {
+    height: calc(100% - 38px); /* or any other height you want to set */
+  }
+
 .search-bar-component {
-  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
+  height: 100%;
+  overflow: hidden;
+
+  .function-dropdown {
+    width: 205px;
+    padding-bottom: 0px;
+    border: 1px solid #dbdbdb;
+    border-radius: 5px;
+    cursor: pointer;
+
+    .q-field__input {
+      cursor: pointer;
+      color: #36383a;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .q-field__native,
+    .q-field__control {
+      min-height: 29px;
+      height: 29px;
+      padding: 0px 0px 0px 4px;
+    }
+
+    .q-field__marginal {
+      height: 30px;
+    }
+  }
 
   .q-toggle__inner {
     font-size: 30px;
@@ -536,8 +836,6 @@ export default defineComponent({
 
   .search-time {
     // width: 120px;
-    margin-right: 10px;
-
     .q-btn-group {
       border-radius: 3px;
 
@@ -611,11 +909,6 @@ export default defineComponent({
 
   .fields_autocomplete {
     max-height: 250px;
-  }
-
-  .monaco-editor {
-    width: 100% !important;
-    height: 70px !important;
   }
 
   .search-button {

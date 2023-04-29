@@ -355,7 +355,7 @@ export default defineComponent({
       },
       {
         title: t("menu.dashboard"),
-        icon: "img:" + getImageURL("images/left_nav/dashb2.svg"),
+        icon: "dashboard",
         link: "/dashboards",
       },
       {
