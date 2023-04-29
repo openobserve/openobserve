@@ -50,16 +50,17 @@
           option-value="function"
           placeholder="Select or create a function"
           data-cy="index-dropdown"
-          input-debounce="0"
+          input-debounce="10"
           use-input
           hide-selected
           fill-input
           dense
+          :loading="false"
           @filter="filterFn"
           @new-value="createNewValue"
           @blur="updateSelectedValue"
           @update:model-value="populateFunctionImplementation"
-          class="float-left function-dropdown q-mr-sm"
+          class="float-left function-dropdown q-mr-sm q-pl-sm"
         >
           <template v-slot:append>
             <q-icon
@@ -73,18 +74,24 @@
           <template #no-option>
             <q-item>
               <q-item-section class="text-xs"
-                >Press Tab/Enter button to apply new function name.</q-item-section
+                >Press Tab/Enter button to apply new function
+                name.</q-item-section
               >
             </q-item>
           </template>
         </q-select>
         <q-btn
-          :disable="!functionModel || !searchObj.data.tempFunctionContent"
+          :disable="
+            !functionModel ||
+            !searchObj.data.tempFunctionContent ||
+            functionModel.function == searchObj.data.tempFunctionContent
+          "
           title="Save Function"
           icon="save"
           icon-right="functions"
           size="sm"
           class="q-px-xs q-mr-sm float-left download-logs-btn"
+          @click="saveFunction"
         ></q-btn>
         <q-btn
           class="q-mr-sm download-logs-btn q-px-sm"
@@ -211,6 +218,21 @@
         </q-splitter>
       </div>
     </div>
+
+    <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
+      <q-card>
+        <q-card-section>
+          {{ confirmMessage }}
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn label="Cancel"
+color="primary" @click="cancelConfirmDialog" />
+          <q-btn label="OK"
+color="positive" @click="confirmDialogOK" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -263,7 +285,7 @@ export default defineComponent({
     },
     changeFunctionName(value) {
       // alert(value)
-      console.log(value)
+      console.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Do something with the new value
@@ -296,7 +318,10 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
+    const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
+    const confirmDialogVisible: boolean = ref(false);
+    let confirmCallback;
     let fnEditorobj: any = null;
     let streamName = "";
 
@@ -462,7 +487,7 @@ export default defineComponent({
 
       fnEditorobj.onDidBlurEditorText((e: any) => {
         searchObj.data.tempFunctionContent = fnEditorobj.getValue();
-        // saveTemporaryFunction(fnEditorobj.getValue());
+        // saveFunction(fnEditorobj.getValue());
       });
 
       fnEditorobj.layout();
@@ -476,90 +501,163 @@ export default defineComponent({
       });
     });
 
-    const saveTemporaryFunction = (content: string) => {
+    const saveFunction = () => {
       let callTransform: Promise<{ data: any }>;
+      const content = fnEditorobj.getValue();
 
-      if (content == formData.value.function) {
-        searchObj.data.tempFunctionLoading = false;
-        return;
+      let fnName = functionModel.value;
+      if (typeof functionModel.value == "object") {
+        fnName = functionModel.value.name;
       }
 
       if (content.trim() == "") {
-        searchObj.data.tempFunctionName = "";
         $q.notify({
-          type: "positive",
+          type: "warning",
           message:
-            "Function has been removed and no more applicable to the query.",
+            "The function field must contain a value and cannot be left empty.",
         });
-        searchObj.data.tempFunctionLoading = false;
-        formData.value.function = "";
+        return;
+      }
+
+      const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+      if (!pattern.test(fnName)) {
+        $q.notify({
+          type: "negative",
+          message: "Function name is not valid.",
+        });
         return;
       }
 
       formData.value.params = "row";
       formData.value.function = content;
       formData.value.transType = 0;
-      if (searchObj.data.tempFunctionName == "") {
-        formData.value.name =
-          store.state.selectedOrganization.identifier +
-          "_" +
-          store.state.userInfo.email.slice(
-            0,
-            store.state.userInfo.email.indexOf("@")
-          ) +
-          "_" +
-          Math.floor(Date.now() / 1000);
+      formData.value.name = fnName;
 
+      const result = functionOptions.value.find((obj) => obj.name === fnName);
+      if (!result) {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
           formData.value
         );
+
+        callTransform
+          .then((res: { data: any }) => {
+            searchObj.data.tempFunctionLoading = false;
+
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+            });
+
+            functionModel.value = {
+              name: formData.value.name,
+              function: formData.value.function,
+            };
+            functionOptions.value.push({
+              name: formData.value.name,
+              function: formData.value.function,
+              transType: 0,
+              params: "row",
+            });
+          })
+          .catch((err) => {
+            searchObj.data.tempFunctionLoading = false;
+            $q.notify({
+              type: "negative",
+              message:
+                JSON.stringify(err.response.data["message"]) ||
+                "Function creation failed",
+              timeout: 5000,
+            });
+          });
       } else {
-        formData.value.name = searchObj.data.tempFunctionName;
+        showConfirmDialog(() => {
+          callTransform = jsTransformService.update(
+            store.state.selectedOrganization.identifier,
+            formData.value
+          );
 
-        callTransform = jsTransformService.update(
-          store.state.selectedOrganization.identifier,
-          formData.value
-        );
-      }
+          callTransform
+            .then((res: { data: any }) => {
+              searchObj.data.tempFunctionLoading = false;
 
-      callTransform
-        .then((res: { data: any }) => {
-          searchObj.data.tempFunctionLoading = false;
-          searchObj.data.tempFunctionName = formData.value.name;
-          $q.notify({
-            type: "positive",
-            message: res.data.hasOwnProperty("message")
-              ? res.data.message
-              : "Function updated successfully.",
-          });
-        })
-        .catch((err) => {
-          searchObj.data.tempFunctionLoading = false;
-          $q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response.data["message"]) ||
-              "Function creation failed",
-            timeout: 5000,
-          });
+              $q.notify({
+                type: "positive",
+                message: "Function updated successfully.",
+              });
+
+              const transformIndex = searchObj.data.transforms.findIndex(
+                (obj) => obj.name === formData.value.name
+              );
+              if (transformIndex !== -1) {
+                searchObj.data.transforms[transformIndex].name =
+                  formData.value.name;
+                searchObj.data.transforms[transformIndex].function =
+                  formData.value.function;
+              }
+
+              functionOptions.value = searchObj.data.transforms;
+            })
+            .catch((err) => {
+              searchObj.data.tempFunctionLoading = false;
+              $q.notify({
+                type: "negative",
+                message:
+                  JSON.stringify(err.response.data["message"]) ||
+                  "Function updation failed",
+                timeout: 5000,
+              });
+            });
         });
+      }
     };
 
     const resetFunctionContent = () => {
       formData.value.function = "";
       fnEditorobj.setValue("");
       formData.value.name = "";
+      functionModel.value = "";
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
+      searchObj.data.tempFunctionContent = "";
     };
 
     const populateFunctionImplementation = (fnValue) => {
-      console.log(fnEditorobj.getValue());
       fnEditorobj.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
-    }
+    };
+
+    const showConfirmDialog = (callback) => {
+      confirmDialogVisible.value = true;
+      confirmCallback = callback;
+    };
+
+    const cancelConfirmDialog = () => {
+      confirmDialogVisible.value = false;
+      confirmCallback = null;
+    };
+
+    const confirmDialogOK = () => {
+      if (confirmCallback) {
+        confirmCallback();
+      }
+      confirmDialogVisible.value = false;
+      confirmCallback = null;
+    };
+
+    const filterFn = (val, update) => {
+      update(() => {
+        if (val === "") {
+          functionOptions.value = searchObj.data.transforms;
+        } else {
+          const needle = val.toLowerCase();
+          functionOptions.value = searchObj.data.transforms.filter(
+            (v) => v.name.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
+    };
 
     return {
       t,
@@ -570,29 +668,24 @@ export default defineComponent({
       searchObj,
       queryEditorRef,
       btnRefreshInterval,
+      confirmDialogVisible,
+      confirmCallback,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
       updateDateTime,
+      showConfirmDialog,
+      cancelConfirmDialog,
+      confirmDialogOK,
       udpateQuery,
       downloadLogs,
+      saveFunction,
       initFunctionEditor,
       resetFunctionContent,
       populateFunctionImplementation,
-      functionModel: ref(null),
+      functionModel,
       functionOptions,
-      filterFn(val, update) {
-        update(() => {
-          if (val === "") {
-            functionOptions.value = searchObj.data.transforms;
-          } else {
-            const needle = val.toLowerCase();
-            functionOptions.value = searchObj.data.transforms.filter(
-              (v) => v.toLowerCase().indexOf(needle) > -1
-            );
-          }
-        });
-      },
+      filterFn,
     };
   },
   computed: {
@@ -602,9 +695,12 @@ export default defineComponent({
     toggleFunction() {
       return this.searchObj.meta.toggleFunction;
     },
-    // executeRunQuery() {
-    //   return this.searchObj.data.tempFunctionLoading;
-    // },
+    selectFunction() {
+      return this.functionModel;
+    },
+    confirmMessage() {
+      return "Are you sure you want to update the function?";
+    },
   },
   watch: {
     addSearchTerm() {
@@ -645,15 +741,17 @@ export default defineComponent({
     toggleFunction(newVal) {
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 100;
+        this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
     },
-    // executeRunQuery(newVal) {
-    //   if (newVal == false) {
-    //     this.$emit("run-query");
-    //   }
-    // },
+    selectFunction(newVal) {
+      if (newVal != "") {
+        this.searchObj.config.fnSplitterModel = 60;
+        this.searchObj.meta.toggleFunction = true;
+      }
+    },
   },
 });
 </script>
@@ -666,17 +764,35 @@ export default defineComponent({
   border: 0px solid #dbdbdb;
 }
 
+.q-field--standard .q-field__control:before,
+.q-field--standard .q-field__control:focus:before,
+.q-field--standard .q-field__control:hover:before {
+  border: 0px !important;
+  border-color: none;
+  transition: none;
+}
+
 .search-bar-component {
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
 
   .function-dropdown {
-    width: 180px;
+    width: 205px;
     padding-bottom: 0px;
+    border: 1px solid #dbdbdb;
+    cursor: pointer;
+
+    .q-field__input {
+      cursor: pointer;
+      color: #36383a;
+      font-weight: 600;
+      font-size: 12px;
+    }
     .q-field__native,
     .q-field__control {
       min-height: 30px;
       height: 30px;
+      padding: 0px;
     }
 
     .q-field__marginal {
