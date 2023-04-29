@@ -269,7 +269,7 @@ export default defineComponent({
         overviewRulerLanes: 0,
         fixedOverflowWidgets: false,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 15,
+        lineDecorationsWidth: 3,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
@@ -325,9 +325,9 @@ export default defineComponent({
 <style>
 #editor {
   width: 100%;
-  min-height: 4rem;
+  height: 83%;
   border-radius: 5px;
-  border: 0px solid #dbdbdb;
+  overflow: hidden;
 }
 
 .monaco-editor,
