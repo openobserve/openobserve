@@ -302,7 +302,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .search-bar-component {
   border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;

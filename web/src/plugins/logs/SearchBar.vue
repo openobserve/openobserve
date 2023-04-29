@@ -53,6 +53,7 @@
           input-debounce="10"
           use-input
           hide-selected
+          behavior="default"
           fill-input
           dense
           :loading="false"
@@ -60,7 +61,7 @@
           @new-value="createNewValue"
           @blur="updateSelectedValue"
           @update:model-value="populateFunctionImplementation"
-          class="float-left function-dropdown q-mr-sm q-pl-sm"
+          class="float-left function-dropdown q-mr-sm"
         >
           <template v-slot:append>
             <q-icon
@@ -191,11 +192,12 @@
       </div>
     </div>
     <div class="row" v-show="searchObj.meta.showQuery">
-      <div class="col" style="border-top: 1px solid #dbdbdb">
+      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
         <q-splitter
+          no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%"
+          style="width: 100%; height: 100%"
         >
           <template #before>
             <b>Query Editor:</b>
@@ -210,9 +212,9 @@
             ></query-editor>
           </template>
           <template #after>
-            <div v-show="searchObj.meta.toggleFunction">
+            <div v-show="searchObj.meta.toggleFunction" style="height: 100%">
               <b>VRL Function Editor:</b>
-              <div ref="fnEditorRef" id="fnEditor"></div>
+              <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
             </div>
           </template>
         </q-splitter>
@@ -466,7 +468,7 @@ export default defineComponent({
         overviewRulerLanes: 0,
         fixedOverflowWidgets: false,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 15,
+        lineDecorationsWidth: 3,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
@@ -759,7 +761,7 @@ export default defineComponent({
 <style lang="scss">
 #fnEditor {
   width: 100%;
-  min-height: 4rem;
+  height: 98% !important;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
 }
@@ -772,9 +774,13 @@ export default defineComponent({
   transition: none;
 }
 
+.search-bar-component > .row:nth-child(2) {
+    height: calc(100% - 38px); /* or any other height you want to set */
+  }
+
 .search-bar-component {
-  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 1px;
+  height: 94%;
 
   .function-dropdown {
     width: 205px;
@@ -792,7 +798,7 @@ export default defineComponent({
     .q-field__control {
       min-height: 30px;
       height: 30px;
-      padding: 0px;
+      padding: 0px 0px 0px 4px;
     }
 
     .q-field__marginal {
@@ -900,11 +906,6 @@ export default defineComponent({
 
   .fields_autocomplete {
     max-height: 250px;
-  }
-
-  .monaco-editor {
-    width: 100% !important;
-    height: 70px !important;
   }
 
   .search-button {
