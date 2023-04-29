@@ -788,6 +788,7 @@ export default defineComponent({
     width: 205px;
     padding-bottom: 0px;
     border: 1px solid #dbdbdb;
+    border-radius: 5px;
     cursor: pointer;
 
     .q-field__input {
@@ -798,8 +799,8 @@ export default defineComponent({
     }
     .q-field__native,
     .q-field__control {
-      min-height: 30px;
-      height: 30px;
+      min-height: 29px;
+      height: 29px;
       padding: 0px 0px 0px 4px;
     }
 
