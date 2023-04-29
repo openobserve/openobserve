@@ -244,6 +244,7 @@ export default defineComponent({
                 name: data.name,
                 args: "(" + args.join(",") + ")",
               };
+              searchObj.data.transforms.push({name: data.name, function: data.function});
               if (!data.stream_name) {
                 searchObj.data.stream.functions.push(itemObj);
               }

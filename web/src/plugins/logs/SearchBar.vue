@@ -43,28 +43,22 @@
           class="float-left q-mr-sm"
           size="32px"
         />
-        <q-input
-          v-model="name"
-          v-if="!functionModel && searchObj.data.tempFunctionContent"
-          placeholder="Enter Function Name"
-          dense
-          :rules="[val => !!val || '']"
-          class="float-left function-dropdown q-mr-sm"
-        >
-
-        </q-input>
         <q-select
-          v-else
           v-model="functionModel"
           :options="functionOptions"
-          :display-value="`${
-            functionModel ? functionModel : 'Select Function'
-          }`"
+          option-label="name"
+          option-value="function"
+          placeholder="Select or create a function"
           data-cy="index-dropdown"
           input-debounce="0"
-          behavior="menu"
+          use-input
+          hide-selected
+          fill-input
           dense
           @filter="filterFn"
+          @new-value="createNewValue"
+          @blur="updateSelectedValue"
+          @update:model-value="populateFunctionImplementation"
           class="float-left function-dropdown q-mr-sm"
         >
           <template v-slot:append>
@@ -78,12 +72,14 @@
           </template>
           <template #no-option>
             <q-item>
-              <q-item-section> {{ t("search.noResult") }}</q-item-section>
+              <q-item-section class="text-xs"
+                >Press Tab/Enter button to apply new function name.</q-item-section
+              >
             </q-item>
           </template>
         </q-select>
         <q-btn
-          :disable="!functionModel && !searchObj.data.tempFunctionContent"
+          :disable="!functionModel || !searchObj.data.tempFunctionContent"
           title="Save Function"
           icon="save"
           icon-right="functions"
@@ -265,6 +261,26 @@ export default defineComponent({
         this.$emit("searchdata");
       }
     },
+    changeFunctionName(value) {
+      // alert(value)
+      console.log(value)
+    },
+    createNewValue(inputValue, doneFn) {
+      // Do something with the new value
+      console.log(`New value created: ${inputValue}`);
+
+      // Call the doneFn with the new value
+      doneFn(inputValue);
+    },
+    updateSelectedValue() {
+      // Update the selected value with the newly created value
+      if (
+        this.functionModel &&
+        !this.functionOptions.includes(this.functionModel)
+      ) {
+        this.functionOptions.push(this.functionModel);
+      }
+    },
   },
   setup() {
     const router = useRouter();
@@ -278,7 +294,7 @@ export default defineComponent({
 
     const parser = new Parser();
     const formData: any = ref(defaultValue());
-    const functionOptions = ref(stringOptions);
+    const functionOptions = ref(searchObj.data.transforms);
 
     const fnEditorRef: any = ref(null);
     let fnEditorobj: any = null;
@@ -538,6 +554,13 @@ export default defineComponent({
       searchObj.data.tempFunctionName = "";
     };
 
+    const populateFunctionImplementation = (fnValue) => {
+      console.log(fnEditorobj.getValue());
+      fnEditorobj.setValue(fnValue.function);
+      searchObj.data.tempFunctionName = fnValue.name;
+      searchObj.data.tempFunctionContent = fnValue.function;
+    }
+
     return {
       t,
       store,
@@ -555,15 +578,16 @@ export default defineComponent({
       downloadLogs,
       initFunctionEditor,
       resetFunctionContent,
+      populateFunctionImplementation,
       functionModel: ref(null),
       functionOptions,
       filterFn(val, update) {
         update(() => {
           if (val === "") {
-            functionOptions.value = stringOptions;
+            functionOptions.value = searchObj.data.transforms;
           } else {
             const needle = val.toLowerCase();
-            functionOptions.value = stringOptions.filter(
+            functionOptions.value = searchObj.data.transforms.filter(
               (v) => v.toLowerCase().indexOf(needle) > -1
             );
           }
@@ -647,7 +671,7 @@ export default defineComponent({
   padding-bottom: 1px;
 
   .function-dropdown {
-    width: 150px;
+    width: 180px;
     padding-bottom: 0px;
     .q-field__native,
     .q-field__control {
