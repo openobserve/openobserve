@@ -16,8 +16,8 @@
 <template>
   <div class="search-bar-component" id="searchBarComponent">
     <!-- {{ searchObj.data }} -->
-    <div class="row q-my-sm">
-      <div class="float-right col">
+    <div class="row">
+      <div class="float-right col q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-bind:disable="searchObj.meta.sqlMode"
@@ -34,7 +34,7 @@
           :sqlmode="searchObj.meta.sqlMode"
         ></syntax-guide>
       </div>
-      <div class="float-right col-auto">
+      <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.toggleFunction"
@@ -764,6 +764,7 @@ export default defineComponent({
   height: 98% !important;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
+  overflow: hidden;
 }
 
 .q-field--standard .q-field__control:before,
@@ -780,7 +781,8 @@ export default defineComponent({
 
 .search-bar-component {
   padding-bottom: 1px;
-  height: 94%;
+  height: 100%;
+  overflow: hidden;
 
   .function-dropdown {
     width: 205px;

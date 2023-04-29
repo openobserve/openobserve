@@ -325,8 +325,9 @@ export default defineComponent({
 <style>
 #editor {
   width: 100%;
-  height: 80%;
+  height: 83%;
   border-radius: 5px;
+  overflow: hidden;
 }
 
 .monaco-editor,

@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
+  <q-page class="logPage q-my-xs" id="logPage">
     <div id="secondLevel">
       <q-splitter v-model="splitterModel" horizontal style="height: 100%">
         <template v-slot:before>
