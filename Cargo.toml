@@ -136,9 +136,9 @@ url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-vrl = { git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
-vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "258cc611080c1bdb5ed6897e8a79b76ab2038fcb" }
+vrl = { git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
+vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
 walkdir = "2"
 zstd = "0.12"
 

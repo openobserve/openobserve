@@ -16,31 +16,75 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
-    <div id="secondLevel">
-      <search-bar data-test="logs-search-bar" ref="searchBarRef" v-show="searchObj.data.stream.streamLists.length > 0"
-        :key="searchObj.data.stream.streamLists.length" @searchdata="searchData" />
-      <div id="thirdLevel" class="row scroll" style="width: 100%" v-if="searchObj.data.stream.streamLists.length > 0">
+  <q-page class="tracePage" id="tracePage">
+    <div id="tracesSecondLevel">
+      <search-bar
+        data-test="logs-search-bar"
+        ref="searchBarRef"
+        v-show="searchObj.data.stream.streamLists.length > 0"
+        :key="searchObj.data.stream.streamLists.length"
+        @searchdata="searchData"
+      />
+      <div
+        id="tracesThirdLevel"
+        class="row scroll"
+        style="width: 100%"
+        v-if="searchObj.data.stream.streamLists.length > 0"
+      >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-        <q-splitter v-model="searchObj.config.splitterModel" :limits="searchObj.config.splitterLimit" style="width: 100%">
+        <q-splitter
+          v-model="searchObj.config.splitterModel"
+          :limits="searchObj.config.splitterLimit"
+          style="width: 100%"
+        >
           <template #before v-if="searchObj.meta.showFields">
-            <index-list data-test="logs-search-index-list" :key="searchObj.data.stream.streamLists" />
+            <index-list
+              data-test="logs-search-index-list"
+              :key="searchObj.data.stream.streamLists"
+            />
           </template>
           <template #separator>
-            <q-avatar color="primary" text-color="white" size="20px" icon="drag_indicator" style="top: 10px" />
+            <q-avatar
+              color="primary"
+              text-color="white"
+              size="20px"
+              icon="drag_indicator"
+              style="top: 10px"
+            />
           </template>
           <template #after>
-            <div v-if="searchObj.data.errorMsg !== '' && searchObj.loading == false
-              ">
+            <div
+              v-if="
+                searchObj.data.errorMsg !== '' && searchObj.loading == false
+              "
+            >
               <h5 class="text-center">
-                <div data-test="logs-search-result-not-found-text" v-if="searchObj.data.errorCode == 0">
+                <div
+                  data-test="logs-search-result-not-found-text"
+                  v-if="searchObj.data.errorCode == 0"
+                >
                   Result not found.
                 </div>
-                <div data-test="logs-search-error-message" v-html="searchObj.data.errorMsg"></div>
-                <div data-test="logs-search-error-20003" v-if="parseInt(searchObj.data.errorCode) == 20003">
-                  <q-btn no-caps unelevated size="sm" bg-secondary class="no-border bg-secondary text-white" :to="'/logstreams?dialog=' +
-                    searchObj.data.stream.selectedStream.label
-                    ">Click here</q-btn>
+                <div
+                  data-test="logs-search-error-message"
+                  v-html="searchObj.data.errorMsg"
+                ></div>
+                <div
+                  data-test="logs-search-error-20003"
+                  v-if="parseInt(searchObj.data.errorCode) == 20003"
+                >
+                  <q-btn
+                    no-caps
+                    unelevated
+                    size="sm"
+                    bg-secondary
+                    class="no-border bg-secondary text-white"
+                    :to="
+                      '/logstreams?dialog=' +
+                      searchObj.data.stream.selectedStream.label
+                    "
+                    >Click here</q-btn
+                  >
                   to configure a full text search field to the stream.
                 </div>
                 <br />
@@ -50,27 +94,46 @@
               </h5>
             </div>
             <div v-else-if="searchObj.data.stream.selectedStream.label == ''">
-              <h5 data-test="logs-search-no-stream-selected-text" class="text-center">
+              <h5
+                data-test="logs-search-no-stream-selected-text"
+                class="text-center"
+              >
                 No stream selected.
               </h5>
             </div>
-            <div v-else-if="searchObj.data.queryResults.hasOwnProperty('total') &&
+            <div
+              v-else-if="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
                 searchObj.data.queryResults.hits.length == 0 &&
                 searchObj.loading == false
-                ">
+              "
+            >
               <h5 class="text-center">No result found.</h5>
             </div>
-            <div data-test="logs-search-search-result" v-show="searchObj.data.queryResults.hasOwnProperty('total') &&
+            <div
+              data-test="logs-search-search-result"
+              v-show="
+                searchObj.data.queryResults.hasOwnProperty('total') &&
                 searchObj.data.queryResults.hits.length !== 0
-                ">
-              <search-result ref="searchResultRef" @update:datetime="searchData" @update:scroll="getMoreData"
-                @search:timeboxed="searchAroundData" />
+              "
+            >
+              <search-result
+                ref="searchResultRef"
+                @update:datetime="searchData"
+                @update:scroll="getMoreData"
+                @search:timeboxed="searchAroundData"
+                @get:traceDetails="getTraceDetails"
+              />
             </div>
           </template>
         </q-splitter>
       </div>
       <div v-else-if="searchObj.loading == true">
-        <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; display: block" />
+        <q-spinner-dots
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
       </div>
       <div v-else>
         <h5 data-test="logs-search-error-message" class="text-center">
@@ -101,7 +164,7 @@ import { useRouter } from "vue-router";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
-import useLogs from "@/composables/useLogs";
+import useTraces from "@/composables/useTraces";
 import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser";
 
@@ -111,11 +174,13 @@ import TransformService from "@/services/jstransform";
 import {
   useLocalLogsObj,
   b64EncodeUnicode,
-  useLocalLogFilterField,
+  useLocalTraceFilterField,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { number } from "@intlify/core-base";
+import { stringLiteral } from "@babel/types";
 
 export default defineComponent({
   name: "PageSearch",
@@ -149,12 +214,12 @@ export default defineComponent({
         this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.from &&
+          this.searchObj.data.queryResults.from &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.size &&
+          this.searchObj.data.queryResults.size &&
         this.searchObj.data.queryResults.total >
-        this.searchObj.data.queryResults.size +
-        this.searchObj.data.queryResults.from
+          this.searchObj.data.queryResults.size +
+            this.searchObj.data.queryResults.from
       ) {
         this.searchObj.loading = true;
         this.getQueryData();
@@ -176,12 +241,13 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useLogs();
+    const { searchObj, resetSearchObj } = useTraces();
     let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
+    const tracesScatterChart = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -244,7 +310,6 @@ export default defineComponent({
                 name: data.name,
                 args: "(" + args.join(",") + ")",
               };
-              searchObj.data.transforms.push({name: data.name, function: data.function});
               if (!data.stream_name) {
                 searchObj.data.stream.functions.push(itemObj);
               }
@@ -261,12 +326,14 @@ export default defineComponent({
     function getStreamList() {
       try {
         streamService
-          .nameList(store.state.selectedOrganization.identifier, "logs", true)
+          .nameList(store.state.selectedOrganization.identifier, "traces", true)
           .then((res) => {
             searchObj.data.streamResults = res.data;
 
             if (res.data.list.length > 0) {
-              getQueryTransform();
+              if (config.isZincObserveCloud == "true") {
+                getQueryTransform();
+              }
 
               //extract stream data from response
               loadStreamLists();
@@ -280,9 +347,8 @@ export default defineComponent({
               searchObj.data.queryResults = {};
               searchObj.data.sortedQueryResults = [];
               searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {},
+                layout: {},
+                data: [],
               };
             }
           })
@@ -329,9 +395,8 @@ export default defineComponent({
             searchObj.data.sortedQueryResults = [];
             searchObj.data.stream.selectedStreamFields = [];
             searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
+              layout: {},
+              data: [],
             };
             // reDrawGrid();
           }
@@ -389,8 +454,8 @@ export default defineComponent({
           } else {
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
-              " " +
-              searchObj.data.datetime.absolute.startTime
+                " " +
+                searchObj.data.datetime.absolute.startTime
             );
           }
           if (
@@ -401,8 +466,8 @@ export default defineComponent({
           } else {
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
-              " " +
-              searchObj.data.datetime.absolute.endTime
+                " " +
+                searchObj.data.datetime.absolute.endTime
             );
           }
           const rVal = {
@@ -416,213 +481,205 @@ export default defineComponent({
       }
     }
 
+    const getDefaultRequest = () => {
+      return {
+        query: {
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, max(service_name) as service_name, max(operation_name) as operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id`,
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
+          from: 0,
+          size: 0,
+        },
+        encoding: "base64",
+      };
+    };
+
+    const getISOTimestamp = (date: any) => {
+      return new Date(date.toISOString()).getTime() * 1000;
+    };
+
+    // Function to return {chartInterval : "1 day", chartKeyFormat : "YYYY-MM-DD"}
+    const getChartSettings = (timestamps: {
+      start_time: number | string;
+      end_time: number | string;
+    }) => {
+      if (
+        timestamps.start_time != "Invalid Date" &&
+        timestamps.end_time != "Invalid Date"
+      ) {
+        const chartSettings = {
+          chartInterval: "1 second",
+          chartKeyFormat: "HH:mm:ss",
+        };
+
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+          chartSettings.chartInterval = "3 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+          chartSettings.chartInterval = "5 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+          chartSettings.chartInterval = "10 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+          chartSettings.chartInterval = "15 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+          chartSettings.chartInterval = "30 second";
+          chartSettings.chartKeyFormat = "HH:mm:ss";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+          chartSettings.chartInterval = "1 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+          chartSettings.chartInterval = "5 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+          chartSettings.chartInterval = "30 minute";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+          chartSettings.chartInterval = "1 hour";
+          chartSettings.chartKeyFormat = "MM-DD HH:mm";
+        }
+        if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+          chartSettings.chartInterval = "1 day";
+          chartSettings.chartKeyFormat = "YYYY-MM-DD";
+        }
+        return chartSettings;
+      } else {
+        return false;
+      }
+    };
+
     function buildSearch() {
       try {
         let query = searchObj.data.editorValue;
-
-        var req: any = {
-          query: {
-            sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-            start_time: (new Date().getTime() - 900000) * 1000,
-            end_time: new Date().getTime() * 1000,
-            from:
-              searchObj.data.resultGrid.currentPage *
-              searchObj.meta.resultGrid.rowsPerPage,
-            size: parseInt(searchObj.meta.resultGrid.rowsPerPage, 10),
-          },
-          aggs: {
-            histogram:
-              "select histogram(" +
-              store.state.zoConfig.timestamp_column +
-              ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
-          },
-          encoding: "base64",
-        };
+        var req = getDefaultRequest();
+        req.query.from =
+          searchObj.data.resultGrid.currentPage *
+          searchObj.meta.resultGrid.rowsPerPage;
+        req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
         var timestamps: any = getConsumableDateTime();
+        req.query.start_time = getISOTimestamp(timestamps.start_time);
+        req.query.end_time = getISOTimestamp(timestamps.end_time);
 
-        if (
-          timestamps.start_time != "Invalid Date" &&
-          timestamps.end_time != "Invalid Date"
-        ) {
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
+        const chartSettings = getChartSettings(timestamps);
+        // if (chartSettings) {
+        //   searchObj.meta.resultGrid.chartKeyFormat =
+        //     chartSettings.chartKeyFormat;
+        //   searchObj.meta.resultGrid.chartInterval = chartSettings.chartInterval;
 
-          const startISOTimestamp: any =
-            new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-          const endISOTimestamp: any =
-            new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          // let timeRangeFilter: String =
-          //   "(_timestamp >= [START_TIME] AND _timestamp < [END_TIME])";
-          // // let timeRangeFilter: String =
-          // //   "time_range(\"_timestamp\", '[START_TIME]','[END_TIME]')";
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[START_TIME]",
-          //   startISOTimestamp
-          // );
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[END_TIME]",
-          //   endISOTimestamp
-          // );
+        //   req.aggs.histogram = req.aggs.histogram.replaceAll(
+        //     "[INTERVAL]",
+        //     searchObj.meta.resultGrid.chartInterval
+        //   );
+        // }
+        req.query["sql_mode"] = "full";
 
-          // if (query.trim() != "") {
-          //   query += " and " + timeRangeFilter;
-          // } else {
-          //   query = timeRangeFilter;
-          // }
-
-          req.query.start_time = startISOTimestamp;
-          req.query.end_time = endISOTimestamp;
-
-          searchObj.meta.resultGrid.chartInterval = "1 second";
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-            searchObj.meta.resultGrid.chartInterval = "3 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-            searchObj.meta.resultGrid.chartInterval = "5 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-            searchObj.meta.resultGrid.chartInterval = "10 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-            searchObj.meta.resultGrid.chartInterval = "15 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-            searchObj.meta.resultGrid.chartInterval = "30 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-            searchObj.meta.resultGrid.chartInterval = "1 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-            searchObj.meta.resultGrid.chartInterval = "5 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-            searchObj.meta.resultGrid.chartInterval = "30 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-            searchObj.meta.resultGrid.chartInterval = "1 hour";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (
-            timestamps.end_time - timestamps.start_time >=
-            1000 * 86400 * 30
-          ) {
-            searchObj.meta.resultGrid.chartInterval = "1 day";
-            searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-          }
-
-          req.aggs.histogram = req.aggs.histogram.replaceAll(
-            "[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval
-          );
+        let parseQuery = query.split("|");
+        let queryFunctions = "";
+        let whereClause = "";
+        if (parseQuery.length > 1) {
+          queryFunctions = "," + parseQuery[0].trim();
+          whereClause = parseQuery[1].trim();
         } else {
-          return false;
+          whereClause = parseQuery[0].trim();
         }
 
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL = parser.astify(searchObj.data.query);
-          if (parsedSQL.limit != null) {
-            req.query.size = parsedSQL.limit.value[0].value;
+        if (whereClause.trim() != "") {
+          whereClause = whereClause
+            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
+            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
+            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
 
-            if (parsedSQL.limit.seperator == "offset") {
-              req.query.from = parsedSQL.limit.value[1].value || 0;
-            }
+          whereClause = whereClause
+            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
+            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
+            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
-            parsedSQL.limit = null;
-
-            query = parser.sqlify(parsedSQL);
-
-            //replace backticks with \" for sql_mode
-            query = query.replace(/`/g, '"');
-            searchObj.loading = true;
-            searchObj.data.queryResults.hits = [];
-            searchObj.data.queryResults.total = 0;
-          }
-
-          req.query.sql = query;
-          req.query["sql_mode"] = "full";
-          delete req.aggs;
-        } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
-
-          if (whereClause.trim() != "") {
-            whereClause = whereClause
-              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-            whereClause = whereClause
-              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
+          const parsedSQL = whereClause.split(" ");
+          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+            parsedSQL.forEach((node: any, index: any) => {
+              if (node == field.name) {
+                node = node.replaceAll('"', "");
+                parsedSQL[index] = '"' + node + '"';
+              }
             });
+          });
 
-            whereClause = parsedSQL.join(" ");
-
-            req.query.sql = req.query.sql.replace(
-              "[WHERE_CLAUSE]",
-              " WHERE " + whereClause
-            );
-          } else {
-            req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          }
+          whereClause = parsedSQL.join(" ");
 
           req.query.sql = req.query.sql.replace(
-            "[QUERY_FUNCTIONS]",
-            queryFunctions
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause
           );
-
-          req.query.sql = req.query.sql.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream.value
-          );
-          // const parsedSQL = parser.astify(req.query.sql);
-          // const unparsedSQL = parser.sqlify(parsedSQL);
-          // console.log(unparsedSQL);
+        } else {
+          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
         }
 
-        if (searchObj.data.resultGrid.currentPage > 0) {
-          delete req.aggs;
-        }
+        req.query.sql = req.query.sql.replace(
+          "[QUERY_FUNCTIONS]",
+          queryFunctions
+        );
+
+        req.query.sql = req.query.sql.replace(
+          "[INDEX_NAME]",
+          searchObj.data.stream.selectedStream.value
+        );
+        // const parsedSQL = parser.astify(req.query.sql);
+        // const unparsedSQL = parser.sqlify(parsedSQL);
+        // console.log(unparsedSQL);
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        if (
-          !searchObj.meta.sqlMode &&
-          searchObj.data.resultGrid.currentPage == 0
-        ) {
-          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
-        }
 
         return req;
       } catch (e) {
         throw new ErrorException(e.message);
       }
     }
+
+    const getTraceDetails = (traceId: string) => {
+      searchObj.data.traceDetails.loading = true;
+      const req = buildTraceSearchQuery(traceId);
+      delete req.aggs;
+
+      searchService
+        .search({
+          org_identifier: searchObj.organizationIdetifier,
+          query: req,
+          page_type: "traces",
+        })
+        .then((res) => {
+          searchObj.data.traceDetails.spanList = res.data?.hits || [];
+        })
+        .finally(() => {
+          searchObj.data.traceDetails.loading = false;
+        });
+    };
+
+    const buildTraceSearchQuery = (traceId: string) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1000;
+      var timestamps: any = getConsumableDateTime();
+      req.query.start_time = getISOTimestamp(timestamps.start_time);
+      req.query.end_time = getISOTimestamp(timestamps.end_time);
+
+      req.query.sql = b64EncodeUnicode(
+        `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${traceId}' ORDER BY start_time`
+      );
+
+      return req;
+    };
 
     function getQueryData() {
       try {
@@ -646,9 +703,8 @@ export default defineComponent({
           searchObj.data.sortedQueryResults = [];
           // searchObj.data.streamResults = [];
           searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {},
+            layout: {},
+            data: [],
           };
           // searchObj.data.editorValue = "";
         }
@@ -661,21 +717,12 @@ export default defineComponent({
           return false;
         }
 
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent
-          );
-        }
-
         searchObj.data.errorCode = 0;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
-            page_type: "logs",
+            page_type: "traces",
           })
           .then((res) => {
             searchObj.loading = false;
@@ -756,19 +803,52 @@ export default defineComponent({
               }
             });
           }
+          const idFields = {
+            trace_id: 1,
+            span_id: 1,
+            reference_parent_span_id: 1,
+            reference_parent_trace_id: 1,
+            start_time: 1,
+          };
+          const importantFields = {
+            trace_id: 1,
+            span_id: 1,
+            reference_parent_span_id: 1,
+            reference_parent_trace_id: 1,
+            service_name: 1,
+            operation_name: 1,
+            start_time: 1,
+          };
 
+          // Ignoring timestamp as start time is present
           let fields: any = {};
+          Object.keys(importantFields).forEach((rowName) => {
+            if (fields[rowName] == undefined) {
+              fields[rowName] = {};
+              searchObj.data.stream.selectedStreamFields.push({
+                name: rowName,
+                ftsKey: ftsKeys.has(rowName),
+                showValues: !idFields[rowName],
+              });
+            }
+          });
+
           queryResult.forEach((row: any) => {
             // let keys = deepKeys(row);
             // for (let i in row) {
-            if (fields[row.name] == undefined) {
-              fields[row.name] = {};
-              searchObj.data.stream.selectedStreamFields.push({
-                name: row.name,
-                ftsKey: ftsKeys.has(row.name),
-              });
+            if (
+              !importantFields[row.name] &&
+              !ignoreFields.includes(row.name)
+            ) {
+              if (fields[row.name] == undefined) {
+                fields[row.name] = {};
+                searchObj.data.stream.selectedStreamFields.push({
+                  name: row.name,
+                  ftsKey: ftsKeys.has(row.name),
+                  showValues: !idFields[row.name],
+                });
+              }
             }
-            // }
           });
         }
       } catch (e) {
@@ -780,89 +860,69 @@ export default defineComponent({
       try {
         searchObj.data.resultGrid.columns = [];
 
-        const logFilterField: any =
-          useLocalLogFilterField()?.value != null
-            ? useLocalLogFilterField()?.value
-            : {};
-        const logFieldSelectedValue =
-          logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
-          ];
-        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
-        if (
-          !searchObj.data.stream.selectedFields.length &&
-          selectedFields.length
-        ) {
-          return (searchObj.data.stream.selectedFields = selectedFields);
-        }
-        searchObj.data.stream.selectedFields = selectedFields;
+        searchObj.data.stream.selectedFields = [];
+
+        searchObj.meta.resultGrid.manualRemoveFields = false;
 
         searchObj.data.resultGrid.columns.push({
           name: "@timestamp",
           field: (row: any) =>
             date.formatDate(
-              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
+              Math.floor(row["start_time"] / 1000000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
           prop: (row: any) =>
             date.formatDate(
-              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
+              Math.floor(row["start_time"] / 1000000),
               "MMM DD, YYYY HH:mm:ss.SSS Z"
             ),
-          label: t("search.timestamp"),
+          label: "Start Time",
           align: "left",
           sortable: true,
         });
-        if (searchObj.data.stream.selectedFields.length == 0) {
-          // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
-          //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-          //     if (
-          //       (field.name == "log" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf("log") ==
-          //           -1) ||
-          //       (field.name == "message" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf(
-          //           "message"
-          //         ) == -1)
-          //     ) {
-          //       searchObj.data.stream.selectedFields.push(field.name);
-          //     }
-          //   });
-          // }
 
-          searchObj.meta.resultGrid.manualRemoveFields = false;
-          if (searchObj.data.stream.selectedFields.length == 0) {
-            searchObj.data.resultGrid.columns.push({
-              name: "source",
-              field: (row: any) => JSON.stringify(row),
-              prop: (row: any) => JSON.stringify(row),
-              label: "source",
-              align: "left",
-              sortable: true,
-            });
-          }
-        } else {
-          searchObj.data.stream.selectedFields.forEach((field: any) => {
-            searchObj.data.resultGrid.columns.push({
-              name: field,
-              field: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              prop: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              label: field,
-              align: "left",
-              sortable: true,
-              closable: true,
-            });
-          });
-        }
+        searchObj.data.resultGrid.columns.push({
+          name: "operation_name",
+          field: (row: any) => row.operation_name,
+          prop: (row: any) => row.operation_name,
+          label: "Operation",
+          align: "left",
+          sortable: true,
+        });
+
+        searchObj.data.resultGrid.columns.push({
+          name: "service_name",
+          field: (row: any) => row.service_name,
+          prop: (row: any) => row.service_name,
+          label: "Service",
+          align: "left",
+          sortable: true,
+        });
+
+        searchObj.data.resultGrid.columns.push({
+          name: "duration",
+          field: (row: any) => row.duration,
+          prop: (row: any) => row.duration,
+          label: "Duration",
+          align: "left",
+          sortable: true,
+          format: (val) => formatTimeWithSuffix(val),
+        });
 
         searchObj.loading = false;
-        if (searchObj.data.queryResults.aggs) reDrawGrid();
+        reDrawGrid();
       } catch (e) {
         throw new ErrorException(e.message);
+      }
+    }
+
+    function formatTimeWithSuffix(ns) {
+      if (ns < 1000) {
+        return `${ns} ns`;
+      } else if (ns < 10000000) {
+        return `${(ns / 1000000).toFixed(2)} ms`;
+      } else {
+        return `${(ns / 1000000000).toFixed(2)} s`;
       }
     }
 
@@ -871,46 +931,81 @@ export default defineComponent({
       const xData: string[] = [];
       const yData: number[] = [];
 
-      if (searchObj.data.queryResults.aggs) {
-        searchObj.data.queryResults.aggs.histogram.map(
+      var trace1 = {
+        x: xData,
+        y: yData,
+        name: "Gold",
+        type: "scatter",
+        mode: "markers",
+      };
+
+      var data = [trace1];
+
+      var layout = {
+        title: {
+          text: "",
+          font: {
+            size: 12,
+          },
+        },
+        margin: {
+          l: 50,
+          r: 50,
+          t: 22,
+          b: 50,
+        },
+        font: { size: 12 },
+        xaxis: { type: "date" },
+        yaxis: { ticksuffix: "ms" },
+        scattergap: 0.7,
+        height: 150,
+        autosize: true,
+      };
+
+      if (searchObj.data.queryResults.hits) {
+        searchObj.data.queryResults.hits.forEach(
           (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
+            [store.state.zoConfig.timestamp_column]: string | number | Date;
+            duration: number | Date;
           }) => {
-            unparsed_x_data.push(bucket.zo_sql_key);
-            let histDate = new Date(bucket.zo_sql_key + "Z");
+            unparsed_x_data.push(bucket[store.state.zoConfig.timestamp_column]);
+            let histDate = new Date(
+              Math.floor(bucket[store.state.zoConfig.timestamp_column] / 1000)
+            );
             xData.push(Math.floor(histDate.getTime()));
-            yData.push(parseInt(bucket.zo_sql_num, 10));
+            yData.push(Number((bucket.duration / 1000000).toFixed(2)));
           }
         );
       }
-      const totalRecords =
-        (searchObj.data.resultGrid.currentPage + 1) *
-          searchObj.meta.resultGrid.rowsPerPage <
-          searchObj.data.queryResults.hits.length
-          ? (searchObj.data.resultGrid.currentPage + 1) *
-          searchObj.meta.resultGrid.rowsPerPage
-          : searchObj.data.queryResults.hits.length;
 
-      const chartParams = {
-        title:
-          "Showing " +
-          (searchObj.data.queryResults.from == 0
-            ? searchObj.data.queryResults.size
-            : totalRecords) +
-          " out of " +
-          searchObj.data.queryResults.total.toLocaleString() +
-          " hits in " +
-          searchObj.data.queryResults.took +
-          " ms. (Scan Size: " +
-          searchObj.data.queryResults.scan_size +
-          "MB)",
-        unparsed_x_data: unparsed_x_data,
+      // const totalRecords =
+      //   (searchObj.data.resultGrid.currentPage + 1) *
+      //     searchObj.meta.resultGrid.rowsPerPage <
+      //   searchObj.data.queryResults.hits.length
+      //     ? (searchObj.data.resultGrid.currentPage + 1) *
+      //       searchObj.meta.resultGrid.rowsPerPage
+      //     : searchObj.data.queryResults.hits.length;
+
+      // layout.title.text =
+      //   "Showing " +
+      //   (searchObj.data.queryResults.from == 0
+      //     ? searchObj.data.queryResults.size
+      //     : totalRecords) +
+      //   " out of " +
+      //   searchObj.data.queryResults.total.toLocaleString() +
+      //   " hits in " +
+      //   searchObj.data.queryResults.took +
+      //   " ms. (Scan Size: " +
+      //   searchObj.data.queryResults.scan_size +
+      //   "MB)";
+
+      searchObj.data.histogram = {
+        data: data,
+        layout: layout,
       };
-      searchObj.data.histogram = { xData, yData, chartParams };
+
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
         searchResultRef.value?.reDrawChart
       ) {
         searchResultRef.value.reDrawChart();
@@ -969,8 +1064,7 @@ export default defineComponent({
       reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
-        router.currentRoute.value.path.indexOf("/logs") > -1
+        router.currentRoute.value.path.indexOf("/traces") > -1
       ) {
         setTimeout(() => {
           if (searchResultRef.value) searchResultRef.value.reDrawChart();
@@ -982,7 +1076,7 @@ export default defineComponent({
       setTimeout(() => {
         let rect = {};
         const secondWrapperElement: any =
-          document.getElementById("secondLevel");
+          document.getElementById("tracesSecondLevel");
         if (secondWrapperElement != null) {
           rect = secondWrapperElement.getBoundingClientRect();
           secondWrapperElement.style.height = `calc(100vh - ${Math.round(
@@ -990,7 +1084,8 @@ export default defineComponent({
           )}px)`;
         }
 
-        const thirdWrapperElement: any = document.getElementById("thirdLevel");
+        const thirdWrapperElement: any =
+          document.getElementById("tracesThirdLevel");
         if (thirdWrapperElement != null) {
           rect = thirdWrapperElement.getBoundingClientRect();
           thirdWrapperElement.style.height = `calc(100vh - ${Math.round(
@@ -998,26 +1093,28 @@ export default defineComponent({
           )}px)`;
         }
 
-        const GridElement: any = document.getElementById("searchGridComponent");
+        const GridElement: any = document.getElementById(
+          "tracesSearchGridComponent"
+        );
         if (GridElement != null) {
           rect = GridElement.getBoundingClientRect();
           GridElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
         }
 
-        const FLElement = document.getElementById("fieldList");
+        const FLElement = document.getElementById("tracesFieldList");
         if (FLElement != null) {
           rect = FLElement.getBoundingClientRect();
           FLElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
         }
 
-        const logPagesecondWrapperElement: any =
-          document.getElementById("logPage");
-        if (logPagesecondWrapperElement != null) {
-          rect = logPagesecondWrapperElement.getBoundingClientRect();
-          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
+        const tracePagesecondWrapperElement: any =
+          document.getElementById("tracePage");
+        if (tracePagesecondWrapperElement != null) {
+          rect = tracePagesecondWrapperElement.getBoundingClientRect();
+          tracePagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
             rect.top
           )}px)`;
-          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
+          tracePagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
             rect.top + 20
           )}px)`;
         }
@@ -1084,64 +1181,12 @@ export default defineComponent({
       try {
         dismiss = Notify();
         searchObj.data.errorCode = 0;
-        let query_context = "";
-        let query = searchObj.data.query;
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL: any = parser.astify(query);
-          //hack add time stamp column to parsedSQL if not already added
-          if (
-            !(parsedSQL.columns === "*") &&
-            parsedSQL.columns.filter(
-              (e) => e.expr.column === store.state.zoConfig.timestamp_column
-            ).length === 0
-          ) {
-            const ts_col = {
-              expr: {
-                type: "column_ref",
-                table: null,
-                column: store.state.zoConfig.timestamp_column,
-              },
-              as: null,
-            };
-            parsedSQL.columns.push(ts_col);
-          }
-          parsedSQL.where = null;
-          query_context = b64EncodeUnicode(
-            parser.sqlify(parsedSQL).replace(/`/g, '"')
-          );
-        } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = "";
-          } else {
-            whereClause = "";
-          }
-          query_context =
-            `SELECT *${queryFunctions} FROM "` +
-            searchObj.data.stream.selectedStream.value +
-            `" `;
-          query_context = b64EncodeUnicode(query_context);
-        }
-
-        let query_fn = "";
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
-        }
-
         searchService
           .search_around({
             org_identifier: searchObj.organizationIdetifier,
             index: searchObj.data.stream.selectedStream.value,
             key: obj.key,
             size: obj.size,
-            query_context: query_context,
-            query_fn: query_fn,
           })
           .then((res) => {
             searchObj.loading = false;
@@ -1230,6 +1275,7 @@ export default defineComponent({
       setQuery,
       useLocalLogsObj,
       searchAroundData,
+      getTraceDetails,
     };
   },
   computed: {
@@ -1315,8 +1361,6 @@ export default defineComponent({
     },
     changeOrganization() {
       if (this.router.currentRoute.value.name == "logs") {
-        this.searchObj.data.tempFunctionContent = "";
-        this.searchBarRef.resetFunctionContent();
         this.searchObj.data.query = "";
         this.setQuery("");
         this.searchObj.meta.sqlMode = false;
@@ -1325,8 +1369,6 @@ export default defineComponent({
     },
     changeStream() {
       if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-        this.searchObj.data.tempFunctionContent = "";
-        this.searchBarRef.resetFunctionContent();
         setTimeout(() => {
           this.runQueryFn();
         }, 500);
@@ -1369,9 +1411,7 @@ export default defineComponent({
 div.plotly-notifier {
   visibility: hidden;
 }
-
-.logPage {
-
+.tracePage {
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
@@ -1388,19 +1428,19 @@ div.plotly-notifier {
   }
 
   .index-table :hover::-webkit-scrollbar,
-  #searchGridComponent:hover::-webkit-scrollbar {
+  #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 13px;
     width: 13px;
   }
 
   .index-table ::-webkit-scrollbar-track,
-  #searchGridComponent::-webkit-scrollbar-track {
+  #tracesSearchGridComponent::-webkit-scrollbar-track {
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
     border-radius: 10px;
   }
 
   .index-table ::-webkit-scrollbar-thumb,
-  #searchGridComponent::-webkit-scrollbar-thumb {
+  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
     border-radius: 10px;
     -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
   }

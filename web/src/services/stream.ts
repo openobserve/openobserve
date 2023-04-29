@@ -62,18 +62,25 @@ const stream = {
     start_time,
     end_time,
     query_context,
-    query_fn
+    query_fn,
+    type,
   }: any) => {
     const fieldsString = fields.join(",");
-    let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}&sql=${query_context}`;
-    if (query_fn.trim() != "") {
-      url = url + `&query_fn=${query_fn}`;
-    }
+    let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
+    if (query_context) url = url + `&sql=${query_context}`;
+    if (query_fn?.trim()) url = url + `&query_fn=${query_fn}`;
+    if (type) url += "&type=" + type;
     return http().get(url);
   },
 
-  delete: (org_identifier: string, stream_name: string, stream_type: string) => {
-    return http().delete(`/api/${org_identifier}/${stream_name}?type=${stream_type}`);
+  delete: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string
+  ) => {
+    return http().delete(
+      `/api/${org_identifier}/${stream_name}?type=${stream_type}`
+    );
   },
 };
 

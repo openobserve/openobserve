@@ -349,6 +349,11 @@ export default defineComponent({
         link: "/metrics",
       },
       {
+        title: t("menu.traces"),
+        icon: "img:" + getImageURL("images/left_nav/traces.svg"),
+        link: "/traces",
+      },
+      {
         title: t("menu.dashboard"),
         icon: "dashboard",
         link: "/dashboards",

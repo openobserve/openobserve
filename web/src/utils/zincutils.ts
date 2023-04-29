@@ -172,6 +172,10 @@ export const useLocalLogFilterField = (val = "", isDelete = false) => {
   return useLocalStorage("logFilterField", val, isDelete, true);
 };
 
+export const useLocalTraceFilterField = (val = "", isDelete = false) => {
+  return useLocalStorage("traceFilterField", val, isDelete, true);
+};
+
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;

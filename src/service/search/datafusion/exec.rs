@@ -945,8 +945,7 @@ fn apply_query_fn(
     in_batch: Vec<json::Map<String, json::Value>>,
 ) -> Result<Option<Vec<RecordBatch>>> {
     let mut resp = vec![];
-    let state = vrl::state::Runtime::default();
-    let mut runtime = vrl::Runtime::new(state);
+    let mut runtime = crate::common::functions::init_vrl_runtime();
     match crate::service::ingestion::compile_vrl_function(&query_fn_src) {
         Ok(program) => {
             let rows_val: Vec<json::Value> = in_batch

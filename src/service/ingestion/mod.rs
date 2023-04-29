@@ -279,8 +279,7 @@ pub fn format_stream_name(stream_name: &str) -> String {
 pub fn init_functions_runtime() -> (Lua, vrl::Runtime) {
     let lua = Lua::new();
     // lua.sandbox(true).unwrap();
-    let state = vrl::state::Runtime::default();
-    let runtime = vrl::Runtime::new(state);
+    let runtime = crate::common::functions::init_vrl_runtime();
     (lua, runtime)
 }
 
