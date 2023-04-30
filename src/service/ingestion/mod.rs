@@ -340,6 +340,7 @@ mod tests {
     }
 
     #[actix_web::test]
+    #[cfg(feature = "zo_functions")]
     async fn test_compile_vrl_function() {
         let result = compile_vrl_function(
             r#"if .country == "USA" {
