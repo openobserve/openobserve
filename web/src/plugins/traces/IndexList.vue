@@ -28,7 +28,7 @@
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="field-table"
+        class="traces-field-table"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
@@ -359,6 +359,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.traces-field-table {
+  height: calc(100vh - 172px) !important;
+}
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -419,7 +422,7 @@ export default defineComponent({
       border-bottom: unset;
     }
   }
-  .field-table {
+  .traces-field-table {
     width: 100%;
   }
 

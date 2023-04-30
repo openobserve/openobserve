@@ -27,7 +27,7 @@
       />
       <div
         id="tracesThirdLevel"
-        class="row scroll"
+        class="row scroll traces-search-result-container"
         style="width: 100%"
         v-if="searchObj.data.stream.streamLists.length > 0"
       >
@@ -114,7 +114,7 @@
               data-test="logs-search-search-result"
               v-show="
                 searchObj.data.queryResults.hasOwnProperty('total') &&
-                searchObj.data.queryResults.hits.length !== 0
+                !!searchObj.data.queryResults.hits.length
               "
             >
               <search-result
@@ -398,7 +398,6 @@ export default defineComponent({
               layout: {},
               data: [],
             };
-            // reDrawGrid();
           }
         } else {
           searchObj.loading = false;
@@ -484,7 +483,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, max(service_name) as service_name, max(operation_name) as operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration)/1000000 as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -587,6 +586,7 @@ export default defineComponent({
         let parseQuery = query.split("|");
         let queryFunctions = "";
         let whereClause = "";
+
         if (parseQuery.length > 1) {
           queryFunctions = "," + parseQuery[0].trim();
           whereClause = parseQuery[1].trim();
@@ -620,10 +620,13 @@ export default defineComponent({
 
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            " WHERE " + whereClause
+            " WHERE duration>10000000 and " + whereClause
           );
         } else {
-          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
+          req.query.sql = req.query.sql.replace(
+            "[WHERE_CLAUSE]",
+            "WHERE duration>10000000 "
+          );
         }
 
         req.query.sql = req.query.sql.replace(
@@ -649,6 +652,7 @@ export default defineComponent({
 
     const getTraceDetails = (traceId: string) => {
       searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.spanList = [];
       const req = buildTraceSearchQuery(traceId);
       delete req.aggs;
 
@@ -910,19 +914,16 @@ export default defineComponent({
         });
 
         searchObj.loading = false;
-        reDrawGrid();
       } catch (e) {
         throw new ErrorException(e.message);
       }
     }
 
-    function formatTimeWithSuffix(ns) {
-      if (ns < 1000) {
-        return `${ns} ns`;
-      } else if (ns < 10000000) {
-        return `${(ns / 1000000).toFixed(2)} ms`;
+    function formatTimeWithSuffix(ms) {
+      if (ms < 1000) {
+        return `${ms}ms`;
       } else {
-        return `${(ns / 1000000000).toFixed(2)} s`;
+        return `${(ms / 1000).toFixed(2)}s`;
       }
     }
 
@@ -973,7 +974,7 @@ export default defineComponent({
               Math.floor(bucket[store.state.zoConfig.timestamp_column] / 1000)
             );
             xData.push(Math.floor(histDate.getTime()));
-            yData.push(Number((bucket.duration / 1000000).toFixed(2)));
+            yData.push(Number(bucket.duration.toFixed(2)));
           }
         );
       }
@@ -1036,15 +1037,7 @@ export default defineComponent({
     onMounted(() => {
       if (searchObj.loading == false) {
         loadPageData();
-
-        reDrawGrid();
-        refreshData();
       }
-    });
-
-    onUpdated(() => {
-      // loadPageData();
-      reDrawGrid();
     });
 
     onDeactivated(() => {
@@ -1052,8 +1045,6 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      refreshData();
-
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
@@ -1061,7 +1052,6 @@ export default defineComponent({
         loadPageData();
       }
 
-      reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
         router.currentRoute.value.path.indexOf("/traces") > -1
@@ -1072,78 +1062,10 @@ export default defineComponent({
       }
     });
 
-    const reDrawGrid = () => {
-      setTimeout(() => {
-        let rect = {};
-        const secondWrapperElement: any =
-          document.getElementById("tracesSecondLevel");
-        if (secondWrapperElement != null) {
-          rect = secondWrapperElement.getBoundingClientRect();
-          secondWrapperElement.style.height = `calc(100vh - ${Math.round(
-            rect.top
-          )}px)`;
-        }
-
-        const thirdWrapperElement: any =
-          document.getElementById("tracesThirdLevel");
-        if (thirdWrapperElement != null) {
-          rect = thirdWrapperElement.getBoundingClientRect();
-          thirdWrapperElement.style.height = `calc(100vh - ${Math.round(
-            rect.top
-          )}px)`;
-        }
-
-        const GridElement: any = document.getElementById(
-          "tracesSearchGridComponent"
-        );
-        if (GridElement != null) {
-          rect = GridElement.getBoundingClientRect();
-          GridElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
-        }
-
-        const FLElement = document.getElementById("tracesFieldList");
-        if (FLElement != null) {
-          rect = FLElement.getBoundingClientRect();
-          FLElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
-        }
-
-        const tracePagesecondWrapperElement: any =
-          document.getElementById("tracePage");
-        if (tracePagesecondWrapperElement != null) {
-          rect = tracePagesecondWrapperElement.getBoundingClientRect();
-          tracePagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
-            rect.top
-          )}px)`;
-          tracePagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
-            rect.top + 20
-          )}px)`;
-        }
-      }, 100);
-    };
-
     const runQueryFn = () => {
       searchObj.data.resultGrid.currentPage = 0;
       searchObj.runQuery = false;
       getQueryData();
-    };
-
-    const refreshData = () => {
-      if (
-        searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
-      ) {
-        refreshIntervalID = setInterval(() => {
-          runQueryFn();
-        }, parseInt(searchObj.meta.refreshInterval) * 1000);
-        $q.notify({
-          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-          color: "positive",
-          position: "top",
-          timeout: 1000,
-        });
-      } else {
-        clearInterval(refreshIntervalID);
-      }
     };
 
     const setQuery = (sqlMode: boolean) => {
@@ -1265,13 +1187,11 @@ export default defineComponent({
       searchBarRef,
       loadPageData,
       getQueryData,
-      reDrawGrid,
       searchResultRef,
       refreshStreamData,
       updateGridColumns,
       getConsumableDateTime,
       runQueryFn,
-      refreshData,
       setQuery,
       useLocalLogsObj,
       searchAroundData,
@@ -1309,9 +1229,6 @@ export default defineComponent({
     runQuery() {
       return this.searchObj.runQuery;
     },
-    changeRefreshInterval() {
-      return this.searchObj.meta.refreshInterval;
-    },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
     },
@@ -1336,9 +1253,6 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      setTimeout(() => {
-        this.reDrawGrid();
-      }, 100);
       if (
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
@@ -1347,11 +1261,6 @@ export default defineComponent({
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
-    },
-    showQuery() {
-      setTimeout(() => {
-        this.reDrawGrid();
-      }, 100);
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -1397,9 +1306,6 @@ export default defineComponent({
         this.runQueryFn();
       }
     },
-    changeRefreshInterval() {
-      this.refreshData();
-    },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
     },
@@ -1407,6 +1313,11 @@ export default defineComponent({
 });
 </script>
 
+<style lang="scss" scoped>
+.traces-search-result-container {
+  height: calc(100vh - 168px) !important;
+}
+</style>
 <style lang="scss">
 div.plotly-notifier {
   visibility: hidden;
