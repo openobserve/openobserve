@@ -15,25 +15,8 @@
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <!-- {{ searchObj.data }} -->
     <div class="row q-my-xs">
       <div class="float-right col">
-        <q-toggle
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="searchObj.meta.showQuery"
-          :label="t('search.showQueryLabel')"
-        />
-        <q-toggle
-          data-test="logs-search-bar-show-fields-toggle-btn"
-          v-model="searchObj.meta.showFields"
-          :label="t('search.showFieldLabel')"
-        />
-        <q-toggle
-          data-test="logs-search-bar-show-histogram-toggle-btn"
-          v-bind:disable="searchObj.meta.sqlMode"
-          v-model="searchObj.meta.showHistogram"
-          :label="t('search.showHistogramLabel')"
-        />
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"

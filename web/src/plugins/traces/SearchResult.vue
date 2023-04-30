@@ -31,6 +31,7 @@
         id="tracesSearchGridComponent"
         type="table"
         ref="searchTableRef"
+        class="traces-table-container"
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
         :virtual-scroll-sticky-size-end="0"
@@ -328,6 +329,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.traces-table-container {
+  height: calc(100vh - 318px) !important;
+}
 .max-result {
   width: 170px;
 }
