@@ -58,8 +58,7 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs"
-class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -81,7 +80,7 @@ class="warning" />{{
             no-caps
             flat
             class="languageDdl"
-            :icon="languageFlag"
+            :icon="selectedLanguage.icon"
             :dropdown-icon="
               'img:' + getImageURL('images/common/language_menu_arrow.svg')
             "
@@ -136,8 +135,7 @@ class="warning" />{{
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey"
-text-color="white">
+                <q-avatar size="md" color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -160,8 +158,7 @@ text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup
-clickable @click="signout">
+              <q-item v-ripple v-close-popup clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -244,7 +241,7 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive } from "vue";
+import { ref, defineComponent, KeepAlive, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -316,9 +313,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const miniMode = ref(false);
-    const languageFlag = ref(
-      "img:" + getImageURL("images/language_flags/en-gb.svg")
-    );
     const zoBackendUrl = store.state.API_ENDPOINT;
     const customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -632,7 +626,6 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
       user,
-      languageFlag,
       zoBackendUrl,
       getImageURL,
       updateOrganization,
