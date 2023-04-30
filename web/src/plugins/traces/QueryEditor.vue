@@ -318,13 +318,15 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 #editor {
   min-height: 4rem;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
 }
+</style>
 
+<style>
 .monaco-editor,
 .monaco-editor .monaco-editor {
   padding: 0px 0px 0px 0px !important;
