@@ -99,7 +99,7 @@ pub async fn ingest(
             continue;
         }
         #[cfg(feature = "zo_functions")]
-        let mut value: json::Value = json::from_slice(line.as_bytes())?;
+        let value: json::Value = json::from_slice(line.as_bytes())?;
         #[cfg(not(feature = "zo_functions"))]
         let value: json::Value = json::from_slice(line.as_bytes())?;
         if !next_line_is_data {
@@ -178,6 +178,9 @@ pub async fn ingest(
             #[cfg(feature = "zo_functions")]
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
+            //JSON Flattening
+            let mut value = json::flatten_json_and_format_field(&value);
+
             #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
                 let mut ret_value = value.clone();
@@ -210,8 +213,6 @@ pub async fn ingest(
 
             //End row based transform
 
-            //JSON Flattening
-            let mut value = json::flatten_json_and_format_field(&value);
             // get json object
             let local_val = value.as_object_mut().unwrap();
             // set _id

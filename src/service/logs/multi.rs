@@ -117,11 +117,13 @@ pub async fn ingest(
             continue;
         }
 
-        let value: json::Value = json::from_slice(line.as_bytes())?;
+        let mut value: json::Value = json::from_slice(line.as_bytes())?;
 
+        // JSON Flattening
+        value = json::flatten_json_and_format_field(&value);
         // Start row based transform
         #[cfg(feature = "zo_functions")]
-        let value = crate::service::ingestion::apply_stream_transform(
+        let mut value = crate::service::ingestion::apply_stream_transform(
             &local_tans,
             &value,
             &lua,
@@ -137,8 +139,6 @@ pub async fn ingest(
         }
         // End row based transform
 
-        // JSON Flattening
-        let mut value = json::flatten_json_and_format_field(&value);
         // get json object
         let local_val = value.as_object_mut().unwrap();
 

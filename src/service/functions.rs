@@ -19,6 +19,8 @@ use actix_web::{
 use std::io::Error;
 use tracing::instrument;
 
+#[cfg(feature = "zo_functions")]
+use super::ingestion::compile_vrl_function;
 use crate::service::db;
 use crate::{
     infra::config::CONFIG,
@@ -29,8 +31,6 @@ use crate::{
 };
 use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
 use crate::{meta::functions::FunctionList, meta::StreamType};
-
-use super::ingestion::compile_vrl_function;
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
@@ -57,6 +57,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             FN_ALREADY_EXIST.to_string(),
         )))
     } else {
+        #[cfg(feature = "zo_functions")]
         if func.trans_type.unwrap() == 0 {
             match compile_vrl_function(func.function.as_str()) {
                 Ok(_) => {}
@@ -112,7 +113,7 @@ pub async fn update_function(
 
     // UI mostly like in 1st version wont send streams, so we need to add them back from existing function
     func.streams = existing_fn.streams;
-
+    #[cfg(feature = "zo_functions")]
     if func.trans_type.unwrap() == 0 {
         match compile_vrl_function(func.function.as_str()) {
             Ok(_) => {}
