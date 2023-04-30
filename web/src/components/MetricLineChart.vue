@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="plotref" id="plotly_chart" />
+  <div ref="plotref" id="metrics_plotly_chart" />
 </template>
 
 <script lang="ts">
@@ -163,7 +163,7 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      if (document.getElementById("plotly_chart") != null) {
+      if (document.getElementById("metrics_plotly_chart") != null) {
         Plotly.relayout(plotref.value, update);
       }
     });
@@ -171,8 +171,8 @@ export default defineComponent({
     const reDraw = (chart: any) => {
       traces = [...chart.data];
       layout.title.text = chart.layout.title;
-      if (document.getElementById("plotly_chart") != null) {
-        Plotly.react("plotly_chart", traces, layout);
+      if (document.getElementById("metrics_plotly_chart") != null) {
+        Plotly.react("metrics_plotly_chart", traces, layout);
       }
     };
 
@@ -183,7 +183,7 @@ export default defineComponent({
         "xaxis.autorange": true,
         "yaxis.autorange": true,
       };
-      if (document.getElementById("plotly_chart") != null) {
+      if (document.getElementById("metrics_plotly_chart") != null) {
         Plotly.relayout(plotref.value, update);
       }
     };
