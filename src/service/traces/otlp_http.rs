@@ -105,9 +105,9 @@ pub async fn traces_json(
     // End get stream alert
 
     let mut trigger: Option<Trigger> = None;
+    /*   // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
     let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
-    // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
     let (local_tans, stream_lua_map, stream_vrl_map) =
         crate::service::ingestion::register_stream_transforms(
@@ -116,7 +116,7 @@ pub async fn traces_json(
             StreamType::Traces,
             &lua,
         );
-    // End Register Transforms for stream
+    // End Register Transforms for stream */
 
     let mut service_name: String = traces_stream_name.to_string();
     let reader = BufReader::new(body.as_ref());
@@ -262,10 +262,14 @@ pub async fn traces_json(
                                 min_ts = timestamp as i64;
                             }
 
-                            let value: json::Value = json::to_value(local_val).unwrap();
-                            // Start row based transform
+                            let mut value: json::Value = json::to_value(local_val).unwrap();
+
+                            //JSON Flattening
+                            value = json::flatten_json_and_format_field(&value);
+
+                            /*     // Start row based transform
                             #[cfg(feature = "zo_functions")]
-                            let value = crate::service::ingestion::apply_stream_transform(
+                            let mut value = crate::service::ingestion::apply_stream_transform(
                                 &local_tans,
                                 &value,
                                 &lua,
@@ -278,10 +282,7 @@ pub async fn traces_json(
                             if value.is_null() || !value.is_object() {
                                 continue;
                             }
-                            // End row based transform
-
-                            //JSON Flattening
-                            let mut value = json::flatten_json_and_format_field(&value);
+                            // End row based transform */
 
                             // get json object
                             let val_map = value.as_object_mut().unwrap();

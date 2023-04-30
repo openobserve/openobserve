@@ -223,6 +223,10 @@ pub async fn prometheus_write_proto(
                     );
                 // End Register Transforms for stream
 
+                #[cfg(not(feature = "zo_functions"))]
+                let mut value: json::Value = json::to_value(&metric).unwrap();
+
+                #[cfg(feature = "zo_functions")]
                 let value: json::Value = json::to_value(&metric).unwrap();
 
                 // Start row based transform
