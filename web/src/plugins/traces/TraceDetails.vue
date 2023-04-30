@@ -544,5 +544,9 @@ $traceChartHeight: 200px;
   .q-splitter__after {
     overflow: revert !important;
   }
+
+  .q-splitter__before {
+    z-index: 999 !important;
+  }
 }
 </style>
