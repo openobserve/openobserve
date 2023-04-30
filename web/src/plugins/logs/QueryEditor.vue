@@ -194,7 +194,6 @@ export default defineComponent({
       //   editorRef.value.addEventListener("keyup", onKeyUp);
       window.MonacoEnvironment = {
         getWorker: function (moduleId, label) {
-          console.log(moduleId, label);
           return new Worker(`${getPath()}src/workers/editor.worker.ts`);
         },
       };
