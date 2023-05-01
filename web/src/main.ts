@@ -29,7 +29,6 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
-import "./workers/editor.worker";
 
 const app = createApp(App);
 const router = createRouter(store);
