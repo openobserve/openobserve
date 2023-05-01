@@ -503,6 +503,7 @@ export default defineComponent({
 
       window.addEventListener("click", () => {
         fnEditorobj.layout();
+        queryEditorRef.value.editorObj.layout();
       });
     });
 
@@ -627,6 +628,13 @@ export default defineComponent({
       searchObj.data.tempFunctionContent = "";
     };
 
+    const resetEditorLayout = () => {
+      setTimeout(() => {
+        queryEditorRef.value.layoutEditor();
+        fnEditorobj.layout();
+      }, 100);
+    };
+
     const populateFunctionImplementation = (fnValue) => {
       fnEditorobj.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -687,6 +695,7 @@ export default defineComponent({
       saveFunction,
       initFunctionEditor,
       resetFunctionContent,
+      resetEditorLayout,
       populateFunctionImplementation,
       functionModel,
       functionOptions,
@@ -746,9 +755,11 @@ export default defineComponent({
     toggleFunction(newVal) {
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 100;
+        this.resetEditorLayout();
         this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
+        this.resetEditorLayout();
       }
     },
     selectFunction(newVal) {

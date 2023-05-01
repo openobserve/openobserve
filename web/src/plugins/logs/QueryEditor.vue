@@ -319,10 +319,15 @@ export default defineComponent({
       if (editorObj?.setValue) editorObj.setValue(value);
     };
 
+    const layoutEditor = () => {
+      editorObj.layout();
+    };
+
     return {
       editorRef,
       editorObj,
       setValue,
+      layoutEditor,
     };
   },
 });
