@@ -55,7 +55,7 @@
         <grid-item class="plotlyBackground" v-for="item in list[0].panels" :key="item.id"
           :x="getPanelLayout(list[0].layouts, item.id, 'x')" :y="getPanelLayout(list[0].layouts, item.id, 'y')"
           :w="getPanelLayout(list[0].layouts, item.id, 'w')" :h="getPanelLayout(list[0].layouts, item.id, 'h')"
-          :i="getPanelLayout(list[0].layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" @resize="resizeEvent"
+          :i="getPanelLayout(list[0].layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resize="resizeEvent"
           @move="moveEvent" @resized="resizedEvent" @container-resized="containerResizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
@@ -393,6 +393,22 @@ export default defineComponent({
         case "scatter":
         case "table":
           return 4;
+          break;
+
+        default:
+          break;
+      }
+    },
+    getMinimumWidth(type) {
+      switch (type) {
+        case "area":
+        case "bar":
+        case "h-bar":
+        case "line":
+        case "pie":
+        case "scatter":
+        case "table":
+          return 3;
           break;
 
         default:
