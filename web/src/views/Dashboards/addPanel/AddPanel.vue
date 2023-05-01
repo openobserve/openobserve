@@ -99,9 +99,9 @@
 							</div>
 							<q-separator vertical />
 							<div class="col scroll" style="height:100%;">
-                <div class="column">
-                  <SearchBar />
-                  <q-separator />
+                <SearchBar />
+                <q-separator />
+                <div style="height: calc(100% - 140px);">
                   <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
                 </div>
 							</div>
@@ -206,7 +206,7 @@ export default defineComponent({
     })
 
     watch(()=> dashboardPanelData.data.type, ()=>{
-      chartData.value = dashboardPanelData.data
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
 		})
 
     watch(selectedDate, () => {
