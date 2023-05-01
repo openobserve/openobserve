@@ -562,6 +562,9 @@ export default defineComponent({
                 ...getPropsByChartTypeForLayout(),
             };
 
+            console.log('layout', layout);
+            
+
             Plotly.react(plotRef.value, traces, layout, {
                 responsive: true,
                 displaylogo: false,
@@ -607,7 +610,7 @@ export default defineComponent({
 
         // get the axis data using key
         const getAxisDataFromKey = (key: string) => {
-            let result: string[] = searchQueryData.data.map((item) => item[key]);
+            let result: string[] = searchQueryData.data.map((item) => item[key] || 0);
             // check for the histogram _timestamp field
             // If histogram _timestamp field is found, format the date labels
             const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
@@ -701,9 +704,9 @@ export default defineComponent({
                     return {
                         barmode: "group",
                         xaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -717,9 +720,9 @@ export default defineComponent({
                 case "line":
                     return {
                         xaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -734,9 +737,9 @@ export default defineComponent({
                     return {
                         scattermode: "group",
                         xaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -772,9 +775,9 @@ export default defineComponent({
                             fixedrange: true
                         },
                         yaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
                             automargin: true,
                         },
@@ -782,9 +785,9 @@ export default defineComponent({
                 case "area":
                     return {
                         xaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -798,9 +801,9 @@ export default defineComponent({
                 default:
                     return {
                         xaxis: {
-                            tickmode: "array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
