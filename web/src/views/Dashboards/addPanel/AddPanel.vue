@@ -102,7 +102,7 @@
                 <SearchBar />
                 <q-separator />
                 <div style="height: calc(100% - 140px);">
-                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime"/>
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
 							</div>
 						</div>

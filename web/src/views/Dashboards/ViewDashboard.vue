@@ -60,7 +60,8 @@
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
             <PanelContainer @updated:chart="onUpdatePanel" :draggable="draggable" :data="item"
-              :selectedTimeDate="currentTimeObj">
+              :selectedTimeDate="currentTimeObj" 
+              :width="getPanelLayout(list[0].layouts, item.id, 'w')" :height="getPanelLayout(list[0].layouts, item.id, 'h')">
             </PanelContainer>
           </div>
         </grid-item>
