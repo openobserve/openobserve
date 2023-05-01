@@ -102,6 +102,7 @@ import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
+import { duration } from "moment";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -321,7 +322,7 @@ export default defineComponent({
           span[store.state.zoConfig.timestamp_column],
         startTimeMs: converTimeFromNsToMs(span.start_time),
         endTimeMs: converTimeFromNsToMs(span.end_time),
-        durationMs: convertTime(span.duration),
+        durationMs: Number(span.duration.toFixed(2)),
         idleMs: convertTime(span.idle_ns),
         busyMs: convertTime(span.busy_ns),
         spanId: span.span_id,
@@ -532,6 +533,10 @@ $traceChartHeight: 200px;
   .q-splitter__before,
   .q-splitter__after {
     overflow: revert !important;
+  }
+
+  .q-splitter__before {
+    z-index: 999 !important;
   }
 }
 </style>
