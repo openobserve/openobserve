@@ -37,6 +37,7 @@ struct ConfigResponse<'a> {
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
     lua_fn_enabled: bool,
+    sql_base64_enabled: bool,
     timestamp_column: String,
 }
 
@@ -70,6 +71,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .collect(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         lua_fn_enabled: CONFIG.common.lua_fn_enabled,
+        sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
         timestamp_column: CONFIG.common.time_stamp_col.clone(),
     }))
 }
