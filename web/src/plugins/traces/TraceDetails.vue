@@ -92,14 +92,7 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  type Ref,
-  onMounted,
-  watch,
-  onActivated,
-} from "vue";
+import { defineComponent, ref, type Ref, onMounted, watch } from "vue";
 import { cloneDeep, range } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
@@ -161,10 +154,6 @@ export default defineComponent({
 
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
-    });
-
-    onActivated(() => {
-      buildTracesTree();
     });
 
     onMounted(() => {

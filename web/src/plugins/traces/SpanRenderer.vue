@@ -37,7 +37,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, onBeforeMount, ref } from "vue";
+import { defineComponent } from "vue";
 import SpanBlock from "./SpanBlock.vue";
 
 export default defineComponent({
