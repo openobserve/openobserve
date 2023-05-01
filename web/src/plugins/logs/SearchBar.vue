@@ -200,6 +200,7 @@
           style="width: 100%; height: 100%"
         >
           <template #before>
+            <b>Query Editor:</b>
             <query-editor
               ref="queryEditorRef"
               class="monaco-editor"
@@ -212,6 +213,7 @@
           </template>
           <template #after>
             <div v-show="searchObj.meta.toggleFunction" style="height: 100%">
+              <b>VRL Function Editor:</b>
               <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
             </div>
           </template>
@@ -456,7 +458,7 @@ export default defineComponent({
         },
       });
       fnEditorobj = monaco.editor.create(fnEditorRef.value, {
-        value: `# VRL Function Editor\n`,
+        value: ``,
         language: "ruby",
         minimap: {
           enabled: false,
@@ -618,7 +620,7 @@ export default defineComponent({
 
     const resetFunctionContent = () => {
       formData.value.function = "";
-      fnEditorobj.setValue("# VRL Function Editor\n");
+      fnEditorobj.setValue("");
       formData.value.name = "";
       functionModel.value = "";
       searchObj.data.tempFunctionLoading = false;
@@ -717,7 +719,7 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.replace("-- SQL Query Editor\n","").split("|");
+        let currentQuery = this.searchObj.data.editorValue.split("|");
         let filter = this.searchObj.data.stream.addToFilter;
 
         const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
@@ -772,7 +774,7 @@ export default defineComponent({
 <style lang="scss">
 #fnEditor {
   width: 100%;
-  height: 98% !important;
+  height: 83% !important;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
   overflow: hidden;
