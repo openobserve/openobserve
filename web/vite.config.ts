@@ -23,6 +23,7 @@ import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfil
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs-extra";
+import monacoEditorPlugin from "vite-plugin-monaco-editor";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -102,6 +103,7 @@ export default defineConfig({
     }),
     enterpriseResolverPlugin,
     vueJsx(),
+    monacoEditorPlugin({}),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {

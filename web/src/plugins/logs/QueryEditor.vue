@@ -14,8 +14,7 @@
 -->
 
 <template>
-  <div data-test="query-editor" ref="editorRef"
-id="editor"></div>
+  <div data-test="query-editor" ref="editorRef" id="editor"></div>
 </template>
 
 <script lang="ts">
@@ -192,12 +191,6 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      //   editorRef.value.addEventListener("keyup", onKeyUp);
-      window.MonacoEnvironment = {
-        getWorker: function (moduleId, label) {
-          return new Worker(`${getPath()}src/workers/editor.worker.ts`);
-        },
-      };
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
