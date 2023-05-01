@@ -56,20 +56,20 @@ export default defineComponent({
     name: "ChartRender",
     props: {
         data: {
-        type: Object,
-        default: () => null
+            type: Object,
+            default: () => null
         }, 
         selectedTimeDate: {
-        type: Object,
-        default: () => null
+            type: Object,
+            default: () => null
         }, 
         height: {
-        type: Number,
-        default: 6,
+            type: Number,
+            default: 6,
         },
         width: {
-        type: Number,
-        default: 12,
+            type: Number,
+            default: 12,
         }
     },
 
@@ -328,10 +328,14 @@ export default defineComponent({
 
             let xData: Array<any> = []
             //generate the traces value f chart
+            console.log(getAxisDataFromKey(xAxisKeys[0]));
+            
+            xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
             xAxisKeys?.map((key: any) => {
-                xData.push(getAxisDataFromKey(key))
-                return xData;
+                return getAxisDataFromKey(key);
             });
+            console.log("xdata", xData);
+            
 
             let trace = {
                 name: props.data.fields?.x[0].label,
@@ -419,13 +423,17 @@ export default defineComponent({
                 case "line":
                 case "scatter":
                 case "area": {
+
                     let xData: Array<any> = []
                     //generate the traces value f chart
+                    console.log(getAxisDataFromKey(xAxisKeys[0]));
+                    
+                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
                     xAxisKeys?.map((key: any) => {
-                        xData.push(getAxisDataFromKey(key))
-                        return xData;
+                        return getAxisDataFromKey(key);
                     });
-
+                    console.log("xdata", xData);
+            
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
                             name: props.data.fields?.y.find((it: any) => it.alias == key).label,
@@ -534,7 +542,7 @@ export default defineComponent({
             // console.log("---traces---", traces);
 
 
-            // console.log("Query: populating traces: ", traces);
+            console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
 
             //generate the layout value of chart
             const layout: any = {
