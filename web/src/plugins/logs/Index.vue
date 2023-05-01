@@ -514,7 +514,6 @@ export default defineComponent({
               store.state.zoConfig.timestamp_column +
               ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
           },
-          encoding: "base64",
         };
 
         var timestamps: any = getConsumableDateTime();
@@ -688,12 +687,15 @@ export default defineComponent({
           delete req.aggs;
         }
 
-        req.query.sql = b64EncodeUnicode(req.query.sql);
-        if (
-          !searchObj.meta.sqlMode &&
-          searchObj.data.resultGrid.currentPage == 0
-        ) {
-          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+        if (store.state.zoConfig.sql_base64_enabled) {
+          req["encoding"] = "base64";
+          req.query.sql = b64EncodeUnicode(req.query.sql);
+          if (
+            !searchObj.meta.sqlMode &&
+            searchObj.data.resultGrid.currentPage == 0
+          ) {
+            req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
+          }
         }
 
         return req;

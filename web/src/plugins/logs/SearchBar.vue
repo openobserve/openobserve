@@ -266,8 +266,6 @@ const defaultValue: any = () => {
   };
 };
 
-const stringOptions = ["Google", "Facebook", "Twitter", "Apple", "Oracle"];
-
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
@@ -503,7 +501,7 @@ export default defineComponent({
 
       window.addEventListener("click", () => {
         fnEditorobj.layout();
-        queryEditorRef.value.editorObj.layout();
+        // queryEditorRef.value.resetEditorLayout();
       });
     });
 
@@ -630,7 +628,7 @@ export default defineComponent({
 
     const resetEditorLayout = () => {
       setTimeout(() => {
-        queryEditorRef.value.layoutEditor();
+        queryEditorRef.value.resetEditorLayout();
         fnEditorobj.layout();
       }, 100);
     };

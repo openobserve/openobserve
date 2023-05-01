@@ -319,7 +319,7 @@ export default defineComponent({
       if (editorObj?.setValue) editorObj.setValue(value);
     };
 
-    const layoutEditor = () => {
+    const resetEditorLayout = () => {
       editorObj.layout();
     };
 
@@ -327,7 +327,7 @@ export default defineComponent({
       editorRef,
       editorObj,
       setValue,
-      layoutEditor,
+      resetEditorLayout,
     };
   },
 });
