@@ -258,7 +258,7 @@ export default defineComponent({
       });
 
       editorObj = monaco.editor.create(editorRef.value, {
-        value: props.query ? props.query : "-- SQL Query Editor\n",
+        value: props.query,
         language: "sql",
         theme: "myCustomTheme",
         showFoldingControls: "never",
@@ -329,7 +329,7 @@ export default defineComponent({
 <style>
 #editor {
   width: 100%;
-  height: 100%;
+  height: 78%;
   border-radius: 5px;
   overflow: hidden;
 }
