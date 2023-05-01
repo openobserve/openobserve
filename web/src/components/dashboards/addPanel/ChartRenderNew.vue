@@ -68,7 +68,22 @@ export default defineComponent({
         //render the plotly chart if the chart type is not table
         onUpdated(() => {
             if (props.data.type != "table") {
-                oneOrMoreXAndOneOrMoreY();
+                renderChart()
+                // if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length > 1){
+                //     console.log("multiple x and multiple y fields");
+
+                //     oneOrMoreXAndOneOrMoreY();
+                // }else if(props.data.fields?.x?.length == 1 && props.data.fields?.y?.length >= 1){
+                //     console.log("single x and single y, single x and multiple y");
+
+                //     renderChart()
+                // }else if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length == 1){
+                //     console.log("multiple x and single y");
+
+                //     oneOrMoreXAndSingleY()
+                // } else {
+                //     //TODO: add else condition
+                // } 
             }
         });
 
@@ -256,12 +271,22 @@ export default defineComponent({
             () => {
                 // console.log("Query: new data received");
                 if (props.data.type != "table") {
-                    oneOrMoreXAndOneOrMoreY();
+                    renderChart()
+                    // if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length > 1){
+                    //     oneOrMoreXAndOneOrMoreY();
+                    // }else if(props.data.fields?.x?.length == 1 && props.data.fields?.y?.length >= 1){
+                    //     renderChart()
+                    // }else if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length == 1){
+                    //     oneOrMoreXAndSingleY()
+                    // } else {
+                    //     //TODO: add else condition
+                    // } 
                 }
             },
             { deep: true }
         );
 
+        //TODO: need to check trace name and marker and customData value
         const oneOrMoreXAndSingleY = () => {
             const xAxisKeys = getXAxisKeys();
             // console.log("x-length", xAxisKeys.length);
@@ -269,11 +294,11 @@ export default defineComponent({
             const yAxisKey = getYAxisKeys()[0];
             // console.log("y-length", getYAxisKeys().length);
 
-            let xData: Array<any>  = []
+            let xData: Array<any> = []
             //generate the traces value f chart
             xAxisKeys?.map((key: any) => {
-                xData.push(getDataFromKey(key))
-                return xData;   
+                xData.push(getAxisDataFromKey(key))
+                return xData;
             });
 
             let trace = {
@@ -287,66 +312,18 @@ export default defineComponent({
                     opacity: 0.8,
                 },
                 x: xData,
-                y: getDataFromKey(yAxisKey),
-                customdata: getDataFromKey(yAxisKey), //TODO: need to check for the data value
+                y: getAxisDataFromKey(yAxisKey),
+                customdata: getAxisDataFromKey(yAxisKey), //TODO: need to check for the data value
                 hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
             };
-            console.log("trace=",trace);
-            
+            console.log("trace=", trace);
+
             return trace
 
         }
 
-        const getDataFromKey = (key: string) => {
-            
-            let result: string[] = searchQueryData.data.map((item) => item[key]);
-            // check for the histogram _timestamp field
-            // If histogram _timestamp field is found, format the date labels 
-            const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
-            if (field && field.alias == key) {
-                // get the format
-                const timestamps = selectedTimeObj.value
-                let keyFormat = "HH:mm:ss";
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (
-                    timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-                    keyFormat = "YYYY-MM-DD";
-                }
-
-                // now we have the format, convert that format
-                result = result.map((it: any) => moment(it + "Z").format(keyFormat))
-            }
-            
-            return result
-        }
-
+        // one or more x axis and one or more y axis
         const oneOrMoreXAndOneOrMoreY = () => {
             const xAxisKeys = getXAxisKeys();
             // console.log("x-length", xAxisKeys.length);
@@ -354,16 +331,16 @@ export default defineComponent({
             const yAxisKeys = getYAxisKeys();
             // console.log("y-length", getYAxisKeys().length);
 
-            let xData: Array<any>  = []
+            let xData: Array<any> = []
             //generate the traces value f chart
             xAxisKeys?.map((key: any) => {
-                xData.push(getDataFromKey(key))
-                return xData;   
+                xData.push(getAxisDataFromKey(key))
+                return xData;
             });
 
             let traces;
 
-            traces= yAxisKeys?.map((key: any) => {
+            traces = yAxisKeys?.map((key: any) => {
                 const trace = {
                     name: props.data.fields?.y.find((it: any) => it.alias == key).label,
                     ...getPropsByChartTypeForTraces(),
@@ -375,8 +352,8 @@ export default defineComponent({
                         opacity: 0.8,
                     },
                     x: xData,
-                    y: getDataFromKey(key),
-                    customdata: getDataFromKey(key), //TODO: need to check for the data value
+                    y: getAxisDataFromKey(key),
+                    customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
                     hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                 };
@@ -384,42 +361,145 @@ export default defineComponent({
             })
 
             console.log("multiple:- traces", traces);
-            
+
 
             return traces
 
         }
 
-
-
+        // single x axis and one or more y axis
         const renderChart = async () => {
             // console.log("Query: rendering chart");
             // console.log("Query: chart type", props.data.type);
             // Step 1: Get the Y-Axis Count
             const xAxisKeys = getXAxisKeys();
+            console.log('xAxisKeys:', xAxisKeys);
+
             const yAxisKeys = getYAxisKeys();
+            console.log('yAxisKeys:', yAxisKeys);
+
+
+            let traces: any;
+
+
+            switch (props.data.type) {
+                case "bar":
+                case "line":
+                case "scatter":
+                case "area": {
+                    let xData: Array<any> = []
+                    //generate the traces value f chart
+                    xAxisKeys?.map((key: any) => {
+                        xData.push(getAxisDataFromKey(key))
+                        return xData;
+                    });
+
+                    traces = yAxisKeys?.map((key: any) => {
+                        const trace = {
+                            name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            marker: {
+                                color:
+                                    props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                    "#5960b2",
+                                opacity: 0.8,
+                            },
+                            x: xData,
+                            y: getAxisDataFromKey(key),
+                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+
+                        };
+                        return trace
+                    })
+                    console.log("multiple:- traces", traces);
+                    break;
+                }
+                case "h-bar": {
+                    let xData: Array<any> = []
+                    //generate the traces value f chart
+                    xAxisKeys?.map((key: any) => {
+                        xData.push(getAxisDataFromKey(key))
+                        return xData;
+                    });
+
+                    traces = yAxisKeys?.map((key: any) => {
+                        const trace = {
+                            name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            marker: {
+                                color:
+                                    props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                    "#5960b2",
+                                opacity: 0.8,
+                            },
+                            x: getAxisDataFromKey(key),
+                            y: xData,
+                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            hovertemplate: "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+
+                        };
+                        return trace
+                    })
+                    break;
+                }
+                case "pie": {
+                    let xData: Array<any> = []
+                    //generate the traces value f chart
+                    xAxisKeys?.map((key: any) => {
+                        xData.push(getAxisDataFromKey(key))
+                        return xData;
+                    });
+
+                    traces = yAxisKeys?.map((key: any) => {
+                        const trace = {
+                            name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            marker: {
+                                color:
+                                    props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                    "#5960b2",
+                                opacity: 0.8,
+                            },
+                            labels: xData,
+                            values: textwrapper(getAxisDataFromKey(key)),
+
+                        };
+                        return trace
+                    })
+                    console.log("multiple:- traces", traces);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
 
             // const margeAxisData = [...xAxisKeys, ...yAxisKeys]
             // console.log("000000-----", margeAxisData);
 
-            let traces;
-            //generate the traces value f chart
-            traces = yAxisKeys?.map((key: any) => {
-                const trace = {
-                    name: props.data.fields?.y.find((it: any) => it.alias == key).label,
-                    ...getTraceValuesByChartType(xAxisKeys, key),
-                    showlegend: props.data.config?.show_legends,
-                    marker: {
-                        color:
-                            props.data.fields?.y.find((it: any) => it.alias == key).color ||
-                            "#5960b2",
-                        opacity: 0.8,
-                    },
-                };
-                return trace;
-            });
+            // let traces;
+            // //generate the traces value f chart
+            // traces = yAxisKeys?.map((key: any) => {
+            //     const trace = {
+            //         name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+            //         x: xData,
+            //         ...getTraceValuesByChartType(xAxisKeys, key),
+            //         showlegend: props.data.config?.show_legends,
+            //         marker: {
+            //             color:
+            //                 props.data.fields?.y.find((it: any) => it.alias == key).color ||
+            //                 "#5960b2",
+            //             opacity: 0.8,
+            //         },
+            //     };
+            //     return trace;
+            // });
 
-            console.log("---traces---", traces);
+            // console.log("---traces---", traces);
 
 
             // console.log("Query: populating traces: ", traces);
