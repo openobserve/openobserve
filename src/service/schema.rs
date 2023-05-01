@@ -197,6 +197,23 @@ pub async fn check_for_schema(
         schema
     };
 
+    let meta = schema.metadata().clone();
+
+    if !meta.is_empty() {
+        let stream_settings = meta.get("settings");
+        if let Some(value) = stream_settings {
+            let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
+            match settings.get("is_frozen") {
+                Some(keys) => {
+                    if keys.as_bool().unwrap_or(false) {
+                        return (true, None);
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+
     let mut schema_reader = BufReader::new(val_str.as_bytes());
     let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
     if schema.fields.eq(&inferred_schema.fields) {
@@ -320,6 +337,7 @@ pub async fn add_stream_schema(
         let settings = crate::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
+            is_frozen: false,
         };
         metadata.insert(
             "settings".to_string(),

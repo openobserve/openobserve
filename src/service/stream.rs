@@ -120,9 +120,15 @@ fn stream_res(
     let mut partition_keys = Vec::new();
     let mut full_text_search_keys = vec![];
     let stream_settings = meta.get("settings");
-
+    let mut is_frozen = false;
     if let Some(value) = stream_settings {
         let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
+        match settings.get("is_frozen") {
+            Some(v) => {
+                is_frozen = v.as_bool().unwrap();
+            }
+            None => {}
+        }
         let keys = settings.get("partition_keys");
 
         if let Some(value) = keys {
@@ -156,6 +162,7 @@ fn stream_res(
         settings: StreamSettings {
             partition_keys,
             full_text_search_keys,
+            is_frozen,
         },
     }
 }

@@ -69,6 +69,8 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
+    #[serde(default)]
+    pub is_frozen: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -83,6 +85,7 @@ impl Serialize for StreamSettings {
         }
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
+        state.serialize_field("is_frozen", &self.is_frozen)?;
         state.end()
     }
 }
