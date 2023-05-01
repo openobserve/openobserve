@@ -67,7 +67,24 @@ import moment from "moment";
 
 export default defineComponent({
   name: "ChartRender",
-  props: ["data", "selectedTimeDate"],
+  props: {
+    data: {
+      type: Object,
+      default: () => null
+    }, 
+    selectedTimeDate: {
+      type: Object,
+      default: () => null
+    }, 
+    height: {
+      type: Number,
+      default: 6,
+    },
+    width: {
+      type: Number,
+      default: 12,
+    }
+  },
 
   setup(props) {
     const $q = useQuasar();
@@ -163,6 +180,17 @@ export default defineComponent({
       }
     });
 
+    // this is used to clear the data after next tick 
+    // majorly for the add panel page
+    // on other pages, it will keep the data
+    // and charts will render the same data
+    onActivated(async () => {
+      await nextTick(); // to wait for the add panel page to remove the panel data
+      if(!props.data.query) {
+        searchQueryData.data = []
+      }
+    })
+
     // wrap the text for long x axis names for pie charts
     const addBreaksAtLength = 12;
     const textwrapper = function (traces: any) {
@@ -192,7 +220,7 @@ export default defineComponent({
     const getTickLimits = (layout: string[]) => {
       if(layout.length > 10) {
         // do the splitting
-        const n = 10;
+        const n = getTickLength();
 
         // get the range of difference
         const range = layout.length / n
@@ -208,6 +236,10 @@ export default defineComponent({
         return layout
       }
     }
+
+    // returns tick length
+    // if width is 12, tick length is 10
+    const getTickLength = () => props.width - 2
 
     // Chart Related Functions
     const fetchQueryData = async () => {
