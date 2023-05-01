@@ -103,7 +103,6 @@ export default defineConfig({
     }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin({}),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {
