@@ -755,12 +755,11 @@ export default defineComponent({
     toggleFunction(newVal) {
       if (newVal == false) {
         this.searchObj.config.fnSplitterModel = 100;
-        this.resetEditorLayout();
         this.resetFunctionContent();
       } else {
         this.searchObj.config.fnSplitterModel = 60;
-        this.resetEditorLayout();
       }
+      this.resetEditorLayout();
     },
     selectFunction(newVal) {
       if (newVal != "") {
