@@ -250,7 +250,7 @@ pub async fn traces_json(
                                     .to_string(),
                                 start_time,
                                 end_time,
-                                duration: end_time - start_time,
+                                duration: (end_time - start_time) / 1000000,
                                 reference: span_ref,
                                 service_name: service_name.clone(),
                                 attributes: span_att_map,
