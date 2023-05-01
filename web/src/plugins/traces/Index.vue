@@ -483,7 +483,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration)/1000000 as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -618,14 +618,17 @@ export default defineComponent({
 
           whereClause = parsedSQL.join(" ");
 
+          // If duration is not present in query adding duration>10
+          if (!whereClause.includes("duration")) "duration>10 " + whereClause;
+
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            " WHERE duration>10000000 and " + whereClause
+            " WHERE " + whereClause
           );
         } else {
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            "WHERE duration>10000000 "
+            " WHERE duration>10 "
           );
         }
 
