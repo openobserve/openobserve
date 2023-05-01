@@ -143,7 +143,7 @@ import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-// import { getImageURL } from "../../utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -295,7 +295,7 @@ export default defineComponent({
       onSubmit,
       updateSettingsForm,
       format,
-      getImageURL: () => { },
+      getImageURL,
     };
   },
   created() {
