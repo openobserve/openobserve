@@ -1297,7 +1297,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(20),
+      splitterModel: ref(17),
       loadPageData,
       getQueryData,
       reDrawGrid,
