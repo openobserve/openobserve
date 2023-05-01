@@ -493,10 +493,7 @@ export default defineComponent({
 
     function buildSearch() {
       try {
-        let query = searchObj.data.editorValue.replace(
-          "-- SQL Query Editor",
-          ""
-        );
+        let query = searchObj.data.editorValue;
 
         var req: any = {
           query: {
@@ -1134,7 +1131,7 @@ export default defineComponent({
       if (sqlMode) {
         let selectFields = "";
         let whereClause = "";
-        let currentQuery = searchObj.data.query.replace("-- SQL Query Editor\n", "");
+        let currentQuery = searchObj.data.query;
         currentQuery = currentQuery.split("|");
         if (currentQuery.length > 1) {
           selectFields = "," + currentQuery[0].trim();
@@ -1156,7 +1153,7 @@ export default defineComponent({
 
         searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       } else {
-        searchObj.data.query = "-- SQL Query Editor\n";
+        searchObj.data.query = "";
         searchBarRef.value.udpateQuery();
       }
     };
