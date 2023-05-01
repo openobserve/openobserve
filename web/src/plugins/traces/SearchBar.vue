@@ -43,7 +43,6 @@
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             dense
-            rounded="sm"
             flat
             title="Run query"
             class="q-pa-none search-button"
