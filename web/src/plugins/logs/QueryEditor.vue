@@ -14,7 +14,8 @@
 -->
 
 <template>
-  <div data-test="query-editor" ref="editorRef" id="editor"></div>
+  <div data-test="query-editor" ref="editorRef"
+id="editor"></div>
 </template>
 
 <script lang="ts">
@@ -206,8 +207,8 @@ export default defineComponent({
           "editor.background": "#fafafa",
           "editorCursor.foreground": "#000000",
           "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#ececec",
-          "editor.border": "#ececec",
+          "editorLineNumber.foreground": "#000000",
+          "editor.border": "#000000",
         },
       });
 
@@ -264,7 +265,7 @@ export default defineComponent({
       });
 
       editorObj = monaco.editor.create(editorRef.value, {
-        value: props.query,
+        value: props.query ? props.query : "-- SQL Query Editor\n",
         language: "sql",
         theme: "myCustomTheme",
         showFoldingControls: "never",
@@ -318,10 +319,15 @@ export default defineComponent({
       if (editorObj?.setValue) editorObj.setValue(value);
     };
 
+    const layoutEditor = () => {
+      editorObj.layout();
+    };
+
     return {
       editorRef,
       editorObj,
       setValue,
+      layoutEditor,
     };
   },
 });
@@ -330,7 +336,7 @@ export default defineComponent({
 <style>
 #editor {
   width: 100%;
-  height: 83%;
+  height: 100%;
   border-radius: 5px;
   overflow: hidden;
 }
