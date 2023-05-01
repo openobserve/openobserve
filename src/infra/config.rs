@@ -154,6 +154,8 @@ pub struct Common {
     pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
+    #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
+    pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
