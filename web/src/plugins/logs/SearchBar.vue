@@ -200,7 +200,6 @@
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <b>Query Editor:</b>
             <query-editor
               ref="queryEditorRef"
               class="monaco-editor"
@@ -213,7 +212,6 @@
           </template>
           <template #after>
             <div v-show="searchObj.meta.toggleFunction" style="height: 100%">
-              <b>VRL Function Editor:</b>
               <div ref="fnEditorRef" id="fnEditor" style="height: 100%"></div>
             </div>
           </template>
@@ -452,10 +450,15 @@ export default defineComponent({
         ],
         colors: {
           "editor.foreground": "#000000",
+          "editor.background": "#fafafa",
+          "editorCursor.foreground": "#000000",
+          "editor.lineHighlightBackground": "#FFFFFF",
+          "editorLineNumber.foreground": "#000000",
+          "editor.border": "#000000",
         },
       });
       fnEditorobj = monaco.editor.create(fnEditorRef.value, {
-        value: ``,
+        value: `# VRL Function Editor\n`,
         language: "ruby",
         minimap: {
           enabled: false,
@@ -500,6 +503,7 @@ export default defineComponent({
 
       window.addEventListener("click", () => {
         fnEditorobj.layout();
+        queryEditorRef.value.editorObj.layout();
       });
     });
 
@@ -616,12 +620,19 @@ export default defineComponent({
 
     const resetFunctionContent = () => {
       formData.value.function = "";
-      fnEditorobj.setValue("");
+      fnEditorobj.setValue("# VRL Function Editor\n");
       formData.value.name = "";
       functionModel.value = "";
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
       searchObj.data.tempFunctionContent = "";
+    };
+
+    const resetEditorLayout = () => {
+      setTimeout(() => {
+        queryEditorRef.value.layoutEditor();
+        fnEditorobj.layout();
+      }, 100);
     };
 
     const populateFunctionImplementation = (fnValue) => {
@@ -684,6 +695,7 @@ export default defineComponent({
       saveFunction,
       initFunctionEditor,
       resetFunctionContent,
+      resetEditorLayout,
       populateFunctionImplementation,
       functionModel,
       functionOptions,
@@ -707,7 +719,7 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.split("|");
+        let currentQuery = this.searchObj.data.editorValue.replace("-- SQL Query Editor\n","").split("|");
         let filter = this.searchObj.data.stream.addToFilter;
 
         const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
@@ -747,6 +759,7 @@ export default defineComponent({
       } else {
         this.searchObj.config.fnSplitterModel = 60;
       }
+      this.resetEditorLayout();
     },
     selectFunction(newVal) {
       if (newVal != "") {

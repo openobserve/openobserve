@@ -18,7 +18,8 @@
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
     <div id="secondLevel">
-      <q-splitter v-model="splitterModel" horizontal style="height: 100%">
+      <q-splitter v-model="splitterModel" horizontal
+style="height: 100%">
         <template v-slot:before>
           <search-bar
             data-test="logs-search-bar"
@@ -142,7 +143,8 @@
           </div>
           <div v-else>
             <h5 data-test="logs-search-error-message" class="text-center">
-              <q-icon name="warning" color="warning" size="10rem" /><br />{{
+              <q-icon name="warning"
+color="warning" size="10rem" /><br />{{
                 searchObj.data.errorMsg
               }}
             </h5>
@@ -491,7 +493,10 @@ export default defineComponent({
 
     function buildSearch() {
       try {
-        let query = searchObj.data.editorValue;
+        let query = searchObj.data.editorValue.replace(
+          "-- SQL Query Editor",
+          ""
+        );
 
         var req: any = {
           query: {
@@ -1127,7 +1132,7 @@ export default defineComponent({
       if (sqlMode) {
         let selectFields = "";
         let whereClause = "";
-        let currentQuery = searchObj.data.query;
+        let currentQuery = searchObj.data.query.replace("-- SQL Query Editor\n", "");
         currentQuery = currentQuery.split("|");
         if (currentQuery.length > 1) {
           selectFields = "," + currentQuery[0].trim();
@@ -1149,7 +1154,7 @@ export default defineComponent({
 
         searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
       } else {
-        searchObj.data.query = "";
+        searchObj.data.query = "-- SQL Query Editor\n";
         searchBarRef.value.udpateQuery();
       }
     };
@@ -1292,7 +1297,7 @@ export default defineComponent({
       parser,
       searchObj,
       searchBarRef,
-      splitterModel: ref(25),
+      splitterModel: ref(17),
       loadPageData,
       getQueryData,
       reDrawGrid,
@@ -1416,7 +1421,7 @@ export default defineComponent({
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       setTimeout(() => {
         this.updateGridColumns();
-      }, 300);
+      }, 50);
     },
     runQuery() {
       if (this.searchObj.runQuery == true) {
