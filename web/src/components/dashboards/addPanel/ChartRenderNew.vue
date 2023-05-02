@@ -86,21 +86,6 @@ export default defineComponent({
         onUpdated(() => {
             if (props.data.type != "table") {
                 renderChart()
-                // if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length > 1){
-                //     console.log("multiple x and multiple y fields");
-
-                //     oneOrMoreXAndOneOrMoreY();
-                // }else if(props.data.fields?.x?.length == 1 && props.data.fields?.y?.length >= 1){
-                //     console.log("single x and single y, single x and multiple y");
-
-                //     renderChart()
-                // }else if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length == 1){
-                //     console.log("multiple x and single y");
-
-                //     oneOrMoreXAndSingleY()
-                // } else {
-                //     //TODO: add else condition
-                // } 
             }
         });
 
@@ -301,18 +286,8 @@ export default defineComponent({
         watch(
             () => [searchQueryData.data, props.data.type],
             () => {
-                // console.log("Query: new data received");
                 if (props.data.type != "table") {
                     renderChart()
-                    // if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length > 1){
-                    //     oneOrMoreXAndOneOrMoreY();
-                    // }else if(props.data.fields?.x?.length == 1 && props.data.fields?.y?.length >= 1){
-                    //     renderChart()
-                    // }else if(props.data.fields?.x?.length > 1 && props.data.fields?.y?.length == 1){
-                    //     oneOrMoreXAndSingleY()
-                    // } else {
-                    //     //TODO: add else condition
-                    // } 
                 }
             },
             { deep: true }
@@ -513,6 +488,37 @@ export default defineComponent({
                     console.log("multiple:- traces", traces);
                     break;
                 }
+                case "stacked": {
+                    // stacked with xAxis second value
+                    // allow 2 xAxis and 1 yAxis value for stack chart
+                    const key1 = xAxisKeys[1]
+                    const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
+                    console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                    
+                    traces = stackedXAxisUniqueValue?.map((key: any) => {
+                        console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                        
+                        const trace = {
+                            name: key,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            // marker: {
+                            //     color:
+                            //         props.data.fields?.x.find((it: any) => it.alias == key)?.color ||
+                            //         "#5960b2",
+                            //     opacity: 0.8,
+                            // },
+                            x: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                            y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            hovertemplate: "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+
+                        };
+                        return trace
+                    })
+                    console.log("multiple:- traces", traces);
+
+                }
                 default: {
                     break;
                 }
@@ -686,6 +692,10 @@ export default defineComponent({
                         fill: "tozeroy", //TODO: hoe to change the color of plot chart
                         type: "scatter",
                     };
+                case "stacked":
+                    return {
+                        type: 'bar',
+                    };
                 default:
                     return {
                         type: "bar",
@@ -784,6 +794,23 @@ export default defineComponent({
                     };
                 case "area":
                     return {
+                        xaxis: {
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
+                            title: props.data.fields?.x[0].label,
+                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                            fixedrange: true
+                        },
+                    };
+                case "stacked":
+                    return {
+                        barmode: "stack",
                         xaxis: {
                             // tickmode: "array",
                             // tickvals: xAxisDataWithTicks,

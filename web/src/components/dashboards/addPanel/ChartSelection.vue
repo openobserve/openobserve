@@ -72,6 +72,11 @@ export default defineComponent({
         id: "h-bar",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
+        title: "Stacked",
+        id: "stacked",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
         title: "Line",
         id: "line",
