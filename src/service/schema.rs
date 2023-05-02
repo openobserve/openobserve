@@ -203,13 +203,10 @@ pub async fn check_for_schema(
         let stream_settings = meta.get("settings");
         if let Some(value) = stream_settings {
             let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-            match settings.get("is_frozen") {
-                Some(keys) => {
-                    if keys.as_bool().unwrap_or(false) {
-                        return (true, None);
-                    }
+            if let Some(keys) = settings.get("schema_validation") {
+                if keys.as_bool().unwrap_or(false) {
+                    return (true, None);
                 }
-                None => {}
             }
         }
     }
