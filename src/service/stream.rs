@@ -162,7 +162,7 @@ fn stream_res(
         settings: StreamSettings {
             partition_keys,
             full_text_search_keys,
-            is_frozen,
+            schema_validation: is_frozen,
         },
     }
 }

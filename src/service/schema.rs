@@ -337,7 +337,7 @@ pub async fn add_stream_schema(
         let settings = crate::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
-            is_frozen: false,
+            schema_validation: false,
         };
         metadata.insert(
             "settings".to_string(),

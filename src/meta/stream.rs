@@ -70,7 +70,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
     #[serde(default)]
-    pub is_frozen: bool,
+    pub schema_validation: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -85,7 +85,7 @@ impl Serialize for StreamSettings {
         }
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
-        state.serialize_field("is_frozen", &self.is_frozen)?;
+        state.serialize_field("schema_validation", &self.schema_validation)?;
         state.end()
     }
 }
