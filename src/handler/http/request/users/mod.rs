@@ -23,7 +23,7 @@ use crate::meta::user::UserRequest;
 use crate::meta::user::{SignInResponse, SignInUser};
 use crate::service::users;
 
-/** listUsers */
+/** ListUsers */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -44,7 +44,7 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     users::list_users(&org_id).await
 }
 
-/** createUser */
+/** CreateUser */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -70,7 +70,7 @@ pub async fn save(
     users::post_user(&org_id, user).await
 }
 
-/** updateUser */
+/** UpdateUser */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -108,7 +108,7 @@ pub async fn update(
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
 }
 
-/** addUserToOrganization */
+/** AddUserToOrganization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -137,7 +137,7 @@ pub async fn add_user_to_org(
     users::add_user_to_org(&org_id, &email_id, role, initiator_id).await
 }
 
-/** removeUserFromOrganization */
+/** RemoveUserFromOrganization */
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -160,7 +160,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     users::remove_user_from_org(&org_id, &email_id).await
 }
 
-/** authenticateUser */
+/** AuthenticateUser */
 #[utoipa::path(
     context_path = "/auth",
     tag = "Auth",
