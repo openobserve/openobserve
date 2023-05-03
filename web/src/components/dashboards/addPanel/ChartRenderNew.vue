@@ -640,94 +640,86 @@ export default defineComponent({
             const xAxisDataWithTicks = getTickLimits(xAxisData)
 
             switch (props.data.type) {
-                case "bar":
-                return props.data.fields?.x.length == 1 ?
-                     {
-                        barmode: "group",
-                        xaxis: {
-                            tickmode:"array",
-                            tickvals: xAxisDataWithTicks,
-                            ticktext: textformat(xAxisDataWithTicks),
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    } : {
-                        barmode: "group",
-                        xaxis: {
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
+                case "bar": {
+                    const xaxis: any = {
+                        title: props.data.fields?.x[0].label,
+                        tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                        automargin: true,
                     }
-                    ;
-                case "line":
-                return props.data.fields?.x.length == 1 ? {
-                        xaxis: {
-                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
-                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
-                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    }:
-                    {
-                        xaxis: {
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
 
-                    };
-                case "scatter":
-                return props.data.fields?.x.length == 1 ? {
+                    const yaxis: any = {
+                        title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                        automargin: true,
+                        fixedrange: true
+                    }
+
+                    if(props.data.fields?.x.length == 1){
+                        xaxis["tickmode"] = "array",
+                        xaxis["tickvals"] = xAxisDataWithTicks,
+                        xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                    }
+
+                    const trace = {
+                        barmode: "group",
+                        xaxis: xaxis,
+                        yaxis: yaxis
+                    }
+
+                    return trace
+
+                }
+                case "line":{
+                    const xaxis: any = {
+                        title: props.data.fields?.x[0].label,
+                        tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                        automargin: true,
+                    }
+
+                    const yaxis: any = {
+                        title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                        automargin: true,
+                        fixedrange: true
+                    }
+
+                    if(props.data.fields?.x.length == 1){
+                        xaxis["tickmode"] = "array",
+                        xaxis["tickvals"] = xAxisDataWithTicks,
+                        xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                    }
+
+                    const trace = {
+                        xaxis: xaxis,
+                        yaxis: yaxis
+                    }
+                    return trace
+                }
+                case "scatter": {
+                    const xaxis: any = {
+                        title: props.data.fields?.x[0].label,
+                        tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                        automargin: true,
+                    }
+
+                    const yaxis: any = {
+                        title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                        automargin: true,
+                        fixedrange: true
+                    }
+
+                    if(props.data.fields?.x.length == 1){
+                        xaxis["tickmode"] = "array",
+                        xaxis["tickvals"] = xAxisDataWithTicks,
+                        xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                    }
+
+                    const trace = {
                         scattermode: "group",
-                        xaxis: {
-                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
-                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
-                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    }:{
-                        xaxis: {
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    };
+                        xaxis: xaxis,
+                        yaxis: yaxis
+                    }
+
+                    return trace
+                }
                 case "pie":
                     return {
                         xaxis: {
@@ -743,67 +735,61 @@ export default defineComponent({
                             automargin: true,
                         },
                     };
-                case "h-bar":
-                return props.data.fields?.x.length == 1 ? {
+                case "h-bar": {
+                    const xaxis: any = {
+                        title: props.data.fields?.y[0].label,
+                        tickangle: -20,
+                        automargin: true,
+                        fixedrange: true
+                    }
+
+                    const yaxis: any = {
+                        title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+                        automargin: true,
+                    }
+
+                    if(props.data.fields?.x.length == 1){
+                        yaxis["tickmode"] = "array",
+                        yaxis["tickvals"] = xAxisDataWithTicks,
+                        yaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                    }
+
+                    const trace = {
                         barmode: "group",
-                        xaxis: {
-                            title: props.data.fields?.y[0].label,
-                            tickangle: -20,
-                            automargin: true,
-                            fixedrange: true
-                        },
-                        yaxis: {
-                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
-                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
-                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
-                            title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
-                            automargin: true,
-                        },
-                    }:
-                    {
-                        barmode: "group",
-                        xaxis: {
-                            title: props.data.fields?.y[0].label,
-                            tickangle: -20,
-                            automargin: true,
-                            fixedrange: true
-                        },
-                        yaxis: {
-                            title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
-                            automargin: true,
-                        },
-                    };
+                        xaxis: xaxis,
+                        yaxis: yaxis
+                    }
+
+                    return trace
+                }
                 case "area":
-                return props.data.fields?.x.length == 1 ? {
-                        xaxis: {
-                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
-                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
-                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    }:
-                    {
-                        xaxis: {
-                            title: props.data.fields?.x[0].label,
-                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                            automargin: true,
-                        },
-                        yaxis: {
-                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                            automargin: true,
-                            fixedrange: true
-                        },
-                    };
+                {
+                    const xaxis: any = {
+                        title: props.data.fields?.x[0].label,
+                        tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                        automargin: true,
+                    }
+
+                    const yaxis: any = {
+                        title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                        automargin: true,
+                        fixedrange: true
+                    }
+
+                    if(props.data.fields?.x.length == 1){
+                        xaxis["tickmode"] = "array",
+                        xaxis["tickvals"] = xAxisDataWithTicks,
+                        xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                    }
+
+                    const trace = {
+                        xaxis: xaxis,
+                        yaxis: yaxis
+                    }
+
+                    return trace
+                }
+
                 case "stacked":
                     return {
                         barmode: "stack",
