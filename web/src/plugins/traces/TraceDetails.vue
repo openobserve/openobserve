@@ -93,8 +93,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onMounted, watch } from "vue";
-import { cloneDeep, range } from "lodash";
+import { defineComponent, ref, onMounted, watch } from "vue";
+import { cloneDeep } from "lodash";
 import SpanRenderer from "./SpanRenderer.vue";
 import useTraces from "@/composables/useTraces";
 import { computed } from "vue";
@@ -103,7 +103,6 @@ import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
-import { duration } from "moment";
 
 export default defineComponent({
   name: "TraceDetails",
