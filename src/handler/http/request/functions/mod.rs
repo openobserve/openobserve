@@ -25,7 +25,7 @@ use crate::meta;
 use crate::meta::functions::StreamOrder;
 use crate::meta::functions::Transform;
 
-/** createFunction*/
+/** CreateFunction*/
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -53,7 +53,7 @@ pub async fn save_function(
     crate::service::functions::save_function(org_id, transform).await
 }
 
-/** listFunctions */
+/** ListFunctions */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -74,7 +74,7 @@ async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error
     crate::service::functions::list_functions(org_id.into_inner()).await
 }
 
-/** deleteFunction*/
+/** DeleteFunction*/
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -98,7 +98,7 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
     crate::service::functions::delete_function(org_id, name).await
 }
 
-/** updateFunction */
+/** UpdateFunction */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -127,7 +127,7 @@ pub async fn update_function(
     crate::service::functions::update_function(org_id, name, transform).await
 }
 
-/** listStreamFunctions */
+/** ListStreamFunctions */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -169,7 +169,7 @@ async fn list_stream_functions(
         .await
 }
 
-/** removeStreamFunction*/
+/** RemoveStreamFunction*/
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -218,7 +218,7 @@ async fn delete_stream_function(
     .await
 }
 
-/** applyFunctionToStream */
+/** ApplyFunctionToStream */
 #[cfg(feature = "zo_functions")]
 #[utoipa::path(
     context_path = "/api",
@@ -270,7 +270,7 @@ pub async fn add_function_to_stream(
     .await
 }
 
-/** createFunction*/
+/** CreateFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -296,7 +296,7 @@ pub async fn save_function(
     fn_not_supported_error()
 }
 
-/** listFunctions */
+/** ListFunctions */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -317,7 +317,7 @@ async fn list_functions(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
     fn_not_supported_error()
 }
 
-/** deleteFunction*/
+/** DeleteFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -340,7 +340,7 @@ async fn delete_function(_path: web::Path<(String, String)>) -> Result<HttpRespo
     fn_not_supported_error()
 }
 
-/** updateFunction */
+/** UpdateFunction */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -367,7 +367,7 @@ pub async fn update_function(
     fn_not_supported_error()
 }
 
-/** applyFunctionToStream */
+/** ApplyFunctionToStream */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -395,7 +395,7 @@ pub async fn add_function_to_stream(
     fn_not_supported_error()
 }
 
-/** listStreamFunctions */
+/** ListStreamFunctions */
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",
@@ -417,7 +417,7 @@ async fn list_stream_functions(_path: web::Path<(String, String)>) -> Result<Htt
     fn_not_supported_error()
 }
 
-/** removeStreamFunction*/
+/** RemoveStreamFunction*/
 #[cfg(not(feature = "zo_functions"))]
 #[utoipa::path(
     context_path = "/api",

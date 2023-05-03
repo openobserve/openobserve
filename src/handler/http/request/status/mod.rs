@@ -41,7 +41,7 @@ struct ConfigResponse<'a> {
     timestamp_column: String,
 }
 
-/** healthz */
+/** Healthz */
 #[utoipa::path(
     path = "/healthz",
     tag = "Meta",

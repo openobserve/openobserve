@@ -21,7 +21,7 @@ use crate::common::http::get_stream_type_from_request;
 use crate::meta::{self, stream::StreamSettings, StreamType};
 use crate::service::stream;
 
-/** getSchema */
+/** GetSchema */
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -60,7 +60,7 @@ async fn schema(
     stream::get_stream(&org_id, &stream_name, stream_type).await
 }
 
-/** updateStreamSettings */
+/** UpdateStreamSettings */
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -101,7 +101,7 @@ async fn settings(
     stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
 }
 
-/** deleteStream */
+/** DeleteStream */
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
@@ -140,7 +140,7 @@ async fn delete(
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
-/** listStreams */
+/** ListStreams */
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",

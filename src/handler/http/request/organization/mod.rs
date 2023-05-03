@@ -27,7 +27,7 @@ use crate::service::organization::{self, update_passcode};
 
 pub mod es;
 
-/** getOrganizations */
+/** GetOrganizations */
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -101,7 +101,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
     Ok(HttpResponse::Ok().json(org_response))
 }
 
-/** getOrganizationSummary */
+/** GetOrganizationSummary */
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -123,7 +123,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(org_summary))
 }
 
-/** getIngestToken */
+/** GetIngestToken */
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -153,7 +153,7 @@ async fn get_user_passcode(
     Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
 }
 
-/** updateIngestToken */
+/** UpdateIngestToken */
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",

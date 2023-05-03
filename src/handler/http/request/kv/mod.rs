@@ -19,7 +19,7 @@ use std::io::Error;
 
 use crate::service::kv;
 
-/** getValue */
+/** GetValue */
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -49,7 +49,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
     }
 }
 
-/** setValue */
+/** SetValue */
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -86,7 +86,7 @@ pub async fn set(
     }
 }
 
-/** removeValue */
+/** RemoveValue */
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
@@ -116,7 +116,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     }
 }
 
-/** listKeys */
+/** ListKeys */
 #[utoipa::path(
     context_path = "/api",
     tag = "KV",
