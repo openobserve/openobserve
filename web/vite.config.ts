@@ -104,9 +104,7 @@ export default defineConfig({
     enterpriseResolverPlugin,
     vueJsx(),
     monacoEditorPlugin({
-      customDistPath: () => {
-        return path.resolve(__dirname, "dist", "monacoeditorwork");
-      },
+      customDistPath: () => path.resolve(__dirname, "dist", "monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
