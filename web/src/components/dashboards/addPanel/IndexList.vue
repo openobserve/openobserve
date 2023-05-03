@@ -189,9 +189,9 @@ import IndexService from "../../../services/index";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  props: ["selectedXAxisValue", "selectedYAxisValue"],
+  props: ["selectedXAxisValue", "selectedYAxisValue", 'editMode'],
   emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
-  setup() {
+  setup(props) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -215,6 +215,8 @@ export default defineComponent({
     watch(
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
+        console.log("stream:", dashboardPanelData.data.fields.stream);
+        
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
         );
@@ -224,20 +226,30 @@ export default defineComponent({
     );
 
     watch(()=> [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], ()=> {
-      dashboardPanelData.data.fields.stream = ""
-      data.indexOptions = dashboardPanelData.meta.stream.streamResults
-        .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
-        .map((data: any) => {
-          return data.name;
-        });
+      console.log("--editmode--",props.editMode);
+      
+        if(!props.editMode){
+          dashboardPanelData.data.fields.stream = ""
+        }
+      
+        data.indexOptions = dashboardPanelData.meta.stream.streamResults
+          .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
+          .map((data: any) => {
+            return data.name;
+          });
 
-      // set the first stream as the selected stream when the api loads the data
-      if (
-        !dashboardPanelData.data.fields.stream &&
-        data.indexOptions.length > 0
-      ) {
-        dashboardPanelData.data.fields.stream = data.indexOptions[0];
-      }
+        console.log("-indexOption---",data.indexOptions );
+        console.log("-stream name---",dashboardPanelData.data.fields.stream);
+
+        // set the first stream as the selected stream when the api loads the data
+        if (!props.editMode &&
+          !dashboardPanelData.data.fields.stream &&
+          data.indexOptions.length > 0
+        ) {
+          console.log("Inside field.stream is");
+          
+          dashboardPanelData.data.fields.stream = data.indexOptions[0];
+        }
     })
 
     // update the current list fields if any of the lists changes

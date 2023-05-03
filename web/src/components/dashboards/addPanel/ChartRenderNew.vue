@@ -205,23 +205,19 @@ export default defineComponent({
         }
 
         const getTickLimits = (layout: string[]) => {
-            if (layout.length > 10) {
-                // do the splitting
-                const n = getTickLength();
+            // do the splitting
+            const n = getTickLength();
 
-                // get the range of difference
-                const range = layout.length / n
+            // get the range of difference
+            const range = layout.length / n
 
-                // find the indexes at intervals
-                const array = [...Array(n).keys()]
-                const resultIndex = [...array.map((it: number, i: number) => it * range), layout.length - 1]
+            // find the indexes at intervals
+            const array = [...Array(n).keys()]
+            const resultIndex = [...array.map((it: number, i: number) => it * range), layout.length - 1]
 
-                // get the actual values from the indexes
-                const tickVals = resultIndex.map((it: number) => layout[Math.floor(it)])
-                return tickVals
-            } else {
-                return layout
-            }
+            // get the actual values from the indexes
+            const tickVals = resultIndex.map((it: number) => layout[Math.floor(it)])
+            return tickVals
         }
 
         // returns tick length
@@ -293,91 +289,6 @@ export default defineComponent({
             { deep: true }
         );
 
-        //TODO: need to check trace name and marker and customData value
-        const oneOrMoreXAndSingleY = () => {
-            const xAxisKeys = getXAxisKeys();
-            // console.log("x-length", xAxisKeys.length);
-
-            const yAxisKey = getYAxisKeys()[0];
-            // console.log("y-length", getYAxisKeys().length);
-
-            let xData: Array<any> = []
-            //generate the traces value f chart
-            console.log(getAxisDataFromKey(xAxisKeys[0]));
-            
-            xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
-            xAxisKeys?.map((key: any) => {
-                return getAxisDataFromKey(key);
-            });
-            console.log("xdata", xData);
-            
-
-            let trace = {
-                name: props.data.fields?.x[0].label,
-                ...getPropsByChartTypeForTraces(),
-                showlegend: props.data.config?.show_legends,
-                marker: {
-                    color:
-                        props.data.fields?.x[0].color ||
-                        "#5960b2",
-                    opacity: 0.8,
-                },
-                x: xData,
-                y: getAxisDataFromKey(yAxisKey),
-                customdata: getAxisDataFromKey(yAxisKey), //TODO: need to check for the data value
-                hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
-
-            };
-            console.log("trace=", trace);
-
-            return trace
-
-        }
-
-        // one or more x axis and one or more y axis
-        const oneOrMoreXAndOneOrMoreY = () => {
-            const xAxisKeys = getXAxisKeys();
-            // console.log("x-length", xAxisKeys.length);
-
-            const yAxisKeys = getYAxisKeys();
-            // console.log("y-length", getYAxisKeys().length);
-
-            let xData: Array<any> = []
-            //generate the traces value f chart
-            xAxisKeys?.map((key: any) => {
-                xData.push(getAxisDataFromKey(key))
-                return xData;
-            });
-
-            let traces;
-
-            traces = yAxisKeys?.map((key: any) => {
-                const trace = {
-                    name: props.data.fields?.y.find((it: any) => it.alias == key).label,
-                    ...getPropsByChartTypeForTraces(),
-                    showlegend: props.data.config?.show_legends,
-                    marker: {
-                        color:
-                            props.data.fields?.y.find((it: any) => it.alias == key).color ||
-                            "#5960b2",
-                        opacity: 0.8,
-                    },
-                    x: xData,
-                    y: getAxisDataFromKey(key),
-                    customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
-                    hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
-
-                };
-                return trace
-            })
-
-            console.log("multiple:- traces", traces);
-
-
-            return traces
-
-        }
-
         // single x axis and one or more y axis
         const renderChart = async () => {
             // console.log("Query: rendering chart");
@@ -389,9 +300,7 @@ export default defineComponent({
             const yAxisKeys = getYAxisKeys();
             console.log('yAxisKeys:', yAxisKeys);
 
-
             let traces: any;
-
 
             switch (props.data.type) {
                 case "bar":
@@ -399,14 +308,16 @@ export default defineComponent({
                 case "scatter":
                 case "area": {
 
-                    let xData: Array<any> = []
-                    //generate the traces value f chart
-                    console.log(getAxisDataFromKey(xAxisKeys[0]));
-                    
-                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
-                    xAxisKeys?.map((key: any) => {
-                        return getAxisDataFromKey(key);
-                    });
+                    // x axis values
+                    // if x axis length is 1, then use the normal labels,
+                    // more more than one, we need to create array of array for each key
+                    const xData = !xAxisKeys.length ?
+                                [] :
+                                xAxisKeys.length == 1 ?  
+                                getAxisDataFromKey(xAxisKeys[0]) :
+                                xAxisKeys?.map((key: any) => {
+                                    return getAxisDataFromKey(key);
+                                });
                     console.log("xdata", xData);
             
                     traces = yAxisKeys?.map((key: any) => {
@@ -424,7 +335,7 @@ export default defineComponent({
                             },
                             x: xData,
                             y: getAxisDataFromKey(key),
-                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
                             hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                         };
@@ -434,12 +345,13 @@ export default defineComponent({
                     break;
                 }
                 case "h-bar": {
-                    let xData: Array<any> = []
-                    //generate the traces value f chart
-                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
-                    xAxisKeys?.map((key: any) => {
-                        return getAxisDataFromKey(key);
-                    });
+                    const xData = !xAxisKeys.length ?
+                                [] :
+                                xAxisKeys.length == 1 ?  
+                                getAxisDataFromKey(xAxisKeys[0]) :
+                                xAxisKeys?.map((key: any) => {
+                                    return getAxisDataFromKey(key);
+                                });
                     console.log("xdata", xData);
 
                     traces = yAxisKeys?.map((key: any) => {
@@ -455,7 +367,7 @@ export default defineComponent({
                             },
                             x: getAxisDataFromKey(key),
                             y: xData,
-                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
                             hovertemplate: "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                         };
@@ -464,13 +376,13 @@ export default defineComponent({
                     break;
                 }
                 case "pie": {
-                    let xData: Array<any> = []
-                    //generate the traces value f chart
-                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
-                    xAxisKeys?.map((key: any) => {
-                        return getAxisDataFromKey(key);
-                    });
-                    console.log("xdata", xData);
+                    const xData = !xAxisKeys.length ?
+                                [] :
+                                xAxisKeys.length == 1 ?  
+                                getAxisDataFromKey(xAxisKeys[0]) :
+                                xAxisKeys?.map((key: any) => {
+                                    return getAxisDataFromKey(key);
+                                });
 
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
@@ -483,7 +395,7 @@ export default defineComponent({
                                     "#5960b2",
                                 opacity: 0.8,
                             },
-                            labels: xData,
+                            labels: textwrapper(xData),
                             values: getAxisDataFromKey(key),
                             hovertemplate : "%{label}: %{value} (%{percent})<extra></extra>"
 
@@ -515,14 +427,14 @@ export default defineComponent({
                             // },
                             x: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
                             y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
-                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
-                            hovertemplate: "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+                            customdata: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                            hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                         };
                         return trace
                     })
                     console.log("multiple:- traces", traces);
-
+                    break;
                 }
                 case "h-stacked": {
                     // stacked with xAxis second value
@@ -560,30 +472,6 @@ export default defineComponent({
                 }
             }
 
-            // const margeAxisData = [...xAxisKeys, ...yAxisKeys]
-            // console.log("000000-----", margeAxisData);
-
-            // let traces;
-            // //generate the traces value f chart
-            // traces = yAxisKeys?.map((key: any) => {
-            //     const trace = {
-            //         name: props.data.fields?.y.find((it: any) => it.alias == key).label,
-            //         x: xData,
-            //         ...getTraceValuesByChartType(xAxisKeys, key),
-            //         showlegend: props.data.config?.show_legends,
-            //         marker: {
-            //             color:
-            //                 props.data.fields?.y.find((it: any) => it.alias == key).color ||
-            //                 "#5960b2",
-            //             opacity: 0.8,
-            //         },
-            //     };
-            //     return trace;
-            // });
-
-            // console.log("---traces---", traces);
-
-
             console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
 
             //generate the layout value of chart
@@ -605,7 +493,6 @@ export default defineComponent({
             };
 
             console.log('layout', layout);
-            
 
             Plotly.react(plotRef.value, traces, layout, {
                 responsive: true,
@@ -658,42 +545,44 @@ export default defineComponent({
             const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
             if (field && field.alias == key) {
                 // get the format
-                const timestamps = selectedTimeObj.value
-                let keyFormat = "HH:mm:ss";
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-                    keyFormat = "HH:mm:ss";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-                    keyFormat = "MM-DD HH:mm";
-                }
-                if (
-                    timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-                    keyFormat = "YYYY-MM-DD";
-                }
+                // const timestamps = selectedTimeObj.value
+                // let keyFormat = "HH:mm:ss";
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+                //     keyFormat = "HH:mm:ss";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+                //     keyFormat = "HH:mm:ss";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+                //     keyFormat = "HH:mm:ss";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+                //     keyFormat = "HH:mm:ss";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+                //     keyFormat = "HH:mm:ss";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+                //     keyFormat = "MM-DD HH:mm";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+                //     keyFormat = "MM-DD HH:mm";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+                //     keyFormat = "MM-DD HH:mm";
+                // }
+                // if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+                //     keyFormat = "MM-DD HH:mm";
+                // }
+                // if (
+                //     timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+                //     keyFormat = "YYYY-MM-DD";
+                // }
 
-                // now we have the format, convert that format
-                result = result.map((it: any) => moment(it + "Z").format(keyFormat))
+                // // now we have the format, convert that format
+                // result = result.map((it: any) => moment(it + "Z").format(keyFormat))
+
+                result = result.map((it: any) => it.replace("T", " "))
             }
 
             return result
@@ -752,12 +641,13 @@ export default defineComponent({
 
             switch (props.data.type) {
                 case "bar":
-                    return {
+                return props.data.fields?.x.length == 1 ?
+                     {
                         barmode: "group",
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
+                            tickmode:"array",
+                            tickvals: xAxisDataWithTicks,
+                            ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -767,13 +657,9 @@ export default defineComponent({
                             automargin: true,
                             fixedrange: true
                         },
-                    };
-                case "line":
-                    return {
+                    } : {
+                        barmode: "group",
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -783,14 +669,55 @@ export default defineComponent({
                             automargin: true,
                             fixedrange: true
                         },
+                    }
+                    ;
+                case "line":
+                return props.data.fields?.x.length == 1 ? {
+                        xaxis: {
+                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
+                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
+                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
+                            title: props.data.fields?.x[0].label,
+                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                            fixedrange: true
+                        },
+                    }:
+                    {
+                        xaxis: {
+                            title: props.data.fields?.x[0].label,
+                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                            fixedrange: true
+                        },
+
                     };
                 case "scatter":
-                    return {
+                return props.data.fields?.x.length == 1 ? {
                         scattermode: "group",
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
+                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
+                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
+                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
+                            title: props.data.fields?.x[0].label,
+                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                            fixedrange: true
+                        },
+                    }:{
+                        xaxis: {
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -817,7 +744,7 @@ export default defineComponent({
                         },
                     };
                 case "h-bar":
-                    return {
+                return props.data.fields?.x.length == 1 ? {
                         barmode: "group",
                         xaxis: {
                             title: props.data.fields?.y[0].label,
@@ -826,19 +753,47 @@ export default defineComponent({
                             fixedrange: true
                         },
                         yaxis: {
+                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
+                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
+                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
                             // tickmode: "array",
                             // tickvals: xAxisDataWithTicks,
                             // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
                             automargin: true,
                         },
+                    }:
+                    {
+                        barmode: "group",
+                        xaxis: {
+                            title: props.data.fields?.y[0].label,
+                            tickangle: -20,
+                            automargin: true,
+                            fixedrange: true
+                        },
+                        yaxis: {
+                            title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+                            automargin: true,
+                        },
                     };
                 case "area":
-                    return {
+                return props.data.fields?.x.length == 1 ? {
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
+                            tickmode: props.data.fields?.x.length == 1 ? "array" : "",
+                            tickvals: props.data.fields?.x.length == 1 ? xAxisDataWithTicks: [],
+                            ticktext: props.data.fields?.x.length == 1 ? textformat(xAxisDataWithTicks): [],
+                            title: props.data.fields?.x[0].label,
+                            tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                            fixedrange: true
+                        },
+                    }:
+                    {
+                        xaxis: {
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -853,9 +808,9 @@ export default defineComponent({
                     return {
                         barmode: "stack",
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
+                            tickmode: "array",
+                            tickvals: xAxisDataWithTicks,
+                            ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,
@@ -875,9 +830,6 @@ export default defineComponent({
                             automargin: true,
                         },
                         yaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
                             automargin: true,
                         },
@@ -885,9 +837,9 @@ export default defineComponent({
                 default:
                     return {
                         xaxis: {
-                            // tickmode: "array",
-                            // tickvals: xAxisDataWithTicks,
-                            // ticktext: textformat(xAxisDataWithTicks),
+                            tickmode: "array",
+                            tickvals: xAxisDataWithTicks,
+                            ticktext: textformat(xAxisDataWithTicks),
                             title: props.data.fields?.x[0].label,
                             tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                             automargin: true,

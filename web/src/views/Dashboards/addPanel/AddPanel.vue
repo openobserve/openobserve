@@ -80,7 +80,7 @@
 				>
 					<template #before>
 						<div class="col scroll " style="height: calc(100vh - 118px); overflow-y: auto;">
-							<GetFields />
+							<GetFields :editMode = "editMode" />
 						</div>
 					</template>
 					<template #separator>
