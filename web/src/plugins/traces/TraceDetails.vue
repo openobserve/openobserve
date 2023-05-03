@@ -34,6 +34,7 @@
       <trace-chart
         id="trace_details_gantt_chart"
         ref="plotChart"
+        class="trace-details-chart"
         :chart="traceChart"
         @updated:chart="updateChart"
       />
@@ -400,6 +401,8 @@ export default defineComponent({
           zeroline: true,
           rangeslider: {
             visible: true,
+            bgcolor: "#d5d5d5",
+            yaxis: {},
           },
         },
         yaxis: {
@@ -537,6 +540,17 @@ $traceChartHeight: 200px;
 
   .q-splitter__before {
     z-index: 999 !important;
+  }
+
+  .trace-details-chart {
+    .rangeslider-slidebox {
+      fill: #5960b2 !important;
+    }
+    .rangeslider-mask-max,
+    .rangeslider-mask-min {
+      fill: #d2d2d2 !important;
+      fill-opacity: 1 !important;
+    }
   }
 }
 </style>
