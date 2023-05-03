@@ -14,7 +14,12 @@
 -->
 
 <template>
-  <div data-test="query-editor" ref="editorRef" id="editor"></div>
+  <div
+    data-test="query-editor"
+    class="logs-query-editor"
+    ref="editorRef"
+    id="editor"
+  ></div>
 </template>
 
 <script lang="ts">
@@ -326,16 +331,25 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 #editor {
   width: 100%;
   height: 78%;
   border-radius: 5px;
-  overflow: hidden;
 }
+</style>
 
-.monaco-editor,
-.monaco-editor .monaco-editor {
-  padding: 0px 0px 0px 0px !important;
+<style lang="scss">
+.logs-query-editor {
+  .monaco-editor,
+  .monaco-editor .monaco-editor {
+    padding: 0px 0px 0px 0px !important;
+
+    .editor-widget .suggest-widget {
+      z-index: 9999;
+      display: flex !important;
+      visibility: visible !important;
+    }
+  }
 }
 </style>
