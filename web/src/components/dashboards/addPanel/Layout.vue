@@ -23,7 +23,7 @@
       <q-expansion-item
         v-model="expansionItems.x"
         dense
-        :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.yAxis') :  t('panel.xAxis')"
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis')"
       >
         <div class="column index-menu q-mb-md droppable" :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
@@ -151,7 +151,7 @@
       <q-expansion-item
         dense
         v-model="expansionItems.y"
-        :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' ? t('panel.xAxis') : t('panel.yAxis')"
+        :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis')"
       >
         <div class="column index-menu q-mb-lg" :class="{
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,

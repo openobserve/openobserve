@@ -410,6 +410,8 @@ export default defineComponent({
                     console.log("xdata", xData);
             
                     traces = yAxisKeys?.map((key: any) => {
+                        console.log("-bar-", props.data.fields?.y.find((it: any) => it.alias == key));
+                        
                         const trace = {
                             name: props.data.fields?.y.find((it: any) => it.alias == key).label,
                             ...getPropsByChartTypeForTraces(),
@@ -434,10 +436,11 @@ export default defineComponent({
                 case "h-bar": {
                     let xData: Array<any> = []
                     //generate the traces value f chart
+                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
                     xAxisKeys?.map((key: any) => {
-                        xData.push(getAxisDataFromKey(key))
-                        return xData;
+                        return getAxisDataFromKey(key);
                     });
+                    console.log("xdata", xData);
 
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
@@ -463,10 +466,11 @@ export default defineComponent({
                 case "pie": {
                     let xData: Array<any> = []
                     //generate the traces value f chart
+                    xData=xAxisKeys.length == 1 ?  getAxisDataFromKey(xAxisKeys[0]) :
                     xAxisKeys?.map((key: any) => {
-                        xData.push(getAxisDataFromKey(key))
-                        return xData;
+                        return getAxisDataFromKey(key);
                     });
+                    console.log("xdata", xData);
 
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
@@ -480,7 +484,8 @@ export default defineComponent({
                                 opacity: 0.8,
                             },
                             labels: xData,
-                            values: textwrapper(getAxisDataFromKey(key)),
+                            values: getAxisDataFromKey(key),
+                            hovertemplate : "%{label}: %{value} (%{percent})<extra></extra>"
 
                         };
                         return trace
@@ -512,6 +517,37 @@ export default defineComponent({
                             y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
                             customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
                             hovertemplate: "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+
+                        };
+                        return trace
+                    })
+                    console.log("multiple:- traces", traces);
+
+                }
+                case "h-stacked": {
+                    // stacked with xAxis second value
+                    // allow 2 xAxis and 1 yAxis value for stack chart
+                    const key1 = xAxisKeys[1]
+                    const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
+                    console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                    
+                    traces = stackedXAxisUniqueValue?.map((key: any) => {
+                        console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                        
+                        const trace = {
+                            name: key,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            // marker: {
+                            //     color:
+                            //         props.data.fields?.x.find((it: any) => it.alias == key)?.color ||
+                            //         "#5960b2",
+                            //     opacity: 0.8,
+                            // },
+                            x: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                            y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                            customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
+                            hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                         };
                         return trace
@@ -696,6 +732,11 @@ export default defineComponent({
                     return {
                         type: 'bar',
                     };
+                case "h-stacked":
+                    return {
+                        type: 'bar',
+                        orientation: "h",
+                    };
                 default:
                     return {
                         type: "bar",
@@ -823,6 +864,22 @@ export default defineComponent({
                             title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
                             automargin: true,
                             fixedrange: true
+                        },
+                    };
+                case "h-stacked":
+                    return {
+                        barmode: "stack",
+                        xaxis: {
+                            title: props.data.fields?.y[0].label,
+                            tickangle: -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            // tickmode: "array",
+                            // tickvals: xAxisDataWithTicks,
+                            // ticktext: textformat(xAxisDataWithTicks),
+                            title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+                            automargin: true,
                         },
                     };
                 default:
