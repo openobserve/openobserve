@@ -18,8 +18,12 @@
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
     <div id="secondLevel">
-      <q-splitter v-model="splitterModel" horizontal
-style="height: 100%">
+      <q-splitter
+        class="logs-horizontal-splitter"
+        v-model="splitterModel"
+        horizontal
+        style="height: 100%"
+      >
         <template v-slot:before>
           <search-bar
             data-test="logs-search-bar"
@@ -143,8 +147,7 @@ style="height: 100%">
           </div>
           <div v-else>
             <h5 data-test="logs-search-error-message" class="text-center">
-              <q-icon name="warning"
-color="warning" size="10rem" /><br />{{
+              <q-icon name="warning" color="warning" size="10rem" /><br />{{
                 searchObj.data.errorMsg
               }}
             </h5>
@@ -1493,6 +1496,15 @@ div.plotly-notifier {
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .logs-horizontal-splitter {
+    .q-splitter__panel {
+      z-index: auto !important;
+    }
+    .q-splitter__before {
+      overflow: visible !important;
+    }
   }
 }
 </style>

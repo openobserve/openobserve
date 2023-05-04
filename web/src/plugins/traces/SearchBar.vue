@@ -45,7 +45,7 @@
             dense
             flat
             title="Run query"
-            class="q-pa-none search-button"
+            class="q-pa-none search-button bg-primary"
             @click="searchData"
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0

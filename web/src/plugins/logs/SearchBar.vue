@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="search-bar-component" id="searchBarComponent">
+  <div class="logs-search-bar-component" id="searchBarComponent">
     <!-- {{ searchObj.data }} -->
     <div class="row">
       <div class="float-right col q-mb-xs">
@@ -191,9 +191,10 @@
         </div>
       </div>
     </div>
-    <div class="row" v-show="searchObj.meta.showQuery">
+    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
       <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
         <q-splitter
+          class="logs-search-splitter"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
@@ -202,6 +203,7 @@
           <template #before>
             <b>Query Editor:</b>
             <query-editor
+              id="logsQueryEditor"
               ref="queryEditorRef"
               class="monaco-editor"
               v-model:query="searchObj.data.query"
@@ -228,10 +230,8 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel"
-color="primary" @click="cancelConfirmDialog" />
-          <q-btn label="OK"
-color="positive" @click="confirmDialogOK" />
+          <q-btn label="Cancel" color="primary" @click="cancelConfirmDialog" />
+          <q-btn label="OK" color="positive" @click="confirmDialogOK" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -772,9 +772,12 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+#logsQueryEditor,
+#fnEditor {
+  height: calc(100% - 20px) !important;
+}
 #fnEditor {
   width: 100%;
-  height: 83% !important;
   border-radius: 5px;
   border: 0px solid #dbdbdb;
   overflow: hidden;
@@ -788,14 +791,14 @@ export default defineComponent({
   transition: none;
 }
 
-.search-bar-component > .row:nth-child(2) {
-    height: calc(100% - 38px); /* or any other height you want to set */
-  }
+.logs-search-bar-component > .row:nth-child(2) {
+  height: calc(100% - 38px); /* or any other height you want to set */
+}
 
-.search-bar-component {
+.logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
 
   .function-dropdown {
     width: 205px;
@@ -946,5 +949,9 @@ export default defineComponent({
   .download-logs-btn {
     height: 30px;
   }
+}
+
+.query-editor-container {
+  height: calc(100% - 40px) !important;
 }
 </style>
