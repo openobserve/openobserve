@@ -39,7 +39,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     };
 
     let user = ROOT_USER.get("root").unwrap();
-    log::info!("grpc auth user: {:?}", user);
+    log::info!("grpc auth user: {} {}",&user.email , &user.password );
     log::info!("incoming credentials of user: {:?}", credentials);
         
     let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
