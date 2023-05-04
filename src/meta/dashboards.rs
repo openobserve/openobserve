@@ -103,6 +103,8 @@ pub enum AggregationFunc {
     Min,
     Max,
     Avg,
+    #[serde(rename = "count-distinct")]
+    CountDistinct,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
