@@ -62,7 +62,7 @@ async fn send_to_node(
             return Ok(());
         }
         let user = ROOT_USER.get("root").unwrap();
-        let credentials = Credentials::new(&user.email, &user.token);
+        let credentials = Credentials::new(&user.email, &user.password);
         let credentials = credentials.as_http_header();
         let token: MetadataValue<_> = credentials.parse()?;
         let channel = Channel::from_shared(node.grpc_addr)

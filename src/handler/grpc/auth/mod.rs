@@ -39,7 +39,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     };
 
     let user = ROOT_USER.get("root").unwrap();
-    if credentials.user_id.eq(&user.email) && credentials.password.eq(&user.token) {
+    let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
+    if credentials.user_id.eq(&user.email)
+        && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
+    {
         Ok(req)
     } else {
         Err(Status::unauthenticated("No valid auth token"))
