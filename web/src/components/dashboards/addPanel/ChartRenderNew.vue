@@ -545,44 +545,44 @@ export default defineComponent({
             const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
             if (field && field.alias == key) {
                 // get the format
-                // const timestamps = selectedTimeObj.value
-                // let keyFormat = "HH:mm:ss";
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-                //     keyFormat = "HH:mm:ss";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-                //     keyFormat = "HH:mm:ss";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-                //     keyFormat = "HH:mm:ss";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-                //     keyFormat = "HH:mm:ss";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-                //     keyFormat = "HH:mm:ss";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-                //     keyFormat = "MM-DD HH:mm";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-                //     keyFormat = "MM-DD HH:mm";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-                //     keyFormat = "MM-DD HH:mm";
-                // }
-                // if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-                //     keyFormat = "MM-DD HH:mm";
-                // }
-                // if (
-                //     timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-                //     keyFormat = "YYYY-MM-DD";
-                // }
+                const timestamps = selectedTimeObj.value
+                let keyFormat = "HH:mm:ss";
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
+                    keyFormat = "HH:mm:ss";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
+                    keyFormat = "HH:mm:ss";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
+                    keyFormat = "HH:mm:ss";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+                    keyFormat = "HH:mm:ss";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+                    keyFormat = "HH:mm:ss";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+                    keyFormat = "MM-DD HH:mm";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+                    keyFormat = "MM-DD HH:mm";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+                    keyFormat = "MM-DD HH:mm";
+                }
+                if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+                    keyFormat = "MM-DD HH:mm";
+                }
+                if (
+                    timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
+                    keyFormat = "YYYY-MM-DD";
+                }
 
-                // // now we have the format, convert that format
-                // result = result.map((it: any) => moment(it + "Z").format(keyFormat))
+                // now we have the format, convert that format
+                result = result.map((it: any) => moment(it + "Z").format(keyFormat))
 
-                result = result.map((it: any) => it.replace("T", " "))
+                // result = result.map((it: any) => it.replace("T", " "))
             }
 
             return result
