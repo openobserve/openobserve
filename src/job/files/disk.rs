@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use arrow::json::reader::infer_json_schema_from_seekable;
 use datafusion::arrow;
-use datafusion::arrow::json::reader::infer_json_schema;
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
+
 use std::io::{BufReader, Seek, SeekFrom};
 use std::sync::atomic::Ordering;
 use std::{fs, path::Path, sync::Arc};
@@ -22,7 +22,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::common::file::scan_files;
 use crate::common::utils::populate_file_meta;
-use crate::infra::config::{get_parquet_compression, CONFIG};
+use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::infra::storage;
@@ -193,7 +193,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
         };
     }
-
     Ok(())
 }
 
@@ -207,6 +206,8 @@ async fn upload_file(
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
+    let mut res_records = vec![];
+    let mut records = vec![];
     log::info!("[JOB] File upload begin: disk: {}", path_str);
 
     // metrics
@@ -215,31 +216,79 @@ async fn upload_file(
         .inc_by(file_size);
 
     let mut schema_reader = BufReader::new(&file);
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
-    let arrow_schema = Arc::new(inferred_schema.clone());
-    drop(schema_reader);
 
-    file.seek(SeekFrom::Start(0)).unwrap();
-    let json_reader = BufReader::new(&file);
-    let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
-        .build(json_reader)
-        .unwrap();
+    let (arrow_schema, inferred_schema) =
+        match infer_json_schema_from_seekable(&mut schema_reader, None) {
+            Ok(inferred_schema) => {
+                let arrow_schema = Arc::new(inferred_schema.clone());
+                drop(schema_reader);
+                (arrow_schema, inferred_schema)
+            }
+            Err(err) => {
+                // File has some corrupt json data....ignore such data & move rest of the records
+                log::error!(
+                    "[JOB] Failed to infer schema from file: {}, error: {}",
+                    path_str,
+                    err.to_string()
+                );
 
-    let mut buf_parquet = Vec::new();
-    let props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256);
-    let writer_props = props.build();
-    let mut writer =
-        ArrowWriter::try_new(&mut buf_parquet, arrow_schema.clone(), Some(writer_props)).unwrap();
+                let mut json_reader = BufReader::new(&file);
+                let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
+
+                for value in value_reader {
+                    match value {
+                        Ok(val) => {
+                            res_records.push(Ok(val.clone()));
+                            records.push(val);
+                        }
+                        Err(err) => {
+                            log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
+                        }
+                    }
+                }
+
+                let inferred_schema =
+                    arrow::json::reader::infer_json_schema_from_iterator(res_records.into_iter())
+                        .unwrap();
+                let arrow_schema = Arc::new(inferred_schema.clone());
+                drop(schema_reader);
+
+                (arrow_schema, inferred_schema)
+            }
+        };
+
     let mut meta_batch = vec![];
-    for batch in json {
-        let batch_write = batch.unwrap();
-        writer.write(&batch_write).expect("Write batch succeeded");
-        meta_batch.push(batch_write);
-    }
+    let mut buf_parquet = Vec::new();
+    let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
+
+    if records.is_empty() {
+        file.seek(SeekFrom::Start(0)).unwrap();
+        let json_reader = BufReader::new(&file);
+        let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+            .build(json_reader)
+            .unwrap();
+        for batch in json {
+            let batch_write = batch.unwrap();
+            writer.write(&batch_write).expect("Write batch succeeded");
+            meta_batch.push(batch_write);
+        }
+    } else {
+        let mut json = vec![];
+        let mut decoder = arrow::json::RawReaderBuilder::new(Arc::new(inferred_schema.clone()))
+            .build_decoder()?;
+
+        for value in records {
+            decoder
+                .decode(crate::common::json::to_string(&value).unwrap().as_bytes())
+                .unwrap();
+            json.push(decoder.flush()?.unwrap());
+        }
+
+        for batch in json {
+            writer.write(&batch).expect("Write batch succeeded");
+            meta_batch.push(batch);
+        }
+    };
     writer.close().unwrap();
 
     //let file_name = path.file_name();
