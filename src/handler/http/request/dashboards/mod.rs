@@ -113,7 +113,6 @@ async fn list_dashboards(org_id: web::Path<String>) -> impl Responder {
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
-    request_body(content = Dashboard, description = "Dashboard details"),
     responses(
         (status = StatusCode::OK, body = Dashboard),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
