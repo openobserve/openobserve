@@ -289,14 +289,15 @@ export default defineComponent({
             { deep: true }
         );
 
-        // single x axis and one or more y axis
+        // multiple x axis and multiple y axis
         const renderChart = async () => {
             // console.log("Query: rendering chart");
             // console.log("Query: chart type", props.data.type);
-            // Step 1: Get the Y-Axis Count
+            // Step 1: Get the X-Axis key
             const xAxisKeys = getXAxisKeys();
             console.log('xAxisKeys:', xAxisKeys);
 
+            // Step 2: Get the Y-Axis key
             const yAxisKeys = getYAxisKeys();
             console.log('yAxisKeys:', yAxisKeys);
 
@@ -307,7 +308,6 @@ export default defineComponent({
                 case "line":
                 case "scatter":
                 case "area": {
-
                     // x axis values
                     // if x axis length is 1, then use the normal labels,
                     // more more than one, we need to create array of array for each key
@@ -320,6 +320,7 @@ export default defineComponent({
                                 });
                     console.log("xdata", xData);
             
+                    //generate trace based on the y axis keys
                     traces = yAxisKeys?.map((key: any) => {
                         console.log("-bar-", props.data.fields?.y.find((it: any) => it.alias == key));
                         
@@ -345,6 +346,9 @@ export default defineComponent({
                     break;
                 }
                 case "h-bar": {
+                    // x axis values
+                    // if x axis length is 1, then use the normal labels,
+                    // more more than one, we need to create array of array for each key
                     const xData = !xAxisKeys.length ?
                                 [] :
                                 xAxisKeys.length == 1 ?  
@@ -354,6 +358,7 @@ export default defineComponent({
                                 });
                     console.log("xdata", xData);
 
+                    //generate trace based on the y axis keys
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
                             name: props.data.fields?.y.find((it: any) => it.alias == key).label,
@@ -376,6 +381,9 @@ export default defineComponent({
                     break;
                 }
                 case "pie": {
+                    // x axis values
+                    // if x axis length is 1, then use the normal labels,
+                    // more more than one, we need to create array of array for each key
                     const xData = !xAxisKeys.length ?
                                 [] :
                                 xAxisKeys.length == 1 ?  
@@ -384,6 +392,7 @@ export default defineComponent({
                                     return getAxisDataFromKey(key);
                                 });
 
+                    //generate trace based on the y axis keys
                     traces = yAxisKeys?.map((key: any) => {
                         const trace = {
                             name: props.data.fields?.y.find((it: any) => it.alias == key).label,
@@ -406,12 +415,15 @@ export default defineComponent({
                     break;
                 }
                 case "stacked": {
-                    // stacked with xAxis second value
+                    // stacked with xAxis's second value
                     // allow 2 xAxis and 1 yAxis value for stack chart
+                    // get second x axis key
                     const key1 = xAxisKeys[1]
+                    // get the unique value of the second xAxis's key
                     const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
                     console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                     
+                    // create a trace based on second xAxis's unique values
                     traces = stackedXAxisUniqueValue?.map((key: any) => {
                         console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                         
@@ -439,10 +451,13 @@ export default defineComponent({
                 case "h-stacked": {
                     // stacked with xAxis second value
                     // allow 2 xAxis and 1 yAxis value for stack chart
+                    // get second x axis key
                     const key1 = xAxisKeys[1]
+                    // get the unique value of the second xAxis's key
                     const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
                     console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                     
+                    // create a trace based on second xAxis's unique values
                     traces = stackedXAxisUniqueValue?.map((key: any) => {
                         console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                         
@@ -501,31 +516,31 @@ export default defineComponent({
             });
         };
 
-        // change the axis value based on chart type
-        const getTraceValuesByChartType = (xAxisKey: string, yAxisKey: string) => {
-            const trace: any = {
-                ...getPropsByChartTypeForTraces(),
-            };
-            if (props.data.type == "pie") {
-                trace["labels"] = textwrapper(getAxisDataFromKey(xAxisKey));
-                trace["values"] = getAxisDataFromKey(yAxisKey);
-                // add hover template for showing Y axis name and count
-                trace["hovertemplate"] = "%{label}: %{value} (%{percent})<extra></extra>"
-            } else if (props.data.type == "h-bar") {
-                trace["y"] = getAxisDataFromKey(xAxisKey);
-                trace["x"] = getAxisDataFromKey(yAxisKey);
-                trace["customdata"] = getAxisDataFromKey(xAxisKey);
-                // add hover template for showing Y axis name and count
-                trace["hovertemplate"] = "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>"
-            } else {
-                trace["x"] = getAxisDataFromKey(xAxisKey);
-                trace["y"] = getAxisDataFromKey(yAxisKey);
-                trace["customdata"] = getAxisDataFromKey(xAxisKey);
-                // add hover template for showing Y axis name and count
-                trace["hovertemplate"] = "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>"
-            }
-            return trace;
-        };
+        // // change the axis value based on chart type
+        // const getTraceValuesByChartType = (xAxisKey: string, yAxisKey: string) => {
+        //     const trace: any = {
+        //         ...getPropsByChartTypeForTraces(),
+        //     };
+        //     if (props.data.type == "pie") {
+        //         trace["labels"] = textwrapper(getAxisDataFromKey(xAxisKey));
+        //         trace["values"] = getAxisDataFromKey(yAxisKey);
+        //         // add hover template for showing Y axis name and count
+        //         trace["hovertemplate"] = "%{label}: %{value} (%{percent})<extra></extra>"
+        //     } else if (props.data.type == "h-bar") {
+        //         trace["y"] = getAxisDataFromKey(xAxisKey);
+        //         trace["x"] = getAxisDataFromKey(yAxisKey);
+        //         trace["customdata"] = getAxisDataFromKey(xAxisKey);
+        //         // add hover template for showing Y axis name and count
+        //         trace["hovertemplate"] = "%{fullData.name}: %{x}<br>%{customdata}<extra></extra>"
+        //     } else {
+        //         trace["x"] = getAxisDataFromKey(xAxisKey);
+        //         trace["y"] = getAxisDataFromKey(yAxisKey);
+        //         trace["customdata"] = getAxisDataFromKey(xAxisKey);
+        //         // add hover template for showing Y axis name and count
+        //         trace["hovertemplate"] = "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>"
+        //     }
+        //     return trace;
+        // };
 
         // get the x axis key
         const getXAxisKeys = () => {
