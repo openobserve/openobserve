@@ -14,7 +14,7 @@
 
 use arrow::json::reader::infer_json_schema_from_seekable;
 use datafusion::arrow;
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
+
 use std::io::{BufReader, Seek, SeekFrom};
 use std::sync::atomic::Ordering;
 use std::{fs, path::Path, sync::Arc};
@@ -22,7 +22,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::common::file::scan_files;
 use crate::common::utils::populate_file_meta;
-use crate::infra::config::{get_parquet_compression, CONFIG};
+use crate::infra::config::CONFIG;
 use crate::infra::file_lock;
 use crate::infra::metrics;
 use crate::infra::storage;
@@ -217,7 +217,6 @@ async fn upload_file(
 
     let mut schema_reader = BufReader::new(&file);
 
-  
     let (arrow_schema, inferred_schema) =
         match infer_json_schema_from_seekable(&mut schema_reader, None) {
             Ok(inferred_schema) => {
@@ -235,6 +234,7 @@ async fn upload_file(
 
                 let mut json_reader = BufReader::new(&file);
                 let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
+
                 for value in value_reader {
                     match value {
                         Ok(val) => {
@@ -259,7 +259,7 @@ async fn upload_file(
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = get_writer(&mut buf_parquet, &arrow_schema);
+    let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
 
     if records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();
@@ -268,15 +268,9 @@ async fn upload_file(
             .build(json_reader)
             .unwrap();
         for batch in json {
-            match batch {
-                Ok(batch_write) => {
-                    writer.write(&batch_write).expect("Write batch succeeded");
-                    meta_batch.push(batch_write);
-                }
-                Err(err) => {
-                    log::error!("[JOB] Failed to write batch error: {}", err.to_string());
-                }
-            }
+            let batch_write = batch.unwrap();
+            writer.write(&batch_write).expect("Write batch succeeded");
+            meta_batch.push(batch_write);
         }
     } else {
         let mut json = vec![];
@@ -345,18 +339,4 @@ async fn upload_file(
             Err(anyhow::anyhow!(err))
         }
     }
-}
-
-fn get_writer<'a>(
-    buf_parquet: &'a mut Vec<u8>,
-    arrow_schema: &'a Arc<arrow_schema::Schema>,
-) -> ArrowWriter<&'a mut Vec<u8>> {
-    let props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256);
-    let writer_props = props.build();
-
-    ArrowWriter::try_new(buf_parquet, arrow_schema.clone(), Some(writer_props)).unwrap()
 }
