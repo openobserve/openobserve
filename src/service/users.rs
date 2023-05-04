@@ -144,7 +144,6 @@ pub async fn update_user(
                 }
                 if is_updated || is_org_updated {
                     let user = db::user::get_db_user(email).await;
-                    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
                     match user {
                         Ok(mut db_user) => {
                             db_user.password = new_user.password;
@@ -155,14 +154,14 @@ pub async fn update_user(
                                 let new_orgs = if orgs.is_empty() {
                                     vec![UserOrg {
                                         name: org_id.to_string(),
-                                        token,
+                                        token: new_user.token,
                                         role: new_user.role,
                                     }]
                                 } else {
                                     orgs.retain(|org| !org.name.eq(org_id));
                                     orgs.push(UserOrg {
                                         name: org_id.to_string(),
-                                        token,
+                                        token: new_user.token,
                                         role: new_user.role,
                                     });
                                     orgs
