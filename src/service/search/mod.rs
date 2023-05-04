@@ -188,7 +188,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
 
     // make grpc auth token
     let user = ROOT_USER.get("root").unwrap();
-    let credentials = Credentials::new(&user.email, &user.token).as_http_header();
+    let credentials = Credentials::new(&user.email, &user.password).as_http_header();
 
     // make cluster request
     let mut tasks = Vec::new();
