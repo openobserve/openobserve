@@ -29,7 +29,7 @@ use super::request::functions;
 use super::request::kv;
 use super::request::logs;
 use super::request::organization;
-use super::request::prom::*;
+use super::request::prom;
 use super::request::search;
 use super::request::status;
 use super::request::stream;
@@ -139,7 +139,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(users::save)
             .service(users::delete)
             .service(users::add_user_to_org)
-            .service(prometheus_write)
+            .service(prom::remote_write)
+            .service(prom::query)
+            .service(prom::query_range)
+            .service(prom::metadata)
+            .service(prom::series)
+            .service(prom::labels)
+            .service(prom::values)
             .service(create_dashboard)
             .service(update_dashboard)
             .service(list_dashboards)
