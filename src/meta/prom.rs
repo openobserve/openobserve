@@ -44,10 +44,55 @@ impl Metric {
             name,
             value,
             collection,
-
             metric_type,
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestQuery {
+    pub query: String,
+    pub time: Option<String>,
+    pub timeout: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestRangeQuery {
+    pub query: String,
+    pub start: String,
+    pub end: String,
+    pub step: Option<String>,
+    pub timeout: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestMetadata {
+    pub limit: i64,
+    pub metric: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestSeries {
+    #[serde(rename = "match")]
+    pub matches: Vec<String>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestLabels {
+    #[serde(rename = "match")]
+    pub matches: Option<Vec<String>>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RequestValues {
+    #[serde(rename = "match")]
+    pub matches: Option<Vec<String>>,
+    pub start: Option<String>,
+    pub end: Option<String>,
 }
 
 #[cfg(test)]
