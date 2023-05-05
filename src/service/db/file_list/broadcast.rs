@@ -61,7 +61,8 @@ async fn send_to_node(
         if cluster::ge_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
-        let user = ROOT_USER.get("root").unwrap();
+        let root_user = ROOT_USER.clone();
+        let user = root_user.get("root").unwrap();
         let credentials = Credentials::new(&user.email, &user.password);
         let credentials = credentials.as_http_header();
         let token: MetadataValue<_> = credentials.parse()?;

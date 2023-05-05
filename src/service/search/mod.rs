@@ -187,7 +187,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     //XXX let span4 = info_span!("srv:search:cluster:do_search").entered();
 
     // make grpc auth token
-    let user = ROOT_USER.get("root").unwrap();
+    let root_user = ROOT_USER.clone();
+    let user = root_user.get("root").unwrap();
     let credentials = Credentials::new(&user.email, &user.password).as_http_header();
 
     // make cluster request

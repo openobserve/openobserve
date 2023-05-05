@@ -210,12 +210,13 @@ pub async fn add_user_to_org(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_db_user(email).await;
+    let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
         let mut db_user = existing_user.unwrap();
         let local_org;
         let initiating_user = if is_root_user(initiator_id).await {
             local_org = org_id.replace(' ', "_");
-            ROOT_USER.get("root").unwrap().value().clone()
+            root_user.get("root").unwrap().clone()
         } else {
             local_org = org_id.to_owned();
             db::user::get(Some(org_id), initiator_id)
