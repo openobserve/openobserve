@@ -261,10 +261,13 @@ async fn upload_file(
     let mut buf_parquet = Vec::new();
     let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
 
+    log::info!("Schema for {stream_name} is {}", arrow_schema.clone());
+
     if records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();
         let json_reader = BufReader::new(&file);
         let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+            .coerce_primitive(true)
             .build(json_reader)
             .unwrap();
         for batch in json {
@@ -275,6 +278,7 @@ async fn upload_file(
     } else {
         let mut json = vec![];
         let mut decoder = arrow::json::RawReaderBuilder::new(Arc::new(inferred_schema.clone()))
+            .coerce_primitive(true)
             .build_decoder()?;
 
         for value in records {

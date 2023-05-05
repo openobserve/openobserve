@@ -182,6 +182,13 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_LUA_FN_ENABLED", default = false)]
     pub lua_fn_enabled: bool,
+    #[env_config(name = "ZO_ENABLE_SENTRY", default = true)]
+    pub sentry_enabled: bool,
+    #[env_config(
+        name = "ZO_SENTRY_URL",
+        default = "https://ae9f1cd6b5b74b3895bf9934a166c04e@o4504105501196288.ingest.sentry.io/4505130723966976"
+    )]
+    pub sentry_url: String,
 }
 
 #[derive(EnvConfig)]
