@@ -66,7 +66,7 @@
     <div class="row" style="height: calc(100vh - 118px); overflow-y: auto">
       <div
         class="col"
-        style="overflow: hidden; min-width: 80px; max-width: 80px"
+        style="overflow: hidden; min-width: 90px; max-width: 90px"
       >
         <ChartSelection
           v-model:selectedChartType="dashboardPanelData.data.type"

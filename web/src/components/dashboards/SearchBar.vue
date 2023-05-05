@@ -203,8 +203,8 @@ export default defineComponent({
         const xAxisAlias = dashboardPanelData.data.fields.x.map((it: any)=> it.alias)
         console.log("xAxisAlias",xAxisAlias);
         
-        query += "GROUP BY " + xAxisAlias.join(", ")
-        query += " ORDER BY " + xAxisAlias.join(", ")
+        query += xAxisAlias.length ? "GROUP BY " + xAxisAlias.join(", ") : ''
+        query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
 
         // console.log('generated query: ', query)
 

@@ -520,11 +520,12 @@ export default defineComponent({
                 }
                 case "metric-text": {
                     const key1 = yAxisKeys[0]
-                    console.log('metric-text changed');
+                    const yAxisValue= getAxisDataFromKey(key1)
+                    console.log('metric-text changed',);
                     traces= []
                     const trace =  {
                         ...getPropsByChartTypeForTraces(),
-                        value: getAxisDataFromKey(key1) ,
+                        value: yAxisValue.length > 0 ? yAxisValue[0] : 0 ,
                         // number: { prefix: "$" },
                         // delta: { position: "top", reference: 320 },
                         // domain: { x: [0, 1], y: [0, 1] }
@@ -911,9 +912,9 @@ export default defineComponent({
                 case "metric-text":
                 console.log("inside metric-text");
                     return {
-                        paper_bgcolor: "lightgray",
-                        width: 600,
-                        height: 200,
+                        paper_bgcolor: "white",
+                        // width: 600,
+                        // height: 200,
                     }
                 default:
                     return {

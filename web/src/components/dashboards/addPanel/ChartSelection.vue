@@ -15,7 +15,7 @@
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 80px">
+    <div class="q-pa-none" style="max-width: 90px">
       <q-list separator>
         <q-item
           :class="
@@ -92,6 +92,11 @@ export default defineComponent({
         id: "pie",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        title: "Donut",
+        id: "donut-chart",
+      },
+      {
         image:
           "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
         title: "Scatter",
@@ -107,11 +112,6 @@ export default defineComponent({
           "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
         title: "Metric Text",
         id: "metric-text",
-      },
-      {
-        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
-        title: "Donut Chart",
-        id: "donut-chart",
       },
     ]);
 
