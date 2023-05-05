@@ -94,16 +94,20 @@
 					</template>
 					<template #after>
 						<div class="row" style="height: calc(100vh - 118px); overflow-y: auto; ">
-							<div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
-								<Layout/>
-							</div>
-							<q-separator vertical />
 							<div class="col scroll" style="height:100%;">
-                <SearchBar />
+								<LayoutNew/>
+                
                 <q-separator />
                 <div style="height: calc(100% - 140px);">
                   <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
+                <SearchBar />
+
+							</div>
+              
+							<q-separator vertical />
+              <div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
+								<Layout/>
 							</div>
 						</div>
 					</template>
@@ -137,6 +141,7 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
+import LayoutNew from "../../../components/dashboards/addPanel/LayoutNew.vue";
 import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
@@ -149,6 +154,7 @@ export default defineComponent({
     ChartSelection,
     GetFields,
     Layout,
+    LayoutNew,
     SearchBar,
     DateTimePicker,
     ChartRender,
@@ -239,8 +245,14 @@ export default defineComponent({
       const error = []
       const dashboardData = dashboardPanelData
 
+      // check for metric-text chart type
+      //metric-text chart don't have a x axis value
+      if(dashboardData.data.type == "metric-text" && dashboardData.data.fields.x.length){
+        error.push(`Metric text chart not have ${currentXLabel.value}`)
+      }
+
       // check for at least 1 x axis
-      if(!dashboardData.data.fields.x.length){
+      if(dashboardData.data.type != "metric-text" && !dashboardData.data.fields.x.length){
         error.push(`Please add at least one field in ${currentXLabel.value}`)
       }
 
@@ -250,8 +262,8 @@ export default defineComponent({
       }
 
       // for pie, make sure only 1 y axis is there
-      if(dashboardData.data.type == "pie" && dashboardData.data.fields.y.length > 1 ){
-        error.push("You can add only one field in the Y-Axis for pie chart")
+      if(["pie", "metric-text", "donut-chart"].includes(dashboardData.data.type) && dashboardData.data.fields.y.length > 1 ){
+        error.push("You can add only one field in the Y-Axis for pie or metric-text or donut charts")
       }
 
       // check if aggregation function is selected or not

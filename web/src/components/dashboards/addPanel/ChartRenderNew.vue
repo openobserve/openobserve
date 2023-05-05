@@ -519,11 +519,12 @@ export default defineComponent({
                     break;
                 }
                 case "metric-text": {
+                    const key1 = yAxisKeys[0]
                     console.log('metric-text changed');
                     traces= []
                     const trace =  {
                         ...getPropsByChartTypeForTraces(),
-                        value: 400,
+                        value: getAxisDataFromKey(key1) ,
                         // number: { prefix: "$" },
                         // delta: { position: "top", reference: 320 },
                         // domain: { x: [0, 1], y: [0, 1] }
