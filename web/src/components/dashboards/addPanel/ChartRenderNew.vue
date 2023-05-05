@@ -414,6 +414,42 @@ export default defineComponent({
                     console.log("multiple:- traces", traces);
                     break;
                 }
+                case "donut-chart": {
+                    // x axis values
+                    // if x axis length is 1, then use the normal labels,
+                    // more more than one, we need to create array of array for each key
+                    const xData = !xAxisKeys.length ?
+                                [] :
+                                xAxisKeys.length == 1 ?  
+                                getAxisDataFromKey(xAxisKeys[0]) :
+                                xAxisKeys?.map((key: any) => {
+                                    return getAxisDataFromKey(key);
+                                });
+
+                    //generate trace based on the y axis keys
+                    traces = yAxisKeys?.map((key: any) => {
+                        const trace = {
+                            name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                            ...getPropsByChartTypeForTraces(),
+                            showlegend: props.data.config?.show_legends,
+                            marker: {
+                                color:
+                                    props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                    "#5960b2",
+                                opacity: 0.8,
+                            },
+                            labels: textwrapper(xData),
+                            values: getAxisDataFromKey(key),
+                            domain: {column: 0},
+                            hole: .4,
+                            hovertemplate : "%{label}: %{value} (%{percent})<extra></extra>"
+
+                        };
+                        return trace
+                    })
+                    console.log("multiple:- traces", traces);
+                    break;
+                }
                 case "stacked": {
                     // stacked with xAxis's second value
                     // allow 2 xAxis and 1 yAxis value for stack chart
@@ -480,7 +516,20 @@ export default defineComponent({
                         return trace
                     })
                     console.log("multiple:- traces", traces);
-
+                    break;
+                }
+                case "metric-text": {
+                    console.log('metric-text changed');
+                    traces= []
+                    const trace =  {
+                        ...getPropsByChartTypeForTraces(),
+                        value: 400,
+                        // number: { prefix: "$" },
+                        // delta: { position: "top", reference: 320 },
+                        // domain: { x: [0, 1], y: [0, 1] }
+                    }
+                    traces.push(trace)
+                    break;
                 }
                 default: {
                     break;
@@ -598,8 +647,10 @@ export default defineComponent({
                 result = result.map((it: any) => moment(it + "Z").format(keyFormat))
 
                 // result = result.map((it: any) => it.replace("T", " "))
+                // console.log("with timestamps: " + result);
+                
             }
-
+            // console.log("without timestamps: " + result);
             return result
         };
 
@@ -622,6 +673,10 @@ export default defineComponent({
                     return {
                         type: "pie",
                     };
+                case "donut-chart":
+                    return {
+                        type: "pie",
+                    };
                 case "h-bar":
                     return {
                         type: "bar",
@@ -635,6 +690,11 @@ export default defineComponent({
                 case "stacked":
                     return {
                         type: 'bar',
+                    };
+                case "metric-text":
+                    return {
+                        type: "indicator",
+                        mode: "number",
                     };
                 case "h-stacked":
                     return {
@@ -679,7 +739,6 @@ export default defineComponent({
                         xaxis: xaxis,
                         yaxis: yaxis
                     }
-
                     return trace
 
                 }
@@ -688,12 +747,13 @@ export default defineComponent({
                         title: props.data.fields?.x[0].label,
                         tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                         automargin: true,
+                        // rangeslider: { range: xAxisDataWithTicks },
                     }
 
                     const yaxis: any = {
                         title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
                         automargin: true,
-                        fixedrange: true
+                        fixedrange: true,
                     }
 
                     if(props.data.fields?.x.length == 1){
@@ -732,10 +792,24 @@ export default defineComponent({
                         xaxis: xaxis,
                         yaxis: yaxis
                     }
-
                     return trace
                 }
                 case "pie":
+                    return {
+                        xaxis: {
+                            title: props.data.fields?.x[0].label,
+                            tickangle: -20,
+                            automargin: true,
+                        },
+                        yaxis: {
+                            tickmode: "array",
+                            tickvals: xAxisDataWithTicks,
+                            ticktext: textformat(xAxisDataWithTicks),
+                            title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                            automargin: true,
+                        },
+                    };
+                case "donut-chart":
                     return {
                         xaxis: {
                             title: props.data.fields?.x[0].label,
@@ -777,8 +851,7 @@ export default defineComponent({
 
                     return trace
                 }
-                case "area":
-                {
+                case "area": {
                     const xaxis: any = {
                         title: props.data.fields?.x[0].label,
                         tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
@@ -804,7 +877,6 @@ export default defineComponent({
 
                     return trace
                 }
-
                 case "stacked":
                     return {
                         barmode: "stack",
@@ -835,6 +907,13 @@ export default defineComponent({
                             automargin: true,
                         },
                     };
+                case "metric-text":
+                console.log("inside metric-text");
+                    return {
+                        paper_bgcolor: "lightgray",
+                        width: 600,
+                        height: 200,
+                    }
                 default:
                     return {
                         xaxis: {

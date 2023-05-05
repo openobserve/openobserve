@@ -102,6 +102,17 @@ export default defineComponent({
         title: "Table",
         id: "table",
       },
+      {
+        image:
+          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        title: "Metric Text",
+        id: "metric-text",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        title: "Donut Chart",
+        id: "donut-chart",
+      },
     ]);
 
     return {
