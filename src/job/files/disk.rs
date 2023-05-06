@@ -261,7 +261,9 @@ async fn upload_file(
     let mut buf_parquet = Vec::new();
     let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
 
-    log::info!("Schema for {stream_name} is {}", arrow_schema.clone());
+    if CONFIG.common.sentry_enabled {
+        log::info!("Schema for {stream_name} is {}", arrow_schema.clone());
+    }
 
     if records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();

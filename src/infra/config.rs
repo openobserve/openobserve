@@ -182,7 +182,7 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_LUA_FN_ENABLED", default = false)]
     pub lua_fn_enabled: bool,
-    #[env_config(name = "ZO_ENABLE_SENTRY", default = false)]
+    #[env_config(name = "ZO_SENTRY_ENABLED", default = false)]
     pub sentry_enabled: bool,
     #[env_config(
         name = "ZO_SENTRY_URL",
