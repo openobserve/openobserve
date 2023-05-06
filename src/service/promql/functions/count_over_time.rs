@@ -12,23 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod alert_manager;
-pub mod alerts;
-pub mod compact;
-pub mod dashboards;
-pub mod db;
-pub mod file_list;
-pub mod functions;
-pub mod ingestion;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod promql;
-pub mod router;
-pub mod schema;
-pub mod search;
-pub mod stream;
-pub mod traces;
-pub mod triggers;
-pub mod users;
+use datafusion::error::Result;
+
+use crate::service::promql::value::{RangeValue, Value};
+
+pub(crate) fn count_over_time(data: &Value) -> Result<Value> {
+    super::eval_idelta(data, "count_over_time", exec)
+}
+
+fn exec(data: &RangeValue) -> f64 {
+    data.values.len() as f64
+}

@@ -12,23 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod alert_manager;
-pub mod alerts;
-pub mod compact;
-pub mod dashboards;
-pub mod db;
-pub mod file_list;
-pub mod functions;
-pub mod ingestion;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod promql;
-pub mod router;
-pub mod schema;
-pub mod search;
-pub mod stream;
-pub mod traces;
-pub mod triggers;
-pub mod users;
+use datafusion::error::Result;
+use promql_parser::parser::Expr as PromExpr;
+
+use super::QueryEngine;
+use crate::service::promql::value::Value;
+
+pub async fn topk(ctx: &mut QueryEngine, param: Box<PromExpr>, data: &Value) -> Result<Value> {
+    super::eval_top(ctx, param, data, false).await
+}

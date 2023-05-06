@@ -698,6 +698,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-recursion"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e97ce7de6cf12de5d7226c73f5ba9811622f4db3a5b91b55c53e987e5f91cba"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.15",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5052,6 +5063,9 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
@@ -6360,10 +6374,12 @@ dependencies = [
  "argon2",
  "arrow",
  "arrow-schema",
+ "async-recursion",
  "async-trait",
  "async_once",
  "awc",
  "base64 0.21.0",
+ "blake3",
  "bytes",
  "chrono",
  "clap",
@@ -6381,7 +6397,10 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "glob",
+ "hex",
  "http-auth-basic",
+ "indexmap",
+ "itertools",
  "lazy_static",
  "log",
  "lru",
@@ -6405,6 +6424,7 @@ dependencies = [
  "reqwest",
  "rs-snowflake",
  "rust-embed-for-web",
+ "rustc-hash",
  "segment",
  "serde",
  "serde_json",
@@ -6412,6 +6432,7 @@ dependencies = [
  "sled",
  "snap",
  "sqlparser",
+ "strum",
  "sys-info",
  "thiserror",
  "time 0.3.20",
