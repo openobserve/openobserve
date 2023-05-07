@@ -209,8 +209,6 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
-    #[env_config(name = "ZO_DATA_LIFECYCLE", default = 0)] // in days
-    pub data_lifecycle: i64,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
@@ -231,6 +229,8 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION", default = 0)] // in days
+    pub data_retention: i64,
 }
 
 #[derive(EnvConfig)]
@@ -359,28 +359,29 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 10;
     }
-    if cfg.limit.data_lifecycle > 0 && cfg.limit.data_lifecycle < 3 {
-        return Err(anyhow::anyhow!(
-            "data lifecyle disallow set period less than 3 days."
-        ));
+    // check max_file_size_on_disk to MB
+    cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+    if cfg.limit.req_cols_per_record_limit == 0 {
+        cfg.limit.req_cols_per_record_limit = 1000;
     }
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = hostname().unwrap();
     }
-    // check max_file_size_on_disk to MB
-    cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+
+    // format local_mode_storage
+    cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
+
     // check compact_max_file_size to MB
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 600;
     }
-    // format local_mode_storage
-    cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
-
-    if cfg.limit.req_cols_per_record_limit == 0 {
-        cfg.limit.req_cols_per_record_limit = 1000;
+    if cfg.compact.data_retention > 0 && cfg.compact.data_retention < 3 {
+        return Err(anyhow::anyhow!(
+            "Data retention is not allowed to be less than 3 days."
+        ));
     }
 
     Ok(())
@@ -539,14 +540,14 @@ mod tests {
 
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
-        cfg.limit.data_lifecycle = 10;
         cfg.compact.interval = 0;
+        cfg.compact.data_retention = 10;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.limit.data_lifecycle, 10);
+        assert_eq!(cfg.compact.data_retention, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.limit.data_lifecycle = 2;
+        cfg.compact.data_retention = 2;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_err());
 
