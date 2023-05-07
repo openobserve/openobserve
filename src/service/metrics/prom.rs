@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, fs::OpenOptions, io::Error, time::Instant};
+use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
@@ -27,14 +27,16 @@ use crate::{
     infra::{
         cluster,
         config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        errors::{Error, Result},
         file_lock, metrics,
     },
     meta::{
         self,
         alert::{Alert, Trigger},
         prom::{
-            ClusterLeader, FxIndexMap, Metadata, Metric, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL,
-            NAME_LABEL, REPLICA_LABEL, VALUE_LABEL,
+            ClusterLeader, FxIndexMap, Metadata, MetadataObject, Metric, RequestMetadata,
+            ResponseMetadata, Status, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL,
+            REPLICA_LABEL, VALUE_LABEL,
         },
         StreamType,
     },
@@ -52,7 +54,7 @@ pub async fn remote_write(
     org_id: &str,
     thread_id: actix_web::web::Data<usize>,
     body: actix_web::web::Bytes,
-) -> Result<HttpResponse, Error> {
+) -> std::result::Result<HttpResponse, io::Error> {
     let start = Instant::now();
     let loc_span = info_span!("service:metrics::prom:remote_write");
     let _guard = loc_span.enter();
@@ -420,7 +422,7 @@ pub async fn remote_write(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            &StreamType::Metrics.to_string(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -429,11 +431,83 @@ pub async fn remote_write(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            &StreamType::Metrics.to_string(),
         ])
         .inc();
 
     Ok(HttpResponse::Ok().into())
+}
+
+pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
+    let empty_response = || mk_metadata_response(std::iter::empty());
+
+    if req.limit == Some(0) {
+        return Ok(empty_response());
+    }
+
+    let stream_type = StreamType::Metrics;
+
+    if let Some(metric_name) = req.metric {
+        let schema = db::schema::get(org_id, &metric_name, Some(stream_type))
+            .await
+            // `db::schema::get` never fails, so it's safe to unwrap
+            .unwrap();
+        let resp = if schema == Schema::empty() {
+            empty_response()
+        } else {
+            mk_metadata_response([(
+                metric_name,
+                get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
+            )])
+        };
+        return Ok(resp);
+    }
+
+    match db::schema::list(org_id, Some(stream_type), true).await {
+        Err(error) => {
+            tracing::error!(%stream_type, ?error, "failed to get metrics' stream schemas");
+            Err(Error::Message(format!(
+                "failed to get metrics' stream schemas: {error}"
+            )))
+        }
+        Ok(stream_schemas) => {
+            let metric_names = stream_schemas.into_iter().map(|schema| {
+                (
+                    schema.stream_name,
+                    get_metadata_object(&schema.schema).map_or_else(Vec::new, |obj| vec![obj]),
+                )
+            });
+            Ok(match req.limit {
+                Some(limit) => mk_metadata_response(metric_names.take(limit)),
+                None => mk_metadata_response(metric_names),
+            })
+        }
+    }
+}
+
+// HACK: ZincObserve implementation returns at most one metadata object per metric.
+// This differs from Prometheus, which [supports] multiple metadata objects per metric.
+//
+// [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
+fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
+    schema.metadata.get(METADATA_LABEL).map(|s| {
+        serde_json::from_str::<Metadata>(s)
+            .unwrap_or_else(|error| {
+                tracing::error!(%error, input = ?s, "failed to parse metadata");
+                panic!("BUG: failed to parse {METADATA_LABEL}")
+            })
+            .into()
+    })
+}
+
+fn mk_metadata_response<I>(it: I) -> ResponseMetadata
+where
+    I: IntoIterator<Item = (String, Vec<meta::prom::MetadataObject>)>,
+{
+    ResponseMetadata {
+        status: Status::Success,
+        data: it.into_iter().collect(),
+    }
 }
 
 async fn prom_ha_handler(
