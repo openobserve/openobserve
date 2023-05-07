@@ -158,6 +158,7 @@ pub struct Response {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
 }
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseTook {
     pub total: usize,
