@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -83,6 +85,13 @@ pub struct Metadata {
     pub unit: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Success,
+    Error,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RequestQuery {
     pub query: String,
@@ -101,8 +110,36 @@ pub struct RequestRangeQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestMetadata {
-    pub limit: i64,
+    /// Maximum number of metrics to return.
+    pub limit: Option<usize>,
+    /// A metric name to filter metadata for. All metric metadata is retrieved
+    /// if left empty.
     pub metric: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResponseMetadata {
+    pub status: Status,
+    /// key - metric name
+    pub data: HashMap<String, Vec<MetadataObject>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MetadataObject {
+    #[serde(rename = "type")]
+    typ: String, // counter, gauge, histogram, summary
+    help: String,
+    unit: String,
+}
+
+impl From<Metadata> for MetadataObject {
+    fn from(md: Metadata) -> Self {
+        Self {
+            typ: md.metric_type.to_string(),
+            help: md.help,
+            unit: md.unit,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
