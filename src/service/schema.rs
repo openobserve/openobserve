@@ -297,7 +297,7 @@ pub async fn stream_schema_exists(
             schema_chk.has_partition_keys = true;
         }
     }
-    if schema.metadata().get("metadata").is_some() {
+    if schema.metadata().get("prom_metadata").is_some() {
         schema_chk.has_metadata = true;
     }
     schema_chk

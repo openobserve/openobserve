@@ -20,7 +20,7 @@ use crate::meta::prom::Metadata;
 pub mod prom;
 
 pub async fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
-    let metadata = schema.metadata.get("metadata")?;
+    let metadata = schema.metadata.get("prom_metadata")?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)
 }
