@@ -19,10 +19,10 @@
       <span class="text-weight-bold">{{t("panel.layout")}}</span>
     </div> -->
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pa-sm">
-      {{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
-      :
-      <div class="column index-menu q-mb-md droppable" :class="{
+    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+      <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
+      :</div>
+      <div class="column index-menu droppable" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
         }"
@@ -89,7 +89,7 @@
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-sm"
+          class="text-caption text-weight-bold text-center q-ma-sm 1-ml-md"
           v-if="dashboardPanelData.data.fields.x.length < 1"
         >
           Please add a field from the list
@@ -98,10 +98,10 @@
      
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pa-sm">
-      {{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
-      :
-      <div class="column index-menu q-mb-md droppable" :class="{
+    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+      <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
+      :</div>
+      <div class="column index-menu droppable" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
         }"
@@ -164,16 +164,16 @@
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-ma-sm"
-          v-if="dashboardPanelData.data.fields.x.length < 1"
+          v-if="dashboardPanelData.data.fields.y.length < 1"
         >
           Please add a field from the list
         </div>
       </div>
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pa-sm">
-      {{ t('panel.filters') }}:
-      <div class="column index-menu q-mb-lg" :class="{
+    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+      <div class="layout-name"> {{ t('panel.filters') }}:</div>
+      <div class="column index-menu droppable" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
         }"
@@ -476,9 +476,18 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 
+.layout-name {
+  white-space: nowrap; 
+  min-width: 120px;
+  display: flex; 
+  align-items:center;
+}
+
 .droppable {
   border-color: white;
-  border-style: dotted;
+  border-style: dashed;
+  border-width: 2px;
+  margin: 1px;
 }
 
 .drop-target {
