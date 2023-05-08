@@ -245,8 +245,11 @@ pub async fn handle_trace_request(
                     // End check for alert trigger
                 }
 
-                let partition_key = format!("service_name={}", format_stream_name(&service_name));
-                hour_key.push_str(&format!("_{}", get_partition_key_record(&partition_key)));
+                if partition_keys.is_empty() {
+                    let partition_key =
+                        format!("service_name={}", format_stream_name(&service_name));
+                    hour_key.push_str(&format!("_{}", get_partition_key_record(&partition_key)));
+                }
 
                 let hour_buf = data_buf.entry(hour_key.clone()).or_default();
 

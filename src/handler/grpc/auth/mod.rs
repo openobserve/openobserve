@@ -59,14 +59,14 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
             ROOT_USER.get("root").unwrap()
+        } else if let Some(user) = USERS.get(&format!(
+            "{}/{}",
+            org_id.unwrap().to_str().unwrap(),
+            &user_id
+        )) {
+            user
         } else {
-            USERS
-                .get(&format!(
-                    "{}/{}",
-                    org_id.unwrap().to_str().unwrap(),
-                    &user_id
-                ))
-                .unwrap()
+            return Err(Status::unauthenticated("No valid auth token"));
         };
 
         if user.token.eq(&credentials.password) {
