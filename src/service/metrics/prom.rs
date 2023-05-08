@@ -112,7 +112,7 @@ pub async fn remote_write(
                 }
             }
         }
-        let labels: AHashMap<String, String> = event
+        let labels: FxIndexMap<String, String> = event
             .labels
             .iter()
             .filter(|label| !label.name.eq(REPLICA_LABEL) && !label.name.eq(CLUSTER_LABEL))
@@ -136,8 +136,8 @@ pub async fn remote_write(
                 continue;
             }
             let metric = Metric {
-                value: sample_val,
                 labels: labels.clone(),
+                value: sample_val,
             };
 
             let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp).unwrap_or_default();

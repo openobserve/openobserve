@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -24,12 +22,15 @@ pub const VALUE_LABEL: &str = "value";
 pub const CLUSTER_LABEL: &str = "cluster";
 pub const REPLICA_LABEL: &str = "__replica__";
 
+// See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
+pub type FxIndexMap<K, V> =
+    indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Metric {
-    pub value: f64,
     #[serde(flatten)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub labels: AHashMap<String, String>,
+    pub labels: FxIndexMap<String, String>,
+    pub value: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
