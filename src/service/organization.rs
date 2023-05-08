@@ -55,7 +55,7 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
     }
     let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
     let mut orgs = db_user.clone().organizations;
-    let new_orgs = if !is_root_user(user_id).await {
+    let new_orgs = if !is_root_user(user_id) {
         let mut existing_org = orgs.clone();
 
         existing_org.retain(|org| org.name.eq(&local_org_id));

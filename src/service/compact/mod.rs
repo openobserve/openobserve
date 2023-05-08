@@ -25,9 +25,9 @@ mod merge;
 /// compactor delete run steps:
 pub async fn run_delete() -> Result<(), anyhow::Error> {
     // check data lifecyle date
-    if CONFIG.limit.data_lifecycle > 0 {
+    if CONFIG.compact.data_retention > 0 {
         let now = chrono::Utc::now();
-        let date = now - chrono::Duration::days(CONFIG.limit.data_lifecycle);
+        let date = now - chrono::Duration::days(CONFIG.compact.data_retention);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = cache::file_list::get_all_organization()?;

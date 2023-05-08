@@ -53,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cli().await? {
         return Ok(());
     }
-
+    let _guard;
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zo-{}", CONFIG.common.instance_name);
         opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
@@ -81,6 +81,16 @@ async fn main() -> Result<(), anyhow::Error> {
             .with(tracing_subscriber::fmt::layer())
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .init();
+    }
+    if CONFIG.common.sentry_enabled {
+        let mut log_builder = env_logger::builder();
+        log_builder.parse_filters(&CONFIG.log.level);
+        log::set_boxed_logger(Box::new(
+            sentry::integrations::log::SentryLogger::with_dest(log_builder.build()),
+        ))
+        .unwrap();
+        log::set_max_level(log::LevelFilter::Debug);
+        _guard = sentry::init(CONFIG.common.sentry_url.clone());
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
