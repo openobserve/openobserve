@@ -12,27 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::{collections::HashMap, fs::OpenOptions, io::Error, time::Instant};
+
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use prost::Message;
-use std::time::Instant;
-use std::{collections::HashMap, fs::OpenOptions, io::Error};
 use tracing::info_span;
 
-use crate::common::{json, time::parse_i64_to_timestamp_micros};
-use crate::infra::config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP};
-use crate::infra::file_lock;
-use crate::infra::{cluster, metrics};
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::prom::*;
-use crate::meta::{self, StreamType};
-use crate::service::db;
-use crate::service::schema::{add_stream_schema, set_schema_metadata, stream_schema_exists};
+use crate::{
+    common::{json, time::parse_i64_to_timestamp_micros},
+    infra::{
+        cluster,
+        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        file_lock, metrics,
+    },
+    meta::{
+        self,
+        alert::{Alert, Trigger},
+        prom::{
+            ClusterLeader, FxIndexMap, Metadata, Metric, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL,
+            NAME_LABEL, REPLICA_LABEL, VALUE_LABEL,
+        },
+        StreamType,
+    },
+    service::{
+        db,
+        schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
+    },
+};
 
-pub mod prometheus {
+pub(crate) mod prometheus {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
 }
 
@@ -77,7 +89,7 @@ pub async fn remote_write(
         let metric_name = item.metric_family_name.clone();
         let metadata = Metadata {
             metric_family_name: item.metric_family_name.clone(),
-            metric_type: item.r#type().as_str_name().into(),
+            metric_type: item.r#type().into(),
             help: item.help.clone(),
             unit: item.unit.clone(),
         };
