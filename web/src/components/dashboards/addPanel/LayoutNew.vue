@@ -89,7 +89,7 @@
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-xs"
+          class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.fields.x.length < 1"
         >
           Please add a field from the list
@@ -163,7 +163,7 @@
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-xs"
+          class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.fields.y.length < 1"
         >
           Please add a field from the list
@@ -196,11 +196,13 @@
                       dense
                     >
                       <q-tab
+                        dense
                         name="list"
                         label="List"
                         style="width: auto"
                       ></q-tab>
                       <q-tab
+                        dense
                         name="condition"
                         label="Condition"
                         style="width: auto"
@@ -214,9 +216,8 @@
                           .type
                       "
                       animated
-                      style="background-color: #f5f5f5"
                     >
-                      <q-tab-panel dense name="condition">
+                      <q-tab-panel dense name="condition" class="q-pa-none">
                         <div class="flex justify-between">
                           <q-select
                             dense
@@ -248,7 +249,7 @@
                           />
                         </div>
                       </q-tab-panel>
-                      <q-tab-panel dense name="list">
+                      <q-tab-panel dense name="list" class="q-pa-none">
                         <q-select
                           dense
                           filled
@@ -328,7 +329,7 @@
         />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-xs"
+          class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.fields.filter < 1"
         >
           Please add a field from the list
