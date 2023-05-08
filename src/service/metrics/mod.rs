@@ -45,11 +45,11 @@ pub fn signature_without_labels(
     labels: &common::json::Map<String, common::json::Value>,
     exclude_names: &[&str],
 ) -> Signature {
-    let mut labels = labels
+    let mut labels: Vec<(&str, &str)> = labels
         .iter()
         .filter(|(key, _value)| !exclude_names.contains(&key.as_str()))
-        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_string()))
-        .collect::<Vec<(String, String)>>();
+        .map(|(key, value)| (key.as_str(), value.as_str().unwrap()))
+        .collect();
     labels.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut hasher = blake3::Hasher::new();
