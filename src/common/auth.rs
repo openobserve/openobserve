@@ -44,8 +44,7 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
 }
 
 pub fn is_root_user(user_id: &str) -> bool {
-    let key = format!("{DEFAULT_ORG}/{user_id}");
-    match USERS.get(&key) {
+    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
