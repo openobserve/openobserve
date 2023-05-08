@@ -410,7 +410,6 @@ pub async fn traces_json(
                 &file,
                 min_ts,
                 &mut traces_schema_map,
-                None,
             )
             .await;
         }

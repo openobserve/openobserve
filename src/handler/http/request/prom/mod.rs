@@ -44,7 +44,7 @@ pub async fn remote_write(
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq("application/x-protobuf") {
-        metrics::prometheus_write_proto(&org_id, thread_id, body).await
+        metrics::prom::remote_write(&org_id, thread_id, body).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(

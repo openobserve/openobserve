@@ -276,6 +276,7 @@ pub async fn stream_schema_exists(
         conforms: true,
         has_fields: false,
         has_partition_keys: false,
+        has_metadata: false,
     };
     let schema;
     if stream_schema_map.contains_key(stream_name) {
@@ -286,24 +287,17 @@ pub async fn stream_schema_exists(
             .unwrap();
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
     }
-    let fields = schema.fields();
-    let mut meta = schema.metadata().clone();
-
-    if !fields.is_empty() {
+    if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if !meta.is_empty() {
-        meta.remove("created_at");
-        if !meta.is_empty() {
-            let stream_settings = meta.get("settings");
-            if let Some(value) = stream_settings {
-                let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-                let keys = settings.get("partition_keys");
-                if keys.is_some() {
-                    schema_chk.has_partition_keys = true;
-                }
-            }
+    if let Some(value) = schema.metadata().get("settings") {
+        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
+        if settings.get("partition_keys").is_some() {
+            schema_chk.has_partition_keys = true;
         }
+    }
+    if schema.metadata().get("metadata").is_some() {
+        schema_chk.has_metadata = true;
     }
     schema_chk
 }
@@ -315,11 +309,7 @@ pub async fn add_stream_schema(
     file: &File,
     min_ts: i64,
     stream_schema_map: &mut AHashMap<String, Schema>,
-    extra_metadata: Option<AHashMap<String, String>>,
 ) {
-    let loc_span = info_span!("service:schema:add_stream_schema");
-    let _guard = loc_span.enter();
-
     let mut local_file = file;
     local_file.seek(SeekFrom::Start(0)).unwrap();
     let mut schema_reader = BufReader::new(local_file);
@@ -342,11 +332,6 @@ pub async fn add_stream_schema(
             json::to_string(&settings).unwrap_or_default(),
         );
     }
-    if let Some(extra_metadata) = extra_metadata {
-        for (key, value) in extra_metadata {
-            metadata.insert(key, value);
-        }
-    }
     db::schema::set(
         org_id,
         stream_name,
@@ -357,6 +342,35 @@ pub async fn add_stream_schema(
     .await
     .unwrap();
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
+}
+
+pub async fn set_schema_metadata(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    extra_metadata: AHashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    let schema = db::schema::get(org_id, stream_name, Some(stream_type)).await?;
+    let mut metadata = schema.metadata().clone();
+    let mut updated = false;
+    for (key, value) in extra_metadata {
+        if metadata.contains_key(&key) {
+            continue;
+        }
+        metadata.insert(key, value);
+        updated = true;
+    }
+    if !updated {
+        return Ok(());
+    }
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type,
+        &schema.with_metadata(metadata),
+        None,
+    )
+    .await
 }
 
 #[cfg(test)]

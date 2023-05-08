@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub const NAME_LABEL: &str = "__name__";
+pub const TYPE_LABEL: &str = "__type__";
 pub const HASH_LABEL: &str = "__hash__";
+pub const VALUE_LABEL: &str = "value";
 pub const CLUSTER_LABEL: &str = "cluster";
 pub const REPLICA_LABEL: &str = "__replica__";
 

@@ -302,7 +302,6 @@ pub async fn handle_trace_request(
                 &file,
                 min_ts,
                 &mut traces_schema_map,
-                None,
             )
             .await;
         }
