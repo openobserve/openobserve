@@ -25,8 +25,8 @@ import AppTraces from "@/views/AppTraces.vue";
 import LogStream from "@/views/LogStream.vue";
 import {
   FunctionList,
-  AssociatedStreamFunction
-} from "../../components/functions/index"
+  AssociatedStreamFunction,
+} from "../../components/functions/index";
 import Alerts from "@/views/AppAlerts.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import Error404 from "@/views/Error404.vue";
@@ -36,6 +36,7 @@ import Fluentd from "@/components/ingestion/Fluentd.vue";
 import Vector from "@/components/ingestion/Vector.vue";
 import Curl from "@/components/ingestion/Curl.vue";
 import KinesisFirehose from "@/components/ingestion/KinesisFirehose.vue";
+import TracesOTLP from "@/components/ingestion/TracesOTLP.vue";
 import {
   AlertList,
   TemplateList,
@@ -169,8 +170,8 @@ const useRoutes = () => {
           path: "stream-association",
           name: "streamFunctions",
           component: AssociatedStreamFunction,
-        }
-      ]
+        },
+      ],
     },
     {
       path: "ingestion",
@@ -201,6 +202,11 @@ const useRoutes = () => {
           path: "kinesisfirehose",
           name: "kinesisfirehose",
           component: KinesisFirehose,
+        },
+        {
+          path: "tracesOTLP",
+          name: "tracesOTLP",
+          component: TracesOTLP,
         },
       ],
     },

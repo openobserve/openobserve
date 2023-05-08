@@ -114,6 +114,18 @@
             label="Kinesis Firehose"
             content-class="tab_content"
           />
+          <q-route-tab
+            name="tracesOTLP"
+            :to="{
+              name: 'tracesOTLP',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+            label="Traces / OTLP"
+            content-class="tab_content"
+          />
         </q-tabs>
       </template>
 
@@ -168,6 +180,26 @@
           <q-tab-panel name="kinesisfirehose">
             <router-view
               title="Kinesis Firehose"
+              :currOrgIdentifier="currentOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+              @copy-to-clipboard-fn="copyToClipboardFn"
+            >
+            </router-view>
+          </q-tab-panel>
+
+          <q-tab-panel name="tracesOTLP">
+            <router-view
+              title="Traces / OTLP"
+              :currOrgIdentifier="currentOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+              @copy-to-clipboard-fn="copyToClipboardFn"
+            >
+            </router-view>
+          </q-tab-panel>
+
+          <q-tab-panel name="metricsOTLP">
+            <router-view
+              title="Traces / OTLP"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -343,7 +375,9 @@ export default defineComponent({
           this.router.currentRoute.value.name == "fluentbit" ||
           this.router.currentRoute.value.name == "fluentd" ||
           this.router.currentRoute.value.name == "vector" ||
-          this.router.currentRoute.value.name == "curl")
+          this.router.currentRoute.value.name == "curl" ||
+          this.router.currentRoute.value.name == "kinesisfirehose" ||
+          this.router.currentRoute.value.name == "tracesOTLP")
       ) {
         this.getOrganizationPasscode();
       }
