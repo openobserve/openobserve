@@ -369,8 +369,8 @@ pub async fn remote_write(
                 &metric_name,
                 StreamType::Metrics,
                 &file,
-                min_ts,
                 &mut metric_schema_map,
+                min_ts,
             )
             .await;
         }

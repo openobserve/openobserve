@@ -308,8 +308,8 @@ pub async fn add_stream_schema(
     stream_name: &str,
     stream_type: StreamType,
     file: &File,
-    min_ts: i64,
     stream_schema_map: &mut AHashMap<String, Schema>,
+    min_ts: i64,
 ) {
     let mut local_file = file;
     local_file.seek(SeekFrom::Start(0)).unwrap();
