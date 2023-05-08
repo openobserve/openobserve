@@ -16,14 +16,17 @@ use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+pub const NAME_LABEL: &str = "__name__";
+pub const HASH_LABEL: &str = "__hash__";
+pub const CLUSTER_LABEL: &str = "cluster";
+pub const REPLICA_LABEL: &str = "__replica__";
+
+#[derive(Clone, Debug, Serialize)]
 pub struct Metric {
-    pub name: String,
     pub value: f64,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub collection: AHashMap<String, String>,
-    pub metric_type: String,
+    pub labels: AHashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,21 +35,54 @@ pub struct ClusterLeader {
     pub last_received: i64,
 }
 
-impl Metric {
-    pub fn new(
-        name: String,
-        value: f64,
-        collection: AHashMap<String, String>,
-        _timestamp: i64,
-        metric_type: String,
-    ) -> Self {
-        Metric {
-            name,
-            value,
-            collection,
-            metric_type,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum MetricType {
+    UNKNOWN,
+    COUNTER,
+    GAUGE,
+    HISTOGRAM,
+    GAUGEHISTOGRAM,
+    SUMMARY,
+    INFO,
+    STATESET,
+}
+
+impl From<&str> for MetricType {
+    fn from(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "COUNTER" => MetricType::COUNTER,
+            "GAUGE" => MetricType::GAUGE,
+            "HISTOGRAM" => MetricType::HISTOGRAM,
+            "GAUGEHISTOGRAM" => MetricType::GAUGEHISTOGRAM,
+            "SUMMARY" => MetricType::SUMMARY,
+            "INFO" => MetricType::INFO,
+            "STATESET" => MetricType::STATESET,
+            _ => MetricType::UNKNOWN,
         }
     }
+}
+
+impl MetricType {
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            MetricType::UNKNOWN => "UNKNOWN",
+            MetricType::COUNTER => "COUNTER",
+            MetricType::GAUGE => "GAUGE",
+            MetricType::HISTOGRAM => "HISTOGRAM",
+            MetricType::GAUGEHISTOGRAM => "GAUGEHISTOGRAM",
+            MetricType::SUMMARY => "SUMMARY",
+            MetricType::INFO => "INFO",
+            MetricType::STATESET => "STATESET",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Metadata {
+    pub metric_type: MetricType,
+    pub metric_family_name: String,
+    pub help: String,
+    pub unit: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,27 +129,4 @@ pub struct RequestValues {
     pub matches: Option<Vec<String>>,
     pub start: Option<String>,
     pub end: Option<String>,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::common::json;
-
-    #[test]
-    fn test_response() {
-        let name = "container_sockets";
-        let metric = Metric::new(
-            name.to_string(),
-            4.0,
-            AHashMap::new(),
-            1667978900217,
-            "Gauge".to_string(),
-        );
-
-        let str_met = json::to_string(&metric).unwrap();
-        let loc_met: Metric = json::from_str(str_met.as_str()).unwrap();
-
-        assert_eq!(loc_met.name, name);
-    }
 }

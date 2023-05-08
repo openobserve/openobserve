@@ -313,8 +313,9 @@ pub async fn add_stream_schema(
     stream_name: &str,
     stream_type: StreamType,
     file: &File,
-    stream_schema_map: &mut AHashMap<String, Schema>,
     min_ts: i64,
+    stream_schema_map: &mut AHashMap<String, Schema>,
+    extra_metadata: Option<AHashMap<String, String>>,
 ) {
     let loc_span = info_span!("service:schema:add_stream_schema");
     let _guard = loc_span.enter();
@@ -340,6 +341,11 @@ pub async fn add_stream_schema(
             "settings".to_string(),
             json::to_string(&settings).unwrap_or_default(),
         );
+    }
+    if let Some(extra_metadata) = extra_metadata {
+        for (key, value) in extra_metadata {
+            metadata.insert(key, value);
+        }
     }
     db::schema::set(
         org_id,

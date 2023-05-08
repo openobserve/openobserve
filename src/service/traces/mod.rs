@@ -300,8 +300,9 @@ pub async fn handle_trace_request(
                 traces_stream_name,
                 StreamType::Traces,
                 &file,
-                &mut traces_schema_map,
                 min_ts,
+                &mut traces_schema_map,
+                None,
             )
             .await;
         }

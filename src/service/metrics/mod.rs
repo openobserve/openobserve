@@ -21,40 +21,19 @@ use prost::Message;
 use std::{collections::HashMap, fs::OpenOptions, io::Error};
 use tracing::info_span;
 
+use crate::common::{json, time::parse_i64_to_timestamp_micros};
+use crate::infra::cluster;
+use crate::infra::config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP};
 use crate::infra::file_lock;
 use crate::meta::alert::{Alert, Trigger};
-use crate::{
-    common::{json, time::parse_i64_to_timestamp_micros},
-    infra::{
-        cluster,
-        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-    },
-    meta::{
-        self,
-        prom::{ClusterLeader, Metric},
-        StreamType,
-    },
-    service::{
-        db,
-        metrics::prometheus::WriteRequest,
-        schema::{add_stream_schema, stream_schema_exists},
-    },
-};
+use crate::meta::prom::*;
+use crate::meta::{self, StreamType};
+use crate::service::db;
+use crate::service::schema::{add_stream_schema, stream_schema_exists};
 
 pub mod prometheus {
     include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
 }
-
-const COUNTER: &str = "Counter";
-const GAUGE: &str = "Gauge";
-const HISTOGRAM: &str = "Histogram";
-const TOTAL_SUFFIX: &str = "_total";
-const SUM_SUFFIX: &str = "_sum";
-const COUNT_SUFFIX: &str = "_count";
-const BUCKET_SUFFIX: &str = "_bucket";
-const MAIN_LABLE: &str = "__name__";
-const CLUSTER_LABEL: &str = "cluster";
-const REPLICA_LABEL: &str = "__replica__";
 
 pub async fn prometheus_write_proto(
     org_id: &str,
@@ -89,42 +68,58 @@ pub async fn prometheus_write_proto(
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
         .expect("Invalid snappy compressed data");
-    let request = WriteRequest::decode(bytes::Bytes::from(decoded)).expect("Invalid protobuf");
+    let request =
+        prometheus::WriteRequest::decode(bytes::Bytes::from(decoded)).expect("Invalid protobuf");
+
+    // parse metadata
+    let mut metrics_metadata: AHashMap<String, Metadata> = AHashMap::new();
+    for item in request.metadata {
+        metrics_metadata.insert(
+            item.metric_family_name.clone(),
+            Metadata {
+                metric_family_name: item.metric_family_name.clone(),
+                metric_type: item.r#type().as_str_name().into(),
+                help: item.help,
+                unit: item.unit,
+            },
+        );
+    }
+
+    // parse timeseries
     let mut i = 0;
     for event in request.timeseries {
+        // get labels
         let mut replica_label = String::new();
-        let mut main_lable = event.labels.clone();
-        main_lable.retain(|x| x.name.eq(MAIN_LABLE));
-        let metric_name = main_lable[0].value.clone();
-        let buf = metric_data_map.entry(metric_name.clone()).or_default();
-
-        metric_file_map
-            .entry(main_lable[0].value.clone())
-            .or_insert_with(|| String::from(""));
-
-        let mut optional_lables = event.labels;
-        optional_lables.retain(|x| !x.name.eq("MAIN_LABLE"));
-
-        let mut map = AHashMap::new();
-        let mut contains_le = false;
-        if optional_lables.len() > 1 {
-            for label in optional_lables.clone() {
-                if label.name.eq("le") {
-                    contains_le = true;
-                } else if !has_entry && label.name.eq(REPLICA_LABEL) {
-                    replica_label = label.value.clone();
-                } else if !has_entry && label.name.eq(CLUSTER_LABEL) && cluster_name.is_empty() {
-                    cluster_name = format!("{}/{}", org_id, label.value);
+        let metric_name = match labels_value(&event.labels, NAME_LABEL) {
+            Some(v) => v,
+            None => continue,
+        };
+        if !has_entry {
+            if let Some(v) = labels_value(&event.labels, REPLICA_LABEL) {
+                replica_label = v;
+            };
+            if cluster_name.is_empty() {
+                if let Some(v) = labels_value(&event.labels, CLUSTER_LABEL) {
+                    cluster_name = format!("{}/{}", org_id, v);
                 }
-                map.insert(label.name, label.value);
             }
         }
-        let metric_type = get_metric_type(main_lable[0].value.clone(), contains_le);
+        let labels: AHashMap<String, String> = event
+            .labels
+            .iter()
+            .filter(|label| !label.name.eq(REPLICA_LABEL) && !label.name.eq(CLUSTER_LABEL))
+            .map(|label| (label.name.clone(), label.value.clone()))
+            .collect();
 
+        let buf = metric_data_map.entry(metric_name.clone()).or_default();
+        metric_file_map
+            .entry(metric_name.clone())
+            .or_insert_with(|| String::from(""));
+
+        // parse samples
         for sample in event.samples {
-            let mut abnormal_val = false;
             let mut sample_val = sample.value;
-            //revisit in future
+            // revisit in future
             if sample_val.is_infinite() {
                 if sample_val == f64::INFINITY || sample_val > f64::MAX {
                     sample_val = f64::MAX;
@@ -133,33 +128,23 @@ pub async fn prometheus_write_proto(
                 }
             } else if sample_val.is_nan() {
                 // skip the entry from adding to store
-                abnormal_val = true;
-                sample_val = 0.0;
+                continue;
             }
-            let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp).unwrap();
+            let metric = Metric {
+                value: sample_val,
+                labels: labels.clone(),
+            };
+
+            let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp).unwrap_or_default();
             if timestamp == 0 {
                 timestamp = Utc::now().timestamp_micros();
             }
             if timestamp < min_ts {
                 min_ts = timestamp;
             }
-            let metric = Metric {
-                name: main_lable[0].value.clone(),
-                value: sample_val,
-                collection: map.clone(),
-                //_timestamp: timestamp,
-                metric_type: metric_type.clone(),
-            };
-            /* let value_str = json::to_string(&metric).unwrap();
-            // get hour file name
-            let hour_key = Utc
-                .timestamp_nanos(timestamp * 1000)
-                .format("%Y_%m_%d_%H")
-                .to_string();
-            let hour_buf = buf.entry(hour_key).or_default(); */
+
             if i == 0 && dedup_enabled {
-                let leader = METRIC_CLUSTER_LEADER.get(&cluster_name);
-                match leader {
+                match METRIC_CLUSTER_LEADER.get(&cluster_name) {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
@@ -181,127 +166,123 @@ pub async fn prometheus_write_proto(
             if !accept_record {
                 //do not accept any entries for request
                 return Ok(HttpResponse::Ok().into());
-            } else if !abnormal_val {
-                // get partition keys
-                let stream_schema = stream_schema_exists(
+            }
+            i += 1;
+
+            // get partition keys
+            let stream_schema = stream_schema_exists(
+                org_id,
+                &metric_name,
+                StreamType::Metrics,
+                &mut metric_schema_map,
+            )
+            .await;
+            let mut partition_keys: Vec<String> = vec![];
+            if stream_schema.has_partition_keys {
+                partition_keys = crate::service::ingestion::get_stream_partition_keys(
+                    metric_name.clone(),
+                    metric_schema_map.clone(),
+                )
+                .await;
+            }
+
+            // Start get stream alerts
+            let key = format!(
+                "{}/{}/{}",
+                &org_id,
+                StreamType::Metrics,
+                metric_name.clone()
+            );
+            crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+            // End get stream alert
+
+            #[cfg(feature = "zo_functions")]
+            let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
+
+            // Start Register Transforms for stream
+            #[cfg(feature = "zo_functions")]
+            let (local_tans, stream_lua_map, stream_vrl_map) =
+                crate::service::ingestion::register_stream_transforms(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
-                    &mut metric_schema_map,
-                )
-                .await;
-                let mut partition_keys: Vec<String> = vec![];
-                if stream_schema.has_partition_keys {
-                    partition_keys = crate::service::ingestion::get_stream_partition_keys(
-                        metric_name.clone(),
-                        metric_schema_map.clone(),
-                    )
-                    .await;
-                }
+                    &lua,
+                );
+            // End Register Transforms for stream
 
-                // Start get stream alerts
+            #[cfg(not(feature = "zo_functions"))]
+            let mut value: json::Value = json::to_value(&metric).unwrap();
+
+            #[cfg(feature = "zo_functions")]
+            let value: json::Value = json::to_value(&metric).unwrap();
+
+            // Start row based transform
+            #[cfg(feature = "zo_functions")]
+            let mut value = crate::service::ingestion::apply_stream_transform(
+                &local_tans,
+                &value,
+                &lua,
+                &stream_lua_map,
+                &stream_vrl_map,
+                &metric_name,
+                &mut runtime,
+            );
+            // End row based transform
+
+            // get json object
+            let val_map = value.as_object_mut().unwrap();
+            val_map.insert(
+                CONFIG.common.time_stamp_col.clone(),
+                json::Value::Number(timestamp.into()),
+            );
+            let value_str = crate::common::json::to_string(&val_map).unwrap();
+
+            // get hour key
+            let hour_key = crate::service::ingestion::get_hour_key(
+                timestamp,
+                partition_keys.clone(),
+                value.as_object().unwrap().clone(),
+            );
+            let hour_buf = buf.entry(hour_key.clone()).or_default();
+            hour_buf.push(value_str);
+
+            // real time alert
+            if !stream_alerts_map.is_empty() {
+                // Start check for alert trigger
                 let key = format!(
                     "{}/{}/{}",
                     &org_id,
                     StreamType::Metrics,
                     metric_name.clone()
                 );
-                crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
-                // End get stream alert
-
-                #[cfg(feature = "zo_functions")]
-                let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
-
-                // Start Register Transforms for stream
-                #[cfg(feature = "zo_functions")]
-                let (local_tans, stream_lua_map, stream_vrl_map) =
-                    crate::service::ingestion::register_stream_transforms(
-                        org_id,
-                        &metric_name,
-                        StreamType::Metrics,
-                        &lua,
-                    );
-                // End Register Transforms for stream
-
-                #[cfg(not(feature = "zo_functions"))]
-                let mut value: json::Value = json::to_value(&metric).unwrap();
-
-                #[cfg(feature = "zo_functions")]
-                let value: json::Value = json::to_value(&metric).unwrap();
-
-                // Start row based transform
-                #[cfg(feature = "zo_functions")]
-                let mut value = crate::service::ingestion::apply_stream_transform(
-                    &local_tans,
-                    &value,
-                    &lua,
-                    &stream_lua_map,
-                    &stream_vrl_map,
-                    &metric_name,
-                    &mut runtime,
-                );
-                // End row based transform
-
-                // get json object
-                let val_map = value.as_object_mut().unwrap();
-
-                val_map.insert(
-                    CONFIG.common.time_stamp_col.clone(),
-                    json::Value::Number(timestamp.into()),
-                );
-
-                let value_str = crate::common::json::to_string(&val_map).unwrap();
-
-                // get hour key
-                let hour_key = crate::service::ingestion::get_hour_key(
-                    timestamp,
-                    partition_keys.clone(),
-                    value.as_object().unwrap().clone(),
-                );
-
-                if !stream_alerts_map.is_empty() {
-                    // Start check for alert trigger
-                    let key = format!(
-                        "{}/{}/{}",
-                        &org_id,
-                        StreamType::Metrics,
-                        metric_name.clone()
-                    );
-                    if let Some(alerts) = stream_alerts_map.get(&key) {
-                        for alert in alerts {
-                            if alert.is_real_time {
-                                let set_trigger = meta::alert::Evaluate::evaluate(
-                                    &alert.condition,
-                                    value.as_object().unwrap().clone(),
+                if let Some(alerts) = stream_alerts_map.get(&key) {
+                    for alert in alerts {
+                        if alert.is_real_time {
+                            let set_trigger = meta::alert::Evaluate::evaluate(
+                                &alert.condition,
+                                value.as_object().unwrap().clone(),
+                            );
+                            if set_trigger {
+                                stream_trigger_map.insert(
+                                    metric_name.clone(),
+                                    Trigger {
+                                        timestamp,
+                                        is_valid: true,
+                                        alert_name: alert.name.clone(),
+                                        stream: metric_name.clone().to_string(),
+                                        org: org_id.to_string(),
+                                        stream_type: StreamType::Metrics,
+                                        last_sent_at: 0,
+                                        count: 0,
+                                        is_ingest_time: true,
+                                    },
                                 );
-                                if set_trigger {
-                                    stream_trigger_map.insert(
-                                        metric_name.clone(),
-                                        Trigger {
-                                            timestamp,
-                                            is_valid: true,
-                                            alert_name: alert.name.clone(),
-                                            stream: metric_name.clone().to_string(),
-                                            org: org_id.to_string(),
-                                            stream_type: StreamType::Metrics,
-                                            last_sent_at: 0,
-                                            count: 0,
-                                            is_ingest_time: true,
-                                        },
-                                    );
-                                }
                             }
                         }
                     }
-                    // End check for alert trigger
                 }
-
-                let hour_buf = buf.entry(hour_key.clone()).or_default();
-
-                hour_buf.push(value_str);
-                //Trace Metadata
+                // End check for alert trigger
             }
-            i += 1;
         }
     }
 
@@ -360,13 +341,19 @@ pub async fn prometheus_write_proto(
                 .read(true)
                 .open(&metric_file_name)
                 .unwrap();
+            let metadata =
+                crate::common::json::to_string(&metrics_metadata.get(&metric_name).unwrap())
+                    .unwrap();
+            let mut extra_metadata: AHashMap<String, String> = AHashMap::default();
+            extra_metadata.insert("metadata".to_string(), metadata);
             add_stream_schema(
                 org_id,
                 &metric_name,
                 StreamType::Metrics,
                 &file,
-                &mut metric_schema_map,
                 min_ts,
+                &mut metric_schema_map,
+                Some(extra_metadata),
             )
             .await;
         }
@@ -394,19 +381,6 @@ pub async fn prometheus_write_proto(
         }
     }
     Ok(HttpResponse::Ok().into())
-}
-
-fn get_metric_type(main_lable: String, contains_le: bool) -> String {
-    if main_lable.ends_with(TOTAL_SUFFIX)
-        || main_lable.ends_with(SUM_SUFFIX)
-        || main_lable.ends_with(COUNT_SUFFIX)
-    {
-        COUNTER.to_string()
-    } else if main_lable.ends_with(BUCKET_SUFFIX) && contains_le {
-        HISTOGRAM.to_string()
-    } else {
-        GAUGE.to_string()
-    }
 }
 
 async fn prom_ha_handler(
@@ -483,17 +457,9 @@ async fn prom_ha_handler(
     _accept_record
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_metric_type() {
-        let htype = get_metric_type(
-            "apiserver_admission_controller_admission_duration_seconds_bucket".to_string(),
-            true,
-        );
-
-        assert_eq!(htype.as_str(), HISTOGRAM);
-    }
+pub fn labels_value(labels: &[prometheus::Label], name: &str) -> Option<String> {
+    labels
+        .binary_search_by_key(&name, |label| label.name.as_str())
+        .ok()
+        .map(|index| labels[index].value.clone())
 }
