@@ -71,23 +71,22 @@
                 </div>
               </q-menu>
           </q-btn>
-          <!-- <q-btn
+          <q-btn
             size="xs"
             round
             dense
-            class="q-mr-xs"
-            @click="removeXAxisItem(props.row.column)"
+            @click="removeXAxisItem(itemX.column)"
             :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
-          /> -->
+          />
       </q-btn-group>
     </div>
     <q-separator />
     <div style="display:flex; flex-direction: row;" class="q-pa-sm">
       {{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
       :
-        <q-btn v-for="(itemY,index) in dashboardPanelData.data.fields.y" :key="index"  
-          icon-right="arrow_drop_down" no-caps dense color="primary" rounded
-          :label="itemY.label" class="q-pl-md q-ml-sm">
+      <q-btn-group v-for="(itemY,index) in dashboardPanelData.data.fields.y" :key="index">
+        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded
+          :label="itemY.label">
           <q-menu class="q-pa-md">
             {{ itemY.label }}
               <div>
@@ -128,497 +127,167 @@
                 />
               </div>
           </q-menu>
-      </q-btn>
-    </div>
-
-
-    <div class="">
-      <q-expansion-item
-        v-model="expansionItems.x"
-        dense
-        :label="dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis')"
-      >
-        <div class="column index-menu q-mb-md droppable" :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
-          }"
-          @dragenter="onDragEnter($event, 'x')"
-          @dragleave="onDragLeave($event, 'x')"
-          @dragover="onDragOver($event, 'x')"
-          @drop="onDrop($event, 'x')"
-          v-mutation="handler2">
-          <div class="index-table q-my-xs">
-            <q-table
-              v-model:selected="dashboardPanelData.data.fields.x"
-              :columns="[
-                {
-                  name: 'column',
-                  field: 'column',
-                  align: 'left',
-                  label: 'Field',
-                },
-              ]"
-              :rows="dashboardPanelData.data.fields.x"
-              row-key="column"
-              class="field-table"
-              id="fieldList"
-              virtual-scroll
-              v-model:pagination="pagination"
-              :rows-per-page-options="[0]"
-              :virtual-scroll-sticky-size-start="48"
-              :hide-pagination="true"
-              hide-header
-              hide-bottom
-            >
-              <template #body-cell-column="props">
-                <q-tr :props="props">
-                  <q-td :props="props" class="field_list">
-                    <div class="field_overlay" :title="props.row.column">
-                      <div class="field_label">
-                        {{ props.row.column }}
-                      </div>
-                      <div class="field_icons">
-                        <div>
-                          <q-btn
-                            size="xs"
-                            round
-                            dense
-                            class="q-mr-xs"
-                            @click="props.expand = !props.expand"
-                            :icon="props.expand ? 'unfold_less' : 'unfold_more'"
-                          />
-                          <q-icon
-                          :name="
-                              'img:' +
-                              getImageURL('images/layout/remove_icon.svg')
-                            "
-                            size="1rem"
-                            @click="removeXAxisItem(props.row.column)"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </q-td>
-                </q-tr>
-                <q-tr
-                  v-show="props.expand"
-                  :props="props"
-                  style="height: min-content"
-                >
-                  <q-td colspan="100%">
-                    <div>
-                      <div class="">
-                        <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm">
-                          <q-select
-                            v-model="
-                              dashboardPanelData.data.fields.x[props.pageIndex]
-                                .aggregationFunction
-                            "
-                            :options="triggerOperatorsWithHistogram"
-                            dense
-                            filled
-                            emit-value
-                            map-options
-                            label="Aggregation"
-                          >
-                            <template v-slot:append>
-                              <q-icon name="close" size="small" @click.stop.prevent="dashboardPanelData.data.fields.x[props.pageIndex].aggregationFunction = null" class="cursor-pointer" />
-                            </template>
-                          </q-select>
-                        </div>
-                        <!-- <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
-                          <input
-                            type="color"
-                            v-model="
-                              dashboardPanelData.data.fields.y[props.pageIndex]
-                                .color
-                            "
-                          />
-                        </div> -->
-                      </div>
-                      <q-input
-                        dense
-                        filled
-                        label="Label"
-                        v-model="
-                          dashboardPanelData.data.fields.x[props.pageIndex]
-                            .label
-                        "
-                        :rules="[ val => val.length > 0 || 'Required']"
-                      />
-                    </div>
-                  </q-td>
-                </q-tr>
-              </template>
-            </q-table>
-          </div>
-          <div
-            class="text-caption text-weight-bold text-center q-ma-sm"
-            v-if="dashboardPanelData.data.fields.x.length < 1"
-          >
-            Please add a field from the list
-          </div>
-        </div>
-      </q-expansion-item>
-      <q-separator />
-      <q-expansion-item
-        dense
-        v-model="expansionItems.y"
-        :label="dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis')"
-      >
-        <div class="column index-menu q-mb-lg" :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
-          }"
-          @dragenter="onDragEnter($event, 'y')"
-          @dragleave="onDragLeave($event, 'y')"
-          @dragover="onDragOver($event, 'y')"
-          @drop="onDrop($event, 'y')"
-          v-mutation="handler2">
-          <div class="index-table  q-my-xs">
-            <q-table
-              v-model:selected="dashboardPanelData.data.fields.y"
-              :columns="[
-                {
-                  name: 'column',
-                  field: 'column',
-                  align: 'left',
-                  label: 'Field',
-                },
-              ]"
-              :rows="dashboardPanelData.data.fields.y"
-              row-key="column"
-              class="field-table"
-              id="fieldList"
-              virtual-scroll
-              v-model:pagination="pagination"
-              :rows-per-page-options="[0]"
-              :virtual-scroll-sticky-size-start="48"
-              :hide-pagination="true"
-              hide-header
-              hide-bottom
-            >
-              <template #body-cell-column="props">
-                <q-tr :props="props">
-                  <q-td :props="props" class="field_list">
-                    <div class="field_overlay" :title="props.row.column">
-                      <div class="field_label">
-                        {{ props.row.column }}
-                      </div>
-                      <div class="field_icons">
-                        <div>
-                          <q-btn
-                            size="xs"
-                            round
-                            dense
-                            class="q-mr-xs"
-                            @click="props.expand = !props.expand"
-                            :icon="props.expand ? 'unfold_less' : 'unfold_more'"
-                          />
-                          <q-icon
-                            :name="
-                              'img:' +
-                              getImageURL('images/layout/remove_icon.svg')
-                            "
-                            size="1rem"
-                            @click="removeYAxisItem(props.row.column)"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </q-td>
-                </q-tr>
-                <q-tr
-                  v-show="props.expand"
-                  :props="props"
-                  style="height: min-content"
-                >
-                  <q-td colspan="100%">
-                    <div>
-                      <div class="flex items-center q-mb-sm">
-                        <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
-                          <q-select
-                            v-model="
-                              dashboardPanelData.data.fields.y[props.pageIndex]
-                                .aggregationFunction
-                            "
-                            :options="triggerOperators"
-                            dense
-                            filled
-                            emit-value
-                            map-options
-                            label="Aggregation"
-                          ></q-select>
-                        </div>
-                        <div class="color-input-wrapper" v-if="!['table', 'pie'].includes(dashboardPanelData.data.type)">
-                          <input
-                            type="color"
-                            v-model="
-                              dashboardPanelData.data.fields.y[props.pageIndex]
-                                .color
-                            "
-                          />
-                        </div>
-                      </div>
-                      <q-input
-                        dense
-                        filled
-                        label="Label"
-                        v-model="
-                          dashboardPanelData.data.fields.y[props.pageIndex]
-                            .label
-                        "
-                        :rules="[ val => val.length > 0 || 'Required']"
-                      />
-                    </div>
-                  </q-td>
-                </q-tr>
-              </template>
-            </q-table>
-          </div>
-          <div
-            class="text-caption text-weight-bold text-center q-ma-sm"
-            v-if="dashboardPanelData.data.fields.y.length < 1"
-          >
-            Please add a field from the list
-          </div>
-        </div>
-      </q-expansion-item>
-      <q-separator />
-      <!-- <q-expansion-item v-model="expansionItems.config" dense :label="t('panel.config')">
-        <div>
-          <q-toggle
-            v-if="dashboardPanelData.data.type != 'table'"
-            v-model="dashboardPanelData.data.config.show_legends"
-            label="Show Legends"
-          />
-          <q-form ref="" class="q-pa-sm">
-            <q-input
-              v-model="dashboardPanelData.data.config.description"
-              type="textarea"
-              :label="t('panel.typeDesc')"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              filled
-              dense
-            />
-          </q-form>
-        </div>
-      </q-expansion-item> -->
+        </q-btn>
+        <q-btn
+          size="xs"
+          round
+          dense
+          @click="removeYAxisItem(itemY.column)"
+          :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
+        />
+      </q-btn-group>
     </div>
     <q-separator />
-    <!-- <q-expansion-item v-model="expansionItems.filter" dense :label="t('panel.filters')">
-      <div class="column index-menu q-mb-lg" :class="{
-          'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
-          'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
-          }"
-          @dragenter="onDragEnter($event, 'f')"
-          @dragleave="onDragLeave($event, 'f')"
-          @dragover="onDragOver($event, 'f')"
-          @drop="onDrop($event, 'f')"
-          v-mutation="handler2">
-        <div class="index-table q-my-xs">
-          <q-table
-            v-model:selected="dashboardPanelData.data.fields.filter"
-            :columns="[
-              {
-                name: 'column',
-                field: 'column',
-                align: 'left',
-                label: 'Filter',
-              },
-            ]"
-            :rows="dashboardPanelData.data.fields.filter"
-            row-key="column"
-            class="field-table"
-            id="fieldList"
-            virtual-scroll
-            v-model:pagination="pagination"
-            :rows-per-page-options="[0]"
-            :virtual-scroll-sticky-size-start="48"
-            :hide-pagination="true"
-            hide-header
-            hide-bottom
-          >
-            <template #body-cell-column="props">
-              <q-tr :props="props">
-                <q-td :props="props" class="field_list">
-                  <div class="field_overlay" :title="props.row.column">
-                    <div class="field_label">
-                      {{ props.row.column }}
-                    </div>
-                    <div class="field_icons">
-                      <div>
-                        <q-btn
-                          size="xs"
-                          round
+    <div style="display:flex; flex-direction: row;" class="q-pa-sm">
+      {{ t('panel.filters') }}
+      :
+      <q-btn-group v-for="(filteredItem,index) in dashboardPanelData.data.fields.filter" :key="index">
+      <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded :label="filteredItem.column" class="q-pl-md">
+        <q-menu class="q-pa-md">
+          {{ filteredItem.column }}
+            <div>
+              <div class="q-pa-xs">
+                <div class="q-gutter-xs">
+                  <q-tabs
+                    v-model="
+                      dashboardPanelData.data.fields.filter[index]
+                        .type
+                    "
+                    dense
+                  >
+                    <q-tab
+                      name="list"
+                      label="List"
+                      style="width: auto"
+                    ></q-tab>
+                    <q-tab
+                      name="condition"
+                      label="Condition"
+                      style="width: auto"
+                    ></q-tab>
+                  </q-tabs>
+                  <q-separator></q-separator>
+                  <q-tab-panels
+                    dense
+                    v-model="
+                      dashboardPanelData.data.fields.filter[index]
+                        .type
+                    "
+                    animated
+                    style="background-color: #f5f5f5"
+                  >
+                    <q-tab-panel dense name="condition">
+                      <div class="flex justify-between">
+                        <q-select
                           dense
-                          class="q-mr-xs"
-                          @click="props.expand = !props.expand"
-                          :icon="props.expand ? 'unfold_less' : 'unfold_more'"
-                        />
-                        <q-icon
-                          :name="
-                            'img:' +
-                            getImageURL('images/layout/remove_icon.svg')
+                          filled
+                          v-model="
+                            dashboardPanelData.data.fields.filter[
+                              index
+                            ].operator
                           "
-                          size="1rem"
-                          @click="removeFilterItem(props.row.column)"
+                          :options="options"
+                          label="Operator"
+                          style="width: 100%"
+                          :rules="[ val => !!val || 'Required' ]"
+                        />
+                        <q-input
+                          dense
+                          filled
+                          v-if="!['Is Null', 'Is Not Null'].includes(dashboardPanelData.data.fields.filter[
+                              index
+                            ].operator)"
+                          v-model="
+                            dashboardPanelData.data.fields.filter[
+                              index
+                            ].value
+                          "
+                          label="Value"
+                          style="width: 100%; margin-top: 5px"
+                          :rules="[ val => val.length > 0 || 'Required' ]"
                         />
                       </div>
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
-              <q-tr
-                v-show="props.expand"
-                :props="props"
-                style="height: min-content"
-              >
-                <q-td colspan="100%">
-                  <div class="q-pa-xs">
-                    <div class="q-gutter-xs">
-                      <q-tabs
-                        v-model="
-                          dashboardPanelData.data.fields.filter[props.pageIndex]
-                            .type
-                        "
+                    </q-tab-panel>
+                    <q-tab-panel dense name="list">
+                      <q-select
                         dense
-                      >
-                        <q-tab
-                          name="list"
-                          label="List"
-                          style="width: auto"
-                        ></q-tab>
-                        <q-tab
-                          name="condition"
-                          label="Condition"
-                          style="width: auto"
-                        ></q-tab>
-                      </q-tabs>
-                      <q-separator></q-separator>
-                      <q-tab-panels
-                        dense
+                        filled
                         v-model="
-                          dashboardPanelData.data.fields.filter[props.pageIndex]
-                            .type
+                          dashboardPanelData.data.fields.filter[
+                            index
+                          ].values
                         "
-                        animated
-                        style="background-color: #f5f5f5"
+                        :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == filteredItem.column)?.value"
+                        label="Select Filter"
+                        multiple
+                        emit-value
+                        map-options
+                        :rules="[ val => val.length > 0 || 'At least 1 item required' ]"
                       >
-                        <q-tab-panel dense name="condition">
-                          <div class="flex justify-between">
-                            <q-select
-                              dense
-                              filled
-                              v-model="
-                                dashboardPanelData.data.fields.filter[
-                                  props.pageIndex
-                                ].operator
-                              "
-                              :options="options"
-                              label="Operator"
-                              style="width: 100%"
-                              :rules="[ val => !!val || 'Required' ]"
-                            />
-                            <q-input
-                              dense
-                              filled
-                              v-if="!['Is Null', 'Is Not Null'].includes(dashboardPanelData.data.fields.filter[
-                                  props.pageIndex
-                                ].operator)"
-                              v-model="
-                                dashboardPanelData.data.fields.filter[
-                                  props.pageIndex
-                                ].value
-                              "
-                              label="Value"
-                              style="width: 100%; margin-top: 5px"
-                              :rules="[ val => val.length > 0 || 'Required' ]"
-                            />
-                          </div>
-                        </q-tab-panel>
-                        <q-tab-panel dense name="list">
-                          <q-select
-                            dense
-                            filled
-                            v-model="
-                              dashboardPanelData.data.fields.filter[
-                                props.pageIndex
-                              ].values
-                            "
-                            :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == props.row.column)?.value"
-                            label="Select Filter"
-                            multiple
-                            emit-value
-                            map-options
-                            :rules="[ val => val.length > 0 || 'At least 1 item required' ]"
-                          >
-                            <template v-slot:selected>
-                              {{
-                                dashboardPanelData.data.fields.filter[
-                                  props.pageIndex
-                                ].values[0]?.length > 15
-                                  ? dashboardPanelData.data.fields.filter[
-                                      props.pageIndex
-                                    ].values[0]?.substring(0, 15) + "..."
-                                  : dashboardPanelData.data.fields.filter[
-                                      props.pageIndex
-                                    ].values[0]
-                              }}
+                        <template v-slot:selected>
+                          {{
+                            dashboardPanelData.data.fields.filter[
+                              index
+                            ].values[0]?.length > 15
+                              ? dashboardPanelData.data.fields.filter[
+                                  index
+                                ].values[0]?.substring(0, 15) + "..."
+                              : dashboardPanelData.data.fields.filter[
+                                  index
+                                ].values[0]
+                          }}
 
-                              {{
-                                dashboardPanelData.data.fields.filter[
-                                  props.pageIndex
-                                ].values?.length > 1
-                                  ? " +" +
-                                    (dashboardPanelData.data.fields.filter[
-                                      props.pageIndex
-                                    ].values?.length -
-                                      1)
-                                  : ""
-                              }}
-                            </template>
-                            <template
-                              v-slot:option="{
-                                itemProps,
-                                opt,
-                                selected,
-                                toggleOption,
-                              }"
-                            >
-                              <q-item v-bind="itemProps">
-                                <q-item-section side>
-                                  <q-checkbox
-                                    dense
-                                    :model-value="selected"
-                                    @update:model-value="toggleOption(opt)"
-                                  ></q-checkbox>
-                                </q-item-section>
-                                <q-item-section>
-                                  <div v-html="opt"></div>
-                                </q-item-section>
-                              </q-item>
-                            </template>
-                          </q-select>
-                        </q-tab-panel>
-                      </q-tab-panels>
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
-            </template>
-          </q-table>
-        </div>
-        <div
-          class="text-caption text-weight-bold text-center q-ma-sm"
-          v-if="dashboardPanelData.meta.filterValue.length < 1"
-        >
-          Please add a field from the list
-        </div>
-      </div>
-      <div></div>
-    </q-expansion-item> -->
+                          {{
+                            dashboardPanelData.data.fields.filter[
+                              index
+                            ].values?.length > 1
+                              ? " +" +
+                                (dashboardPanelData.data.fields.filter[
+                                  index
+                                ].values?.length -
+                                  1)
+                              : ""
+                          }}
+                        </template>
+                        <template
+                          v-slot:option="{
+                            itemProps,
+                            opt,
+                            selected,
+                            toggleOption,
+                          }"
+                        >
+                          <q-item v-bind="itemProps">
+                            <q-item-section side>
+                              <q-checkbox
+                                dense
+                                :model-value="selected"
+                                @update:model-value="toggleOption(opt)"
+                              ></q-checkbox>
+                            </q-item-section>
+                            <q-item-section>
+                              <div v-html="opt"></div>
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+                    </q-tab-panel>
+                  </q-tab-panels>
+                </div>
+              </div>
+            </div>
+        </q-menu>
+      </q-btn>
+      <q-btn
+        size="xs"
+        round
+        dense
+        @click="removeFilterItem(filteredItem.column)"
+        :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
+      />
+      </q-btn-group>
+
+    </div>
   </div>
 </template>
 

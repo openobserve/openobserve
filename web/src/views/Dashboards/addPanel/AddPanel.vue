@@ -32,6 +32,11 @@
         </div>
       </div>
       <div class="flex q-gutter-sm">
+        <q-toggle
+          v-if="dashboardPanelData.data.type != 'table'"
+          v-model="dashboardPanelData.data.config.show_legends"
+          label="Show Legends"
+        />
         <DateTimePicker v-model="selectedDate" />
         <q-btn
           class="q-ml-md text-bold"
