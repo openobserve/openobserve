@@ -19,7 +19,7 @@
       <span class="text-weight-bold">{{t("panel.layout")}}</span>
     </div> -->
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+    <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       :</div>
       <div class="axis-container droppable scroll q-py-xs" :class="{
@@ -98,7 +98,7 @@
      
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+    <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
       :</div>
       <div class="axis-container droppable scroll q-py-xs" :class="{
@@ -171,7 +171,7 @@
       </div>
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-px-sm">
+    <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name"> {{ t('panel.filters') }}:</div>
       <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,

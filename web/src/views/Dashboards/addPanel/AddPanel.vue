@@ -95,7 +95,7 @@
               text-color="white"
               size="20px"
               icon="drag_indicator"
-              style="top: 10px; left: 6px;"
+              style="top: 10px; left: 3.5px;"
 						/>
 					</template>
 					<template #after>
