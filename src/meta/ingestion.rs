@@ -63,6 +63,7 @@ pub struct StreamSchemaChk {
     pub conforms: bool,
     pub has_fields: bool,
     pub has_partition_keys: bool,
+    pub has_metadata: bool,
 }
 
 pub const INGESTION_EP: [&str; 6] = [
