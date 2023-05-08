@@ -91,11 +91,11 @@
 					</template>
 					<template #separator>
 						<q-avatar
-						color="primary"
-						text-color="white"
-						size="20px"
-						icon="drag_indicator"
-						style="top: 10px"
+              color="primary"
+              text-color="white"
+              size="20px"
+              icon="drag_indicator"
+              style="top: 10px; left: 3.5px;"
 						/>
 					</template>
 					<template #after>
