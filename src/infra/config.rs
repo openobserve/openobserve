@@ -107,6 +107,11 @@ pub struct Grpc {
     pub timeout: u64,
     #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
     pub org_header_key: String,
+    #[env_config(
+        name = "ZO_INTERNAL_GRPC_TOKEN",
+        default = "cm9vdEB6by5jb206R3JwY0B6bzEyMw=="
+    )]
+    pub internal_grpc_token: String,
 }
 
 #[derive(EnvConfig)]

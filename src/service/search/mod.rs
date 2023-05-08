@@ -187,10 +187,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     //XXX let span4 = info_span!("srv:search:cluster:do_search").entered();
 
     // make grpc auth token
-    let root_user = ROOT_USER.clone();
-    let user = root_user.get("root").unwrap();
-    let credentials = Credentials::new(&user.email, &user.password).as_http_header();
-
+    /*     let root_user = ROOT_USER.clone();
+       let user = root_user.get("root").unwrap();
+       let credentials = Credentials::new(&user.email, &user.password).as_http_header();
+    */
     // make cluster request
     let mut tasks = Vec::new();
     let mut offset_start: usize = 0;
@@ -228,7 +228,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         let grpc_span = info_span!("srv:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
-        let credentials_str = credentials.clone();
+        //let credentials_str = C.clone();
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = match req.org_id.parse() {
@@ -245,7 +245,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     )
                 });
 
-                let token: MetadataValue<_> = match credentials_str.parse() {
+                let token: MetadataValue<_> = match CONFIG.grpc.internal_grpc_token.parse() {
                     Ok(token) => token,
                     Err(_) => return Err(Error::Message("invalid token".to_string())),
                 };

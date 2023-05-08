@@ -30,26 +30,30 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_str()
         .unwrap()
         .to_string();
-    let credentials = match Credentials::from_header(token) {
-        Ok(c) => c,
-        Err(err) => {
-            log::info!("Err authenticating {}", err);
-            return Err(Status::unauthenticated("No valid auth token"));
-        }
-    };
-
-    let root_user = ROOT_USER.clone();
-    let user = root_user.get("root").unwrap();
-    log::info!("grpc auth user: {} {}", &user.email, &user.password);
-    log::info!("incoming credentials of user: {:?}", credentials);
-
-    let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
-    if credentials.user_id.eq(&user.email)
-        && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
-    {
-        Ok(req)
+    if token.eq(CONFIG.grpc.internal_grpc_token.as_str()) {
+        return Ok(req);
     } else {
-        Err(Status::unauthenticated("No valid auth token"))
+        let credentials = match Credentials::from_header(token) {
+            Ok(c) => c,
+            Err(err) => {
+                log::info!("Err authenticating {}", err);
+                return Err(Status::unauthenticated("No valid auth token"));
+            }
+        };
+
+        let root_user = ROOT_USER.clone();
+        let user = root_user.get("root").unwrap();
+        log::info!("grpc auth user: {} {}", &user.email, &user.password);
+        log::info!("incoming credentials of user: {:?}", credentials);
+
+        let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
+        if credentials.user_id.eq(&user.email)
+            && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
+        {
+            Ok(req)
+        } else {
+            Err(Status::unauthenticated("No valid auth token"))
+        }
     }
 }
 

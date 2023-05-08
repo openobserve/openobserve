@@ -61,11 +61,11 @@ async fn send_to_node(
         if cluster::ge_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
-        let root_user = ROOT_USER.clone();
+        /*         let root_user = ROOT_USER.clone();
         let user = root_user.get("root").unwrap();
         let credentials = Credentials::new(&user.email, &user.password);
-        let credentials = credentials.as_http_header();
-        let token: MetadataValue<_> = credentials.parse()?;
+        let credentials = credentials.as_http_header();*/
+        let token: MetadataValue<_> = CONFIG.grpc.internal_grpc_token.parse()?;
         let channel = Channel::from_shared(node.grpc_addr)
             .unwrap()
             .connect()
