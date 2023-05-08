@@ -278,15 +278,16 @@ pub async fn stream_schema_exists(
         has_partition_keys: false,
         has_metadata: false,
     };
-    let schema;
-    if stream_schema_map.contains_key(stream_name) {
-        schema = stream_schema_map.get(stream_name).unwrap().clone();
-    } else {
-        schema = db::schema::get(org_id, stream_name, Some(stream_type))
-            .await
-            .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), schema.clone());
-    }
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.clone(),
+        None => {
+            let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+                .await
+                .unwrap();
+            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+            schema
+        }
+    };
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }

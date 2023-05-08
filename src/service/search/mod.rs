@@ -24,7 +24,7 @@ use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::json::{self};
+use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
 
