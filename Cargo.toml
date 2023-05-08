@@ -119,7 +119,6 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
 ] }
 rs-snowflake = "0.6"
-rustc-hash = "1.1.0"
 rust-embed-for-web = "11.1"
 rustc-hash = "1.1.0"
 segment = "0.2"
@@ -150,7 +149,7 @@ vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = 
 vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
 walkdir = "2"
 zstd = "0.12"
-sentry = { version = "0.31.0" ,features = ["log"] }
+sentry = { version = "0.31.0", features = ["log"] }
 
 
 [build-dependencies]
