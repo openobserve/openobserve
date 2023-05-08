@@ -21,8 +21,8 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
-#[tracing::instrument(name = "service:search:exec", skip(req))]
-pub async fn search(
+#[tracing::instrument(name = "service:search:exec:search_for_grpc", skip(req))]
+pub async fn search_for_grpc(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
     let start = std::time::Instant::now();

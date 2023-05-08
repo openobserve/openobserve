@@ -27,4 +27,19 @@ enum StreamType {
     FILELIST = 4;
 }
 
+// Search request type
+enum SearchType {
+    USER       = 0; // user input search request
+    CLUSTER    = 1; // cluster dispatch search request
+    CACHE_ONLY = 2; // ingester node just search local cache
+}
+
+// Job information for a request
+message Job {
+    string session_id = 1;
+    string        job = 2;
+    int32       stage = 3;
+    int32   partition = 4;
+}
+
 message EmptyResponse {}

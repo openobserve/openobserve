@@ -44,7 +44,7 @@ mod storage;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
 
-pub async fn search(
+pub async fn search_for_http(
     org_id: &str,
     stream_type: StreamType,
     req: &meta::search::Request,

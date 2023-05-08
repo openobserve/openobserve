@@ -36,7 +36,6 @@ use std::{
 use super::{aggregations, functions, value::*};
 
 pub struct QueryEngine {
-    ctx: Arc<SessionContext>,
     /// The time boundaries for the evaluation. If start equals end an instant
     /// is evaluated.
     start: i64,
@@ -58,7 +57,6 @@ impl QueryEngine {
         let now = micros_since_epoch(SystemTime::now());
         let five_min = micros(Duration::from_secs(300));
         Self {
-            ctx,
             start: now,
             end: now,
             interval: five_min,
