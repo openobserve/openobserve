@@ -88,6 +88,11 @@ pub async fn remote_write(
             .unwrap();
     }
 
+    // maybe empty, we can return immediately
+    if request.timeseries.is_empty() {
+        return Ok(HttpResponse::Ok().into());
+    }
+
     // parse timeseries
     let mut first_line = true;
     for event in request.timeseries {
@@ -231,6 +236,8 @@ pub async fn remote_write(
 
             // get json object
             let val_map = value.as_object_mut().unwrap();
+            let hash = super::signature_without_labels(val_map, &[LE_LABEL, VALUE_LABEL]);
+            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             val_map.insert(
                 CONFIG.common.time_stamp_col.clone(),
                 json::Value::Number(timestamp.into()),
@@ -445,11 +452,7 @@ async fn prom_ha_handler(
         if replica_label.eq(&leader.name) {
             _accept_record = true;
             leader.last_received = curr_ts;
-            log::info!(
-                "Updating last received data for {} to {} ",
-                &leader.name,
-                Utc.timestamp_nanos(last_received * 1000)
-            );
+            // log::info!(  "Updating last received data for {} to {}", &leader.name, Utc.timestamp_nanos(last_received * 1000));
         } else if curr_ts - last_received > election_interval {
             //elect new leader as didnt receive data for last 30 secs
             log::info!(

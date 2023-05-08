@@ -11,21 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use ahash::AHashMap;
+
+use datafusion::arrow::datatypes::Schema;
+
+use crate::common;
+use crate::meta::prom::Metadata;
 
 pub mod prom;
 
-use crate::common;
-use crate::meta;
-use crate::meta::prom::Metadata;
-use crate::service::db;
-
-pub async fn get_prom_metadata(org_id: &str, metric_name: &str) -> Option<Metadata> {
-    let schema = db::schema::get(org_id, metric_name, Some(meta::StreamType::Metrics)).await;
-    if schema.is_err() {
-        return None;
-    }
-    let schema = schema.unwrap();
+pub async fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get("metadata")?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)
@@ -41,23 +35,27 @@ impl From<Signature> for String {
 }
 
 // REFACTORME: make this a method of `Metric`
-pub fn signature(labels: &AHashMap<String, String>) -> Signature {
+pub fn signature(labels: &common::json::Map<String, common::json::Value>) -> Signature {
     signature_without_labels(labels, &[])
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(
-    labels: &AHashMap<String, String>,
+    labels: &common::json::Map<String, common::json::Value>,
     exclude_names: &[&str],
 ) -> Signature {
-    let mut hasher = blake3::Hasher::new();
-    labels
+    let mut labels = labels
         .iter()
         .filter(|(key, _value)| !exclude_names.contains(&key.as_str()))
-        .for_each(|(key, value)| {
-            hasher.update(key.as_bytes());
-            hasher.update(value.as_bytes());
-        });
+        .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_string()))
+        .collect::<Vec<(String, String)>>();
+    labels.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut hasher = blake3::Hasher::new();
+    labels.iter().for_each(|(key, value)| {
+        hasher.update(key.as_bytes());
+        hasher.update(value.as_bytes());
+    });
     Signature(hasher.finalize().into())
 }
