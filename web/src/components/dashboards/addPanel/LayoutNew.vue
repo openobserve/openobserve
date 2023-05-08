@@ -163,7 +163,7 @@
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-sm"
+          class="text-caption text-weight-bold text-center q-ma-xs"
           v-if="dashboardPanelData.data.fields.y.length < 1"
         >
           Please add a field from the list
@@ -328,7 +328,7 @@
         />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-sm"
+          class="text-caption text-weight-bold text-center q-ma-xs"
           v-if="dashboardPanelData.data.fields.filter < 1"
         >
           Please add a field from the list
@@ -494,7 +494,6 @@ export default defineComponent({
   border-color: white;
   border-style: dashed;
   border-width: 2px;
-  margin: 1px;
 }
 
 .drop-target {

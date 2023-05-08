@@ -15,7 +15,7 @@
 
 <template>
     <div style="height: 40px; z-index: 10;">
-        <q-spinner-dots v-if="searchQueryData.loading" color="primary" size="40px" style="margin: 0 auto; display: block" />
+        <q-spinner-dots v-if="searchQueryData.loading" color="primary" size="40px" style="margin: 0 auto; display: block;" />
     </div>
     <div style="margin-top: -40px; height: calc(100% - 40px);">
         <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">

@@ -101,6 +101,10 @@ export default defineComponent({
         showQuery.value = !showQuery.value
     }
 
+    watch(showQuery, () => {
+      window.dispatchEvent(new Event("resize"))
+    })
+
     onActivated(() => {
       dashboardPanelData.meta.errors.queryErrors = []
     })
@@ -113,7 +117,6 @@ export default defineComponent({
       dashboardPanelData.data.fields.filter,
       dashboardPanelData.data.customQuery
     ], () => {
-
       // only continue if current mode is auto query generation
       if(!dashboardPanelData.data.customQuery){
         // console.log("Updating query");

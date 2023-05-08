@@ -81,6 +81,7 @@
       <div class="col" style="width: 100%;">
 				<q-splitter
 					v-model="dashboardPanelData.layout.splitter"
+          @update:model-value="layoutSplitterUpdated"
 					style="width: 100%"
 				>
 					<template #before>
@@ -99,11 +100,11 @@
 					</template>
 					<template #after>
 						<div class="row" style="height: calc(100vh - 118px); overflow-y: auto; ">
-							<div class="col scroll" style="height:100%;">
+							<div class="layout-panel-container col scroll" style="height:100%;">
 								<LayoutNew/>
                 
                 <q-separator />
-                <div style="height: calc(100% - 280px);">
+                <div style="flex:1; background-color: gray;">
                   <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
                 <SearchBar />
@@ -392,6 +393,10 @@ export default defineComponent({
       });
     };
 
+    const layoutSplitterUpdated = () => {
+      window.dispatchEvent(new Event("resize"))
+    }
+
     return {
       t,
       updateDateTime,
@@ -399,6 +404,7 @@ export default defineComponent({
       savePanelChangesToDashboard,
       runQuery,
       getDashboard,
+      layoutSplitterUpdated,
       currentDashboard,
       list,
       dashboardPanelData,
@@ -419,5 +425,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="sass" scoped>
+<style lang="scss" scoped>
+  .layout-panel-container {
+    display: flex;
+    flex-direction:  column;
+  }
 </style>
