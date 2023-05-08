@@ -5332,6 +5332,9 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
@@ -6731,6 +6734,7 @@ dependencies = [
  "sled",
  "snap",
  "sqlparser",
+ "strum",
  "sys-info",
  "thiserror",
  "time 0.3.20",
