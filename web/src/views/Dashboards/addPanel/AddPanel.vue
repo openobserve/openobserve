@@ -70,8 +70,8 @@
     <q-separator></q-separator>
     <div class="row" style="height: calc(100vh - 118px); overflow-y: auto">
       <div
-        class="col"
-        style="overflow: hidden; min-width: 90px; max-width: 90px"
+        class="col scroll"
+        style="overflow-y: auto; height: 100%; min-width: 90px; max-width: 90px"
       >
         <ChartSelection
           v-model:selectedChartType="dashboardPanelData.data.type"
@@ -103,17 +103,17 @@
 								<LayoutNew/>
                 
                 <q-separator />
-                <div style="height: calc(100% - 140px);">
+                <div style="height: calc(100% - 280px);">
                   <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
                 <SearchBar />
 
 							</div>
               
-							<q-separator vertical />
+							<!-- <q-separator vertical />
               <div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
 								<Layout/>
-							</div>
+							</div> -->
 						</div>
 					</template>
 				</q-splitter>
