@@ -15,12 +15,12 @@
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
-use crate::meta::prom::Metadata;
+use crate::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod prom;
 
 pub async fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
-    let metadata = schema.metadata.get("prom_metadata")?;
+    let metadata = schema.metadata.get(METADATA_LABEL)?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)
 }

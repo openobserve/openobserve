@@ -22,6 +22,7 @@ pub const LE_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const CLUSTER_LABEL: &str = "cluster";
 pub const REPLICA_LABEL: &str = "__replica__";
+pub const METADATA_LABEL: &str = "prom_metadata";
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 pub type FxIndexMap<K, V> =

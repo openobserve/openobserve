@@ -83,7 +83,7 @@ pub async fn remote_write(
         };
         let mut extra_metadata: AHashMap<String, String> = AHashMap::new();
         extra_metadata.insert(
-            "prom_metadata".to_string(),
+            METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
         );
         set_schema_metadata(org_id, &metric_name, StreamType::Metrics, extra_metadata)

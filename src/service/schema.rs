@@ -23,6 +23,7 @@ use tracing::info_span;
 
 use crate::common::json;
 use crate::infra::config::CONFIG;
+use crate::meta::prom::METADATA_LABEL;
 use crate::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
 
@@ -297,7 +298,7 @@ pub async fn stream_schema_exists(
             schema_chk.has_partition_keys = true;
         }
     }
-    if schema.metadata().contains_key("prom_metadata") {
+    if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;
     }
     schema_chk
