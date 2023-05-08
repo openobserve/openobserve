@@ -55,7 +55,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         email: user_id.to_string(),
     };
 
-    let is_root_user = is_root_user(user_id).await;
+    let is_root_user = is_root_user(user_id);
     if is_root_user {
         id += 1;
         org_names.insert(DEFAULT_ORG.to_string());
@@ -146,7 +146,7 @@ async fn get_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id).await {
+    if is_root_user(user_id) {
         org_id = None;
     }
     let passcode = get_passcode(org_id, user_id).await;
@@ -176,7 +176,7 @@ async fn update_user_passcode(
     let org = org_id.into_inner();
     let user_id = credentials.user_id();
     let mut org_id = Some(org.as_str());
-    if is_root_user(user_id).await {
+    if is_root_user(user_id) {
         org_id = None;
     }
     let passcode = update_passcode(org_id, user_id).await;
