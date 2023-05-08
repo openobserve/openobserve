@@ -68,7 +68,7 @@
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 118px); overflow-y: auto">
+    <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
       <div
         class="col scroll"
         style="overflow-y: auto; height: 100%; min-width: 90px; max-width: 90px"
@@ -78,14 +78,14 @@
         />
       </div>
       <q-separator vertical />
-      <div class="col" style="width: 100%;">
+      <div class="col" style="width: 100%; height:100%;">
 				<q-splitter
 					v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
-					style="width: 100%"
+					style="width: 100%; height: 100%;"
 				>
 					<template #before>
-						<div class="col scroll " style="height: calc(100vh - 118px); overflow-y: auto;">
+						<div class="col scroll " style="height: calc(100vh - 115px); overflow-y: auto;">
 							<GetFields :editMode = "editMode" />
 						</div>
 					</template>
@@ -99,14 +99,15 @@
 						/>
 					</template>
 					<template #after>
-						<div class="row" style="height: calc(100vh - 118px); overflow-y: auto; ">
+						<div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
 							<div class="layout-panel-container col scroll" style="height:100%;">
 								<LayoutNew/>
                 
                 <q-separator />
-                <div style="flex:1; background-color: gray;">
+                <div style="flex:1;">
                   <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
+                <q-separator />
                 <SearchBar />
 
 							</div>

@@ -115,8 +115,8 @@
             :label="itemY.column" class="q-pl-sm">
             <q-menu class="q-pa-md">
                 <div>
-                  <div class="">
-                    <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
+                  <div class="row q-mb-sm" style="align-items: center;">
+                    <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs" style="width: 160px">
                       <q-select
                         v-model="
                           dashboardPanelData.data.fields.y[index]

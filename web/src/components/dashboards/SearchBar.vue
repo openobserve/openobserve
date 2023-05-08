@@ -14,49 +14,55 @@
 -->
 
 <template>
-    <div>
-      <q-bar class="q-pa-sm bg-white">
-        <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
-        <q-space />
-
-        <div @click.prevent="showWarning" style="cursor: pointer;">
-          <div style="pointer-events: none;">
-            <q-toggle
-              v-model="dashboardPanelData.data.customQuery"
-              :label="t('panel.customSql')"
-              @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery)"
-            />
+  <div style="background-color: white;">
+    <q-expansion-item
+        switch-toggle-side
+        dense
+        dense-toggle
+        expand-separator
+        default-opened
+        icon="perm_identity"
+        expand-icon-toggle
+        label="Account settings"
+        @after-show="queryEditorExpanded"
+        @after-hide="queryEditorExpanded"
+      >
+        <template #header="{ toggle }">
+          <div class="row" style="width:100%;">
+            <span class="text-subtitle2 text-weight-bold" style="flex: 1;">{{ t('panel.sql') }}</span>
+            <div @click.prevent="showWarning" style="cursor: pointer;">
+              <div style="pointer-events: none;">
+                <q-toggle
+                  dense
+                  v-model="dashboardPanelData.data.customQuery"
+                  :label="t('panel.customSql')"
+                  @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery); toggle()"
+                />
+              </div>
+            </div>
           </div>
+        </template>
+        <div class="col">
+          <query-editor
+            ref="queryEditorRef"
+            class="monaco-editor"
+            v-model:query="dashboardPanelData.data.query"
+            v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
+            v-model:functions="dashboardPanelData.meta.stream.functions"
+            @run-query="searchData"
+            :readOnly="!dashboardPanelData.data.customQuery"
+            ></query-editor>
+          <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
         </div>
-        <q-btn-dropdown
-          color="white"
-          flat
-          text-color="black"
-          @click="onDropDownClick"
-        />
-      </q-bar>
-    </div>
-    <div class="row" v-if="showQuery">
-      <div class="col">
-        <query-editor
-        ref="queryEditorRef"
-        class="monaco-editor"
-        v-model:query="dashboardPanelData.data.query"
-        v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-        v-model:functions="dashboardPanelData.meta.stream.functions"
-        @run-query="searchData"
-        :readOnly="!dashboardPanelData.data.customQuery"
-        ></query-editor>
-        <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
-      </div>
-    </div>
-    <ConfirmDialog
-      title="Change Query Mode"
-      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
-      @update:ok="changeToggle"
-      @update:cancel="confirmQueryModeChangeDialog = false"
-      v-model="confirmQueryModeChangeDialog"
-    />
+      </q-expansion-item>
+  </div>
+  <ConfirmDialog
+    title="Change Query Mode"
+    message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+    @update:ok="changeToggle"
+    @update:cancel="confirmQueryModeChangeDialog = false"
+    v-model="confirmQueryModeChangeDialog"
+  />
 </template>
 
 <script lang="ts">
@@ -87,7 +93,6 @@ export default defineComponent({
   },
   setup() {
     // show the query box
-    const showQuery = ref(true)
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -96,14 +101,9 @@ export default defineComponent({
     const parser = new Parser();
     let streamName = "";
 
-    // toggle show query view
-    const onDropDownClick= () =>{
-        showQuery.value = !showQuery.value
-    }
-
-    watch(showQuery, () => {
+    const queryEditorExpanded = () => {
       window.dispatchEvent(new Event("resize"))
-    })
+    }
 
     onActivated(() => {
       dashboardPanelData.meta.errors.queryErrors = []
@@ -315,8 +315,7 @@ export default defineComponent({
       t,
       router,
       updateQueryValue,
-      onDropDownClick,
-      showQuery,
+      queryEditorExpanded,
       dashboardPanelData,
       confirmQueryModeChangeDialog,
       onUpdateToggle,

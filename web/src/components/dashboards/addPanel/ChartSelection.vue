@@ -15,7 +15,7 @@
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 90px">
+    <div class="q-pa-none" style="max-width: 90px;">
       <q-list separator>
         <q-item
           :class="
