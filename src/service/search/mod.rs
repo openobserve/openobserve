@@ -15,7 +15,6 @@
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use datafusion_common::DataFusionError;
-use http_auth_basic::Credentials;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::{cmp::min, time::Duration};
@@ -28,7 +27,7 @@ use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
 
-use crate::infra::config::{CONFIG, ROOT_USER};
+use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;

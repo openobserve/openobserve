@@ -31,7 +31,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .unwrap()
         .to_string();
     if token.eq(CONFIG.grpc.internal_grpc_token.as_str()) {
-        return Ok(req);
+        Ok(req)
     } else {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,

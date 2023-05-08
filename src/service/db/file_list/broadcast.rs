@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use dashmap::DashMap;
-use http_auth_basic::Credentials;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-use crate::infra::config::{CONFIG, ROOT_USER};
+use crate::infra::config::CONFIG;
 use crate::meta::common::FileKey;
 
 lazy_static! {
