@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::config::{CONFIG, ROOT_USER};
+use crate::{
+    common::auth::is_root_user,
+    infra::{
+        cluster::get_internal_grpc_token,
+        config::{CONFIG, ROOT_USER, USERS},
+    },
+};
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
-    if !req.metadata().contains_key(&CONFIG.grpc.org_header_key)
-        && !req.metadata().contains_key("authorization")
+    let metadata = req.metadata().clone();
+    if !metadata.contains_key(&CONFIG.grpc.org_header_key)
+        && !metadata.contains_key("authorization")
     {
         return Err(Status::unauthenticated("No valid auth token"));
     }
@@ -30,22 +37,49 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_str()
         .unwrap()
         .to_string();
-    let credentials = match Credentials::from_header(token) {
-        Ok(c) => c,
-        Err(err) => {
-            log::info!("Err authenticating {}", err);
-            return Err(Status::unauthenticated("No valid auth token"));
-        }
-    };
-
-    let user = ROOT_USER.get("root").unwrap();
-    let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
-    if credentials.user_id.eq(&user.email)
-        && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
-    {
+    if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
-        Err(Status::unauthenticated("No valid auth token"))
+        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        if org_id.is_none() {
+            return Err(Status::invalid_argument(format!(
+                "Please specify organization id with header key '{}' ",
+                &CONFIG.grpc.org_header_key
+            )));
+        }
+
+        let credentials = match Credentials::from_header(token) {
+            Ok(c) => c,
+            Err(err) => {
+                log::info!("Err authenticating {}", err);
+                return Err(Status::unauthenticated("No valid auth token"));
+            }
+        };
+
+        let user_id = credentials.user_id;
+        let user = if is_root_user(&user_id) {
+            ROOT_USER.get("root").unwrap()
+        } else if let Some(user) = USERS.get(&format!(
+            "{}/{}",
+            org_id.unwrap().to_str().unwrap(),
+            &user_id
+        )) {
+            user
+        } else {
+            return Err(Status::unauthenticated("No valid auth token"));
+        };
+
+        if user.token.eq(&credentials.password) {
+            return Ok(req);
+        }
+        let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
+        if user_id.eq(&user.email)
+            && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
+        {
+            Ok(req)
+        } else {
+            Err(Status::unauthenticated("No valid auth token"))
+        }
     }
 }
 
