@@ -23,7 +23,7 @@ use crate::service::file_list;
 // 1. create partion
 // 2. query on all ingester & 1 on N querier
 // 3. merge result
-pub async fn exec_for_http() -> Result<Value, Error> {
+pub async fn exec_for_http(_req: super::MetricsQueryRequest) -> Result<Value, Error> {
     Err(Error::NotImplemented)
 }
 

@@ -14,8 +14,12 @@
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
+use std::time::Duration;
 
-use crate::{meta, service::metrics};
+use crate::common::time::parse_str_to_timestamp_micros;
+use crate::meta;
+use crate::service::metrics;
+use crate::service::promql;
 
 /** prometheus remote-write endpoint for metrics */
 #[utoipa::path(
@@ -105,11 +109,49 @@ pub async fn query(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let query = query.into_inner();
-    println!("org_id: {}", org_id);
-    println!("query.query: {}", query.query);
-    println!("query.time: {:?}", query.time);
-    println!("query.timeout: {:?}", query.timeout);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+
+    let start = match query.time {
+        Some(v) => match parse_str_to_timestamp_micros(&v) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("parse time error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                    status: promql::Status::Error,
+                    data: None,
+                    error_type: Some("bad_data".to_string()),
+                    error: Some(e.to_string()),
+                }));
+            }
+        },
+        None => chrono::Utc::now().timestamp_micros(),
+    };
+    let end = start;
+
+    let req = promql::MetricsQueryRequest {
+        query: query.query,
+        start,
+        end,
+        step: Duration::from_secs(300).as_micros() as i64,
+    };
+
+    let resp = match promql::search::exec_for_http(req).await {
+        Ok(data) => promql::QueryResponse {
+            status: promql::Status::Success,
+            data: Some(promql::QueryResult {
+                result_type: data.get_type().to_string(),
+                result: data,
+            }),
+            error_type: None,
+            error: None,
+        },
+        Err(e) => promql::QueryResponse {
+            status: promql::Status::Error,
+            data: None,
+            error_type: Some("bad_data".to_string()),
+            error: Some(e.to_string()),
+        },
+    };
+    Ok(HttpResponse::Ok().json(resp))
 }
 
 /** prometheus range queries */
@@ -172,13 +214,72 @@ pub async fn query_range(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let range_query = range_query.into_inner();
-    println!("org_id: {}", org_id);
-    println!("query.query: {}", range_query.query);
-    println!("query.start: {:?}", range_query.start);
-    println!("query.end: {:?}", range_query.end);
-    println!("query.step: {:?}", range_query.step);
-    println!("query.timeout: {:?}", range_query.timeout);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+
+    let start = match parse_str_to_timestamp_micros(&range_query.start) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("parse time error: {}", e);
+            return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                status: promql::Status::Error,
+                data: None,
+                error_type: Some("bad_data".to_string()),
+                error: Some(e.to_string()),
+            }));
+        }
+    };
+    let end = match parse_str_to_timestamp_micros(&range_query.start) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("parse time error: {}", e);
+            return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                status: promql::Status::Error,
+                data: None,
+                error_type: Some("bad_data".to_string()),
+                error: Some(e.to_string()),
+            }));
+        }
+    };
+    let step = match range_query.step {
+        Some(v) => match parse_str_to_timestamp_micros(&v) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("parse time error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                    status: promql::Status::Error,
+                    data: None,
+                    error_type: Some("bad_data".to_string()),
+                    error: Some(e.to_string()),
+                }));
+            }
+        },
+        None => Duration::from_secs(300).as_micros() as i64,
+    };
+
+    let req = promql::MetricsQueryRequest {
+        query: range_query.query,
+        start,
+        end,
+        step,
+    };
+
+    let resp = match promql::search::exec_for_http(req).await {
+        Ok(data) => promql::QueryResponse {
+            status: promql::Status::Success,
+            data: Some(promql::QueryResult {
+                result_type: data.get_type().to_string(),
+                result: data,
+            }),
+            error_type: None,
+            error: None,
+        },
+        Err(e) => promql::QueryResponse {
+            status: promql::Status::Error,
+            data: None,
+            error_type: Some("bad_data".to_string()),
+            error: Some(e.to_string()),
+        },
+    };
+    Ok(HttpResponse::Ok().json(resp))
 }
 
 /** prometheus query metric metadata */
