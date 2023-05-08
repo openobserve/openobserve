@@ -37,7 +37,7 @@ use crate::{
 use crate::{infra::config::USERS, meta::user::UpdateUser};
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
-    let existing_user = if is_root_user(&usr_req.email).await {
+    let existing_user = if is_root_user(&usr_req.email) {
         db::user::get(None, &usr_req.email).await
     } else {
         db::user::get(Some(org_id), &usr_req.email).await
@@ -70,7 +70,7 @@ pub async fn update_user(
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
 
-    let existing_user = if is_root_user(email).await {
+    let existing_user = if is_root_user(email) {
         db::user::get(None, email).await
     } else {
         db::user::get(Some(org_id), email).await
@@ -84,7 +84,7 @@ pub async fn update_user(
         match existing_user.unwrap() {
             Some(local_user) => {
                 if !self_update {
-                    if is_root_user(initiator_id).await {
+                    if is_root_user(initiator_id) {
                         allow_password_update = true
                     } else {
                         let initiating_user = db::user::get(Some(org_id), initiator_id)
@@ -214,7 +214,7 @@ pub async fn add_user_to_org(
     if existing_user.is_ok() {
         let mut db_user = existing_user.unwrap();
         let local_org;
-        let initiating_user = if is_root_user(initiator_id).await {
+        let initiating_user = if is_root_user(initiator_id) {
             local_org = org_id.replace(' ', "_");
             root_user.get("root").unwrap().clone()
         } else {

@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::config::{CONFIG, ROOT_USER};
+use crate::{
+    common::auth::is_root_user,
+    infra::config::{CONFIG, ROOT_USER, USERS},
+};
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
-    if !req.metadata().contains_key(&CONFIG.grpc.org_header_key)
-        && !req.metadata().contains_key("authorization")
+    let metadata = req.metadata().clone();
+    if !metadata.contains_key(&CONFIG.grpc.org_header_key)
+        && !metadata.contains_key("authorization")
     {
         return Err(Status::unauthenticated("No valid auth token"));
     }
@@ -33,6 +37,14 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     if token.eq(CONFIG.grpc.internal_grpc_token.as_str()) {
         Ok(req)
     } else {
+        let org_id = metadata.get(&CONFIG.grpc.org_header_key);
+        if org_id.is_none() {
+            return Err(Status::invalid_argument(format!(
+                "Please specify organization id with header key '{}' ",
+                &CONFIG.grpc.org_header_key
+            )));
+        }
+
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
@@ -41,13 +53,21 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
             }
         };
 
-        let root_user = ROOT_USER.clone();
-        let user = root_user.get("root").unwrap();
-        log::info!("grpc auth user: {} {}", &user.email, &user.password);
-        log::info!("incoming credentials of user: {:?}", credentials);
+        let user_id = credentials.user_id;
+        let user = if is_root_user(&user_id) {
+            ROOT_USER.get("root").unwrap()
+        } else {
+            USERS
+                .get(&format!(
+                    "{}/{}",
+                    org_id.unwrap().to_str().unwrap(),
+                    &user_id
+                ))
+                .unwrap()
+        };
 
         let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
-        if credentials.user_id.eq(&user.email)
+        if user_id.eq(&user.email)
             && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
         {
             Ok(req)

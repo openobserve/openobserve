@@ -108,9 +108,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let users = item_value.get_all_users();
                 for user in users {
                     if user.role.eq(&UserRole::Root) {
-                        log::info!("db update root user: {:?}", user);
                         ROOT_USER.insert("root".to_string(), user.clone());
-
                     }
                     USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
