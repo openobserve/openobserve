@@ -14,7 +14,10 @@
 
 use crate::{
     common::auth::is_root_user,
-    infra::config::{CONFIG, ROOT_USER, USERS},
+    infra::{
+        cluster::get_internal_grpc_token,
+        config::{CONFIG, ROOT_USER, USERS},
+    },
 };
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
@@ -34,7 +37,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_str()
         .unwrap()
         .to_string();
-    if token.eq(CONFIG.grpc.internal_grpc_token.as_str()) {
+    if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
         let org_id = metadata.get(&CONFIG.grpc.org_header_key);

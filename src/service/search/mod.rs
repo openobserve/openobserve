@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster;
+use crate::infra::cluster::{self, get_internal_grpc_token};
 
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
@@ -244,7 +244,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     )
                 });
 
-                let token: MetadataValue<_> = match CONFIG.grpc.internal_grpc_token.parse() {
+                let token: MetadataValue<_> = match  get_internal_grpc_token().parse() {
                     Ok(token) => token,
                     Err(_) => return Err(Error::Message("invalid token".to_string())),
                 };

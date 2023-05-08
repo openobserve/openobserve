@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster;
+use crate::infra::cluster::{self, get_internal_grpc_token};
 use crate::infra::config::CONFIG;
 use crate::meta::common::FileKey;
 
@@ -64,7 +64,7 @@ async fn send_to_node(
         let user = root_user.get("root").unwrap();
         let credentials = Credentials::new(&user.email, &user.password);
         let credentials = credentials.as_http_header();*/
-        let token: MetadataValue<_> = CONFIG.grpc.internal_grpc_token.parse()?;
+        let token: MetadataValue<_> = get_internal_grpc_token().parse()?;
         let channel = Channel::from_shared(node.grpc_addr)
             .unwrap()
             .connect()
