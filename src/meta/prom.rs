@@ -17,8 +17,9 @@ use serde::{Deserialize, Serialize};
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
 pub const HASH_LABEL: &str = "__hash__";
-pub const LE_LABEL: &str = "le";
 pub const VALUE_LABEL: &str = "value";
+pub const LE_LABEL: &str = "le";
+pub const QUANTILE_LABEL: &str  = "quantile";
 pub const CLUSTER_LABEL: &str = "cluster";
 pub const REPLICA_LABEL: &str = "__replica__";
 

@@ -236,7 +236,8 @@ pub async fn remote_write(
 
             // get json object
             let val_map = value.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &[LE_LABEL, VALUE_LABEL]);
+            let hash =
+                super::signature_without_labels(val_map, &[VALUE_LABEL, LE_LABEL, QUANTILE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             val_map.insert(
                 CONFIG.common.time_stamp_col.clone(),
