@@ -14,46 +14,39 @@
 -->
 
 <template>
-  <div class="tabContent">
+  <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Vector</div>
+      <div class="title" data-test="vector-title-text">Prometheus</div>
       <div class="copy_action">
         <q-btn
-          data-test="vector-copy-btn"
+          data-test="traces-copy-btn"
           flat
           round
           size="0.5rem"
           padding="0.6rem"
           :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', vectorContent)"
+          @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
         />
       </div>
     </div>
-    <pre ref="vectorContent" data-test="vector-content-text">
-[sinks.zinc]
-type = "http"
-inputs = [ source or transform id ]
-uri = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
-method = "post"
-auth.strategy = "basic"
-auth.user = "{{ currUserEmail }}"
-auth.password = "{{ store.state.organizationPasscode }}"
-compression = "gzip"
-encoding.codec = "json"
-encoding.timestamp_format = "rfc3339"
-healthcheck.enabled = false</pre
-    >
+    <pre ref="copyTracesContent" data-test="traces-content-text">
+url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/write
+basic_auth:
+  username: {{ currUserEmail }}
+  password: {{ store.state.organizationPasscode }}
+    </pre>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, type Ref } from "vue";
-import config from "../../aws-exports";
+import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, b64EncodeUnicode } from "../../../utils/zincutils";
 import type { Endpoint } from "@/ts/interfaces";
+import { computed } from "vue";
 export default defineComponent({
-  name: "vector-mechanism",
+  name: "traces-otlp",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -62,7 +55,7 @@ export default defineComponent({
       type: String,
     },
   },
-  setup() {
+  setup(props) {
     const store = useStore();
     const endpoint: Ref<Endpoint> = ref({
       url: "",
@@ -79,12 +72,18 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const vectorContent = ref(null);
+    const accessKey = computed(() => {
+      return b64EncodeUnicode(
+        `${props.currUserEmail}:${store.state.organizationPasscode}`
+      );
+    });
+    const copyTracesContent = ref(null);
     return {
       store,
       config,
       endpoint,
-      vectorContent,
+      copyTracesContent,
+      accessKey,
       getImageURL,
     };
   },

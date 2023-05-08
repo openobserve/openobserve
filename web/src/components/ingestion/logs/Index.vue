@@ -15,120 +15,144 @@
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="ingestionPage">
-    <div class="head q-table__title q-pb-md q-px-md">
-      {{ t("ingestion.header") }}
+  <q-splitter
+    v-model="splitterModel"
+    unit="px"
+    style="min-height: calc(100vh - 130px)"
+  >
+    <template v-slot:before>
+      <q-tabs
+        v-model="ingestiontabs"
+        indicator-color="transparent"
+        class="text-secondary"
+        inline-label
+        vertical
+      >
+        <q-route-tab
+          default
+          name="curl"
+          :to="{
+            name: 'curl',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          icon="data_object"
+          label="Curl"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          default
+          name="fluentbit"
+          :to="{
+            name: 'fluentbit',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+          label="FluentBit"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="fluentd"
+          :to="{
+            name: 'fluentd',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
+          label="Fluentd"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="vector"
+          :to="{
+            name: 'vector',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/vector.png')"
+          label="Vector"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="kinesisfirehose"
+          :to="{
+            name: 'kinesisfirehose',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+          label="Kinesis Firehose"
+          content-class="tab_content"
+        />
+      </q-tabs>
+    </template>
 
-      <q-btn
-        class="q-ml-md q-mb-xs text-bold no-border right float-right"
-        padding="sm lg"
-        color="secondary"
-        no-caps
-        icon="lock_reset"
-        :label="t(`ingestion.passwordLabel`)"
-        @click="showUpdateDialogFn"
-      />
-      <ConfirmDialog
-        title="Reset Token"
-        message="Are you sure you want to update token for this organization?"
-        @update:ok="updatePasscode"
-        @update:cancel="confirmUpdate = false"
-        v-model="confirmUpdate"
-      />
-    </div>
-    <q-separator class="separator" />
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 130px)"
-    >
-      <template v-slot:before>
-        <q-tabs
-          v-model="ingestTabType"
-          indicator-color="transparent"
-          class="text-secondary"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            default
-            name="ingestLogs"
-            :to="{
-              name: 'ingestLogs',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Logs"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            default
-            name="ingestMetrics"
-            :to="{
-              name: 'ingestMetrics',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Metrics"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestTraces"
-            :to="{
-              name: 'ingestTraces',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Traces"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </template>
+    <template v-slot:after>
+      <q-tab-panels
+        v-model="ingestiontabs"
+        animated
+        swipeable
+        vertical
+        transition-prev="jump-up"
+        transition-next="jump-up"
+      >
+        <q-tab-panel name="curl">
+          <router-view
+            title="CURL"
+            :currOrgIdentifier="currentOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </q-tab-panel>
+        <q-tab-panel name="fluentbit">
+          <router-view
+            title="Fluent Bit"
+            :currOrgIdentifier="currentOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </q-tab-panel>
 
-      <template v-slot:after>
-        <q-tab-panels
-          v-model="ingestTabType"
-          animated
-          swipeable
-          vertical
-          transition-prev="jump-up"
-          transition-next="jump-up"
-        >
-          <q-tab-panel name="ingestLogs">
-            <router-view
-              title="Logs"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="ingestMetrics">
-            <router-view
-              title="Metrics"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
+        <q-tab-panel name="fluentd">
+          <router-view
+            title="Fluentd"
+            :currOrgIdentifier="currentOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </q-tab-panel>
 
-          <q-tab-panel name="ingestTraces">
-            <router-view
-              title="Traces"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
-        </q-tab-panels>
-      </template>
-    </q-splitter>
-  </q-page>
+        <q-tab-panel name="vector">
+          <router-view
+            title="Vector"
+            :currOrgIdentifier="currentOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </q-tab-panel>
+
+        <q-tab-panel name="kinesisfirehose">
+          <router-view
+            title="Kinesis Firehose"
+            :currOrgIdentifier="currentOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+            @copy-to-clipboard-fn="copyToClipboardFn"
+          >
+          </router-view>
+        </q-tab-panel>
+      </q-tab-panels>
+    </template>
+  </q-splitter>
 </template>
 
 <script lang="ts">
@@ -138,19 +162,18 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
-import organizationsService from "../services/organizations";
+import organizationsService from "@/services/organizations";
 // import { config } from "../constants/config";
-import config from "../aws-exports";
-import ConfirmDialog from "../components/ConfirmDialog.vue";
-import segment from "../services/segment_analytics";
-import { getImageURL } from "../utils/zincutils";
+import config from "../../../aws-exports";
+import segment from "@/services/segment_analytics";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "PageIngestion",
-  components: { ConfirmDialog },
+  name: "IngestLogs",
+  components: {},
   data() {
     return {
-      ingestTabType: "ingestLogs",
+      ingestiontabs: "curl",
     };
   },
   setup() {
@@ -165,9 +188,9 @@ export default defineComponent({
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.name == "ingestion") {
+      if (router.currentRoute.value.name == "ingestLogs") {
         router.push({
-          name: "ingestLogs",
+          name: "curl",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -335,6 +358,17 @@ export default defineComponent({
         }
       }
     }
+  }
+}
+</style>
+<style lang="scss">
+.ingestionPage {
+  .q-tab-panel {
+    padding: 0 !important;
+  }
+
+  .q-icon > img {
+    height: auto !important;
   }
 }
 </style>

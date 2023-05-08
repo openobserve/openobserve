@@ -31,12 +31,18 @@ import Alerts from "@/views/AppAlerts.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import Error404 from "@/views/Error404.vue";
 import Dashboards from "@/views/Dashboards/Dashboards.vue";
-import FluentBit from "@/components/ingestion/FluentBit.vue";
-import Fluentd from "@/components/ingestion/Fluentd.vue";
-import Vector from "@/components/ingestion/Vector.vue";
-import Curl from "@/components/ingestion/Curl.vue";
-import KinesisFirehose from "@/components/ingestion/KinesisFirehose.vue";
-import TracesOTLP from "@/components/ingestion/TracesOTLP.vue";
+import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
+import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
+import Vector from "@/components/ingestion/logs/Vector.vue";
+import Curl from "@/components/ingestion/logs/Curl.vue";
+import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
+import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
+import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
+import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
+import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
+import IngestLogs from "@/components/ingestion/logs/Index.vue";
+import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
+import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import {
   AlertList,
   TemplateList,
@@ -179,34 +185,70 @@ const useRoutes = () => {
       component: Ingestion,
       children: [
         {
-          path: "curl",
-          name: "curl",
-          component: Curl,
+          path: "logs",
+          name: "ingestLogs",
+          component: IngestLogs,
+          children: [
+            {
+              path: "curl",
+              name: "curl",
+              component: Curl,
+            },
+            {
+              path: "fluentbit",
+              name: "fluentbit",
+              component: FluentBit,
+            },
+            {
+              path: "fluentd",
+              name: "fluentd",
+              component: Fluentd,
+            },
+            {
+              path: "vector",
+              name: "vector",
+              component: Vector,
+            },
+            {
+              path: "kinesisfirehose",
+              name: "kinesisfirehose",
+              component: KinesisFirehose,
+            },
+          ],
         },
         {
-          path: "fluentbit",
-          name: "fluentbit",
-          component: FluentBit,
+          path: "metrics",
+          name: "ingestMetrics",
+          component: IngestMetrics,
+          children: [
+            {
+              path: "prometheus",
+              name: "prometheus",
+              component: PrometheusConfig,
+            },
+            {
+              path: "otelcollector",
+              name: "otelCollector",
+              component: OtelCollector,
+            },
+            {
+              path: "telegraf",
+              name: "telegraf",
+              component: TelegrafConfig,
+            },
+          ],
         },
         {
-          path: "fluentd",
-          name: "fluentd",
-          component: Fluentd,
-        },
-        {
-          path: "vector",
-          name: "vector",
-          component: Vector,
-        },
-        {
-          path: "kinesisfirehose",
-          name: "kinesisfirehose",
-          component: KinesisFirehose,
-        },
-        {
-          path: "tracesOTLP",
-          name: "tracesOTLP",
-          component: TracesOTLP,
+          path: "traces",
+          name: "ingestTraces",
+          component: IngestTraces,
+          children: [
+            {
+              path: "tracesOTLP",
+              name: "tracesOTLP",
+              component: OpenTelemetry,
+            },
+          ],
         },
       ],
     },

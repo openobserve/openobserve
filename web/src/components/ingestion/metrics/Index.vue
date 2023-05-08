@@ -15,120 +15,68 @@
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="ingestionPage">
-    <div class="head q-table__title q-pb-md q-px-md">
-      {{ t("ingestion.header") }}
+  <q-splitter
+    v-model="splitterModel"
+    unit="px"
+    style="min-height: calc(100vh - 130px)"
+  >
+    <template v-slot:before>
+      <q-tabs
+        v-model="ingestiontabs"
+        indicator-color="transparent"
+        class="text-secondary"
+        inline-label
+        vertical
+      >
+        <q-route-tab
+          name="prometheus"
+          :to="{
+            name: 'prometheus',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
+          label="Prometheus"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="otelCollector"
+          :to="{
+            name: 'otelCollector',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+          label="OTEL Collector"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          name="telegraf"
+          :to="{
+            name: 'telegraf',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
+          label="Telegraf"
+          content-class="tab_content"
+        />
+      </q-tabs>
+    </template>
 
-      <q-btn
-        class="q-ml-md q-mb-xs text-bold no-border right float-right"
-        padding="sm lg"
-        color="secondary"
-        no-caps
-        icon="lock_reset"
-        :label="t(`ingestion.passwordLabel`)"
-        @click="showUpdateDialogFn"
-      />
-      <ConfirmDialog
-        title="Reset Token"
-        message="Are you sure you want to update token for this organization?"
-        @update:ok="updatePasscode"
-        @update:cancel="confirmUpdate = false"
-        v-model="confirmUpdate"
-      />
-    </div>
-    <q-separator class="separator" />
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 130px)"
-    >
-      <template v-slot:before>
-        <q-tabs
-          v-model="ingestTabType"
-          indicator-color="transparent"
-          class="text-secondary"
-          inline-label
-          vertical
-        >
-          <q-route-tab
-            default
-            name="ingestLogs"
-            :to="{
-              name: 'ingestLogs',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Logs"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            default
-            name="ingestMetrics"
-            :to="{
-              name: 'ingestMetrics',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Metrics"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ingestTraces"
-            :to="{
-              name: 'ingestTraces',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            label="Traces"
-            content-class="tab_content"
-          />
-        </q-tabs>
-      </template>
-
-      <template v-slot:after>
-        <q-tab-panels
-          v-model="ingestTabType"
-          animated
-          swipeable
-          vertical
-          transition-prev="jump-up"
-          transition-next="jump-up"
-        >
-          <q-tab-panel name="ingestLogs">
-            <router-view
-              title="Logs"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
-          <q-tab-panel name="ingestMetrics">
-            <router-view
-              title="Metrics"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
-
-          <q-tab-panel name="ingestTraces">
-            <router-view
-              title="Traces"
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
-            </router-view>
-          </q-tab-panel>
-        </q-tab-panels>
-      </template>
-    </q-splitter>
-  </q-page>
+    <template v-slot:after>
+      <router-view
+        :title="ingestiontabs"
+        :currOrgIdentifier="currentOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </template>
+  </q-splitter>
 </template>
 
 <script lang="ts">
@@ -138,19 +86,18 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
-import organizationsService from "../services/organizations";
+import organizationsService from "@/services/organizations";
 // import { config } from "../constants/config";
-import config from "../aws-exports";
-import ConfirmDialog from "../components/ConfirmDialog.vue";
-import segment from "../services/segment_analytics";
-import { getImageURL } from "../utils/zincutils";
+import config from "../../../aws-exports";
+import segment from "@/services/segment_analytics";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "PageIngestion",
-  components: { ConfirmDialog },
+  name: "IngestMetrics",
+  components: {},
   data() {
     return {
-      ingestTabType: "ingestLogs",
+      ingestiontabs: "prometheus",
     };
   },
   setup() {
@@ -165,9 +112,9 @@ export default defineComponent({
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.name == "ingestion") {
+      if (router.currentRoute.value.name == "ingestMetrics") {
         router.push({
-          name: "ingestLogs",
+          name: "prometheus",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
