@@ -22,7 +22,7 @@
     <div style="display:flex; flex-direction: row;" class="q-px-sm">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       :</div>
-      <div class="column index-menu droppable" :class="{
+      <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
         }"
@@ -31,12 +31,11 @@
         @dragover="onDragOver($event, 'x')"
         @drop="onDrop($event, 'x')"
         v-mutation="handler2">
-        <q-btn-group  v-for="(itemX,index) in dashboardPanelData.data.fields.x" :key="index">
+        <q-btn-group class="q-mr-sm" v-for="(itemX,index) in dashboardPanelData.data.fields.x" :key="index">
           <q-btn  
-            icon-right="arrow_drop_down" no-caps dense color="primary" rounded
-            :label="itemX.label" class="q-pl-md">
+            icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
+            :label="itemX.column" class="q-pl-sm">
               <q-menu class="q-pa-md">
-              {{ itemX.label }}
                 <div>
                   <div class="">
                     <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm">
@@ -83,13 +82,14 @@
           <q-btn
             size="xs"
             round
+            flat
             dense
             @click="removeXAxisItem(itemX.column)"
-            :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
+            icon="close"
           />
         </q-btn-group>
         <div
-          class="text-caption text-weight-bold text-center q-ma-sm 1-ml-md"
+          class="text-caption text-weight-bold text-center q-ma-xs"
           v-if="dashboardPanelData.data.fields.x.length < 1"
         >
           Please add a field from the list
@@ -101,7 +101,7 @@
     <div style="display:flex; flex-direction: row;" class="q-px-sm">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
       :</div>
-      <div class="column index-menu droppable" :class="{
+      <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
         }"
@@ -110,11 +110,10 @@
         @dragover="onDragOver($event, 'y')"
         @drop="onDrop($event, 'y')"
         v-mutation="handler2">
-        <q-btn-group v-for="(itemY,index) in dashboardPanelData.data.fields.y" :key="index">
-          <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded
-            :label="itemY.label">
+        <q-btn-group class="q-mr-sm" v-for="(itemY,index) in dashboardPanelData.data.fields.y" :key="index">
+          <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
+            :label="itemY.column">
             <q-menu class="q-pa-md">
-              {{ itemY.label }}
                 <div>
                   <div class="">
                     <div v-if="!dashboardPanelData.data.customQuery" class="q-mr-xs q-mb-sm" style="width: 160px">
@@ -157,9 +156,10 @@
           <q-btn
             size="xs"
             round
+            flat
             dense
             @click="removeYAxisItem(itemY.column)"
-            :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
+            icon="close"
           />
         </q-btn-group>
         <div
@@ -173,7 +173,7 @@
     <q-separator />
     <div style="display:flex; flex-direction: row;" class="q-px-sm">
       <div class="layout-name"> {{ t('panel.filters') }}:</div>
-      <div class="column index-menu droppable" :class="{
+      <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
         }"
@@ -182,10 +182,9 @@
         @dragover="onDragOver($event, 'f')"
         @drop="onDrop($event, 'f')"
         v-mutation="handler2">
-        <q-btn-group v-for="(filteredItem,index) in dashboardPanelData.data.fields.filter" :key="index">
-        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded :label="filteredItem.column">
+        <q-btn-group class="q-mr-sm" v-for="(filteredItem,index) in dashboardPanelData.data.fields.filter" :key="index">
+        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column">
           <q-menu class="q-pa-md">
-            {{ filteredItem.column }}
               <div>
                 <div class="q-pa-xs">
                   <div class="q-gutter-xs">
@@ -322,14 +321,15 @@
         <q-btn
           size="xs"
           round
+          flat
           dense
           @click="removeFilterItem(filteredItem.column)"
-          :icon="'img:' + getImageURL('images/layout/remove_icon.svg')"
+          icon="close"
         />
         </q-btn-group>
         <div
           class="text-caption text-weight-bold text-center q-ma-sm"
-          v-if="dashboardPanelData.meta.filterValue.length < 1"
+          v-if="dashboardPanelData.data.fields.filter < 1"
         >
           Please add a field from the list
         </div>
@@ -475,6 +475,13 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
+.axis-container {
+  flex: 1;
+  width: 100%;
+  white-space: nowrap;
+  overflow-x: auto;
+}
 
 .layout-name {
   white-space: nowrap; 
