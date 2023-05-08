@@ -50,7 +50,7 @@ pub fn signature_without_labels(
         .filter(|(key, _value)| !exclude_names.contains(&key.as_str()))
         .map(|(key, value)| (key.as_str(), value.as_str().unwrap()))
         .collect();
-    labels.sort_by(|a, b| a.0.cmp(&b.0));
+    labels.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut hasher = blake3::Hasher::new();
     labels.iter().for_each(|(key, value)| {
