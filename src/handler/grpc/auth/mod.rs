@@ -69,6 +69,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
                 .unwrap()
         };
 
+        if user.token.eq(&credentials.password) {
+            return Ok(req);
+        }
         let in_pass = crate::common::auth::get_hash(&credentials.password, &user.salt);
         if user_id.eq(&user.email)
             && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
