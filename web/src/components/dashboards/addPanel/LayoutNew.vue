@@ -112,7 +112,7 @@
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(itemY,index) in dashboardPanelData.data.fields.y" :key="index">
           <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
-            :label="itemY.column">
+            :label="itemY.column" class="q-pl-sm">
             <q-menu class="q-pa-md">
                 <div>
                   <div class="">
@@ -183,7 +183,7 @@
         @drop="onDrop($event, 'f')"
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(filteredItem,index) in dashboardPanelData.data.fields.filter" :key="index">
-        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column">
+        <q-btn icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm" :label="filteredItem.column"  class="q-pl-sm">
           <q-menu class="q-pa-md">
               <div>
                 <div class="q-pa-xs">
