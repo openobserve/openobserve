@@ -277,15 +277,16 @@ pub async fn stream_schema_exists(
         has_fields: false,
         has_partition_keys: false,
     };
-    let schema;
-    if stream_schema_map.contains_key(stream_name) {
-        schema = stream_schema_map.get(stream_name).unwrap().clone();
-    } else {
-        schema = db::schema::get(org_id, stream_name, Some(stream_type))
-            .await
-            .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), schema.clone());
-    }
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.clone(),
+        None => {
+            let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+                .await
+                .unwrap();
+            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+            schema
+        }
+    };
     let fields = schema.fields();
     let mut meta = schema.metadata().clone();
 
@@ -294,15 +295,14 @@ pub async fn stream_schema_exists(
     }
     if !meta.is_empty() {
         meta.remove("created_at");
-        if !meta.is_empty() {
-            let stream_settings = meta.get("settings");
-            if let Some(value) = stream_settings {
-                let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-                let keys = settings.get("partition_keys");
-                if keys.is_some() {
-                    schema_chk.has_partition_keys = true;
-                }
-            }
+    }
+    if meta.is_empty() {
+        return schema_chk;
+    }
+    if let Some(value) = meta.get("settings") {
+        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
+        if settings.get("partition_keys").is_some() {
+            schema_chk.has_partition_keys = true;
         }
     }
     schema_chk
