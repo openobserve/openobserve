@@ -94,7 +94,7 @@ export default defineComponent({
       {
         image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
         title: "Donut",
-        id: "donut-chart",
+        id: "donut",
       },
       {
         image:
@@ -109,7 +109,7 @@ export default defineComponent({
       },
       {
         image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+          "img:" + getImageURL("images/dashboard/charts/123.png"),
         title: "Metric Text",
         id: "metric-text",
       },

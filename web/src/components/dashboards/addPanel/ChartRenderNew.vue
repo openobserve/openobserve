@@ -414,7 +414,7 @@ export default defineComponent({
                     console.log("multiple:- traces", traces);
                     break;
                 }
-                case "donut-chart": {
+                case "donut": {
                     // x axis values
                     // if x axis length is 1, then use the normal labels,
                     // more more than one, we need to create array of array for each key
@@ -675,7 +675,7 @@ export default defineComponent({
                     return {
                         type: "pie",
                     };
-                case "donut-chart":
+                case "donut":
                     return {
                         type: "pie",
                     };
@@ -811,7 +811,7 @@ export default defineComponent({
                             automargin: true,
                         },
                     };
-                case "donut-chart":
+                case "donut":
                     return {
                         xaxis: {
                             title: props.data.fields?.x[0].label,

@@ -262,7 +262,7 @@ export default defineComponent({
       }
 
       // for pie, make sure only 1 y axis is there
-      if(["pie", "metric-text", "donut-chart"].includes(dashboardData.data.type) && dashboardData.data.fields.y.length > 1 ){
+      if(["pie", "metric-text", "donut"].includes(dashboardData.data.type) && dashboardData.data.fields.y.length > 1 ){
         error.push("You can add only one field in the Y-Axis for pie or metric-text or donut charts")
       }
 
