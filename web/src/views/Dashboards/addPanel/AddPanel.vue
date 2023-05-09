@@ -17,7 +17,7 @@
 <template>
   <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
     <div class="flex justify-between items-center q-pa-sm">
-      <div class="flex items-baseline q-table__title q-mr-md">
+      <div class="flex items-center q-table__title q-mr-md">
         <span>
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
         </span>
