@@ -102,20 +102,13 @@
 						<div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
 							<div class="layout-panel-container col scroll" style="height:100%;">
 								<LayoutNew/>
-                
                 <q-separator />
                 <div style="flex:1;">
                   <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
                 <q-separator />
                 <SearchBar />
-
 							</div>
-              
-							<!-- <q-separator vertical />
-              <div class="col scroll " style="height:100%; min-width: 250px; max-width: 250px;">
-								<Layout/>
-							</div> -->
 						</div>
 					</template>
 				</q-splitter>
