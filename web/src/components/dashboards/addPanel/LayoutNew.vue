@@ -15,10 +15,6 @@
 
 <template>
   <div>
-    <!-- <div class="q-pa-sm">
-      <span class="text-weight-bold">{{t("panel.layout")}}</span>
-    </div> -->
-    <q-separator />
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       :</div>
