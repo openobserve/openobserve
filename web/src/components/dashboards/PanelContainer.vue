@@ -23,19 +23,18 @@
         :draggable="props.draggable"
       />
     </div>
-    <ChartRenderNew
+    <ChartRender
       :data="props.data"
       :selectedTimeDate="props.selectedTimeDate"
       :width="props.width"
       :height="props.height"
-    ></ChartRenderNew>
+    ></ChartRender>
   </div>
 </template>
 
 <script  lang="ts">
 import { defineComponent } from "vue";
 import ChartRender from "./addPanel/ChartRender.vue";
-import ChartRenderNew from "./addPanel/ChartRenderNew.vue";
 import PanelHeader from "./PanelHeader.vue";
 
 export default defineComponent({
@@ -45,7 +44,6 @@ export default defineComponent({
   components: {
     ChartRender,
     PanelHeader,
-    ChartRenderNew
   },
   setup(props) {
     //get props data

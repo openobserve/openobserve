@@ -59,10 +59,10 @@
           <template #after>
             <div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
               <div class="layout-panel-container col scroll" style="height:100%;">
-                <LayoutNew />
+                <Layout />
                 <q-separator />
                 <div style="flex:1;">
-                  <ChartRenderNew :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
                 <q-separator />
                 <SearchBar />
@@ -99,12 +99,10 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import Layout from "../../../components/dashboards/addPanel/Layout.vue";
-import LayoutNew from "../../../components/dashboards/addPanel/LayoutNew.vue";
 import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
-import ChartRenderNew from "../../../components/dashboards/addPanel/ChartRenderNew.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -112,11 +110,9 @@ export default defineComponent({
     ChartSelection,
     GetFields,
     Layout,
-    LayoutNew,
     SearchBar,
     DateTimePicker,
     ChartRender,
-    ChartRenderNew
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
