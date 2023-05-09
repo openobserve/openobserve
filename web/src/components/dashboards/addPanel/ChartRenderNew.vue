@@ -605,7 +605,7 @@ export default defineComponent({
 
         // get the axis data using key
         const getAxisDataFromKey = (key: string) => {
-            let result: string[] = searchQueryData.data.map((item) => item[key] || 0);
+            let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
             // check for the histogram _timestamp field
             // If histogram _timestamp field is found, format the date labels
             const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
