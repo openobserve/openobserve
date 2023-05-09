@@ -327,7 +327,6 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      console.log(this.router.currentRoute.value.name);
       if (
         newVal != oldVal &&
         (this.router.currentRoute.value.name === "ingestLogs" ||
