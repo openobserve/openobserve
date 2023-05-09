@@ -80,7 +80,7 @@ export default defineComponent({
             data: [],
             loading: false
         });
-        const noData = ref('')
+        // const noData = ref('')
 
         //render the plotly chart if the chart type is not table
         onUpdated(() => {
@@ -155,9 +155,9 @@ export default defineComponent({
                     }
                 );
 
-                plotRef.value.on('plotly_afterplot', function () {
-                    !searchQueryData.data.length ? noData.value = "No Data" : noData.value = ""
-                })
+                // plotRef.value.on('plotly_afterplot', function () {
+                //     !searchQueryData.data.length ? noData.value = "No Data" : noData.value = ""
+                // })
             } else {
                 updateTableColumns()
             }
@@ -176,6 +176,9 @@ export default defineComponent({
             if(!props.data.query) {
                 searchQueryData.data = []
             }
+        })
+        const noData = computed(()=> {
+            return !searchQueryData.data.length ? "No Data" : ""
         })
 
         // wrap the text for long x axis names for pie charts
