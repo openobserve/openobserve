@@ -31,7 +31,7 @@
     </div>
     <pre ref="copyTracesContent" data-test="traces-content-text">
 HTTP Endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/traces
-Access Key: Basic {{ accessKey }}
+Authorization: Basic {{ accessKey }}
   </pre
     >
   </div>
