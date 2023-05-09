@@ -32,6 +32,7 @@
         <div>Spans: {{ spanList.length - 1 }}</div>
       </div>
       <trace-chart
+        class="trace-details-chart"
         id="trace_details_gantt_chart"
         ref="plotChart"
         :chart="traceChart"
@@ -400,6 +401,7 @@ export default defineComponent({
           zeroline: true,
           rangeslider: {
             visible: true,
+            bgcolor: "#d5d5d5",
           },
         },
         yaxis: {
@@ -537,6 +539,17 @@ $traceChartHeight: 200px;
 
   .q-splitter__before {
     z-index: 999 !important;
+  }
+
+  .trace-details-chart {
+    .rangeslider-slidebox {
+      fill: #7076be !important;
+    }
+    .rangeslider-mask-max,
+    .rangeslider-mask-min {
+      fill: #d2d2d2 !important;
+      fill-opacity: 1 !important;
+    }
   }
 }
 </style>
