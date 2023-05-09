@@ -88,16 +88,26 @@ export default defineComponent({
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.name == "ingestTraces") {
+      const ingestRoutes = ["tracesOTLP"];
+      if (ingestRoutes.includes(router.currentRoute.value.name)) {
+        router.push({
+          name: router.currentRoute.value.name,
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+      if (router.currentRoute.value.name === "ingestTraces") {
         router.push({
           name: "tracesOTLP",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-      } else {
-        getOrganizationPasscode();
+        return;
       }
+      getOrganizationPasscode();
     });
 
     const getOrganizationPasscode = () => {
@@ -211,15 +221,11 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      console.log(this.router.currentRoute.value.name);
       if (
         newVal != oldVal &&
-        (this.router.currentRoute.value.name == "ingestion" ||
-          this.router.currentRoute.value.name == "fluentbit" ||
-          this.router.currentRoute.value.name == "fluentd" ||
-          this.router.currentRoute.value.name == "vector" ||
-          this.router.currentRoute.value.name == "curl" ||
-          this.router.currentRoute.value.name == "kinesisfirehose" ||
-          this.router.currentRoute.value.name == "tracesOTLP")
+        (this.router.currentRoute.value.name === "ingestTraces" ||
+          this.router.currentRoute.value.name === "tracesOTLP")
       ) {
         this.getOrganizationPasscode();
       }

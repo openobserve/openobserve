@@ -244,7 +244,7 @@ const useRoutes = () => {
           component: IngestTraces,
           children: [
             {
-              path: "tracesOTLP",
+              path: "opentelemetry",
               name: "tracesOTLP",
               component: OpenTelemetry,
             },
