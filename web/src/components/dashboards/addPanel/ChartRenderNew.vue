@@ -605,7 +605,11 @@ export default defineComponent({
 
         // get the axis data using key
         const getAxisDataFromKey = (key: string) => {
-            let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
+            // when the key is not available in the data that is not show the default value
+            let result: string[] = searchQueryData.data.map((item) => item[key]);
+            // when the key is not available in the data make default value null using below line
+            // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
+
             // check for the histogram _timestamp field
             // If histogram _timestamp field is found, format the date labels
             const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
