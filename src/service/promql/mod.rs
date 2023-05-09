@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 mod aggregations;
 mod engine;
@@ -22,9 +23,10 @@ mod value;
 
 pub use engine::QueryEngine;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsQueryRequest {
     pub query: String,
+    pub is_range_query: bool,
     pub start: i64,
     pub end: i64,
     pub step: i64,

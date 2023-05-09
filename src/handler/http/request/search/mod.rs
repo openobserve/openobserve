@@ -132,7 +132,7 @@ pub async fn search(
     let took_wait = start.elapsed().as_millis() as usize;
 
     // do search
-    match SearchService::search_for_http(&org_id, stream_type, &req).await {
+    match SearchService::search(&org_id, stream_type, &req).await {
         Ok(mut res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
@@ -305,7 +305,7 @@ pub async fn around(
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
-    let resp_forward = match SearchService::search_for_http(&org_id, stream_type, &req).await {
+    let resp_forward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -357,7 +357,7 @@ pub async fn around(
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
-    let resp_backward = match SearchService::search_for_http(&org_id, stream_type, &req).await {
+    let resp_backward = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -549,7 +549,7 @@ pub async fn values(
             ),
         );
     }
-    let resp_search = match SearchService::search_for_http(&org_id, stream_type, &req).await {
+    let resp_search = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();

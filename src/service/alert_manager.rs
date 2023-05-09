@@ -109,12 +109,8 @@ async fn handle_trigger(alert_name: &str, frequency: i64) {
                         encoding: meta::search::RequestEncoding::Empty,
                     };
                     // do search
-                    match SearchService::search_for_http(
-                        &trigger.org,
-                        alert.stream_type.unwrap(),
-                        &req,
-                    )
-                    .await
+                    match SearchService::search(&trigger.org, alert.stream_type.unwrap(), &req)
+                        .await
                     {
                         Ok(res) => {
                             if !res.hits.is_empty() {

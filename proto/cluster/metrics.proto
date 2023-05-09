@@ -14,12 +14,11 @@ service Metrics {
 
 // Search request query
 message MetricsQueryStmt {
-    string             expr = 1;
-    bool        range_query = 2;
-    int32              time = 3; 
-    int64        start_time = 4;
-    int64          end_time = 5;
-    int32              step = 6; 
+    string            query = 1;
+    bool     is_range_query = 2;
+    int64             start = 3;
+    int64               end = 4;
+    int64              step = 5; 
 }
 
 // Search request
@@ -53,5 +52,5 @@ message Label {
 
 message Sample {
     int64   time = 1;
-    float  value = 2;
+    double value = 2;
 }

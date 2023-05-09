@@ -19,12 +19,12 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{info_span, Instrument};
 
-use super::datafusion::storage::file_list::SessionType;
-use super::sql::Sql;
 use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
+use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
 
 /// search in remote object storage

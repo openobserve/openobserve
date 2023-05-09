@@ -43,7 +43,7 @@ impl Search for Searcher {
         let req = req.get_ref();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.as_str();
-        let result = match SearchService::exec::search_for_grpc(req).await {
+        let result = match SearchService::grpc::search(req).await {
             Ok(res) => res,
             Err(err) => {
                 // metrics

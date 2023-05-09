@@ -15,6 +15,7 @@
 use uuid::Uuid;
 
 use crate::meta;
+use crate::service::promql;
 
 pub mod auth;
 pub mod request;
@@ -93,6 +94,32 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
             deleted: req.deleted,
+        }
+    }
+}
+
+impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
+    fn from(req: promql::MetricsQueryRequest) -> Self {
+        let req_query = cluster_rpc::MetricsQueryStmt {
+            query: req.query.to_owned(),
+            is_range_query: req.is_range_query,
+            start: req.start,
+            end: req.end,
+            step: req.step,
+        };
+
+        let job = cluster_rpc::Job {
+            session_id: Uuid::new_v4().to_string(),
+            job: "".to_string(),
+            stage: 0,
+            partition: 0,
+        };
+
+        cluster_rpc::MetricsQueryRequest {
+            job: Some(job),
+            org_id: "".to_string(),
+            stype: cluster_rpc::SearchType::User.into(),
+            query: Some(req_query),
         }
     }
 }

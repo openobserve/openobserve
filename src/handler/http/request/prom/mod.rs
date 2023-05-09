@@ -14,9 +14,8 @@
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
-use std::time::Duration;
 
-use crate::common::time::parse_str_to_timestamp_micros;
+use crate::common::time::{parse_milliseconds, parse_str_to_timestamp_micros};
 use crate::meta;
 use crate::service::metrics;
 use crate::service::promql;
@@ -129,12 +128,13 @@ pub async fn query(
 
     let req = promql::MetricsQueryRequest {
         query: query.query,
+        is_range_query: false,
         start,
         end,
-        step: Duration::from_secs(300).as_micros() as i64,
+        step: 300_000_000,
     };
 
-    let resp = match promql::search::exec_for_http(req).await {
+    let resp = match promql::search::search(&org_id, &req).await {
         Ok(data) => promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -240,8 +240,8 @@ pub async fn query_range(
         }
     };
     let step = match range_query.step {
-        Some(v) => match parse_str_to_timestamp_micros(&v) {
-            Ok(v) => v,
+        Some(v) => match parse_milliseconds(&v) {
+            Ok(v) => (v * 1_000) as i64,
             Err(e) => {
                 log::error!("parse time error: {}", e);
                 return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
@@ -252,17 +252,18 @@ pub async fn query_range(
                 }));
             }
         },
-        None => Duration::from_secs(300).as_micros() as i64,
+        None => 300_000_000,
     };
 
     let req = promql::MetricsQueryRequest {
         query: range_query.query,
+        is_range_query: true,
         start,
         end,
         step,
     };
 
-    let resp = match promql::search::exec_for_http(req).await {
+    let resp = match promql::search::search(&org_id, &req).await {
         Ok(data) => promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {

@@ -14,7 +14,6 @@
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
-use datafusion_common::DataFusionError;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::{cmp::min, time::Duration};
@@ -26,7 +25,6 @@ use uuid::Uuid;
 use crate::common::json;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster::{self, get_internal_grpc_token};
-
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
@@ -35,20 +33,16 @@ use crate::meta::search::Response;
 use crate::meta::StreamType;
 use crate::service::{db, file_list};
 
-mod cache;
 pub mod datafusion;
-pub mod exec;
+pub mod grpc;
 pub mod sql;
-mod storage;
 
-pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
-
-pub async fn search_for_http(
+pub async fn search(
     org_id: &str,
     stream_type: StreamType,
     req: &meta::search::Request,
 ) -> Result<Response, Error> {
-    let root_span = info_span!("srv:search:enter");
+    let root_span = info_span!("service:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
@@ -57,6 +51,7 @@ pub async fn search_for_http(
     search_in_cluster(req).instrument(root_span).await
 }
 
+#[inline(always)]
 async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
     lock.lock(0).await.map_err(server_internal_error)?;
@@ -84,7 +79,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
 }
 
 #[instrument(skip_all)]
-async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
+async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
     match file_list::get_file_list(
         &sql.org_id,
@@ -119,7 +114,7 @@ async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<
     }
 }
 
-#[instrument(name = "srv:search:cluster", skip(req))]
+#[instrument(name = "service:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
     let start = std::time::Instant::now();
 
@@ -132,7 +127,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let took_wait = start.elapsed().as_millis() as usize;
 
     //XXX span1.exit(); // drop span1
-    //XXX let span2 = info_span!("srv:search:cluster:prepare_base").entered();
+    //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -164,7 +159,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     };
 
-    let file_list = partition_by_file_list(&meta, stream_type).await;
+    let file_list = get_file_list(&meta, stream_type).await;
     let file_num = file_list.len();
     let offset = if querier_num >= file_num {
         1
@@ -183,7 +178,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     };
 
     //XXX span3.exit(); // drop span3
-    //XXX let span4 = info_span!("srv:search:cluster:do_search").entered();
+    //XXX let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
     /*     let root_user = ROOT_USER.clone();
@@ -224,7 +219,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             req_file_list_end,
         );
 
-        let grpc_span = info_span!("srv:search:cluster:grpc_search");
+        let grpc_span = info_span!("service:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
         //let credentials_str = C.clone();
@@ -323,7 +318,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span4.exit(); // drop span4
-    //XXX let span6 = info_span!("srv:search:cluster:release_queue_lock").entered();
+    //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -333,43 +328,41 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span6.exit(); // drop span6
-    //XXX let span7 = info_span!("srv:search:cluster:merge_result").entered();
+    //XXX let span7 = info_span!("service:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
     let mut scan_size = 0;
     let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
     let sql = Arc::new(meta);
-    if !results.is_empty() {
-        for resp in results {
-            file_count += resp.file_count;
-            scan_size += resp.scan_size;
-            // handle hits
-            let value = batches.entry("query".to_string()).or_default();
-            if !resp.hits.is_empty() {
-                let buf = Cursor::new(resp.hits);
+    for resp in results {
+        file_count += resp.file_count;
+        scan_size += resp.scan_size;
+        // handle hits
+        let value = batches.entry("query".to_string()).or_default();
+        if !resp.hits.is_empty() {
+            let buf = Cursor::new(resp.hits);
+            let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+            log::info!(
+                "search_in_cluster: query num_batches: {:?}",
+                reader.num_batches()
+            );
+            let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+            value.push(batch);
+        }
+        // handle aggs
+        for agg in resp.aggs {
+            let value = batches.entry(format!("agg_{}", agg.name)).or_default();
+            if !agg.hits.is_empty() {
+                let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
                 log::info!(
-                    "search_in_cluster: query num_batches: {:?}",
+                    "search_in_cluster: agg:{} num_batches: {:?}",
+                    agg.name,
                     reader.num_batches()
                 );
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
                 value.push(batch);
-            }
-            // handle aggs
-            for agg in resp.aggs {
-                let value = batches.entry(format!("agg_{}", agg.name)).or_default();
-                if !agg.hits.is_empty() {
-                    let buf = Cursor::new(agg.hits);
-                    let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                    log::info!(
-                        "search_in_cluster: agg:{} num_batches: {:?}",
-                        agg.name,
-                        reader.num_batches()
-                    );
-                    let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                    value.push(batch);
-                }
             }
         }
 
@@ -404,7 +397,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span7.exit(); // drop span7
-    //XXX let _span8 = info_span!("srv:search:cluster:response").entered();
+    //XXX let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
     let mut result = Response::new(sql.meta.offset, sql.meta.limit);
@@ -532,52 +525,6 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     }
 
     new_sources
-}
-
-pub fn handle_datafusion_error(err: DataFusionError) -> Error {
-    let err = err.to_string();
-    if err.contains("Schema error: No field named") {
-        let pos = err.find("Schema error: No field named").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
-    }
-    if err.contains("parquet not found") {
-        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
-    }
-    if err.contains("Invalid function ") {
-        let pos = err.find("Invalid function ").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
-    }
-    if err.contains("Incompatible data types") {
-        let pos = err.find("for field").unwrap();
-        let pos_start = err[pos..].find(' ').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
-    }
-    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
-}
-
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for ponct in ['\'', '"'] {
-        let pos_start = err[pos..].find(ponct);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(ponct);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
-    }
-    None
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);

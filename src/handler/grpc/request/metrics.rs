@@ -44,7 +44,7 @@ impl Metrics for Querier {
         let req = req.get_ref();
         let org_id = req.org_id.clone();
         let stream_type = meta::StreamType::Metrics.to_string();
-        let result = match SearchService::exec_for_grpc(req).await {
+        let result = match SearchService::grpc::search(req).await {
             Ok(res) => res,
             Err(err) => {
                 // metrics
