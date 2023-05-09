@@ -518,10 +518,10 @@ export default defineComponent({
                     console.log("multiple:- traces", traces);
                     break;
                 }
-                case "metric-text": {
+                case "metric": {
                     const key1 = yAxisKeys[0]
                     const yAxisValue= getAxisDataFromKey(key1)
-                    console.log('metric-text changed',);
+                    console.log('metric changed',);
                     traces= []
                     const trace =  {
                         ...getPropsByChartTypeForTraces(),
@@ -693,7 +693,7 @@ export default defineComponent({
                     return {
                         type: 'bar',
                     };
-                case "metric-text":
+                case "metric":
                     return {
                         type: "indicator",
                         mode: "number",
@@ -909,8 +909,8 @@ export default defineComponent({
                             automargin: true,
                         },
                     };
-                case "metric-text":
-                console.log("inside metric-text");
+                case "metric":
+                console.log("inside metric");
                     return {
                         paper_bgcolor: "white",
                         // width: 600,

@@ -112,12 +112,7 @@
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="
-                      dashboardPanelData.data.fields.x.length >= 1 &&
-                      dashboardPanelData.data.type == 'pie'
-                        ? true
-                        : false
-                    "
+                    :disabled="isAddXAxisNotAllowed"
                     @click="addXAxisItem(props.row)"
                   >
                     <div>
@@ -130,12 +125,7 @@
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="
-                      dashboardPanelData.data.fields.y.length >= 1 &&
-                      dashboardPanelData.data.type == 'pie'
-                        ? true
-                        : false
-                    "
+                    :disabled="isAddYAxisNotAllowed"
                     @click="addYAxisItem(props.row)"
                   >
                     <div>
@@ -179,7 +169,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, watch, onActivated } from "vue";
+import { defineComponent, reactive, ref, watch, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -203,7 +193,7 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed } =
       useDashboardPanelData();
 
     onActivated(() => {
@@ -348,6 +338,8 @@ export default defineComponent({
       dashboardPanelData,
       filterStreamFn,
       filteredStreams,
+      isAddXAxisNotAllowed,
+      isAddYAxisNotAllowed
     };
   },
 });

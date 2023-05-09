@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import StreamService from '@/services/stream';
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -93,15 +93,43 @@ const useDashboardPanelData = () => {
     return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
 
+  const isAddXAxisNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case 'pie':
+      case 'donut':
+        return dashboardPanelData.data.fields.x.length >= 1
+      case 'metric':
+        return dashboardPanelData.data.fields.x.length >= 0
+      case 'table':
+        return false
+      default:
+        return dashboardPanelData.data.fields.x.length >= 2;
+    }
+  })
+
+  const isAddYAxisNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case 'pie':
+      case 'donut':
+        return dashboardPanelData.data.fields.y.length >= 1
+      case 'metric':
+        return dashboardPanelData.data.fields.y.length >= 1
+      case 'stacked':
+      case 'h-stacked':
+        return dashboardPanelData.data.fields.y.length >= 1
+      default:
+        return false;
+    }
+  })
+
   const addXAxisItem = (row: any) => {
     if(!dashboardPanelData.data.fields.x) {
       dashboardPanelData.data.fields.x = []
     }
 
-    // TODO: condition for all chart type
-    // if(dashboardPanelData.data.fields.x.length >= 1){
-    //   return;
-    // } 
+    if(isAddXAxisNotAllowed.value){
+      return;
+    }
 
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == row.name)) {
@@ -118,6 +146,10 @@ const useDashboardPanelData = () => {
   const addYAxisItem = (row: any) => {
     if(!dashboardPanelData.data.fields.y) {
       dashboardPanelData.data.fields.y = []
+    }
+
+    if(isAddYAxisNotAllowed.value){
+      return;
     }
 
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == row.name)) {
@@ -228,7 +260,9 @@ const useDashboardPanelData = () => {
     removeYAxisItem,
     removeFilterItem,
     addFilteredItem,
-    removeXYFilters
+    removeXYFilters,
+    isAddXAxisNotAllowed,
+    isAddYAxisNotAllowed
   };
 };
 

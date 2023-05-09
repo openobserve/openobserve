@@ -88,7 +88,7 @@
           class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.fields.x.length < 1"
         >
-          Please add a field from the list
+          {{ xAxisHint }}
         </div>
       </div>
      
@@ -162,7 +162,7 @@
           class="text-caption text-weight-bold text-center q-mt-xs"
           v-if="dashboardPanelData.data.fields.y.length < 1"
         >
-          Please add a field from the list
+          {{ yAxisHint }}
         </div>
       </div>
     </div>
@@ -338,7 +338,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch } from "vue";
+import { defineComponent, ref, reactive, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -440,6 +440,39 @@ export default defineComponent({
 
     const handler2 = () => {}
 
+    const xAxisHint = computed((e: any) => {
+      switch (dashboardPanelData.data.type) {
+        case 'pie':
+        case 'donut':
+          return "Add 1 label field here"
+        case 'metric':
+          return "X-Axis field is not allowed"
+        case 'table':
+          return "Add one or more fields here"
+        case 'stacked':
+        case 'h-stacked':
+          return "Add 2 fields here"
+        default:
+          return "Add maximum 2 fields here";
+      }
+    })
+
+    const yAxisHint = computed((e: any) => {
+      switch (dashboardPanelData.data.type) {
+
+        case 'pie':
+        case 'donut':
+          return "Add 1 values field here"
+        case 'metric':
+          return "Add 1 values field here"
+        case 'stacked':
+        case 'h-stacked':
+          return "Add 1 field here"
+        default:
+          return "Add one or more fields here";
+      }
+    })
+
     return {
       showXAxis,
       t,
@@ -465,7 +498,9 @@ export default defineComponent({
       handler2,
       currentDragArea,
       expansionItems,
-      triggerOperatorsWithHistogram
+      triggerOperatorsWithHistogram,
+      xAxisHint,
+      yAxisHint
     };
   },
 });

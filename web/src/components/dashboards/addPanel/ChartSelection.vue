@@ -111,7 +111,7 @@ export default defineComponent({
         image:
           "img:" + getImageURL("images/dashboard/charts/123.png"),
         title: "Metric Text",
-        id: "metric-text",
+        id: "metric",
       },
     ]);
 

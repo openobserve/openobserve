@@ -245,14 +245,14 @@ export default defineComponent({
       const error = []
       const dashboardData = dashboardPanelData
 
-      // check for metric-text chart type
-      //metric-text chart don't have a x axis value
-      if(dashboardData.data.type == "metric-text" && dashboardData.data.fields.x.length){
+      // check for metric chart type
+      //metric chart don't have a x axis value
+      if(dashboardData.data.type == "metric" && dashboardData.data.fields.x.length){
         error.push(`Metric text chart not have ${currentXLabel.value}`)
       }
 
       // check for at least 1 x axis
-      if(dashboardData.data.type != "metric-text" && !dashboardData.data.fields.x.length){
+      if(dashboardData.data.type != "metric" && !dashboardData.data.fields.x.length){
         error.push(`Please add at least one field in ${currentXLabel.value}`)
       }
 
@@ -262,8 +262,8 @@ export default defineComponent({
       }
 
       // for pie, make sure only 1 y axis is there
-      if(["pie", "metric-text", "donut"].includes(dashboardData.data.type) && dashboardData.data.fields.y.length > 1 ){
-        error.push("You can add only one field in the Y-Axis for pie or metric-text or donut charts")
+      if(["pie", "metric", "donut"].includes(dashboardData.data.type) && dashboardData.data.fields.y.length > 1 ){
+        error.push("You can add only one field in the Y-Axis for pie or metric or donut charts")
       }
 
       // check if aggregation function is selected or not
