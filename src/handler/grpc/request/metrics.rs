@@ -29,7 +29,7 @@ pub struct Querier {}
 
 #[tonic::async_trait]
 impl Metrics for Querier {
-    #[tracing::instrument(name = "grpc:metrics:enter", skip(self, req))]
+    #[tracing::instrument(name = "grpc:metrics:enter", skip_all)]
     async fn query(
         &self,
         req: Request<MetricsQueryRequest>,

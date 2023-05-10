@@ -255,13 +255,13 @@ pub fn handle_datafusion_error(err: DataFusionError) -> Error {
 }
 
 fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for ponct in ['\'', '"'] {
-        let pos_start = err[pos..].find(ponct);
+    for punctuation in ['\'', '"'] {
+        let pos_start = err[pos..].find(punctuation);
         if pos_start.is_none() {
             continue;
         }
         let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(ponct);
+        let pos_end = err[pos + pos_start + 1..].find(punctuation);
         if pos_end.is_none() {
             continue;
         }

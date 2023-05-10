@@ -6714,7 +6714,6 @@ dependencies = [
  "hex",
  "http-auth-basic",
  "indexmap",
- "itertools",
  "lazy_static",
  "log",
  "lru",

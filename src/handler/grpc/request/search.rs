@@ -28,7 +28,7 @@ pub struct Searcher {}
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:enter", skip(self, req))]
+    #[tracing::instrument(name = "grpc:search:enter", skip_all)]
     async fn search(
         &self,
         req: Request<SearchRequest>,

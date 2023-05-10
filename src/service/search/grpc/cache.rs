@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::datasource::file_format::file_type::FileType;
 use ahash::AHashMap as HashMap;
+use datafusion::datasource::file_format::file_type::FileType;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

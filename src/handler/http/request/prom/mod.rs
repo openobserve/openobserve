@@ -107,6 +107,7 @@ pub async fn query(
 ) -> Result<HttpResponse, Error> {
     let query = query.into_inner();
     let start = match query.time {
+        None => chrono::Utc::now().timestamp_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
             Err(e) => {
@@ -119,7 +120,6 @@ pub async fn query(
                 }));
             }
         },
-        None => chrono::Utc::now().timestamp_micros(),
     };
     let end = start;
 
@@ -240,6 +240,7 @@ pub async fn query_range(
         }
     };
     let step = match range_query.step {
+        None => 300_000_000,
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
@@ -252,7 +253,6 @@ pub async fn query_range(
                 }));
             }
         },
-        None => 300_000_000,
     };
 
     let req = promql::MetricsQueryRequest {
