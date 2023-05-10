@@ -17,7 +17,13 @@
   <div>
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
-      :</div>
+      <q-icon name="info_outline" class="q-ml-xs" >
+        <q-tooltip>
+          {{ xAxisHint }}
+        </q-tooltip>
+      </q-icon>
+      </div>
+      <span class="layout-separator">:</span>
       <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'x'
@@ -87,7 +93,13 @@
     <q-separator />
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.otherColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.xAxis') : t('panel.yAxis') }}
-      :</div>
+        <q-icon name="info_outline" class="q-ml-xs" >
+        <q-tooltip>
+          {{ yAxisHint }}
+        </q-tooltip>
+      </q-icon>
+      </div>
+      <span class="layout-separator">:</span>
       <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'y'
@@ -505,10 +517,15 @@ export default defineComponent({
   white-space: nowrap;
   overflow-x: auto;
 }
-
+.layout-separator {
+  display: flex; 
+  align-items:center;
+  margin-left: 2px;
+  margin-right: 2px;
+}
 .layout-name {
   white-space: nowrap; 
-  min-width: 120px;
+  min-width: 130px;
   display: flex; 
   align-items:center;
 }
