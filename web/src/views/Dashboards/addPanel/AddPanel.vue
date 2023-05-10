@@ -65,6 +65,8 @@
                   <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
                 <q-separator />
+                <ErrorComponent :errorArray="error"/>
+                <q-separator />
                 <SearchBar />
               </div>
             </div>
@@ -83,7 +85,8 @@ import {
   toRaw,
   onActivated,
   nextTick,
-  watch
+  watch,
+  reactive
 } from "vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
@@ -103,6 +106,8 @@ import SearchBar from "../../../components/dashboards/SearchBar.vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
+import ErrorComponent from "../../../components/dashboards/addPanel/error.vue"
+
 
 export default defineComponent({
   name: "AddPanel",
@@ -113,6 +118,7 @@ export default defineComponent({
     SearchBar,
     DateTimePicker,
     ChartRender,
+    ErrorComponent
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
@@ -127,6 +133,7 @@ export default defineComponent({
       useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref()
+    const error : any= reactive([])
 
     onActivated(async () => {
       // todo check for the edit more
@@ -196,7 +203,7 @@ export default defineComponent({
 
     //validate the data
     const isValid = (onlyChart = false) => {
-      const error = []
+      error.splice(0)
       const dashboardData = dashboardPanelData
 
       switch (dashboardPanelData.data.type) {
@@ -353,6 +360,8 @@ export default defineComponent({
         return true
       }
 
+      
+
     }
 
     const savePanelChangesToDashboard = async (dashId: string) => {
@@ -401,7 +410,8 @@ export default defineComponent({
       dashboardPanelData,
       chartData,
       editMode,
-      selectedDate
+      selectedDate,
+      error
     };
   },
   methods: {
