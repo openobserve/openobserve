@@ -365,7 +365,6 @@ export default defineComponent({
           value: "other",
         });
       }
-      formData.value.organization = store.state.selectedOrganization.identifier;
     };
 
     return {

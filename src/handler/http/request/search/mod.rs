@@ -19,8 +19,6 @@ use std::collections::HashMap;
 use std::io::Error;
 use std::time::Instant;
 
-use crate::common::base64;
-use crate::common::functions;
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
 use crate::infra::config::{CONFIG, SEARCH_LOCKER};
@@ -117,9 +115,15 @@ pub async fn search(
         return Ok(bad_request(e));
     }
 
-    req.query.query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
+    req.query.query_fn = match req.query.query_fn.clone() {
+        Some(v) => match crate::common::base64::decode(&v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
 
-    for fn_name in functions::get_all_transform_keys(&org_id).await {
+    for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
         if req.query.sql.contains(&fn_name) {
             req.query.uses_zo_fn = true;
             break;
@@ -250,28 +254,36 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(bad_request("around key is empty")),
     };
-    let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+    let query_fn = match query.get("query_fn") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
 
     let default_sql = format!(
         "SELECT * FROM \"{}\" ORDER BY {} DESC",
         stream_name, CONFIG.common.time_stamp_col
     );
     let around_sql = match query.get("sql") {
-        None => default_sql,
-        Some(v) => match base64::decode(v) {
-            Err(_) => default_sql,
+        Some(v) => match crate::common::base64::decode(v) {
             Ok(v) => {
-                uses_fn = functions::get_all_transform_keys(&org_id)
-                    .await
-                    .iter()
-                    .any(|fn_name| v.contains(fn_name));
+                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
+                    if v.contains(&fn_name) {
+                        uses_fn = true;
+                        break;
+                    }
+                }
                 if uses_fn {
                     v
                 } else {
                     default_sql
                 }
             }
+            Err(_) => default_sql,
         },
+        None => default_sql,
     };
 
     let around_size = query
@@ -478,21 +490,34 @@ pub async fn values(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(bad_request("fields is empty")),
     };
-    let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+
+    let query_fn = match query.get("query_fn") {
+        Some(v) => match crate::common::base64::decode(v) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        },
+        None => None,
+    };
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\"");
     let query_context = match query.get("sql") {
-        None => None,
-        Some(v) => match base64::decode(v) {
-            Err(_) => None,
+        Some(v) => match crate::common::base64::decode(v) {
             Ok(v) => {
-                uses_fn = functions::get_all_transform_keys(&org_id)
-                    .await
-                    .iter()
-                    .any(|fn_name| v.contains(fn_name));
-                uses_fn.then_some(v)
+                for fn_name in crate::common::functions::get_all_transform_keys(&org_id).await {
+                    if v.contains(&fn_name) {
+                        uses_fn = true;
+                        break;
+                    }
+                }
+                if uses_fn {
+                    Some(v)
+                } else {
+                    None
+                }
             }
+            Err(_) => None,
         },
+        None => None,
     };
 
     let size = query

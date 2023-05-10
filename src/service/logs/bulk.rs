@@ -77,6 +77,7 @@ pub async fn ingest(
     let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
     #[cfg(feature = "zo_functions")]
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
+    let mut stream_file_map: AHashMap<String, String> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_data_map = AHashMap::new();
     #[cfg(feature = "zo_functions")]
@@ -165,6 +166,8 @@ pub async fn ingest(
                 .or_insert(BulkStreamData {
                     data: AHashMap::new(),
                 });
+
+            stream_file_map.entry(stream_name.clone()).or_default();
         } else {
             next_line_is_data = false;
 

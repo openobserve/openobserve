@@ -13,13 +13,14 @@
 // limitations under the License.
 
 use dashmap::DashMap;
+use http_auth_basic::Credentials;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::CONFIG;
+use crate::infra::cluster;
+use crate::infra::config::{CONFIG, ROOT_USER};
 use crate::meta::common::FileKey;
 
 lazy_static! {
@@ -60,11 +61,10 @@ async fn send_to_node(
         if cluster::ge_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
-        /*         let root_user = ROOT_USER.clone();
-        let user = root_user.get("root").unwrap();
+        let user = ROOT_USER.get("root").unwrap();
         let credentials = Credentials::new(&user.email, &user.password);
-        let credentials = credentials.as_http_header();*/
-        let token: MetadataValue<_> = get_internal_grpc_token().parse()?;
+        let credentials = credentials.as_http_header();
+        let token: MetadataValue<_> = credentials.parse()?;
         let channel = Channel::from_shared(node.grpc_addr)
             .unwrap()
             .connect()

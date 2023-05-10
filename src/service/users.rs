@@ -37,7 +37,7 @@ use crate::{
 use crate::{infra::config::USERS, meta::user::UpdateUser};
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
-    let existing_user = if is_root_user(&usr_req.email) {
+    let existing_user = if is_root_user(&usr_req.email).await {
         db::user::get(None, &usr_req.email).await
     } else {
         db::user::get(Some(org_id), &usr_req.email).await
@@ -70,7 +70,7 @@ pub async fn update_user(
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
 
-    let existing_user = if is_root_user(email) {
+    let existing_user = if is_root_user(email).await {
         db::user::get(None, email).await
     } else {
         db::user::get(Some(org_id), email).await
@@ -84,7 +84,7 @@ pub async fn update_user(
         match existing_user.unwrap() {
             Some(local_user) => {
                 if !self_update {
-                    if is_root_user(initiator_id) {
+                    if is_root_user(initiator_id).await {
                         allow_password_update = true
                     } else {
                         let initiating_user = db::user::get(Some(org_id), initiator_id)
@@ -144,6 +144,7 @@ pub async fn update_user(
                 }
                 if is_updated || is_org_updated {
                     let user = db::user::get_db_user(email).await;
+                    let token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
                     match user {
                         Ok(mut db_user) => {
                             db_user.password = new_user.password;
@@ -154,14 +155,14 @@ pub async fn update_user(
                                 let new_orgs = if orgs.is_empty() {
                                     vec![UserOrg {
                                         name: org_id.to_string(),
-                                        token: new_user.token,
+                                        token,
                                         role: new_user.role,
                                     }]
                                 } else {
                                     orgs.retain(|org| !org.name.eq(org_id));
                                     orgs.push(UserOrg {
                                         name: org_id.to_string(),
-                                        token: new_user.token,
+                                        token,
                                         role: new_user.role,
                                     });
                                     orgs
@@ -210,13 +211,12 @@ pub async fn add_user_to_org(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_db_user(email).await;
-    let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
         let mut db_user = existing_user.unwrap();
         let local_org;
-        let initiating_user = if is_root_user(initiator_id) {
+        let initiating_user = if is_root_user(initiator_id).await {
             local_org = org_id.replace(' ', "_");
-            root_user.get("root").unwrap().clone()
+            ROOT_USER.get("root").unwrap().value().clone()
         } else {
             local_org = org_id.to_owned();
             db::user::get(Some(org_id), initiator_id)

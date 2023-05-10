@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-import Curl from "@/components/ingestion/logs/Curl.vue";
+import Curl from "@/components/ingestion/Curl.vue";
 
 installQuasar();
 const store = createStore({

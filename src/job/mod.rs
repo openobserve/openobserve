@@ -52,7 +52,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
-    //set instance id
+
     let instance_id = match db::get_instance().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

@@ -12,84 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
-use strum::Display;
-
-use crate::service::metrics::prom::prometheus as proto;
-
-pub const NAME_LABEL: &str = "__name__";
-pub const TYPE_LABEL: &str = "__type__";
-pub const HASH_LABEL: &str = "__hash__";
-pub const VALUE_LABEL: &str = "value";
-pub const LE_LABEL: &str = "le";
-pub const QUANTILE_LABEL: &str = "quantile";
-pub const CLUSTER_LABEL: &str = "cluster";
-pub const REPLICA_LABEL: &str = "__replica__";
-pub const METADATA_LABEL: &str = "prom_metadata";
-
-// See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
-pub type FxIndexMap<K, V> =
-    indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Metric {
-    #[serde(flatten)]
-    pub labels: FxIndexMap<String, String>,
+    pub name: String,
     pub value: f64,
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub collection: AHashMap<String, String>,
+    pub metric_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClusterLeader {
     pub name: String,
     pub last_received: i64,
 }
 
-// cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
-#[strum(serialize_all = "lowercase")]
-pub enum MetricType {
-    Unknown,
-    Counter,
-    Gauge,
-    Histogram,
-    GaugeHistogram,
-    Summary,
-    Info,
-    StateSet,
-}
-
-impl From<proto::metric_metadata::MetricType> for MetricType {
-    fn from(mt: proto::metric_metadata::MetricType) -> Self {
-        use proto::metric_metadata::MetricType as ProtoMetricType;
-
-        match mt {
-            ProtoMetricType::Unknown => Self::Unknown,
-            ProtoMetricType::Counter => Self::Counter,
-            ProtoMetricType::Gauge => Self::Gauge,
-            ProtoMetricType::Histogram => Self::Histogram,
-            ProtoMetricType::Gaugehistogram => Self::GaugeHistogram,
-            ProtoMetricType::Summary => Self::Summary,
-            ProtoMetricType::Info => Self::Info,
-            ProtoMetricType::Stateset => Self::StateSet,
+impl Metric {
+    pub fn new(
+        name: String,
+        value: f64,
+        collection: AHashMap<String, String>,
+        _timestamp: i64,
+        metric_type: String,
+    ) -> Self {
+        Metric {
+            name,
+            value,
+            collection,
+            metric_type,
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metadata {
-    pub metric_type: MetricType,
-    pub metric_family_name: String,
-    pub help: String,
-    pub unit: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Status {
-    Success,
-    Error,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,36 +67,8 @@ pub struct RequestRangeQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestMetadata {
-    /// Maximum number of metrics to return.
-    pub limit: Option<usize>,
-    /// A metric name to filter metadata for. All metric metadata is retrieved
-    /// if left empty.
+    pub limit: i64,
     pub metric: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ResponseMetadata {
-    pub status: Status,
-    /// key - metric name
-    pub data: HashMap<String, Vec<MetadataObject>>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct MetadataObject {
-    #[serde(rename = "type")]
-    typ: String, // counter, gauge, histogram, summary
-    help: String,
-    unit: String,
-}
-
-impl From<Metadata> for MetadataObject {
-    fn from(md: Metadata) -> Self {
-        Self {
-            typ: md.metric_type.to_string(),
-            help: md.help,
-            unit: md.unit,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -167,19 +96,24 @@ pub struct RequestValues {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
+    use crate::common::json;
 
     #[test]
-    fn test_metric_type_display() {
-        assert_eq!(MetricType::Counter.to_string(), "counter");
-        assert_eq!(MetricType::Gauge.to_string(), "gauge");
-        assert_eq!(MetricType::Histogram.to_string(), "histogram");
-        assert_eq!(MetricType::GaugeHistogram.to_string(), "gaugehistogram");
-        assert_eq!(MetricType::Summary.to_string(), "summary");
-        assert_eq!(MetricType::Info.to_string(), "info");
-        assert_eq!(MetricType::StateSet.to_string(), "stateset");
-        assert_eq!(format!("{}", MetricType::Unknown), "unknown");
-        assert_eq!(MetricType::Unknown.to_string(), "unknown");
+    fn test_response() {
+        let name = "container_sockets";
+        let metric = Metric::new(
+            name.to_string(),
+            4.0,
+            AHashMap::new(),
+            1667978900217,
+            "Gauge".to_string(),
+        );
+
+        let str_met = json::to_string(&metric).unwrap();
+        let loc_met: Metric = json::from_str(str_met.as_str()).unwrap();
+
+        assert_eq!(loc_met.name, name);
     }
 }

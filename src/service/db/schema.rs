@@ -27,7 +27,6 @@ fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }
 
-// XXX-TODO: `get` never fails. Return `Schema` instead of `Result<Schema, _>`.
 pub async fn get(
     org_id: &str,
     stream_name: &str,
@@ -36,8 +35,15 @@ pub async fn get(
     let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
-    if let Some(schema) = STREAM_SCHEMAS.get(map_key) {
-        return Ok(schema.value().clone().last().unwrap().clone());
+    if STREAM_SCHEMAS.contains_key(map_key) {
+        return Ok(STREAM_SCHEMAS
+            .get(map_key)
+            .unwrap()
+            .value()
+            .clone()
+            .last()
+            .unwrap()
+            .clone());
     }
 
     let db = &crate::infra::db::DEFAULT;

@@ -194,11 +194,6 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    // This method is used in parent component using ref
-    const setEditorValue = (value: String) => {
-      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(value);
-    };
-
     const jsonToCsv = (jsonData) => {
       const replacer = (key, value) => (value === null ? "" : value);
       const header = Object.keys(jsonData[0]);
@@ -242,7 +237,6 @@ export default defineComponent({
       updateDateTime,
       udpateQuery,
       downloadLogs,
-      setEditorValue,
     };
   },
   computed: {

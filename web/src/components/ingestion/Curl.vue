@@ -14,46 +14,38 @@
 -->
 
 <template>
-  <div class="tabContent q-ma-md">
+  <div class="tabContent">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Telegraf</div>
+      <div class="title" data-test="curl-title-text">CURL</div>
       <div class="copy_action">
         <q-btn
-          data-test="traces-copy-btn"
+          data-test="curl-copy-btn"
           flat
           round
           size="0.5rem"
           padding="0.6rem"
           :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', copyTracesContent)"
+          @click="$emit('copy-to-clipboard-fn', content)"
         />
       </div>
     </div>
-    <pre ref="copyTracesContent" data-test="traces-content-text">
-[[outputs.http]]
-  ## URL is the address to send metrics to
-  url = {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/write
-  ## Data format to output.
-  data_format = "prometheusremotewrite"
-
-  [outputs.http.headers]
-     Content-Type = "application/x-protobuf"
-     Content-Encoding = "snappy"
-     X-Prometheus-Remote-Write-Version = "0.1.0"
-     Authorization = Basic {{ accessKey }}
+    <pre ref="content" data-test="curl-content-text">
+curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
+        endpoint.url
+      }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
     </pre>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../../aws-exports";
+import { defineComponent, ref } from "vue";
+import type { Ref } from "vue";
+import config from "../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL, b64EncodeUnicode } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
-import { computed } from "vue";
+import { getImageURL } from "../../utils/zincutils";
+import type { Endpoint } from "@/ts/interfaces/";
 export default defineComponent({
-  name: "traces-otlp",
+  name: "curl-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -62,7 +54,7 @@ export default defineComponent({
       type: String,
     },
   },
-  setup(props) {
+  setup() {
     const store = useStore();
     const endpoint: Ref<Endpoint> = ref({
       url: "",
@@ -79,18 +71,12 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const accessKey = computed(() => {
-      return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationPasscode}`
-      );
-    });
-    const copyTracesContent = ref(null);
+    const content = ref(null);
     return {
       store,
       config,
       endpoint,
-      copyTracesContent,
-      accessKey,
+      content,
       getImageURL,
     };
   },

@@ -68,6 +68,7 @@ with open('report.json') as f:
 
 totals = report['data'][0]['totals']
 
+ret = None
 for k, threshold in thresholds.items():
     actual = totals[k]['percent']
     k = k.capitalize()
@@ -78,6 +79,9 @@ for k, threshold in thresholds.items():
             f'❌ {k} coverage is below threshold: {actual:.2f}% < {threshold}%',
             file=sys.stderr,
         )
+        ret = 1
+
+sys.exit(ret)
 EOF
 )
 }

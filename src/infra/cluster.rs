@@ -21,7 +21,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::config::{CONFIG, INSTANCE_ID};
+use super::config::CONFIG;
 use super::db::ETCD_CLIENT;
 use super::errors::{Error, Result};
 use crate::common::json;
@@ -313,15 +313,6 @@ pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
         node.status == NodeStatus::Online && (is_querier(&node.role) || is_ingester(&node.role))
     })
-}
-
-#[inline]
-pub fn get_internal_grpc_token() -> String {
-    if CONFIG.grpc.internal_grpc_token.is_empty() {
-        INSTANCE_ID.get("instance_id").unwrap().to_string()
-    } else {
-        CONFIG.grpc.internal_grpc_token.clone()
-    }
 }
 
 /// List nodes from cluster or local cache

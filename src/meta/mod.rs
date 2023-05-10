@@ -32,12 +32,15 @@ pub mod traces;
 pub mod user;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
 pub enum StreamType {
     #[default]
+    #[serde(rename = "logs")]
     Logs,
+    #[serde(rename = "metrics")]
     Metrics,
+    #[serde(rename = "traces")]
     Traces,
+    #[serde(rename = "metadata")]
     Metadata,
     #[serde(rename = "file_list")]
     Filelist,

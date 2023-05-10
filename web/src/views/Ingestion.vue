@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="head q-table__title q-pb-md q-px-md">
+    <div class="head q-table__title q-pb-md">
       {{ t("ingestion.header") }}
 
       <q-btn
@@ -44,7 +44,7 @@
     >
       <template v-slot:before>
         <q-tabs
-          v-model="ingestTabType"
+          v-model="ingestiontabs"
           indicator-color="transparent"
           class="text-secondary"
           inline-label
@@ -52,37 +52,66 @@
         >
           <q-route-tab
             default
-            name="ingestLogs"
+            name="curl"
             :to="{
-              name: 'ingestLogs',
+              name: 'curl',
               query: {
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
-            label="Logs"
+            icon="data_object"
+            label="Curl"
             content-class="tab_content"
           />
           <q-route-tab
             default
-            name="ingestMetrics"
+            name="fluentbit"
             :to="{
-              name: 'ingestMetrics',
+              name: 'fluentbit',
               query: {
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
-            label="Metrics"
+            :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+            label="FluentBit"
             content-class="tab_content"
           />
           <q-route-tab
-            name="ingestTraces"
+            name="fluentd"
             :to="{
-              name: 'ingestTraces',
+              name: 'fluentd',
               query: {
                 org_identifier: store.state.selectedOrganization.identifier,
               },
             }"
-            label="Traces"
+            :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
+            label="Fluentd"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="vector"
+            :to="{
+              name: 'vector',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :icon="'img:' + getImageURL('images/ingestion/vector_icon.png')"
+            label="Vector"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="kinesisfirehose"
+            :to="{
+              name: 'kinesisfirehose',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :icon="
+              'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')
+            "
+            label="Kinesis Firehose"
             content-class="tab_content"
           />
         </q-tabs>
@@ -90,25 +119,25 @@
 
       <template v-slot:after>
         <q-tab-panels
-          v-model="ingestTabType"
+          v-model="ingestiontabs"
           animated
           swipeable
           vertical
           transition-prev="jump-up"
           transition-next="jump-up"
         >
-          <q-tab-panel name="ingestLogs">
+          <q-tab-panel name="curl">
             <router-view
-              title="Logs"
+              title="CURL"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
             >
             </router-view>
           </q-tab-panel>
-          <q-tab-panel name="ingestMetrics">
+          <q-tab-panel name="fluentbit">
             <router-view
-              title="Metrics"
+              title="Fluent Bit"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -116,9 +145,29 @@
             </router-view>
           </q-tab-panel>
 
-          <q-tab-panel name="ingestTraces">
+          <q-tab-panel name="fluentd">
             <router-view
-              title="Traces"
+              title="Fluentd"
+              :currOrgIdentifier="currentOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+              @copy-to-clipboard-fn="copyToClipboardFn"
+            >
+            </router-view>
+          </q-tab-panel>
+
+          <q-tab-panel name="vector">
+            <router-view
+              title="Vector"
+              :currOrgIdentifier="currentOrgIdentifier"
+              :currUserEmail="currentUserEmail"
+              @copy-to-clipboard-fn="copyToClipboardFn"
+            >
+            </router-view>
+          </q-tab-panel>
+
+          <q-tab-panel name="kinesisfirehose">
+            <router-view
+              title="Kinesis Firehose"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -150,7 +199,7 @@ export default defineComponent({
   components: { ConfirmDialog },
   data() {
     return {
-      ingestTabType: "ingestLogs",
+      ingestiontabs: "curl",
     };
   },
   setup() {
@@ -167,7 +216,7 @@ export default defineComponent({
     onMounted(() => {
       if (router.currentRoute.value.name == "ingestion") {
         router.push({
-          name: "ingestLogs",
+          name: "curl",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -294,9 +343,7 @@ export default defineComponent({
           this.router.currentRoute.value.name == "fluentbit" ||
           this.router.currentRoute.value.name == "fluentd" ||
           this.router.currentRoute.value.name == "vector" ||
-          this.router.currentRoute.value.name == "curl" ||
-          this.router.currentRoute.value.name == "kinesisfirehose" ||
-          this.router.currentRoute.value.name == "tracesOTLP")
+          this.router.currentRoute.value.name == "curl")
       ) {
         this.getOrganizationPasscode();
       }
@@ -307,16 +354,16 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .ingestionPage {
-  padding: 1.5rem 0 0;
+  padding: 1.5rem 1.5rem 0;
   .head {
     padding-bottom: 1rem;
   }
   .q-tabs {
     &--vertical {
-      margin: 1.5rem 1rem 0 1rem;
+      margin: 1.5rem 1rem 0 0;
       .q-tab {
         justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
+        padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
         color: $dark;
