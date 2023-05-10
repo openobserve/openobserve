@@ -356,11 +356,13 @@ export default defineComponent({
       //   });
       // }
 
-      $q.notify({
-        type: "negative",
-        message: 'There are some errors, please fix them and try again',
-        timeout: 5000,
-      });
+      if(errors.length){
+        $q.notify({
+          type: "negative",
+          message: 'There are some errors, please fix them and try again',
+          timeout: 5000,
+        })
+      }
 
       if (errors.length) {
         return false
