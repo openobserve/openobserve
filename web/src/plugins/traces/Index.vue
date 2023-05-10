@@ -618,18 +618,12 @@ export default defineComponent({
 
           whereClause = parsedSQL.join(" ");
 
-          // If duration is not present in query adding duration>10
-          if (!whereClause.includes("duration")) "duration>10 " + whereClause;
-
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
             " WHERE " + whereClause
           );
         } else {
-          req.query.sql = req.query.sql.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE duration>10 "
-          );
+          req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
         }
 
         req.query.sql = req.query.sql.replace(
@@ -1039,6 +1033,7 @@ export default defineComponent({
 
     onMounted(() => {
       if (searchObj.loading == false) {
+        searchBarRef?.value?.setEditorValue("duration>10");
         loadPageData();
       }
     });
