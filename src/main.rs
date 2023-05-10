@@ -40,7 +40,7 @@ use zincobserve::handler::grpc::request::{
 use zincobserve::handler::http::router::{
     get_basic_routes, get_other_service_routes, get_service_routes,
 };
-use zincobserve::handler::tcp_udp_uds::{tcp_server, udp_server};
+use zincobserve::handler::tcp_udp::{tcp_server, udp_server};
 use zincobserve::infra::cluster;
 use zincobserve::infra::config::{self, CONFIG};
 use zincobserve::infra::file_lock;
