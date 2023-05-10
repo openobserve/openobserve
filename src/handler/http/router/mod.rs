@@ -146,7 +146,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(prom::metadata)
             .service(prom::series)
             .service(prom::labels)
-            .service(prom::values)
+            .service(prom::label_values)
             .service(create_dashboard)
             .service(update_dashboard)
             .service(list_dashboards)
