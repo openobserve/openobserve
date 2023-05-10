@@ -37,8 +37,9 @@ struct MetricWithBuckets {
 pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Result<Value> {
     let in_vec = match data {
         Value::Vector(v) => v,
+        Value::None => return Ok(Value::None),
         _ => {
-            return Err(DataFusionError::Internal(
+            return Err(DataFusionError::Plan(
                 "histogram_quantile: vector argument expected".to_owned(),
             ))
         }
@@ -73,8 +74,8 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         let entry = metrics_with_buckets.entry(sig).or_insert_with(|| {
             labels.retain(|l| {
                 l.name != value::FIELD_HASH
-                    || l.name != value::FIELD_NAME
-                    || l.name != value::FIELD_BUCKET
+                    && l.name != value::FIELD_NAME
+                    && l.name != value::FIELD_BUCKET
             });
             MetricWithBuckets {
                 labels,

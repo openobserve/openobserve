@@ -107,7 +107,7 @@ pub(crate) fn eval_idelta(
         Value::Matrix(v) => v,
         Value::None => return Ok(Value::None),
         _ => {
-            return Err(DataFusionError::Internal(format!(
+            return Err(DataFusionError::Plan(format!(
                 "{fn_name}: matrix argument expected"
             )))
         }
@@ -116,9 +116,11 @@ pub(crate) fn eval_idelta(
     let rate_values = data
         .iter()
         .map(|metric| {
+            let mut labels = metric.labels.clone();
+            labels.retain(|l| l.name != super::value::FIELD_NAME);
             let value = fn_handler(metric);
             InstantValue {
-                labels: metric.labels.clone(),
+                labels,
                 value: Sample {
                     timestamp: metric.time_range.unwrap().1,
                     value,

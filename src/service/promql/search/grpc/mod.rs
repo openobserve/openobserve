@@ -129,16 +129,12 @@ pub async fn search(
         }
     }
 
-    let mut result_type = if is_range_query {
-        "matrix".to_string()
-    } else {
-        "vector".to_string()
-    };
+    let mut result_type = if is_range_query { "matrix" } else { "vector" };
 
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
-        result_type: result_type.clone(),
+        result_type: result_type.to_string(),
         ..Default::default()
     };
 
@@ -147,6 +143,7 @@ pub async fn search(
     }
 
     for result in results.iter() {
+        result_type = result.get_type();
         match result {
             value::Value::None => {
                 continue;
@@ -178,7 +175,6 @@ pub async fn search(
                 });
             }
             value::Value::Matrix(v) => {
-                result_type = "matrix".to_string();
                 v.iter().for_each(|v| {
                     resp.result.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|l| l.as_ref().into()).collect(),
@@ -197,7 +193,6 @@ pub async fn search(
                 });
             }
             value::Value::Float(v) => {
-                result_type = "scalar".to_string();
                 resp.result.push(cluster_rpc::Series {
                     metric: vec![],
                     values: vec![],
@@ -209,7 +204,7 @@ pub async fn search(
     }
 
     // reset result type
-    resp.result_type = result_type;
+    resp.result_type = result_type.to_string();
 
     Ok(resp)
 }

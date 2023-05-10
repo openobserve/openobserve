@@ -181,17 +181,36 @@ impl QueryEngine {
                 modifier,
             }) => self.aggregate_exprs(op, expr, param, modifier).await?,
             PromExpr::Unary(UnaryExpr { expr }) => {
-                let _input = self.exec_expr(expr).await?;
-                todo!()
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Unary: {:?}",
+                    expr
+                )));
             }
-            PromExpr::Binary(_) => todo!(),
+            PromExpr::Binary(expr) => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Paren: {:?}",
+                    expr
+                )));
+            }
             PromExpr::Paren(ParenExpr { expr }) => {
-                let _input = self.exec_expr(expr).await?;
-                todo!()
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Paren: {:?}",
+                    expr
+                )));
             }
-            PromExpr::Subquery(_) => todo!(),
+            PromExpr::Subquery(expr) => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Subquery: {:?}",
+                    expr
+                )));
+            }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
-            PromExpr::StringLiteral(_) => todo!(),
+            PromExpr::StringLiteral(expr) => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported StringLiteral: {:?}",
+                    expr
+                )));
+            }
             PromExpr::VectorSelector(v) => {
                 let data = self.eval_vector_selector(v).await?;
                 if data.is_empty() {
@@ -212,7 +231,12 @@ impl QueryEngine {
                 }
             }
             PromExpr::Call(Call { func, args }) => self.call_expr(func, args).await?,
-            PromExpr::Extension(_) => todo!(),
+            PromExpr::Extension(expr) => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Extension: {:?}",
+                    expr
+                )));
+            }
         })
     }
 
@@ -235,14 +259,18 @@ impl QueryEngine {
 
         let mut values = vec![];
         for metric in metrics_cache {
-            let value = match metric.values.last() {
+            let mut value = match metric.values.last() {
                 Some(v) => *v,
                 None => continue, // have no sample
             };
+            if value.timestamp != self.end && metric.values.len() > 1 {
+                let mut metric = metric.clone();
+                metric.time_range = Some((metric.values.first().unwrap().timestamp, self.end));
+                if let Some(extra) = metric.extrapolate() {
+                    value = extra.1;
+                }
+            }
             values.push(
-                // XXX-FIXME: an instant query can return any valid PromQL
-                // expression type (string, scalar, instant and range vectors).
-                //
                 // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
                 InstantValue {
                     labels: metric.labels.clone(),
@@ -305,8 +333,13 @@ impl QueryEngine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        // TODO: support filters
-        let filters: Vec<(String, String)> = Vec::new();
+        let filters: Vec<(String, String)> = selector
+            .matchers
+            .matchers
+            .iter()
+            .filter(|mat| mat.op == MatchOp::Equal)
+            .map(|mat| (mat.name.clone(), mat.value.clone()))
+            .collect();
         let ctx = self
             .table_provider
             .create_context(table_name, (start, end), &filters)
@@ -351,7 +384,10 @@ impl QueryEngine {
                 }
             }
         }
-        let batches = df_group.collect().await?;
+        let batches = df_group
+            .sort(vec![col(FIELD_TIME).sort(true, true)])?
+            .collect()
+            .await?;
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
         for batch in &batches {
@@ -459,7 +495,7 @@ impl QueryEngine {
             token::T_COUNT_VALUES => Value::None,
             token::T_QUANTILE => Value::None,
             _ => {
-                return Err(DataFusionError::Internal(format!(
+                return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Aggregate: {:?}",
                     op
                 )));
@@ -471,7 +507,7 @@ impl QueryEngine {
         use crate::service::promql::functions::Func;
 
         let func_name = Func::from_str(func.name).map_err(|_| {
-            DataFusionError::Internal(format!("Unsupported function: {}", func.name))
+            DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
         let last_arg = args
@@ -480,30 +516,115 @@ impl QueryEngine {
         let input = self.exec_expr(&last_arg).await?;
 
         Ok(match func_name {
-            Func::Abs => todo!(),
-            Func::Absent => todo!(),
-            Func::AbsentOverTime => todo!(),
+            Func::Abs => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Absent => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::AbsentOverTime => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::AvgOverTime => functions::avg_over_time(&input)?,
-            Func::Ceil => todo!(),
-            Func::Changes => todo!(),
-            Func::Clamp => todo!(),
-            Func::ClampMax => todo!(),
-            Func::ClampMin => todo!(),
+            Func::Ceil => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Changes => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Clamp => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::ClampMax => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::ClampMin => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::CountOverTime => functions::count_over_time(&input)?,
-            Func::DayOfMonth => todo!(),
-            Func::DayOfWeek => todo!(),
-            Func::DayOfYear => todo!(),
-            Func::DaysInMonth => todo!(),
+            Func::DayOfMonth => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::DayOfWeek => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::DayOfYear => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::DaysInMonth => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::Delta => functions::delta(&input)?,
-            Func::Deriv => todo!(),
-            Func::Exp => todo!(),
-            Func::Floor => todo!(),
-            Func::HistogramCount => todo!(),
-            Func::HistogramFraction => todo!(),
+            Func::Deriv => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Exp => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Floor => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::HistogramCount => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::HistogramFraction => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::HistogramQuantile => {
                 let args = &args.args;
                 if args.len() != 2 {
-                    return Err(DataFusionError::Internal(format!(
+                    return Err(DataFusionError::Plan(format!(
                         "{}: expected 2 arguments, got {}",
                         func.name,
                         args.len()
@@ -513,7 +634,7 @@ impl QueryEngine {
                     match *args[0] {
                         PromExpr::NumberLiteral(ref num) => num.val,
                         _ => {
-                            return Err(DataFusionError::Internal(format!(
+                            return Err(DataFusionError::Plan(format!(
                                 "{}: the first argument must be a number",
                                 func.name
                             )))
@@ -523,35 +644,145 @@ impl QueryEngine {
                 let sample_time = self.start + (self.interval * self.time_window_idx);
                 functions::histogram_quantile(sample_time, phi, input)?
             }
-            Func::HistogramSum => todo!(),
-            Func::HoltWinters => todo!(),
-            Func::Hour => todo!(),
+            Func::HistogramSum => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::HoltWinters => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Hour => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::Idelta => functions::idelta(&input)?,
             Func::Increase => functions::increase(&input)?,
             Func::Irate => functions::irate(&input)?,
-            Func::LabelJoin => todo!(),
-            Func::LabelReplace => todo!(),
-            Func::Ln => todo!(),
-            Func::Log10 => todo!(),
-            Func::Log2 => todo!(),
+            Func::LabelJoin => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::LabelReplace => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Ln => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Log10 => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Log2 => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::MaxOverTime => functions::max_over_time(&input)?,
             Func::MinOverTime => functions::min_over_time(&input)?,
-            Func::Minute => todo!(),
-            Func::Month => todo!(),
-            Func::PredictLinear => todo!(),
-            Func::QuantileOverTime => todo!(),
+            Func::Minute => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Month => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::PredictLinear => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::QuantileOverTime => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::Rate => functions::rate(&input)?,
-            Func::Resets => todo!(),
-            Func::Round => todo!(),
-            Func::Scalar => todo!(),
-            Func::Sgn => todo!(),
-            Func::Sort => todo!(),
-            Func::SortDesc => todo!(),
+            Func::Resets => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Round => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Scalar => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Sgn => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Sort => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::SortDesc => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
             Func::SumOverTime => functions::sum_over_time(&input)?,
-            Func::Time => todo!(),
-            Func::Timestamp => todo!(),
-            Func::Vector => todo!(),
-            Func::Year => todo!(),
+            Func::Time => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Timestamp => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Vector => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
+            Func::Year => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {:?}",
+                    func_name
+                )));
+            }
         })
     }
 }

@@ -42,7 +42,7 @@ pub struct Label {
     pub value: String,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Sample {
     /// Time in microseconds
     pub timestamp: i64,

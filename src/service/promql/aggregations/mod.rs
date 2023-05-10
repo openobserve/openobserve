@@ -58,7 +58,7 @@ pub(crate) fn eval_arithmetic(
         Value::Vector(v) => v,
         Value::None => return Ok(None),
         _ => {
-            return Err(DataFusionError::Internal(format!(
+            return Err(DataFusionError::Plan(format!(
                 "[{f_name}] function only accept vector values"
             )))
         }
@@ -133,7 +133,7 @@ pub async fn eval_top(
     let n = match param {
         Value::Float(v) => v as usize,
         _ => {
-            return Err(DataFusionError::Internal(format!(
+            return Err(DataFusionError::Plan(format!(
                 "[{fn_name}] param must be NumberLiteral"
             )))
         }
@@ -143,7 +143,7 @@ pub async fn eval_top(
         Value::Vector(v) => v,
         Value::None => return Ok(Value::None),
         _ => {
-            return Err(DataFusionError::Internal(format!(
+            return Err(DataFusionError::Plan(format!(
                 "[{fn_name}] function only accept vector values"
             )))
         }

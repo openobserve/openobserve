@@ -320,11 +320,16 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut value: f64 = 0.0;
+    let mut sample: Sample = Default::default();
     series.iter().for_each(|v| {
-        value = v.scalar.unwrap();
+        if v.scalar.is_some() {
+            sample.value = v.scalar.unwrap();
+        }
+        if v.value.is_some() {
+            sample = v.value.as_ref().unwrap().into();
+        }
     });
-    Value::Float(value)
+    Value::Sample(sample)
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
