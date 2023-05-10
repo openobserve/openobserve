@@ -142,13 +142,6 @@ impl RangeValue {
     }
 }
 
-pub fn labels_value(labels: &Labels, name: &str) -> Option<String> {
-    labels
-        .binary_search_by_key(&name, |label| label.name.as_str())
-        .ok()
-        .map(|index| labels[index].value.clone())
-}
-
 // https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data
 fn extrapolated_sample(p1: &Sample, p2: &Sample, t: i64) -> Sample {
     let dt = p2.timestamp - p1.timestamp;
@@ -159,6 +152,13 @@ fn extrapolated_sample(p1: &Sample, p2: &Sample, t: i64) -> Sample {
         timestamp: t,
         value: p1.value + dv2,
     }
+}
+
+pub fn labels_value(labels: &Labels, name: &str) -> Option<String> {
+    labels
+        .binary_search_by_key(&name, |label| label.name.as_str())
+        .ok()
+        .map(|index| labels[index].value.clone())
 }
 
 #[derive(Debug, Clone, Serialize)]

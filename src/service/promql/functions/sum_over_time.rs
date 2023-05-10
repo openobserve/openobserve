@@ -20,7 +20,7 @@ pub(crate) fn sum_over_time(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "sum_over_time", exec)
 }
 
-fn exec(data: &RangeValue) ->Option<f64> {
+fn exec(data: &RangeValue) -> Option<f64> {
     if data.values.is_empty() {
         return None;
     }

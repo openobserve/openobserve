@@ -23,5 +23,5 @@ pub(crate) fn delta(data: &Value) -> Result<Value> {
 fn exec(range: &RangeValue) -> Option<f64> {
     range
         .extrapolate()
-        .map_or(None, |(first, last)| Some(last.value - first.value))
+        .map(|(first, last)| last.value - first.value)
 }

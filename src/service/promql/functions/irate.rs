@@ -27,7 +27,7 @@ fn exec(data: &RangeValue) -> Option<f64> {
         return Some(0.0);
     }
     let (last, data) = data.values.split_last().unwrap();
-    let previous =  data.last().unwrap();
+    let previous = data.last().unwrap();
     let dt_seconds = ((last.timestamp - previous.timestamp) / 1_000_000) as f64;
     if dt_seconds == 0.0 {
         return Some(0.0);

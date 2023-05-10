@@ -441,6 +441,9 @@ impl QueryEngine {
         // We don't need the primary key (FIELD_HASH) any more
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
 
+        // TODO fix Extrapolation, it needs reduce by distance
+        // https://ihac.xyz/2018/12/11/Prometheus-Extrapolation%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/
+
         // Fix data about app restart
         for series in metric_values.iter_mut() {
             if let Some(metric_type) = labels_value(&series.labels, FIELD_TYPE) {

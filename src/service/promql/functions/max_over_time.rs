@@ -24,9 +24,11 @@ fn exec(data: &RangeValue) -> Option<f64> {
     if data.values.is_empty() {
         return None;
     }
-    Some(data.values
-        .iter()
-        .map(|s| s.value)
-        .max_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap())
+    Some(
+        data.values
+            .iter()
+            .map(|s| s.value)
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap(),
+    )
 }

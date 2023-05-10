@@ -21,12 +21,12 @@ pub(crate) fn rate(data: &Value) -> Result<Value> {
 }
 
 fn exec(range: &RangeValue) -> Option<f64> {
-    range.extrapolate().map_or(None, |(first, last)| {
+    range.extrapolate().map(|(first, last)| {
         let dt_seconds = ((last.timestamp - first.timestamp) / 1_000_000) as f64;
         if dt_seconds == 0.0 {
-            Some(0.0)
+            0.0
         } else {
-            Some((last.value - first.value) / dt_seconds)
+            (last.value - first.value) / dt_seconds
         }
     })
 }
