@@ -28,6 +28,7 @@ use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
 use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
+use crate::meta::syslog::SyslogRoute;
 use crate::meta::user::User;
 
 pub static VERSION: &str = env!("GIT_VERSION");
@@ -68,6 +69,7 @@ pub static TRIGGERS: Lazy<DashMap<String, Trigger>> = Lazy::new(DashMap::new);
 pub static TRIGGERS_IN_PROCESS: Lazy<DashMap<String, TriggerTimer>> = Lazy::new(DashMap::new);
 pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::new(DashMap::new);
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
+pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -118,6 +120,8 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 12346)]
     pub udp_port: u16,
+    #[env_config(name = "ZO_SYSLOGS_ENABLED", default = false)]
+    pub syslogs_enabled: bool,
 }
 
 #[derive(EnvConfig)]

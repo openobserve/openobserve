@@ -31,7 +31,10 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
 }
 
 #[instrument(skip(route))]
-pub async fn update_route(id: &str, route: &SyslogRoute) -> Result<HttpResponse, io::Error> {
+pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpResponse, io::Error> {
+    if route.id.is_empty() {
+        route.id = id.to_owned();
+    }
     let old_route = match syslog::get(id).await {
         Ok(route) => route,
         Err(error) => {

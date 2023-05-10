@@ -70,9 +70,12 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
     ),
 )]
 #[put("/{org_id}/syslog-routes/{id}")]
-async fn update_route(path: web::Path<String>, details: web::Json<SyslogRoute>) -> impl Responder {
-    let id = path.into_inner();
-    syslogs_route::update_route(&id, &details.into_inner()).await
+async fn update_route(
+    path: web::Path<(String, String)>,
+    details: web::Json<SyslogRoute>,
+) -> impl Responder {
+    let (_, id) = path.into_inner();
+    syslogs_route::update_route(&id, &mut details.into_inner()).await
 }
 
 /// ListSyslogRoutes
@@ -111,6 +114,7 @@ async fn list_routes() -> impl Responder {
     ),
 )]
 #[delete("/{org_id}/syslog-routes/{id}")]
-async fn delete_route(path: web::Path<String>) -> impl Responder {
-    syslogs_route::delete_route(&path.into_inner()).await
+async fn delete_route(path: web::Path<(String, String)>) -> impl Responder {
+    let (_, id) = path.into_inner();
+    syslogs_route::delete_route(&id).await
 }

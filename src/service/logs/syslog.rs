@@ -10,7 +10,7 @@ use syslog_loose::{Message, ProcId, Protocol};
 use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, SYSLOG_ROUTES};
 use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -21,7 +21,6 @@ use crate::service::schema::stream_schema_exists;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn Error>> {
     let start = Instant::now();
-
     let ip = addr.ip();
     let org = get_org_for_ip(ip).await;
 
@@ -39,7 +38,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
 
     let thread_id = web::Data::new(0);
     let in_stream_name = "syslog";
-
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -210,9 +208,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
 }
 
 async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<String> {
-    let list = db::syslog::list().await.unwrap();
     let mut org_id = None;
-    for route in list {
+    for (_, route) in SYSLOG_ROUTES.clone() {
         for subnet in route.subnets {
             if subnet.contains(ip) {
                 org_id = Some(route.org_id.to_owned());
@@ -254,7 +251,6 @@ fn message_to_value(message: Message<&str>) -> json::Value {
     }
 
     if let Some(timestamp) = message.timestamp {
-        //let timestamp: DateTime<Utc> = timestamp.into();
         result.insert(
             "_timestamp".to_string(),
             timestamp.timestamp_micros().into(),
@@ -289,9 +285,7 @@ mod test {
     #[actix_web::test]
     async fn test_ingest() {
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog: [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] This is a test message"#;
-
-        let _ = ingest(&raw, addr).await;
+        ingest(&raw, addr).await.unwrap();
     }
 }

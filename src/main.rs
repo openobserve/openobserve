@@ -150,17 +150,18 @@ async fn main() -> Result<(), anyhow::Error> {
     let prometheus = metrics::create_prometheus_handler();
 
     //TCP UDP Server
-    let tcp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.tcp_port).parse()?;
-    let udp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.udp_port).parse()?;
-    let tcp_listener = TcpListener::bind(tcp_addr).await?;
-    let udp_socket = UdpSocket::bind(udp_addr).await?;
-    tokio::task::spawn(async move {
-        _ = tcp_server(tcp_listener).await;
-    });
-
-    tokio::task::spawn(async move {
-        _ = udp_server(udp_socket).await;
-    });
+    if CONFIG.tcp.syslogs_enabled {
+        let tcp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.tcp_port).parse()?;
+        let udp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.udp_port).parse()?;
+        let tcp_listener = TcpListener::bind(tcp_addr).await?;
+        let udp_socket = UdpSocket::bind(udp_addr).await?;
+        tokio::task::spawn(async move {
+            _ = tcp_server(tcp_listener).await;
+        });
+        tokio::task::spawn(async move {
+            _ = udp_server(udp_socket).await;
+        });
+    }
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
