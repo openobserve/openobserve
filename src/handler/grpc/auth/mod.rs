@@ -88,10 +88,11 @@ mod tests {
     use tonic::metadata::MetadataValue;
 
     use super::*;
-    use crate::meta::user::User;
+    use crate::{infra::config::INSTANCE_ID, meta::user::User};
 
     #[actix_web::test]
     async fn test_check_no_auth() {
+        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
             "root".to_string(),
             User {
@@ -105,6 +106,7 @@ mod tests {
                 org: "dummy".to_owned(),
             },
         );
+
         let mut request = tonic::Request::new(());
 
         let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap();
@@ -117,6 +119,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_check_auth() {
+        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
             "root".to_string(),
             User {
@@ -130,11 +133,9 @@ mod tests {
                 org: "dummy".to_owned(),
             },
         );
-        let mut request = tonic::Request::new(());
 
-        let token: MetadataValue<_> = "basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
-            .parse()
-            .unwrap();
+        let mut request = tonic::Request::new(());
+        let token: MetadataValue<_> = "instance".parse().unwrap();
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
 
@@ -143,6 +144,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_check_err_auth() {
+        INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
             "root".to_string(),
             User {

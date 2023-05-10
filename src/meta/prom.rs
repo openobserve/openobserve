@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+use strum::Display;
+
+use crate::service::metrics::prom::prometheus as proto;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -28,67 +33,63 @@ pub const METADATA_LABEL: &str = "prom_metadata";
 pub type FxIndexMap<K, V> =
     indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub labels: FxIndexMap<String, String>,
     pub value: f64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterLeader {
     pub name: String,
     pub last_received: i64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+// cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[strum(serialize_all = "lowercase")]
 pub enum MetricType {
-    UNKNOWN,
-    COUNTER,
-    GAUGE,
-    HISTOGRAM,
-    GAUGEHISTOGRAM,
-    SUMMARY,
-    INFO,
-    STATESET,
+    Unknown,
+    Counter,
+    Gauge,
+    Histogram,
+    GaugeHistogram,
+    Summary,
+    Info,
+    StateSet,
 }
 
-impl From<&str> for MetricType {
-    fn from(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
-            "COUNTER" => MetricType::COUNTER,
-            "GAUGE" => MetricType::GAUGE,
-            "HISTOGRAM" => MetricType::HISTOGRAM,
-            "GAUGEHISTOGRAM" => MetricType::GAUGEHISTOGRAM,
-            "SUMMARY" => MetricType::SUMMARY,
-            "INFO" => MetricType::INFO,
-            "STATESET" => MetricType::STATESET,
-            _ => MetricType::UNKNOWN,
+impl From<proto::metric_metadata::MetricType> for MetricType {
+    fn from(mt: proto::metric_metadata::MetricType) -> Self {
+        use proto::metric_metadata::MetricType as ProtoMetricType;
+
+        match mt {
+            ProtoMetricType::Unknown => Self::Unknown,
+            ProtoMetricType::Counter => Self::Counter,
+            ProtoMetricType::Gauge => Self::Gauge,
+            ProtoMetricType::Histogram => Self::Histogram,
+            ProtoMetricType::Gaugehistogram => Self::GaugeHistogram,
+            ProtoMetricType::Summary => Self::Summary,
+            ProtoMetricType::Info => Self::Info,
+            ProtoMetricType::Stateset => Self::StateSet,
         }
     }
 }
 
-impl MetricType {
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            MetricType::UNKNOWN => "UNKNOWN",
-            MetricType::COUNTER => "COUNTER",
-            MetricType::GAUGE => "GAUGE",
-            MetricType::HISTOGRAM => "HISTOGRAM",
-            MetricType::GAUGEHISTOGRAM => "GAUGEHISTOGRAM",
-            MetricType::SUMMARY => "SUMMARY",
-            MetricType::INFO => "INFO",
-            MetricType::STATESET => "STATESET",
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub metric_type: MetricType,
     pub metric_family_name: String,
     pub help: String,
     pub unit: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    Success,
+    Error,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,8 +110,36 @@ pub struct RequestRangeQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestMetadata {
-    pub limit: i64,
+    /// Maximum number of metrics to return.
+    pub limit: Option<usize>,
+    /// A metric name to filter metadata for. All metric metadata is retrieved
+    /// if left empty.
     pub metric: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResponseMetadata {
+    pub status: Status,
+    /// key - metric name
+    pub data: HashMap<String, Vec<MetadataObject>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MetadataObject {
+    #[serde(rename = "type")]
+    typ: String, // counter, gauge, histogram, summary
+    help: String,
+    unit: String,
+}
+
+impl From<Metadata> for MetadataObject {
+    fn from(md: Metadata) -> Self {
+        Self {
+            typ: md.metric_type.to_string(),
+            help: md.help,
+            unit: md.unit,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -135,4 +164,22 @@ pub struct RequestValues {
     pub matches: Option<Vec<String>>,
     pub start: Option<String>,
     pub end: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metric_type_display() {
+        assert_eq!(MetricType::Counter.to_string(), "counter");
+        assert_eq!(MetricType::Gauge.to_string(), "gauge");
+        assert_eq!(MetricType::Histogram.to_string(), "histogram");
+        assert_eq!(MetricType::GaugeHistogram.to_string(), "gaugehistogram");
+        assert_eq!(MetricType::Summary.to_string(), "summary");
+        assert_eq!(MetricType::Info.to_string(), "info");
+        assert_eq!(MetricType::StateSet.to_string(), "stateset");
+        assert_eq!(format!("{}", MetricType::Unknown), "unknown");
+        assert_eq!(MetricType::Unknown.to_string(), "unknown");
+    }
 }

@@ -16,9 +16,11 @@ use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
 use crate::common::time::{parse_milliseconds, parse_str_to_timestamp_micros};
-use crate::meta;
 use crate::service::metrics;
 use crate::service::promql;
+use crate::{
+    meta::{self, http::HttpResponse as MetaHttpResponse},
+};
 
 /** prometheus remote-write endpoint for metrics */
 #[utoipa::path(
@@ -46,15 +48,13 @@ pub async fn remote_write(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
-    if content_type.eq("application/x-protobuf") {
+    if content_type == "application/x-protobuf" {
         metrics::prom::remote_write(&org_id, thread_id, body).await
     } else {
-        Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Bad Request".to_string(),
-            )),
-        )
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Bad Request".to_string(),
+        )))
     }
 }
 
@@ -106,9 +106,7 @@ pub async fn query(
     org_id: web::Path<String>,
     query: web::Query<meta::prom::RequestQuery>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
     let query = query.into_inner();
-
     let start = match query.time {
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
@@ -212,9 +210,7 @@ pub async fn query_range(
     org_id: web::Path<String>,
     range_query: web::Query<meta::prom::RequestRangeQuery>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
     let range_query = range_query.into_inner();
-
     let start = match parse_str_to_timestamp_micros(&range_query.start) {
         Ok(v) => v,
         Err(e) => {
@@ -328,14 +324,17 @@ pub async fn query_range(
 #[get("/{org_id}/prometheus/v1/metadata")]
 pub async fn metadata(
     org_id: web::Path<String>,
-    metadata: web::Query<meta::prom::RequestMetadata>,
+    req: web::Query<meta::prom::RequestMetadata>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-    let metadata = metadata.into_inner();
-    println!("org_id: {}", org_id);
-    println!("query.limit: {}", metadata.limit);
-    println!("query.metric: {:?}", metadata.metric);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+    let req = req.into_inner();
+    tracing::trace!(%org_id, ?req);
+    Ok(match metrics::prom::get_metadata(&org_id, req).await {
+        Ok(resp) => HttpResponse::Ok().json(resp),
+        Err(err) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            err.to_string(),
+        )),
+    })
 }
 
 /** prometheus finding series by label matchers */
@@ -382,12 +381,8 @@ pub async fn series(
     org_id: web::Path<String>,
     series: web::Query<meta::prom::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
     let series = series.into_inner();
-    println!("org_id: {}", org_id);
-    println!("query.match[]: {:?}", series.matches);
-    println!("query.start: {:?}", series.start);
-    println!("query.end: {:?}", series.end);
+    tracing::trace!(%org_id, ?series);
     Ok(HttpResponse::NotImplemented().body("Not Implemented"))
 }
 
@@ -441,12 +436,8 @@ pub async fn labels(
     org_id: web::Path<String>,
     labels: web::Query<meta::prom::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
     let labels = labels.into_inner();
-    println!("org_id: {}", org_id);
-    println!("query.match[]: {:?}", labels.matches);
-    println!("query.start: {:?}", labels.start);
-    println!("query.end: {:?}", labels.end);
+    tracing::trace!(%org_id, ?labels);
     Ok(HttpResponse::NotImplemented().body("Not Implemented"))
 }
 
@@ -484,10 +475,6 @@ pub async fn values(
 ) -> Result<HttpResponse, Error> {
     let (org_id, label_name) = path.into_inner();
     let values = values.into_inner();
-    println!("org_id: {}", org_id);
-    println!("label_name: {}", label_name);
-    println!("query.match[]: {:?}", values.matches);
-    println!("query.start: {:?}", values.start);
-    println!("query.end: {:?}", values.end);
+    tracing::trace!(%org_id, %label_name, ?values);
     Ok(HttpResponse::NotImplemented().body("Not Implemented"))
 }
