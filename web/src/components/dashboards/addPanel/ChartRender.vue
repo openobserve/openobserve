@@ -298,11 +298,9 @@ export default defineComponent({
           // console.log("Query: chart type", props.data.type);
           // Step 1: Get the X-Axis key
           const xAxisKeys = getXAxisKeys();
-          console.log('xAxisKeys:', xAxisKeys);
 
           // Step 2: Get the Y-Axis key
           const yAxisKeys = getYAxisKeys();
-          console.log('yAxisKeys:', yAxisKeys);
 
           let traces: any;
 
@@ -321,11 +319,9 @@ export default defineComponent({
                               xAxisKeys?.map((key: any) => {
                                   return getAxisDataFromKey(key);
                               });
-                  console.log("xdata", xData);
           
                   //generate trace based on the y axis keys
                   traces = yAxisKeys?.map((key: any) => {
-                      console.log("-bar-", props.data.fields?.y.find((it: any) => it.alias == key));
                       
                       const trace = {
                           name: props.data.fields?.y.find((it: any) => it.alias == key).label,
@@ -345,7 +341,6 @@ export default defineComponent({
                       };
                       return trace
                   })
-                  console.log("multiple:- traces", traces);
                   break;
               }
               case "h-bar": {
@@ -359,7 +354,6 @@ export default defineComponent({
                               xAxisKeys?.map((key: any) => {
                                   return getAxisDataFromKey(key);
                               });
-                  console.log("xdata", xData);
 
                   //generate trace based on the y axis keys
                   traces = yAxisKeys?.map((key: any) => {
@@ -414,7 +408,7 @@ export default defineComponent({
                       };
                       return trace
                   })
-                  console.log("multiple:- traces", traces);
+                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "donut": {
@@ -450,7 +444,7 @@ export default defineComponent({
                       };
                       return trace
                   })
-                  console.log("multiple:- traces", traces);
+                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "stacked": {
@@ -460,11 +454,11 @@ export default defineComponent({
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
                   const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
-                  console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
-                      console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                       
                       const trace = {
                           name: key,
@@ -478,7 +472,7 @@ export default defineComponent({
                       };
                       return trace
                   })
-                  console.log("multiple:- traces", traces);
+                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "h-stacked": {
@@ -488,11 +482,11 @@ export default defineComponent({
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
                   const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
-                  console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
-                      console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
                       
                       const trace = {
                           name: key,
@@ -506,13 +500,13 @@ export default defineComponent({
                       };
                       return trace
                   })
-                  console.log("multiple:- traces", traces);
+                //   console.log("multiple:- traces", traces);
                   break;
               }
               case "metric": {
                   const key1 = yAxisKeys[0]
                   const yAxisValue= getAxisDataFromKey(key1)
-                  console.log('metric changed',);
+                //   console.log('metric changed',);
                   traces= []
                   const trace =  {
                     ...getPropsByChartTypeForTraces(),
@@ -526,7 +520,7 @@ export default defineComponent({
               }
           }
 
-          console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
+        //   console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
 
           //generate the layout value of chart
           const layout: any = {
@@ -546,7 +540,7 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
           };
 
-          console.log('layout', layout);
+        //   console.log('layout', layout);
 
           Plotly.react(plotRef.value, traces, layout, {
               responsive: true,
@@ -876,7 +870,6 @@ export default defineComponent({
                       },
                   };
               case "metric":
-              console.log("inside metric");
                   return {
                       paper_bgcolor: "white",
                       // width: 600,

@@ -205,7 +205,7 @@ export default defineComponent({
     watch(
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
-        console.log("stream:", dashboardPanelData.data.fields.stream);
+        // console.log("stream:", dashboardPanelData.data.fields.stream);
         
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
@@ -216,7 +216,6 @@ export default defineComponent({
     );
 
     watch(()=> [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], ()=> {
-      console.log("--editmode--",props.editMode);
       
         if(!props.editMode){
           dashboardPanelData.data.fields.stream = ""
@@ -228,16 +227,11 @@ export default defineComponent({
             return data.name;
           });
 
-        console.log("-indexOption---",data.indexOptions );
-        console.log("-stream name---",dashboardPanelData.data.fields.stream);
-
         // set the first stream as the selected stream when the api loads the data
         if (!props.editMode &&
           !dashboardPanelData.data.fields.stream &&
           data.indexOptions.length > 0
         ) {
-          console.log("Inside field.stream is");
-          
           dashboardPanelData.data.fields.stream = data.indexOptions[0];
         }
     })
@@ -291,7 +285,6 @@ export default defineComponent({
     };
 
     const onDragStart = (e: any, item: any) => {
-      console.log("dragstart", e, item);
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
     };

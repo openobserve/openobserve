@@ -169,7 +169,6 @@ const useDashboardPanelData = () => {
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
    const YAxisColor = dashboardPanelData.data.fields.y.map((it: any)=> it.color)
-   console.log("-Yaxis color", JSON.stringify(YAxisColor))
    let newColor = colors.filter((el:any) => !YAxisColor.includes(el));
     if(!newColor.length){
       newColor = colors
@@ -233,7 +232,6 @@ const useDashboardPanelData = () => {
 
     // remove any existing data
     const find = dashboardPanelData.meta.filterValue.findIndex((it: any) => it.column == name)
-    console.log('find: ' , find)
     if (find >= 0) {
       dashboardPanelData.meta.filterValue.splice(find, 1);
     }

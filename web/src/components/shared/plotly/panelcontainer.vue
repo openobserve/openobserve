@@ -121,15 +121,15 @@ export default defineComponent({
         query: { sql: sqlQueryModified, sql_mode: "full" },
       };
 
-      console.log("query===",query);
+      // console.log("query===",query);
       
       const panelData = toRaw(store.state.currentPanelsData);
-      console.log("panelData====",panelData);
+      // console.log("panelData====",panelData);
       
       const existingPanel = panelData.find(
         (panel:any) => panel.id == panelDataElement.id
       );
-      console.log("existingPanel---",existingPanel);
+      // console.log("existingPanel---",existingPanel);
       
 
       if (existingPanel && onMounted) {

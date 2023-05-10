@@ -392,7 +392,6 @@ export default defineComponent({
     const currentDragArea = ref('')
 
     const onDrop = (e:any, area: string) => {
-      console.log('dropped');
       
       const dragItem:any  = dashboardPanelData.meta.dragAndDrop.dragElement
 
@@ -413,8 +412,6 @@ export default defineComponent({
 
 
     const onDragEnter = (e:any, area: string) => {
-      console.log('enter');
-
 
       // // don't drop on other draggables
       // if (e.target.draggable !== true) {
@@ -423,20 +420,16 @@ export default defineComponent({
     }
 
     const onDragStart = (e:any, item: any) => {
-      console.log('start');
-
       e.preventDefault()
     }
 
     const onDragLeave = (e:any, area: string) => {
-      console.log('leave');
       currentDragArea.value = ''
 
       e.preventDefault()
     }
 
     const onDragOver = (e:any, area: string) => {
-      console.log('over');
       currentDragArea.value = area
       e.preventDefault()
     }
