@@ -32,3 +32,10 @@ pub mod stream;
 pub mod traces;
 pub mod triggers;
 pub mod users;
+
+// generate partition key for query
+pub fn get_partition_key_query(s: &str) -> String {
+    let mut s = s.replace(['/', '.'], "_");
+    s.truncate(100);
+    s
+}

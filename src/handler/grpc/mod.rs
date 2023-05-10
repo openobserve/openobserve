@@ -124,6 +124,41 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
     }
 }
 
+impl From<&cluster_rpc::Label> for promql::value::Label {
+    fn from(req: &cluster_rpc::Label) -> Self {
+        promql::value::Label {
+            name: req.name.to_owned(),
+            value: req.value.to_owned(),
+        }
+    }
+}
+
+impl From<&promql::value::Label> for cluster_rpc::Label {
+    fn from(req: &promql::value::Label) -> Self {
+        cluster_rpc::Label {
+            name: req.name.to_owned(),
+            value: req.value.to_owned(),
+        }
+    }
+}
+
+impl From<&cluster_rpc::Sample> for promql::value::Sample {
+    fn from(req: &cluster_rpc::Sample) -> Self {
+        promql::value::Sample {
+            timestamp: req.time,
+            value: req.value,
+        }
+    }
+}
+impl From<&promql::value::Sample> for cluster_rpc::Sample {
+    fn from(req: &promql::value::Sample) -> Self {
+        cluster_rpc::Sample {
+            time: req.timestamp,
+            value: req.value,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;

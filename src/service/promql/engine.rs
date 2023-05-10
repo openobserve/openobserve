@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 use datafusion::{
     arrow::array::{Float64Array, Int64Array, StringArray},
     error::{DataFusionError, Result},
@@ -35,8 +36,18 @@ use std::{
 
 use super::{aggregations, functions, value::*};
 
+#[async_trait]
+pub trait TableProvider: Sync + Send + 'static {
+    async fn create_context(
+        &self,
+        stream_name: &str,
+        time_range: (i64, i64),
+        filters: &[(String, String)],
+    ) -> Result<SessionContext>;
+}
+
 pub struct QueryEngine {
-    ctx: Arc<SessionContext>,
+    table_provider: Box<dyn TableProvider>,
     /// The time boundaries for the evaluation. If start equals end an instant
     /// is evaluated.
     start: i64,
@@ -54,11 +65,14 @@ pub struct QueryEngine {
 }
 
 impl QueryEngine {
-    pub fn new(ctx: Arc<SessionContext>) -> Self {
+    pub fn new<P>(provider: P) -> Self
+    where
+        P: TableProvider,
+    {
         let now = micros_since_epoch(SystemTime::now());
         let five_min = micros(Duration::from_secs(300));
         Self {
-            ctx,
+            table_provider: Box::new(provider),
             start: now,
             end: now,
             interval: five_min,
@@ -291,7 +305,13 @@ impl QueryEngine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        let table = self.ctx.table(table_name).await?;
+        // TODO: support filters
+        let filters: Vec<(String, String)> = Vec::new();
+        let ctx = self
+            .table_provider
+            .create_context(table_name, (start, end), &filters)
+            .await?;
+        let table = ctx.table(table_name).await?;
         let mut df_group = table.clone().filter(
             col(FIELD_TIME)
                 .gt(lit(start))

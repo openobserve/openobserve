@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use opentelemetry::global;
-use std::time::Instant;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -34,7 +33,7 @@ impl Search for Searcher {
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let parent_cx = global::get_text_map_propagator(|prop| {
             prop.extract(&super::MetadataMap(req.metadata()))
         });

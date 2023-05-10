@@ -103,7 +103,7 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
             } else {
                 // less than 1 hour, use file meta reduce file list
                 for file in file_list {
-                    if sql.match_source(&file, false, stream_type).await {
+                    if sql.match_source(&file, false, false, stream_type).await {
                         files.push(file.clone());
                     }
                 }

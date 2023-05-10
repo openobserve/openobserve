@@ -17,25 +17,28 @@ use datafusion::datasource::file_format::file_type::FileType;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::prelude::SessionContext;
 use promql_parser::parser;
+use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use tokio::sync::Semaphore;
 
+use crate::common::file::scan_files;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cache::file_data;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{self, CONFIG};
 use crate::meta;
-use crate::service::promql::{engine, value};
+use crate::service::db;
+use crate::service::promql;
+use crate::service::promql::engine;
+use crate::service::promql::value;
 use crate::service::search::datafusion::storage::file_list::SessionType;
-use crate::service::{db, file_list, promql, search};
 
-struct StorageProvider {
+struct WalProvider {
     org_id: String,
     session_id: String,
 }
 
 #[async_trait]
-impl engine::TableProvider for StorageProvider {
+impl engine::TableProvider for WalProvider {
     async fn create_context(
         &self,
         stream_name: &str,
@@ -44,43 +47,6 @@ impl engine::TableProvider for StorageProvider {
     ) -> Result<SessionContext> {
         // get file list
         let files = get_file_list(&self.org_id, stream_name, time_range, filters).await?;
-        let file_count = files.len();
-
-        // load files to local cache
-        let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
-        for file in files.iter() {
-            let file = file.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
-                tokio::task::spawn(async move {
-                    if !file_data::exist(&file).unwrap_or_default() {
-                        if let Err(e) = file_data::download(&file).await {
-                            log::error!("storage->search: load file {}, err: {}", &file, e);
-                        }
-                    };
-                    drop(permit);
-                    Ok(())
-                });
-            tasks.push(task);
-        }
-
-        for task in tasks {
-            match task.await {
-                Ok(ret) => {
-                    if let Err(err) = ret {
-                        return Err(DataFusionError::Execution(err.to_string()));
-                    }
-                }
-                Err(err) => {
-                    return Err(DataFusionError::Execution(err.to_string()));
-                }
-            };
-        }
-        log::info!(
-            "[TRACE] promql->search->storage: load files {} done",
-            file_count
-        );
 
         // fetch all schema versions, get latest schema
         let stream_type = meta::StreamType::Metrics;
@@ -100,7 +66,7 @@ impl engine::TableProvider for StorageProvider {
         );
         let session = meta::search::Session {
             id: self.session_id.clone(),
-            data_type: SessionType::Storage,
+            data_type: SessionType::Wal,
         };
 
         super::register_table(
@@ -110,13 +76,11 @@ impl engine::TableProvider for StorageProvider {
             stream_type,
             Some(schema),
             &files,
-            FileType::PARQUET,
+            FileType::JSON,
         )
         .await
     }
 }
-
-/// search in remote object storage
 
 /// search in local wal, which haven't been sync to object storage
 pub async fn search(
@@ -124,6 +88,9 @@ pub async fn search(
     org_id: &str,
     query: &cluster_rpc::MetricsQueryStmt,
 ) -> Result<value::Value> {
+    // mark searching in wal
+    let searching = Searching::new();
+
     let prom_expr = match parser::parse(&query.query) {
         Ok(expr) => expr,
         Err(e) => {
@@ -143,20 +110,19 @@ pub async fn search(
         lookback_delta: Duration::from_secs(300),
     };
 
-    let mut engine = promql::QueryEngine::new(StorageProvider {
+    let mut engine = promql::QueryEngine::new(WalProvider {
         org_id: org_id.to_string(),
         session_id: session_id.to_string(),
     });
     let data = engine.exec(eval_stmt).await?;
 
-    // clear session
-    search::datafusion::storage::file_list::clear(session_id)
-        .await
-        .unwrap();
+    // searching done.
+    drop(searching);
 
     Ok(data)
 }
 
+/// get file list from local cache, no need match_source, each file will be searched
 #[inline]
 async fn get_file_list(
     org_id: &str,
@@ -164,40 +130,59 @@ async fn get_file_list(
     time_range: (i64, i64),
     filters: &[(String, String)],
 ) -> Result<Vec<String>> {
-    let (time_min, time_max) = time_range;
-    let results = match file_list::get_file_list(
+    let pattern = format!(
+        "{}/files/{}/{}/{}/*.json",
+        &CONFIG.common.data_wal_dir,
         org_id,
-        stream_name,
-        Some(meta::StreamType::Metrics),
-        time_min,
-        time_max,
-    )
-    .await
-    {
-        Ok(results) => results,
-        Err(err) => {
-            log::error!("get file list error: {}", err);
-            return Err(DataFusionError::Execution(
-                "get file list error".to_string(),
-            ));
+        meta::StreamType::Metrics,
+        stream_name
+    );
+    let files = scan_files(&pattern);
+
+    let mut result = Vec::new();
+    let data_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
+        Ok(path) => path,
+        Err(_) => {
+            return Ok(result);
         }
     };
-
-    let mut files = Vec::new();
-    for file in results {
+    for file in files {
+        let file = Path::new(&file).canonicalize().unwrap();
+        let file = file.strip_prefix(&data_dir).unwrap();
+        let local_file = file.to_str().unwrap();
+        let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
+        let file_name = file.file_name().unwrap().to_str().unwrap();
+        let file_name = file_name.replace('_', "/");
+        let source_file = format!("{file_path}/{file_name}");
         if super::match_source(
             org_id,
             stream_name,
             Some(time_range),
             filters,
-            &file,
+            &source_file,
             false,
-            false,
+            true,
         )
         .await
         {
-            files.push(file.clone());
+            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
         }
     }
-    Ok(files)
+    Ok(result)
+}
+
+/// Searching for marking searching in wal
+struct Searching;
+
+impl Searching {
+    pub fn new() -> Self {
+        config::SEARCHING_IN_WAL.store(1, Ordering::Relaxed);
+        Searching
+    }
+}
+
+impl Drop for Searching {
+    fn drop(&mut self) {
+        config::SEARCHING_IN_WAL.store(0, Ordering::Relaxed);
+    }
 }

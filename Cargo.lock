@@ -2175,9 +2175,9 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "dotenv_config"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc8db7cd099cfe5d7b33f170b3d19054045425fe6d0d876defb7912c31d2fb67"
+checksum = "72ef519d2aabc15ca3dba4729976066fa23f80187bf2b19d623d24fe1a0ec3ea"
 dependencies = [
  "anyhow",
  "askama",
@@ -4406,9 +4406,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.26"
+version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4424af4bf778aae2051a77b60283332f386554255d722233d09fbfc7e30da2fc"
+checksum = "8f4f29d145265ec1c483c7c654450edde0bfe043d3938d6972630663356d9500"
 dependencies = [
  "proc-macro2",
 ]

@@ -31,7 +31,7 @@ use crate::service::promql::value::*;
 pub mod grpc;
 
 pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Value, Error> {
-    let root_span = info_span!("service:metrics:search:enter"); 
+    let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
@@ -45,7 +45,7 @@ async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     Ok(lock)
 }
 
-#[instrument(name = "service:metrics:search:cluster", skip(req))]
+#[instrument(name = "service:promql:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value, Error> {
     let start = std::time::Instant::now();
 
@@ -118,14 +118,14 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
             }
         }
         log::info!(
-            "[TRACE] metrics->search->partition: node: {}, is_querier: {}, start: {}, end: {}",
+            "[TRACE] promql->search->partition: node: {}, is_querier: {}, start: {}, end: {}",
             node.id,
             is_querier,
             req_query.start,
             req_query.end,
         );
 
-        let grpc_span = info_span!("service:metrics:search:cluster:grpc_search");
+        let grpc_span = info_span!("service:promql:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
         let task = tokio::task::spawn(
@@ -152,7 +152,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     Ok(channel) => channel,
                     Err(err) => {
                         log::error!(
-                            "[TRACE] metrics->search->grpc: node: {}, connect err: {:?}",
+                            "[TRACE] promql->search->grpc: node: {}, connect err: {:?}",
                             node.id,
                             err
                         );
@@ -175,7 +175,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[TRACE] metrics->search->grpc: node: {}, search err: {:?}",
+                            "[TRACE] promql->search->grpc: node: {}, search err: {:?}",
                             node.id,
                             err
                         );
@@ -188,7 +188,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 };
 
                 log::info!(
-                "[TRACE] metrics->search->grpc: result node: {}, is_querier: {}, took: {}, files: {}",
+                "[TRACE] promql->search->grpc: result node: {}, is_querier: {}, took: {}, files: {}",
                 node.id,
                 is_querier,
                 response.took,
@@ -247,11 +247,15 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
-    } else {
+    } else if result_type == "vector" {
         merge_vector_query(&series_data)
+    } else if result_type == "scalar" {
+        merge_scalar_query(&series_data)
+    } else {
+        return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[TRACE] metrics->search->result: took: {},  took_wait: {}, file_count: {}, scan_size: {}",
+        "[TRACE] promql->search->result: took: {},  took_wait: {}, file_count: {}, scan_size: {}",
         start.elapsed().as_millis(),
         took_wait,
         file_count,
@@ -259,29 +263,6 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     );
 
     Ok(values)
-}
-
-fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = FxHashMap::default();
-    let mut merged_metrics: std::collections::HashMap<Signature, Vec<Arc<Label>>, std::hash::BuildHasherDefault<rustc_hash::FxHasher>> = FxHashMap::default();
-    series.iter().for_each(|v| {
-        let labels: Labels = v.metric.iter().map(|v| Arc::new(Label::from(v))).collect();
-        let value: Sample = v.value.as_ref().unwrap().into();
-        merged_data.insert(signature(&labels), value);
-        merged_metrics.insert(signature(&labels), labels);
-    });
-    let merged_data = merged_data
-        .into_iter()
-        .map(|(sig, value)| InstantValue {
-            labels: merged_metrics.get(&sig).unwrap().to_owned(),
-            value,
-        })
-        .collect::<Vec<_>>();
-
-    // sort data
-    let mut value = Value::Vector(merged_data);
-    value.sort();
-    value
 }
 
 fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
@@ -309,6 +290,41 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
     let mut value = Value::Matrix(merged_data);
     value.sort();
     value
+}
+
+fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
+    let mut merged_data = FxHashMap::default();
+    let mut merged_metrics: std::collections::HashMap<
+        Signature,
+        Vec<Arc<Label>>,
+        std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
+    > = FxHashMap::default();
+    series.iter().for_each(|v| {
+        let labels: Labels = v.metric.iter().map(|v| Arc::new(Label::from(v))).collect();
+        let value: Sample = v.value.as_ref().unwrap().into();
+        merged_data.insert(signature(&labels), value);
+        merged_metrics.insert(signature(&labels), labels);
+    });
+    let merged_data = merged_data
+        .into_iter()
+        .map(|(sig, value)| InstantValue {
+            labels: merged_metrics.get(&sig).unwrap().to_owned(),
+            value,
+        })
+        .collect::<Vec<_>>();
+
+    // sort data
+    let mut value = Value::Vector(merged_data);
+    value.sort();
+    value
+}
+
+fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
+    let mut value: f64 = 0.0;
+    series.iter().for_each(|v| {
+        value = v.scalar.unwrap();
+    });
+    Value::Float(value)
 }
 
 struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);

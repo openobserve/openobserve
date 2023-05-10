@@ -171,7 +171,7 @@ pub async fn search(
         let sql = sql.clone();
         let session = meta::search::Session {
             id: format!("{session_id}-{ver}"),
-            data_type: SessionType::Remote,
+            data_type: SessionType::Storage,
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
@@ -252,7 +252,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
 
     let mut files = Vec::new();
     for file in results {
-        if sql.match_source(&file, false, stream_type).await {
+        if sql.match_source(&file, false, false, stream_type).await {
             files.push(file.clone());
         }
     }

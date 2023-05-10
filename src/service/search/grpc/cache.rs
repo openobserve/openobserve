@@ -92,7 +92,7 @@ pub async fn search(
 
     let session = meta::search::Session {
         id: session_id.to_string(),
-        data_type: SessionType::Cache,
+        data_type: SessionType::Wal,
     };
     let result = match super::datafusion::exec::sql(
         &session,
@@ -118,7 +118,7 @@ pub async fn search(
     Ok((result, file_count, scan_size as usize))
 }
 
-/// get file list from local cache, no need match_source, each file will be searched
+/// get file list from local wal, no need match_source, each file will be searched
 #[inline]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let pattern = format!(
@@ -142,25 +142,28 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
         let source_file = format!("{file_path}/{file_name}");
-        if sql.match_source(&source_file, false, stream_type).await {
+        if sql
+            .match_source(&source_file, false, true, stream_type)
+            .await
+        {
             result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
         }
     }
     Ok(result)
 }
 
-/// Searching for marking searching in cache
+/// Searching for marking searching in wal
 struct Searching;
 
 impl Searching {
     pub fn new() -> Self {
-        config::SEARCHING_IN_CACHE.store(1, Ordering::Relaxed);
+        config::SEARCHING_IN_WAL.store(1, Ordering::Relaxed);
         Searching
     }
 }
 
 impl Drop for Searching {
     fn drop(&mut self) {
-        config::SEARCHING_IN_CACHE.store(0, Ordering::Relaxed);
+        config::SEARCHING_IN_WAL.store(0, Ordering::Relaxed);
     }
 }

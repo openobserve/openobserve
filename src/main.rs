@@ -53,6 +53,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cli().await? {
         return Ok(());
     }
+
     let _guard;
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zo-{}", CONFIG.common.instance_name);
@@ -81,8 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .with(tracing_subscriber::fmt::layer())
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .init();
-    }
-    if CONFIG.common.sentry_enabled {
+    } else if CONFIG.common.sentry_enabled {
         let mut log_builder = env_logger::builder();
         log_builder.parse_filters(&CONFIG.log.level);
         log::set_boxed_logger(Box::new(

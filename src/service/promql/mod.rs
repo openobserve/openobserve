@@ -19,7 +19,7 @@ mod aggregations;
 mod engine;
 mod functions;
 pub mod search;
-mod value;
+pub mod value;
 
 pub use engine::QueryEngine;
 

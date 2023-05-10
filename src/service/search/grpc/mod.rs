@@ -20,6 +20,7 @@ use tracing::{info_span, Instrument};
 
 use super::datafusion;
 use crate::handler::grpc::cluster_rpc;
+use crate::infra::cluster;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
@@ -49,7 +50,14 @@ pub async fn search(
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let task1 = tokio::task::spawn(
-        async move { cache::search(&session_id1, sql1, stream_type).await }.instrument(span1),
+        async move {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                cache::search(&session_id1, sql1, stream_type).await
+            } else {
+                Ok((HashMap::new(), 0, 0))
+            }
+        }
+        .instrument(span1),
     );
 
     let span2 = info_span!("service:search:grpc:in_storage");
