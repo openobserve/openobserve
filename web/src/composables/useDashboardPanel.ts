@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import StreamService from '@/services/stream';
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -93,15 +93,43 @@ const useDashboardPanelData = () => {
     return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
 
+  const isAddXAxisNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case 'pie':
+      case 'donut':
+        return dashboardPanelData.data.fields.x.length >= 1
+      case 'metric':
+        return dashboardPanelData.data.fields.x.length >= 0
+      case 'table':
+        return false
+      default:
+        return dashboardPanelData.data.fields.x.length >= 2;
+    }
+  })
+
+  const isAddYAxisNotAllowed = computed((e: any) => {
+    switch (dashboardPanelData.data.type) {
+      case 'pie':
+      case 'donut':
+        return dashboardPanelData.data.fields.y.length >= 1
+      case 'metric':
+        return dashboardPanelData.data.fields.y.length >= 1
+      case 'stacked':
+      case 'h-stacked':
+        return dashboardPanelData.data.fields.y.length >= 1
+      default:
+        return false;
+    }
+  })
+
   const addXAxisItem = (row: any) => {
     if(!dashboardPanelData.data.fields.x) {
       dashboardPanelData.data.fields.x = []
     }
 
-    // TODO: condition for all chart type
-    if(dashboardPanelData.data.fields.x.length >= 1){
+    if(isAddXAxisNotAllowed.value){
       return;
-    } 
+    }
 
     // check for existing field
     if(!dashboardPanelData.data.fields.x.find((it:any) => it.column == row.name)) {
@@ -113,6 +141,8 @@ const useDashboardPanelData = () => {
         aggregationFunction: (row.name == store.state.zoConfig.timestamp_column) ? 'histogram' : null
       })
     }
+
+    updateArrayAlias()
   }
 
   const addYAxisItem = (row: any) => {
@@ -120,15 +150,36 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.fields.y = []
     }
 
+    if(isAddYAxisNotAllowed.value){
+      return;
+    }
+
     if(!dashboardPanelData.data.fields.y.find((it:any) => it.column == row.name)) {
       dashboardPanelData.data.fields.y.push({
         label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
         alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : row.name,
         column: row.name,
-        color: colors[dashboardPanelData.data.fields.y.length % colors.length],
+        color: getNewColorValue(),
         aggregationFunction: row.type == 'Utf8' ? 'count-distinct' : row.type == 'Int64' ? 'sum' : 'count'
       })
     }
+    updateArrayAlias()
+  }
+
+  // get new color value based on existing color from the chart
+  const getNewColorValue = () => {
+   const YAxisColor = dashboardPanelData.data.fields.y.map((it: any)=> it.color)
+   let newColor = colors.filter((el:any) => !YAxisColor.includes(el));
+    if(!newColor.length){
+      newColor = colors
+    }
+    return newColor[0]
+  }
+
+  // update X or Y axis aliases when new value pushes into the X and Y axes arrays
+  const updateArrayAlias = () => {
+    dashboardPanelData.data.fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'x_axis_' + (index + 1) : it.column )
+    dashboardPanelData.data.fields.y.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'y_axis_' + (index + 1) : it.column )
   }
 
 
@@ -181,7 +232,6 @@ const useDashboardPanelData = () => {
 
     // remove any existing data
     const find = dashboardPanelData.meta.filterValue.findIndex((it: any) => it.column == name)
-    console.log('find: ' , find)
     if (find >= 0) {
       dashboardPanelData.meta.filterValue.splice(find, 1);
     }
@@ -228,7 +278,9 @@ const useDashboardPanelData = () => {
     removeYAxisItem,
     removeFilterItem,
     addFilteredItem,
-    removeXYFilters
+    removeXYFilters,
+    isAddXAxisNotAllowed,
+    isAddYAxisNotAllowed
   };
 };
 
