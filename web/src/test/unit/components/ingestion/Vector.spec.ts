@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-import Vector from "@/components/ingestion/Vector.vue";
+import Vector from "@/components/ingestion/logs/Vector.vue";
 
 installQuasar();
 const store = createStore({
