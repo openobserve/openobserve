@@ -33,6 +33,7 @@ use super::request::prom;
 use super::request::search;
 use super::request::status;
 use super::request::stream;
+use super::request::syslog;
 use super::request::traces::*;
 use super::request::users;
 use crate::infra::config::CONFIG;
@@ -180,7 +181,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(kv::get)
             .service(kv::set)
             .service(kv::delete)
-            .service(kv::list),
+            .service(kv::list)
+            .service(syslog::list_routes)
+            .service(syslog::create_route)
+            .service(syslog::delete_route)
+            .service(syslog::update_route),
     );
 }
 

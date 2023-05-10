@@ -83,6 +83,7 @@ pub struct Config {
     pub etcd: Etcd,
     pub sled: Sled,
     pub s3: S3,
+    pub tcp: TCP,
 }
 
 #[derive(EnvConfig)]
@@ -109,6 +110,14 @@ pub struct Grpc {
     pub org_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
+}
+
+#[derive(EnvConfig)]
+pub struct TCP {
+    #[env_config(name = "ZO_TCP_PORT", default = 12345)]
+    pub tcp_port: u16,
+    #[env_config(name = "ZO_UDP_PORT", default = 12346)]
+    pub udp_port: u16,
 }
 
 #[derive(EnvConfig)]

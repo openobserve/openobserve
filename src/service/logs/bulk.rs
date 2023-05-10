@@ -184,8 +184,8 @@ pub async fn ingest(
                 ret_value = crate::service::ingestion::apply_stream_transform(
                     transforms,
                     &ret_value,
-                    &lua,
-                    &stream_lua_map,
+                    Some(&lua),
+                    Some(&stream_lua_map),
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,

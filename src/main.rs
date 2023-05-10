@@ -20,10 +20,12 @@ use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
 use std::collections::HashMap;
+
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::net::{TcpListener, UdpSocket};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::prelude::*;
@@ -38,6 +40,7 @@ use zincobserve::handler::grpc::request::{
 use zincobserve::handler::http::router::{
     get_basic_routes, get_other_service_routes, get_service_routes,
 };
+use zincobserve::handler::tcp_udp_uds::{tcp_server, udp_server};
 use zincobserve::infra::cluster;
 use zincobserve::infra::config::{self, CONFIG};
 use zincobserve::infra::file_lock;
@@ -145,6 +148,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // metrics
     let prometheus = metrics::create_prometheus_handler();
+
+    //TCP UDP Server
+    let tcp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.tcp_port).parse()?;
+    let udp_addr: SocketAddr = format!("0.0.0.0:{}", CONFIG.tcp.udp_port).parse()?;
+    let tcp_listener = TcpListener::bind(tcp_addr).await?;
+    let udp_socket = UdpSocket::bind(udp_addr).await?;
+    tokio::task::spawn(async move {
+        _ = tcp_server(tcp_listener).await;
+    });
+
+    tokio::task::spawn(async move {
+        _ = udp_server(udp_socket).await;
+    });
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));

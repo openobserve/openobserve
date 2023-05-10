@@ -29,6 +29,7 @@ pub mod router;
 pub mod schema;
 pub mod search;
 pub mod stream;
+pub mod syslogs_route;
 pub mod traces;
 pub mod triggers;
 pub mod users;

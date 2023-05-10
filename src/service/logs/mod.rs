@@ -30,6 +30,7 @@ pub mod bulk;
 pub mod json;
 pub mod kinesis_firehose;
 pub mod multi;
+pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 

@@ -71,16 +71,20 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program, row: &Value) -
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn lua_transform(lua: &Lua, row: &Value, func: &Function) -> Value {
-    let input = lua.to_value(&row).unwrap();
-    let _res = func.call::<_, LuaValue>(input);
-    match _res {
-        Ok(res) => lua.from_value(res).unwrap(),
-        Err(err) => {
-            log::error!("Err from lua {:?}", err.to_string());
-            //Value::Null
-            row.clone()
+pub fn lua_transform(in_lua: Option<&Lua>, row: &Value, func: &Function) -> Value {
+    match in_lua {
+        Some(lua) => {
+            let input = lua.to_value(&row).unwrap();
+            let _res = func.call::<_, LuaValue>(input);
+            match _res {
+                Ok(res) => lua.from_value(res).unwrap(),
+                Err(err) => {
+                    log::error!("Err from lua {:?}", err.to_string());
+                    row.clone()
+                }
+            }
         }
+        None => row.clone(),
     }
 }
 
@@ -113,7 +117,7 @@ pub async fn get_stream_transforms<'a>(
             &org_id,
             &stream_name,
             stream_type,
-            lua,
+            Some(lua),
         );
     stream_transform_map.insert(key, _local_tans);
 }
@@ -216,7 +220,7 @@ pub fn register_stream_transforms<'a>(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    lua: &'a Lua,
+    lua: Option<&'a Lua>,
 ) -> (
     Vec<StreamTransform>,
     AHashMap<String, Function<'a>>,
@@ -233,7 +237,9 @@ pub fn register_stream_transforms<'a>(
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.transform.name);
             if trans.transform.trans_type.is_some() && trans.transform.trans_type.unwrap() == 1 {
-                if let Some(local_fn) = load_lua_transform(lua, trans.transform.function.clone()) {
+                if let Some(local_fn) =
+                    load_lua_transform(lua.unwrap(), trans.transform.function.clone())
+                {
                     stream_lua_map.insert(func_key, local_fn.to_owned());
                 }
             } else if let Ok(program) = compile_vrl_function(&trans.transform.function) {
@@ -249,17 +255,22 @@ pub fn register_stream_transforms<'a>(
 pub fn apply_stream_transform<'a>(
     local_tans: &Vec<StreamTransform>,
     value: &'a Value,
-    lua: &'a Lua,
-    stream_lua_map: &'a AHashMap<String, Function>,
+    lua: Option<&'a Lua>,
+    stream_lua_map: Option<&'a AHashMap<String, Function>>,
     stream_vrl_map: &'a AHashMap<String, Program>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Value {
     let mut value = value.clone();
+    let empty_map = AHashMap::new();
     for trans in local_tans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
-        if stream_lua_map.contains_key(&func_key) {
-            value = lua_transform(lua, &value, stream_lua_map.get(&func_key).unwrap());
+        let local_map = match stream_lua_map {
+            Some(stream_lua_map) => stream_lua_map,
+            None => &empty_map,
+        };
+        if local_map.contains_key(&func_key) && lua.is_some() {
+            value = lua_transform(lua, &value, local_map.get(&func_key).unwrap());
         } else if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             value = apply_vrl_fn(
                 runtime,
