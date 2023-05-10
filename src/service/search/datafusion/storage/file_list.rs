@@ -24,9 +24,8 @@ lazy_static! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SessionType {
-    Cache,
-    Local,
-    Remote,
+    Wal,
+    Storage,
 }
 
 pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {

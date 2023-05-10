@@ -89,7 +89,7 @@ pub async fn sql(
         }
     };
 
-    let prefix = if session.data_type.eq(&file_list::SessionType::Cache) {
+    let prefix = if session.data_type.eq(&file_list::SessionType::Wal) {
         format!(
             "{}files/{}/{stream_type}/{}/",
             &CONFIG.common.data_wal_dir, sql.org_id, sql.stream_name
@@ -114,7 +114,7 @@ pub async fn sql(
 
     let mut config =
         ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
-    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Cache) {
+    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Wal) {
         config = config.infer_schema(&ctx.state()).await.unwrap();
         let table = ListingTable::try_new(config.clone())?;
         let infered_schema = table.schema();
@@ -886,7 +886,7 @@ pub async fn merge_parquet_files(
     Ok(file_meta)
 }
 
-fn create_runtime_env() -> Result<RuntimeEnv> {
+pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let mem = super::storage::memory::InMemory::new();

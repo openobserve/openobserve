@@ -16,23 +16,24 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::cluster_rpc::event_server::Event;
-use crate::handler::grpc::cluster_rpc::EmptyResponse;
-use crate::handler::grpc::cluster_rpc::FileList;
+use crate::handler::grpc::cluster_rpc::metrics_server::Metrics;
+use crate::handler::grpc::cluster_rpc::MetricsQueryRequest;
+use crate::handler::grpc::cluster_rpc::MetricsQueryResponse;
+use crate::infra::errors;
 use crate::infra::metrics;
-use crate::meta::common::FileMeta;
-use crate::service::db::file_list;
+use crate::meta;
+use crate::service::promql::search as SearchService;
 
 #[derive(Default)]
-pub struct Eventer {}
+pub struct Querier {}
 
 #[tonic::async_trait]
-impl Event for Eventer {
-    #[tracing::instrument(name = "grpc:event:SendFileList:enter", skip(self, req))]
-    async fn send_file_list(
+impl Metrics for Querier {
+    #[tracing::instrument(name = "grpc:metrics:enter", skip_all)]
+    async fn query(
         &self,
-        req: Request<FileList>,
-    ) -> Result<Response<EmptyResponse>, Status> {
+        req: Request<MetricsQueryRequest>,
+    ) -> Result<Response<MetricsQueryResponse>, Status> {
         let start = std::time::Instant::now();
         let parent_cx = global::get_text_map_propagator(|prop| {
             prop.extract(&super::MetadataMap(req.metadata()))
@@ -40,36 +41,35 @@ impl Event for Eventer {
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
-        for file in req.items.iter() {
-            log::info!("received event:file, {:?}", file);
-            if let Err(e) = file_list::progress(
-                &file.key,
-                FileMeta::from(file.meta.as_ref().unwrap()),
-                file.deleted,
-            )
-            .await
-            {
+        let org_id = req.org_id.clone();
+        let stream_type = meta::StreamType::Metrics.to_string();
+        let result = match SearchService::grpc::search(req).await {
+            Ok(res) => res,
+            Err(err) => {
                 // metrics
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .with_label_values(&["/prom/v1/query", "500", &org_id, "", &stream_type])
                     .observe(time);
                 metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .with_label_values(&["/prom/v1/query", "500", &org_id, "", &stream_type])
                     .inc();
-                return Err(Status::internal(e.to_string()));
+                return Err(match err {
+                    errors::Error::ErrorCode(code) => Status::internal(code.to_json()),
+                    _ => Status::internal(err.to_string()),
+                });
             }
-        }
+        };
 
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/prom/v1/query", "200", &org_id, "", &stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/prom/v1/query", "200", &org_id, "", &stream_type])
             .inc();
 
-        Ok(Response::new(EmptyResponse {}))
+        Ok(Response::new(result))
     }
 }

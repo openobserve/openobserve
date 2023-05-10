@@ -59,13 +59,6 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
     None
 }
 
-// generate partition key for query
-pub fn get_partition_key_query(s: &str) -> String {
-    let mut s = s.replace(['/', '.'], "_");
-    s.truncate(100);
-    s
-}
-
 pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
     let local_map = value.as_object_mut().unwrap();
     //let mut error_msg = String::new();

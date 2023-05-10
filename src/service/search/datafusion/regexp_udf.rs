@@ -81,7 +81,7 @@ pub fn regex_match_expr_impl(matches: bool) -> ScalarFunctionImplementation {
             }
             ColumnarValue::Scalar(ScalarValue::Utf8(pattern)) => pattern,
             ColumnarValue::Scalar(arg) => {
-                return Err(DataFusionError::Internal(format!(
+                return Err(DataFusionError::Plan(format!(
                     "Expected string pattern to regex_match({matches}), got: {arg:?}"
                 )))
             }
@@ -97,9 +97,8 @@ pub fn regex_match_expr_impl(matches: bool) -> ScalarFunctionImplementation {
         // the golang regexp library which is different than Rust's regexp
         let pattern = clean_non_meta_escapes(pattern);
 
-        let pattern = regex::Regex::new(&pattern).map_err(|e| {
-            DataFusionError::Internal(format!("error compiling regex pattern: {e}"))
-        })?;
+        let pattern = regex::Regex::new(&pattern)
+            .map_err(|e| DataFusionError::Plan(format!("error compiling regex pattern: {e}")))?;
 
         match &args[0] {
             ColumnarValue::Array(arr) => {
@@ -118,7 +117,7 @@ pub fn regex_match_expr_impl(matches: bool) -> ScalarFunctionImplementation {
                 let res = row.as_ref().map(|v| pattern.is_match(v) == matches);
                 Ok(ColumnarValue::Scalar(ScalarValue::Boolean(res)))
             }
-            ColumnarValue::Scalar(v) => Err(DataFusionError::Internal(format!(
+            ColumnarValue::Scalar(v) => Err(DataFusionError::Plan(format!(
                 "regex_match({matches}) expected first argument to be utf8, got ('{v}')"
             ))),
         }

@@ -37,7 +37,7 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
-pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
+pub static SEARCHING_IN_WAL: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);

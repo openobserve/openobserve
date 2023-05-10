@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use opentelemetry::global;
-use std::time::Instant;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -29,12 +28,12 @@ pub struct Searcher {}
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:enter", skip(self, req))]
+    #[tracing::instrument(name = "grpc:search:enter", skip_all)]
     async fn search(
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let parent_cx = global::get_text_map_propagator(|prop| {
             prop.extract(&super::MetadataMap(req.metadata()))
         });
@@ -43,7 +42,7 @@ impl Search for Searcher {
         let req = req.get_ref();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.as_str();
-        let result = match SearchService::exec::search(req).await {
+        let result = match SearchService::grpc::search(req).await {
             Ok(res) => res,
             Err(err) => {
                 // metrics

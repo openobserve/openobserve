@@ -151,7 +151,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             loop {
-                                let searching = config::SEARCHING_IN_CACHE.load(Ordering::Relaxed);
+                                let searching = config::SEARCHING_IN_WAL.load(Ordering::Relaxed);
                                 if searching == 0 {
                                     break;
                                 } else {

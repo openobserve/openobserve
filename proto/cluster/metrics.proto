@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.zinc.observe.cluster";
+option java_outer_classname = "clusterProto";
+
+package cluster;
+
+import "cluster/common.proto";
+
+service Metrics {
+  rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
+}
+
+// Search request query
+message MetricsQueryStmt {
+    string            query = 1;
+    bool     is_range_query = 2;
+    int64             start = 3;
+    int64               end = 4;
+    int64              step = 5; 
+}
+
+// Search request
+message MetricsQueryRequest {
+    Job                         job = 1;
+    string                   org_id = 2; 
+    SearchType                stype = 3;
+    MetricsQueryStmt          query = 4; 
+}
+
+// The response message containing the greetings
+message MetricsQueryResponse {
+    Job                         job = 1;
+    int32                      took = 2;
+    int32                file_count = 3;
+    int32                 scan_size = 4; // unit: mb 
+    string              result_type = 5; // vector, matrix, scalar
+    repeated Series          result = 6; 
+}
+
+message Series {
+    repeated Label  metric = 1;
+    repeated Sample values = 2;
+    optional Sample  value = 3;
+    optional double scalar = 4;
+}
+
+message Label {
+    string  name = 1;
+    string value = 2;
+}
+
+message Sample {
+    int64   time = 1;
+    double value = 2;
+}
