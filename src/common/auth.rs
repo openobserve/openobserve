@@ -43,9 +43,8 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub async fn is_root_user(user_id: &str) -> bool {
-    let key = format!("{DEFAULT_ORG}/{user_id}");
-    match USERS.get(&key) {
+pub fn is_root_user(user_id: &str) -> bool {
+    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
@@ -58,7 +57,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_is_root_user() {
-        assert!(!is_root_user("dummy").await);
+        assert!(!is_root_user("dummy"));
     }
 
     #[actix_web::test]
@@ -74,8 +73,8 @@ mod tests {
             },
         )
         .await;
-        assert!(is_root_user("root@example.com").await);
-        assert!(!is_root_user("root2@example.com").await);
+        assert!(is_root_user("root@example.com"));
+        assert!(!is_root_user("root2@example.com"));
     }
 
     #[actix_web::test]

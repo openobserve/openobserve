@@ -32,6 +32,7 @@
         <div>Spans: {{ spanList.length - 1 }}</div>
       </div>
       <trace-chart
+        class="trace-details-chart"
         id="trace_details_gantt_chart"
         ref="plotChart"
         class="trace-details-chart"
@@ -398,10 +399,10 @@ export default defineComponent({
           ticksuffix: "ms",
           showgrid: true,
           zeroline: true,
+          range: [],
           rangeslider: {
             visible: true,
             bgcolor: "#d5d5d5",
-            yaxis: {},
           },
         },
         yaxis: {
@@ -420,6 +421,7 @@ export default defineComponent({
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
           traceTree.value[0].lowestStartTime;
+
         shapes.push({
           x0: absoluteStartTime,
           x1: Number(
@@ -444,6 +446,10 @@ export default defineComponent({
         layout.xaxis.tickvals.push(tic.value);
       });
       layout.shapes = shapes;
+      const endTime = Math.ceil(
+        traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime
+      );
+      layout.xaxis.range = [0, endTime > 0 ? endTime : 1];
       traceChart.value.layout = layout;
       if (plotChart.value) plotChart.value?.reDraw();
     };
@@ -543,7 +549,7 @@ $traceChartHeight: 200px;
 
   .trace-details-chart {
     .rangeslider-slidebox {
-      fill: #5960b2 !important;
+      fill: #7076be !important;
     }
     .rangeslider-mask-max,
     .rangeslider-mask-min {

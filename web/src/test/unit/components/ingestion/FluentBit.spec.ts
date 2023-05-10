@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { createStore } from "vuex";
-import FluentBit from "@/components/ingestion/FluentBit.vue";
+import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 
 installQuasar();
 const store = createStore({

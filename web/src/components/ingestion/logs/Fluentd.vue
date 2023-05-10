@@ -14,46 +14,51 @@
 -->
 
 <template>
-  <div class="tabContent">
+  <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="fluent-bit-title-text">Fluent Bit</div>
+      <div class="title" data-test="fluentd-title-text">Fluentd</div>
       <div class="copy_action">
         <q-btn
-          data-test="fluent-bit-copy-btn"
+          data-test="fluentd-copy-btn"
           flat
           round
           size="0.5rem"
           padding="0.6rem"
           :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', fluentbitContent)"
+          @click="$emit('copy-to-clipboard-fn', fluentdContent)"
         />
       </div>
     </div>
-    <pre ref="fluentbitContent" data-test="fluent-bit-content-text">
-[OUTPUT]
-  Name http
-  Match *
-  URI /api/{{ currOrgIdentifier }}/default/_json
-  Host {{ endpoint.host }}
-  Port {{ endpoint.port }}
-  tls {{ endpoint.tls }}
-  Format json
-  Json_date_key    {{ store.state.zoConfig.timestamp_column }}
-  Json_date_format iso8601
-  HTTP_User {{ currUserEmail }}
-  HTTP_Passwd {{ store.state.organizationPasscode }}</pre
+    <pre ref="fluentdContent" data-test="fluentd-content-text">
+&lt;source&gt;
+  @type forward
+  port 24224
+  bind 0.0.0.0
+&lt;/source&gt;
+
+&lt;match **&gt;
+  @type http
+  endpoint {{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json
+  content_type json
+  json_array true
+  &lt;auth&gt;
+    method basic
+    username {{ currUserEmail }}
+    password {{ store.state.organizationPasscode }}
+  &lt;/auth&gt;
+&lt;/match&gt;</pre
     >
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, type Ref } from "vue";
-import config from "../../aws-exports";
+import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL } from "../../../utils/zincutils";
 import type { Endpoint } from "@/ts/interfaces";
 export default defineComponent({
-  name: "fluentbit-mechanism",
+  name: "fluentd-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -79,12 +84,12 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const fluentbitContent = ref(null);
+    const fluentdContent = ref(null);
     return {
       store,
       config,
       endpoint,
-      fluentbitContent,
+      fluentdContent,
       getImageURL,
     };
   },
