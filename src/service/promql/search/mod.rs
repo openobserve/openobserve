@@ -25,12 +25,12 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster::{self, get_internal_grpc_token};
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::infra::errors::{Error, ErrorCodes, Result};
 use crate::service::promql::value::*;
 
 pub mod grpc;
 
-pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Value, Error> {
+pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Value> {
     let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
@@ -39,14 +39,14 @@ pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Va
 }
 
 #[inline(always)]
-async fn get_queue_lock() -> Result<etcd::Locker, Error> {
+async fn get_queue_lock() -> Result<etcd::Locker> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
     lock.lock(0).await.map_err(server_internal_error)?;
     Ok(lock)
 }
 
 #[instrument(name = "service:promql:search:cluster", skip(req))]
-async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value, Error> {
+async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
     let start = std::time::Instant::now();
 
     // get a cluster search queue lock

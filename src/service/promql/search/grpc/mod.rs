@@ -332,10 +332,9 @@ pub async fn register_table(
     file_type: FileType,
 ) -> datafusion::error::Result<SessionContext> {
     if files.is_empty() {
-        return Err(DataFusionError::Execution(format!(
-            "No files found for stream {stream_name}",
-        )));
+        return Ok(SessionContext::new());
     }
+
     let start = std::time::Instant::now();
     let runtime_env = search::datafusion::exec::create_runtime_env()?;
     let session_config = SessionConfig::new()

@@ -311,7 +311,15 @@ impl QueryEngine {
             .table_provider
             .create_context(table_name, (start, end), &filters)
             .await?;
-        let table = ctx.table(table_name).await?;
+        let table = match ctx.table(table_name).await {
+            Ok(v) => v,
+            Err(_) => {
+                self.metrics_cache
+                    .insert(table_name.to_string(), Value::None);
+                return Ok(()); // table not found
+            }
+        };
+
         let mut df_group = table.clone().filter(
             col(FIELD_TIME)
                 .gt(lit(start))
