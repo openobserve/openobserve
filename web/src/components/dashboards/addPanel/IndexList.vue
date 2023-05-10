@@ -112,11 +112,7 @@
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="
-                      dashboardPanelData.data.fields.x.length >= 1
-                        ? true
-                        : false
-                    "
+                    :disabled="isAddXAxisNotAllowed"
                     @click="addXAxisItem(props.row)"
                   >
                     <div>
@@ -129,12 +125,7 @@
                     color="white"
                     padding="sm"
                     text-color="black"
-                    :disabled="
-                      dashboardPanelData.data.fields.y.length >= 1 &&
-                      dashboardPanelData.data.type == 'pie'
-                        ? true
-                        : false
-                    "
+                    :disabled="isAddYAxisNotAllowed"
                     @click="addYAxisItem(props.row)"
                   >
                     <div>
@@ -178,7 +169,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, watch, onActivated } from "vue";
+import { defineComponent, reactive, ref, watch, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -188,9 +179,9 @@ import IndexService from "../../../services/index";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  props: ["selectedXAxisValue", "selectedYAxisValue"],
+  props: ["selectedXAxisValue", "selectedYAxisValue", 'editMode'],
   emits: ["update:selectedXAxisValue", "update:selectedYAxisValue"],
-  setup() {
+  setup(props) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -202,7 +193,7 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed } =
       useDashboardPanelData();
 
     onActivated(() => {
@@ -214,6 +205,8 @@ export default defineComponent({
     watch(
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
+        // console.log("stream:", dashboardPanelData.data.fields.stream);
+        
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
         );
@@ -223,20 +216,24 @@ export default defineComponent({
     );
 
     watch(()=> [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], ()=> {
-      dashboardPanelData.data.fields.stream = ""
-      data.indexOptions = dashboardPanelData.meta.stream.streamResults
-        .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
-        .map((data: any) => {
-          return data.name;
-        });
+      
+        if(!props.editMode){
+          dashboardPanelData.data.fields.stream = ""
+        }
+      
+        data.indexOptions = dashboardPanelData.meta.stream.streamResults
+          .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
+          .map((data: any) => {
+            return data.name;
+          });
 
-      // set the first stream as the selected stream when the api loads the data
-      if (
-        !dashboardPanelData.data.fields.stream &&
-        data.indexOptions.length > 0
-      ) {
-        dashboardPanelData.data.fields.stream = data.indexOptions[0];
-      }
+        // set the first stream as the selected stream when the api loads the data
+        if (!props.editMode &&
+          !dashboardPanelData.data.fields.stream &&
+          data.indexOptions.length > 0
+        ) {
+          dashboardPanelData.data.fields.stream = data.indexOptions[0];
+        }
     })
 
     // update the current list fields if any of the lists changes
@@ -288,7 +285,6 @@ export default defineComponent({
     };
 
     const onDragStart = (e: any, item: any) => {
-      console.log("dragstart", e, item);
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
     };
@@ -335,6 +331,8 @@ export default defineComponent({
       dashboardPanelData,
       filterStreamFn,
       filteredStreams,
+      isAddXAxisNotAllowed,
+      isAddYAxisNotAllowed
     };
   },
 });
