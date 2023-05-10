@@ -15,7 +15,7 @@
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 80px">
+    <div class="q-pa-none" style="max-width: 90px;">
       <q-list separator>
         <q-item
           :class="
@@ -72,6 +72,16 @@ export default defineComponent({
         id: "h-bar",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
+        title: "Stacked",
+        id: "stacked",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        title: "H-Stacked",
+        id: "h-stacked",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
         title: "Line",
         id: "line",
@@ -80,6 +90,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
         title: "Pie",
         id: "pie",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        title: "Donut",
+        id: "donut",
       },
       {
         image:
@@ -91,6 +106,12 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
         title: "Table",
         id: "table",
+      },
+      {
+        image:
+          "img:" + getImageURL("images/dashboard/charts/123.png"),
+        title: "Metric Text",
+        id: "metric",
       },
     ]);
 
