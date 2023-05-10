@@ -78,7 +78,7 @@ use crate::meta;
         request::prom::metadata,
         request::prom::series,
         request::prom::labels,
-        request::prom::values,
+        request::prom::label_values,
         request::traces::traces_write,
     ),
     components(
