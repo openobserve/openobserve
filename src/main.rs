@@ -81,8 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .with(tracing_subscriber::fmt::layer())
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .init();
-    }
-    if CONFIG.common.sentry_enabled {
+    } else if CONFIG.common.sentry_enabled {
         let mut log_builder = env_logger::builder();
         log_builder.parse_filters(&CONFIG.log.level);
         log::set_boxed_logger(Box::new(

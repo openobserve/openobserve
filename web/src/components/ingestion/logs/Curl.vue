@@ -14,46 +14,38 @@
 -->
 
 <template>
-  <div class="tabContent">
+  <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Vector</div>
+      <div class="title" data-test="curl-title-text">CURL</div>
       <div class="copy_action">
         <q-btn
-          data-test="vector-copy-btn"
+          data-test="curl-copy-btn"
           flat
           round
           size="0.5rem"
           padding="0.6rem"
           :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', vectorContent)"
+          @click="$emit('copy-to-clipboard-fn', content)"
         />
       </div>
     </div>
-    <pre ref="vectorContent" data-test="vector-content-text">
-[sinks.zinc]
-type = "http"
-inputs = [ source or transform id ]
-uri = "{{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json"
-method = "post"
-auth.strategy = "basic"
-auth.user = "{{ currUserEmail }}"
-auth.password = "{{ store.state.organizationPasscode }}"
-compression = "gzip"
-encoding.codec = "json"
-encoding.timestamp_format = "rfc3339"
-healthcheck.enabled = false</pre
-    >
+    <pre ref="content" data-test="curl-content-text">
+curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
+        endpoint.url
+      }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
+    </pre>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../aws-exports";
+import { defineComponent, ref } from "vue";
+import type { Ref } from "vue";
+import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces";
+import { getImageURL } from "../../../utils/zincutils";
+import type { Endpoint } from "@/ts/interfaces/";
 export default defineComponent({
-  name: "vector-mechanism",
+  name: "curl-mechanism",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -79,12 +71,12 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const vectorContent = ref(null);
+    const content = ref(null);
     return {
       store,
       config,
       endpoint,
-      vectorContent,
+      content,
       getImageURL,
     };
   },
