@@ -141,6 +141,8 @@ const useDashboardPanelData = () => {
         aggregationFunction: (row.name == store.state.zoConfig.timestamp_column) ? 'histogram' : null
       })
     }
+
+    updateArrayAlias()
   }
 
   const addYAxisItem = (row: any) => {
@@ -157,10 +159,28 @@ const useDashboardPanelData = () => {
         label: !dashboardPanelData.data.customQuery ? generateLabelFromName(row.name) : row.name,
         alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : row.name,
         column: row.name,
-        color: colors[dashboardPanelData.data.fields.y.length % colors.length],
+        color: getNewColorValue(),
         aggregationFunction: row.type == 'Utf8' ? 'count-distinct' : row.type == 'Int64' ? 'sum' : 'count'
       })
     }
+    updateArrayAlias()
+  }
+
+  // get new color value based on existing color from the chart
+  const getNewColorValue = () => {
+   const YAxisColor = dashboardPanelData.data.fields.y.map((it: any)=> it.color)
+   console.log("-Yaxis color", JSON.stringify(YAxisColor))
+   let newColor = colors.filter((el:any) => !YAxisColor.includes(el));
+    if(!newColor.length){
+      newColor = colors
+    }
+    return newColor[0]
+  }
+
+  // update X or Y axis aliases when new value pushes into the X and Y axes arrays
+  const updateArrayAlias = () => {
+    dashboardPanelData.data.fields.x.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'x_axis_' + (index + 1) : it.column )
+    dashboardPanelData.data.fields.y.forEach((it:any, index:any) => it.alias = !dashboardPanelData.data.customQuery ? 'y_axis_' + (index + 1) : it.column )
   }
 
 
