@@ -37,20 +37,6 @@
         />
 
         <q-toolbar-title></q-toolbar-title>
-        <q-btn
-          class="q-ml-xs no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.openapi`)"
-          @click="navigateToOpenAPI(zoBackendUrl)"
-        />
-        <q-btn
-          class="q-ml-xs no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.docs`)"
-          @click="navigateToDocs()"
-        />
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
           <div
             type="warning"
@@ -74,6 +60,20 @@
             >Upgrade to PRO Plan</q-btn
           >
         </div>
+        <q-btn
+          class="q-ml-xs no-border"
+          size="13px"
+          no-caps
+          :label="t(`menu.openapi`)"
+          @click="navigateToOpenAPI(zoBackendUrl)"
+        />
+        <q-btn
+          class="q-ml-xs no-border"
+          size="13px"
+          no-caps
+          :label="t(`menu.docs`)"
+          @click="navigateToDocs()"
+        />
         <div class="languageWrapper">
           <q-btn-dropdown
             unelevated
@@ -550,12 +550,12 @@ export default defineComponent({
                 (customOrganization == "" || customOrganization == undefined))
             ) {
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-              useLocalOrganization(selectedOrg.value);
-              store.dispatch("setSelectedOrganization", selectedOrg.value);
+              useLocalOrganization(optiondata);
+              store.dispatch("setSelectedOrganization", optiondata);
             } else if (data.identifier == customOrganization) {
               selectedOrg.value = optiondata;
-              useLocalOrganization(selectedOrg.value);
-              store.dispatch("setSelectedOrganization", selectedOrg.value);
+              useLocalOrganization(optiondata);
+              store.dispatch("setSelectedOrganization", optiondata);
             }
             return optiondata;
           }

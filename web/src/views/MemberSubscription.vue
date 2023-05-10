@@ -14,12 +14,33 @@
 -->
 
 <template>
-  <q-page class="row justify-center items-center">
-    <h6 v-if="status == 'processing'">{{ message }}</h6>
-    <h6 v-else-if="status == 'error'">
-      Error while processing member subscription request.
-    </h6>
-    <h2 v-else>Thank you for your subscription.</h2>
+  <q-page>
+    <div
+      style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
+    >
+      Member Subscription
+    </div>
+    <div v-if="status == 'processing'">{{ message }}</div>
+    <div
+      v-else-if="status == 'error' && error == ''"
+      style="text-align: center"
+    >
+      Error while processing member subscription request.<br /><br />
+    </div>
+    <div
+      v-else-if="status == 'error' && error !== ''"
+      v-html="error"
+      class="subscription_message"
+    ></div>
+    <div v-else>Thank you for your subscription.</div>
+
+    <div
+      v-if="status == 'error' && error !== ''"
+      class="subscription_message q-btn-primary"
+    >
+      <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
+      <q-btn @click="ProcessSubscription(queryString, 'confirm')" class="q-mt-md">Confirm Member Subscription</q-btn>
+    </div>
   </q-page>
 </template>
 
@@ -38,16 +59,18 @@ export default defineComponent({
     return {
       status: "processing",
       message: "Please wait while we process your request...",
+      error: "",
+      queryString: this.$route.hash.split("=")[1],
     };
   },
   created() {
     const propArr = this.$route.hash.split("=");
-    this.ProcessSubscription(propArr[1]);
+    this.ProcessSubscription(propArr[1], "normal");
   },
   methods: {
-    async ProcessSubscription(s: any) {
+    async ProcessSubscription(s: any, action: string) {
       await organizationsService
-        .process_subscription(s)
+        .process_subscription(s, action)
         .then((res) => {
           this.status = "completed";
           const dismiss = this.$q.notify({
@@ -67,6 +90,7 @@ export default defineComponent({
         })
         .catch((e) => {
           this.status = "error";
+          this.error = e.response.data.error;
         });
     },
   },
@@ -76,8 +100,19 @@ export default defineComponent({
     const $router = useRouter();
 
     return {
+      $router,
       $store,
     };
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.subscription_message {
+  font-size: 16px;
+  line-height: 30px;
+  width: 70%;
+  margin: auto;
+  text-align: left;
+}
+</style>
