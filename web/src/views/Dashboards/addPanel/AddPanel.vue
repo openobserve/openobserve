@@ -64,7 +64,7 @@
                 <div style="flex:1;">
                   <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
                 </div>
-                <DashboardErrorsComponent :errors="errorData" @clearClicked="clearErrors"/>
+                <DashboardErrorsComponent :errors="errorData"/>
                 <q-separator />
                 <SearchBar />
               </div>
@@ -374,10 +374,6 @@ export default defineComponent({
 
     }
 
-    const clearErrors = () => {
-      errorData.errors = []
-    }
-
     const savePanelChangesToDashboard = async (dashId: string) => {
       if (!isValid()) {
         return
@@ -426,7 +422,6 @@ export default defineComponent({
       editMode,
       selectedDate,
       errorData,
-      clearErrors
     };
   },
   methods: {

@@ -8,9 +8,6 @@
           <span class="text-subtitle2 text-weight-bold" style="color: red;">Errors ({{ props.errors.errors.length }})</span>
           <q-space />
         </div>
-        <div class="q-px-md">
-          <q-btn dense no-caps class="q-px-sm" label="Clear" @click="onClearBtnClick"></q-btn>
-        </div>
       </q-bar>
     </div>
     <div class="row" :style="!showErrors ? 'height: 0px;' : 'height: auto;'" style="overflow: hidden;">
@@ -32,7 +29,6 @@ import { useI18n } from "vue-i18n";
 export default defineComponent({
   name: "DashboardErrorsComponent",
   props: ["errors"],
-  emits: ["clearClicked"],
 
   setup(props, { emit }) {
     const showErrors = ref(false)
@@ -56,16 +52,10 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"))
     }
 
-    const onClearBtnClick = () => {
-      emit("clearClicked")
-      resizeChartEvent()
-    }
-
     return {
       props,
       t,
       onDropDownClick,
-      onClearBtnClick,
       showErrors
     }
   }
