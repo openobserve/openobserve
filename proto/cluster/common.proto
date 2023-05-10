@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "org.zinc.oxide.cluster";
+option java_package = "org.zinc.observe.cluster";
 option java_outer_classname = "clusterProto";
 
 package cluster;
@@ -25,6 +25,21 @@ enum StreamType {
     TRACES   = 2;
     METADATA = 3;
     FILELIST = 4;
+}
+
+// Search request type
+enum SearchType {
+    USER       = 0; // user input search request
+    CLUSTER    = 1; // cluster dispatch search request
+    CACHE_ONLY = 2; // ingester node just search local cache
+}
+
+// Job information for a request
+message Job {
+    string session_id = 1;
+    string        job = 2;
+    int32       stage = 3;
+    int32   partition = 4;
 }
 
 message EmptyResponse {}

@@ -27,7 +27,7 @@ use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
 use crate::meta::StreamType;
 use crate::service::stream::get_stream_setting_fts_fields;
-use crate::service::{db, file_list, logs};
+use crate::service::{db, file_list, get_partition_key_query};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -587,6 +587,7 @@ impl Sql {
         &self,
         source: &str,
         match_min_ts_only: bool,
+        is_wal: bool,
         stream_type: StreamType,
     ) -> bool {
         // match org_id & table
@@ -603,6 +604,10 @@ impl Sql {
         // check partition key
         if !self.filter_source_by_partition_key(source) {
             return false;
+        }
+
+        if is_wal {
+            return true;
         }
 
         // check time range
@@ -797,8 +802,8 @@ fn path_matches_by_partition_key<'a>(
     partitions: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) -> bool {
     !partitions.into_iter().any(|(k, v)| {
-        let field = logs::get_partition_key_query(&format!("{k}="));
-        let value = logs::get_partition_key_query(&format!("{k}={v}"));
+        let field = get_partition_key_query(&format!("{k}="));
+        let value = get_partition_key_query(&format!("{k}={v}"));
         find(path, &format!("/{field}")) && !find(path, &format!("/{value}/"))
     })
 }

@@ -21,7 +21,17 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 3] = ["/_search", "/_around", "/_values"];
+const QUERIER_ROUTES: [&str; 9] = [
+    "/_search",
+    "/_around",
+    "/_values",
+    "/prometheus/v1/series",
+    "/prometheus/v1/query_range",
+    "/prometheus/v1/query",
+    "/prometheus/v1/metadata",
+    "/prometheus/v1/labels",
+    "/prometheus/v1/label/",
+];
 
 #[inline]
 pub fn is_router() -> bool {

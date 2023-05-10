@@ -32,12 +32,12 @@ phases:
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
 
       # build zincobserve-mimalloc
-      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t zincobserve:latest-amd64-mimalloc -f deploy/build/Dockerfile.mimalloc.amd64 .
-      - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-      - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
+      # - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
+      # - docker build -t zincobserve:latest-amd64-mimalloc -f deploy/build/Dockerfile.mimalloc.amd64 .
+      # - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
+      # - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
+      # - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
+      # - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
 
 cache:
   paths:

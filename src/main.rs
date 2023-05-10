@@ -30,8 +30,11 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 use zincobserve::handler::grpc::auth::check_auth;
 use zincobserve::handler::grpc::cluster_rpc::event_server::EventServer;
+use zincobserve::handler::grpc::cluster_rpc::metrics_server::MetricsServer;
 use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
-use zincobserve::handler::grpc::request::{event::Eventer, search::Searcher, traces::TraceServer};
+use zincobserve::handler::grpc::request::{
+    event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
+};
 use zincobserve::handler::http::router::{
     get_basic_routes, get_other_service_routes, get_service_routes,
 };
@@ -53,6 +56,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if cli().await? {
         return Ok(());
     }
+
     let _guard;
     if CONFIG.common.tracing_enabled {
         let service_name = format!("zo-{}", CONFIG.common.instance_name);
@@ -110,12 +114,13 @@ async fn main() -> Result<(), anyhow::Error> {
     rx.await?;
     if !router::is_router() {
         let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-        let searcher = Searcher::default();
-        let search_svc = SearchServer::new(searcher)
+        let event_svc = EventServer::new(Eventer::default())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let eventer = Eventer::default();
-        let event_svc = EventServer::new(eventer)
+        let search_svc = SearchServer::new(Searcher::default())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+        let metrics_svc = MetricsServer::new(Querier::default())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         let tracer = TraceServer::default();
@@ -125,8 +130,9 @@ async fn main() -> Result<(), anyhow::Error> {
             log::info!("starting gRPC server at {}", gaddr);
             tonic::transport::Server::builder()
                 .layer(tonic::service::interceptor(check_auth))
-                .add_service(search_svc)
                 .add_service(event_svc)
+                .add_service(search_svc)
+                .add_service(metrics_svc)
                 .add_service(trace_svc)
                 .serve(gaddr)
                 .await

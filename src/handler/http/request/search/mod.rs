@@ -17,7 +17,6 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
-use std::time::Instant;
 
 use crate::common::base64;
 use crate::common::functions;
@@ -100,7 +99,7 @@ pub async fn search(
     in_req: HttpRequest,
     body: actix_web::web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -237,7 +236,7 @@ pub async fn around(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -465,7 +464,7 @@ pub async fn values(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();

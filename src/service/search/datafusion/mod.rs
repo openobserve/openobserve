@@ -16,8 +16,8 @@ use crate::meta::functions::ZoFunction;
 
 mod date_format_udf;
 pub mod exec;
-mod match_udf;
-mod regexp_udf;
+pub mod match_udf;
+pub mod regexp_udf;
 pub mod storage;
 mod time_range_udf;
 #[cfg(feature = "zo_functions")]

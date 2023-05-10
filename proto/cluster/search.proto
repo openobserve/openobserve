@@ -1,29 +1,15 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "org.zinc.oxide.cluster";
+option java_package = "org.zinc.observe.cluster";
 option java_outer_classname = "clusterProto";
 
 package cluster;
 
+import "cluster/common.proto";
 
 service Search {
   rpc Search (SearchRequest) returns (SearchResponse) {}
-}
-
-// Job information for a request
-message Job {
-    string session_id = 1;
-    string        job = 2;
-    int32       stage = 3;
-    int32   partition = 4;
-}
-
-// Search request type
-enum SearchType {
-    USER       = 0; // user input search request
-    CLUSTER    = 1; // cluster dispatch search request
-    CACHE_ONLY = 2; // ingester node just search local cache
 }
 
 // Search request query
@@ -43,13 +29,13 @@ message SearchQuery {
 
 // Search request
 message SearchRequest {
-    Job                        job = 1;
-    string                  org_id = 2;
-    string             stream_type = 3;
-    SearchType               stype = 4;
-    SearchQuery              query = 5;
-    repeated string      file_list = 6;
-    repeated SearchAggRequest aggs = 7;
+    Job                         job = 1;
+    string                   org_id = 2;
+    string              stream_type = 3;
+    SearchType                stype = 4;
+    SearchQuery               query = 5;
+    repeated string       file_list = 6;
+    repeated SearchAggRequest  aggs = 7;
 }
 
 // The response message containing the greetings

@@ -37,10 +37,17 @@ fn main() -> Result<()> {
         .type_attribute("SearchAggRequest", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggResponse", "#[derive(Eq)]")
         .type_attribute("SearchAggResponse", "#[derive(serde::Serialize)]")
+        .type_attribute("Series", "#[derive(serde::Serialize)]")
+        .type_attribute("Label", "#[derive(serde::Serialize)]")
+        .type_attribute("Sample", "#[derive(serde::Serialize)]")
+        .type_attribute("MetricsQueryStmt", "#[derive(serde::Serialize)]")
+        .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
+        .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .compile(
             &[
                 "proto/cluster/common.proto",
                 "proto/cluster/event.proto",
+                "proto/cluster/metrics.proto",
                 "proto/cluster/search.proto",
             ],
             &["proto"],
