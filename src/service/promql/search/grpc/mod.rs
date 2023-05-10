@@ -41,16 +41,14 @@ pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let start = std::time::Instant::now();
-    let session_id = req.job.as_ref().unwrap().session_id.to_string();
-    let session_id = Arc::new(session_id);
+    let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
     let is_range_query = req.query.as_ref().unwrap().is_range_query;
 
-    // result
     let mut results = Vec::new();
 
     let span1 = info_span!("service:promql:search:grpc:in_cache");
 
-    // search in cache
+    // 1. search in the local WAL
     let session_id1 = session_id.clone();
     let org_id1 = req.org_id.clone();
     let req1: cluster_rpc::MetricsQueryStmt = req.query.as_ref().unwrap().clone();
@@ -67,7 +65,7 @@ pub async fn search(
 
     let span2 = info_span!("service:promql:search:grpc:in_storage");
 
-    // search in object storage
+    // 2. search in the object storage
     let req_stype = req.stype;
     let session_id2 = session_id.clone();
     let org_id2 = req.org_id.clone();
@@ -83,50 +81,41 @@ pub async fn search(
         .instrument(span2),
     );
 
-    // merge local wal
+    // merge local WAL
     let value1 = match task1.await {
-        Ok(result) => match result {
-            Ok(val) => val,
-            Err(err) => {
-                log::error!("datafusion execute error: {}", err);
-                return Err(handle_datafusion_error(err));
-            }
-        },
+        Ok(result) => result.map_err(|err| {
+            log::error!("datafusion execute error: {}", err);
+            handle_datafusion_error(err)
+        })?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
             )))
         }
     };
-
-    match value1 {
-        value::Value::None => {}
-        _ => {
-            results.push(value1);
-        }
+    if !matches!(value1, value::Value::None) {
+        results.push(value1);
     }
+
+    // XXX-REVIEW: instead of executing task1 and task2 sequentially,
+    // we could execute them in parallel and [`futures::join`] the results.
+    //
+    // [`futures::join`]: https://docs.rs/futures/latest/futures/macro.join.html
 
     // merge object storage search
     let value2 = match task2.await {
-        Ok(result) => match result {
-            Ok(val) => val,
-            Err(err) => {
-                log::error!("datafusion execute error: {}", err);
-                return Err(handle_datafusion_error(err));
-            }
-        },
+        Ok(result) => result.map_err(|err| {
+            log::error!("datafusion execute error: {}", err);
+            handle_datafusion_error(err)
+        })?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
             )))
         }
     };
-
-    match value2 {
-        value::Value::None => {}
-        _ => {
-            results.push(value2);
-        }
+    if !matches!(value2, value::Value::None) {
+        results.push(value2);
     }
 
     let mut result_type = if is_range_query { "matrix" } else { "vector" };
@@ -209,24 +198,24 @@ pub async fn search(
     Ok(resp)
 }
 
-pub fn handle_datafusion_error(err: DataFusionError) -> Error {
+fn handle_datafusion_error(err: DataFusionError) -> Error {
     let err = err.to_string();
-    if err.contains("Schema error: No field named") {
-        let pos = err.find("Schema error: No field named").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
+    if let Some(pos) = err.find("Schema error: No field named") {
+        let err_code = get_key_from_error(&err, pos).map_or_else(
+            || ErrorCodes::SearchSQLExecuteError(err),
+            ErrorCodes::SearchFieldNotFound,
+        );
+        return Error::ErrorCode(err_code);
     }
     if err.contains("parquet not found") {
         return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
     }
-    if err.contains("Invalid function ") {
-        let pos = err.find("Invalid function ").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
+    if let Some(pos) = err.find("Invalid function ") {
+        let err_code = get_key_from_error(&err, pos).map_or_else(
+            || ErrorCodes::SearchSQLExecuteError(err),
+            ErrorCodes::SearchFunctionNotDefined,
+        );
+        return Error::ErrorCode(err_code);
     }
     if err.contains("Incompatible data types") {
         let pos = err.find("for field").unwrap();

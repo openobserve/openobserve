@@ -129,10 +129,7 @@ pub async fn set(
                 metadata.get("created_at").unwrap().clone(),
             );
         } else {
-            let min_ts = match min_ts {
-                Some(v) => v,
-                None => Utc::now().timestamp_micros(),
-            };
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
             metadata.insert("start_dt".to_string(), min_ts.to_string());
             metadata.insert("created_at".to_string(), min_ts.to_string());
         }

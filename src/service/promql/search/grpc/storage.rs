@@ -117,30 +117,26 @@ impl engine::TableProvider for StorageProvider {
 }
 
 /// search in remote object storage
-
-/// search in local wal, which haven't been sync to object storage
 pub async fn search(
     session_id: &str,
     org_id: &str,
     query: &cluster_rpc::MetricsQueryStmt,
 ) -> Result<value::Value> {
-    let prom_expr = match parser::parse(&query.query) {
-        Ok(expr) => expr,
-        Err(e) => {
-            return Err(DataFusionError::Execution(e));
-        }
-    };
+    let prom_expr = parser::parse(&query.query).map_err(|e| {
+        log::error!("parse query error: {e}");
+        DataFusionError::Execution(e)
+    })?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
         start: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.start as u64))
+            .checked_add(Duration::from_micros(query.start as _))
             .unwrap(),
         end: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.end as u64))
+            .checked_add(Duration::from_micros(query.end as _))
             .unwrap(),
-        interval: Duration::from_micros(query.step as u64),
-        lookback_delta: Duration::from_secs(300),
+        interval: Duration::from_micros(query.step as _),
+        lookback_delta: Duration::from_secs(300), // 5m
     };
 
     let mut engine = promql::QueryEngine::new(StorageProvider {

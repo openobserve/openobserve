@@ -225,10 +225,9 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         //let credentials_str = C.clone();
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = match req.org_id.parse() {
-                    Ok(org_id) => org_id,
-                    Err(_) => return Err(Error::Message("invalid org_id".to_string())),
-                };
+                let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {
+                    Error::Message("invalid org_id".to_string())
+                })?;
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -239,21 +238,19 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     )
                 });
 
-                let token: MetadataValue<_> = match  get_internal_grpc_token().parse() {
-                    Ok(token) => token,
-                    Err(_) => return Err(Error::Message("invalid token".to_string())),
-                };
-                let channel = match Channel::from_shared(node_addr).unwrap().connect().await {
-                    Ok(channel) => channel,
-                    Err(err) => {
+                let token: MetadataValue<_> = get_internal_grpc_token().parse().map_err(|_| {
+                    Error::Message("invalid token".to_string())
+                })?;
+                let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(
+                    |err| {
                         log::error!(
                             "[TRACE] search->grpc: node: {}, connect err: {:?}",
                             node.id,
                             err
                         );
-                        return Err(server_internal_error("connect search node error"));
-                    }
-                };
+                        server_internal_error("connect search node error")
+                    },
+                )?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -283,14 +280,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 };
 
                 log::info!(
-                "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
-                node.id,
-                is_querier,
-                response.total,
-                response.took,
-                response.file_count
-            );
-
+                    "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                    node.id,
+                    is_querier,
+                    response.total,
+                    response.took,
+                    response.file_count
+                );
                 Ok(response)
             }
             .instrument(grpc_span),

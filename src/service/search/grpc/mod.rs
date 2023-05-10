@@ -36,10 +36,8 @@ pub async fn search(
     let start = std::time::Instant::now();
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
-    let session_id = req.job.as_ref().unwrap().session_id.to_string();
-    let session_id = Arc::new(session_id);
+    let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
 
-    // result
     let mut results = HashMap::new();
     let mut file_count = 0;
     let mut scan_size = 0;

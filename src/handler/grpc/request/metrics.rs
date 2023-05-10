@@ -25,7 +25,7 @@ use crate::meta;
 use crate::service::promql::search as SearchService;
 
 #[derive(Default)]
-pub struct Querier {}
+pub struct Querier;
 
 #[tonic::async_trait]
 impl Metrics for Querier {
@@ -43,25 +43,22 @@ impl Metrics for Querier {
         let req = req.get_ref();
         let org_id = req.org_id.clone();
         let stream_type = meta::StreamType::Metrics.to_string();
-        let result = match SearchService::grpc::search(req).await {
-            Ok(res) => res,
-            Err(err) => {
-                // metrics
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/prom/v1/query", "500", &org_id, "", &stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/prom/v1/query", "500", &org_id, "", &stream_type])
-                    .inc();
-                return Err(match err {
-                    errors::Error::ErrorCode(code) => Status::internal(code.to_json()),
-                    _ => Status::internal(err.to_string()),
-                });
-            }
-        };
+        let result = SearchService::grpc::search(req).await.map_err(|err| {
+            let time = start.elapsed().as_secs_f64();
+            metrics::GRPC_RESPONSE_TIME
+                .with_label_values(&["/prom/api/v1/query", "500", &org_id, "", &stream_type])
+                .observe(time);
+            metrics::GRPC_INCOMING_REQUESTS
+                .with_label_values(&["/prom/api/v1/query", "500", &org_id, "", &stream_type])
+                .inc();
+            let message = if let errors::Error::ErrorCode(code) = err {
+                code.to_json()
+            } else {
+                err.to_string()
+            };
+            Status::internal(message)
+        })?;
 
-        // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
             .with_label_values(&["/prom/v1/query", "200", &org_id, "", &stream_type])
