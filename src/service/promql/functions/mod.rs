@@ -101,7 +101,7 @@ pub(crate) enum Func {
 pub(crate) fn eval_idelta(
     data: &Value,
     fn_name: &str,
-    fn_handler: fn(&RangeValue) -> f64,
+    fn_handler: fn(&RangeValue) -> Option<f64>,
 ) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
@@ -113,20 +113,21 @@ pub(crate) fn eval_idelta(
         }
     };
 
-    let rate_values = data
-        .iter()
-        .map(|metric| {
-            let mut labels = metric.labels.clone();
-            labels.retain(|l| l.name != super::value::FIELD_NAME);
-            let value = fn_handler(metric);
-            InstantValue {
-                labels,
-                value: Sample {
-                    timestamp: metric.time_range.unwrap().1,
-                    value,
-                },
-            }
-        })
-        .collect();
+    let mut rate_values = Vec::with_capacity(data.len());
+    for metric in data.iter() {
+        let mut labels = metric.labels.clone();
+        labels.retain(|l| l.name != super::value::FIELD_NAME);
+        let value = fn_handler(metric);
+        if value.is_none() {
+            continue;
+        }
+        rate_values.push(InstantValue {
+            labels,
+            value: Sample {
+                timestamp: metric.time_range.unwrap().1,
+                value: value.unwrap(),
+            },
+        });
+    }
     Ok(Value::Vector(rate_values))
 }

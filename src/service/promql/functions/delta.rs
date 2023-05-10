@@ -20,8 +20,8 @@ pub(crate) fn delta(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "delta", exec)
 }
 
-fn exec(range: &RangeValue) -> f64 {
+fn exec(range: &RangeValue) -> Option<f64> {
     range
         .extrapolate()
-        .map_or(0.0, |(first, last)| last.value - first.value)
+        .map_or(None, |(first, last)| Some(last.value - first.value))
 }

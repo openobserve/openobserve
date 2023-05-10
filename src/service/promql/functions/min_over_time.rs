@@ -20,13 +20,13 @@ pub(crate) fn min_over_time(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "min_over_time", exec)
 }
 
-fn exec(data: &RangeValue) -> f64 {
+fn exec(data: &RangeValue) -> Option<f64> {
     if data.values.is_empty() {
-        return 0.0;
+        return None;
     }
-    data.values
+    Some(data.values
         .iter()
         .map(|s| s.value)
         .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap()
+        .unwrap())
 }
