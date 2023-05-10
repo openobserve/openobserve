@@ -218,6 +218,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "plan_type",
+        field: "plan_type",
+        label: t("organization.subscription_type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "created",
         field: "created",
         label: t("organization.created"),
@@ -342,6 +349,7 @@ export default defineComponent({
             created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
             role: role,
             actions: "true",
+            plan_type: data.CustomerBillingObj.subscription_type == "Free-Plan-USD-Monthly" || data.CustomerBillingObj.subscription_type == "" ? "Developer" : "Pro",
           };
         });
 

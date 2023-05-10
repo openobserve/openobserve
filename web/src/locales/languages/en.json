@@ -161,7 +161,8 @@
     "copyapikey": "Copy API Key",
     "getapikey": "Get API Key",
     "role": "Role",
-    "nameRequired": "Name is required"
+    "nameRequired": "Name is required",
+    "subscription_type": "Plan Type"
   },
   "template": {
     "header": "Templates",
