@@ -76,6 +76,7 @@ glob = "0.3"
 hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
+ipnetwork = "0.20.0"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.8"
@@ -130,6 +131,7 @@ snap = "1"
 sqlparser = { version = "0.32", features = ["serde"] }
 strum = { version = "0.24", features = ["derive"] }
 sys-info = "0.9"
+syslog_loose = "0.18.0"
 thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }

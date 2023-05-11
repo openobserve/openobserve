@@ -2965,6 +2965,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12b6ee2129af8d4fb011108c73d99a1b83a85977f23b82460c0ae2e25bb4b57f"
 
 [[package]]
+name = "ipnetwork"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "is-terminal"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6714,6 +6723,7 @@ dependencies = [
  "hex",
  "http-auth-basic",
  "indexmap",
+ "ipnetwork",
  "lazy_static",
  "log",
  "lru",
@@ -6748,6 +6758,7 @@ dependencies = [
  "sqlparser",
  "strum",
  "sys-info",
+ "syslog_loose",
  "thiserror",
  "time 0.3.21",
  "tokio",

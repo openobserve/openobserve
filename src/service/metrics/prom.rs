@@ -228,7 +228,7 @@ pub async fn remote_write(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
-                    &lua,
+                    Some(&lua),
                 );
             // End Register Transforms for stream
 
@@ -243,8 +243,8 @@ pub async fn remote_write(
             let mut value = crate::service::ingestion::apply_stream_transform(
                 &local_tans,
                 &value,
-                &lua,
-                &stream_lua_map,
+                Some(&lua),
+                Some(&stream_lua_map),
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,
