@@ -80,6 +80,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+    tokio::task::spawn(async move { db::syslog::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
     db::functions::cache().await?;
     db::user::cache().await?;
@@ -90,6 +91,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::triggers::cache().await?;
     db::alerts::templates::cache().await?;
     db::alerts::destinations::cache().await?;
+    db::syslog::cache().await?;
 
     // cache file list
     db::file_list::local::cache().await?;
