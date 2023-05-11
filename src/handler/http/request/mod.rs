@@ -22,5 +22,6 @@ pub mod prom;
 pub mod search;
 pub mod status;
 pub mod stream;
+pub mod syslog;
 pub mod traces;
 pub mod users;

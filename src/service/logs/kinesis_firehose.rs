@@ -80,7 +80,7 @@ pub async fn process(
             org_id,
             stream_name,
             StreamType::Logs,
-            &lua,
+            Some(&lua),
         );
     // End Register Transforms for stream
 
@@ -190,8 +190,8 @@ pub async fn process(
                 let mut value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
-                    &lua,
-                    &stream_lua_map,
+                    Some(&lua),
+                    Some(&stream_lua_map),
                     &stream_vrl_map,
                     stream_name,
                     &mut runtime,

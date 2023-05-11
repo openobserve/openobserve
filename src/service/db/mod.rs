@@ -28,6 +28,7 @@ pub mod file_list;
 pub mod functions;
 pub mod kv;
 pub mod schema;
+pub mod syslog;
 pub mod triggers;
 pub mod user;
 pub mod version;

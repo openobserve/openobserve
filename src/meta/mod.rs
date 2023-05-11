@@ -27,6 +27,7 @@ pub mod search;
 pub mod service;
 pub mod sql;
 pub mod stream;
+pub mod syslog;
 pub mod telemetry;
 pub mod traces;
 pub mod user;
