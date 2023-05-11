@@ -961,7 +961,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/prometheus/v1/write", "e2e"))
+            .uri(&format!("/api/{}/prometheus/api/v1/write", "e2e"))
             .insert_header(("X-Prometheus-Remote-Write-Version", "0.1.0"))
             .insert_header(("Content-Encoding", "snappy"))
             .insert_header(("Content-Type", "application/x-protobuf"))

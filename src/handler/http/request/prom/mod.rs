@@ -38,7 +38,7 @@ use crate::service::promql;
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/prometheus/v1/write")]
+#[post("/{org_id}/prometheus/api/v1/write")]
 pub async fn remote_write(
     org_id: web::Path<String>,
     thread_id: web::Data<usize>,
@@ -100,7 +100,7 @@ pub async fn remote_write(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/query")]
+#[get("/{org_id}/prometheus/api/v1/query")]
 pub async fn query(
     org_id: web::Path<String>,
     query: web::Query<meta::prom::RequestQuery>,
@@ -209,7 +209,7 @@ pub async fn query(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/query_range")]
+#[get("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range(
     org_id: web::Path<String>,
     range_query: web::Query<meta::prom::RequestRangeQuery>,
@@ -330,7 +330,7 @@ pub async fn query_range(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/metadata")]
+#[get("/{org_id}/prometheus/api/v1/metadata")]
 pub async fn metadata(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestMetadata>,
@@ -385,7 +385,7 @@ pub async fn metadata(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/series")]
+#[get("/{org_id}/prometheus/api/v1/series")]
 pub async fn series(
     org_id: web::Path<String>,
     series: web::Query<meta::prom::RequestSeries>,
@@ -440,7 +440,7 @@ pub async fn series(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/labels")]
+#[get("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels(
     org_id: web::Path<String>,
     labels: web::Query<meta::prom::RequestLabels>,
@@ -477,7 +477,7 @@ pub async fn labels(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/v1/label/{label_name}/values")]
+#[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
 pub async fn values(
     path: web::Path<(String, String)>,
     values: web::Query<meta::prom::RequestValues>,
