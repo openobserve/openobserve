@@ -24,9 +24,7 @@ phases:
       # increase swap file size
       - fallocate -l 32G /swapfile
       - chmod 600 /swapfile
-      # `mkswap` may fail with `error: /swapfile is mounted; will not make swapspace`
-      # That's because we are using build cache. Proceed anyway.
       - mkswap /swapfile || true
-      - swapon /swapfile
+      - swapon /swapfile || true
       - cargo clippy -- -D warnings
       - ./coverage.sh

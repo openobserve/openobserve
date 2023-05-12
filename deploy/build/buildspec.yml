@@ -15,8 +15,8 @@ phases:
       # Increase swap file size
       - fallocate -l 32G /swapfile
       - chmod 600 /swapfile
-      - mkswap /swapfile
-      - swapon /swapfile
+      - mkswap /swapfile || true
+      - swapon /swapfile || true
 
       # install buildx
       - wget -nv https://github.com/docker/buildx/releases/download/v0.10.4/buildx-v0.10.4.linux-amd64
