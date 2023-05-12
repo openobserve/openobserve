@@ -50,15 +50,12 @@ impl engine::TableProvider for WalProvider {
 
         // fetch all schema versions, get latest schema
         let stream_type = meta::StreamType::Metrics;
-        let schema = match db::schema::get(&self.org_id, stream_name, Some(stream_type)).await {
-            Ok(schema) => schema,
-            Err(err) => {
+        let schema = db::schema::get(&self.org_id, stream_name, Some(stream_type))
+            .await
+            .map_err(|err| {
                 log::error!("get schema error: {}", err);
-                return Err(datafusion::error::DataFusionError::Execution(
-                    err.to_string(),
-                ));
-            }
-        };
+                DataFusionError::Execution(err.to_string())
+            })?;
         let schema = Arc::new(
             schema
                 .to_owned()
@@ -82,7 +79,7 @@ impl engine::TableProvider for WalProvider {
     }
 }
 
-/// search in local wal, which haven't been sync to object storage
+/// Search in the local WAL, which hasn't been persisted to the object storage yet
 pub async fn search(
     session_id: &str,
     org_id: &str,
@@ -91,23 +88,18 @@ pub async fn search(
     // mark searching in wal
     let searching = Searching::new();
 
-    let prom_expr = match parser::parse(&query.query) {
-        Ok(expr) => expr,
-        Err(e) => {
-            return Err(DataFusionError::Execution(e));
-        }
-    };
+    let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
         start: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.start as u64))
+            .checked_add(Duration::from_micros(query.start as _))
             .unwrap(),
         end: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.end as u64))
+            .checked_add(Duration::from_micros(query.end as _))
             .unwrap(),
-        interval: Duration::from_micros(query.step as u64),
-        lookback_delta: Duration::from_secs(300),
+        interval: Duration::from_micros(query.step as _),
+        lookback_delta: Duration::from_secs(300), // 5m
     };
 
     let mut engine = promql::QueryEngine::new(WalProvider {

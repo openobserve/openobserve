@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::{cmp::min, sync::Arc, time::Duration};
+
 use rustc_hash::FxHashMap;
-use std::sync::Arc;
-use std::{cmp::min, time::Duration};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use super::value::{InstantValue, Labels, Value};
-use crate::handler::grpc::cluster_rpc;
+use crate::handler::grpc::cluster_rpc::{self, SearchType};
 use crate::infra::cluster::{self, get_internal_grpc_token};
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
@@ -34,7 +33,7 @@ pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Va
     let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::User as i32;
+    req.stype = SearchType::User as _;
     search_in_cluster(req).instrument(root_span).await
 }
 
@@ -47,7 +46,7 @@ async fn get_queue_lock() -> Result<etcd::Locker> {
 
 #[instrument(name = "service:promql:search:cluster", skip(req))]
 async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
-    let start = std::time::Instant::now();
+    let op_start = std::time::Instant::now();
 
     // get a cluster search queue lock
     let locker = if CONFIG.common.local_mode {
@@ -55,7 +54,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     } else {
         Some(get_queue_lock().await?)
     };
-    let took_wait = start.elapsed().as_millis() as usize;
+    let took_wait = op_start.elapsed().as_millis() as usize;
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -63,7 +62,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
-    let querier_num = match nodes
+    let nr_queriers = match nodes
         .iter()
         .filter(|node| cluster::is_querier(&node.role))
         .count()
@@ -72,47 +71,60 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         n => n as i64,
     };
 
-    let is_range_query = req.query.as_ref().unwrap().is_range_query;
-    let req_start: i64 = req.query.as_ref().unwrap().start;
-    let req_end: i64 = req.query.as_ref().unwrap().end;
-    let req_step: i64 = req.query.as_ref().unwrap().step;
-    let point_num = if !is_range_query || req_start == req_end {
+    let &cluster_rpc::MetricsQueryStmt {
+        query: _,
+        is_range_query,
+        start,
+        end,
+        step,
+    } = req.query.as_ref().unwrap();
+
+    // The number of resolution steps; see the diagram at
+    // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
+    let nr_steps = if !is_range_query || start == end {
         1
     } else {
-        (req_end - req_start) / req_step
+        (end - start) / step
     };
-    let offset = if querier_num >= point_num {
-        req_step
+    // A span of time covered by an individual querier (worker).
+    let worker_dt = if nr_steps > nr_queriers {
+        step * ((nr_steps / nr_queriers) + 1)
     } else {
-        ((point_num / querier_num) + 1) * req_step
+        step
     };
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
-    let mut session_id = Uuid::new_v4().to_string();
+    // XXX-REFACTORME: move this into a function
+    let session_id = Uuid::new_v4().to_string();
+    let job_id = session_id[30..].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
-        session_id: session_id.clone(),
-        job: session_id.split_off(30), // take the last 6 characters as job id
+        session_id,
+        job: job_id,
         stage: 0,
         partition: 0,
     };
 
     // make cluster request
     let mut tasks = Vec::new();
-    let mut offset_start = req_start;
+    let mut worker_start = start;
     for (partition_no, node) in nodes.iter().cloned().enumerate() {
-        let mut req = req.clone();
+        let job = Some(cluster_rpc::Job {
+            partition: partition_no as _,
+            ..job.clone()
+        });
+        let mut req = cluster_rpc::MetricsQueryRequest {
+            job,
+            stype: SearchType::CacheOnly as _,
+            ..req.clone()
+        };
         let mut req_query = req.query.as_mut().unwrap();
-        let mut job = job.clone();
-        job.partition = partition_no as i32;
-        req.job = Some(job);
-        req.stype = cluster_rpc::SearchType::CacheOnly as i32;
         let is_querier = cluster::is_querier(&node.role);
         if is_querier {
-            if offset_start <= req_end {
-                req.stype = cluster_rpc::SearchType::Cluster as i32;
-                req_query.start = offset_start;
-                req_query.end = min(req_end, offset_start + offset);
-                offset_start += offset;
+            if worker_start <= end {
+                req.stype = SearchType::Cluster as _;
+                req_query.start = worker_start;
+                req_query.end = min(end, worker_start + worker_dt);
+                worker_start += worker_dt;
             } else if !cluster::is_ingester(&node.role) {
                 continue; // no need more querier
             }
@@ -130,10 +142,9 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         let node_addr = node.grpc_addr.clone();
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = match req.org_id.parse() {
-                    Ok(org_id) => org_id,
-                    Err(_) => return Err(Error::Message("invalid org_id".to_string())),
-                };
+                let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {
+                    Error::Message(format!("invalid org_id: {}", req.org_id))
+                })?;
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -144,21 +155,13 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     )
                 });
 
-                let token: MetadataValue<_> = match  get_internal_grpc_token().parse() {
-                    Ok(token) => token,
-                    Err(_) => return Err(Error::Message("invalid token".to_string())),
-                };
-                let channel = match Channel::from_shared(node_addr).unwrap().connect().await {
-                    Ok(channel) => channel,
-                    Err(err) => {
-                        log::error!(
-                            "[TRACE] promql->search->grpc: node: {}, connect err: {:?}",
-                            node.id,
-                            err
-                        );
-                        return Err(server_internal_error("connect search node error"));
-                    }
-                };
+                let token: MetadataValue<_> = get_internal_grpc_token().parse().map_err(|_| {
+                    Error::Message("invalid token".to_string())
+                })?;
+                let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(|err| {
+                    log::error!("[TRACE] promql->search->grpc: node: {}, connect err: {:?}", node.id, err);
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -188,13 +191,12 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 };
 
                 log::info!(
-                "[TRACE] promql->search->grpc: result node: {}, is_querier: {}, took: {}, files: {}",
-                node.id,
-                is_querier,
-                response.took,
-                response.file_count
-            );
-
+                    "[TRACE] promql->search->grpc: result node: {}, is_querier: {}, took: {}, files: {}",
+                    node.id,
+                    is_querier,
+                    response.took,
+                    response.file_count
+                );
                 Ok(response)
             }
             .instrument(grpc_span),
@@ -204,20 +206,26 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 
     let mut results = Vec::new();
     for task in tasks {
-        let result = task
-            .await
-            .map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())))?;
-        match result {
-            Ok(res) => results.push(res),
-            Err(err) => {
-                // search done, release lock
-                if locker.is_some() {
-                    if let Err(e) = locker.unwrap().unlock().await {
-                        log::error!("search in cluster unlock error: {}", e);
-                    }
-                }
-                return Err(err);
+        // XXX-OPTIMIZE: use [`futures::future::try_join_all`]
+        //
+        // [`futures::future::try_join_all`]: https://docs.rs/futures/0.3.28/futures/future/fn.try_join_all.html
+        let res = match task.await {
+            Err(task_err) => Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                task_err.to_string(),
+            ))),
+            Ok(Err(err)) => Err(err),
+            Ok(Ok(res)) => {
+                results.push(res);
+                Ok(())
             }
+        };
+        if let Err(err) = res {
+            if locker.is_some() {
+                if let Err(e) = locker.unwrap().unlock().await {
+                    log::error!("search in cluster unlock error: {}", e);
+                }
+            }
+            return Err(err);
         }
     }
 
@@ -256,12 +264,11 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     };
     log::info!(
         "[TRACE] promql->search->result: took: {},  took_wait: {}, file_count: {}, scan_size: {}",
-        start.elapsed().as_millis(),
+        op_start.elapsed().as_millis(),
         took_wait,
         file_count,
         scan_size,
     );
-
     Ok(values)
 }
 
