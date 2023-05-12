@@ -360,7 +360,7 @@ pub async fn metadata(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("match[]" = Vec<String>, Query, description = "<series_selector>: Repeated series selector argument that selects the series to return. At least one match[] argument must be provided"),
+        ("match[]" = String, Query, description = "<series_selector>: Series selector argument that selects the series to return"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
@@ -425,7 +425,7 @@ pub async fn series(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("match" = Option<Vec<String>>, Query, description = "Repeated series selector argument that selects the series from which to read the label names. Optional"),
+        ("match[]" = String, Query, description = "Series selector argument that selects the series from which to read the label names"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
@@ -498,7 +498,7 @@ pub async fn labels(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("label_name" = String, Path, description = "Label name"),
-        ("match" = Option<Vec<String>>, Query, description = "Repeated series selector argument that selects the series from which to read the label names. Optional"),
+        ("match[]" = String, Query, description = "Series selector argument that selects the series from which to read the label values"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
