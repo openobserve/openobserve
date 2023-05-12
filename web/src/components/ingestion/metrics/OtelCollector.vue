@@ -32,7 +32,9 @@
     <pre ref="copyTracesContent" data-test="traces-content-text">
 exporters:
   prometheusremotewrite:
-    endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/write
+    endpoint: {{ endpoint.url }}/api/{{
+        currOrgIdentifier
+      }}/prometheus/api/v1/write
     headers:
       Authorization: Basic {{ accessKey }}
     </pre>
