@@ -26,8 +26,42 @@
         <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
       </div>
-      <div @click.prevent="showWarning" class="q-px-md" style="cursor: pointer;">
+      <div>
+        <q-btn-toggle
+          v-model="dashboardPanelData.data.selectedQuery"
+          push
+          glossy
+          toggle-color="primary"
+          @update:model-value="onUpdateButton(value)"
+          :options="[
+            {label: 'Auto', value: 'auto'},
+            {label: 'Custom SQL', value: 'custom-sql'},
+            {label: 'PromQL', value: 'prom-ql'}
+          ]"
+        />
+      </div>
+      <div @click.prevent="showWarning" style="cursor: pointer;">
         <div style="pointer-events: none;">
+          <!-- <q-btn-group>
+            <q-btn  
+              size="md"
+              no-wrap
+              style="border-right: 1px solid gray"
+              :label="t('panel.auto')"
+            />
+            <q-btn  
+              size="md"
+              :label="t('panel.customSql')"
+              style="border-right: 1px solid gray"
+              @click="onUpdateToggle(dashboardPanelData.data.customQuery)"
+            />
+            <q-btn 
+              v-show="dashboardPanelData.data.fields.stream_type == 'metrics'" 
+              size="md"
+              :label="t('panel.promQL')"
+              @click="updatePromQL(dashboardPanelData.data.customQuery)"
+            />
+          </q-btn-group> -->
           <q-toggle
             v-model="dashboardPanelData.data.customQuery"
             :label="t('panel.customSql')"
@@ -303,6 +337,11 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = []
     }
 
+    const onUpdateButton = (value) => {
+      console.log("value=", value);
+      
+    }
+
     const changeToggle = () => {
       dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
       removeXYFilters()
@@ -324,6 +363,7 @@ export default defineComponent({
       confirmQueryModeChangeDialog,
       onUpdateToggle,
       changeToggle,
+      onUpdateButton,
       showWarning
     };
   },

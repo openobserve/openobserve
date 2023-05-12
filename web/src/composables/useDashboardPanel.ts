@@ -49,6 +49,8 @@ const getDefaultDashboardPanelData = () => (
         description: "",
         show_legends: true,
       },
+      queryType: "sql",
+      selectedQuery: 'auto',
       query: "",
       customQuery: false
     },
