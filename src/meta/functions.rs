@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use vrl::{TimeZone, VrlRuntime};
+use vrl::compiler::{TimeZone, VrlRuntime};
 
 use super::StreamType;
 

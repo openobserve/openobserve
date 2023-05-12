@@ -14,6 +14,7 @@
 
 pub mod alerts;
 pub mod dashboards;
+pub mod metadata;
 pub mod functions;
 pub mod kv;
 pub mod logs;

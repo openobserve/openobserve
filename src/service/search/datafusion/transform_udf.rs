@@ -25,9 +25,10 @@ use datafusion::{
     prelude::create_udf,
 };
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
+use std::collections::BTreeMap;
 use std::sync::Arc;
-use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
-use vrl::{CompilationResult, Program, Runtime};
+use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
+use vrl::compiler::{TargetValueRef, VrlRuntime};
 
 use crate::{common::json, infra::config::QUERY_FUNCTIONS, service::logs::get_value};
 
@@ -197,7 +198,7 @@ fn get_udf_vrl(
 
 pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
     let mut fields = vec![];
-    let result = vrl::compile(func, &vrl_stdlib::all());
+    let result = vrl::compiler::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
             program,
@@ -220,7 +221,7 @@ pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> json::Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> json::Value {
     let obj_str = String::from("");
 
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
@@ -229,7 +230,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> json::Value
         metadata: &mut metadata,
         secrets: &mut vrl_value::Secrets::new(),
     };
-    let timezone = vrl::TimeZone::Local;
+    let timezone = vrl::compiler::TimeZone::Local;
     let result = match VrlRuntime::default() {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };

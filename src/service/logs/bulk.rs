@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
 #[cfg(feature = "zo_functions")]
-use vrl::Program;
+use vrl::compiler::Program;
 
 use super::StreamMeta;
 use crate::common::json;

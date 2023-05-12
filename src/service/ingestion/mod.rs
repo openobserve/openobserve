@@ -12,16 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::json::{Map, Value};
-use ahash::AHashMap;
-use arrow_schema::Schema;
-use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-#[cfg(feature = "zo_functions")]
-use vrl::{prelude::BTreeMap, CompilationResult, Program, Runtime, TargetValueRef, VrlRuntime};
-
 use super::triggers;
+use crate::common::json::{Map, Value};
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 #[cfg(feature = "zo_functions")]
@@ -33,10 +26,21 @@ use crate::{
     infra::config::STREAM_ALERTS,
     meta::alert::{Alert, Trigger},
 };
+use ahash::AHashMap;
+use arrow_schema::Schema;
+use chrono::{TimeZone, Utc};
+#[cfg(feature = "zo_functions")]
+use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
+use std::collections::BTreeMap;
+use vrl::compiler::TargetValueRef;
+use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
 
 #[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str) -> Result<Program, std::io::Error> {
-    match vrl::compile(func, &vrl_stdlib::all()) {
+    let mut functions = vrl::stdlib::all();
+    functions.append(&mut vector_enrichment::vrl_functions());
+
+    match vrl::compiler::compile(func, &functions) {
         Ok(CompilationResult {
             program,
             warnings: _,
@@ -50,16 +54,16 @@ pub fn compile_vrl_function(func: &str) -> Result<Program, std::io::Error> {
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program, row: &Value) -> Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: Program, row: &Value) -> Value {
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl_value::Value::from(row),
         metadata: &mut metadata,
         secrets: &mut vrl_value::Secrets::new(),
     };
-    let timezone = vrl::TimeZone::Local;
-    let result = match VrlRuntime::default() {
-        VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
+    let timezone = vrl::compiler::TimeZone::Local;
+    let result = match vrl::compiler::VrlRuntime::default() {
+        vrl::compiler::VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
     match result {
         Ok(res) => match res.try_into() {
@@ -287,7 +291,7 @@ pub fn format_stream_name(stream_name: &str) -> String {
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn init_functions_runtime() -> (Lua, vrl::Runtime) {
+pub fn init_functions_runtime() -> (Lua, Runtime) {
     let lua = Lua::new();
     // lua.sandbox(true).unwrap();
     let runtime = crate::common::functions::init_vrl_runtime();
