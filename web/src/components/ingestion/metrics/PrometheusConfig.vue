@@ -16,7 +16,9 @@
 <template>
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
-      <div class="title" data-test="vector-title-text">Prometheus</div>
+      <div class="title" data-test="vector-title-text">
+        Prometheus Remote Write
+      </div>
       <div class="copy_action">
         <q-btn
           data-test="traces-copy-btn"
@@ -30,10 +32,11 @@
       </div>
     </div>
     <pre ref="copyTracesContent" data-test="traces-content-text">
-url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/write
-basic_auth:
-  username: {{ currUserEmail }}
-  password: {{ store.state.organizationPasscode }}
+remote_write:
+  - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
+    basic_auth:
+      username: {{ currUserEmail }}
+      password: {{ store.state.organizationPasscode }}
     </pre>
   </div>
 </template>

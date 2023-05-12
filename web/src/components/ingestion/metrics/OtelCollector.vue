@@ -32,7 +32,9 @@
     <pre ref="copyTracesContent" data-test="traces-content-text">
 exporters:
   prometheusremotewrite:
-    endpoint: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/write
+    endpoint: {{ endpoint.url }}/api/{{
+        currOrgIdentifier
+      }}/prometheus/api/v1/write
     headers:
       Authorization: Basic {{ accessKey }}
     </pre>
@@ -40,6 +42,7 @@ exporters:
 </template>
 
 <script lang="ts">
+// /{org_id}/prometheus/api/v1/write
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
