@@ -36,6 +36,7 @@ import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
+import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
@@ -213,6 +214,11 @@ const useRoutes = () => {
               path: "kinesisfirehose",
               name: "kinesisfirehose",
               component: KinesisFirehose,
+            },
+            {
+              path: "filebeat",
+              name: "filebeat",
+              component: FileBeat,
             },
           ],
         },
