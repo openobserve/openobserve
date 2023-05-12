@@ -7,9 +7,14 @@ phases:
 
   build:
     commands:
+      # Increase swap file size
+      - fallocate -l 32G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile || true
+      - swapon /swapfile || true
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
-
+      
       # simd version
       - docker build -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
       - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve:$GIT_TAG-arm64-simd
