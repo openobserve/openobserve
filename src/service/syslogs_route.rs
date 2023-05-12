@@ -26,18 +26,21 @@ use crate::service::db::syslog;
 #[instrument(skip(route))]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {
     for (_, existing_route) in SYSLOG_ROUTES.clone() {
-        for subnet in &route.subnets {
-            for existing_subnet in &existing_route.subnets {
-                if subnets_overlap(existing_subnet, subnet) {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        format!(
-                            "Provided subnet/s overlap with existing subnet/s {existing_subnet} for organization {}",
-                            &existing_route.org_id
-                        ),
-                    )));
-                }
-            }
+        let existing_subnets = &existing_route.subnets;
+        let new_subnets = &route.subnets;
+
+        if existing_subnets.iter().any(|existing_subnet| {
+            new_subnets
+                .iter()
+                .any(|subnet| subnets_overlap(existing_subnet, subnet))
+        }) {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!(
+                    "Provided subnet/s overlap with existing subnet/s for organization {}",
+                    &existing_route.org_id
+                ),
+            )));
         }
     }
 
