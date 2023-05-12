@@ -127,12 +127,8 @@ pub struct RequestMetadata {
     pub metric: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ResponseMetadata {
-    pub status: Status,
-    /// key - metric name
-    pub data: HashMap<String, Vec<MetadataObject>>,
-}
+// key - metric name
+pub(crate) type ResponseMetadata = HashMap<String, Vec<MetadataObject>>;
 
 #[derive(Debug, Serialize)]
 pub struct MetadataObject {
