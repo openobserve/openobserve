@@ -25,11 +25,11 @@ use crate::infra::cluster::{self, get_internal_grpc_token};
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes, Result};
-use crate::service::promql::value::*;
+use crate::service::promql::{self, value::*};
 
 pub mod grpc;
 
-pub async fn search(org_id: &str, req: &super::MetricsQueryRequest) -> Result<Value> {
+pub async fn search(org_id: &str, req: &promql::MetricsQueryRequest) -> Result<Value> {
     let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();

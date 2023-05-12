@@ -57,3 +57,81 @@ pub struct QueryResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub(crate) enum ApiFuncResponse<T: Serialize> {
+    Success {
+        data: T,
+    },
+    Error {
+        #[serde(rename = "errorType")]
+        error_type: ApiErrorType,
+        error: String,
+    },
+}
+
+impl<T: Serialize> ApiFuncResponse<T> {
+    pub(crate) fn ok(data: T) -> Self {
+        ApiFuncResponse::Success { data }
+    }
+
+    pub(crate) fn err_bad_data(error: impl ToString) -> Self {
+        ApiFuncResponse::Error {
+            error_type: ApiErrorType::BadData,
+            error: error.to_string(),
+        }
+    }
+
+    pub(crate) fn err_internal(error: impl ToString) -> Self {
+        ApiFuncResponse::Error {
+            error_type: ApiErrorType::Internal,
+            error: error.to_string(),
+        }
+    }
+}
+
+// cf. https://github.com/prometheus/prometheus/blob/5c5fa5c319fca713506fa144ec6768fddf00d466/web/api/v1/api.go#L73-L82
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiErrorType {
+    Timeout,
+    Cancelled,
+    Exec,
+    BadData,
+    Internal,
+    Unavailable,
+    NotFound,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use expect_test::expect;
+
+    #[test]
+    fn test_api_func_response_serialize() {
+        let ok = ApiFuncResponse::ok("hello".to_owned());
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            r#"{"status":"success","data":"hello"}"#
+        );
+
+        let err = ApiFuncResponse::<()>::err_internal("something went wrong".to_owned());
+        assert_eq!(
+            serde_json::to_string(&err).unwrap(),
+            r#"{"status":"error","errorType":"internal","error":"something went wrong"}"#
+        );
+
+        let err = ApiFuncResponse::<()>::err_bad_data(
+            r#"invalid parameter \"start\": Invalid time value for 'start': cannot parse \"foobar\" to a valid timestamp"#,
+        );
+        expect![[r#"
+            {
+              "status": "error",
+              "errorType": "bad_data",
+              "error": "invalid parameter \\\"start\\\": Invalid time value for 'start': cannot parse \\\"foobar\\\" to a valid timestamp"
+            }"#
+        ]].assert_eq(&serde_json::to_string_pretty(&err).unwrap());
+    }
+}

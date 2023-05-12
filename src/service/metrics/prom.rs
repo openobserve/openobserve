@@ -19,6 +19,7 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
+use promql_parser::parser;
 use prost::Message;
 use tracing::info_span;
 
@@ -34,9 +35,7 @@ use crate::{
         self,
         alert::{Alert, Trigger},
         prom::{
-            ClusterLeader, FxIndexMap, Metadata, MetadataObject, Metric, RequestMetadata,
-            ResponseMetadata, Status, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL,
-            REPLICA_LABEL, VALUE_LABEL,
+            self, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, REPLICA_LABEL, VALUE_LABEL,
         },
         StreamType,
     },
@@ -89,7 +88,7 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = item.metric_family_name.clone();
-        let metadata = Metadata {
+        let metadata = prom::Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
             help: item.help.clone(),
@@ -129,10 +128,10 @@ pub async fn remote_write(
                 }
             }
         }
-        let labels: FxIndexMap<String, String> = event
+        let labels: prom::FxIndexMap<String, String> = event
             .labels
             .iter()
-            .filter(|label| !label.name.eq(REPLICA_LABEL) && !label.name.eq(CLUSTER_LABEL))
+            .filter(|label| label.name != REPLICA_LABEL && label.name != CLUSTER_LABEL)
             .map(|label| (label.name.clone(), label.value.clone()))
             .collect();
 
@@ -152,7 +151,7 @@ pub async fn remote_write(
                 // skip the entry from adding to store
                 continue;
             }
-            let metric = Metric {
+            let metric = prom::Metric {
                 labels: labels.clone(),
                 value: sample_val,
             };
@@ -438,7 +437,10 @@ pub async fn remote_write(
     Ok(HttpResponse::Ok().into())
 }
 
-pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
+pub async fn get_metadata(
+    org_id: &str,
+    req: prom::RequestMetadata,
+) -> Result<prom::ResponseMetadata> {
     let empty_response = || mk_metadata_response(std::iter::empty());
 
     if req.limit == Some(0) {
@@ -489,9 +491,9 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
 // This differs from Prometheus, which [supports] multiple metadata objects per metric.
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
-fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
+fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
     schema.metadata.get(METADATA_LABEL).map(|s| {
-        serde_json::from_str::<Metadata>(s)
+        serde_json::from_str::<prom::Metadata>(s)
             .unwrap_or_else(|error| {
                 tracing::error!(%error, input = ?s, "failed to parse metadata");
                 panic!("BUG: failed to parse {METADATA_LABEL}")
@@ -500,14 +502,42 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     })
 }
 
-fn mk_metadata_response<I>(it: I) -> ResponseMetadata
+fn mk_metadata_response<I>(it: I) -> prom::ResponseMetadata
 where
-    I: IntoIterator<Item = (String, Vec<meta::prom::MetadataObject>)>,
+    I: IntoIterator<Item = (String, Vec<prom::MetadataObject>)>,
 {
-    ResponseMetadata {
-        status: Status::Success,
+    prom::ResponseMetadata {
+        status: prom::Status::Success,
         data: it.into_iter().collect(),
     }
+}
+
+pub(crate) async fn get_series(
+    _org_id: &str,
+    _selector: parser::VectorSelector,
+    _start: i64,
+    _end: i64,
+) -> Result<prom::ResponseSeries> {
+    todo!("XXX-IMPLEMENTME")
+}
+
+pub(crate) async fn get_labels(
+    _org_id: &str,
+    _selector: parser::VectorSelector,
+    _start: i64,
+    _end: i64,
+) -> Result<prom::ResponseLabels> {
+    todo!("XXX-IMPLEMENTME")
+}
+
+pub(crate) async fn get_label_values(
+    _org_id: &str,
+    _label_name: String,
+    _selector: parser::VectorSelector,
+    _start: i64,
+    _end: i64,
+) -> Result<prom::ResponseLabelValues> {
+    todo!("XXX-IMPLEMENTME")
 }
 
 async fn prom_ha_handler(
@@ -528,7 +558,7 @@ async fn prom_ha_handler(
         );
         METRIC_CLUSTER_LEADER.insert(
             cluster_name.clone(),
-            ClusterLeader {
+            prom::ClusterLeader {
                 name: replica_label.clone(),
                 last_received: curr_ts,
             },

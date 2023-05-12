@@ -137,10 +137,7 @@ tokio = { version = "1", features = ["full"] }
 tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.18"
-tracing-subscriber = { version = "0.3", features = [
-  "tracing-log",
-  "env-filter",
-] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }

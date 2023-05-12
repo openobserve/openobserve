@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::common::time::{parse_milliseconds, parse_str_to_timestamp_micros};
-use crate::infra::errors;
-use crate::meta::{self, http::HttpResponse as MetaHttpResponse};
-use crate::service::metrics;
-use crate::service::promql;
+use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+use promql_parser::parser;
+
+use crate::{
+    common::time::{parse_milliseconds, parse_str_to_timestamp_micros},
+    infra::errors,
+    meta::{self, http::HttpResponse as MetaHttpResponse},
+    service::{metrics, promql},
+};
 
 /** prometheus remote-write endpoint for metrics */
 #[utoipa::path(
@@ -128,7 +131,7 @@ pub async fn query(
         is_range_query: false,
         start,
         end,
-        step: 300_000_000,
+        step: 300_000_000, // 5m
     };
 
     match promql::search::search(&org_id, &req).await {
@@ -240,7 +243,7 @@ pub async fn query_range(
         }
     };
     let step = match range_query.step {
-        None => 300_000_000,
+        None => 300_000_000, // 5m
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
@@ -262,7 +265,6 @@ pub async fn query_range(
         end,
         step,
     };
-
     match promql::search::search(&org_id, &req).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
@@ -335,15 +337,16 @@ pub async fn metadata(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestMetadata>,
 ) -> Result<HttpResponse, Error> {
-    let req = req.into_inner();
-    tracing::trace!(%org_id, ?req);
-    Ok(match metrics::prom::get_metadata(&org_id, req).await {
-        Ok(resp) => HttpResponse::Ok().json(resp),
-        Err(err) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-            err.to_string(),
-        )),
-    })
+    Ok(
+        match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_metadata failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus finding series by label matchers */
@@ -357,7 +360,7 @@ pub async fn metadata(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("match" = Vec<String>, Query, description = "<series_selector>: Repeated series selector argument that selects the series to return. At least one match[] argument must be provided"),
+        ("match[]" = String, Query, description = "<series_selector>: Series selector argument that selects the series to return"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
@@ -388,11 +391,31 @@ pub async fn metadata(
 #[get("/{org_id}/prometheus/api/v1/series")]
 pub async fn series(
     org_id: web::Path<String>,
-    series: web::Query<meta::prom::RequestSeries>,
+    req: web::Query<meta::prom::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
-    let series = series.into_inner();
-    tracing::trace!(%org_id, ?series);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+    let meta::prom::RequestSeries {
+        matcher,
+        start,
+        end,
+    } = req.into_inner();
+    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
+    };
+    Ok(
+        match metrics::prom::get_series(&org_id, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_series failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus getting label names */
@@ -406,7 +429,7 @@ pub async fn series(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("match" = Option<Vec<String>>, Query, description = "Repeated series selector argument that selects the series from which to read the label names. Optional"),
+        ("match[]" = String, Query, description = "Series selector argument that selects the series from which to read the label names"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
@@ -443,11 +466,31 @@ pub async fn series(
 #[get("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels(
     org_id: web::Path<String>,
-    labels: web::Query<meta::prom::RequestLabels>,
+    req: web::Query<meta::prom::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
-    let labels = labels.into_inner();
-    tracing::trace!(%org_id, ?labels);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+    let meta::prom::RequestLabels {
+        matcher,
+        start,
+        end,
+    } = req.into_inner();
+    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
+    };
+    Ok(
+        match metrics::prom::get_labels(&org_id, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_labels failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus query label values */
@@ -462,7 +505,7 @@ pub async fn labels(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("label_name" = String, Path, description = "Label name"),
-        ("match" = Option<Vec<String>>, Query, description = "Repeated series selector argument that selects the series from which to read the label names. Optional"),
+        ("match[]" = String, Query, description = "Series selector argument that selects the series from which to read the label values"),
         ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
         ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
     ),
@@ -478,12 +521,90 @@ pub async fn labels(
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
-pub async fn values(
+pub async fn label_values(
     path: web::Path<(String, String)>,
-    values: web::Query<meta::prom::RequestValues>,
+    req: web::Query<meta::prom::RequestLabelValues>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, label_name) = path.into_inner();
-    let values = values.into_inner();
-    tracing::trace!(%org_id, %label_name, ?values);
-    Ok(HttpResponse::NotImplemented().body("Not Implemented"))
+    let meta::prom::RequestLabelValues {
+        matcher,
+        start,
+        end,
+    } = req.into_inner();
+    let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
+    };
+    Ok(
+        match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_label_values failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
+}
+
+fn validate_metadata_params(
+    matcher: String,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(parser::VectorSelector, i64, i64), String> {
+    let selector = match parser::parse(&matcher) {
+        Err(err) => {
+            let err = format!("parse promql error: {err}");
+            log::error!("{err}");
+            return Err(err);
+        }
+        Ok(parser::Expr::VectorSelector(sel)) => {
+            let err = if sel.name.is_none() {
+                Some("match[] argument must start with a metric name, e.g. `match[]=up`")
+            } else if sel.offset.is_some() {
+                Some("match[]: unexpected offset modifier")
+            } else if sel.at.is_some() {
+                Some("match[]: unexpected @ modifier")
+            } else {
+                None
+            };
+            if let Some(err) = err {
+                log::error!("{err}");
+                return Err(err.to_owned());
+            }
+            sel
+        }
+        Ok(_expr) => {
+            let err = "vector selector expected";
+            log::error!("{err}");
+            return Err(err.to_owned());
+        }
+    };
+    let start = match start {
+        None => 0,
+        Some(s) => match parse_str_to_timestamp_micros(&s) {
+            Ok(t) => t,
+            Err(e) => {
+                let err = format!("parse time error: {e}");
+                log::error!("{err}");
+                return Err(err);
+            }
+        },
+    };
+    let end = match end {
+        None => i64::MAX,
+        Some(s) => match parse_str_to_timestamp_micros(&s) {
+            Ok(t) => t,
+            Err(e) => {
+                let err = format!("parse time error: {e}");
+                log::error!("{err}");
+                return Err(err);
+            }
+        },
+    };
+    Ok((selector, start, end))
 }
