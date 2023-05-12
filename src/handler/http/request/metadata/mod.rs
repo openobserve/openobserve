@@ -12,21 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_multipart::Multipart;
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::meta;
+use crate::{meta, service::metadata::save_metadata};
 
 #[post("/{org_id}/metadata/{table_name}")]
 pub async fn set(
     path: web::Path<(String, String)>,
-    body: actix_web::web::Bytes,
+    mut payload: Multipart,
     req: HttpRequest,
+    thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, key) = path.into_inner();
+    let (org_id, table_name) = path.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap();
     if content_type == "text/csv" {
-        Ok(HttpResponse::Ok().into())
+        save_metadata(&org_id, &table_name, payload, thread_id).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
