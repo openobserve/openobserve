@@ -137,6 +137,8 @@ export default defineComponent({
     })
 
     onActivated(async () => {
+      errorData.errors = []
+
       // todo check for the edit more
       if (route.query.panelId) {
         editMode.value = true;
@@ -145,8 +147,9 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId
         );
-        // console.log("panel data", panelData);
-        Object.assign(dashboardPanelData.data, panelData);
+        // console.log("panel data", JSON.stringify(panelData, null , 2));
+        Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
+        // console.log("dashboard panel data",JSON.stringify(dashboardPanelData.data, null, 2));
         chartData.value = dashboardPanelData.data
       } else {
         editMode.value = false;
@@ -338,7 +341,7 @@ export default defineComponent({
         // check if field selection is from the selected stream fields when the custom query mode is OFF
         const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
         if (customQueryXFieldError.length) {
-          errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
+          errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`))
         }
 
         const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
