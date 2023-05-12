@@ -12,21 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::http;
 use actix_web::{http::StatusCode, HttpResponse};
+use ipnetwork::IpNetwork;
 use std::io;
 use tracing::instrument;
 
+use crate::infra::config::SYSLOG_ROUTES;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::syslog::{Routes, SyslogRoute};
 use crate::service::db::syslog;
 
 #[instrument(skip(route))]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {
+    for (_, existing_route) in SYSLOG_ROUTES.clone() {
+        for subnet in &route.subnets {
+            for existing_subnet in &existing_route.subnets {
+                if subnets_overlap(existing_subnet, subnet) {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!(
+                            "Provided subnet/s overlap with existing subnet/s {existing_subnet} for organization {}",
+                            &existing_route.org_id
+                        ),
+                    )));
+                }
+            }
+        }
+    }
+
     route.id = crate::infra::ider::generate();
     if let Err(e) = syslog::set(&route).await {
         return Ok(Response::InternalServerError(e).into());
     }
-    tracing::info!(dashboard_id = route.id, "Syslog Route created");
+    tracing::info!(id = route.id, "Syslog Route created");
     Ok(HttpResponse::Created().json(route))
 }
 
@@ -103,4 +122,11 @@ impl From<Response> for HttpResponse {
             ),
         }
     }
+}
+
+fn subnets_overlap(net1: &IpNetwork, net2: &IpNetwork) -> bool {
+    net1.contains(net2.network())
+        || net1.contains(net2.broadcast())
+        || net2.contains(net1.network())
+        || net2.contains(net1.broadcast())
 }
