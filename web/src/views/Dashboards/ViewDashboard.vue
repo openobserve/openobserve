@@ -84,6 +84,7 @@ import {
   watch,
   onMounted,
   onActivated,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -207,7 +208,7 @@ export default defineComponent({
     })
 
     // ------- work with query params ----------
-    onActivated(() => {
+    onActivated(async() => {
       const params = route.query
 
       if(params.refresh) {
@@ -217,6 +218,11 @@ export default defineComponent({
       if(params.period || (params.to && params.from)){
         selectedDate.value = getDurationObjectFromParams(params)
       }
+
+      // resize charts if needed
+      await nextTick();
+      window.dispatchEvent(new Event("resize"))
+      
     })
 
     // whenever the refreshInterval is changed, update the query params
