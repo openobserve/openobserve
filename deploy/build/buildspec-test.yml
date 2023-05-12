@@ -18,13 +18,13 @@ phases:
 
   build:
     commands:
-      - pwd
-      - mkdir -p web/dist 
-      - touch web/dist/index.html
-      # increase swap file size
+      # Increase swap file size
       - fallocate -l 32G /swapfile
       - chmod 600 /swapfile
       - mkswap /swapfile || true
       - swapon /swapfile || true
+      - pwd
+      - mkdir -p web/dist 
+      - touch web/dist/index.html
       - cargo clippy -- -D warnings
       - ./coverage.sh

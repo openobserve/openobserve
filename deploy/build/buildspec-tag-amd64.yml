@@ -7,6 +7,11 @@ phases:
 
   build:
     commands:
+      # Increase swap file size
+      - fallocate -l 32G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile || true
+      - swapon /swapfile || true
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
 
