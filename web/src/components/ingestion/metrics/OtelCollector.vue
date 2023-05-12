@@ -42,7 +42,6 @@ exporters:
 </template>
 
 <script lang="ts">
-// /{org_id}/prometheus/api/v1/write
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
