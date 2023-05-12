@@ -93,7 +93,7 @@ async fn dispatch(
     let mut nodes = nodes.unwrap();
     if nodes.is_empty() {
         log::error!("Not found online nodes, restaring...");
-        std::process::exit(0);
+        std::process::exit(1);
     }
 
     // random nodes
