@@ -222,7 +222,9 @@ export default defineComponent({
           },
         });
       } else {
-        getOrganizationPasscode();
+        if (store.state.selectedOrganization.status == "active") {
+          getOrganizationPasscode();
+        }
       }
     });
 

@@ -6,6 +6,8 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import UsersCloud from "@/enterprise/components/users/User.vue";
 import UsersOpenSource from "@/components/users/User.vue";
 import config from "@/aws-exports";
@@ -30,6 +32,12 @@ export default defineComponent({
   components: {
     UsersCloud,
     UsersOpenSource,
+  },
+  setup() {
+    const store = useStore();
+    const { t } = useI18n();
+
+    return {store, t,};
   },
 });
 </script>

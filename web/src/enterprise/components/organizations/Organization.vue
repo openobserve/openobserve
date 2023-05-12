@@ -154,6 +154,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
+import { convertToTitleCase } from "@/utils/zincUtils";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -221,6 +222,13 @@ export default defineComponent({
         name: "plan_type",
         field: "plan_type",
         label: t("organization.subscription_type"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "status",
+        field: "status",
+        label: t("organization.status"),
         align: "left",
         sortable: true,
       },
@@ -341,15 +349,21 @@ export default defineComponent({
             id: data.id,
             name: data.name,
             identifier: data.identifier,
-            type: data.type,
+            type: convertToTitleCase(data.type),
             owner:
               data.UserObj.first_name != ""
                 ? data.UserObj.first_name
                 : data.UserObj.email,
             created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
-            role: role,
+            role: convertToTitleCase(role),
             actions: "true",
-            plan_type: data.CustomerBillingObj.subscription_type == "Free-Plan-USD-Monthly" || data.CustomerBillingObj.subscription_type == "" ? "Developer" : "Pro",
+            status: convertToTitleCase(data.status),
+            plan_type:
+              data.CustomerBillingObj.subscription_type ==
+                "Free-Plan-USD-Monthly" ||
+              data.CustomerBillingObj.subscription_type == ""
+                ? "Developer"
+                : "Pro",
           };
         });
 
