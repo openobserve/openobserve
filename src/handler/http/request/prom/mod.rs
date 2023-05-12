@@ -337,16 +337,16 @@ pub async fn metadata(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestMetadata>,
 ) -> Result<HttpResponse, Error> {
-    Ok(metrics::prom::get_metadata(&org_id, req.into_inner())
-        .await
-        .map_or_else(
-            |e| {
-                log::error!("get_metadata failed: {e}");
-                promql::ApiFuncResponse::err_internal(e)
-            },
-            promql::ApiFuncResponse::ok,
-        )
-        .into())
+    Ok(
+        match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_metadata failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus finding series by label matchers */
@@ -400,18 +400,22 @@ pub async fn series(
     } = req.into_inner();
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
-        Err(e) => return Ok(promql::ApiFuncResponse::<()>::err_bad_data(e).into()),
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
     };
-    Ok(metrics::prom::get_series(&org_id, selector, start, end)
-        .await
-        .map_or_else(
-            |e| {
-                log::error!("get_series failed: {e}");
-                promql::ApiFuncResponse::err_internal(e)
-            },
-            promql::ApiFuncResponse::ok,
-        )
-        .into())
+    Ok(
+        match metrics::prom::get_series(&org_id, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_series failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus getting label names */
@@ -471,19 +475,22 @@ pub async fn labels(
     } = req.into_inner();
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
-        Err(e) => return Ok(promql::ApiFuncResponse::<()>::err_bad_data(e).into()),
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
     };
-
-    Ok(metrics::prom::get_labels(&org_id, selector, start, end)
-        .await
-        .map_or_else(
-            |e| {
-                log::error!("get_labels failed: {e}");
-                promql::ApiFuncResponse::err_internal(e)
-            },
-            promql::ApiFuncResponse::ok,
-        )
-        .into())
+    Ok(
+        match metrics::prom::get_labels(&org_id, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_labels failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
+    )
 }
 
 /** prometheus query label values */
@@ -526,19 +533,21 @@ pub async fn label_values(
     } = req.into_inner();
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
-        Err(e) => return Ok(promql::ApiFuncResponse::<()>::err_bad_data(e).into()),
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
+            )
+        }
     };
     Ok(
-        metrics::prom::get_label_values(&org_id, label_name, selector, start, end)
-            .await
-            .map_or_else(
-                |e| {
-                    log::error!("get_label_values failed: {e}");
-                    promql::ApiFuncResponse::err_internal(e)
-                },
-                promql::ApiFuncResponse::ok,
-            )
-            .into(),
+        match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Err(err) => {
+                log::error!("get_label_values failed: {err}");
+                HttpResponse::InternalServerError()
+                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+            }
+        },
     )
 }
 

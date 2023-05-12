@@ -71,21 +71,6 @@ pub(crate) enum ApiFuncResponse<T: Serialize> {
     },
 }
 
-impl<T: Serialize> From<ApiFuncResponse<T>> for actix_web::HttpResponse {
-    fn from(resp: ApiFuncResponse<T>) -> Self {
-        match resp {
-            ok @ ApiFuncResponse::Success { .. } => actix_web::HttpResponse::Ok().json(ok),
-            err @ ApiFuncResponse::Error {
-                error_type: ApiErrorType::BadData,
-                ..
-            } => actix_web::HttpResponse::BadRequest().json(err),
-            err @ ApiFuncResponse::Error { .. } => {
-                actix_web::HttpResponse::InternalServerError().json(err)
-            }
-        }
-    }
-}
-
 impl<T: Serialize> ApiFuncResponse<T> {
     pub(crate) fn ok(data: T) -> Self {
         ApiFuncResponse::Success { data }
