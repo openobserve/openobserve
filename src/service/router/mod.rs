@@ -18,7 +18,7 @@ use awc::Client;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use crate::infra::cluster;
+use crate::infra::cluster::{self, is_ingester, is_querier, list_nodes, Node, NodeStatus};
 use crate::infra::config::CONFIG;
 
 const QUERIER_ROUTES: [&str; 9] = [
@@ -93,6 +93,24 @@ async fn dispatch(
     let mut nodes = nodes.unwrap();
     let mut rng = thread_rng();
     nodes.shuffle(&mut rng);
+
+    if nodes.is_empty() {
+        nodes = list_nodes().await.unwrap_or_else(|_| vec![]);
+        let filter_fn = if check_querier_route(path) {
+            |node: &Node| node.status == NodeStatus::Online && is_querier(&node.role)
+        } else {
+            |node: &Node| node.status == NodeStatus::Online && is_ingester(&node.role)
+        };
+
+        nodes.retain(filter_fn);
+
+        if nodes.is_empty() {
+            log::error!("No online querier or ingestor nodes");
+            return Ok(
+                HttpResponse::ServiceUnavailable().body("Please wait for other nodes to be online")
+            );
+        }
+    }
 
     let node = nodes.first().unwrap();
     let new_url = format!("{}{}", node.http_addr, path);
