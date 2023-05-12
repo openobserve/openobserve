@@ -49,7 +49,7 @@ import { defineComponent } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getSessionStorageVal, useLocalOrganization } from "../utils/zincutils";
+import { getSessionStorageVal, useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 
@@ -69,6 +69,8 @@ export default defineComponent({
   },
   methods: {
     async ProcessSubscription(s: any, action: string) {
+      const baseURL = getPath();
+      alert(baseURL)
       await organizationsService
         .process_subscription(s, action)
         .then((res) => {
@@ -90,7 +92,7 @@ export default defineComponent({
         })
         .catch((e) => {
           this.status = "error";
-          this.error = e.response.data.error;
+          this.error = e.response.data.error.replaceAll("[BASE_URL]", baseURL);
         });
     },
   },

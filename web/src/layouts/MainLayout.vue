@@ -44,7 +44,8 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs"
+class="warning" />{{
               store.state.quotaThresholdMsg
             }}
           </div>
@@ -135,7 +136,8 @@
           >
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -158,7 +160,9 @@
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup clickable @click="signout">
+              <q-item v-ripple
+v-close-popup clickable
+@click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -314,7 +318,7 @@ export default defineComponent({
     const { t } = useI18n();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
-    const customOrganization = router.currentRoute.value.query.hasOwnProperty(
+    let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
     )
       ? router.currentRoute.value.query.org_identifier
@@ -505,6 +509,9 @@ export default defineComponent({
     };
 
     const setSelectedOrganization = () => {
+      customOrganization = router.currentRoute.value.query.hasOwnProperty("org_identifier")
+        ? router.currentRoute.value.query.org_identifier
+        : "";
       if (store.state.organizations.length > 0) {
         const localOrg: any = useLocalOrganization();
         orgOptions.value = store.state.organizations.map(
@@ -517,6 +524,7 @@ export default defineComponent({
             ingest_threshold: number;
             search_threshold: number;
             CustomerBillingObj: { subscription_type: string };
+            status: string;
           }) => {
             const optiondata: any = {
               label: data.name,
@@ -528,6 +536,7 @@ export default defineComponent({
               subscription_type: data.hasOwnProperty("CustomerBillingObj")
                 ? data.CustomerBillingObj.subscription_type
                 : "",
+              status: data.status,
             };
 
             if (
@@ -535,9 +544,10 @@ export default defineComponent({
               localOrg.value.identifier == data.identifier &&
               (customOrganization == "" || customOrganization == undefined)
             ) {
-              localOrg.value.subscription_type =
-                data.CustomerBillingObj.subscription_type;
-              useLocalOrganization(localOrg.value);
+              // localOrg.value.subscription_type =
+              //   data.CustomerBillingObj.subscription_type;
+              // useLocalOrganization(localOrg.value);
+              useLocalOrganization(optiondata);
             }
 
             if (
@@ -560,6 +570,12 @@ export default defineComponent({
             return optiondata;
           }
         );
+      }
+
+      if (router.currentRoute.value.query.action == "subscribe") {
+        router.push({
+          name: "plans",
+        });
       }
 
       if (
@@ -636,8 +652,14 @@ export default defineComponent({
     changeOrganization() {
       return this.store.state.organizations;
     },
+    forceFetchOrganization() {
+      return this.router.currentRoute.value.query.update_org;
+    },
   },
   watch: {
+    forceFetchOrganization() {
+      mainLayoutMixin.setup().getDefaultOrganization(this.store);
+    },
     changeOrganization() {
       setTimeout(() => {
         this.setSelectedOrganization();
