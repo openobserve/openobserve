@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
-
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
@@ -22,9 +20,11 @@ use datafusion::arrow::datatypes::Schema;
 use promql_parser::parser;
 use prost::Message;
 use rustc_hash::FxHashSet;
+use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
 use tracing::info_span;
 
 use crate::infra::cache::stats;
+use crate::service::search as SearchService;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -574,13 +574,87 @@ pub(crate) async fn get_labels(
 }
 
 pub(crate) async fn get_label_values(
-    _org_id: &str,
-    _label_name: String,
-    _selector: Option<parser::VectorSelector>,
-    _start: i64,
-    _end: i64,
-) -> Result<prom::ResponseLabelValues> {
-    todo!("XXX-IMPLEMENTME")
+    org_id: &str,
+    label_name: String,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
+) -> Result<Vec<String>> {
+    let stream_name = match selector {
+        Some(selector) => match selector.name {
+            Some(v) => v,
+            None => {
+                let labels = selector.matchers.find_matchers(NAME_LABEL);
+                if !labels.is_empty() {
+                    labels.first().unwrap().to_string()
+                } else {
+                    "".to_string()
+                }
+            }
+        },
+        None => "".to_string(),
+    };
+
+    // just query stream name
+    if label_name == NAME_LABEL {
+        let streams = db::schema::list(org_id, Some(StreamType::Metrics), false)
+            .await
+            .unwrap_or_default();
+        let mut values = Vec::with_capacity(streams.len());
+        streams.iter().for_each(|v| {
+            let stats = stats::get_stream_stats(org_id, &v.stream_name, StreamType::Metrics);
+            if !stream_name.is_empty() && v.stream_name != stream_name {
+                return;
+            }
+            // check the stream is active, last updated >= start - file_push_interval && first updated >= end
+            if stats.doc_time_max
+                >= start
+                    - Duration::seconds(CONFIG.limit.file_push_interval as i64)
+                        .num_microseconds()
+                        .unwrap()
+                && stats.doc_time_min < end
+            {
+                values.push(v.stream_name.clone())
+            }
+        });
+        values.sort();
+        return Ok(values);
+    }
+    // query other labels, only support one stream
+    let schema = db::schema::get(org_id, &stream_name, Some(StreamType::Metrics))
+        .await
+        .unwrap();
+    if schema.fields().is_empty() {
+        return Ok(vec![]);
+    }
+    // get topK values
+    let req = meta::search::Request {
+        query: meta::search::Query {
+            sql: format!("SELECT DISTINCT({}) FROM {}", label_name, stream_name),
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            sql_mode: "full".to_string(),
+            ..Default::default()
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    let stream_type = StreamType::Metrics;
+    let values = match SearchService::search(org_id, stream_type, &req).await {
+        Ok(mut res) => res
+            .hits
+            .iter_mut()
+            .filter_map(|v| v.as_object().unwrap().get(&label_name))
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<String>>(),
+        Err(err) => {
+            log::error!("search values error: {:?}", err);
+            return Err(err);
+        }
+    };
+    Ok(values)
 }
 
 async fn prom_ha_handler(

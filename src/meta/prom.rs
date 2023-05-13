@@ -204,11 +204,6 @@ pub struct RequestLabelValues {
     pub end: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct ResponseLabelValues {
-    // XXX-TODO: IMPLEMENTME
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
