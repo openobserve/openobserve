@@ -26,8 +26,8 @@ use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionConfig;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use datafusion::prelude::{cast, col, Expr, SessionContext};
-use datafusion_common::DataFusionError;
+use datafusion::prelude::{cast, col, lit, Expr, SessionContext};
+use datafusion_common::{DataFusionError, ScalarValue};
 use object_store::limit::LimitStore;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
@@ -253,6 +253,28 @@ pub async fn sql(
                     vec![resp],
                 )?;
                 ctx.register_table("tbl_temp", Arc::new(mem_table))?;
+                // -- fix mem table, add missing columns
+                let mut tmp_df = ctx.table("tbl_temp").await?;
+                let tmp_fields = tmp_df
+                    .schema()
+                    .field_names()
+                    .iter()
+                    .map(|f| f.strip_prefix("tbl_temp.").unwrap().to_string())
+                    .collect::<Vec<String>>();
+                let need_add_columns = schema
+                    .fields()
+                    .iter()
+                    .filter(|field| !tmp_fields.contains(&field.name().to_string()))
+                    .map(|field| field.name().as_str())
+                    .collect::<Vec<&str>>();
+                if !need_add_columns.is_empty() {
+                    for column in need_add_columns {
+                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                    }
+                    ctx.deregister_table("tbl_temp")?;
+                    ctx.register_table("tbl_temp", tmp_df.into_view())?;
+                }
+                // -- fix done
             }
             None => {
                 return Err(datafusion::error::DataFusionError::Execution(
