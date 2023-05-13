@@ -213,7 +213,7 @@ async fn add_valid_record(
 ) -> Option<Trigger> {
     let mut trigger: Option<Trigger> = None;
     let timestamp: i64 = local_val
-        .get(&CONFIG.common.time_stamp_col.clone())
+        .get(&CONFIG.common.column_timestamp.clone())
         .unwrap()
         .as_i64()
         .unwrap();

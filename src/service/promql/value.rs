@@ -18,18 +18,6 @@ use serde::{
 };
 use std::{cmp::Ordering, sync::Arc};
 
-pub const FIELD_HASH: &str = "__hash__";
-pub const FIELD_NAME: &str = "__name__";
-pub const FIELD_TYPE: &str = "metric_type";
-pub const FIELD_TIME: &str = "_timestamp";
-pub const FIELD_VALUE: &str = "value";
-pub const FIELD_BUCKET: &str = "le";
-
-pub const TYPE_COUNTER: &str = "counter";
-pub const TYPE_GAUGE: &str = "gauge";
-pub const TYPE_HISTOGRAM: &str = "histogram";
-pub const TYPE_SUMMARY: &str = "summary";
-
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 type FxIndexMap<K, V> =
     indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;

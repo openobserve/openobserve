@@ -253,7 +253,7 @@ pub async fn around(
 
     let default_sql = format!(
         "SELECT * FROM \"{}\" ORDER BY {} DESC",
-        stream_name, CONFIG.common.time_stamp_col
+        stream_name, CONFIG.common.column_timestamp
     );
     let around_sql = match query.get("sql") {
         None => default_sql,

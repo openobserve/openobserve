@@ -490,21 +490,21 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if *k != CONFIG.common.time_stamp_col && k != "value" {
+            if *k != CONFIG.common.column_timestamp && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");
         if !results_metrics.contains_key(&key) {
             let mut fields = fields.clone();
-            fields.remove(&CONFIG.common.time_stamp_col);
+            fields.remove(&CONFIG.common.column_timestamp);
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_default();
         let value = [
             fields
-                .get(&CONFIG.common.time_stamp_col)
+                .get(&CONFIG.common.column_timestamp)
                 .unwrap()
                 .to_owned(),
             json::Value::String(fields.get("value").unwrap().to_string()),

@@ -47,7 +47,7 @@ pub struct ClusterLeader {
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum MetricType {
     Unknown,
@@ -160,7 +160,7 @@ pub struct RequestSeries {
     /// NOTE: Prometheus API allows passing multiple `match[]` arguments,
     /// but ZincObserve only supports a single one.
     #[serde(rename = "match[]")]
-    pub matcher: String,
+    pub matcher: Option<String>,
     /// Start timestamp.
     pub start: Option<String>,
     /// End timestamp.
@@ -181,16 +181,11 @@ pub struct RequestLabels {
     /// NOTE: Prometheus API allows passing any number of `match[]` arguments,
     /// but ZincObserve requires that exactly one is passed.
     #[serde(rename = "match[]")]
-    pub matcher: String,
+    pub matcher: Option<String>,
     /// Start timestamp.
     pub start: Option<String>,
     /// End timestamp.
     pub end: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct ResponseLabels {
-    // XXX-TODO: IMPLEMENTME
 }
 
 /// Request a list of label values for a provided label name.
@@ -202,16 +197,11 @@ pub struct RequestLabelValues {
     /// NOTE: Prometheus API allows passing any number of `match[]` arguments,
     /// but ZincObserve requires that exactly one is passed.
     #[serde(rename = "match[]")]
-    pub matcher: String,
+    pub matcher: Option<String>,
     /// Start timestamp.
     pub start: Option<String>,
     /// End timestamp.
     pub end: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct ResponseLabelValues {
-    // XXX-TODO: IMPLEMENTME
 }
 
 #[cfg(test)]

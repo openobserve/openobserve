@@ -187,9 +187,9 @@ pub async fn sql(
             Some(ts_range) => format!(
                 "{} where {} >= {} AND {} < {}",
                 sql_parts[0],
-                CONFIG.common.time_stamp_col,
+                CONFIG.common.column_timestamp,
                 ts_range.0,
-                CONFIG.common.time_stamp_col,
+                CONFIG.common.column_timestamp,
                 ts_range.1
             ),
             None => sql_parts[0].to_owned(),
@@ -758,7 +758,7 @@ pub async fn convert_parquet_file(
     // get all sorted data
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp
     );
     let mut df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
@@ -857,7 +857,7 @@ pub async fn merge_parquet_files(
     // get meta data
     let meta_sql = format!(
         "SELECT MIN({}) as min_ts, MAX({}) as max_ts, COUNT(1) as num_records FROM tbl",
-        CONFIG.common.time_stamp_col, CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp, CONFIG.common.column_timestamp
     );
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
@@ -875,12 +875,12 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp
     );
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let batches = df.collect().await?;
-    let sort_column_id = schema.index_of(&CONFIG.common.time_stamp_col).unwrap();
+    let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
     let props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
         .set_write_batch_size(8192)
