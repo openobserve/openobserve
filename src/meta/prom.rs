@@ -47,7 +47,7 @@ pub struct ClusterLeader {
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/f5fcaa3872ce03808567fabc56afc9cf61c732cb/model/textparse/interface.go#L106-L119
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Display)]
 #[strum(serialize_all = "lowercase")]
 pub enum MetricType {
     Unknown,

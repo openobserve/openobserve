@@ -41,7 +41,6 @@ use crate::{
     },
     service::{
         db,
-        promql::value::{FIELD_HASH, FIELD_NAME, FIELD_TIME, FIELD_VALUE},
         schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
     },
 };
@@ -256,7 +255,7 @@ pub async fn remote_write(
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             val_map.insert(
-                CONFIG.common.time_stamp_col.clone(),
+                CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
             let value_str = crate::common::json::to_string(&val_map).unwrap();
@@ -531,7 +530,7 @@ pub(crate) async fn get_labels(
     let stream_name = if let Some(v) = selector.name {
         v
     } else {
-        let name_matcher = selector.matchers.find_matchers(FIELD_NAME);
+        let name_matcher = selector.matchers.find_matchers(NAME_LABEL);
         if !name_matcher.is_empty() {
             name_matcher.first().unwrap().to_string()
         } else {
@@ -549,7 +548,9 @@ pub(crate) async fn get_labels(
         .fields()
         .iter()
         .filter(|field| {
-            field.name() != FIELD_HASH && field.name() != FIELD_TIME && field.name() != FIELD_VALUE
+            field.name() != &CONFIG.common.column_timestamp
+                && field.name() != HASH_LABEL
+                && field.name() != VALUE_LABEL
         })
         .map(|field| field.name().to_string())
         .collect::<Vec<String>>())

@@ -254,7 +254,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         match selection.0 {
-            Some(expr) => parse_expr_for_field(expr, &CONFIG.common.time_stamp_col, &mut fields)?,
+            Some(expr) => parse_expr_for_field(expr, &CONFIG.common.column_timestamp, &mut fields)?,
             None => {}
         }
 
@@ -504,7 +504,7 @@ fn parse_expr_for_field(
                 }
                 SqlExpr::Function(f) => {
                     // Hack _timestamp
-                    if field == CONFIG.common.time_stamp_col {
+                    if field == CONFIG.common.column_timestamp {
                         let f_name = f.to_string().to_lowercase();
                         if parse_expr_check_field_name(&f_name, field) {
                             let val = get_value_from_expr(right);
@@ -514,7 +514,7 @@ fn parse_expr_for_field(
                                 ));
                             }
                             fields.push((
-                                CONFIG.common.time_stamp_col.clone(),
+                                CONFIG.common.column_timestamp.clone(),
                                 val.unwrap(),
                                 next_op,
                                 next_op,
@@ -612,7 +612,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
     if s == field {
         return true;
     }
-    if field == "*" && s != "_all" && s != CONFIG.common.time_stamp_col.clone() {
+    if field == "*" && s != "_all" && s != CONFIG.common.column_timestamp.clone() {
         return true;
     }
 

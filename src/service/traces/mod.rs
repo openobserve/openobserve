@@ -205,7 +205,7 @@ pub async fn handle_trace_request(
                 let val_map = value.as_object_mut().unwrap();
 
                 val_map.insert(
-                    CONFIG.common.time_stamp_col.clone(),
+                    CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

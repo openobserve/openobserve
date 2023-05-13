@@ -67,7 +67,7 @@ pub async fn populate_file_meta(
 
     let sql = format!(
         "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp ;",
-        CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp
     );
     let df = ctx.sql(sql.as_str()).await.unwrap();
     let batches = df.collect().await.unwrap();

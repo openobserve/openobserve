@@ -35,6 +35,8 @@ use std::{
 };
 
 use super::{aggregations, functions, value::*};
+use crate::infra::config::CONFIG;
+use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
 
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
@@ -44,6 +46,7 @@ pub trait TableProvider: Sync + Send + 'static {
         time_range: (i64, i64),
         filters: &[(String, String)],
     ) -> Result<SessionContext>;
+    async fn get_metrics_type(&self, stream_name: &str) -> Result<MetricType>;
 }
 
 pub struct QueryEngine {
@@ -354,9 +357,9 @@ impl QueryEngine {
         };
 
         let mut df_group = table.clone().filter(
-            col(FIELD_TIME)
+            col(&CONFIG.common.column_timestamp)
                 .gt(lit(start))
-                .and(col(FIELD_TIME).lt_eq(lit(end))),
+                .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
         )?;
         let regexp_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
@@ -385,26 +388,26 @@ impl QueryEngine {
             }
         }
         let batches = df_group
-            .sort(vec![col(FIELD_TIME).sort(true, true)])?
+            .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
             .collect()
             .await?;
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
         for batch in &batches {
             let hash_values = batch
-                .column_by_name(FIELD_HASH)
+                .column_by_name(HASH_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<StringArray>()
                 .unwrap();
             let time_values = batch
-                .column_by_name(FIELD_TIME)
+                .column_by_name(&CONFIG.common.column_timestamp)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<Int64Array>()
                 .unwrap();
             let value_values = batch
-                .column_by_name(FIELD_VALUE)
+                .column_by_name(VALUE_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<Float64Array>()
@@ -415,7 +418,10 @@ impl QueryEngine {
                     let mut labels = Vec::with_capacity(batch.num_columns());
                     for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                         let name = k.name();
-                        if name == FIELD_HASH || name == FIELD_TIME || name == FIELD_VALUE {
+                        if name == &CONFIG.common.column_timestamp
+                            || name == HASH_LABEL
+                            || name == VALUE_LABEL
+                        {
                             continue;
                         }
                         let value = v.as_any().downcast_ref::<StringArray>().unwrap();
@@ -445,21 +451,19 @@ impl QueryEngine {
         // https://ihac.xyz/2018/12/11/Prometheus-Extrapolation%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/
 
         // Fix data about app restart
-        for series in metric_values.iter_mut() {
-            if let Some(metric_type) = labels_value(&series.labels, FIELD_TYPE) {
-                if metric_type != TYPE_COUNTER {
-                    continue;
-                }
-            }
-            let mut delta: f64 = 0.0;
-            let mut last_value = 0.0;
-            for sample in series.values.iter_mut() {
-                if last_value > sample.value {
-                    delta += last_value;
-                }
-                last_value = sample.value;
-                if delta > 0.0 {
-                    sample.value += delta;
+        let metrics_type = self.table_provider.get_metrics_type(table_name).await?;
+        if metrics_type == MetricType::Counter {
+            for series in metric_values.iter_mut() {
+                let mut delta: f64 = 0.0;
+                let mut last_value = 0.0;
+                for sample in series.values.iter_mut() {
+                    if last_value > sample.value {
+                        delta += last_value;
+                    }
+                    last_value = sample.value;
+                    if delta > 0.0 {
+                        sample.value += delta;
+                    }
                 }
             }
         }

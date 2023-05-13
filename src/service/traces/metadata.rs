@@ -44,7 +44,7 @@ pub async fn ingest(
         // get json object
         let local_val = value.as_object_mut().unwrap();
         // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
+        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
             Some(v) => match parse_timestamp_micro_from_value(v) {
                 Ok(t) => t,
                 Err(_) => Utc::now().timestamp_micros(),
@@ -52,7 +52,7 @@ pub async fn ingest(
             None => Utc::now().timestamp_micros(),
         };
         local_val.insert(
-            CONFIG.common.time_stamp_col.clone(),
+            CONFIG.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
         let trace_id = local_val.get("trace_id").unwrap().as_str().unwrap();

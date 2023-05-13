@@ -15,7 +15,12 @@
 use datafusion::error::{DataFusionError, Result};
 use rustc_hash::FxHashMap;
 
-use crate::service::promql::value::{self, InstantValue, Labels, Signature, Value};
+use crate::{
+    meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
+    service::promql::value::{
+        signature_without_labels, InstantValue, Labels, Sample, Signature, Value,
+    },
+};
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -67,16 +72,9 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
             None | Some(Err(_)) => continue,
         };
 
-        let sig = value::signature_without_labels(
-            &labels,
-            &[value::FIELD_HASH, value::FIELD_NAME, value::FIELD_BUCKET],
-        );
+        let sig = signature_without_labels(&labels, &[HASH_LABEL, NAME_LABEL, LE_LABEL]);
         let entry = metrics_with_buckets.entry(sig).or_insert_with(|| {
-            labels.retain(|l| {
-                l.name != value::FIELD_HASH
-                    && l.name != value::FIELD_NAME
-                    && l.name != value::FIELD_BUCKET
-            });
+            labels.retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != LE_LABEL);
             MetricWithBuckets {
                 labels,
                 buckets: Vec::new(),
@@ -90,9 +88,9 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
 
     let values = metrics_with_buckets
         .into_values()
-        .map(|mb| value::InstantValue {
+        .map(|mb| InstantValue {
             labels: mb.labels,
-            value: value::Sample {
+            value: Sample {
                 timestamp: sample_time,
                 value: bucket_quantile(phi, mb.buckets),
             },
