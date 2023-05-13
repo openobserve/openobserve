@@ -188,11 +188,6 @@ pub struct RequestLabels {
     pub end: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct ResponseLabels {
-    // XXX-TODO: IMPLEMENTME
-}
-
 /// Request a list of label values for a provided label name.
 #[derive(Debug, Deserialize)]
 pub struct RequestLabelValues {

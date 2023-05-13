@@ -41,6 +41,7 @@ use crate::{
     },
     service::{
         db,
+        promql::value::{FIELD_HASH, FIELD_NAME, FIELD_TIME, FIELD_VALUE},
         schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
     },
 };
@@ -522,12 +523,36 @@ pub(crate) async fn get_series(
 }
 
 pub(crate) async fn get_labels(
-    _org_id: &str,
-    _selector: parser::VectorSelector,
+    org_id: &str,
+    selector: parser::VectorSelector,
     _start: i64,
     _end: i64,
-) -> Result<prom::ResponseLabels> {
-    todo!("XXX-IMPLEMENTME")
+) -> Result<Vec<String>> {
+    let stream_name = if let Some(v) = selector.name {
+        v
+    } else {
+        let name_matcher = selector.matchers.find_matchers(FIELD_NAME);
+        if !name_matcher.is_empty() {
+            name_matcher.first().unwrap().to_string()
+        } else {
+            "".to_string()
+        }
+    };
+    if stream_name.is_empty() {
+        return Err(Error::Message("no stream name provided".to_string()));
+    }
+    let schema = db::schema::get(org_id, &stream_name, Some(StreamType::Metrics))
+        .await
+        // `db::schema::get` never fails, so it's safe to unwrap
+        .unwrap();
+    Ok(schema
+        .fields()
+        .iter()
+        .filter(|field| {
+            field.name() != FIELD_HASH && field.name() != FIELD_TIME && field.name() != FIELD_VALUE
+        })
+        .map(|field| field.name().to_string())
+        .collect::<Vec<String>>())
 }
 
 pub(crate) async fn get_label_values(
