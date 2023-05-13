@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::Error;
-
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use promql_parser::parser;
+use std::io::Error;
 
 use crate::{
     common::time::{parse_milliseconds, parse_str_to_timestamp_micros},
@@ -587,27 +586,15 @@ fn validate_metadata_params(
             }
         },
     };
-    let start = match start {
-        None => 0,
-        Some(s) => match parse_str_to_timestamp_micros(&s) {
-            Ok(t) => t,
-            Err(e) => {
-                let err = format!("parse time error: {e}");
-                log::error!("{err}");
-                return Err(err);
-            }
-        },
+    let start = if start.is_none() || start.as_ref().unwrap().is_empty() {
+        0
+    } else {
+        parse_str_to_timestamp_micros(&start.unwrap()).map_err(|e| e.to_string())?
     };
-    let end = match end {
-        None => i64::MAX,
-        Some(s) => match parse_str_to_timestamp_micros(&s) {
-            Ok(t) => t,
-            Err(e) => {
-                let err = format!("parse time error: {e}");
-                log::error!("{err}");
-                return Err(err);
-            }
-        },
+    let end = if end.is_none() || end.as_ref().unwrap().is_empty() {
+        chrono::Utc::now().timestamp_micros()
+    } else {
+        parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
     };
     Ok((selector, start, end))
 }
