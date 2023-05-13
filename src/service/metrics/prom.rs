@@ -21,8 +21,10 @@ use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::parser;
 use prost::Message;
+use rustc_hash::FxHashSet;
 use tracing::info_span;
 
+use crate::infra::cache::stats;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -514,7 +516,7 @@ where
 
 pub(crate) async fn get_series(
     _org_id: &str,
-    _selector: parser::VectorSelector,
+    _selector: Option<parser::VectorSelector>,
     _start: i64,
     _end: i64,
 ) -> Result<prom::ResponseSeries> {
@@ -523,43 +525,58 @@ pub(crate) async fn get_series(
 
 pub(crate) async fn get_labels(
     org_id: &str,
-    selector: parser::VectorSelector,
-    _start: i64,
-    _end: i64,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
 ) -> Result<Vec<String>> {
-    let stream_name = if let Some(v) = selector.name {
-        v
-    } else {
-        let name_matcher = selector.matchers.find_matchers(NAME_LABEL);
-        if !name_matcher.is_empty() {
-            name_matcher.first().unwrap().to_string()
-        } else {
-            "".to_string()
-        }
+    let stream_name = match selector {
+        Some(selector) => match selector.name {
+            Some(v) => v,
+            None => {
+                let labels = selector.matchers.find_matchers(NAME_LABEL);
+                if !labels.is_empty() {
+                    labels.first().unwrap().to_string()
+                } else {
+                    "".to_string()
+                }
+            }
+        },
+        None => "".to_string(),
     };
-    if stream_name.is_empty() {
-        return Err(Error::Message("no stream name provided".to_string()));
-    }
-    let schema = db::schema::get(org_id, &stream_name, Some(StreamType::Metrics))
+    let streams = db::schema::list(org_id, Some(StreamType::Metrics), true)
         .await
-        // `db::schema::get` never fails, so it's safe to unwrap
-        .unwrap();
-    Ok(schema
-        .fields()
-        .iter()
-        .filter(|field| {
-            field.name() != &CONFIG.common.column_timestamp
-                && field.name() != HASH_LABEL
-                && field.name() != VALUE_LABEL
-        })
-        .map(|field| field.name().to_string())
-        .collect::<Vec<String>>())
+        .unwrap_or_default();
+    let mut labels = FxHashSet::default();
+    streams.iter().for_each(|v| {
+        let stats = stats::get_stream_stats(org_id, &v.stream_name, StreamType::Metrics);
+        if !stream_name.is_empty() && v.stream_name != stream_name {
+            return;
+        }
+        // check the stream is active, last updated >= start - file_push_interval && first updated >= end
+        if stats.doc_time_max
+            >= start
+                - Duration::seconds(CONFIG.limit.file_push_interval as i64)
+                    .num_microseconds()
+                    .unwrap()
+            && stats.doc_time_min < end
+        {
+            v.schema.fields().iter().for_each(|v| {
+                labels.insert(v.name().to_string());
+            });
+        }
+    });
+    let mut labels = labels
+        .into_iter()
+        .filter(|v| v != &CONFIG.common.column_timestamp && v != HASH_LABEL && v != VALUE_LABEL)
+        .collect::<Vec<String>>();
+    labels.sort();
+    Ok(labels)
 }
 
 pub(crate) async fn get_label_values(
     _org_id: &str,
     _label_name: String,
-    _selector: parser::VectorSelector,
+    _selector: Option<parser::VectorSelector>,
     _start: i64,
     _end: i64,
 ) -> Result<prom::ResponseLabelValues> {
