@@ -439,14 +439,12 @@ pub async fn remote_write(
     Ok(HttpResponse::Ok().into())
 }
 
-pub async fn get_metadata(
+pub(crate) async fn get_metadata(
     org_id: &str,
     req: prom::RequestMetadata,
 ) -> Result<prom::ResponseMetadata> {
-    let empty_response = || mk_metadata_response(std::iter::empty());
-
     if req.limit == Some(0) {
-        return Ok(empty_response());
+        return Ok(HashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -457,9 +455,9 @@ pub async fn get_metadata(
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
         let resp = if schema == Schema::empty() {
-            empty_response()
+            HashMap::new()
         } else {
-            mk_metadata_response([(
+            HashMap::from([(
                 metric_name,
                 get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
             )])
@@ -482,8 +480,8 @@ pub async fn get_metadata(
                 )
             });
             Ok(match req.limit {
-                Some(limit) => mk_metadata_response(metric_names.take(limit)),
-                None => mk_metadata_response(metric_names),
+                None => metric_names.collect(),
+                Some(limit) => metric_names.take(limit).collect(),
             })
         }
     }
@@ -502,16 +500,6 @@ fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
             })
             .into()
     })
-}
-
-fn mk_metadata_response<I>(it: I) -> prom::ResponseMetadata
-where
-    I: IntoIterator<Item = (String, Vec<prom::MetadataObject>)>,
-{
-    prom::ResponseMetadata {
-        status: prom::Status::Success,
-        data: it.into_iter().collect(),
-    }
 }
 
 pub(crate) async fn get_series(
