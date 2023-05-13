@@ -193,7 +193,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         let mut job = job.clone();
         job.partition = partition_no as i32;
         req.job = Some(job);
-        req.stype = cluster_rpc::SearchType::CacheOnly as i32;
+        req.stype = cluster_rpc::SearchType::WalOnly as i32;
         let is_querier = cluster::is_querier(&node.role);
         if is_querier {
             if offset_start < file_num {

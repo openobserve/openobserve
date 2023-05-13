@@ -28,20 +28,17 @@ use crate::service::file_list::calculate_local_files_size;
 use crate::service::search::datafusion::storage::file_list::SessionType;
 use crate::service::search::sql::Sql;
 
-/// search in local cache, which haven't been sync to object storage
-#[tracing::instrument(
-    name = "service:search:cache:enter",
-    skip(session_id, sql, stream_type)
-)]
+/// search in local WAL, which haven't been sync to object storage
+#[tracing::instrument(name = "service:search:wal:enter", skip_all)]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    let span1 = info_span!("service:search:cache:get_file_list");
+    let span1 = info_span!("service:search:wal:get_file_list");
     let guard1 = span1.enter();
 
-    // mark searching in cache
+    // mark searching in WAL
     let searching = Searching::new();
 
     // get file list
@@ -53,7 +50,7 @@ pub async fn search(
         return Ok((HashMap::new(), 0, 0));
     }
 
-    let span2 = info_span!("service:search:cache:calculate_files_size");
+    let span2 = info_span!("service:search:wal:calculate_files_size");
     let guard2 = span2.enter();
     let scan_size = match calculate_local_files_size(&files).await {
         Ok(size) => size,
@@ -65,13 +62,13 @@ pub async fn search(
         }
     };
     log::info!(
-        "[TRACE] cache->search: load files {}, scan_size {}",
+        "[TRACE] wal->search: load files {}, scan_size {}",
         file_count,
         scan_size
     );
 
     drop(guard2);
-    let span3 = info_span!("service:search:cache:datafusion");
+    let span3 = info_span!("service:search:wal:datafusion");
     let _guard3 = span3.enter();
 
     // fetch all schema versions, get latest schema
