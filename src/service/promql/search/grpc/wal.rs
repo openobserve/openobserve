@@ -27,6 +27,7 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::{self, CONFIG};
 use crate::meta;
 use crate::service::db;
+use crate::service::metrics::get_prom_metrics_type;
 use crate::service::promql;
 use crate::service::promql::engine;
 use crate::service::promql::value;
@@ -76,6 +77,17 @@ impl engine::TableProvider for WalProvider {
             FileType::JSON,
         )
         .await
+    }
+
+    async fn get_metrics_type(&self, stream_name: &str) -> Result<meta::prom::MetricType> {
+        if let Some(v) = get_prom_metrics_type(&self.org_id, stream_name).await {
+            Ok(v)
+        } else {
+            Err(DataFusionError::Execution(format!(
+                "stream {} not found",
+                stream_name
+            )))
+        }
     }
 }
 

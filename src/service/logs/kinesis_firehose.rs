@@ -168,7 +168,7 @@ pub async fn process(
                     timestamp = match value
                         .as_object()
                         .unwrap()
-                        .get(&CONFIG.common.time_stamp_col)
+                        .get(&CONFIG.common.column_timestamp)
                     {
                         Some(v) => match parse_timestamp_micro_from_value(v) {
                             Ok(t) => t,
@@ -218,7 +218,7 @@ pub async fn process(
                     min_ts = timestamp;
                 }
                 local_val.insert(
-                    CONFIG.common.time_stamp_col.clone(),
+                    CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

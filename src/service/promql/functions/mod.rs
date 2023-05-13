@@ -14,6 +14,7 @@
 
 use datafusion::error::{DataFusionError, Result};
 
+use crate::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod avg_over_time;
@@ -116,7 +117,7 @@ pub(crate) fn eval_idelta(
     let mut rate_values = Vec::with_capacity(data.len());
     for metric in data.iter() {
         let mut labels = metric.labels.clone();
-        labels.retain(|l| l.name != super::value::FIELD_NAME);
+        labels.retain(|l| l.name != NAME_LABEL);
         let value = fn_handler(metric);
         if value.is_none() {
             continue;
