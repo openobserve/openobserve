@@ -608,6 +608,7 @@ pub(crate) async fn get_label_values(
         values.sort();
         return Ok(values);
     }
+
     // query other labels, only support one stream
     let schema = db::schema::get(org_id, &stream_name, Some(StreamType::Metrics))
         .await
@@ -630,7 +631,7 @@ pub(crate) async fn get_label_values(
         encoding: meta::search::RequestEncoding::Empty,
     };
     let stream_type = StreamType::Metrics;
-    let values = match SearchService::search(org_id, stream_type, &req).await {
+    let mut values = match SearchService::search(org_id, stream_type, &req).await {
         Ok(mut res) => res
             .hits
             .iter_mut()
@@ -642,6 +643,7 @@ pub(crate) async fn get_label_values(
             return Err(err);
         }
     };
+    values.sort();
     Ok(values)
 }
 
