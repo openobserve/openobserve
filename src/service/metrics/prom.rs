@@ -24,7 +24,7 @@ use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
 use tracing::info_span;
 
 use crate::infra::cache::stats;
-use crate::service::search as SearchService;
+use crate::service::search as search_service;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -511,56 +511,47 @@ pub(crate) async fn get_series(
     todo!("XXX-IMPLEMENTME")
 }
 
+// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_labels(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let stream_name = match selector {
-        Some(selector) => match selector.name {
-            Some(v) => v,
-            None => {
-                let labels = selector.matchers.find_matchers(NAME_LABEL);
-                if !labels.is_empty() {
-                    labels.first().unwrap().to_string()
-                } else {
-                    "".to_string()
-                }
-            }
-        },
-        None => "".to_string(),
+    let opt_metric_name = selector.and_then(try_into_metric_name);
+    let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
+        Err(_) => return Ok(vec![]),
+        Ok(schemas) => schemas,
     };
-    let streams = db::schema::list(org_id, Some(StreamType::Metrics), true)
-        .await
-        .unwrap_or_default();
-    let mut labels = FxHashSet::default();
-    streams.iter().for_each(|v| {
-        let stats = stats::get_stream_stats(org_id, &v.stream_name, StreamType::Metrics);
-        if !stream_name.is_empty() && v.stream_name != stream_name {
-            return;
+    let mut label_names = FxHashSet::default();
+    for schema in stream_schemas {
+        if let Some(ref metric_name) = opt_metric_name {
+            if *metric_name != schema.stream_name {
+                // Client has requested a particular metric name, but this stream is
+                // not it.
+                continue;
+            }
         }
-        // check the stream is active, last updated >= start - file_push_interval && first updated >= end
-        if stats.doc_time_max
-            >= start
-                - Duration::seconds(CONFIG.limit.file_push_interval as i64)
-                    .num_microseconds()
-                    .unwrap()
-            && stats.doc_time_min < end
-        {
-            v.schema.fields().iter().for_each(|v| {
-                labels.insert(v.name().to_string());
-            });
+        let stats = stats::get_stream_stats(org_id, &schema.stream_name, StreamType::Metrics);
+        if stats.time_range_intersects(start, end) {
+            let field_names = schema
+                .schema
+                .fields()
+                .iter()
+                .map(|f| f.name())
+                .filter(|&s| {
+                    s != &CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
+                })
+                .cloned();
+            label_names.extend(field_names);
         }
-    });
-    let mut labels = labels
-        .into_iter()
-        .filter(|v| v != &CONFIG.common.column_timestamp && v != HASH_LABEL && v != VALUE_LABEL)
-        .collect::<Vec<String>>();
-    labels.sort();
-    Ok(labels)
+    }
+    let mut label_names = label_names.into_iter().collect::<Vec<_>>();
+    label_names.sort();
+    Ok(label_names)
 }
 
+// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_label_values(
     org_id: &str,
     label_name: String,
@@ -568,58 +559,53 @@ pub(crate) async fn get_label_values(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let stream_name = match selector {
-        Some(selector) => match selector.name {
-            Some(v) => v,
-            None => {
-                let labels = selector.matchers.find_matchers(NAME_LABEL);
-                if !labels.is_empty() {
-                    labels.first().unwrap().to_string()
-                } else {
-                    "".to_string()
-                }
-            }
-        },
-        None => "".to_string(),
-    };
+    let opt_metric_name = selector.and_then(try_into_metric_name);
+    let stream_type = StreamType::Metrics;
 
-    // just query stream name
     if label_name == NAME_LABEL {
-        let streams = db::schema::list(org_id, Some(StreamType::Metrics), false)
+        // This special case doesn't require any SQL to be executed. All we have
+        // to do is to collect stream names that satisfy selection criteria
+        // (i.e., `selector` and `start`/`end`) and return them.
+        let stream_schemas = db::schema::list(org_id, Some(stream_type), false)
             .await
             .unwrap_or_default();
-        let mut values = Vec::with_capacity(streams.len());
-        streams.iter().for_each(|v| {
-            let stats = stats::get_stream_stats(org_id, &v.stream_name, StreamType::Metrics);
-            if !stream_name.is_empty() && v.stream_name != stream_name {
-                return;
+        let mut label_values = Vec::with_capacity(stream_schemas.len());
+        for schema in stream_schemas {
+            if let Some(ref metric_name) = opt_metric_name {
+                if *metric_name != schema.stream_name {
+                    // Client has requested a particular metric name, but this stream is
+                    // not it.
+                    continue;
+                }
             }
-            // check the stream is active, last updated >= start - file_push_interval && first updated >= end
-            if stats.doc_time_max
-                >= start
-                    - Duration::seconds(CONFIG.limit.file_push_interval as i64)
-                        .num_microseconds()
-                        .unwrap()
-                && stats.doc_time_min < end
-            {
-                values.push(v.stream_name.clone())
+            let stats = stats::get_stream_stats(org_id, &schema.stream_name, stream_type);
+            if stats.time_range_intersects(start, end) {
+                label_values.push(schema.stream_name.clone())
             }
-        });
-        values.sort();
-        return Ok(values);
+        }
+        label_values.sort();
+        return Ok(label_values);
     }
 
-    // query other labels, only support one stream
-    let schema = db::schema::get(org_id, &stream_name, Some(StreamType::Metrics))
+    let metric_name = match opt_metric_name {
+        Some(name) => name,
+        None => {
+            // HACK: in the ideal world we would have queried all the metric streams
+            // and collected label names from them.
+            return Ok(vec![]);
+        }
+    };
+
+    let schema = db::schema::get(org_id, &metric_name, Some(stream_type))
         .await
+        // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
     if schema.fields().is_empty() {
         return Ok(vec![]);
     }
-    // get topK values
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT DISTINCT({}) FROM {}", label_name, stream_name),
+            sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),
             from: 0,
             size: 1000,
             start_time: start,
@@ -630,21 +616,37 @@ pub(crate) async fn get_label_values(
         aggs: HashMap::new(),
         encoding: meta::search::RequestEncoding::Empty,
     };
-    let stream_type = StreamType::Metrics;
-    let mut values = match SearchService::search(org_id, stream_type, &req).await {
-        Ok(mut res) => res
+    let mut label_values = match search_service::search(org_id, stream_type, &req).await {
+        Ok(resp) => resp
             .hits
-            .iter_mut()
+            .iter()
             .filter_map(|v| v.as_object().unwrap().get(&label_name))
             .map(|v| v.as_str().unwrap().to_string())
-            .collect::<Vec<String>>(),
+            .collect::<Vec<_>>(),
         Err(err) => {
             log::error!("search values error: {:?}", err);
             return Err(err);
         }
     };
-    values.sort();
-    Ok(values)
+    label_values.sort();
+    Ok(label_values)
+}
+
+fn try_into_metric_name(selector: parser::VectorSelector) -> Option<String> {
+    match selector.name {
+        Some(name) => {
+            // `match[]` argument contains a metric name, e.g.
+            // `match[]=zo_response_code{method="GET"}`
+            Some(name)
+        }
+        None => {
+            // `match[]` argument does not contain a metric name.
+            // Check if there is `__name__` among the matchers,
+            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
+            let mut labels = selector.matchers.find_matchers(NAME_LABEL);
+            labels.pop().map(|s| s.to_owned())
+        }
+    }
 }
 
 async fn prom_ha_handler(

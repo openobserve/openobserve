@@ -282,9 +282,8 @@ pub async fn match_source(
         source
     );
 
-    // match partation clause
-    if time_range.is_some() {
-        let (time_min, time_max) = time_range.unwrap();
+    // match partition clause
+    if let Some((time_min, time_max)) = time_range {
         if match_min_ts_only && time_min > 0 {
             return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
         }
