@@ -136,7 +136,7 @@ pub async fn sql(
     } else {
         schema.as_ref().unwrap().clone()
     };
-    config = config.with_schema(schema);
+    config = config.with_schema(schema.clone());
     log::info!(
         "infer schema took {:.3} seconds.",
         start.elapsed().as_secs_f64()

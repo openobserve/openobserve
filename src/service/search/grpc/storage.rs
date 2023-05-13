@@ -28,10 +28,7 @@ use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
 
 /// search in remote object storage
-#[tracing::instrument(
-    name = "service:search:storage:enter",
-    skip(session_id, sql, file_list, stream_type)
-)]
+#[tracing::instrument(name = "service:search:storage:enter", skip_all)]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
