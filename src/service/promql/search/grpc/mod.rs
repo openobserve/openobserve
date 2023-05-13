@@ -72,7 +72,7 @@ pub async fn search(
     let req2 = req.query.as_ref().unwrap().clone();
     let task2 = tokio::task::spawn(
         async move {
-            if req_stype == cluster_rpc::SearchType::CacheOnly as i32 {
+            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok(value::Value::None)
             } else {
                 storage::search(&session_id2, &org_id2, &req2).await

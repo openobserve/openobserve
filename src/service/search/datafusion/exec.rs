@@ -26,8 +26,8 @@ use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::execution::context::SessionConfig;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use datafusion::prelude::{cast, col, Expr, SessionContext};
-use datafusion_common::DataFusionError;
+use datafusion::prelude::{cast, col, lit, Expr, SessionContext};
+use datafusion_common::{DataFusionError, ScalarValue};
 use object_store::limit::LimitStore;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
@@ -136,7 +136,7 @@ pub async fn sql(
     } else {
         schema.as_ref().unwrap().clone()
     };
-    config = config.with_schema(schema);
+    config = config.with_schema(schema.clone());
     log::info!(
         "infer schema took {:.3} seconds.",
         start.elapsed().as_secs_f64()
@@ -187,9 +187,9 @@ pub async fn sql(
             Some(ts_range) => format!(
                 "{} where {} >= {} AND {} < {}",
                 sql_parts[0],
-                CONFIG.common.time_stamp_col,
+                CONFIG.common.column_timestamp,
                 ts_range.0,
-                CONFIG.common.time_stamp_col,
+                CONFIG.common.column_timestamp,
                 ts_range.1
             ),
             None => sql_parts[0].to_owned(),
@@ -253,6 +253,28 @@ pub async fn sql(
                     vec![resp],
                 )?;
                 ctx.register_table("tbl_temp", Arc::new(mem_table))?;
+                // -- fix mem table, add missing columns
+                let mut tmp_df = ctx.table("tbl_temp").await?;
+                let tmp_fields = tmp_df
+                    .schema()
+                    .field_names()
+                    .iter()
+                    .map(|f| f.strip_prefix("tbl_temp.").unwrap().to_string())
+                    .collect::<Vec<String>>();
+                let need_add_columns = schema
+                    .fields()
+                    .iter()
+                    .filter(|field| !tmp_fields.contains(&field.name().to_string()))
+                    .map(|field| field.name().as_str())
+                    .collect::<Vec<&str>>();
+                if !need_add_columns.is_empty() {
+                    for column in need_add_columns {
+                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                    }
+                    ctx.deregister_table("tbl_temp")?;
+                    ctx.register_table("tbl_temp", tmp_df.into_view())?;
+                }
+                // -- fix done
             }
             None => {
                 return Err(datafusion::error::DataFusionError::Execution(
@@ -736,7 +758,7 @@ pub async fn convert_parquet_file(
     // get all sorted data
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp
     );
     let mut df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
@@ -835,7 +857,7 @@ pub async fn merge_parquet_files(
     // get meta data
     let meta_sql = format!(
         "SELECT MIN({}) as min_ts, MAX({}) as max_ts, COUNT(1) as num_records FROM tbl",
-        CONFIG.common.time_stamp_col, CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp, CONFIG.common.column_timestamp
     );
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
@@ -853,12 +875,12 @@ pub async fn merge_parquet_files(
     // get all sorted data
     let query_sql = format!(
         "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.time_stamp_col
+        CONFIG.common.column_timestamp
     );
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let batches = df.collect().await?;
-    let sort_column_id = schema.index_of(&CONFIG.common.time_stamp_col).unwrap();
+    let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
     let props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
         .set_write_batch_size(8192)

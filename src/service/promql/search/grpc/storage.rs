@@ -25,6 +25,7 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::meta;
+use crate::service::metrics::get_prom_metrics_type;
 use crate::service::promql::{engine, value};
 use crate::service::search::datafusion::storage::file_list::SessionType;
 use crate::service::{db, file_list, promql, search};
@@ -113,6 +114,17 @@ impl engine::TableProvider for StorageProvider {
             FileType::PARQUET,
         )
         .await
+    }
+
+    async fn get_metrics_type(&self, stream_name: &str) -> Result<meta::prom::MetricType> {
+        if let Some(v) = get_prom_metrics_type(&self.org_id, stream_name).await {
+            Ok(v)
+        } else {
+            Err(DataFusionError::Execution(format!(
+                "stream {} not found",
+                stream_name
+            )))
+        }
     }
 }
 

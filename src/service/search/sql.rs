@@ -190,10 +190,10 @@ impl Sql {
             let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
             let caps = re.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(&CONFIG.common.time_stamp_col) {
+            if !cap_str.contains(&CONFIG.common.column_timestamp) {
                 origin_sql = origin_sql.replace(
                     cap_str,
-                    &format!("{}, {}", &CONFIG.common.time_stamp_col, cap_str),
+                    &format!("{}, {}", &CONFIG.common.column_timestamp, cap_str),
                 );
             }
         }
@@ -232,15 +232,15 @@ impl Sql {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
                     "({} >= {} AND {} < {})",
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     time_range.0,
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     time_range.1
                 )
             } else if time_range.0 > 0 {
-                format!("{} >= {}", CONFIG.common.time_stamp_col, time_range.0)
+                format!("{} >= {}", CONFIG.common.column_timestamp, time_range.0)
             } else if time_range.1 > 0 {
-                format!("{} < {}", CONFIG.common.time_stamp_col, time_range.1)
+                format!("{} < {}", CONFIG.common.column_timestamp, time_range.1)
             } else {
                 "".to_string()
             };
@@ -285,7 +285,7 @@ impl Sql {
                 format!(
                     "{} ORDER BY {} DESC LIMIT {}",
                     origin_sql,
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     meta.offset + meta.limit
                 )
             } else {

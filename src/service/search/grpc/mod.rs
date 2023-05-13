@@ -24,8 +24,8 @@ use crate::infra::cluster;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
-mod cache;
 mod storage;
+mod wal;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
 
@@ -42,15 +42,15 @@ pub async fn search(
     let mut file_count = 0;
     let mut scan_size = 0;
 
-    let span1 = info_span!("service:search:grpc:in_cache");
+    let span1 = info_span!("service:search:grpc:in_wal");
 
-    // search in cache
+    // search in WAL
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                cache::search(&session_id1, sql1, stream_type).await
+                wal::search(&session_id1, sql1, stream_type).await
             } else {
                 Ok((HashMap::new(), 0, 0))
             }
@@ -67,7 +67,7 @@ pub async fn search(
     let file_list = req.file_list.to_owned();
     let task2 = tokio::task::spawn(
         async move {
-            if req_stype == cluster_rpc::SearchType::CacheOnly as i32 {
+            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), 0, 0))
             } else {
                 storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
@@ -76,7 +76,7 @@ pub async fn search(
         .instrument(span2),
     );
 
-    // merge local cache
+    // merge data from local WAL
     let (batches1, file_count1, scan_size1) = match task1.await {
         Ok(result) => match result {
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
@@ -100,7 +100,7 @@ pub async fn search(
     file_count += file_count1;
     scan_size += scan_size1;
 
-    // merge object storage search
+    // merge data from object storage search
     let (batches2, file_count2, scan_size2) = match task2.await {
         Ok(result) => match result {
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),

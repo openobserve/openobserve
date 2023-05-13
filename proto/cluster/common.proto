@@ -29,9 +29,9 @@ enum StreamType {
 
 // Search request type
 enum SearchType {
-    USER       = 0; // user input search request
-    CLUSTER    = 1; // cluster dispatch search request
-    CACHE_ONLY = 2; // ingester node just search local cache
+    USER     = 0; // user input search request
+    CLUSTER  = 1; // cluster dispatch search request
+    WAL_ONLY = 2; // ingester node just search local wal
 }
 
 // Job information for a request

@@ -552,37 +552,40 @@ pub async fn label_values(
 }
 
 fn validate_metadata_params(
-    matcher: String,
+    matcher: Option<String>,
     start: Option<String>,
     end: Option<String>,
-) -> Result<(parser::VectorSelector, i64, i64), String> {
-    let selector = match parser::parse(&matcher) {
-        Err(err) => {
-            let err = format!("parse promql error: {err}");
-            log::error!("{err}");
-            return Err(err);
-        }
-        Ok(parser::Expr::VectorSelector(sel)) => {
-            let err = if sel.name.is_none() {
-                Some("match[] argument must start with a metric name, e.g. `match[]=up`")
-            } else if sel.offset.is_some() {
-                Some("match[]: unexpected offset modifier")
-            } else if sel.at.is_some() {
-                Some("match[]: unexpected @ modifier")
-            } else {
-                None
-            };
-            if let Some(err) = err {
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    let selector = match matcher {
+        None => None,
+        Some(matcher) => match parser::parse(&matcher) {
+            Err(err) => {
+                let err = format!("parse promql error: {err}");
+                log::error!("{err}");
+                return Err(err);
+            }
+            Ok(parser::Expr::VectorSelector(sel)) => {
+                let err = if sel.name.is_none() {
+                    Some("match[] argument must start with a metric name, e.g. `match[]=up`")
+                } else if sel.offset.is_some() {
+                    Some("match[]: unexpected offset modifier")
+                } else if sel.at.is_some() {
+                    Some("match[]: unexpected @ modifier")
+                } else {
+                    None
+                };
+                if let Some(err) = err {
+                    log::error!("{err}");
+                    return Err(err.to_owned());
+                }
+                Some(sel)
+            }
+            Ok(_expr) => {
+                let err = "vector selector expected";
                 log::error!("{err}");
                 return Err(err.to_owned());
             }
-            sel
-        }
-        Ok(_expr) => {
-            let err = "vector selector expected";
-            log::error!("{err}");
-            return Err(err.to_owned());
-        }
+        },
     };
     let start = match start {
         None => 0,
