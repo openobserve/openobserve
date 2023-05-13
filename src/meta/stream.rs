@@ -44,7 +44,7 @@ pub struct StreamQueryParams {
     pub stream_type: Option<StreamType>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
     pub doc_time_min: i64,
     pub doc_time_max: i64,
@@ -87,19 +87,6 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("schema_validation", &self.schema_validation)?;
         state.end()
-    }
-}
-
-impl Default for StreamStats {
-    fn default() -> Self {
-        Self {
-            doc_time_min: 0,
-            doc_time_max: 0,
-            doc_num: 0,
-            file_num: 0,
-            storage_size: 0.0,
-            compressed_size: 0.0,
-        }
     }
 }
 
