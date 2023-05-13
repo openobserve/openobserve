@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use super::StreamType;
-use crate::common::json;
+use crate::{common::json, infra::config::CONFIG, meta::StreamType};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -54,6 +54,52 @@ pub struct StreamStats {
     pub compressed_size: f64,
 }
 
+impl StreamStats {
+    /// Returns true iff [start, end] time range intersects with the stream's time range.
+    pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
+        assert!(start <= end);
+        let (min, max) = self.time_range();
+        // [min, max] does *not* intersect with [start, end] if either
+        //
+        // max < start
+        // |--------------------|         |--------------------|
+        // min                  max       start                end
+        //
+        // or min >= end
+        // |--------------------|         |--------------------|
+        // start                end       min                  max
+        //
+        // The time ranges intersect iff !(max < start || min >= end)
+        max >= start && min < end
+    }
+
+    fn time_range(&self) -> (i64, i64) {
+        assert!(self.doc_time_min <= self.doc_time_max);
+        let file_push_interval = Duration::seconds(CONFIG.limit.file_push_interval as _)
+            .num_microseconds()
+            .unwrap();
+        (self.doc_time_min, self.doc_time_max + file_push_interval)
+    }
+}
+
+impl From<&str> for StreamStats {
+    fn from(data: &str) -> Self {
+        json::from_str::<StreamStats>(data).unwrap()
+    }
+}
+
+impl From<StreamStats> for Vec<u8> {
+    fn from(value: StreamStats) -> Vec<u8> {
+        json::to_vec(&value).unwrap()
+    }
+}
+
+impl From<StreamStats> for String {
+    fn from(data: StreamStats) -> Self {
+        json::to_string(&data).unwrap()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StreamSchema {
     pub stream_name: String,
@@ -87,24 +133,6 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("schema_validation", &self.schema_validation)?;
         state.end()
-    }
-}
-
-impl From<&str> for StreamStats {
-    fn from(data: &str) -> Self {
-        json::from_str::<StreamStats>(data).unwrap()
-    }
-}
-
-impl From<StreamStats> for Vec<u8> {
-    fn from(value: StreamStats) -> Vec<u8> {
-        json::to_vec(&value).unwrap()
-    }
-}
-
-impl From<StreamStats> for String {
-    fn from(data: StreamStats) -> Self {
-        json::to_string(&data).unwrap()
     }
 }
 
