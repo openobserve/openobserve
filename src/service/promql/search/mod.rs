@@ -114,7 +114,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         });
         let mut req = cluster_rpc::MetricsQueryRequest {
             job,
-            stype: SearchType::CacheOnly as _,
+            stype: SearchType::WalOnly as _,
             ..req.clone()
         };
         let mut req_query = req.query.as_mut().unwrap();
