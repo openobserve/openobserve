@@ -22,16 +22,16 @@ use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::json;
+use crate::common::{json, str::find};
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster::{self, get_internal_grpc_token};
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
-use crate::meta;
-use crate::meta::search::Response;
-use crate::meta::StreamType;
+use crate::meta::{search, stream::StreamParams, StreamType};
 use crate::service::{db, file_list};
+
+use super::get_partition_key_query;
 
 pub mod datafusion;
 pub mod grpc;
@@ -40,8 +40,8 @@ pub mod sql;
 pub async fn search(
     org_id: &str,
     stream_type: StreamType,
-    req: &meta::search::Request,
-) -> Result<Response, Error> {
+    req: &search::Request,
+) -> Result<search::Response, Error> {
     let root_span = info_span!("service:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -115,7 +115,7 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
 }
 
 #[instrument(name = "service:search:cluster", skip(req))]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
 
     // get a cluster search queue lock
@@ -396,7 +396,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     //XXX let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
-    let mut result = Response::new(sql.meta.offset, sql.meta.limit);
+    let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
     // hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
@@ -523,7 +523,72 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     new_sources
 }
 
-struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
+/// match a source is a valid file or not
+pub async fn match_source(
+    stream: StreamParams<'_>,
+    time_range: Option<(i64, i64)>,
+    filters: &[(&str, &str)],
+    source: &str,
+    is_wal: bool,
+    match_min_ts_only: bool,
+) -> bool {
+    let StreamParams {
+        org_id,
+        stream_name,
+        stream_type,
+    } = stream;
+
+    // match org_id & table
+    if !source.starts_with(format!("files/{}/{}/{}/", org_id, stream_type, stream_name).as_str()) {
+        return false;
+    }
+
+    // check partition key
+    if !filter_source_by_partition_key(source, filters) {
+        return false;
+    }
+
+    if is_wal {
+        return true;
+    }
+
+    // check time range
+    let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
+    if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
+        return true;
+    }
+    log::trace!(
+        "time range: {:?}, file time: {}-{}, {}",
+        time_range,
+        file_meta.min_ts,
+        file_meta.max_ts,
+        source
+    );
+
+    // match partition clause
+    if let Some((time_min, time_max)) = time_range {
+        if match_min_ts_only && time_min > 0 {
+            return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
+        }
+        if time_min > 0 && time_min > file_meta.max_ts {
+            return false;
+        }
+        if time_max > 0 && time_max < file_meta.min_ts {
+            return false;
+        }
+    }
+    true
+}
+
+fn filter_source_by_partition_key(source: &str, filters: &[(&str, &str)]) -> bool {
+    !filters.iter().any(|(k, v)| {
+        let field = get_partition_key_query(&format!("{k}="));
+        let value = get_partition_key_query(&format!("{k}={v}"));
+        find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
+    })
+}
+
+pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or value are not valid inputs
@@ -536,6 +601,75 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
     }
 }
 
-fn server_internal_error(error: impl ToString) -> Error {
+pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_by_partition_key() {
+        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet";
+        assert!(filter_source_by_partition_key(path, &[]));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![("kubernetes_host", "")]
+        ));
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![("kubernetes_host", "gke-dev1")]
+        ));
+        assert!(!filter_source_by_partition_key(
+            &path,
+            &vec![("kubernetes_host", "gke-dev2")]
+        ));
+        assert!(
+            filter_source_by_partition_key(path, &vec![("some_other_key", "no-matter")]),
+            "Partition key was not found ==> the Parquet file has to be searched"
+        );
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+    }
 }

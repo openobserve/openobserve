@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use async_trait::async_trait;
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use utoipa::ToSchema;
 
 mod aggregations;
@@ -22,6 +25,17 @@ pub mod search;
 pub mod value;
 
 pub use engine::QueryEngine;
+
+#[async_trait]
+pub trait TableProvider: Sync + Send + 'static {
+    async fn create_context(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        time_range: (i64, i64),
+        filters: &[(&str, &str)],
+    ) -> Result<(SessionContext, Arc<Schema>)>;
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsQueryRequest {

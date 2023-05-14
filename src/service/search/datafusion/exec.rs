@@ -13,28 +13,34 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use datafusion::arrow::datatypes::{DataType, Schema};
-use datafusion::arrow::json as arrowJson;
-use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::file_format::file_type::{FileType, GetExt};
-use datafusion::datasource::file_format::json::JsonFormat;
-use datafusion::datasource::file_format::parquet::ParquetFormat;
-use datafusion::datasource::listing::{ListingOptions, ListingTable};
-use datafusion::datasource::listing::{ListingTableConfig, ListingTableUrl};
-use datafusion::datasource::object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry};
-use datafusion::datasource::TableProvider;
-use datafusion::error::Result;
-use datafusion::execution::context::SessionConfig;
-use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use datafusion::prelude::{cast, col, lit, Expr, SessionContext};
-use datafusion_common::{DataFusionError, ScalarValue};
+use datafusion::{
+    arrow::{
+        datatypes::{DataType, Schema},
+        json as arrowJson,
+        record_batch::RecordBatch,
+    },
+    datasource::{
+        file_format::{
+            file_type::{FileType, GetExt},
+            json::JsonFormat,
+            parquet::ParquetFormat,
+        },
+        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+        object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
+        TableProvider,
+    },
+    error::{DataFusionError, Result},
+    execution::{
+        context::SessionConfig,
+        runtime_env::{RuntimeConfig, RuntimeEnv},
+    },
+    prelude::{cast, col, lit, Expr, SessionContext},
+    scalar::ScalarValue,
+};
 use object_store::limit::LimitStore;
-use parquet::arrow::ArrowWriter;
-use parquet::file::properties::WriterProperties;
-use parquet::format::SortingColumn;
+use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
 use regex::Regex;
-use std::sync::Arc;
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 use uuid::Uuid;
 
 use super::storage::file_list;
@@ -43,8 +49,7 @@ use super::transform_udf::get_all_transform;
 use crate::common::json;
 use crate::infra::cache::tmpfs;
 use crate::infra::config::{get_parquet_compression, CONFIG};
-use crate::meta::common::FileMeta;
-use crate::meta::{self, StreamType};
+use crate::meta::{self, common::FileMeta, stream::StreamParams, StreamType};
 use crate::service::search::sql::Sql;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
@@ -61,94 +66,21 @@ pub async fn sql(
     if files.is_empty() {
         return Ok(HashMap::new());
     }
-    let start = Instant::now();
-    let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(schema.is_none())
-        .with_batch_size(8192);
-    let mut ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
-    // Configure listing options
-    let listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
-        }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
-        }
-    };
-
-    let prefix = if session.data_type.eq(&file_list::SessionType::Wal) {
-        format!(
-            "{}files/{}/{stream_type}/{}/",
-            &CONFIG.common.data_wal_dir, sql.org_id, sql.stream_name
-        )
-    } else {
-        file_list::set(&session.id, files).await.unwrap();
-        format!("mem:///{}/", session.id)
-    };
-    let prefix = match ListingTableUrl::parse(prefix) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}",
-            )));
-        }
-    };
-    let prefixes = vec![prefix];
-    log::info!(
-        "Prepare table took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    let mut config =
-        ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
-    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Wal) {
-        config = config.infer_schema(&ctx.state()).await.unwrap();
-        let table = ListingTable::try_new(config.clone())?;
-        let infered_schema = table.schema();
-        if schema.is_none() {
-            infered_schema
-        } else {
-            match Schema::try_merge(vec![
-                schema.unwrap().as_ref().to_owned(),
-                infered_schema.as_ref().to_owned(),
-            ]) {
-                Ok(schema) => Arc::new(schema),
-                Err(e) => {
-                    return Err(datafusion::error::DataFusionError::Execution(format!(
-                        "ListingTable Merge schema error: {e}"
-                    )));
-                }
-            }
-        }
-    } else {
-        schema.as_ref().unwrap().clone()
-    };
-    config = config.with_schema(schema.clone());
-    log::info!(
-        "infer schema took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    let table = ListingTable::try_new(config)?;
-    ctx.register_table("tbl", Arc::new(table))?;
-
-    log::info!(
-        "Register table took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
+    let start = std::time::Instant::now();
+    let (mut ctx, schema) = register_table(
+        session,
+        StreamParams {
+            org_id: &sql.org_id,
+            stream_name: &sql.stream_name,
+            stream_type,
+        },
+        schema.clone(),
+        "tbl",
+        files,
+        file_type,
+    )
+    .await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -178,8 +110,8 @@ pub async fn sql(
     }
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
-    // query
 
+    // query
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
     } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
@@ -473,7 +405,7 @@ pub async fn merge(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
-    // log::info!("Merge sql: {}", query_sql);
+    log::info!("Merge sql: {query_sql}");
 
     let df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
@@ -587,7 +519,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     let mut last_is_as = false;
     for (i, field) in fields.iter().enumerate() {
         let field = field.trim();
-        if field.to_lowercase().eq("select") {
+        if field.to_lowercase().eq("select") || field.to_lowercase().eq("distinct") {
             continue;
         }
         if field.to_lowercase().eq("as") {
@@ -940,6 +872,97 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
             ctx.register_udf(udf.clone());
         }
     }
+}
+
+pub async fn register_table(
+    session: &meta::search::Session,
+    stream: StreamParams<'_>,
+    schema: Option<Arc<Schema>>,
+    table_name: &str,
+    files: &[String],
+    file_type: FileType,
+) -> Result<(SessionContext, Arc<Schema>)> {
+    let StreamParams {
+        org_id,
+        stream_name,
+        stream_type,
+    } = stream;
+    let runtime_env = create_runtime_env()?;
+    let session_config = SessionConfig::new()
+        .with_information_schema(schema.is_none())
+        .with_batch_size(8192);
+    let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
+
+    // Configure listing options
+    let listing_options = match file_type {
+        FileType::PARQUET => {
+            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+            ListingOptions::new(Arc::new(file_format))
+                .with_file_extension(FileType::PARQUET.get_ext())
+                .with_target_partitions(CONFIG.limit.cpu_num)
+        }
+        FileType::JSON => {
+            let file_format = JsonFormat::default();
+            ListingOptions::new(Arc::new(file_format))
+                .with_file_extension(FileType::JSON.get_ext())
+                .with_target_partitions(CONFIG.limit.cpu_num)
+        }
+        _ => {
+            return Err(DataFusionError::Execution(format!(
+                "Unsupported file type scheme {file_type:?}",
+            )));
+        }
+    };
+
+    let prefix = if session.data_type.eq(&file_list::SessionType::Wal) {
+        format!(
+            "{}files/{}/{stream_type}/{}/",
+            &CONFIG.common.data_wal_dir, org_id, stream_name
+        )
+    } else {
+        file_list::set(&session.id, files).await.unwrap();
+        format!("mem:///{}/", session.id)
+    };
+    let prefix = match ListingTableUrl::parse(prefix) {
+        Ok(url) => url,
+        Err(e) => {
+            return Err(datafusion::error::DataFusionError::Execution(format!(
+                "ListingTableUrl error: {e}",
+            )));
+        }
+    };
+    let prefixes = vec![prefix];
+
+    let mut config =
+        ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
+    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Wal) {
+        config = config.infer_schema(&ctx.state()).await.unwrap();
+        let table = ListingTable::try_new(config.clone())?;
+        let infered_schema = table.schema();
+        if schema.is_none() {
+            infered_schema
+        } else {
+            match Schema::try_merge(vec![
+                schema.unwrap().as_ref().to_owned(),
+                infered_schema.as_ref().to_owned(),
+            ]) {
+                Ok(schema) => Arc::new(schema),
+                Err(e) => {
+                    return Err(datafusion::error::DataFusionError::Execution(format!(
+                        "ListingTable Merge schema error: {e}"
+                    )));
+                }
+            }
+        }
+    } else {
+        schema.as_ref().unwrap().clone()
+    };
+    config = config.with_schema(schema.clone());
+
+    let table = ListingTable::try_new(config)?;
+    ctx.register_table(table_name, Arc::new(table))?;
+
+    Ok((ctx, schema))
 }
 
 #[cfg(not(feature = "zo_functions"))]

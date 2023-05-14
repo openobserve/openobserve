@@ -13,45 +13,48 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use datafusion::datasource::file_format::file_type::FileType;
-use datafusion::error::{DataFusionError, Result};
-use datafusion::prelude::SessionContext;
+use datafusion::{
+    arrow::datatypes::Schema,
+    datasource::file_format::file_type::FileType,
+    error::{DataFusionError, Result},
+    prelude::SessionContext,
+};
 use promql_parser::parser;
 use std::path::Path;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::common::file::scan_files;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::{self, CONFIG};
-use crate::meta;
+use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
 use crate::service::db;
-use crate::service::metrics::get_prom_metrics_type;
-use crate::service::promql;
-use crate::service::promql::engine;
-use crate::service::promql::value;
-use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::promql::{value, QueryEngine, TableProvider};
+use crate::service::search::datafusion::{exec::register_table, storage::file_list::SessionType};
+use crate::service::search::match_source;
 
 struct WalProvider {
-    org_id: String,
     session_id: String,
 }
 
 #[async_trait]
-impl engine::TableProvider for WalProvider {
+impl TableProvider for WalProvider {
     async fn create_context(
         &self,
+        org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
-        filters: &[(String, String)],
-    ) -> Result<SessionContext> {
+        filters: &[(&str, &str)],
+    ) -> Result<(SessionContext, Arc<Schema>)> {
         // get file list
-        let files = get_file_list(&self.org_id, stream_name, time_range, filters).await?;
+        let files = get_file_list(org_id, stream_name, time_range, filters).await?;
+        if files.is_empty() {
+            return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+        }
 
         // fetch all schema versions, get latest schema
-        let stream_type = meta::StreamType::Metrics;
-        let schema = db::schema::get(&self.org_id, stream_name, Some(stream_type))
+        let stream_type = StreamType::Metrics;
+        let schema = db::schema::get(org_id, stream_name, Some(stream_type))
             .await
             .map_err(|err| {
                 log::error!("get schema error: {}", err);
@@ -62,32 +65,24 @@ impl engine::TableProvider for WalProvider {
                 .to_owned()
                 .with_metadata(std::collections::HashMap::new()),
         );
-        let session = meta::search::Session {
+        let session = SearchSession {
             id: self.session_id.clone(),
             data_type: SessionType::Wal,
         };
 
-        super::register_table(
+        register_table(
             &session,
-            &self.org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             Some(schema),
+            stream_name,
             &files,
             FileType::JSON,
         )
         .await
-    }
-
-    async fn get_metrics_type(&self, stream_name: &str) -> Result<meta::prom::MetricType> {
-        if let Some(v) = get_prom_metrics_type(&self.org_id, stream_name).await {
-            Ok(v)
-        } else {
-            Err(DataFusionError::Execution(format!(
-                "stream {} not found",
-                stream_name
-            )))
-        }
     }
 }
 
@@ -114,10 +109,12 @@ pub async fn search(
         lookback_delta: Duration::from_secs(300), // 5m
     };
 
-    let mut engine = promql::QueryEngine::new(WalProvider {
-        org_id: org_id.to_string(),
-        session_id: session_id.to_string(),
-    });
+    let mut engine = QueryEngine::new(
+        org_id,
+        WalProvider {
+            session_id: session_id.to_string(),
+        },
+    );
     let data = engine.exec(eval_stmt).await?;
 
     // searching done.
@@ -132,13 +129,13 @@ async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &[(String, String)],
+    filters: &[(&str, &str)],
 ) -> Result<Vec<String>> {
     let pattern = format!(
         "{}/files/{}/{}/{}/*.json",
         &CONFIG.common.data_wal_dir,
         org_id,
-        meta::StreamType::Metrics,
+        StreamType::Metrics,
         stream_name
     );
     let files = scan_files(&pattern);
@@ -158,9 +155,12 @@ async fn get_file_list(
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
         let source_file = format!("{file_path}/{file_name}");
-        if super::match_source(
-            org_id,
-            stream_name,
+        if match_source(
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type: StreamType::Metrics,
+            },
             Some(time_range),
             filters,
             &source_file,

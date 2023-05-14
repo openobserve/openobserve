@@ -12,27 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::arrow::datatypes::Schema;
-use datafusion::datasource::file_format::file_type::{FileType, GetExt};
-use datafusion::datasource::file_format::json::JsonFormat;
-use datafusion::datasource::file_format::parquet::ParquetFormat;
-use datafusion::datasource::listing::{ListingOptions, ListingTable};
-use datafusion::datasource::listing::{ListingTableConfig, ListingTableUrl};
-use datafusion::datasource::TableProvider;
-use datafusion::prelude::{SessionConfig, SessionContext};
-use datafusion_common::DataFusionError;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
-use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster;
-use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes, Result};
-use crate::meta::{self, StreamType};
-use crate::service::promql::value;
-use crate::service::search;
-use crate::service::{file_list, get_partition_key_query};
+use crate::service::{promql::value, search};
 
 mod storage;
 mod wal;
@@ -85,7 +71,7 @@ pub async fn search(
     let value1 = match task1.await {
         Ok(result) => result.map_err(|err| {
             log::error!("datafusion execute error: {}", err);
-            handle_datafusion_error(err)
+            search::grpc::handle_datafusion_error(err)
         })?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -106,7 +92,7 @@ pub async fn search(
     let value2 = match task2.await {
         Ok(result) => result.map_err(|err| {
             log::error!("datafusion execute error: {}", err);
-            handle_datafusion_error(err)
+            search::grpc::handle_datafusion_error(err)
         })?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -196,225 +182,4 @@ pub async fn search(
     resp.result_type = result_type.to_string();
 
     Ok(resp)
-}
-
-fn handle_datafusion_error(err: DataFusionError) -> Error {
-    let err = err.to_string();
-    if let Some(pos) = err.find("Schema error: No field named") {
-        let err_code = get_key_from_error(&err, pos).map_or_else(
-            || ErrorCodes::SearchSQLExecuteError(err),
-            ErrorCodes::SearchFieldNotFound,
-        );
-        return Error::ErrorCode(err_code);
-    }
-    if err.contains("parquet not found") {
-        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
-    }
-    if let Some(pos) = err.find("Invalid function ") {
-        let err_code = get_key_from_error(&err, pos).map_or_else(
-            || ErrorCodes::SearchSQLExecuteError(err),
-            ErrorCodes::SearchFunctionNotDefined,
-        );
-        return Error::ErrorCode(err_code);
-    }
-    if err.contains("Incompatible data types") {
-        let pos = err.find("for field").unwrap();
-        let pos_start = err[pos..].find(' ').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
-    }
-    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
-}
-
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for ponct in ['\'', '"'] {
-        let pos_start = err[pos..].find(ponct);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(ponct);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
-    }
-    None
-}
-
-/// match a source is a valid file or not
-pub async fn match_source(
-    org_id: &str,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    filters: &[(String, String)],
-    source: &str,
-    is_wal: bool,
-    match_min_ts_only: bool,
-) -> bool {
-    let stream_type = StreamType::Metrics;
-    // match org_id & table
-    if !source.starts_with(format!("files/{}/{}/{}/", org_id, stream_type, stream_name).as_str()) {
-        return false;
-    }
-
-    // check partition key
-    if !filter_source_by_partition_key(source, filters) {
-        return false;
-    }
-
-    if is_wal {
-        return true;
-    }
-
-    // check time range
-    let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
-    if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
-        return true;
-    }
-    log::trace!(
-        "time range: {:?}, file time: {}-{}, {}",
-        time_range,
-        file_meta.min_ts,
-        file_meta.max_ts,
-        source
-    );
-
-    // match partition clause
-    if let Some((time_min, time_max)) = time_range {
-        if match_min_ts_only && time_min > 0 {
-            return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
-        }
-        if time_min > 0 && time_min > file_meta.max_ts {
-            return false;
-        }
-        if time_max > 0 && time_max < file_meta.min_ts {
-            return false;
-        }
-    }
-    true
-}
-
-fn filter_source_by_partition_key(source: &str, filters: &[(String, String)]) -> bool {
-    !filters.iter().any(|(k, v)| {
-        let field = get_partition_key_query(&format!("{k}="));
-        let value = get_partition_key_query(&format!("{k}={v}"));
-        find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
-    })
-}
-
-pub async fn register_table(
-    session: &meta::search::Session,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    schema: Option<Arc<Schema>>,
-    files: &Vec<String>,
-    file_type: FileType,
-) -> datafusion::error::Result<SessionContext> {
-    if files.is_empty() {
-        return Ok(SessionContext::new());
-    }
-
-    let start = std::time::Instant::now();
-    let runtime_env = search::datafusion::exec::create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(schema.is_none())
-        .with_batch_size(8192);
-    let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
-
-    // Configure listing options
-    let listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
-        }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(CONFIG.limit.cpu_num)
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
-        }
-    };
-
-    let prefix = if session
-        .data_type
-        .eq(&search::datafusion::storage::file_list::SessionType::Wal)
-    {
-        format!(
-            "{}files/{}/{stream_type}/{}/",
-            &CONFIG.common.data_wal_dir, org_id, stream_name
-        )
-    } else {
-        search::datafusion::storage::file_list::set(&session.id, files)
-            .await
-            .unwrap();
-        format!("mem:///{}/", session.id)
-    };
-    let prefix = match ListingTableUrl::parse(prefix) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}",
-            )));
-        }
-    };
-    let prefixes = vec![prefix];
-    log::info!(
-        "Prepare table took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    let mut config =
-        ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
-    let schema = if schema.is_none()
-        || session
-            .data_type
-            .eq(&search::datafusion::storage::file_list::SessionType::Wal)
-    {
-        config = config.infer_schema(&ctx.state()).await.unwrap();
-        let table = ListingTable::try_new(config.clone())?;
-        let infered_schema = table.schema();
-        if schema.is_none() {
-            infered_schema
-        } else {
-            match Schema::try_merge(vec![
-                schema.unwrap().as_ref().to_owned(),
-                infered_schema.as_ref().to_owned(),
-            ]) {
-                Ok(schema) => Arc::new(schema),
-                Err(e) => {
-                    return Err(datafusion::error::DataFusionError::Execution(format!(
-                        "ListingTable Merge schema error: {e}"
-                    )));
-                }
-            }
-        }
-    } else {
-        schema.as_ref().unwrap().clone()
-    };
-    config = config.with_schema(schema);
-    log::info!(
-        "infer schema took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    let table = ListingTable::try_new(config)?;
-    ctx.register_table(stream_name, Arc::new(table))?;
-
-    log::info!(
-        "Register table took {:.3} seconds.",
-        start.elapsed().as_secs_f64()
-    );
-
-    Ok(ctx)
 }

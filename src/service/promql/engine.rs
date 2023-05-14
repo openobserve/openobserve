@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use async_recursion::async_recursion;
-use async_trait::async_trait;
 use datafusion::{
     arrow::array::{Float64Array, Int64Array, StringArray},
     error::{DataFusionError, Result},
-    prelude::{col, lit, SessionContext},
+    prelude::{col, lit},
 };
 use promql_parser::{
     label::MatchOp,
@@ -34,22 +33,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use super::{aggregations, functions, value::*};
-use crate::infra::config::CONFIG;
+use super::{aggregations, functions, value::*, TableProvider};
 use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
-
-#[async_trait]
-pub trait TableProvider: Sync + Send + 'static {
-    async fn create_context(
-        &self,
-        stream_name: &str,
-        time_range: (i64, i64),
-        filters: &[(String, String)],
-    ) -> Result<SessionContext>;
-    async fn get_metrics_type(&self, stream_name: &str) -> Result<MetricType>;
-}
+use crate::{infra::config::CONFIG, service::metrics::get_prom_metadata_from_schema};
 
 pub struct QueryEngine {
+    org_id: String,
     table_provider: Box<dyn TableProvider>,
     /// The time boundaries for the evaluation. If start equals end an instant
     /// is evaluated.
@@ -68,13 +57,14 @@ pub struct QueryEngine {
 }
 
 impl QueryEngine {
-    pub fn new<P>(provider: P) -> Self
+    pub fn new<P>(org_id: &str, provider: P) -> Self
     where
         P: TableProvider,
     {
         let now = micros_since_epoch(SystemTime::now());
         let five_min = micros(Duration::from_secs(300));
         Self {
+            org_id: org_id.to_string(),
             table_provider: Box::new(provider),
             start: now,
             end: now,
@@ -336,16 +326,16 @@ impl QueryEngine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        let filters: Vec<(String, String)> = selector
+        let filters: Vec<(&str, &str)> = selector
             .matchers
             .matchers
             .iter()
             .filter(|mat| mat.op == MatchOp::Equal)
-            .map(|mat| (mat.name.clone(), mat.value.clone()))
+            .map(|mat| (mat.name.as_str(), mat.value.as_str()))
             .collect();
-        let ctx = self
+        let (ctx, schema) = self
             .table_provider
-            .create_context(table_name, (start, end), &filters)
+            .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
         let table = match ctx.table(table_name).await {
             Ok(v) => v,
@@ -451,7 +441,11 @@ impl QueryEngine {
         // https://ihac.xyz/2018/12/11/Prometheus-Extrapolation%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/
 
         // Fix data about app restart
-        let metrics_type = self.table_provider.get_metrics_type(table_name).await?;
+        let metrics_type = if let Some(meta) = get_prom_metadata_from_schema(&schema) {
+            meta.metric_type
+        } else {
+            MetricType::Unknown
+        };
         if metrics_type == MetricType::Counter {
             for series in metric_values.iter_mut() {
                 let mut delta: f64 = 0.0;
