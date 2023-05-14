@@ -13,39 +13,44 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use datafusion::datasource::file_format::file_type::FileType;
-use datafusion::error::{DataFusionError, Result};
-use datafusion::prelude::SessionContext;
+use datafusion::{
+    arrow::datatypes::Schema,
+    datasource::file_format::file_type::FileType,
+    error::{DataFusionError, Result},
+    prelude::SessionContext,
+};
 use promql_parser::parser;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::sync::Semaphore;
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cache::file_data;
-use crate::infra::config::CONFIG;
-use crate::meta;
-use crate::service::metrics::get_prom_metrics_type;
-use crate::service::promql::{engine, value};
-use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::infra::{cache::file_data, config::CONFIG};
+use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
+use crate::service::promql::{value, TableProvider};
+use crate::service::search::datafusion::{exec::register_table, storage::file_list::SessionType};
+use crate::service::search::match_source;
 use crate::service::{db, file_list, promql, search};
 
 struct StorageProvider {
-    org_id: String,
     session_id: String,
 }
 
 #[async_trait]
-impl engine::TableProvider for StorageProvider {
+impl TableProvider for StorageProvider {
     async fn create_context(
         &self,
+        org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
-        filters: &[(String, String)],
-    ) -> Result<SessionContext> {
+        filters: &[(&str, &str)],
+    ) -> Result<(SessionContext, Arc<Schema>)> {
         // get file list
-        let files = get_file_list(&self.org_id, stream_name, time_range, filters).await?;
+        let files = get_file_list(org_id, stream_name, time_range, filters).await?;
         let file_count = files.len();
+        if files.is_empty() {
+            return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+        }
 
         // load files to local cache
         let mut tasks = Vec::new();
@@ -84,8 +89,8 @@ impl engine::TableProvider for StorageProvider {
         );
 
         // fetch all schema versions, get latest schema
-        let stream_type = meta::StreamType::Metrics;
-        let schema = match db::schema::get(&self.org_id, stream_name, Some(stream_type)).await {
+        let stream_type = StreamType::Metrics;
+        let schema = match db::schema::get(org_id, stream_name, Some(stream_type)).await {
             Ok(schema) => schema,
             Err(err) => {
                 log::error!("get schema error: {}", err);
@@ -99,32 +104,24 @@ impl engine::TableProvider for StorageProvider {
                 .to_owned()
                 .with_metadata(std::collections::HashMap::new()),
         );
-        let session = meta::search::Session {
+        let session = SearchSession {
             id: self.session_id.clone(),
             data_type: SessionType::Storage,
         };
 
-        super::register_table(
+        register_table(
             &session,
-            &self.org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
             Some(schema),
+            stream_name,
             &files,
             FileType::PARQUET,
         )
         .await
-    }
-
-    async fn get_metrics_type(&self, stream_name: &str) -> Result<meta::prom::MetricType> {
-        if let Some(v) = get_prom_metrics_type(&self.org_id, stream_name).await {
-            Ok(v)
-        } else {
-            Err(DataFusionError::Execution(format!(
-                "stream {} not found",
-                stream_name
-            )))
-        }
     }
 }
 
@@ -151,10 +148,12 @@ pub async fn search(
         lookback_delta: Duration::from_secs(300), // 5m
     };
 
-    let mut engine = promql::QueryEngine::new(StorageProvider {
-        org_id: org_id.to_string(),
-        session_id: session_id.to_string(),
-    });
+    let mut engine = promql::QueryEngine::new(
+        org_id,
+        StorageProvider {
+            session_id: session_id.to_string(),
+        },
+    );
     let data = engine.exec(eval_stmt).await?;
 
     // clear session
@@ -170,13 +169,13 @@ async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &[(String, String)],
+    filters: &[(&str, &str)],
 ) -> Result<Vec<String>> {
     let (time_min, time_max) = time_range;
     let results = match file_list::get_file_list(
         org_id,
         stream_name,
-        Some(meta::StreamType::Metrics),
+        Some(StreamType::Metrics),
         time_min,
         time_max,
     )
@@ -193,9 +192,12 @@ async fn get_file_list(
 
     let mut files = Vec::new();
     for file in results {
-        if super::match_source(
-            org_id,
-            stream_name,
+        if match_source(
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type: StreamType::Metrics,
+            },
             Some(time_range),
             filters,
             &file,

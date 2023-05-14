@@ -15,21 +15,11 @@
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
-use crate::meta::prom::{Metadata, MetricType, METADATA_LABEL};
-use crate::meta::StreamType;
-use crate::service::db;
+use crate::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod prom;
 
-pub async fn get_prom_metrics_type(org_id: &str, metrics_name: &str) -> Option<MetricType> {
-    let schema = db::schema::get(org_id, metrics_name, Some(StreamType::Metrics))
-        .await
-        .unwrap();
-    let metadata = get_prom_metadata_from_schema(&schema).await.unwrap();
-    Some(metadata.metric_type)
-}
-
-pub async fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
+pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)

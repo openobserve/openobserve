@@ -12,28 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cmp::min, sync::Arc, time::Duration};
-
 use rustc_hash::FxHashMap;
+use std::{cmp::min, sync::Arc, time::Duration};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::handler::grpc::cluster_rpc::{self, SearchType};
-use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::CONFIG;
-use crate::infra::db::etcd;
+use crate::handler::grpc::cluster_rpc;
 use crate::infra::errors::{Error, ErrorCodes, Result};
-use crate::service::promql::{self, value::*};
+use crate::infra::{cluster, config::CONFIG, db::etcd};
+use crate::service::promql::{value::*, MetricsQueryRequest};
+use crate::service::search::{server_internal_error, MetadataMap};
 
 pub mod grpc;
 
-pub async fn search(org_id: &str, req: &promql::MetricsQueryRequest) -> Result<Value> {
+pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
     let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
-    req.stype = SearchType::User as _;
+    req.stype = cluster_rpc::SearchType::User as _;
     search_in_cluster(req).instrument(root_span).await
 }
 
@@ -114,14 +112,14 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         });
         let mut req = cluster_rpc::MetricsQueryRequest {
             job,
-            stype: SearchType::WalOnly as _,
+            stype: cluster_rpc::SearchType::WalOnly as _,
             ..req.clone()
         };
         let mut req_query = req.query.as_mut().unwrap();
         let is_querier = cluster::is_querier(&node.role);
         if is_querier {
             if worker_start <= end {
-                req.stype = SearchType::Cluster as _;
+                req.stype = cluster_rpc::SearchType::Cluster as _;
                 req_query.start = worker_start;
                 req_query.end = min(end, worker_start + worker_dt);
                 worker_start += worker_dt;
@@ -155,7 +153,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     )
                 });
 
-                let token: MetadataValue<_> = get_internal_grpc_token().parse().map_err(|_| {
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token().parse().map_err(|_| {
                     Error::Message("invalid token".to_string())
                 })?;
                 let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(|err| {
@@ -337,21 +335,4 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
         }
     });
     Value::Sample(sample)
-}
-
-struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
-
-impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
-    /// Set a key and value in the MetadataMap.  Does nothing if the key or value are not valid inputs
-    fn set(&mut self, key: &str, value: String) {
-        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
-            if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
-                self.0.insert(key, val);
-            }
-        }
-    }
-}
-
-fn server_internal_error(error: impl ToString) -> Error {
-    Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }

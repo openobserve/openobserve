@@ -141,6 +141,12 @@ pub struct ListStream {
     pub list: Vec<Stream>,
 }
 
+pub struct StreamParams<'a> {
+    pub org_id: &'a str,
+    pub stream_name: &'a str,
+    pub stream_type: StreamType,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
