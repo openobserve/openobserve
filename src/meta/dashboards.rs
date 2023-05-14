@@ -98,13 +98,13 @@ pub struct AxisItem {
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
+    #[serde(rename = "count-distinct")]
+    CountDistinct,
     Histogram,
     Sum,
     Min,
     Max,
     Avg,
-    #[serde(rename = "count-distinct")]
-    CountDistinct,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

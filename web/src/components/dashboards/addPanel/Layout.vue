@@ -372,11 +372,11 @@ export default defineComponent({
     } = useDashboardPanelData();
     const triggerOperators = [
       {label: "Count", value: "count"},
+      {label: "Count (Distinct)", value: "count-distinct"},
       {label: "Sum", value: "sum"},
       {label: "Avg", value: "avg"},
       {label: "Min", value: "min"},
       {label: "Max", value: "max"},
-      {label: "Count (Distinct)", value: "count-distinct"},
     ]
     const triggerOperatorsWithHistogram: any = [ {label: "Histogram", value: "histogram"} ]
 
