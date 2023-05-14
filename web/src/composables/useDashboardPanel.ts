@@ -160,7 +160,7 @@ const useDashboardPanelData = () => {
         alias: !dashboardPanelData.data.customQuery ? 'y_axis_' + (dashboardPanelData.data.fields.y.length + 1) : row.name,
         column: row.name,
         color: getNewColorValue(),
-        aggregationFunction: row.type == 'Utf8' ? 'count-distinct' : row.type == 'Int64' ? 'sum' : 'count'
+        aggregationFunction: 'count'
       })
     }
     updateArrayAlias()
