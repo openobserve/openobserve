@@ -502,13 +502,68 @@ fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
     })
 }
 
+// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_series(
-    _org_id: &str,
-    _selector: Option<parser::VectorSelector>,
-    _start: i64,
-    _end: i64,
-) -> Result<prom::ResponseSeries> {
-    todo!("XXX-IMPLEMENTME")
+    org_id: &str,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
+) -> Result<Vec<serde_json::Value>> {
+    let metric_name = match selector.and_then(try_into_metric_name) {
+        Some(name) => name,
+        None => {
+            // HACK: in the ideal world we would have queried all the metric streams
+            return Ok(vec![]);
+        }
+    };
+
+    let schema = db::schema::get(org_id, &metric_name, Some(StreamType::Metrics))
+        .await
+        // `db::schema::get` never fails, so it's safe to unwrap
+        .unwrap();
+
+    // Comma-separated list of label names
+    let label_names = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().as_str())
+        .filter(|&s| s != CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
+        .collect::<Vec<_>>()
+        .join(", ");
+    if label_names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let req = meta::search::Request {
+        query: meta::search::Query {
+            sql: format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}"),
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            sql_mode: "full".to_string(),
+            ..Default::default()
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    let series = match search_service::search(org_id, StreamType::Metrics, &req).await {
+        Err(err) => {
+            log::error!("search series error: {err}");
+            return Err(err);
+        }
+        Ok(resp) => resp
+            .hits
+            .into_iter()
+            .map(|mut val| {
+                if let Some(map) = val.as_object_mut() {
+                    map.remove(HASH_LABEL);
+                }
+                val
+            })
+            .collect(),
+    };
+    Ok(series)
 }
 
 // XXX-TODO: filter the results in accordance with `selector.matchers`

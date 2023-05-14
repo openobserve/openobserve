@@ -163,11 +163,6 @@ pub struct RequestSeries {
     pub end: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ResponseSeries {
-    // XXX-TODO: IMPLEMENTME
-}
-
 /// Request a list of label names.
 #[derive(Debug, Deserialize)]
 pub struct RequestLabels {
