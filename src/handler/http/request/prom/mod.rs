@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+use actix_web::{http, post, route, web, HttpRequest, HttpResponse};
 use promql_parser::parser;
 use std::io::Error;
 
@@ -62,6 +62,8 @@ pub async fn remote_write(
 /** prometheus instant queries */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
@@ -102,7 +104,7 @@ pub async fn remote_write(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/query")]
+#[route("/{org_id}/prometheus/api/v1/query", method = "GET", method = "POST")]
 pub async fn query(
     org_id: web::Path<String>,
     query: web::Query<meta::prom::RequestQuery>,
@@ -161,6 +163,8 @@ pub async fn query(
 /** prometheus range queries */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/query_range",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
@@ -211,7 +215,11 @@ pub async fn query(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/query_range")]
+#[route(
+    "/{org_id}/prometheus/api/v1/query_range",
+    method = "GET",
+    method = "POST"
+)]
 pub async fn query_range(
     org_id: web::Path<String>,
     range_query: web::Query<meta::prom::RequestRangeQuery>,
@@ -292,6 +300,8 @@ pub async fn query_range(
 /** prometheus query metric metadata */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/metadata",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
@@ -331,7 +341,11 @@ pub async fn query_range(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/metadata")]
+#[route(
+    "/{org_id}/prometheus/api/v1/metadata",
+    method = "GET",
+    method = "POST"
+)]
 pub async fn metadata(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestMetadata>,
@@ -351,6 +365,8 @@ pub async fn metadata(
 /** prometheus finding series by label matchers */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/series",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
@@ -387,7 +403,7 @@ pub async fn metadata(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/series")]
+#[route("/{org_id}/prometheus/api/v1/series", method = "GET", method = "POST")]
 pub async fn series(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestSeries>,
@@ -420,6 +436,8 @@ pub async fn series(
 /** prometheus getting label names */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/labels",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
@@ -462,7 +480,7 @@ pub async fn series(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/labels")]
+#[route("/{org_id}/prometheus/api/v1/labels", method = "GET", method = "POST")]
 pub async fn labels(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestLabels>,
@@ -495,6 +513,8 @@ pub async fn labels(
 /** prometheus query label values */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
+    get,
+    path="/{org_id}/prometheus/api/v1/label/{label_name}/values",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
@@ -519,7 +539,11 @@ pub async fn labels(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
+#[route(
+    "/{org_id}/prometheus/api/v1/label/{label_name}/values",
+    method = "GET",
+    method = "POST"
+)]
 pub async fn label_values(
     path: web::Path<(String, String)>,
     req: web::Query<meta::prom::RequestLabelValues>,
