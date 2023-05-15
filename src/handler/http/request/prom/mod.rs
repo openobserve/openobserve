@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, post, route, web, HttpRequest, HttpResponse};
+use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use promql_parser::parser;
 use std::io::Error;
 
@@ -62,8 +62,6 @@ pub async fn remote_write(
 /** prometheus instant queries */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
@@ -104,13 +102,24 @@ pub async fn remote_write(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route("/{org_id}/prometheus/api/v1/query", method = "GET", method = "POST")]
-pub async fn query(
+#[get("/{org_id}/prometheus/api/v1/query")]
+pub async fn query_get(
     org_id: web::Path<String>,
-    query: web::Query<meta::prom::RequestQuery>,
+    req: web::Query<meta::prom::RequestQuery>,
 ) -> Result<HttpResponse, Error> {
-    let query = query.into_inner();
-    let start = match query.time {
+    query(&org_id.into_inner(), req.into_inner()).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/query")]
+pub async fn query_post(
+    org_id: web::Path<String>,
+    web::Form(form): web::Form<meta::prom::RequestQuery>,
+) -> Result<HttpResponse, Error> {
+    query(&org_id.into_inner(), form).await
+}
+
+async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpResponse, Error> {
+    let start = match req.time {
         None => chrono::Utc::now().timestamp_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
             Ok(v) => v,
@@ -128,14 +137,14 @@ pub async fn query(
     let end = start;
 
     let req = promql::MetricsQueryRequest {
-        query: query.query,
+        query: req.query,
         is_range_query: false,
         start,
         end,
         step: 300_000_000, // 5m
     };
 
-    match promql::search::search(&org_id, &req).await {
+    match promql::search::search(org_id, &req).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -163,8 +172,6 @@ pub async fn query(
 /** prometheus range queries */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/query_range",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
@@ -215,17 +222,27 @@ pub async fn query(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route(
-    "/{org_id}/prometheus/api/v1/query_range",
-    method = "GET",
-    method = "POST"
-)]
-pub async fn query_range(
+#[get("/{org_id}/prometheus/api/v1/query_range")]
+pub async fn query_range_get(
     org_id: web::Path<String>,
-    range_query: web::Query<meta::prom::RequestRangeQuery>,
+    req: web::Query<meta::prom::RequestRangeQuery>,
 ) -> Result<HttpResponse, Error> {
-    let range_query = range_query.into_inner();
-    let start = match parse_str_to_timestamp_micros(&range_query.start) {
+    query_range(&org_id.into_inner(), req.into_inner()).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/query_range")]
+pub async fn query_range_post(
+    org_id: web::Path<String>,
+    web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
+) -> Result<HttpResponse, Error> {
+    query_range(&org_id.into_inner(), form).await
+}
+
+async fn query_range(
+    org_id: &str,
+    req: meta::prom::RequestRangeQuery,
+) -> Result<HttpResponse, Error> {
+    let start = match parse_str_to_timestamp_micros(&req.start) {
         Ok(v) => v,
         Err(e) => {
             log::error!("parse time error: {}", e);
@@ -237,7 +254,7 @@ pub async fn query_range(
             }));
         }
     };
-    let end = match parse_str_to_timestamp_micros(&range_query.end) {
+    let end = match parse_str_to_timestamp_micros(&req.end) {
         Ok(v) => v,
         Err(e) => {
             log::error!("parse time error: {}", e);
@@ -249,7 +266,7 @@ pub async fn query_range(
             }));
         }
     };
-    let step = match range_query.step {
+    let step = match req.step {
         None => 300_000_000, // 5m
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
@@ -266,13 +283,13 @@ pub async fn query_range(
     };
 
     let req = promql::MetricsQueryRequest {
-        query: range_query.query,
+        query: req.query,
         is_range_query: true,
         start,
         end,
         step,
     };
-    match promql::search::search(&org_id, &req).await {
+    match promql::search::search(org_id, &req).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -300,8 +317,6 @@ pub async fn query_range(
 /** prometheus query metric metadata */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/metadata",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
@@ -341,11 +356,7 @@ pub async fn query_range(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route(
-    "/{org_id}/prometheus/api/v1/metadata",
-    method = "GET",
-    method = "POST"
-)]
+#[get("/{org_id}/prometheus/api/v1/metadata")]
 pub async fn metadata(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestMetadata>,
@@ -365,8 +376,6 @@ pub async fn metadata(
 /** prometheus finding series by label matchers */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/series",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
@@ -403,16 +412,28 @@ pub async fn metadata(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route("/{org_id}/prometheus/api/v1/series", method = "GET", method = "POST")]
-pub async fn series(
+#[get("/{org_id}/prometheus/api/v1/series")]
+pub async fn series_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
+    series(&org_id, req.into_inner()).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/series")]
+pub async fn series_post(
+    org_id: web::Path<String>,
+    web::Form(form): web::Form<meta::prom::RequestSeries>,
+) -> Result<HttpResponse, Error> {
+    series(&org_id, form).await
+}
+
+async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResponse, Error> {
     let meta::prom::RequestSeries {
         matcher,
         start,
         end,
-    } = req.into_inner();
+    } = req;
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
@@ -422,7 +443,7 @@ pub async fn series(
         }
     };
     Ok(
-        match metrics::prom::get_series(&org_id, selector, start, end).await {
+        match metrics::prom::get_series(org_id, selector, start, end).await {
             Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
             Err(err) => {
                 log::error!("get_series failed: {err}");
@@ -436,8 +457,6 @@ pub async fn series(
 /** prometheus getting label names */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/labels",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
@@ -480,16 +499,28 @@ pub async fn series(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route("/{org_id}/prometheus/api/v1/labels", method = "GET", method = "POST")]
-pub async fn labels(
+#[get("/{org_id}/prometheus/api/v1/labels")]
+pub async fn labels_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
+    labels(&org_id, req.into_inner()).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/labels")]
+pub async fn labels_post(
+    org_id: web::Path<String>,
+    web::Form(form): web::Form<meta::prom::RequestLabels>,
+) -> Result<HttpResponse, Error> {
+    labels(&org_id, form).await
+}
+
+async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResponse, Error> {
     let meta::prom::RequestLabels {
         matcher,
         start,
         end,
-    } = req.into_inner();
+    } = req;
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
@@ -499,7 +530,7 @@ pub async fn labels(
         }
     };
     Ok(
-        match metrics::prom::get_labels(&org_id, selector, start, end).await {
+        match metrics::prom::get_labels(org_id, selector, start, end).await {
             Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
             Err(err) => {
                 log::error!("get_labels failed: {err}");
@@ -513,8 +544,6 @@ pub async fn labels(
 /** prometheus query label values */
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
-    get,
-    path="/{org_id}/prometheus/api/v1/label/{label_name}/values",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
@@ -539,11 +568,7 @@ pub async fn labels(
         (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[route(
-    "/{org_id}/prometheus/api/v1/label/{label_name}/values",
-    method = "GET",
-    method = "POST"
-)]
+#[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
 pub async fn label_values(
     path: web::Path<(String, String)>,
     req: web::Query<meta::prom::RequestLabelValues>,
@@ -588,7 +613,12 @@ fn validate_metadata_params(
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if sel.name.is_none() {
+                let err = if sel.name.is_none()
+                    && sel
+                        .matchers
+                        .find_matchers(meta::prom::NAME_LABEL)
+                        .is_empty()
+                {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
                 } else if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
