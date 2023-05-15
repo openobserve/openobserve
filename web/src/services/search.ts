@@ -48,6 +48,16 @@ const search = {
     }
     return http().get(url);
   },
+  query: ({
+    org_identifier,
+    query
+  }:{
+    org_identifier: string;
+    query: any;
+  }) => {
+    const url = `/api/${org_identifier}/prometheus/api/v1/query?query=${query}`;
+    return http().get(url);
+  }
 };
 
 export default search;

@@ -50,7 +50,6 @@ const getDefaultDashboardPanelData = () => (
         show_legends: true,
       },
       queryType: "sql",
-      selectedQuery: 'auto',
       query: "",
       customQuery: false
     },

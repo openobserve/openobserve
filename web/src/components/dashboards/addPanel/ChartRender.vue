@@ -261,24 +261,46 @@ export default defineComponent({
           };
 
           searchQueryData.loading = true
-          await queryService
-              .search({
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: query,
-                  page_type: props.data.fields.stream_type,
-              })
-              .then((res) => {
+            if (props.data.fields.stream_type != "metrics") {
+                await queryService
+                    .query({
+                        org_identifier: store.state.selectedOrganization.identifier,
+                        query: query,
+                    })
+                    .then((res) => {
+                        console.log("-----", res);
+                        
+                        searchQueryData.data = res.data.hits;
+                        searchQueryData.loading = false
+                    })
+                    .catch((error) => {
+                        $q.notify({
+                            type: "negative",
+                            message: "Something went wrong!",
+                            timeout: 5000,
+                        });
+                    });
+            }
+            else{
+                await queryService
+                    .search({
+                        org_identifier: store.state.selectedOrganization.identifier,
+                        query: query,
+                        page_type: props.data.fields.stream_type,
+                    })
+                    .then((res) => {
 
-                  searchQueryData.data = res.data.hits;
-                  searchQueryData.loading = false
-              })
-              .catch((error) => {
-                  $q.notify({
-                      type: "negative",
-                      message: "Something went wrong!",
-                      timeout: 5000,
-                  });
-              });
+                        searchQueryData.data = res.data.hits;
+                        searchQueryData.loading = false
+                    })
+                    .catch((error) => {
+                        $q.notify({
+                            type: "negative",
+                            message: "Something went wrong!",
+                            timeout: 5000,
+                        });
+                    });
+            }
       };
 
       // If data or chart type is updated, rerender the chart

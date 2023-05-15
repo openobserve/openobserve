@@ -292,7 +292,9 @@
     "fields": "Fields",
     "layout": "Layout",
     "sql": "SQL",
-    "back": "<< Back"
+    "back": "<< Back",
+    "auto": "Auto",
+    "promQL":"PromQL"
   },
   "alerts": {
     "header": "Alerts",
