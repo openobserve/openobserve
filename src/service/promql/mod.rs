@@ -24,6 +24,7 @@ mod engine;
 mod functions;
 pub mod search;
 pub mod value;
+mod binaries;
 
 pub use engine::QueryEngine;
 
