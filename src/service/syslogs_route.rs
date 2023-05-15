@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http;
 use actix_web::{http::StatusCode, HttpResponse};
 use ipnetwork::IpNetwork;
 use std::io;
@@ -26,6 +25,15 @@ use crate::service::db::syslog;
 
 #[instrument(skip(route))]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {
+    if route.org_id.trim().is_empty()
+        || route.stream_name.trim().is_empty()
+        || route.subnets.is_empty()
+    {
+        return Ok(Response::BadRequest(
+            "Please provide stream name/org_id/subnets for route".to_owned(),
+        )
+        .into());
+    }
     for (_, existing_route) in SYSLOG_ROUTES.clone() {
         let existing_subnets = &existing_route.subnets;
         let new_subnets = &route.subnets;
@@ -35,13 +43,11 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
                 .iter()
                 .any(|subnet| subnets_overlap(existing_subnet, subnet))
         }) {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!(
-                    "Provided subnet/s overlap with existing subnet/s for organization {}",
-                    &existing_route.org_id
-                ),
-            )));
+            return Ok(Response::BadRequest(format!(
+                "Provided subnet/s overlap with existing subnet/s for organization {}",
+                &existing_route.org_id
+            ))
+            .into());
         }
     }
 
@@ -55,6 +61,16 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
 
 #[instrument(skip(route))]
 pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpResponse, io::Error> {
+    if route.org_id.trim().is_empty()
+        && route.stream_name.trim().is_empty()
+        && route.subnets.is_empty()
+    {
+        return Ok(Response::BadRequest(
+            "Please provide stream name/org_id/subnets for route to update".to_owned(),
+        )
+        .into());
+    }
+
     if route.id.is_empty() {
         route.id = id.to_owned();
     }
@@ -65,6 +81,15 @@ pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpRespo
             return Ok(Response::NotFound.into());
         }
     };
+    if route.org_id.is_empty() {
+        route.org_id = old_route.org_id.clone();
+    }
+    if route.stream_name.is_empty() {
+        route.stream_name = old_route.stream_name.clone();
+    }
+    if route.subnets.is_empty() {
+        route.subnets = old_route.subnets.clone();
+    }
 
     if route == &old_route {
         return Ok(HttpResponse::Ok().json(route));
@@ -120,6 +145,7 @@ enum Response {
     OkMessage(String),
     NotFound,
     InternalServerError(anyhow::Error),
+    BadRequest(String),
 }
 
 impl From<Response> for HttpResponse {
@@ -135,6 +161,10 @@ impl From<Response> for HttpResponse {
             Response::InternalServerError(err) => Self::InternalServerError().json(
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
             ),
+            Response::BadRequest(err) => Self::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                err.to_string(),
+            )),
         }
     }
 }

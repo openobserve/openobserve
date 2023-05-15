@@ -19,8 +19,11 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SyslogRoute {
+    #[serde(default)]
     pub org_id: String,
+    #[serde(default)]
     pub stream_name: String,
+    #[serde(default)]
     pub subnets: Vec<IpNetwork>,
     #[serde(default)]
     pub id: String,

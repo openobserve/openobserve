@@ -29,6 +29,7 @@ use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
+use crate::meta::syslog::SyslogRoute;
 use crate::meta::StreamType;
 use crate::service::db;
 use crate::service::schema::stream_schema_exists;
@@ -36,10 +37,10 @@ use crate::service::schema::stream_schema_exists;
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn Error>> {
     let start = Instant::now();
     let ip = addr.ip();
-    let org = get_org_for_ip(ip).await;
+    let matching_route = get_org_for_ip(ip).await;
 
-    let org_id = match org {
-        Some(org) => org,
+    let route = match matching_route {
+        Some(matching_route) => matching_route,
         None => {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -51,7 +52,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     };
 
     let thread_id = web::Data::new(0);
-    let in_stream_name = "syslog";
+    let in_stream_name = &route.stream_name;
+    let org_id = &route.org_id;
+
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -221,17 +224,17 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     )))
 }
 
-async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<String> {
-    let mut org_id = None;
+async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<SyslogRoute> {
+    let mut matching_route = None;
     for (_, route) in SYSLOG_ROUTES.clone() {
-        for subnet in route.subnets {
+        for subnet in &route.subnets {
             if subnet.contains(ip) {
-                org_id = Some(route.org_id.to_owned());
+                matching_route = Some(route.clone());
                 break;
             }
         }
     }
-    org_id
+    matching_route
 }
 
 /// Create a `Value::Map` from the fields of the given syslog message.
