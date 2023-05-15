@@ -22,7 +22,9 @@ pub async fn send_notification(
     alert: &Alert,
     trigger: &alert::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()?;
 
     let alert_type = match &trigger.is_ingest_time {
         true => "Real time",
