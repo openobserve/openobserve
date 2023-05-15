@@ -250,8 +250,8 @@ impl QueryEngine {
             None => return Ok(vec![]),
         };
 
-        let end = self.start + (self.interval * self.time_window_idx); // 15s
-        let start = end - self.lookback_delta; // 5m
+        let end = self.start + (self.interval * self.time_window_idx);
+        let start = end - self.lookback_delta;
 
         let mut values = vec![];
         for metric in metrics_cache {
