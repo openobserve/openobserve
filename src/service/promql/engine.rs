@@ -184,6 +184,7 @@ impl QueryEngine {
                 let rhs = self.exec_expr(&expr.rhs).await?;
                 match expr.op.id() {
                     token::T_ADD => binaries::add(&lhs, &rhs)?,
+                    token::T_SUB => binaries::sub(&lhs, &rhs)?,
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Binary: {:?}",
