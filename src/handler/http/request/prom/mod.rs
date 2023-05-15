@@ -588,7 +588,12 @@ fn validate_metadata_params(
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if sel.name.is_none() {
+                let err = if sel.name.is_none()
+                    && sel
+                        .matchers
+                        .find_matchers(meta::prom::NAME_LABEL)
+                        .is_empty()
+                {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
                 } else if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
