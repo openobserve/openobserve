@@ -161,10 +161,8 @@ impl From<Response> for HttpResponse {
             Response::InternalServerError(err) => Self::InternalServerError().json(
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.into(), err.to_string()),
             ),
-            Response::BadRequest(err) => Self::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                err.to_string(),
-            )),
+            Response::BadRequest(err) => Self::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST.into(), err)),
         }
     }
 }

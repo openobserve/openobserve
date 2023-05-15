@@ -66,7 +66,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     }
 
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(&org_id, stream_name, StreamType::Logs, None) {
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -94,7 +94,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
     let (local_tans, _, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
-        &org_id,
+        org_id,
         stream_name,
         StreamType::Logs,
         None,
@@ -102,7 +102,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
-        &org_id,
+        org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
@@ -186,7 +186,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     }
 
     let mut stream_file_name = "".to_string();
-    super::write_file(buf, thread_id, &org_id, stream_name, &mut stream_file_name);
+    super::write_file(buf, thread_id, org_id, stream_name, &mut stream_file_name);
 
     if stream_file_name.is_empty() {
         return Ok(HttpResponse::Ok().json(IngestionResponse::new(
@@ -203,7 +203,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
         .with_label_values(&[
             "/_json",
             "200",
-            &org_id,
+            org_id,
             stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
@@ -212,7 +212,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
         .with_label_values(&[
             "/_json",
             "200",
-            &org_id,
+            org_id,
             stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
