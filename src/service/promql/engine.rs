@@ -443,12 +443,10 @@ impl QueryEngine {
         // Fix data about app restart
         let metrics_type = if let Some(meta) = get_prom_metadata_from_schema(&schema) {
             meta.metric_type
+        } else if table_name.ends_with("_sum") || table_name.ends_with("_count") {
+            MetricType::Counter
         } else {
-            if table_name.ends_with("_sum") || table_name.ends_with("_count") {
-                MetricType::Counter
-            } else {
-                MetricType::Unknown
-            }
+            MetricType::Unknown
         };
         if metrics_type == MetricType::Counter {
             for series in metric_values.iter_mut() {

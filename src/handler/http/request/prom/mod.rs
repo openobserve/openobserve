@@ -144,7 +144,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
         step: 300_000_000, // 5m
     };
 
-    match promql::search::search(&org_id, &req).await {
+    match promql::search::search(org_id, &req).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -289,7 +289,7 @@ async fn query_range(
         end,
         step,
     };
-    match promql::search::search(&org_id, &req).await {
+    match promql::search::search(org_id, &req).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
@@ -443,7 +443,7 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
         }
     };
     Ok(
-        match metrics::prom::get_series(&org_id, selector, start, end).await {
+        match metrics::prom::get_series(org_id, selector, start, end).await {
             Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
             Err(err) => {
                 log::error!("get_series failed: {err}");
@@ -530,7 +530,7 @@ async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResp
         }
     };
     Ok(
-        match metrics::prom::get_labels(&org_id, selector, start, end).await {
+        match metrics::prom::get_labels(org_id, selector, start, end).await {
             Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
             Err(err) => {
                 log::error!("get_labels failed: {err}");
