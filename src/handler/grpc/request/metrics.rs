@@ -46,10 +46,10 @@ impl Metrics for Querier {
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/prom/api/v1/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/prometheus/api/v1/query", "500", &org_id, "", &stream_type])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/prom/api/v1/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/prometheus/api/v1/query", "500", &org_id, "", &stream_type])
                 .inc();
             let message = if let errors::Error::ErrorCode(code) = err {
                 code.to_json()
@@ -61,10 +61,10 @@ impl Metrics for Querier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/prom/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/prometheus/v1/query", "200", &org_id, "", &stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/prom/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/prometheus/v1/query", "200", &org_id, "", &stream_type])
             .inc();
 
         Ok(Response::new(result))

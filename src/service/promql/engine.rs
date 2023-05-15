@@ -33,7 +33,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use super::{aggregations, functions, value::*, TableProvider};
+use super::{aggregations, binaries, functions, value::*, TableProvider};
 use crate::infra::config::CONFIG;
 use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
 
@@ -180,10 +180,18 @@ impl QueryEngine {
                 )));
             }
             PromExpr::Binary(expr) => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Paren: {:?}",
-                    expr
-                )));
+                let lhs = self.exec_expr(&expr.lhs).await?;
+                let rhs = self.exec_expr(&expr.rhs).await?;
+                match expr.op.id() {
+                    token::T_ADD => binaries::add(&lhs, &rhs)?,
+                    token::T_SUB => binaries::sub(&lhs, &rhs)?,
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported Binary: {:?}",
+                            expr
+                        )))
+                    }
+                }
             }
             PromExpr::Paren(ParenExpr { expr }) => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -250,8 +258,8 @@ impl QueryEngine {
             None => return Ok(vec![]),
         };
 
-        let end = self.start + (self.interval * self.time_window_idx); // 15s
-        let start = end - self.lookback_delta; // 5m
+        let end = self.start + (self.interval * self.time_window_idx);
+        let start = end - self.lookback_delta;
 
         let mut values = vec![];
         for metric in metrics_cache {

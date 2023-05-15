@@ -420,7 +420,7 @@ pub async fn remote_write(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",
@@ -429,7 +429,7 @@ pub async fn remote_write(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",
@@ -475,11 +475,7 @@ pub(crate) async fn get_metadata(
         }
         Ok(stream_schemas) => {
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
-                if let Some(meta) = get_metadata_object(&schema.schema) {
-                    Some((schema.stream_name, vec![meta]))
-                } else {
-                    None
-                }
+                get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
             });
             Ok(match req.limit {
                 None => metric_names.collect(),
@@ -553,10 +549,10 @@ pub(crate) async fn get_series(
                     sql_where.push(format!("{} != '{}'", mat.name, mat.value));
                 }
                 MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}'", mat.name, mat.value));
+                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
                 }
                 MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}'", mat.name, mat.value));
+                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
                 }
             }
         }
