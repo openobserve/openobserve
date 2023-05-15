@@ -16,9 +16,16 @@ use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
 
 use crate::{
-    meta::syslog::SyslogRoute,
+    meta::syslog::{SyslogRoute, SyslogServer},
     service::syslogs_route::{self},
 };
+
+/** Start/StopSyslog Server */
+
+#[post("/{org_id}/syslog-server")]
+pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpResponse, Error> {
+    syslogs_route::toggle_state(details.into_inner()).await
+}
 
 /** CreateSyslogRoute */
 #[utoipa::path(

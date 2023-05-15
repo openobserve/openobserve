@@ -189,7 +189,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::list_routes)
             .service(syslog::create_route)
             .service(syslog::delete_route)
-            .service(syslog::update_route),
+            .service(syslog::update_route)
+            .service(syslog::toggle_state),
     );
 }
 

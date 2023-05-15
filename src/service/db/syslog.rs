@@ -17,12 +17,22 @@ use std::sync::Arc;
 use crate::{
     common::json,
     infra::{
-        config::SYSLOG_ROUTES,
+        config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
         db::{self, Event},
     },
     meta::syslog::SyslogRoute,
 };
 use tracing::instrument;
+
+#[instrument(err)]
+pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
+    Ok(db::DEFAULT
+        .put(
+            "/syslog/enabled/",
+            json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
+        )
+        .await?)
+}
 
 #[instrument(err)]
 pub async fn list() -> Result<Vec<SyslogRoute>, anyhow::Error> {
@@ -92,5 +102,44 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         SYSLOG_ROUTES.insert(json_val.id.to_owned(), json_val);
     }
     log::info!("[TRACE] SyslogRoutes Cached");
+    Ok(())
+}
+
+pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
+    let key = "/syslog/enabled/";
+    let mut events = db::DEFAULT.watch(key).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("[TRACE] Start watching SyslogServer settings");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_syslog: event channel closed");
+                break;
+            }
+        };
+        match ev {
+            Event::Put(ev) => {
+                let item_value: bool = json::from_slice(&ev.value.unwrap()).unwrap();
+                let mut syslog_enabled = SYSLOG_ENABLED.write();
+                *syslog_enabled = item_value;
+            }
+            Event::Delete(_) => {
+                let mut syslog_enabled = SYSLOG_ENABLED.write();
+                *syslog_enabled = false;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn cache_syslog_settings() -> Result<(), anyhow::Error> {
+    let key = "/syslog/enabled/";
+    for (_, item_value) in db::DEFAULT.list(key).await? {
+        let item_value: bool = json::from_slice(&item_value).unwrap();
+        let mut syslog_enabled = SYSLOG_ENABLED.write();
+        *syslog_enabled = item_value;
+    }
+    log::info!("[TRACE] SyslogServer settings Cached");
     Ok(())
 }

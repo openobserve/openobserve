@@ -17,6 +17,7 @@ use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use reqwest::Client;
 use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
@@ -70,6 +71,7 @@ pub static TRIGGERS_IN_PROCESS: Lazy<DashMap<String, TriggerTimer>> = Lazy::new(
 pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::new(DashMap::new);
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
+pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 
 #[derive(EnvConfig)]
 pub struct Config {
