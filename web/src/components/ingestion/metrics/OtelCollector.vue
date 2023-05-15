@@ -34,7 +34,7 @@ exporters:
   prometheusremotewrite:
     endpoint: {{ endpoint.url }}/api/{{
         currOrgIdentifier
-      }}/prometheus/api/v1/write
+      }}/prom/api/v1/write
     headers:
       Authorization: Basic {{ accessKey }}
     </pre>

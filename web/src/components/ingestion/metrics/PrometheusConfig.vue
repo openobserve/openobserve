@@ -33,7 +33,7 @@
     </div>
     <pre ref="copyTracesContent" data-test="traces-content-text">
 remote_write:
-  - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
+  - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prom/api/v1/write
     basic_auth:
       username: {{ currUserEmail }}
       password: {{ store.state.organizationPasscode }}

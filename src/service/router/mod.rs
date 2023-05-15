@@ -25,12 +25,12 @@ const QUERIER_ROUTES: [&str; 9] = [
     "/_search",
     "/_around",
     "/_values",
-    "/prometheus/api/v1/series",
-    "/prometheus/api/v1/query_range",
-    "/prometheus/api/v1/query",
-    "/prometheus/api/v1/metadata",
-    "/prometheus/api/v1/labels",
-    "/prometheus/api/v1/label/",
+    "/prom/api/v1/series",
+    "/prom/api/v1/query_range",
+    "/prom/api/v1/query",
+    "/prom/api/v1/metadata",
+    "/prom/api/v1/labels",
+    "/prom/api/v1/label/",
 ];
 
 #[inline]

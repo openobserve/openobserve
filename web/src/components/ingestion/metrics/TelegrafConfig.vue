@@ -32,7 +32,7 @@
     <pre ref="copyTracesContent" data-test="traces-content-text">
 [[outputs.http]]
   ## URL is the address to send metrics to
-  url = {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
+  url = {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prom/api/v1/write
   ## Data format to output.
   data_format = "prometheusremotewrite"
 
