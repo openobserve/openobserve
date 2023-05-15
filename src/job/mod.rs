@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::config::{CONFIG, INSTANCE_ID};
+use crate::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
 use crate::infra::{cluster, ider};
 use crate::meta::organization::DEFAULT_ORG;
 use crate::meta::user::UserRequest;
@@ -25,6 +25,7 @@ mod file_list;
 mod files;
 mod metrics;
 mod prom;
+pub(crate) mod syslog_server;
 mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -81,6 +82,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::syslog::watch().await });
+    tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
     tokio::task::yield_now().await; // yield let other tasks run
     db::functions::cache().await?;
     db::user::cache().await?;
@@ -92,6 +94,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::templates::cache().await?;
     db::alerts::destinations::cache().await?;
     db::syslog::cache().await?;
+    db::syslog::cache_syslog_settings().await?;
 
     // cache file list
     db::file_list::local::cache().await?;
@@ -112,6 +115,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { metrics::run().await });
+
+    // Syslog server start
+    let start_syslog = *SYSLOG_ENABLED.read();
+    if start_syslog {
+        syslog_server::run(start_syslog, true).await?;
+    }
 
     Ok(())
 }
