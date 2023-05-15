@@ -15,6 +15,7 @@
 use std::error::Error as StdError;
 
 use crate::common::json::{self, Value};
+use crate::infra::config::CONFIG;
 use crate::meta::alert::{self, Alert};
 use crate::service::db;
 
@@ -22,9 +23,13 @@ pub async fn send_notification(
     alert: &Alert,
     trigger: &alert::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()?;
+    let client = if CONFIG.common.req_accept_invalid_certs {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
 
     let alert_type = match &trigger.is_ingest_time {
         true => "Real time",
