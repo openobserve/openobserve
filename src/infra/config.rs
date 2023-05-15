@@ -483,6 +483,16 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.s3.provider = "gcs".to_string();
         } else if cfg.s3.server_url.contains(".aliyuncs.com") {
             cfg.s3.provider = "oss".to_string();
+            if !cfg
+                .s3
+                .server_url
+                .contains(&format!("://{}.", cfg.s3.bucket_name))
+            {
+                cfg.s3.server_url = cfg
+                    .s3
+                    .server_url
+                    .replace("://", &format!("://{}.", cfg.s3.bucket_name));
+            }
         } else {
             cfg.s3.provider = "aws".to_string();
         }
