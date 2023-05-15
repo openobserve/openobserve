@@ -34,8 +34,8 @@ use std::{
 };
 
 use super::{aggregations, functions, value::*, TableProvider};
+use crate::infra::config::CONFIG;
 use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
-use crate::{infra::config::CONFIG, service::metrics::get_prom_metadata_from_schema};
 
 pub struct QueryEngine {
     org_id: String,
@@ -250,15 +250,21 @@ impl QueryEngine {
             None => return Ok(vec![]),
         };
 
+        let end = self.start + (self.interval * self.time_window_idx); // 15s
+        let start = end - self.lookback_delta; // 5m
+
         let mut values = vec![];
         for metric in metrics_cache {
+            let mut metric = metric.clone();
+            metric
+                .values
+                .retain(|v| v.timestamp > start && v.timestamp <= end);
             let mut value = match metric.values.last() {
                 Some(v) => *v,
                 None => continue, // have no sample
             };
-            if value.timestamp != self.end && metric.values.len() > 1 {
-                let mut metric = metric.clone();
-                metric.time_range = Some((metric.values.first().unwrap().timestamp, self.end));
+            if value.timestamp != end && metric.values.len() > 1 {
+                metric.time_range = Some((metric.values.first().unwrap().timestamp, end));
                 if let Some(extra) = metric.extrapolate() {
                     value = extra.1;
                 }
@@ -333,7 +339,7 @@ impl QueryEngine {
             .filter(|mat| mat.op == MatchOp::Equal)
             .map(|mat| (mat.name.as_str(), mat.value.as_str()))
             .collect();
-        let (ctx, schema) = self
+        let (ctx, metadata) = self
             .table_provider
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
@@ -441,7 +447,7 @@ impl QueryEngine {
         // https://ihac.xyz/2018/12/11/Prometheus-Extrapolation%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/
 
         // Fix data about app restart
-        let metrics_type = if let Some(meta) = get_prom_metadata_from_schema(&schema) {
+        let metrics_type = if let Some(meta) = metadata {
             meta.metric_type
         } else if table_name.ends_with("_sum") || table_name.ends_with("_count") {
             MetricType::Counter

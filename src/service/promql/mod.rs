@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use datafusion::{error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use utoipa::ToSchema;
+
+use crate::meta::prom::Metadata;
 
 mod aggregations;
 mod engine;
@@ -34,7 +35,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<(SessionContext, Arc<Schema>)>;
+    ) -> Result<(SessionContext, Option<Metadata>)>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
