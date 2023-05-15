@@ -473,11 +473,12 @@ pub(crate) async fn get_metadata(
             )))
         }
         Ok(stream_schemas) => {
-            let metric_names = stream_schemas.into_iter().map(|schema| {
-                (
-                    schema.stream_name,
-                    get_metadata_object(&schema.schema).map_or_else(Vec::new, |obj| vec![obj]),
-                )
+            let metric_names = stream_schemas.into_iter().filter_map(|schema| {
+                if let Some(meta) = get_metadata_object(&schema.schema) {
+                    Some((schema.stream_name, vec![meta]))
+                } else {
+                    None
+                }
             });
             Ok(match req.limit {
                 None => metric_names.collect(),

@@ -34,11 +34,6 @@ impl From<Signature> for String {
     }
 }
 
-// REFACTORME: make this a method of `Metric`
-pub fn signature(labels: &common::json::Map<String, common::json::Value>) -> Signature {
-    signature_without_labels(labels, &[])
-}
-
 /// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(
