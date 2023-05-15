@@ -15,6 +15,8 @@
 use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
+    http::header,
+    http::Method,
     Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
@@ -49,6 +51,14 @@ pub async fn validator(
     {
         Ok(res) => {
             if res {
+                // / Hack for prometheus, need support POST and check the header
+                let mut req = req;
+                if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type") {
+                    req.headers_mut().insert(
+                        header::CONTENT_TYPE,
+                        header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+                    );
+                }
                 Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))

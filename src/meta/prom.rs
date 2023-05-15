@@ -96,7 +96,7 @@ pub enum Status {
 #[derive(Debug, Deserialize)]
 pub struct RequestQuery {
     /// PromQL expression.
-    pub query: String,
+    pub query: Option<String>,
     /// Evaluation timestamp. Defaults to current server time.
     pub time: Option<String>,
     /// Evaluation timeout.
@@ -107,11 +107,11 @@ pub struct RequestQuery {
 #[derive(Debug, Deserialize)]
 pub struct RequestRangeQuery {
     /// PromQL expression.
-    pub query: String,
+    pub query: Option<String>,
     /// Start timestamp, inclusive.
-    pub start: String,
+    pub start: Option<String>,
     /// End timestamp, inclusive.
-    pub end: String,
+    pub end: Option<String>,
     /// Query resolution step width in `duration` format or float number of seconds.
     pub step: Option<String>,
     /// Evaluation timeout.

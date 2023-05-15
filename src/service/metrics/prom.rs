@@ -420,7 +420,7 @@ pub async fn remote_write(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",
@@ -429,7 +429,7 @@ pub async fn remote_write(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",

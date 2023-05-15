@@ -113,9 +113,15 @@ pub async fn query_get(
 #[post("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_post(
     org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestQuery>,
     web::Form(form): web::Form<meta::prom::RequestQuery>,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), form).await
+    let req = if form.query.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    query(&org_id.into_inner(), req).await
 }
 
 async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpResponse, Error> {
@@ -137,7 +143,7 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
     let end = start;
 
     let req = promql::MetricsQueryRequest {
-        query: req.query,
+        query: req.query.unwrap_or_default(),
         is_range_query: false,
         start,
         end,
@@ -233,38 +239,50 @@ pub async fn query_range_get(
 #[post("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_post(
     org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestRangeQuery>,
     web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), form).await
+    let req = if form.query.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    query_range(&org_id.into_inner(), req).await
 }
 
 async fn query_range(
     org_id: &str,
     req: meta::prom::RequestRangeQuery,
 ) -> Result<HttpResponse, Error> {
-    let start = match parse_str_to_timestamp_micros(&req.start) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("parse time error: {}", e);
-            return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                status: promql::Status::Error,
-                data: None,
-                error_type: Some("bad_data".to_string()),
-                error: Some(e.to_string()),
-            }));
-        }
+    let start = match req.start {
+        None => chrono::Utc::now().timestamp_micros(),
+        Some(v) => match parse_str_to_timestamp_micros(&v) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("parse time error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                    status: promql::Status::Error,
+                    data: None,
+                    error_type: Some("bad_data".to_string()),
+                    error: Some(e.to_string()),
+                }));
+            }
+        },
     };
-    let end = match parse_str_to_timestamp_micros(&req.end) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("parse time error: {}", e);
-            return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                status: promql::Status::Error,
-                data: None,
-                error_type: Some("bad_data".to_string()),
-                error: Some(e.to_string()),
-            }));
-        }
+    let end = match req.end {
+        None => chrono::Utc::now().timestamp_micros(),
+        Some(v) => match parse_str_to_timestamp_micros(&v) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("parse time error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                    status: promql::Status::Error,
+                    data: None,
+                    error_type: Some("bad_data".to_string()),
+                    error: Some(e.to_string()),
+                }));
+            }
+        },
     };
     let step = match req.step {
         None => 300_000_000, // 5m
@@ -283,7 +301,7 @@ async fn query_range(
     };
 
     let req = promql::MetricsQueryRequest {
-        query: req.query,
+        query: req.query.unwrap_or_default(),
         is_range_query: true,
         start,
         end,
@@ -423,9 +441,15 @@ pub async fn series_get(
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestSeries>,
     web::Form(form): web::Form<meta::prom::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
-    series(&org_id, form).await
+    let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    series(&org_id, req).await
 }
 
 async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResponse, Error> {
@@ -510,9 +534,15 @@ pub async fn labels_get(
 #[post("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels_post(
     org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestLabels>,
     web::Form(form): web::Form<meta::prom::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
-    labels(&org_id, form).await
+    let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    labels(&org_id, req).await
 }
 
 async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResponse, Error> {
