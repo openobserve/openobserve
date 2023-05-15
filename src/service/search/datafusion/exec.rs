@@ -75,7 +75,7 @@ pub async fn sql(
             stream_name: &sql.stream_name,
             stream_type,
         },
-        schema.clone(),
+        schema,
         "tbl",
         files,
         file_type,

@@ -17,6 +17,7 @@ use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
+use promql_parser::label::MatchOp;
 use promql_parser::parser;
 use prost::Message;
 use rustc_hash::FxHashSet;
@@ -473,11 +474,12 @@ pub(crate) async fn get_metadata(
             )))
         }
         Ok(stream_schemas) => {
-            let metric_names = stream_schemas.into_iter().map(|schema| {
-                (
-                    schema.stream_name,
-                    get_metadata_object(&schema.schema).map_or_else(Vec::new, |obj| vec![obj]),
-                )
+            let metric_names = stream_schemas.into_iter().filter_map(|schema| {
+                if let Some(meta) = get_metadata_object(&schema.schema) {
+                    Some((schema.stream_name, vec![meta]))
+                } else {
+                    None
+                }
             });
             Ok(match req.limit {
                 None => metric_names.collect(),
@@ -502,14 +504,13 @@ fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
     })
 }
 
-// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<serde_json::Value>> {
-    let metric_name = match selector.and_then(try_into_metric_name) {
+    let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
         None => {
             // HACK: in the ideal world we would have queried all the metric streams
@@ -534,9 +535,40 @@ pub(crate) async fn get_series(
         return Ok(vec![]);
     }
 
+    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}");
+    let mut sql_where = Vec::new();
+    if let Some(selector) = selector {
+        for mat in selector.matchers.matchers.iter() {
+            if mat.name == CONFIG.common.column_timestamp
+                || mat.name == NAME_LABEL
+                || mat.name == VALUE_LABEL
+            {
+                continue;
+            }
+            match &mat.op {
+                MatchOp::Equal => {
+                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
+                }
+                MatchOp::NotEqual => {
+                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
+                }
+                MatchOp::Re(_re) => {
+                    sql_where.push(format!("re_match({}, '{}'", mat.name, mat.value));
+                }
+                MatchOp::NotRe(_re) => {
+                    sql_where.push(format!("re_not_match({}, '{}'", mat.name, mat.value));
+                }
+            }
+        }
+        if !sql_where.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&sql_where.join(" AND "));
+        }
+    }
+
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}"),
+            sql,
             from: 0,
             size: 1000,
             start_time: start,
@@ -566,14 +598,13 @@ pub(crate) async fn get_series(
     Ok(series)
 }
 
-// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_labels(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let opt_metric_name = selector.and_then(try_into_metric_name);
+    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
     let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
@@ -614,7 +645,7 @@ pub(crate) async fn get_label_values(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let opt_metric_name = selector.and_then(try_into_metric_name);
+    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
     let stream_type = StreamType::Metrics;
 
     if label_name == NAME_LABEL {
@@ -687,12 +718,12 @@ pub(crate) async fn get_label_values(
     Ok(label_values)
 }
 
-fn try_into_metric_name(selector: parser::VectorSelector) -> Option<String> {
-    match selector.name {
+fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
+    match &selector.name {
         Some(name) => {
             // `match[]` argument contains a metric name, e.g.
             // `match[]=zo_response_code{method="GET"}`
-            Some(name)
+            Some(name.clone())
         }
         None => {
             // `match[]` argument does not contain a metric name.
