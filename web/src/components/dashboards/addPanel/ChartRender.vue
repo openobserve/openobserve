@@ -261,7 +261,7 @@ export default defineComponent({
           };
 
           searchQueryData.loading = true
-            if (props.data.fields.stream_type != "metrics") {
+            if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
                 await queryService
                     .query({
                         org_identifier: store.state.selectedOrganization.identifier,
