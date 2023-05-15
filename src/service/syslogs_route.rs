@@ -19,8 +19,9 @@ use std::io;
 use tracing::instrument;
 
 use crate::infra::config::SYSLOG_ROUTES;
+use crate::job;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::syslog::{Routes, SyslogRoute};
+use crate::meta::syslog::{Routes, SyslogRoute, SyslogServer};
 use crate::service::db::syslog;
 
 #[instrument(skip(route))]
@@ -101,6 +102,17 @@ pub async fn delete_route(id: &str) -> Result<HttpResponse, io::Error> {
         Response::OkMessage("Syslog route deleted".to_owned())
     };
     Ok(resp.into())
+}
+
+#[instrument(skip(server))]
+pub async fn toggle_state(server: SyslogServer) -> Result<HttpResponse, io::Error> {
+    if job::syslog_server::run(server.state, false).await.is_err() {
+        return Ok(Response::InternalServerError(anyhow::anyhow!(
+            "Failed to toggle syslog server state"
+        ))
+        .into());
+    }
+    Ok(HttpResponse::Created().json(server.state))
 }
 
 #[derive(Debug)]
