@@ -17,7 +17,7 @@ use serde::Serialize;
 use std::io::Error;
 use utoipa::ToSchema;
 
-use crate::infra::config::{self, CONFIG, INSTANCE_ID};
+use crate::infra::config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
 
@@ -39,6 +39,7 @@ struct ConfigResponse<'a> {
     lua_fn_enabled: bool,
     sql_base64_enabled: bool,
     timestamp_column: String,
+    syslog_enabled: bool,
 }
 
 /** Healthz */
@@ -73,5 +74,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         lua_fn_enabled: CONFIG.common.lua_fn_enabled,
         sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
         timestamp_column: CONFIG.common.column_timestamp.clone(),
+        syslog_enabled: *SYSLOG_ENABLED.read(),
     }))
 }

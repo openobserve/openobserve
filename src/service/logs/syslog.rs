@@ -29,6 +29,7 @@ use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
+use crate::meta::syslog::SyslogRoute;
 use crate::meta::StreamType;
 use crate::service::db;
 use crate::service::schema::stream_schema_exists;
@@ -36,10 +37,10 @@ use crate::service::schema::stream_schema_exists;
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn Error>> {
     let start = Instant::now();
     let ip = addr.ip();
-    let org = get_org_for_ip(ip).await;
+    let matching_route = get_org_for_ip(ip).await;
 
-    let org_id = match org {
-        Some(org) => org,
+    let route = match matching_route {
+        Some(matching_route) => matching_route,
         None => {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -51,7 +52,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     };
 
     let thread_id = web::Data::new(0);
-    let in_stream_name = "syslog";
+    let in_stream_name = &route.stream_name;
+    let org_id = &route.org_id;
+
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -63,7 +66,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     }
 
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(&org_id, stream_name, StreamType::Logs, None) {
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -91,7 +94,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
     let (local_tans, _, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
-        &org_id,
+        org_id,
         stream_name,
         StreamType::Logs,
         None,
@@ -99,7 +102,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
-        &org_id,
+        org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
@@ -183,7 +186,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     }
 
     let mut stream_file_name = "".to_string();
-    super::write_file(buf, thread_id, &org_id, stream_name, &mut stream_file_name);
+    super::write_file(buf, thread_id, org_id, stream_name, &mut stream_file_name);
 
     if stream_file_name.is_empty() {
         return Ok(HttpResponse::Ok().json(IngestionResponse::new(
@@ -200,7 +203,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
         .with_label_values(&[
             "/_json",
             "200",
-            &org_id,
+            org_id,
             stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
@@ -209,7 +212,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
         .with_label_values(&[
             "/_json",
             "200",
-            &org_id,
+            org_id,
             stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
@@ -221,17 +224,17 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, Box<dyn
     )))
 }
 
-async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<String> {
-    let mut org_id = None;
+async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<SyslogRoute> {
+    let mut matching_route = None;
     for (_, route) in SYSLOG_ROUTES.clone() {
-        for subnet in route.subnets {
+        for subnet in &route.subnets {
             if subnet.contains(ip) {
-                org_id = Some(route.org_id.to_owned());
+                matching_route = Some(route.clone());
                 break;
             }
         }
     }
-    org_id
+    matching_route
 }
 
 /// Create a `Value::Map` from the fields of the given syslog message.
