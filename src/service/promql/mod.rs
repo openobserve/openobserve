@@ -20,6 +20,7 @@ use utoipa::ToSchema;
 use crate::meta::prom::Metadata;
 
 mod aggregations;
+mod binaries;
 mod engine;
 mod functions;
 pub mod search;
