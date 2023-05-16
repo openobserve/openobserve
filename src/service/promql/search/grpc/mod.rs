@@ -52,7 +52,7 @@ pub async fn search(
 
     // 2. search in the local WAL
     // search wal second because there are latest data
-    let span2 = info_span!("service:promql:search:grpc:in_cache");
+    let span2 = info_span!("service:promql:search:grpc:in_wal");
     let session_id2 = session_id.clone();
     let org_id2 = req.org_id.clone();
     let req2 = req.query.as_ref().unwrap().clone();
