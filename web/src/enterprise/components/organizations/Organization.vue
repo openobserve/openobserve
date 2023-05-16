@@ -154,7 +154,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
-import { convertToTitleCase } from "@/utils/zincUtils";
+import { convertToTitleCase } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageOrganization",
