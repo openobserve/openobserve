@@ -262,27 +262,23 @@ impl QueryEngine {
 
         let mut values = vec![];
         for metric in metrics_cache {
-            let mut metric = metric.clone();
-            metric
+            if let Some(last_value) = metric
                 .samples
-                .retain(|sample| sample.timestamp > start && sample.timestamp <= end);
-            if metric.samples.is_empty() {
-                continue;
+                .iter()
+                .filter_map(|s| (start < s.timestamp && s.timestamp <= end).then_some(s.value))
+                .last()
+            {
+                values.push(
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    InstantValue {
+                        labels: metric.labels.clone(),
+                        sample: Sample {
+                            timestamp: end,
+                            value: last_value,
+                        },
+                    },
+                );
             }
-            let mut last_value = *metric.samples.last().unwrap();
-            if last_value.timestamp != end && metric.samples.len() > 1 {
-                metric.time_range = Some((metric.samples[0].timestamp, end));
-                if let Some(extra) = metric.extrapolate() {
-                    last_value = extra.1;
-                }
-            }
-            values.push(
-                // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                InstantValue {
-                    labels: metric.labels,
-                    sample: last_value,
-                },
-            );
         }
         Ok(values)
     }
