@@ -81,7 +81,7 @@ pub(crate) fn eval_arithmetic(
                         value: 0.0,
                         num: 0,
                     });
-                    entry.value = f_handler(entry.value, item.value.value);
+                    entry.value = f_handler(entry.value, item.sample.value);
                     entry.num += 1;
                 }
             }
@@ -99,7 +99,7 @@ pub(crate) fn eval_arithmetic(
                         value: 0.0,
                         num: 0,
                     });
-                    entry.value = f_handler(entry.value, item.value.value);
+                    entry.value = f_handler(entry.value, item.sample.value);
                     entry.num += 1;
                 }
             }
@@ -113,7 +113,7 @@ pub(crate) fn eval_arithmetic(
                         value: 0.0,
                         num: 0,
                     });
-                entry.value = f_handler(entry.value, item.value.value);
+                entry.value = f_handler(entry.value, item.sample.value);
                 entry.num += 1;
             }
         }
@@ -151,12 +151,12 @@ pub async fn eval_top(
 
     let mut score_values = Vec::new();
     for (i, item) in data.iter().enumerate() {
-        if item.value.value.is_nan() {
+        if item.sample.value.is_nan() {
             continue;
         }
         score_values.push(TopItem {
             index: i,
-            value: item.value.value,
+            value: item.sample.value,
         });
     }
 

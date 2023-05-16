@@ -108,24 +108,24 @@ impl QueryEngine {
                 Value::Instant(v) => instant_vectors.push(RangeValue {
                     labels: v.labels.to_owned(),
                     time_range: None,
-                    values: vec![v.value],
+                    samples: vec![v.sample],
                 }),
                 Value::Vector(vs) => instant_vectors.extend(vs.into_iter().map(|v| RangeValue {
                     labels: v.labels.to_owned(),
                     time_range: None,
-                    values: vec![v.value],
+                    samples: vec![v.sample],
                 })),
                 Value::Range(v) => instant_vectors.push(v),
                 Value::Matrix(v) => instant_vectors.extend(v),
                 Value::Sample(v) => instant_vectors.push(RangeValue {
                     labels: Labels::default(),
                     time_range: None,
-                    values: vec![v],
+                    samples: vec![v],
                 }),
                 Value::Float(v) => instant_vectors.push(RangeValue {
                     labels: Labels::default(),
                     time_range: None,
-                    values: vec![Sample {
+                    samples: vec![Sample {
                         timestamp: self.start + (self.interval * self.time_window_idx),
                         value: v,
                     }],
@@ -146,7 +146,7 @@ impl QueryEngine {
             merged_data
                 .entry(signature(&value.labels))
                 .or_insert_with(Vec::new)
-                .extend(value.values);
+                .extend(value.samples);
             merged_metrics.insert(signature(&value.labels), value.labels);
         }
         let merged_data = merged_data
@@ -154,7 +154,7 @@ impl QueryEngine {
             .map(|(sig, values)| RangeValue {
                 labels: merged_metrics.get(&sig).unwrap().to_owned(),
                 time_range: None,
-                values,
+                samples: values,
             })
             .collect::<Vec<_>>();
 
@@ -241,7 +241,6 @@ impl QueryEngine {
         })
     }
 
-    /// MatrixSelector is a special case of VectorSelector that returns a matrix of samples.
     async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
@@ -265,23 +264,23 @@ impl QueryEngine {
         for metric in metrics_cache {
             let mut metric = metric.clone();
             metric
-                .values
-                .retain(|v| v.timestamp > start && v.timestamp <= end);
-            let mut value = match metric.values.last() {
-                Some(v) => *v,
-                None => continue, // have no sample
-            };
-            if value.timestamp != end && metric.values.len() > 1 {
-                metric.time_range = Some((metric.values.first().unwrap().timestamp, end));
+                .samples
+                .retain(|sample| sample.timestamp > start && sample.timestamp <= end);
+            if metric.samples.is_empty() {
+                continue;
+            }
+            let mut last_value = *metric.samples.last().unwrap();
+            if last_value.timestamp != end && metric.samples.len() > 1 {
+                metric.time_range = Some((metric.samples[0].timestamp, end));
                 if let Some(extra) = metric.extrapolate() {
-                    value = extra.1;
+                    last_value = extra.1;
                 }
             }
             values.push(
                 // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
                 InstantValue {
-                    labels: metric.labels.clone(),
-                    value,
+                    labels: metric.labels,
+                    sample: last_value,
                 },
             );
         }
@@ -312,7 +311,7 @@ impl QueryEngine {
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
             let metric_data = metric
-                .values
+                .samples
                 .iter()
                 .filter(|v| v.timestamp > start && v.timestamp <= end)
                 .cloned()
@@ -320,7 +319,7 @@ impl QueryEngine {
             values.push(RangeValue {
                 labels: metric.labels.clone(),
                 time_range: Some((start, end)),
-                values: metric_data,
+                samples: metric_data,
             });
         }
         Ok(values)
@@ -438,10 +437,10 @@ impl QueryEngine {
                     RangeValue {
                         labels,
                         time_range: None,
-                        values: Vec::with_capacity(20),
+                        samples: Vec::with_capacity(20),
                     }
                 });
-                entry.values.push(Sample {
+                entry.samples.push(Sample {
                     timestamp: time_values.value(i),
                     value: value_values.value(i),
                 });
@@ -466,7 +465,7 @@ impl QueryEngine {
             for series in metric_values.iter_mut() {
                 let mut delta: f64 = 0.0;
                 let mut last_value = 0.0;
-                for sample in series.values.iter_mut() {
+                for sample in series.samples.iter_mut() {
                     if last_value > sample.value {
                         delta += last_value;
                     }

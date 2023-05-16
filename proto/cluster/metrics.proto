@@ -37,10 +37,10 @@ message MetricsQueryResponse {
 }
 
 message Series {
-    repeated Label  metric = 1;
-    repeated Sample values = 2;
-    optional Sample  value = 3;
-    optional double scalar = 4;
+    repeated Label   metric = 1;
+    repeated Sample samples = 2;
+    optional Sample  sample = 3;
+    optional double  scalar = 4;
 }
 
 message Label {
