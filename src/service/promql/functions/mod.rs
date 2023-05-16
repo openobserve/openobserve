@@ -124,7 +124,7 @@ pub(crate) fn eval_idelta(
         }
         rate_values.push(InstantValue {
             labels,
-            value: Sample {
+            sample: Sample {
                 timestamp: metric.time_range.unwrap().1,
                 value: value.unwrap(),
             },

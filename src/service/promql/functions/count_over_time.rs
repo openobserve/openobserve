@@ -21,8 +21,8 @@ pub(crate) fn count_over_time(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.values.is_empty() {
+    if data.samples.is_empty() {
         return None;
     }
-    Some(data.values.len() as f64)
+    Some(data.samples.len() as f64)
 }

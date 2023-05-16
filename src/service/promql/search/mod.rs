@@ -273,25 +273,28 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
     let mut merged_data = FxHashMap::default();
     let mut merged_metrics = FxHashMap::default();
-    series.iter().for_each(|v| {
-        let labels: Labels = v.metric.iter().map(|v| Arc::new(Label::from(v))).collect();
-        let values: Vec<Sample> = v.values.iter().map(Sample::from).collect();
+    for ser in series {
+        let labels: Labels = ser
+            .metric
+            .iter()
+            .map(|l| Arc::new(Label::from(l)))
+            .collect();
+        let samples: Vec<Sample> = ser.samples.iter().map(Sample::from).collect();
         merged_data
             .entry(signature(&labels))
             .or_insert_with(Vec::new)
-            .extend(values);
+            .extend(samples);
         merged_metrics.insert(signature(&labels), labels);
-    });
+    }
     let merged_data = merged_data
         .into_iter()
-        .map(|(sig, values)| RangeValue {
+        .map(|(sig, samples)| RangeValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
-            values,
+            samples,
             time_range: None,
         })
         .collect::<Vec<_>>();
 
-    // sort data
     let mut value = Value::Matrix(merged_data);
     value.sort();
     value
@@ -304,21 +307,24 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
         Vec<Arc<Label>>,
         std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
     > = FxHashMap::default();
-    series.iter().for_each(|v| {
-        let labels: Labels = v.metric.iter().map(|v| Arc::new(Label::from(v))).collect();
-        let value: Sample = v.value.as_ref().unwrap().into();
-        merged_data.insert(signature(&labels), value);
+    for ser in series {
+        let labels: Labels = ser
+            .metric
+            .iter()
+            .map(|l| Arc::new(Label::from(l)))
+            .collect();
+        let sample: Sample = ser.sample.as_ref().unwrap().into();
+        merged_data.insert(signature(&labels), sample);
         merged_metrics.insert(signature(&labels), labels);
-    });
+    }
     let merged_data = merged_data
         .into_iter()
-        .map(|(sig, value)| InstantValue {
+        .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
-            value,
+            sample,
         })
         .collect::<Vec<_>>();
 
-    // sort data
     let mut value = Value::Vector(merged_data);
     value.sort();
     value
@@ -326,13 +332,12 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
     let mut sample: Sample = Default::default();
-    series.iter().for_each(|v| {
-        if v.scalar.is_some() {
-            sample.value = v.scalar.unwrap();
+    for ser in series {
+        if let Some(x) = ser.sample.as_ref() {
+            sample = x.into();
+        } else if let Some(x) = ser.scalar {
+            sample.value = x;
         }
-        if v.value.is_some() {
-            sample = v.value.as_ref().unwrap().into();
-        }
-    });
+    }
     Value::Sample(sample)
 }

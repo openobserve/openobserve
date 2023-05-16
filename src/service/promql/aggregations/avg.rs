@@ -27,7 +27,7 @@ pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
         .values()
         .map(|v| InstantValue {
             labels: v.labels.clone(),
-            value: Sample {
+            sample: Sample {
                 timestamp,
                 value: v.value / v.num as f64,
             },
