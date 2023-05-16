@@ -17,6 +17,9 @@ use std::io::Result;
 use std::process::Command;
 
 fn main() -> Result<()> {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=proto");
+
     tonic_build::configure()
         .type_attribute("FileList", "#[derive(Eq)]")
         .type_attribute("FileList", "#[derive(serde::Serialize)]")
