@@ -21,11 +21,11 @@ pub(crate) fn max_over_time(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.values.is_empty() {
+    if data.samples.is_empty() {
         return None;
     }
     Some(
-        data.values
+        data.samples
             .iter()
             .map(|s| s.value)
             .max_by(|a, b| a.partial_cmp(b).unwrap())
