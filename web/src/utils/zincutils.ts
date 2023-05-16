@@ -269,12 +269,16 @@ export const routeGuardPendingSubscriptions = (
   from: any,
   next: any
 ) => {
-  const local_organization = useLocalOrganization();
-  if (local_organization == null || config.isZincObserveCloud == "false") {
+  const local_organization = ref();
+  local_organization.value = useLocalOrganization();
+  if (
+    local_organization.value.value == null ||
+    config.isZincObserveCloud == "false"
+  ) {
     next();
   }
 
-  if (local_organization.value.status == "pending-subscription") {
+  if (local_organization.value.value.status == "pending-subscription") {
     Dialog.create({
       title: "Confirmation",
       message: "Please subscribe to a paid plan to continue.",
