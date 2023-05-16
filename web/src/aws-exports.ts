@@ -37,6 +37,8 @@ const config = {
   isZincObserveCloud: import.meta.env.VITE_ZINCOBSERVE_CLOUD
     ? import.meta.env.VITE_ZINCOBSERVE_CLOUD
     : "false",
+  freePlan: "Free-Plan-USD-Monthly",
+  paidPlan: "professional-USD-Monthly",
 };
 
 export default config;

@@ -51,6 +51,7 @@ import {
 } from "@/components/alerts/index";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Functions from "../../views/Functions.vue";
+import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -71,6 +72,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "metrics",
@@ -78,6 +82,9 @@ const useRoutes = () => {
       component: AppMetrics,
       meta: {
         keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
       },
     },
     {
@@ -87,6 +94,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "logstreams",
@@ -95,6 +105,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "tickets",
@@ -102,6 +115,9 @@ const useRoutes = () => {
       component: Tickets,
       meta: {
         keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
       },
     },
     {
@@ -119,6 +135,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "/dashboards/view",
@@ -127,6 +146,9 @@ const useRoutes = () => {
       props: true,
       meta: {
         keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
       },
     },
     {
@@ -137,6 +159,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "/dashboards/add_panel",
@@ -146,6 +171,9 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "users",
@@ -153,6 +181,9 @@ const useRoutes = () => {
       component: Users,
       meta: {
         keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
       },
     },
     {
@@ -162,11 +193,17 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
     },
     {
       path: "functions",
       name: "functions",
       component: Functions,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
       children: [
         {
           path: "functions",
@@ -184,6 +221,9 @@ const useRoutes = () => {
       path: "ingestion",
       name: "ingestion",
       component: Ingestion,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
       children: [
         {
           path: "logs",
@@ -262,6 +302,9 @@ const useRoutes = () => {
       path: "alerts",
       name: "alerts",
       component: Alerts,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
+      },
       children: [
         {
           path: "alerts",

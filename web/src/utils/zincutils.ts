@@ -14,6 +14,7 @@
 
 import config from "../aws-exports";
 import { ref, onMounted, onUnmounted } from "vue";
+import { Dialog } from "quasar";
 
 const useLocalStorage = (
   key: string,
@@ -261,4 +262,44 @@ export const getPath = () => {
       : window.location.pathname;
   const cloudPath = import.meta.env.BASE_URL;
   return config.isZincObserveCloud == "true" ? cloudPath : path;
+};
+
+export const routeGuardPendingSubscriptions = (
+  to: any,
+  from: any,
+  next: any
+) => {
+  const local_organization = ref();
+  local_organization.value = useLocalOrganization();
+  if (
+    local_organization.value.value == null ||
+    config.isZincObserveCloud == "false"
+  ) {
+    next();
+  }
+
+  if (local_organization.value.value.status == "pending-subscription") {
+    Dialog.create({
+      title: "Confirmation",
+      message: "Please subscribe to a paid plan to continue.",
+      cancel: true,
+      persistent: true,
+    })
+      .onOk(() => {
+        const nextURL = getPath() + "billings/plans";
+        next(nextURL);
+      })
+      .onCancel(() => {
+        return false;
+      });
+  } else {
+    next();
+  }
+};
+
+export const convertToTitleCase = (str: string) => {
+  return str
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };

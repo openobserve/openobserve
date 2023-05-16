@@ -82,7 +82,7 @@
             @click="router.replace({ name: 'organizations' })"
           />
           <q-btn
-            :disable="organizationData.name === ''"
+            :disable="organizationData.name === '' && !proPlanRequired"
             :label="t('organization.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
@@ -92,7 +92,20 @@
             data-test="add-org"
           />
         </div>
+
+        <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
+          <q-btn
+            class="q-mb-md text-bold no-border q-ml-md"
+            :label="t('organization.proceed_subscription')"
+            text-color="light-text"
+            padding="sm xl"
+            color="secondary"
+            no-caps
+            @click="completeSubscriptionProcess"
+          />
+        </div>
       </q-form>
+      asd{{ proPlanRequired }}
     </q-card-section>
   </q-card>
 </template>
@@ -103,6 +116,7 @@ import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import config from "@/aws-exports";
 
 const defaultValue = () => {
   return {
@@ -120,6 +134,13 @@ export default defineComponent({
       type: Object,
       default: () => defaultValue(),
     },
+  },
+  data() {
+    return {
+      proPlanRequired: false,
+      proPlanMsg: "",
+      newOrgIdentifier: "",
+    };
   },
   emits: ["update:modelValue", "updated", "finish"],
   setup() {
@@ -153,6 +174,17 @@ export default defineComponent({
         name: this.modelValue.name,
       };
     }
+
+    // this.store.state.organizations.forEach((organization: any) => {
+    //   if (
+    //     (organization.hasOwnProperty("CustomerBillingObj") &&
+    //       organization.CustomerBillingObj.subscription_type ==
+    //         config.freePlan) ||
+    //     !organization.hasOwnProperty("CustomerBillingObj")
+    //   ) {
+    //     this.proPlanRequired = true;
+    //   }
+    // });
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
@@ -160,6 +192,13 @@ export default defineComponent({
         type: "negative",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
+    },
+    completeSubscriptionProcess() {
+      console.log(this.store.state);
+      // this.store.state.dispatch("setSelectedOrganization",)
+      this.router.push(
+        `/billings/plans?org_identifier=${this.newOrgIdentifier}`
+      );
     },
     onSubmit() {
       const dismiss = this.$q.notify({
@@ -188,15 +227,40 @@ export default defineComponent({
         callOrganization
           .then((res: { data: any }) => {
             const data = res.data;
-            this.organizationData = {
-              id: "",
-              name: "",
-            };
+            if (res.data.data.status == "active") {
+              this.organizationData = {
+                id: "",
+                name: "",
+              };
 
-            this.$emit("update:modelValue", data);
-            this.$emit("updated");
-            this.addOrganizationForm.resetValidation();
-            dismiss();
+              this.$emit("update:modelValue", data);
+              this.$emit("updated");
+              this.addOrganizationForm.resetValidation();
+              dismiss();
+            } else {
+              this.proPlanRequired = true;
+              this.proPlanMsg = res.data.message;
+              this.newOrgIdentifier = res.data.identifier;
+              // this.store.state.dispatch("setSelectedOrganization", {
+              //   identifier: data.identifier,
+              //   name: data.name,
+              //   id: data.id,
+              //   ingest_threshold: data.ingest_threshold,
+              //   search_threshold: data.search_threshold,
+              //   label: data.name,
+              //   user_email: this.store.state.userInfo.email,
+              //   subscription_type: "Free-Plan-USD-Monthly",
+              // });
+              // window.location.href = `/organizations?org_identifier=${data.data.identifier}&action=subscribe`;
+              this.router.push({
+                name: "organizations",
+                query: {
+                  org_identifier: data.data.identifier,
+                  action: "subscribe",
+                  update_org: Date.now(),
+                },
+              })
+            }
           })
           .catch((err: any) => {
             this.$q.notify({

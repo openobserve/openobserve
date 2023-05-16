@@ -28,6 +28,7 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 
 const useEnvRoutes = () => {
   const parentRoutes = [
@@ -62,6 +63,9 @@ const useEnvRoutes = () => {
       component: Organizations,
       meta: {
         keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuardPendingSubscriptions(to, from, next);
       },
     },
     {
