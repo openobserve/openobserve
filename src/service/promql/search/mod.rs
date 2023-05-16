@@ -37,7 +37,7 @@ pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
 
 #[inline(always)]
 async fn get_queue_lock() -> Result<etcd::Locker> {
-    let mut lock = etcd::Locker::new("search/cluster_queue");
+    let mut lock = etcd::Locker::new("search/cluster_queue_metrics");
     lock.lock(0).await.map_err(server_internal_error)?;
     Ok(lock)
 }
@@ -275,19 +275,30 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
     let mut merged_metrics = FxHashMap::default();
     series.iter().for_each(|v| {
         let labels: Labels = v.metric.iter().map(|v| Arc::new(Label::from(v))).collect();
-        let values: Vec<Sample> = v.values.iter().map(Sample::from).collect();
-        merged_data
+        let entry = merged_data
             .entry(signature(&labels))
-            .or_insert_with(Vec::new)
-            .extend(values);
+            .or_insert_with(FxHashMap::default);
+        v.values.iter().for_each(|v| {
+            entry.insert(v.time, v.value);
+        });
         merged_metrics.insert(signature(&labels), labels);
     });
     let merged_data = merged_data
         .into_iter()
-        .map(|(sig, values)| RangeValue {
-            labels: merged_metrics.get(&sig).unwrap().to_owned(),
-            values,
-            time_range: None,
+        .map(|(sig, values)| {
+            let mut values = values
+                .into_iter()
+                .map(|(ts, v)| Sample {
+                    timestamp: ts,
+                    value: v,
+                })
+                .collect::<Vec<_>>();
+            values.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            RangeValue {
+                labels: merged_metrics.get(&sig).unwrap().to_owned(),
+                values,
+                time_range: None,
+            }
         })
         .collect::<Vec<_>>();
 

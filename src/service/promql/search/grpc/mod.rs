@@ -32,80 +32,60 @@ pub async fn search(
 
     let mut results = Vec::new();
 
-    let span1 = info_span!("service:promql:search:grpc:in_cache");
-
-    // 1. search in the local WAL
+    // 1. search in the object storage
+    // search storage first because there are old data
+    let span1 = info_span!("service:promql:search:grpc:in_storage");
+    let req_stype = req.stype;
     let session_id1 = session_id.clone();
     let org_id1 = req.org_id.clone();
     let req1: cluster_rpc::MetricsQueryStmt = req.query.as_ref().unwrap().clone();
     let task1 = tokio::task::spawn(
         async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search(&session_id1, &org_id1, &req1).await
-            } else {
+            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok(value::Value::None)
+            } else {
+                storage::search(&session_id1, &org_id1, &req1).await
             }
         }
         .instrument(span1),
     );
 
-    let span2 = info_span!("service:promql:search:grpc:in_storage");
-
-    // 2. search in the object storage
-    let req_stype = req.stype;
+    // 2. search in the local WAL
+    // search wal second because there are latest data
+    let span2 = info_span!("service:promql:search:grpc:in_cache");
     let session_id2 = session_id.clone();
     let org_id2 = req.org_id.clone();
     let req2 = req.query.as_ref().unwrap().clone();
     let task2 = tokio::task::spawn(
         async move {
-            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
-                Ok(value::Value::None)
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                wal::search(&session_id2, &org_id2, &req2).await
             } else {
-                storage::search(&session_id2, &org_id2, &req2).await
+                Ok(value::Value::None)
             }
         }
         .instrument(span2),
     );
 
-    // merge local WAL
-    let value1 = match task1.await {
-        Ok(result) => result.map_err(|err| {
-            log::error!("datafusion execute error: {}", err);
-            search::grpc::handle_datafusion_error(err)
-        })?,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )))
+    // merge search result
+    for task in vec![task1, task2].into_iter() {
+        let value = match task.await {
+            Ok(result) => result.map_err(|err| {
+                log::error!("datafusion execute error: {}", err);
+                search::grpc::handle_datafusion_error(err)
+            })?,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )))
+            }
+        };
+        if !matches!(value, value::Value::None) {
+            results.push(value);
         }
-    };
-    if !matches!(value1, value::Value::None) {
-        results.push(value1);
-    }
-
-    // XXX-REVIEW: instead of executing task1 and task2 sequentially,
-    // we could execute them in parallel and [`futures::join`] the results.
-    //
-    // [`futures::join`]: https://docs.rs/futures/latest/futures/macro.join.html
-
-    // merge object storage search
-    let value2 = match task2.await {
-        Ok(result) => result.map_err(|err| {
-            log::error!("datafusion execute error: {}", err);
-            search::grpc::handle_datafusion_error(err)
-        })?,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )))
-        }
-    };
-    if !matches!(value2, value::Value::None) {
-        results.push(value2);
     }
 
     let mut result_type = if is_range_query { "matrix" } else { "vector" };
-
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,

@@ -61,10 +61,10 @@ impl Metrics for Querier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/prometheus/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/prometheus/api/v1/query", "200", &org_id, "", &stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/prometheus/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/prometheus/api/v1/query", "200", &org_id, "", &stream_type])
             .inc();
 
         Ok(Response::new(result))
