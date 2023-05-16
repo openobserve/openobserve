@@ -19,7 +19,7 @@ use crate::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod prom;
 
-pub async fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
+pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)
@@ -32,11 +32,6 @@ impl From<Signature> for String {
     fn from(sig: Signature) -> Self {
         hex::encode(sig.0)
     }
-}
-
-// REFACTORME: make this a method of `Metric`
-pub fn signature(labels: &common::json::Map<String, common::json::Value>) -> Signature {
-    signature_without_labels(labels, &[])
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.

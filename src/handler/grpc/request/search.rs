@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use opentelemetry::global;
-use std::time::Instant;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -29,12 +28,12 @@ pub struct Searcher {}
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:enter", skip(self, req))]
+    #[tracing::instrument(name = "grpc:search:enter", skip_all)]
     async fn search(
         &self,
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let parent_cx = global::get_text_map_propagator(|prop| {
             prop.extract(&super::MetadataMap(req.metadata()))
         });
@@ -43,25 +42,22 @@ impl Search for Searcher {
         let req = req.get_ref();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.as_str();
-        let result = match SearchService::exec::search(req).await {
-            Ok(res) => res,
-            Err(err) => {
-                // metrics
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/_search", "500", &org_id, "", stream_type])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/_search", "500", &org_id, "", stream_type])
-                    .inc();
-                return Err(match err {
-                    errors::Error::ErrorCode(code) => Status::internal(code.to_json()),
-                    _ => Status::internal(err.to_string()),
-                });
-            }
-        };
+        let result = SearchService::grpc::search(req).await.map_err(|err| {
+            let time = start.elapsed().as_secs_f64();
+            metrics::GRPC_RESPONSE_TIME
+                .with_label_values(&["/_search", "500", &org_id, "", stream_type])
+                .observe(time);
+            metrics::GRPC_INCOMING_REQUESTS
+                .with_label_values(&["/_search", "500", &org_id, "", stream_type])
+                .inc();
+            let message = if let errors::Error::ErrorCode(code) = err {
+                code.to_json()
+            } else {
+                err.to_string()
+            };
+            Status::internal(message)
+        })?;
 
-        // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
             .with_label_values(&["/_search", "200", &org_id, "", stream_type])

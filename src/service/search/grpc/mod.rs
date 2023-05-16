@@ -12,41 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::arrow::ipc;
+use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use datafusion_common::DataFusionError;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
+use super::datafusion;
 use crate::handler::grpc::cluster_rpc;
+use crate::infra::cluster;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::StreamType;
 
-#[tracing::instrument(name = "service:search:exec", skip(req))]
+mod storage;
+mod wal;
+
+pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
+
+#[tracing::instrument(name = "service:search:grpc:search", skip(req))]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
     let start = std::time::Instant::now();
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
-    let session_id = req.job.as_ref().unwrap().session_id.to_string();
-    let session_id = Arc::new(session_id);
+    let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
 
-    // result
     let mut results = HashMap::new();
     let mut file_count = 0;
     let mut scan_size = 0;
 
-    let span1 = info_span!("service:search:exec:in_cache");
+    let span1 = info_span!("service:search:grpc:in_wal");
 
-    // search in cache
+    // search in WAL
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let task1 = tokio::task::spawn(
-        async move { super::cache::search(&session_id1, sql1, stream_type).await }
-            .instrument(span1),
+        async move {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                wal::search(&session_id1, sql1, stream_type).await
+            } else {
+                Ok((HashMap::new(), 0, 0))
+            }
+        }
+        .instrument(span1),
     );
 
-    let span2 = info_span!("service:search:exec:in_storage");
+    let span2 = info_span!("service:search:grpc:in_storage");
 
     // search in object storage
     let req_stype = req.stype;
@@ -55,16 +67,16 @@ pub async fn search(
     let file_list = req.file_list.to_owned();
     let task2 = tokio::task::spawn(
         async move {
-            if req_stype == cluster_rpc::SearchType::CacheOnly as i32 {
+            if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), 0, 0))
             } else {
-                super::storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
+                storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
             }
         }
         .instrument(span2),
     );
 
-    // merge local cache
+    // merge data from local WAL
     let (batches1, file_count1, scan_size1) = match task1.await {
         Ok(result) => match result {
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
@@ -88,7 +100,7 @@ pub async fn search(
     file_count += file_count1;
     scan_size += scan_size1;
 
-    // merge object storage search
+    // merge data from object storage search
     let (batches2, file_count2, scan_size2) = match task2.await {
         Ok(result) => match result {
             Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
@@ -112,7 +124,7 @@ pub async fn search(
     file_count += file_count2;
     scan_size += scan_size2;
 
-    let span3 = info_span!("service:search:exec:merge");
+    let span3 = info_span!("service:search:grpc:merge");
     let guard3 = span3.enter();
 
     // merge all batches
@@ -134,18 +146,18 @@ pub async fn search(
                 Ok(res) => res,
                 Err(err) => {
                     log::error!("datafusion merge error: {}", err);
-                    return Err(super::handle_datafusion_error(err));
+                    return Err(handle_datafusion_error(err));
                 }
             };
     }
 
     // clear session data
-    super::datafusion::storage::file_list::clear(&session_id)
+    datafusion::storage::file_list::clear(&session_id)
         .await
         .unwrap();
 
     drop(guard3);
-    let span4 = info_span!("service:search:exec:response");
+    let span4 = info_span!("service:search:grpc:response");
     let _guard4 = span4.enter();
 
     // final result
@@ -209,4 +221,50 @@ pub async fn search(
     };
 
     Ok(result)
+}
+
+pub fn handle_datafusion_error(err: DataFusionError) -> Error {
+    let err = err.to_string();
+    if err.contains("Schema error: No field named") {
+        let pos = err.find("Schema error: No field named").unwrap();
+        return match get_key_from_error(&err, pos) {
+            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
+            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
+        };
+    }
+    if err.contains("parquet not found") {
+        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
+    }
+    if err.contains("Invalid function ") {
+        let pos = err.find("Invalid function ").unwrap();
+        return match get_key_from_error(&err, pos) {
+            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
+            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
+        };
+    }
+    if err.contains("Incompatible data types") {
+        let pos = err.find("for field").unwrap();
+        let pos_start = err[pos..].find(' ').unwrap();
+        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
+        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
+        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
+    }
+    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
+}
+
+fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
+    for punctuation in ['\'', '"'] {
+        let pos_start = err[pos..].find(punctuation);
+        if pos_start.is_none() {
+            continue;
+        }
+        let pos_start = pos_start.unwrap();
+        let pos_end = err[pos + pos_start + 1..].find(punctuation);
+        if pos_end.is_none() {
+            continue;
+        }
+        let pos_end = pos_end.unwrap();
+        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
+    }
+    None
 }

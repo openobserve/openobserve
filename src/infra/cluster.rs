@@ -325,7 +325,7 @@ pub fn get_internal_grpc_token() -> String {
 }
 
 /// List nodes from cluster or local cache
-async fn list_nodes() -> Result<Vec<Node>> {
+pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
     let mut client = ETCD_CLIENT.get().await.clone().unwrap();
     let key = format!("{}nodes/", &CONFIG.etcd.prefix);

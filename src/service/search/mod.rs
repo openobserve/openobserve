@@ -14,7 +14,6 @@
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
-use datafusion_common::DataFusionError;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::{cmp::min, time::Duration};
@@ -23,32 +22,27 @@ use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::json;
+use crate::common::{json, str::find};
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster::{self, get_internal_grpc_token};
-
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::infra::errors::{Error, ErrorCodes};
-use crate::meta;
-use crate::meta::search::Response;
-use crate::meta::StreamType;
+use crate::meta::{search, stream::StreamParams, StreamType};
 use crate::service::{db, file_list};
 
-mod cache;
-pub mod datafusion;
-pub mod exec;
-pub mod sql;
-mod storage;
+use super::get_partition_key_query;
 
-pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
+pub mod datafusion;
+pub mod grpc;
+pub mod sql;
 
 pub async fn search(
     org_id: &str,
     stream_type: StreamType,
-    req: &meta::search::Request,
-) -> Result<Response, Error> {
-    let root_span = info_span!("srv:search:enter");
+    req: &search::Request,
+) -> Result<search::Response, Error> {
+    let root_span = info_span!("service:search:enter");
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
@@ -57,6 +51,7 @@ pub async fn search(
     search_in_cluster(req).instrument(root_span).await
 }
 
+#[inline(always)]
 async fn get_queue_lock() -> Result<etcd::Locker, Error> {
     let mut lock = etcd::Locker::new("search/cluster_queue");
     lock.lock(0).await.map_err(server_internal_error)?;
@@ -84,7 +79,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
 }
 
 #[instrument(skip_all)]
-async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
+async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
     match file_list::get_file_list(
         &sql.org_id,
@@ -108,7 +103,7 @@ async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<
             } else {
                 // less than 1 hour, use file meta reduce file list
                 for file in file_list {
-                    if sql.match_source(&file, false, stream_type).await {
+                    if sql.match_source(&file, false, false, stream_type).await {
                         files.push(file.clone());
                     }
                 }
@@ -119,8 +114,8 @@ async fn partition_by_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<
     }
 }
 
-#[instrument(name = "srv:search:cluster", skip(req))]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, Error> {
+#[instrument(name = "service:search:cluster", skip(req))]
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
 
     // get a cluster search queue lock
@@ -132,7 +127,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     let took_wait = start.elapsed().as_millis() as usize;
 
     //XXX span1.exit(); // drop span1
-    //XXX let span2 = info_span!("srv:search:cluster:prepare_base").entered();
+    //XXX let span2 = info_span!("service:search:cluster:prepare_base").entered();
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -164,7 +159,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         }
     };
 
-    let file_list = partition_by_file_list(&meta, stream_type).await;
+    let file_list = get_file_list(&meta, stream_type).await;
     let file_num = file_list.len();
     let offset = if querier_num >= file_num {
         1
@@ -183,7 +178,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     };
 
     //XXX span3.exit(); // drop span3
-    //XXX let span4 = info_span!("srv:search:cluster:do_search").entered();
+    //XXX let span4 = info_span!("service:search:cluster:do_search").entered();
 
     // make grpc auth token
     /*     let root_user = ROOT_USER.clone();
@@ -198,7 +193,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
         let mut job = job.clone();
         job.partition = partition_no as i32;
         req.job = Some(job);
-        req.stype = cluster_rpc::SearchType::CacheOnly as i32;
+        req.stype = cluster_rpc::SearchType::WalOnly as i32;
         let is_querier = cluster::is_querier(&node.role);
         if is_querier {
             if offset_start < file_num {
@@ -224,16 +219,15 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
             req_file_list_end,
         );
 
-        let grpc_span = info_span!("srv:search:cluster:grpc_search");
+        let grpc_span = info_span!("service:search:cluster:grpc_search");
 
         let node_addr = node.grpc_addr.clone();
         //let credentials_str = C.clone();
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = match req.org_id.parse() {
-                    Ok(org_id) => org_id,
-                    Err(_) => return Err(Error::Message("invalid org_id".to_string())),
-                };
+                let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {
+                    Error::Message("invalid org_id".to_string())
+                })?;
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -244,21 +238,19 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                     )
                 });
 
-                let token: MetadataValue<_> = match  get_internal_grpc_token().parse() {
-                    Ok(token) => token,
-                    Err(_) => return Err(Error::Message("invalid token".to_string())),
-                };
-                let channel = match Channel::from_shared(node_addr).unwrap().connect().await {
-                    Ok(channel) => channel,
-                    Err(err) => {
+                let token: MetadataValue<_> = get_internal_grpc_token().parse().map_err(|_| {
+                    Error::Message("invalid token".to_string())
+                })?;
+                let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(
+                    |err| {
                         log::error!(
                             "[TRACE] search->grpc: node: {}, connect err: {:?}",
                             node.id,
                             err
                         );
-                        return Err(server_internal_error("connect search node error"));
-                    }
-                };
+                        server_internal_error("connect search node error")
+                    },
+                )?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -288,14 +280,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
                 };
 
                 log::info!(
-                "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
-                node.id,
-                is_querier,
-                response.total,
-                response.took,
-                response.file_count
-            );
-
+                    "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                    node.id,
+                    is_querier,
+                    response.total,
+                    response.took,
+                    response.file_count
+                );
                 Ok(response)
             }
             .instrument(grpc_span),
@@ -323,7 +314,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span4.exit(); // drop span4
-    //XXX let span6 = info_span!("srv:search:cluster:release_queue_lock").entered();
+    //XXX let span6 = info_span!("service:search:cluster:release_queue_lock").entered();
 
     // search done, release lock
     if locker.is_some() {
@@ -333,43 +324,41 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span6.exit(); // drop span6
-    //XXX let span7 = info_span!("srv:search:cluster:merge_result").entered();
+    //XXX let span7 = info_span!("service:search:cluster:merge_result").entered();
 
     // merge multiple instances data
     let mut file_count = 0;
     let mut scan_size = 0;
     let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
     let sql = Arc::new(meta);
-    if !results.is_empty() {
-        for resp in results {
-            file_count += resp.file_count;
-            scan_size += resp.scan_size;
-            // handle hits
-            let value = batches.entry("query".to_string()).or_default();
-            if !resp.hits.is_empty() {
-                let buf = Cursor::new(resp.hits);
+    for resp in results {
+        file_count += resp.file_count;
+        scan_size += resp.scan_size;
+        // handle hits
+        let value = batches.entry("query".to_string()).or_default();
+        if !resp.hits.is_empty() {
+            let buf = Cursor::new(resp.hits);
+            let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+            log::info!(
+                "search_in_cluster: query num_batches: {:?}",
+                reader.num_batches()
+            );
+            let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+            value.push(batch);
+        }
+        // handle aggs
+        for agg in resp.aggs {
+            let value = batches.entry(format!("agg_{}", agg.name)).or_default();
+            if !agg.hits.is_empty() {
+                let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
                 log::info!(
-                    "search_in_cluster: query num_batches: {:?}",
+                    "search_in_cluster: agg:{} num_batches: {:?}",
+                    agg.name,
                     reader.num_batches()
                 );
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
                 value.push(batch);
-            }
-            // handle aggs
-            for agg in resp.aggs {
-                let value = batches.entry(format!("agg_{}", agg.name)).or_default();
-                if !agg.hits.is_empty() {
-                    let buf = Cursor::new(agg.hits);
-                    let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                    log::info!(
-                        "search_in_cluster: agg:{} num_batches: {:?}",
-                        agg.name,
-                        reader.num_batches()
-                    );
-                    let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                    value.push(batch);
-                }
             }
         }
 
@@ -404,10 +393,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<Response, 
     }
 
     //XXX span7.exit(); // drop span7
-    //XXX let _span8 = info_span!("srv:search:cluster:response").entered();
+    //XXX let _span8 = info_span!("service:search:cluster:response").entered();
 
     // final result
-    let mut result = Response::new(sql.meta.offset, sql.meta.limit);
+    let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
     // hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
@@ -501,21 +490,21 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if *k != CONFIG.common.time_stamp_col && k != "value" {
+            if *k != CONFIG.common.column_timestamp && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");
         if !results_metrics.contains_key(&key) {
             let mut fields = fields.clone();
-            fields.remove(&CONFIG.common.time_stamp_col);
+            fields.remove(&CONFIG.common.column_timestamp);
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_default();
         let value = [
             fields
-                .get(&CONFIG.common.time_stamp_col)
+                .get(&CONFIG.common.column_timestamp)
                 .unwrap()
                 .to_owned(),
             json::Value::String(fields.get("value").unwrap().to_string()),
@@ -534,53 +523,72 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     new_sources
 }
 
-pub fn handle_datafusion_error(err: DataFusionError) -> Error {
-    let err = err.to_string();
-    if err.contains("Schema error: No field named") {
-        let pos = err.find("Schema error: No field named").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
+/// match a source is a valid file or not
+pub async fn match_source(
+    stream: StreamParams<'_>,
+    time_range: Option<(i64, i64)>,
+    filters: &[(&str, &str)],
+    source: &str,
+    is_wal: bool,
+    match_min_ts_only: bool,
+) -> bool {
+    let StreamParams {
+        org_id,
+        stream_name,
+        stream_type,
+    } = stream;
+
+    // match org_id & table
+    if !source.starts_with(format!("files/{}/{}/{}/", org_id, stream_type, stream_name).as_str()) {
+        return false;
     }
-    if err.contains("parquet not found") {
-        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
+
+    // check partition key
+    if !filter_source_by_partition_key(source, filters) {
+        return false;
     }
-    if err.contains("Invalid function ") {
-        let pos = err.find("Invalid function ").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
+
+    if is_wal {
+        return true;
     }
-    if err.contains("Incompatible data types") {
-        let pos = err.find("for field").unwrap();
-        let pos_start = err[pos..].find(' ').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
+
+    // check time range
+    let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
+    if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
+        return true;
     }
-    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
+    log::trace!(
+        "time range: {:?}, file time: {}-{}, {}",
+        time_range,
+        file_meta.min_ts,
+        file_meta.max_ts,
+        source
+    );
+
+    // match partition clause
+    if let Some((time_min, time_max)) = time_range {
+        if match_min_ts_only && time_min > 0 {
+            return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
+        }
+        if time_min > 0 && time_min > file_meta.max_ts {
+            return false;
+        }
+        if time_max > 0 && time_max < file_meta.min_ts {
+            return false;
+        }
+    }
+    true
 }
 
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for ponct in ['\'', '"'] {
-        let pos_start = err[pos..].find(ponct);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(ponct);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
-    }
-    None
+fn filter_source_by_partition_key(source: &str, filters: &[(&str, &str)]) -> bool {
+    !filters.iter().any(|(k, v)| {
+        let field = get_partition_key_query(&format!("{k}="));
+        let value = get_partition_key_query(&format!("{k}={v}"));
+        find(source, &format!("/{field}")) && !find(source, &format!("/{value}/"))
+    })
 }
 
-struct MetadataMap<'a>(&'a mut tonic::metadata::MetadataMap);
+pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or value are not valid inputs
@@ -593,6 +601,75 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
     }
 }
 
-fn server_internal_error(error: impl ToString) -> Error {
+pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_by_partition_key() {
+        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet";
+        assert!(filter_source_by_partition_key(path, &[]));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![("kubernetes_host", "")]
+        ));
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![("kubernetes_host", "gke-dev1")]
+        ));
+        assert!(!filter_source_by_partition_key(
+            &path,
+            &vec![("kubernetes_host", "gke-dev2")]
+        ));
+        assert!(
+            filter_source_by_partition_key(path, &vec![("some_other_key", "no-matter")]),
+            "Partition key was not found ==> the Parquet file has to be searched"
+        );
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "ziox-qqx")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("kubernetes_namespace_name", "abcdefg")
+            ],
+        ));
+        assert!(filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev1"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+        assert!(!filter_source_by_partition_key(
+            path,
+            &vec![
+                ("kubernetes_host", "gke-dev2"),
+                ("some_other_key", "no-matter")
+            ],
+        ));
+    }
 }

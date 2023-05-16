@@ -19,29 +19,26 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tracing::info_span;
 
-use super::datafusion::storage::file_list::SessionType;
-use super::sql::Sql;
 use crate::common::file::scan_files;
 use crate::infra::config::{self, CONFIG};
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
 use crate::service::db;
 use crate::service::file_list::calculate_local_files_size;
+use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::search::sql::Sql;
 
-/// search in local cache, which haven't been sync to object storage
-#[tracing::instrument(
-    name = "service:search:cache:enter",
-    skip(session_id, sql, stream_type)
-)]
+/// search in local WAL, which haven't been sync to object storage
+#[tracing::instrument(name = "service:search:wal:enter", skip_all)]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    let span1 = info_span!("service:search:cache:get_file_list");
+    let span1 = info_span!("service:search:wal:get_file_list");
     let guard1 = span1.enter();
 
-    // mark searching in cache
+    // mark searching in WAL
     let searching = Searching::new();
 
     // get file list
@@ -53,7 +50,7 @@ pub async fn search(
         return Ok((HashMap::new(), 0, 0));
     }
 
-    let span2 = info_span!("service:search:cache:calculate_files_size");
+    let span2 = info_span!("service:search:wal:calculate_files_size");
     let guard2 = span2.enter();
     let scan_size = match calculate_local_files_size(&files).await {
         Ok(size) => size,
@@ -65,13 +62,13 @@ pub async fn search(
         }
     };
     log::info!(
-        "[TRACE] cache->search: load files {}, scan_size {}",
+        "[TRACE] wal->search: load files {}, scan_size {}",
         file_count,
         scan_size
     );
 
     drop(guard2);
-    let span3 = info_span!("service:search:cache:datafusion");
+    let span3 = info_span!("service:search:wal:datafusion");
     let _guard3 = span3.enter();
 
     // fetch all schema versions, get latest schema
@@ -92,7 +89,7 @@ pub async fn search(
 
     let session = meta::search::Session {
         id: session_id.to_string(),
-        data_type: SessionType::Cache,
+        data_type: SessionType::Wal,
     };
     let result = match super::datafusion::exec::sql(
         &session,
@@ -118,7 +115,7 @@ pub async fn search(
     Ok((result, file_count, scan_size as usize))
 }
 
-/// get file list from local cache, no need match_source, each file will be searched
+/// get file list from local wal, no need match_source, each file will be searched
 #[inline]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let pattern = format!(
@@ -142,25 +139,28 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
         let source_file = format!("{file_path}/{file_name}");
-        if sql.match_source(&source_file, false, stream_type).await {
+        if sql
+            .match_source(&source_file, false, true, stream_type)
+            .await
+        {
             result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
         }
     }
     Ok(result)
 }
 
-/// Searching for marking searching in cache
+/// Searching for marking searching in wal
 struct Searching;
 
 impl Searching {
     pub fn new() -> Self {
-        config::SEARCHING_IN_CACHE.store(1, Ordering::Relaxed);
+        config::SEARCHING_IN_WAL.store(1, Ordering::Relaxed);
         Searching
     }
 }
 
 impl Drop for Searching {
     fn drop(&mut self) {
-        config::SEARCHING_IN_CACHE.store(0, Ordering::Relaxed);
+        config::SEARCHING_IN_WAL.store(0, Ordering::Relaxed);
     }
 }

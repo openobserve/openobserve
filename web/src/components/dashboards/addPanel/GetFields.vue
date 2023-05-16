@@ -23,7 +23,7 @@
             style="width: 100%;"
             v-if="true"
         >
-            <index-list/>
+            <index-list :editMode="props.editMode"/>
         </div>
     </div>
 </template>
@@ -38,11 +38,11 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
     export default defineComponent({
         name: "GetFields",
-        props:[],
+        props:['editMode'],
         components: {
             IndexList,
         },
-        setup(){
+        setup(props){
             const store = useStore();
             const router = useRouter();
             const { dashboardPanelData } = useDashboardPanelData()
@@ -52,7 +52,8 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
                 store,
                 router,
                 dashboardPanelData,
-                t              
+                t,
+                props
             }
         }
           

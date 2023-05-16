@@ -80,7 +80,7 @@ pub async fn process(
             org_id,
             stream_name,
             StreamType::Logs,
-            &lua,
+            Some(&lua),
         );
     // End Register Transforms for stream
 
@@ -168,7 +168,7 @@ pub async fn process(
                     timestamp = match value
                         .as_object()
                         .unwrap()
-                        .get(&CONFIG.common.time_stamp_col)
+                        .get(&CONFIG.common.column_timestamp)
                     {
                         Some(v) => match parse_timestamp_micro_from_value(v) {
                             Ok(t) => t,
@@ -190,8 +190,8 @@ pub async fn process(
                 let mut value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
-                    &lua,
-                    &stream_lua_map,
+                    Some(&lua),
+                    Some(&stream_lua_map),
                     &stream_vrl_map,
                     stream_name,
                     &mut runtime,
@@ -218,7 +218,7 @@ pub async fn process(
                     min_ts = timestamp;
                 }
                 local_val.insert(
-                    CONFIG.common.time_stamp_col.clone(),
+                    CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 

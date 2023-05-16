@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "org.zinc.oxide.cluster";
+option java_package = "org.zinc.observe.cluster";
 option java_outer_classname = "clusterProto";
 
 package cluster;
@@ -20,6 +20,4 @@ message FileKey {
     string   key     = 1;
     FileMeta meta    = 2;
     bool     deleted = 3;
-
 }
- 

@@ -85,7 +85,7 @@ pub async fn ingest(
             org_id,
             stream_name,
             StreamType::Logs,
-            &lua,
+            Some(&lua),
         );
     // End Register Transforms for stream
 
@@ -126,8 +126,8 @@ pub async fn ingest(
         let mut value = crate::service::ingestion::apply_stream_transform(
             &local_tans,
             &value,
-            &lua,
-            &stream_lua_map,
+            Some(&lua),
+            Some(&stream_lua_map),
             &stream_vrl_map,
             stream_name,
             &mut runtime,
@@ -143,7 +143,7 @@ pub async fn ingest(
         let local_val = value.as_object_mut().unwrap();
 
         // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
+        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
             Some(v) => match parse_timestamp_micro_from_value(v) {
                 Ok(t) => t,
                 Err(e) => {
@@ -165,7 +165,7 @@ pub async fn ingest(
             min_ts = timestamp;
         }
         local_val.insert(
-            CONFIG.common.time_stamp_col.clone(),
+            CONFIG.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
 

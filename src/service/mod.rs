@@ -24,10 +24,19 @@ pub mod kv;
 pub mod logs;
 pub mod metrics;
 pub mod organization;
+pub mod promql;
 pub mod router;
 pub mod schema;
 pub mod search;
 pub mod stream;
+pub mod syslogs_route;
 pub mod traces;
 pub mod triggers;
 pub mod users;
+
+// generate partition key for query
+pub fn get_partition_key_query(s: &str) -> String {
+    let mut s = s.replace(['/', '.'], "_");
+    s.truncate(100);
+    s
+}

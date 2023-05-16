@@ -25,9 +25,11 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta::sql::Sql as MetaSql;
+use crate::meta::stream::StreamParams;
 use crate::meta::StreamType;
+use crate::service::db;
+use crate::service::search::{filter_source_by_partition_key, match_source};
 use crate::service::stream::get_stream_setting_fts_fields;
-use crate::service::{db, file_list, logs};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -190,10 +192,10 @@ impl Sql {
             let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
             let caps = re.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
-            if !cap_str.contains(&CONFIG.common.time_stamp_col) {
+            if !cap_str.contains(&CONFIG.common.column_timestamp) {
                 origin_sql = origin_sql.replace(
                     cap_str,
-                    &format!("{}, {}", &CONFIG.common.time_stamp_col, cap_str),
+                    &format!("{}, {}", &CONFIG.common.column_timestamp, cap_str),
                 );
             }
         }
@@ -232,15 +234,15 @@ impl Sql {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
                     "({} >= {} AND {} < {})",
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     time_range.0,
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     time_range.1
                 )
             } else if time_range.0 > 0 {
-                format!("{} >= {}", CONFIG.common.time_stamp_col, time_range.0)
+                format!("{} >= {}", CONFIG.common.column_timestamp, time_range.0)
             } else if time_range.1 > 0 {
-                format!("{} < {}", CONFIG.common.time_stamp_col, time_range.1)
+                format!("{} < {}", CONFIG.common.column_timestamp, time_range.1)
             } else {
                 "".to_string()
             };
@@ -285,7 +287,7 @@ impl Sql {
                 format!(
                     "{} ORDER BY {} DESC LIMIT {}",
                     origin_sql,
-                    CONFIG.common.time_stamp_col,
+                    CONFIG.common.column_timestamp,
                     meta.offset + meta.limit
                 )
             } else {
@@ -587,60 +589,39 @@ impl Sql {
         &self,
         source: &str,
         match_min_ts_only: bool,
+        is_wal: bool,
         stream_type: StreamType,
     ) -> bool {
-        // match org_id & table
-        if !source.starts_with(
-            format!(
-                "files/{}/{}/{}/",
-                &self.org_id, stream_type, &self.stream_name
-            )
-            .as_str(),
-        ) {
-            return false;
-        }
-
-        // check partition key
-        if !self.filter_source_by_partition_key(source) {
-            return false;
-        }
-
-        // check time range
-        let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
-        if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
-            return true;
-        }
-        log::trace!(
-            "time range: {:?}, file time: {}-{}, {}",
+        let filters = self
+            .meta
+            .quick_text
+            .iter()
+            .map(|(k, v, _)| (k.as_str(), v.as_str()))
+            .collect::<Vec<(_, _)>>();
+        match_source(
+            StreamParams {
+                org_id: &self.org_id,
+                stream_name: &self.stream_name,
+                stream_type,
+            },
             self.meta.time_range,
-            file_meta.min_ts,
-            file_meta.max_ts,
-            source
-        );
-
-        // match partation clause
-        if self.meta.time_range.is_some() {
-            let (time_min, time_max) = self.meta.time_range.unwrap();
-            if match_min_ts_only && time_min > 0 {
-                return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
-            }
-            if time_min > 0 && time_min > file_meta.max_ts {
-                return false;
-            }
-            if time_max > 0 && time_max < file_meta.min_ts {
-                return false;
-            }
-        }
-        true
+            &filters,
+            source,
+            is_wal,
+            match_min_ts_only,
+        )
+        .await
     }
 
     pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        path_matches_by_partition_key(
+        filter_source_by_partition_key(
             source,
-            self.meta
+            &self
+                .meta
                 .quick_text
                 .iter()
-                .map(|(k, v, _)| (k.as_str(), v.as_str())),
+                .map(|(k, v, _)| (k.as_str(), v.as_str()))
+                .collect::<Vec<(_, _)>>(),
         )
     }
 }
@@ -781,26 +762,6 @@ fn split_sql_token(text: &str) -> Vec<String> {
         }
     }
     tokens
-}
-
-/// Whether we should search this `path`, given the search criteria.
-///
-/// `partitions` is a list of partition key-value pairs.
-///
-/// For example, the `path` argument may look something like
-/// `"files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet"`.
-///
-/// The corresponding SQL query:
-/// `"SELECT * FROM gke_fluentbit WHERE kubernetes_host='gke-dev1' AND kubernetes_namespace_name='ziox-qqx'"`.
-fn path_matches_by_partition_key<'a>(
-    path: &str,
-    partitions: impl IntoIterator<Item = (&'a str, &'a str)>,
-) -> bool {
-    !partitions.into_iter().any(|(k, v)| {
-        let field = logs::get_partition_key_query(&format!("{k}="));
-        let value = logs::get_partition_key_query(&format!("{k}={v}"));
-        find(path, &format!("/{field}")) && !find(path, &format!("/{value}/"))
-    })
 }
 
 #[cfg(test)]
@@ -972,6 +933,10 @@ mod tests {
                 "select histogram(_timestamp, '5 second') AS key, count(*) AS num from table1 GROUP BY key ORDER BY key",
                 true, 0, (0,0),
             ),
+            (
+                "select DISTINCT field1, field2, field3 FROM table1",
+                true, 0, (0,0),
+            ),
 
         ];
 
@@ -1019,61 +984,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_matches_by_partition_key() {
-        let f = path_matches_by_partition_key;
-        let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kubernetes_host=gke-dev1/kubernetes_namespace_name=ziox-qqx/7052558621820981249.parquet";
-        assert!(f(path, vec![]));
-        assert!(!f(path, vec![("kubernetes_host", "")]));
-        assert!(f(path, vec![("kubernetes_host", "gke-dev1")]));
-        assert!(!f(&path, vec![("kubernetes_host", "gke-dev2")]));
-        assert!(
-            f(path, vec![("some_other_key", "no-matter")]),
-            "Partition key was not found ==> the Parquet file has to be searched"
-        );
-        assert!(f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev1"),
-                ("kubernetes_namespace_name", "ziox-qqx")
-            ],
-        ));
-        assert!(!f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev1"),
-                ("kubernetes_namespace_name", "abcdefg")
-            ],
-        ));
-        assert!(!f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev2"),
-                ("kubernetes_namespace_name", "ziox-qqx")
-            ],
-        ));
-        assert!(!f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev2"),
-                ("kubernetes_namespace_name", "abcdefg")
-            ],
-        ));
-        assert!(f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev1"),
-                ("some_other_key", "no-matter")
-            ],
-        ));
-        assert!(!f(
-            path,
-            vec![
-                ("kubernetes_host", "gke-dev2"),
-                ("some_other_key", "no-matter")
-            ],
-        ));
     }
 }

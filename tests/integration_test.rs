@@ -153,6 +153,8 @@ mod tests {
         e2e_list_real_time_alerts().await;
         e2e_delete_alert_template().await;
         e2e_delete_alert_destination().await;
+        e2e_post_syslog_route().await;
+        e2e_list_syslog_routes().await;
 
         // others
         e2e_health_check().await;
@@ -961,7 +963,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/prometheus/v1/write", "e2e"))
+            .uri(&format!("/api/{}/prometheus/api/v1/write", "e2e"))
             .insert_header(("X-Prometheus-Remote-Write-Version", "0.1.0"))
             .insert_header(("Content-Encoding", "snappy"))
             .insert_header(("Content-Type", "application/x-protobuf"))
@@ -1317,7 +1319,56 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri("/config")
+            .uri(&format!("/api/{}/syslog-routes", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_post_syslog_route() {
+        let auth = setup();
+        let body_str = r#"{
+                                "orgId": "acceptLogs",
+                                "subnets": [
+                                            "192.168.0.0/16",
+                                            "127.0.0.0/8",
+                                            "172.16.0.0/12"
+                                        ]
+                            }"#;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/syslog-routes", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp);
+        assert!(resp.status().is_success());
+    }
+
+    async fn e2e_list_syslog_routes() {
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/{}/syslog-routes", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();

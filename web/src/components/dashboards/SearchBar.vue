@@ -14,49 +14,52 @@
 -->
 
 <template>
-    <div>
-      <q-bar class="q-pa-sm bg-white">
+  <div>
+    <q-bar class="row q-pa-sm sql-bar">
+      <div style="flex: 1;" @click="onDropDownClick">
+        <q-icon
+          flat
+          :name="!showQuery ? 'arrow_right' : 'arrow_drop_down'"
+          text-color="black"
+          class="q-mr-sm"
+        />
         <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
-
-        <div @click.prevent="showWarning" style="cursor: pointer;">
-          <div style="pointer-events: none;">
-            <q-toggle
-              v-model="dashboardPanelData.data.customQuery"
-              :label="t('panel.customSql')"
-              @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery)"
-            />
-          </div>
-        </div>
-        <q-btn-dropdown
-          color="white"
-          flat
-          text-color="black"
-          @click="onDropDownClick"
-        />
-      </q-bar>
-    </div>
-    <div class="row" v-if="showQuery">
-      <div class="col">
-        <query-editor
-        ref="queryEditorRef"
-        class="monaco-editor"
-        v-model:query="dashboardPanelData.data.query"
-        v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-        v-model:functions="dashboardPanelData.meta.stream.functions"
-        @run-query="searchData"
-        :readOnly="!dashboardPanelData.data.customQuery"
-        ></query-editor>
-        <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
       </div>
+      <div @click.prevent="showWarning" class="q-px-md" style="cursor: pointer;">
+        <div style="pointer-events: none;">
+          <q-toggle
+            v-model="dashboardPanelData.data.customQuery"
+            :label="t('panel.customSql')"
+            @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery)"
+          />
+        </div>
+      </div>
+    </q-bar>
+  </div>
+  <div class="row" 
+    :style="!showQuery ? 'height: 0px;' : 'height: auto;'"
+    style="overflow: hidden;">
+    <div class="col">
+      <query-editor
+      ref="queryEditorRef"
+      class="monaco-editor"
+      v-model:query="dashboardPanelData.data.query"
+      v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
+      v-model:functions="dashboardPanelData.meta.stream.functions"
+      @run-query="searchData"
+      :readOnly="!dashboardPanelData.data.customQuery"
+      ></query-editor>
+      <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
     </div>
-    <ConfirmDialog
-      title="Change Query Mode"
-      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
-      @update:ok="changeToggle"
-      @update:cancel="confirmQueryModeChangeDialog = false"
-      v-model="confirmQueryModeChangeDialog"
-    />
+  </div>
+  <ConfirmDialog
+    title="Change Query Mode"
+    message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+    @update:ok="changeToggle"
+    @update:cancel="confirmQueryModeChangeDialog = false"
+    v-model="confirmQueryModeChangeDialog"
+  />
 </template>
 
 <script lang="ts">
@@ -87,7 +90,7 @@ export default defineComponent({
   },
   setup() {
     // show the query box
-    const showQuery = ref(true)
+    const showQuery = ref(false)
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -101,6 +104,10 @@ export default defineComponent({
         showQuery.value = !showQuery.value
     }
 
+    watch(showQuery, () => {
+      window.dispatchEvent(new Event("resize"))
+    })
+
     onActivated(() => {
       dashboardPanelData.meta.errors.queryErrors = []
     })
@@ -113,7 +120,6 @@ export default defineComponent({
       dashboardPanelData.data.fields.filter,
       dashboardPanelData.data.customQuery
     ], () => {
-
       // only continue if current mode is auto query generation
       if(!dashboardPanelData.data.customQuery){
         // console.log("Updating query");
@@ -200,8 +206,11 @@ export default defineComponent({
         }
 
         // add group by statement
-        query += ` GROUP BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
-        query += ` ORDER BY "${dashboardPanelData.data.fields.x[0]?.alias}"`
+        const xAxisAlias = dashboardPanelData.data.fields.x.map((it: any)=> it.alias)
+        // console.log("xAxisAlias",xAxisAlias);
+        
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : ''
+        query += xAxisAlias.length ? " ORDER BY " + xAxisAlias.join(", ") : ''
 
         // console.log('generated query: ', query)
 
@@ -310,8 +319,8 @@ export default defineComponent({
       router,
       updateQueryValue,
       onDropDownClick,
-      showQuery,
       dashboardPanelData,
+      showQuery,
       confirmQueryModeChangeDialog,
       onUpdateToggle,
       changeToggle,
@@ -321,3 +330,14 @@ export default defineComponent({
 });
 </script>
 
+<style lang="scss" scoped>
+.sql-bar {
+  overflow: hidden;
+  cursor: pointer;
+  background-color: white;
+
+  &:hover {
+    background-color: #eaeaeaa5;
+  }
+}
+</style>

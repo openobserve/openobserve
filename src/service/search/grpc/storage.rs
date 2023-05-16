@@ -19,19 +19,16 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{info_span, Instrument};
 
-use super::datafusion::storage::file_list::SessionType;
-use super::sql::Sql;
 use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
+use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
 
 /// search in remote object storage
-#[tracing::instrument(
-    name = "service:search:storage:enter",
-    skip(session_id, sql, file_list, stream_type)
-)]
+#[tracing::instrument(name = "service:search:storage:enter", skip_all)]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -171,7 +168,7 @@ pub async fn search(
         let sql = sql.clone();
         let session = meta::search::Session {
             id: format!("{session_id}-{ver}"),
-            data_type: SessionType::Remote,
+            data_type: SessionType::Storage,
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
@@ -252,7 +249,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
 
     let mut files = Vec::new();
     for file in results {
-        if sql.match_source(&file, false, stream_type).await {
+        if sql.match_source(&file, false, false, stream_type).await {
             files.push(file.clone());
         }
     }

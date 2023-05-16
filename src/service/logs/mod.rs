@@ -30,6 +30,7 @@ pub mod bulk;
 pub mod json;
 pub mod kinesis_firehose;
 pub mod multi;
+pub mod syslog;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
@@ -57,13 +58,6 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, String)> {
         };
     }
     None
-}
-
-// generate partition key for query
-pub fn get_partition_key_query(s: &str) -> String {
-    let mut s = s.replace(['/', '.'], "_");
-    s.truncate(100);
-    s
 }
 
 pub fn cast_to_type(mut value: Value, delta: Vec<Field>) -> (Option<String>, Option<String>) {
@@ -219,7 +213,7 @@ async fn add_valid_record(
 ) -> Option<Trigger> {
     let mut trigger: Option<Trigger> = None;
     let timestamp: i64 = local_val
-        .get(&CONFIG.common.time_stamp_col.clone())
+        .get(&CONFIG.common.column_timestamp.clone())
         .unwrap()
         .as_i64()
         .unwrap();

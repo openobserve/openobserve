@@ -184,8 +184,8 @@ pub async fn ingest(
                 ret_value = crate::service::ingestion::apply_stream_transform(
                     transforms,
                     &ret_value,
-                    &lua,
-                    &stream_lua_map,
+                    Some(&lua),
+                    Some(&stream_lua_map),
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,
@@ -218,7 +218,7 @@ pub async fn ingest(
             }
 
             // handle timestamp
-            let timestamp = match local_val.get(&CONFIG.common.time_stamp_col) {
+            let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
                 Some(v) => match parse_timestamp_micro_from_value(v) {
                     Ok(t) => t,
                     Err(_e) => {
@@ -257,7 +257,7 @@ pub async fn ingest(
                 min_ts = timestamp;
             }
             local_val.insert(
-                CONFIG.common.time_stamp_col.clone(),
+                CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
             let partition_keys: Vec<String> = match stream_partition_keys_map.get(&stream_name) {

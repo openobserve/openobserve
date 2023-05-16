@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
-
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
+use promql_parser::label::MatchOp;
+use promql_parser::parser;
 use prost::Message;
+use rustc_hash::FxHashSet;
+use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
 use tracing::info_span;
 
+use crate::infra::cache::stats;
+use crate::service::search as search_service;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
@@ -34,9 +38,7 @@ use crate::{
         self,
         alert::{Alert, Trigger},
         prom::{
-            ClusterLeader, FxIndexMap, Metadata, MetadataObject, Metric, RequestMetadata,
-            ResponseMetadata, Status, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL,
-            REPLICA_LABEL, VALUE_LABEL,
+            self, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, REPLICA_LABEL, VALUE_LABEL,
         },
         StreamType,
     },
@@ -89,7 +91,7 @@ pub async fn remote_write(
     // parse metadata
     for item in request.metadata {
         let metric_name = item.metric_family_name.clone();
-        let metadata = Metadata {
+        let metadata = prom::Metadata {
             metric_family_name: item.metric_family_name.clone(),
             metric_type: item.r#type().into(),
             help: item.help.clone(),
@@ -129,10 +131,10 @@ pub async fn remote_write(
                 }
             }
         }
-        let labels: FxIndexMap<String, String> = event
+        let labels: prom::FxIndexMap<String, String> = event
             .labels
             .iter()
-            .filter(|label| !label.name.eq(REPLICA_LABEL) && !label.name.eq(CLUSTER_LABEL))
+            .filter(|label| label.name != REPLICA_LABEL && label.name != CLUSTER_LABEL)
             .map(|label| (label.name.clone(), label.value.clone()))
             .collect();
 
@@ -152,7 +154,7 @@ pub async fn remote_write(
                 // skip the entry from adding to store
                 continue;
             }
-            let metric = Metric {
+            let metric = prom::Metric {
                 labels: labels.clone(),
                 value: sample_val,
             };
@@ -228,7 +230,7 @@ pub async fn remote_write(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
-                    &lua,
+                    Some(&lua),
                 );
             // End Register Transforms for stream
 
@@ -243,8 +245,8 @@ pub async fn remote_write(
             let mut value = crate::service::ingestion::apply_stream_transform(
                 &local_tans,
                 &value,
-                &lua,
-                &stream_lua_map,
+                Some(&lua),
+                Some(&stream_lua_map),
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,
@@ -256,7 +258,7 @@ pub async fn remote_write(
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
             val_map.insert(
-                CONFIG.common.time_stamp_col.clone(),
+                CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
             let value_str = crate::common::json::to_string(&val_map).unwrap();
@@ -418,7 +420,7 @@ pub async fn remote_write(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",
@@ -427,7 +429,7 @@ pub async fn remote_write(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/prom/v1/write",
+            "/prometheus/api/v1/write",
             "200",
             org_id,
             "",
@@ -438,11 +440,12 @@ pub async fn remote_write(
     Ok(HttpResponse::Ok().into())
 }
 
-pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
-    let empty_response = || mk_metadata_response(std::iter::empty());
-
+pub(crate) async fn get_metadata(
+    org_id: &str,
+    req: prom::RequestMetadata,
+) -> Result<prom::ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(empty_response());
+        return Ok(HashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -453,9 +456,9 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
         let resp = if schema == Schema::empty() {
-            empty_response()
+            HashMap::new()
         } else {
-            mk_metadata_response([(
+            HashMap::from([(
                 metric_name,
                 get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
             )])
@@ -471,15 +474,12 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
             )))
         }
         Ok(stream_schemas) => {
-            let metric_names = stream_schemas.into_iter().map(|schema| {
-                (
-                    schema.stream_name,
-                    get_metadata_object(&schema.schema).map_or_else(Vec::new, |obj| vec![obj]),
-                )
+            let metric_names = stream_schemas.into_iter().filter_map(|schema| {
+                get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
             });
             Ok(match req.limit {
-                Some(limit) => mk_metadata_response(metric_names.take(limit)),
-                None => mk_metadata_response(metric_names),
+                None => metric_names.collect(),
+                Some(limit) => metric_names.take(limit).collect(),
             })
         }
     }
@@ -489,9 +489,9 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
 // This differs from Prometheus, which [supports] multiple metadata objects per metric.
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
-fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
+fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
     schema.metadata.get(METADATA_LABEL).map(|s| {
-        serde_json::from_str::<Metadata>(s)
+        serde_json::from_str::<prom::Metadata>(s)
             .unwrap_or_else(|error| {
                 tracing::error!(%error, input = ?s, "failed to parse metadata");
                 panic!("BUG: failed to parse {METADATA_LABEL}")
@@ -500,13 +500,234 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     })
 }
 
-fn mk_metadata_response<I>(it: I) -> ResponseMetadata
-where
-    I: IntoIterator<Item = (String, Vec<meta::prom::MetadataObject>)>,
-{
-    ResponseMetadata {
-        status: Status::Success,
-        data: it.into_iter().collect(),
+pub(crate) async fn get_series(
+    org_id: &str,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
+) -> Result<Vec<serde_json::Value>> {
+    let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
+        Some(name) => name,
+        None => {
+            // HACK: in the ideal world we would have queried all the metric streams
+            return Ok(vec![]);
+        }
+    };
+
+    let schema = db::schema::get(org_id, &metric_name, Some(StreamType::Metrics))
+        .await
+        // `db::schema::get` never fails, so it's safe to unwrap
+        .unwrap();
+
+    // Comma-separated list of label names
+    let label_names = schema
+        .fields()
+        .iter()
+        .map(|f| f.name().as_str())
+        .filter(|&s| s != CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
+        .collect::<Vec<_>>()
+        .join(", ");
+    if label_names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}");
+    let mut sql_where = Vec::new();
+    if let Some(selector) = selector {
+        for mat in selector.matchers.matchers.iter() {
+            if mat.name == CONFIG.common.column_timestamp
+                || mat.name == NAME_LABEL
+                || mat.name == VALUE_LABEL
+            {
+                continue;
+            }
+            match &mat.op {
+                MatchOp::Equal => {
+                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
+                }
+                MatchOp::NotEqual => {
+                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
+                }
+                MatchOp::Re(_re) => {
+                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
+                }
+                MatchOp::NotRe(_re) => {
+                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
+                }
+            }
+        }
+        if !sql_where.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&sql_where.join(" AND "));
+        }
+    }
+
+    let req = meta::search::Request {
+        query: meta::search::Query {
+            sql,
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            sql_mode: "full".to_string(),
+            ..Default::default()
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    let series = match search_service::search(org_id, StreamType::Metrics, &req).await {
+        Err(err) => {
+            log::error!("search series error: {err}");
+            return Err(err);
+        }
+        Ok(resp) => resp
+            .hits
+            .into_iter()
+            .map(|mut val| {
+                if let Some(map) = val.as_object_mut() {
+                    map.remove(HASH_LABEL);
+                }
+                val
+            })
+            .collect(),
+    };
+    Ok(series)
+}
+
+pub(crate) async fn get_labels(
+    org_id: &str,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
+) -> Result<Vec<String>> {
+    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
+    let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
+        Err(_) => return Ok(vec![]),
+        Ok(schemas) => schemas,
+    };
+    let mut label_names = FxHashSet::default();
+    for schema in stream_schemas {
+        if let Some(ref metric_name) = opt_metric_name {
+            if *metric_name != schema.stream_name {
+                // Client has requested a particular metric name, but this stream is
+                // not it.
+                continue;
+            }
+        }
+        let stats = stats::get_stream_stats(org_id, &schema.stream_name, StreamType::Metrics);
+        if stats.time_range_intersects(start, end) {
+            let field_names = schema
+                .schema
+                .fields()
+                .iter()
+                .map(|f| f.name())
+                .filter(|&s| {
+                    s != &CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
+                })
+                .cloned();
+            label_names.extend(field_names);
+        }
+    }
+    let mut label_names = label_names.into_iter().collect::<Vec<_>>();
+    label_names.sort();
+    Ok(label_names)
+}
+
+// XXX-TODO: filter the results in accordance with `selector.matchers`
+pub(crate) async fn get_label_values(
+    org_id: &str,
+    label_name: String,
+    selector: Option<parser::VectorSelector>,
+    start: i64,
+    end: i64,
+) -> Result<Vec<String>> {
+    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
+    let stream_type = StreamType::Metrics;
+
+    if label_name == NAME_LABEL {
+        // This special case doesn't require any SQL to be executed. All we have
+        // to do is to collect stream names that satisfy selection criteria
+        // (i.e., `selector` and `start`/`end`) and return them.
+        let stream_schemas = db::schema::list(org_id, Some(stream_type), false)
+            .await
+            .unwrap_or_default();
+        let mut label_values = Vec::with_capacity(stream_schemas.len());
+        for schema in stream_schemas {
+            if let Some(ref metric_name) = opt_metric_name {
+                if *metric_name != schema.stream_name {
+                    // Client has requested a particular metric name, but this stream is
+                    // not it.
+                    continue;
+                }
+            }
+            let stats = stats::get_stream_stats(org_id, &schema.stream_name, stream_type);
+            if stats.time_range_intersects(start, end) {
+                label_values.push(schema.stream_name.clone())
+            }
+        }
+        label_values.sort();
+        return Ok(label_values);
+    }
+
+    let metric_name = match opt_metric_name {
+        Some(name) => name,
+        None => {
+            // HACK: in the ideal world we would have queried all the metric streams
+            // and collected label names from them.
+            return Ok(vec![]);
+        }
+    };
+
+    let schema = db::schema::get(org_id, &metric_name, Some(stream_type))
+        .await
+        // `db::schema::get` never fails, so it's safe to unwrap
+        .unwrap();
+    if schema.fields().is_empty() {
+        return Ok(vec![]);
+    }
+    let req = meta::search::Request {
+        query: meta::search::Query {
+            sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            sql_mode: "full".to_string(),
+            ..Default::default()
+        },
+        aggs: HashMap::new(),
+        encoding: meta::search::RequestEncoding::Empty,
+    };
+    let mut label_values = match search_service::search(org_id, stream_type, &req).await {
+        Ok(resp) => resp
+            .hits
+            .iter()
+            .filter_map(|v| v.as_object().unwrap().get(&label_name))
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>(),
+        Err(err) => {
+            log::error!("search values error: {:?}", err);
+            return Err(err);
+        }
+    };
+    label_values.sort();
+    Ok(label_values)
+}
+
+fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
+    match &selector.name {
+        Some(name) => {
+            // `match[]` argument contains a metric name, e.g.
+            // `match[]=zo_response_code{method="GET"}`
+            Some(name.clone())
+        }
+        None => {
+            // `match[]` argument does not contain a metric name.
+            // Check if there is `__name__` among the matchers,
+            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
+            let mut labels = selector.matchers.find_matchers(NAME_LABEL);
+            labels.pop().map(|s| s.to_owned())
+        }
     }
 }
 
@@ -528,7 +749,7 @@ async fn prom_ha_handler(
         );
         METRIC_CLUSTER_LEADER.insert(
             cluster_name.clone(),
-            ClusterLeader {
+            prom::ClusterLeader {
                 name: replica_label.clone(),
                 last_received: curr_ts,
             },

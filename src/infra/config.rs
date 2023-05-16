@@ -17,6 +17,7 @@ use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 use reqwest::Client;
 use std::sync::atomic::AtomicU8;
 use std::sync::Arc;
@@ -28,6 +29,7 @@ use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
 use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
+use crate::meta::syslog::SyslogRoute;
 use crate::meta::user::User;
 
 pub static VERSION: &str = env!("GIT_VERSION");
@@ -37,7 +39,7 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
-pub static SEARCHING_IN_CACHE: AtomicU8 = AtomicU8::new(0);
+pub static SEARCHING_IN_WAL: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
@@ -68,6 +70,8 @@ pub static TRIGGERS: Lazy<DashMap<String, Trigger>> = Lazy::new(DashMap::new);
 pub static TRIGGERS_IN_PROCESS: Lazy<DashMap<String, TriggerTimer>> = Lazy::new(DashMap::new);
 pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::new(DashMap::new);
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
+pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
+pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -83,6 +87,7 @@ pub struct Config {
     pub etcd: Etcd,
     pub sled: Sled,
     pub s3: S3,
+    pub tcp: TCP,
 }
 
 #[derive(EnvConfig)]
@@ -109,6 +114,16 @@ pub struct Grpc {
     pub org_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
+}
+
+#[derive(EnvConfig)]
+pub struct TCP {
+    #[env_config(name = "ZO_TCP_PORT", default = 5541)]
+    pub tcp_port: u16,
+    #[env_config(name = "ZO_UDP_PORT", default = 5541)]
+    pub udp_port: u16,
+    #[env_config(name = "ZO_SYSLOGS_ENABLED", default = false)]
+    pub syslogs_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -146,8 +161,8 @@ pub struct Common {
     pub file_ext_parquet: String,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
-    #[env_config(name = "ZO_TIME_STAMP_COL", default = "_timestamp")]
-    pub time_stamp_col: String,
+    #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
+    pub column_timestamp: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
@@ -184,13 +199,8 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_LUA_FN_ENABLED", default = false)]
     pub lua_fn_enabled: bool,
-    #[env_config(name = "ZO_SENTRY_ENABLED", default = false)]
-    pub sentry_enabled: bool,
-    #[env_config(
-        name = "ZO_SENTRY_URL",
-        default = "https://485ccf5575f446f18fdc2df3cb956002@o4504105501196288.ingest.sentry.io/4505131259789312"
-    )]
-    pub sentry_url: String,
+    #[env_config(name = "ZO_REQ_ACCEPT_INVALID_CERTS", default = false)]
+    pub req_accept_invalid_certs: bool,
 }
 
 #[derive(EnvConfig)]
@@ -475,6 +485,16 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.s3.provider = "gcs".to_string();
         } else if cfg.s3.server_url.contains(".aliyuncs.com") {
             cfg.s3.provider = "oss".to_string();
+            if !cfg
+                .s3
+                .server_url
+                .contains(&format!("://{}.", cfg.s3.bucket_name))
+            {
+                cfg.s3.server_url = cfg
+                    .s3
+                    .server_url
+                    .replace("://", &format!("://{}.", cfg.s3.bucket_name));
+            }
         } else {
             cfg.s3.provider = "aws".to_string();
         }

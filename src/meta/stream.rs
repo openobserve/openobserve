@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use super::StreamType;
-use crate::common::json;
+use crate::{common::json, infra::config::CONFIG, meta::StreamType};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -44,7 +44,7 @@ pub struct StreamQueryParams {
     pub stream_type: Option<StreamType>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
     pub doc_time_min: i64,
     pub doc_time_max: i64,
@@ -52,6 +52,52 @@ pub struct StreamStats {
     pub file_num: u64,
     pub storage_size: f64,
     pub compressed_size: f64,
+}
+
+impl StreamStats {
+    /// Returns true iff [start, end] time range intersects with the stream's time range.
+    pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
+        assert!(start <= end);
+        let (min, max) = self.time_range();
+        // [min, max] does *not* intersect with [start, end] if either
+        //
+        // max < start
+        // |--------------------|         |--------------------|
+        // min                  max       start                end
+        //
+        // or min >= end
+        // |--------------------|         |--------------------|
+        // start                end       min                  max
+        //
+        // The time ranges intersect iff !(max < start || min >= end)
+        max >= start && min < end
+    }
+
+    fn time_range(&self) -> (i64, i64) {
+        assert!(self.doc_time_min <= self.doc_time_max);
+        let file_push_interval = Duration::seconds(CONFIG.limit.file_push_interval as _)
+            .num_microseconds()
+            .unwrap();
+        (self.doc_time_min, self.doc_time_max + file_push_interval)
+    }
+}
+
+impl From<&str> for StreamStats {
+    fn from(data: &str) -> Self {
+        json::from_str::<StreamStats>(data).unwrap()
+    }
+}
+
+impl From<StreamStats> for Vec<u8> {
+    fn from(value: StreamStats) -> Vec<u8> {
+        json::to_vec(&value).unwrap()
+    }
+}
+
+impl From<StreamStats> for String {
+    fn from(data: StreamStats) -> Self {
+        json::to_string(&data).unwrap()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,40 +136,15 @@ impl Serialize for StreamSettings {
     }
 }
 
-impl Default for StreamStats {
-    fn default() -> Self {
-        Self {
-            doc_time_min: 0,
-            doc_time_max: 0,
-            doc_num: 0,
-            file_num: 0,
-            storage_size: 0.0,
-            compressed_size: 0.0,
-        }
-    }
-}
-
-impl From<&str> for StreamStats {
-    fn from(data: &str) -> Self {
-        json::from_str::<StreamStats>(data).unwrap()
-    }
-}
-
-impl From<StreamStats> for Vec<u8> {
-    fn from(value: StreamStats) -> Vec<u8> {
-        json::to_vec(&value).unwrap()
-    }
-}
-
-impl From<StreamStats> for String {
-    fn from(data: StreamStats) -> Self {
-        json::to_string(&data).unwrap()
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStream {
     pub list: Vec<Stream>,
+}
+
+pub struct StreamParams<'a> {
+    pub org_id: &'a str,
+    pub stream_name: &'a str,
+    pub stream_type: StreamType,
 }
 
 #[cfg(test)]

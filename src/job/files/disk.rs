@@ -151,7 +151,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             loop {
-                                let searching = config::SEARCHING_IN_CACHE.load(Ordering::Relaxed);
+                                let searching = config::SEARCHING_IN_WAL.load(Ordering::Relaxed);
                                 if searching == 0 {
                                     break;
                                 } else {
@@ -260,10 +260,6 @@ async fn upload_file(
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
     let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
-
-    if CONFIG.common.sentry_enabled {
-        log::info!("Schema for {stream_name} is {}", arrow_schema.clone());
-    }
 
     if records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();

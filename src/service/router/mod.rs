@@ -21,7 +21,17 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 3] = ["/_search", "/_around", "/_values"];
+const QUERIER_ROUTES: [&str; 9] = [
+    "/_search",
+    "/_around",
+    "/_values",
+    "/prometheus/api/v1/series",
+    "/prometheus/api/v1/query_range",
+    "/prometheus/api/v1/query",
+    "/prometheus/api/v1/metadata",
+    "/prometheus/api/v1/labels",
+    "/prometheus/api/v1/label/",
+];
 
 #[inline]
 pub fn is_router() -> bool {
@@ -79,15 +89,20 @@ async fn dispatch(
         return Ok(HttpResponse::ServiceUnavailable().body("No online nodes"));
     }
 
-    // random nodes
+    // checking nodes
     let mut nodes = nodes.unwrap();
+    if nodes.is_empty() {
+        log::error!("Not found online nodes, restaring...");
+        std::process::exit(1);
+    }
+
+    // random nodes
     let mut rng = thread_rng();
     nodes.shuffle(&mut rng);
 
+    // send query
     let node = nodes.first().unwrap();
     let new_url = format!("{}{}", node.http_addr, path);
-
-    // send query
     let resp = client
         .request_from(new_url.clone(), req.head())
         .send_stream(payload)
