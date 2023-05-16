@@ -11,7 +11,8 @@
 -->
 
 <template>
-  <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
+  <q-page data-test="alerts-page"
+class="q-pa-none" style="min-height: inherit">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -80,51 +81,79 @@
   </q-page>
 </template>
 
-<script lang="ts" setup>
-import { ref, onActivated, onBeforeMount } from "vue";
+<script lang="ts">
+import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
-const store = useStore();
-const { t } = useI18n();
-const router = useRouter();
-const activeTab: any = ref("destinations");
-const templates = ref([]);
-const destinations = ref([]);
-const splitterModel = ref(220);
-onActivated(() => {
-  redirectRoute();
-});
-onBeforeMount(() => {
-  redirectRoute();
-});
-const redirectRoute = () => {
-  if (router.currentRoute.value.name === "alerts") {
-    router.push({
-      name: "alertList",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
+
+export default defineComponent({
+  name: "AppAlerts",
+  setup() {
+    const store = useStore();
+    const { t } = useI18n();
+    const router = useRouter();
+    const activeTab: any = ref("destinations");
+    const templates = ref([]);
+    const destinations = ref([]);
+    const splitterModel = ref(220);
+
+    onActivated(() => {
+      redirectRoute();
     });
-  }
-};
-const getTemplates = () => {
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => (templates.value = res.data));
-};
-const getDestinations = () => {
-  destinationService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => (destinations.value = res.data));
-};
+
+    onBeforeMount(() => {
+      redirectRoute();
+    });
+
+    const redirectRoute = () => {
+      if (
+        router.currentRoute.value.name === "alerts" &&
+        store.state.selectedOrganization.status == "active"
+      ) {
+        router.push({
+          name: "alertList",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
+    };
+    const getTemplates = () => {
+      if (store.state.selectedOrganization.status == "active") {
+        templateService
+          .list({
+            org_identifier: store.state.selectedOrganization.identifier,
+          })
+          .then((res) => (templates.value = res.data));
+      }
+    };
+    const getDestinations = () => {
+      if (store.state.selectedOrganization.status == "active") {
+        destinationService
+          .list({
+            org_identifier: store.state.selectedOrganization.identifier,
+          })
+          .then((res) => (destinations.value = res.data));
+      }
+    };
+
+    return {
+      activeTab,
+      templates,
+      destinations,
+      splitterModel,
+      getTemplates,
+      getDestinations,
+      redirectRoute,
+      t,
+      store,
+    };
+  },
+});
 </script>
 
 <style scoped lang="scss">

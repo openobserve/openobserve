@@ -65,51 +65,51 @@
   </q-page>
 </template>
 
-<script lang="ts" setup>
-import { ref, onActivated, onBeforeMount } from "vue";
+<script lang="ts">
+import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
-const store = useStore();
-const { t } = useI18n();
-const router = useRouter();
-const activeTab: any = ref("functionAssociatedStreams");
-const templates = ref([]);
-const functionAssociatedStreams = ref([]);
-const splitterModel = ref(220);
-onActivated(() => {
-  redirectRoute();
-});
-onBeforeMount(() => {
-  redirectRoute();
-});
-const redirectRoute = () => {
-  if (router.currentRoute.value.name === "functions") {
-    router.push({
-      name: "functionList",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
+
+export default defineComponent({
+  name: "AppFunctions",
+  setup() {
+    const store = useStore();
+    const { t } = useI18n();
+    const router = useRouter();
+    const activeTab: any = ref("functionAssociatedStreams");
+    const templates = ref([]);
+    const functionAssociatedStreams = ref([]);
+    const splitterModel = ref(220);
+    onActivated(() => {
+      redirectRoute();
     });
-  }
-};
-const getTemplates = () => {
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => (templates.value = res.data));
-};
-const getDestinations = () => {
-  destinationService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => (functionAssociatedStreams.value = res.data));
-};
+    onBeforeMount(() => {
+      redirectRoute();
+    });
+    const redirectRoute = () => {
+      if (router.currentRoute.value.name === "functions") {
+        router.push({
+          name: "functionList",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
+    };
+
+    return {
+      t,
+      store,
+      router,
+      redirectRoute,
+      splitterModel,
+      functionAssociatedStreams,
+      activeTab,
+      templates,
+    };
+  },
+});
 </script>
 
 <style scoped lang="scss">

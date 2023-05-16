@@ -17,24 +17,53 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table data-test="log-stream-table" ref="qTable" v-model:selected="selected" :rows="logStream" :columns="columns"
-      row-key="id" :pagination="pagination" :filter="filterQuery" :filter-method="filterData" style="width: 100%">
+    <q-table
+      data-test="log-stream-table"
+      ref="qTable"
+      v-model:selected="selected"
+      :rows="logStream"
+      :columns="columns"
+      row-key="id"
+      :pagination="pagination"
+      :filter="filterQuery"
+      :filter-method="filterData"
+      style="width: 100%"
+    >
       <template #no-data>
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn :icon="'img:' + getImageURL('images/common/delete_icon.svg')" :title="t('logStream.delete')"
-            class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
-            @click="confirmDeleteAction(props)" />
-          <q-btn :icon="'img:' + getImageURL('images/common/list_icon.svg')" :title="t('logStream.schemaHeader')"
-            class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat @click="listSchema(props)" />
+          <q-btn
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            :title="t('logStream.delete')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
+          />
+          <q-btn
+            :icon="'img:' + getImageURL('images/common/list_icon.svg')"
+            :title="t('logStream.schemaHeader')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="listSchema(props)"
+          />
         </q-td>
       </template>
 
@@ -42,26 +71,57 @@
         <div class="q-table__title" data-test="log-stream-title-text">
           {{ t("logStream.header") }}
         </div>
-        <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('logStream.search')">
+        <q-input
+          v-model="filterQuery"
+          borderless
+          filled
+          dense
+          class="q-ml-auto q-mb-xs no-border"
+          :placeholder="t('logStream.search')"
+        >
           <template #prepend>
             <q-icon name="search" />
           </template>
         </q-input>
-        <q-btn data-test="log-stream-refresh-stats-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
-          color="secondary" no-caps icon="refresh" :label="t(`logStream.refreshStats`)" @click="getLogStream" />
+        <q-btn
+          data-test="log-stream-refresh-stats-btn"
+          class="q-ml-md q-mb-xs text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          icon="refresh"
+          :label="t(`logStream.refreshStats`)"
+          @click="getLogStream"
+        />
 
-        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :pageTitle="t('logStream.header')"
-          :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="top"
-          @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          data-test="log-stream-table-pagination"
+          :scope="scope"
+          :pageTitle="t('logStream.header')"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions" position="bottom" @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          data-test="log-stream-table-pagination"
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="bottom"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
     </q-table>
-    <q-dialog v-model="showIndexSchemaDialog" position="right" full-height maximized>
+    <q-dialog
+      v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
+    >
       <SchemaIndex v-model="schemaData" />
     </q-dialog>
 
@@ -73,10 +133,18 @@
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
-          <q-btn v-close-popup unelevated no-caps class="no-border" color="primary" @click="deleteStream">
+          <q-btn
+            v-close-popup
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="deleteStream"
+          >
             {{ t("logStream.ok") }}
           </q-btn>
         </q-card-actions>
@@ -280,7 +348,11 @@ export default defineComponent({
 
     const deleteStream = () => {
       streamService
-        .delete(store.state.selectedOrganization.identifier, deleteStreamName, deleteStreamType)
+        .delete(
+          store.state.selectedOrganization.identifier,
+          deleteStreamName,
+          deleteStreamType
+        )
         .then((res: any) => {
           if (res.data.code == 200) {
             $q.notify({
