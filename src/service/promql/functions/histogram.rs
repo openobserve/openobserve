@@ -86,10 +86,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         .into_values()
         .map(|mb| InstantValue {
             labels: mb.labels,
-            sample: Sample {
-                timestamp: sample_time,
-                value: bucket_quantile(phi, mb.buckets),
-            },
+            sample: Sample::new(sample_time, bucket_quantile(phi, mb.buckets)),
         })
         .collect();
 

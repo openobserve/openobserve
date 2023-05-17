@@ -118,17 +118,12 @@ pub(crate) fn eval_idelta(
     for metric in data.iter() {
         let mut labels = metric.labels.clone();
         labels.retain(|l| l.name != NAME_LABEL);
-        let value = fn_handler(metric);
-        if value.is_none() {
-            continue;
+        if let Some(value) = fn_handler(metric) {
+            rate_values.push(InstantValue {
+                labels,
+                sample: Sample::new(metric.time_range.unwrap().1, value),
+            });
         }
-        rate_values.push(InstantValue {
-            labels,
-            sample: Sample {
-                timestamp: metric.time_range.unwrap().1,
-                value: value.unwrap(),
-            },
-        });
     }
     Ok(Value::Vector(rate_values))
 }

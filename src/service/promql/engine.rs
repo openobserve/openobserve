@@ -88,11 +88,8 @@ impl QueryEngine {
         if self.start == self.end {
             // Instant query
             let mut value = self.exec_expr(&stmt.expr).await?;
-            if let Value::Float(v) = value {
-                value = Value::Sample(Sample {
-                    timestamp: self.end,
-                    value: v,
-                });
+            if let Value::Float(val) = value {
+                value = Value::Sample(Sample::new(self.end, val));
             }
             value.sort();
             return Ok(value);
@@ -125,10 +122,10 @@ impl QueryEngine {
                 Value::Float(v) => instant_vectors.push(RangeValue {
                     labels: Labels::default(),
                     time_range: None,
-                    samples: vec![Sample {
-                        timestamp: self.start + (self.interval * self.time_window_idx),
-                        value: v,
-                    }],
+                    samples: vec![Sample::new(
+                        self.start + (self.interval * self.time_window_idx),
+                        v,
+                    )],
                 }),
                 Value::None => continue,
             };
@@ -272,10 +269,7 @@ impl QueryEngine {
                     // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
                     InstantValue {
                         labels: metric.labels.clone(),
-                        sample: Sample {
-                            timestamp: end,
-                            value: last_value,
-                        },
+                        sample: Sample::new(end, last_value),
                     },
                 );
             }
@@ -436,10 +430,9 @@ impl QueryEngine {
                         samples: Vec::with_capacity(20),
                     }
                 });
-                entry.samples.push(Sample {
-                    timestamp: time_values.value(i),
-                    value: value_values.value(i),
-                });
+                entry
+                    .samples
+                    .push(Sample::new(time_values.value(i), value_values.value(i)));
             }
         }
 

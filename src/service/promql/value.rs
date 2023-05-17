@@ -49,6 +49,12 @@ impl Serialize for Sample {
     }
 }
 
+impl Sample {
+    pub(crate) fn new(timestamp: i64, value: f64) -> Self {
+        Self { timestamp, value }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InstantValue {
     pub labels: Labels,
@@ -136,10 +142,7 @@ fn extrapolated_sample(p1: &Sample, p2: &Sample, t: i64) -> Sample {
     let dv = p2.value - p1.value;
     let dt2 = t - p1.timestamp;
     let dv2 = dv * dt2 as f64 / dt as f64;
-    Sample {
-        timestamp: t,
-        value: p1.value + dv2,
-    }
+    Sample::new(t, p1.value + dv2)
 }
 
 pub fn labels_value(labels: &Labels, name: &str) -> Option<String> {
@@ -274,38 +277,20 @@ mod tests {
 
     #[test]
     fn test_extrapolated_sample() {
-        let p1 = Sample {
-            timestamp: 100,
-            value: 10.0,
-        };
-        let p2 = Sample {
-            timestamp: 200,
-            value: 20.0,
-        };
+        let p1 = Sample::new(100, 10.0);
+        let p2 = Sample::new(200, 20.0);
         let p3 = extrapolated_sample(&p1, &p2, 300);
         assert_eq!(p3.timestamp, 300);
         assert_eq!(p3.value, 30.0);
 
-        let p1 = Sample {
-            timestamp: 225,
-            value: 1.0,
-        };
-        let p2 = Sample {
-            timestamp: 675,
-            value: 2.0,
-        };
+        let p1 = Sample::new(225, 1.0);
+        let p2 = Sample::new(675, 2.0);
         let p3 = extrapolated_sample(&p1, &p2, 750);
         let p4 = extrapolated_sample(&p1, &p2, 150);
         assert_eq!(format!("{:.2}", p3.value - p4.value), "1.33");
 
-        let p1 = Sample {
-            timestamp: 375,
-            value: 1.0,
-        };
-        let p2 = Sample {
-            timestamp: 675,
-            value: 2.0,
-        };
+        let p1 = Sample::new(375, 1.0);
+        let p2 = Sample::new(675, 2.0);
         let p3 = extrapolated_sample(&p1, &p2, 750);
         let p4 = extrapolated_sample(&p1, &p2, 300);
         assert_eq!(format!("{:.2}", p3.value - p4.value), "1.50");

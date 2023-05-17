@@ -25,13 +25,10 @@ pub fn count(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Res
     let values = score_values
         .unwrap()
         .values()
-        .map(|v| InstantValue {
-            labels: v.labels.clone(),
-            sample: Sample {
-                timestamp,
-                value: v.num as f64,
-            },
+        .map(|it| InstantValue {
+            labels: it.labels.clone(),
+            sample: Sample::new(timestamp, it.num as _),
         })
-        .collect::<Vec<_>>();
+        .collect();
     Ok(Value::Vector(values))
 }

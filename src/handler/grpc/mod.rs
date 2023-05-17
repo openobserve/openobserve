@@ -144,12 +144,10 @@ impl From<&promql::value::Label> for cluster_rpc::Label {
 
 impl From<&cluster_rpc::Sample> for promql::value::Sample {
     fn from(req: &cluster_rpc::Sample) -> Self {
-        promql::value::Sample {
-            timestamp: req.time,
-            value: req.value,
-        }
+        promql::value::Sample::new(req.time, req.value)
     }
 }
+
 impl From<&promql::value::Sample> for cluster_rpc::Sample {
     fn from(req: &promql::value::Sample) -> Self {
         cluster_rpc::Sample {
