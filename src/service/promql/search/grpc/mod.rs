@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::future::try_join_all;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
@@ -67,21 +68,21 @@ pub async fn search(
         .instrument(span2),
     );
 
-    // merge search result
-    for task in vec![task1, task2].into_iter() {
-        let value = match task.await {
-            Ok(result) => result.map_err(|err| {
-                log::error!("datafusion execute error: {}", err);
-                search::grpc::handle_datafusion_error(err)
-            })?,
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )))
+    // Perform search operations (in storage and WAL) and collect results
+    let values = try_join_all(vec![task1, task2])
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for value in values {
+        match value {
+            Ok(value) => {
+                if !matches!(value, value::Value::None) {
+                    results.push(value);
+                }
             }
-        };
-        if !matches!(value, value::Value::None) {
-            results.push(value);
+            Err(err) => {
+                log::error!("datafusion execute error: {}", err);
+                return Err(search::grpc::handle_datafusion_error(err));
+            }
         }
     }
 
