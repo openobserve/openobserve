@@ -30,10 +30,13 @@ use rustc_hash::FxHashMap;
 use std::{
     str::FromStr,
     sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 
-use super::{aggregations, binaries, functions, value::*, TableProvider};
+use super::{
+    aggregations, binaries, functions, micros, micros_since_epoch, value::*, TableProvider,
+    DEFAULT_LOOKBACK,
+};
 use crate::infra::config::CONFIG;
 use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
 
@@ -62,7 +65,7 @@ impl QueryEngine {
         P: TableProvider,
     {
         let now = micros_since_epoch(SystemTime::now());
-        let five_min = micros(Duration::from_secs(300));
+        let five_min = micros(DEFAULT_LOOKBACK);
         Self {
             org_id: org_id.to_string(),
             table_provider: Box::new(provider),
@@ -797,18 +800,4 @@ impl QueryEngine {
             }
         })
     }
-}
-
-/// Converts `t` to the number of microseconds elapsed since the beginning of the Unix epoch.
-fn micros_since_epoch(t: SystemTime) -> i64 {
-    micros(
-        t.duration_since(UNIX_EPOCH)
-            .expect("BUG: {t} is earlier than Unix epoch"),
-    )
-}
-
-fn micros(t: Duration) -> i64 {
-    t.as_micros()
-        .try_into()
-        .expect("BUG: time value is too large to fit in i64")
 }

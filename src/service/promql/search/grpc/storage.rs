@@ -29,7 +29,7 @@ use crate::meta::prom::Metadata;
 use crate::meta::search::Session as SearchSession;
 use crate::meta::{stream::StreamParams, StreamType};
 use crate::service::metrics::get_prom_metadata_from_schema;
-use crate::service::promql::{value, TableProvider};
+use crate::service::promql::{value, TableProvider, DEFAULT_LOOKBACK};
 use crate::service::search::datafusion::{exec::register_table, storage::file_list::SessionType};
 use crate::service::search::match_source;
 use crate::service::{db, file_list, promql, search};
@@ -149,7 +149,7 @@ pub async fn search(
             .checked_add(Duration::from_micros(query.end as _))
             .unwrap(),
         interval: Duration::from_micros(query.step as _),
-        lookback_delta: Duration::from_secs(300), // 5m
+        lookback_delta: DEFAULT_LOOKBACK,
     };
 
     let mut engine = promql::QueryEngine::new(

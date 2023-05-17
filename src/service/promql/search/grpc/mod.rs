@@ -69,10 +69,10 @@ pub async fn search(
     );
 
     // Perform search operations (in storage and WAL) and collect results
-    let values = try_join_all(vec![task1, task2])
+    let task_results = try_join_all(vec![task1, task2])
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-    for value in values {
+    for value in task_results {
         match value {
             Ok(value) => {
                 if !matches!(value, value::Value::None) {
