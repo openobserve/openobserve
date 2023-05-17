@@ -51,11 +51,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
     };
 
     let mut metrics_with_buckets: FxHashMap<Signature, MetricWithBuckets> = FxHashMap::default();
-    for InstantValue {
-        mut labels,
-        value: sample,
-    } in in_vec
-    {
+    for InstantValue { mut labels, sample } in in_vec {
         // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
         //
         // The conventional float samples in `in_vec` are considered the counts
@@ -90,7 +86,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         .into_values()
         .map(|mb| InstantValue {
             labels: mb.labels,
-            value: Sample {
+            sample: Sample {
                 timestamp: sample_time,
                 value: bucket_quantile(phi, mb.buckets),
             },

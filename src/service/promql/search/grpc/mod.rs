@@ -105,26 +105,26 @@ pub async fn search(
             }
             value::Value::Instant(v) => {
                 resp.result.push(cluster_rpc::Series {
-                    metric: v.labels.iter().map(|l| l.as_ref().into()).collect(),
-                    values: vec![],
-                    value: Some((&v.value).into()),
+                    metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                    samples: vec![],
+                    sample: Some((&v.sample).into()),
                     scalar: None,
                 });
             }
             value::Value::Range(v) => {
                 resp.result.push(cluster_rpc::Series {
-                    metric: v.labels.iter().map(|l| l.as_ref().into()).collect(),
-                    values: v.values.iter().map(|l| l.into()).collect(),
-                    value: None,
+                    metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                    samples: v.samples.iter().map(|x| x.into()).collect(),
+                    sample: None,
                     scalar: None,
                 });
             }
             value::Value::Vector(v) => {
                 v.iter().for_each(|v| {
                     resp.result.push(cluster_rpc::Series {
-                        metric: v.labels.iter().map(|l| l.as_ref().into()).collect(),
-                        values: vec![],
-                        value: Some((&v.value).into()),
+                        metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                        samples: vec![],
+                        sample: Some((&v.sample).into()),
                         scalar: None,
                     });
                 });
@@ -132,9 +132,9 @@ pub async fn search(
             value::Value::Matrix(v) => {
                 v.iter().for_each(|v| {
                     resp.result.push(cluster_rpc::Series {
-                        metric: v.labels.iter().map(|l| l.as_ref().into()).collect(),
-                        values: v.values.iter().map(|l| l.into()).collect(),
-                        value: None,
+                        metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                        samples: v.samples.iter().map(|x| x.into()).collect(),
+                        sample: None,
                         scalar: None,
                     });
                 });
@@ -142,16 +142,16 @@ pub async fn search(
             value::Value::Sample(v) => {
                 resp.result.push(cluster_rpc::Series {
                     metric: vec![],
-                    values: vec![],
-                    value: Some(v.into()),
+                    samples: vec![],
+                    sample: Some(v.into()),
                     scalar: None,
                 });
             }
             value::Value::Float(v) => {
                 resp.result.push(cluster_rpc::Series {
                     metric: vec![],
-                    values: vec![],
-                    value: None,
+                    samples: vec![],
+                    sample: None,
                     scalar: Some(*v),
                 });
             }

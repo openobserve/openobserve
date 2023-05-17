@@ -21,12 +21,12 @@ pub(crate) fn idelta(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.values.is_empty() {
+    if data.samples.is_empty() {
         return None;
-    } else if data.values.len() == 1 {
+    } else if data.samples.len() == 1 {
         return Some(0.0);
     }
-    let (last, data) = data.values.split_last().unwrap();
+    let (last, data) = data.samples.split_last().unwrap();
     let previous = data.last().unwrap();
     Some(last.value - previous.value)
 }

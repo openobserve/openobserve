@@ -52,7 +52,7 @@ impl Serialize for Sample {
 #[derive(Debug, Clone)]
 pub struct InstantValue {
     pub labels: Labels,
-    pub value: Sample,
+    pub sample: Sample,
 }
 
 impl Serialize for InstantValue {
@@ -67,7 +67,7 @@ impl Serialize for InstantValue {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("metric", &labels_map)?;
-        seq.serialize_field("value", &self.value)?;
+        seq.serialize_field("value", &self.sample)?;
         seq.end()
     }
 }
@@ -76,7 +76,7 @@ impl Serialize for InstantValue {
 pub struct RangeValue {
     pub labels: Labels,
     pub time_range: Option<(i64, i64)>, // start, end
-    pub values: Vec<Sample>,
+    pub samples: Vec<Sample>,
 }
 
 impl Serialize for RangeValue {
@@ -91,7 +91,7 @@ impl Serialize for RangeValue {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("metric", &labels_map)?;
-        seq.serialize_field("values", &self.values)?;
+        seq.serialize_field("values", &self.samples)?;
         seq.end()
     }
 }
@@ -102,7 +102,7 @@ impl RangeValue {
     ///
     /// [extrapolated]: https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data
     pub(crate) fn extrapolate(&self) -> Option<(Sample, Sample)> {
-        let samples = &self.values;
+        let samples = &self.samples;
         if samples.len() < 2 {
             return None;
         }
@@ -185,16 +185,16 @@ impl Value {
         match self {
             Value::Vector(v) => {
                 v.sort_by(|a, b| {
-                    b.value
+                    b.sample
                         .value
-                        .partial_cmp(&a.value.value)
+                        .partial_cmp(&a.sample.value)
                         .unwrap_or(Ordering::Equal)
                 });
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
-                    let a = a.values.iter().map(|x| x.value).sum::<f64>();
-                    let b = b.values.iter().map(|x| x.value).sum::<f64>();
+                    let a = a.samples.iter().map(|x| x.value).sum::<f64>();
+                    let b = b.samples.iter().map(|x| x.value).sum::<f64>();
                     b.partial_cmp(&a).unwrap_or(Ordering::Equal)
                 });
             }
