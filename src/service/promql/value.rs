@@ -16,7 +16,7 @@ use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,
 };
-use std::{cmp::Ordering, sync::Arc};
+use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 type FxIndexMap<K, V> =
@@ -79,10 +79,33 @@ impl Serialize for InstantValue {
 }
 
 #[derive(Debug, Clone)]
+pub struct TimeWindow {
+    /// Evaluation timestamp, microseconds.
+    pub eval_ts: i64,
+    pub range: Duration,
+    /// The offset used during the query execution.
+    /// We don't use it in ZincObserve (yet), so its value is always zero.
+    //
+    // See https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/parser/ast.go#L192-L198
+    pub offset: Duration,
+}
+
+impl TimeWindow {
+    pub fn new(eval_ts: i64, range: Duration) -> Self {
+        assert!(eval_ts > 0);
+        Self {
+            eval_ts,
+            range,
+            offset: Duration::ZERO,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct RangeValue {
     pub labels: Labels,
-    pub time_range: Option<(i64, i64)>, // start, end
     pub samples: Vec<Sample>,
+    pub time_window: Option<TimeWindow>,
 }
 
 impl Serialize for RangeValue {
@@ -103,46 +126,155 @@ impl Serialize for RangeValue {
 }
 
 impl RangeValue {
-    /// Returns first and last data points, [extrapolated] to the time window
-    /// boundaries.
-    ///
-    /// [extrapolated]: https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data
-    pub(crate) fn extrapolate(&self) -> Option<(Sample, Sample)> {
-        let samples = &self.samples;
-        if samples.len() < 2 {
-            return None;
+    pub(crate) fn new<S>(labels: Labels, samples: S) -> Self
+    where
+        S: IntoIterator<Item = Sample>,
+    {
+        Self {
+            labels,
+            samples: Vec::from_iter(samples),
+            time_window: None,
         }
-        let first = samples.first().unwrap();
-        let last = samples.last().unwrap();
-
-        let (t_start, t_end) = self.time_range.unwrap();
-        assert!(t_start < t_end);
-        assert!(t_start <= first.timestamp);
-        assert!(first.timestamp <= last.timestamp);
-        assert!(last.timestamp <= t_end);
-
-        Some((
-            if first.timestamp == t_start {
-                *first
-            } else {
-                extrapolated_sample(first, last, t_start)
-            },
-            if last.timestamp == t_end {
-                *last
-            } else {
-                extrapolated_sample(first, last, t_end)
-            },
-        ))
     }
 }
 
-// https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data
-fn extrapolated_sample(p1: &Sample, p2: &Sample, t: i64) -> Sample {
-    let dt = p2.timestamp - p1.timestamp;
-    let dv = p2.value - p1.value;
-    let dt2 = t - p1.timestamp;
-    let dv2 = dv * dt2 as f64 / dt as f64;
-    Sample::new(t, p1.value + dv2)
+#[derive(Debug)]
+pub(crate) enum ExtrapolationKind {
+    /// Calculate the per-second average rate of increase of the time series.
+    /// Adjust for breaks in monotonicity (counter resets).
+    /// Should only be used with counters.
+    ///
+    /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#rate>
+    Rate,
+
+    /// Calculate the increase in the time series. Adjust for counter resets.
+    /// Should only be used with counters.
+    ///
+    /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#increase>
+    Increase,
+
+    /// Calculate the difference between the first and last value. Don't adjust for counter resets. Should only be used with gauges.
+    ///
+    /// See <https://prometheus.io/docs/prometheus/latest/querying/functions/#delta>
+    Delta,
+}
+
+/// `extrapolated_rate` is a utility function for rate/increase/delta.
+///
+/// Calculates the rate (allowing for counter resets if `kind` is Rate or
+/// Increase), extrapolates if the first/last sample is close to the boundary,
+/// and returns the result as either per-second (if `kind` is Rate) or overall.
+///
+/// Returns `None` if there are fewer than two samples.
+///
+/// See the diagrams at <https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data>
+///
+/// # Panics
+///
+/// Panics if the samples are not in the range.
+//
+// cf. https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/functions.go#L67
+pub(crate) fn extrapolated_rate(
+    samples: &[Sample],
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+) -> Option<f64> {
+    let start = {
+        let range_plus_offset = range
+            .checked_add(offset)
+            .expect("BUG: overflow")
+            .as_micros()
+            .try_into()
+            .expect("BUG: integer conversion failed");
+        eval_ts
+            .checked_sub(range_plus_offset)
+            .expect("BUG: overflow")
+    };
+    assert!(start > 0);
+    let end = eval_ts
+        .checked_sub(
+            offset
+                .as_micros()
+                .try_into()
+                .expect("BUG: integer conversion failed"),
+        )
+        .expect("BUG: overflow");
+    assert!(end > 0);
+    assert!(start <= end);
+
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+
+    // The caller must ensure that the samples are in the range.
+    assert!(first.timestamp <= last.timestamp);
+    assert!(first.timestamp >= start);
+    assert!(last.timestamp <= end);
+
+    let mut result = last.value - first.value;
+
+    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
+    if is_counter {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                result += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
+
+    // Duration between first/last samples and boundary of range.
+    let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
+    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+
+    let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
+    let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
+
+    if is_counter && result > 0.0 && first.value >= 0.0 {
+        // Counters cannot be negative. If we have any slope at all
+        // (i.e. `result` went up), we can extrapolate the zero point
+        // of the counter. If the duration to the zero point is shorter
+        // than the `duration_to_start`, we take the zero point as the start
+        // of the series, thereby avoiding extrapolation to negative
+        // counter values.
+        let duration_to_zero = sampled_interval * (first.value / result);
+        if duration_to_zero < duration_to_start {
+            duration_to_start = duration_to_zero;
+        }
+    }
+
+    // If the first/last samples are close to the boundaries of the range,
+    // extrapolate the result. This is as we expect that another sample
+    // will exist given the spacing between samples we've seen thus far,
+    // with an allowance for noise.
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    let mut extrapolate_to_interval = sampled_interval;
+
+    if duration_to_start < extrapolation_threshold {
+        extrapolate_to_interval += duration_to_start;
+    } else {
+        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    }
+    if duration_to_end < extrapolation_threshold {
+        extrapolate_to_interval += duration_to_end;
+    } else {
+        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    }
+    let factor = extrapolate_to_interval / sampled_interval;
+    if matches!(kind, ExtrapolationKind::Rate) {
+        result *= factor / range.as_secs_f64();
+    } else {
+        result *= factor;
+    }
+
+    Some(result)
 }
 
 pub fn labels_value(labels: &Labels, name: &str) -> Option<String> {
@@ -238,6 +370,7 @@ pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Sign
 mod tests {
     use super::*;
     use expect_test::expect;
+    use float_cmp::approx_eq;
 
     #[test]
     fn test_signature_without_labels() {
@@ -276,23 +409,68 @@ mod tests {
     }
 
     #[test]
-    fn test_extrapolated_sample() {
-        let p1 = Sample::new(100, 10.0);
-        let p2 = Sample::new(200, 20.0);
-        let p3 = extrapolated_sample(&p1, &p2, 300);
-        assert_eq!(p3.timestamp, 300);
-        assert_eq!(p3.value, 30.0);
+    fn test_extrapolated_rate() {
+        fn extrapolate(samples: &[Sample], kind: ExtrapolationKind) -> f64 {
+            extrapolated_rate(
+                samples,
+                75_000_000,
+                Duration::from_secs(60),
+                Duration::ZERO,
+                kind,
+            )
+            .unwrap()
+        }
 
-        let p1 = Sample::new(225, 1.0);
-        let p2 = Sample::new(675, 2.0);
-        let p3 = extrapolated_sample(&p1, &p2, 750);
-        let p4 = extrapolated_sample(&p1, &p2, 150);
-        assert_eq!(format!("{:.2}", p3.value - p4.value), "1.33");
+        // See the diagrams at
+        // https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data
 
-        let p1 = Sample::new(375, 1.0);
-        let p2 = Sample::new(675, 2.0);
-        let p3 = extrapolated_sample(&p1, &p2, 750);
-        let p4 = extrapolated_sample(&p1, &p2, 300);
-        assert_eq!(format!("{:.2}", p3.value - p4.value), "1.50");
+        // Diagram 1
+        let samples = [
+            Sample::new(23_000_000, 1.0),
+            Sample::new(38_000_000, 1.0),
+            Sample::new(53_000_000, 2.0),
+            Sample::new(68_000_000, 2.0),
+        ];
+
+        let rate = extrapolate(&samples, ExtrapolationKind::Rate);
+        assert!(approx_eq!(f64, rate, 0.0222, epsilon = 0.0001));
+
+        let increase = extrapolate(&samples, ExtrapolationKind::Increase);
+        assert!(approx_eq!(f64, increase, 1.3333, epsilon = 0.0001));
+        assert!(approx_eq!(f64, increase, rate * 60.0));
+
+        let delta = extrapolate(&samples, ExtrapolationKind::Delta);
+        assert_eq!(delta, increase);
+
+        // Diagram 2: the first value is too far from the boundary to extrapolate fully
+        let samples_2 = &samples[1..];
+
+        let rate = extrapolate(samples_2, ExtrapolationKind::Rate);
+        assert!(approx_eq!(f64, rate, 0.0247, epsilon = 0.0001));
+
+        let increase = extrapolate(samples_2, ExtrapolationKind::Increase);
+        assert!(approx_eq!(f64, increase, 1.4833, epsilon = 0.0001));
+        assert!(approx_eq!(f64, increase, rate * 60.0));
+
+        let delta = extrapolate(samples_2, ExtrapolationKind::Delta);
+        assert_eq!(delta, increase);
+
+        // Diagram 3: dealing with counter resets
+        let samples = [
+            Sample::new(23_000_000, 6.0),
+            Sample::new(38_000_000, 10.0),
+            Sample::new(53_000_000, 4.0),
+            Sample::new(68_000_000, 9.0),
+        ];
+
+        let rate = extrapolate(&samples, ExtrapolationKind::Rate);
+        assert!(approx_eq!(f64, rate, 0.2888, epsilon = 0.0001));
+
+        let increase = extrapolate(&samples, ExtrapolationKind::Increase);
+        assert!(approx_eq!(f64, increase, 17.3333, epsilon = 0.0001));
+        assert!(approx_eq!(f64, increase, rate * 60.0));
+
+        let delta = extrapolate(&samples, ExtrapolationKind::Delta);
+        assert!(approx_eq!(f64, dbg!(delta), 4.0));
     }
 }
