@@ -18,11 +18,11 @@ use promql_parser::parser;
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cache::tmpfs;
-use crate::infra::errors::Result;
-use crate::meta::prom::Metadata;
-use crate::service::promql::{value, QueryEngine, TableProvider, DEFAULT_LOOKBACK};
-use crate::service::search;
+use crate::infra::{cache::tmpfs, errors::Result};
+use crate::service::{
+    promql::{value, QueryEngine, TableProvider, DEFAULT_LOOKBACK},
+    search,
+};
 
 mod storage;
 mod wal;
@@ -40,17 +40,19 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> datafusion::error::Result<Vec<(SessionContext, Option<Metadata>)>> {
+    ) -> datafusion::error::Result<Vec<SessionContext>> {
         let mut resp = Vec::new();
-        let (ctx, metadata) =
+        // register storage table
+        let ctx =
             storage::create_context(&self.session_id, org_id, stream_name, time_range, filters)
                 .await?;
-        resp.push((ctx, metadata));
+        resp.push(ctx);
+        // register Wal table
         if self.need_wal {
-            let (ctx, metadata) =
+            let ctx =
                 wal::create_context(&self.session_id, org_id, stream_name, time_range, filters)
                     .await?;
-            resp.push((ctx, metadata));
+            resp.push(ctx);
         }
         Ok(resp)
     }

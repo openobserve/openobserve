@@ -18,8 +18,6 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use utoipa::ToSchema;
 
-use crate::meta::prom::Metadata;
-
 mod aggregations;
 mod binaries;
 mod engine;
@@ -39,7 +37,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<Vec<(SessionContext, Option<Metadata>)>>;
+    ) -> Result<Vec<SessionContext>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

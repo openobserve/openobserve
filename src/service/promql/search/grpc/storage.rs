@@ -21,13 +21,14 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::infra::{cache::file_data, config::CONFIG};
-use crate::meta::prom::Metadata;
-use crate::meta::search::Session as SearchSession;
-use crate::meta::{stream::StreamParams, StreamType};
-use crate::service::metrics::get_prom_metadata_from_schema;
-use crate::service::search::datafusion::{exec::register_table, storage::file_list::SessionType};
-use crate::service::search::match_source;
-use crate::service::{db, file_list};
+use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
+use crate::service::{
+    db, file_list,
+    search::{
+        datafusion::{exec::register_table, storage::file_list::SessionType},
+        match_source,
+    },
+};
 
 pub(crate) async fn create_context(
     session_id: &str,
@@ -35,12 +36,12 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     filters: &[(&str, &str)],
-) -> Result<(SessionContext, Option<Metadata>)> {
+) -> Result<SessionContext> {
     // get file list
     let files = get_file_list(org_id, stream_name, time_range, filters).await?;
     let file_count = files.len();
     if files.is_empty() {
-        return Ok((SessionContext::new(), None));
+        return Ok(SessionContext::new());
     }
 
     // load files to local cache
@@ -90,7 +91,6 @@ pub(crate) async fn create_context(
             ));
         }
     };
-    let metadata = get_prom_metadata_from_schema(&schema);
     let schema = Arc::new(
         schema
             .to_owned()
@@ -114,7 +114,7 @@ pub(crate) async fn create_context(
         FileType::PARQUET,
     )
     .await?;
-    Ok((ctx, metadata))
+    Ok(ctx)
 }
 
 #[inline]

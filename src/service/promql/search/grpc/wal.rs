@@ -29,12 +29,9 @@ use crate::infra::{
     cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     config::CONFIG,
 };
-use crate::meta::{
-    prom::Metadata, search::Session as SearchSession, stream::StreamParams, StreamType,
-};
+use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
 use crate::service::{
     db,
-    metrics::get_prom_metadata_from_schema,
     search::{
         datafusion::{exec::register_table, storage::file_list::SessionType},
         MetadataMap,
@@ -47,11 +44,11 @@ pub(crate) async fn create_context(
     stream_name: &str,
     _time_range: (i64, i64),
     _filters: &[(&str, &str)],
-) -> Result<(SessionContext, Option<Metadata>)> {
+) -> Result<SessionContext> {
     // get file list
     let files = get_file_list(org_id, stream_name).await?;
     if files.is_empty() {
-        return Ok((SessionContext::new(), None));
+        return Ok(SessionContext::new());
     }
 
     let work_dir = session_id.to_string();
@@ -67,7 +64,6 @@ pub(crate) async fn create_context(
             log::error!("get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
-    let metadata = get_prom_metadata_from_schema(&schema);
     let schema = Arc::new(
         schema
             .to_owned()
@@ -91,7 +87,7 @@ pub(crate) async fn create_context(
         FileType::JSON,
     )
     .await?;
-    Ok((ctx, metadata))
+    Ok(ctx)
 }
 
 /// get file list from local cache, no need match_source, each file will be searched

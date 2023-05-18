@@ -25,10 +25,16 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::errors::{Error, ErrorCodes, Result};
-use crate::infra::{cluster, config::CONFIG, db::etcd};
-use crate::service::promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK};
-use crate::service::search::{server_internal_error, MetadataMap};
+use crate::infra::{
+    cluster,
+    config::CONFIG,
+    db::etcd,
+    errors::{Error, ErrorCodes, Result},
+};
+use crate::service::{
+    promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
+    search::{server_internal_error, MetadataMap},
+};
 
 pub mod grpc;
 

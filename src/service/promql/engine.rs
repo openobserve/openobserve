@@ -34,8 +34,11 @@ use std::{
 };
 
 use crate::infra::config::CONFIG;
-use crate::meta::prom::{Metadata, MetricType, HASH_LABEL, VALUE_LABEL};
-use crate::service::promql::{aggregations, binaries, functions, micros, micros_since_epoch, DEFAULT_LOOKBACK, value::*, TableProvider};
+use crate::meta::prom::{HASH_LABEL, VALUE_LABEL};
+use crate::service::promql::{
+    aggregations, binaries, functions, micros, micros_since_epoch, value::*, TableProvider,
+    DEFAULT_LOOKBACK,
+};
 
 pub struct QueryEngine {
     org_id: String,
@@ -341,15 +344,13 @@ impl QueryEngine {
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
 
-        let mut batches = Vec::new();
-        let mut metadata: Option<Metadata> = None;
-
         let regexp_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
         let regexp_not_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
 
-        for (ctx, _) in ctxs {
+        let mut batches = Vec::new();
+        for ctx in ctxs {
             let table = match ctx.table(table_name).await {
                 Ok(v) => v,
                 Err(_) => {
