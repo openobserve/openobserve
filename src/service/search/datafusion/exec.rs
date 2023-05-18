@@ -919,6 +919,8 @@ pub async fn register_table(
             "{}files/{}/{stream_type}/{}/",
             &CONFIG.common.data_wal_dir, org_id, stream_name
         )
+    } else if session.data_type.eq(&file_list::SessionType::Tmpfs) {
+        format!("tmpfs:///{}/", session.id)
     } else {
         file_list::set(&session.id, files).await.unwrap();
         format!("mem:///{}/", session.id)

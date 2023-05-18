@@ -38,7 +38,7 @@ use super::{
     DEFAULT_LOOKBACK,
 };
 use crate::infra::config::CONFIG;
-use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
+use crate::meta::prom::{Metadata, MetricType, HASH_LABEL, VALUE_LABEL};
 
 pub struct QueryEngine {
     org_id: String,
@@ -345,54 +345,68 @@ impl QueryEngine {
             .filter(|mat| mat.op == MatchOp::Equal)
             .map(|mat| (mat.name.as_str(), mat.value.as_str()))
             .collect();
-        let (ctx, metadata) = self
+        let ctxs = self
             .table_provider
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
-        let table = match ctx.table(table_name).await {
-            Ok(v) => v,
-            Err(_) => {
-                self.metrics_cache
-                    .insert(table_name.to_string(), Value::None);
-                return Ok(()); // table not found
-            }
-        };
 
-        let mut df_group = table.clone().filter(
-            col(&CONFIG.common.column_timestamp)
-                .gt(lit(start))
-                .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
-        )?;
+        let mut batches = Vec::new();
+        let mut metadata: Option<Metadata> = None;
+
         let regexp_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
         let regexp_not_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
-        for mat in selector.matchers.matchers.iter() {
-            match &mat.op {
-                MatchOp::Equal => {
-                    df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+
+        for (ctx, meta) in ctxs {
+            if metadata.is_none() && meta.is_some() {
+                metadata = meta;
+            }
+
+            let table = match ctx.table(table_name).await {
+                Ok(v) => v,
+                Err(_) => {
+                    self.metrics_cache
+                        .insert(table_name.to_string(), Value::None);
+                    return Ok(()); // table not found
                 }
-                MatchOp::NotEqual => {
-                    df_group =
-                        df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-                }
-                MatchOp::Re(_re) => {
-                    df_group = df_group.filter(
-                        regexp_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                    )?
-                }
-                MatchOp::NotRe(_re) => {
-                    df_group = df_group.filter(
-                        regexp_not_match_udf
-                            .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                    )?
+            };
+
+            let mut df_group = table.clone().filter(
+                col(&CONFIG.common.column_timestamp)
+                    .gt(lit(start))
+                    .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
+            )?;
+            for mat in selector.matchers.matchers.iter() {
+                match &mat.op {
+                    MatchOp::Equal => {
+                        df_group =
+                            df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+                    }
+                    MatchOp::NotEqual => {
+                        df_group =
+                            df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
+                    }
+                    MatchOp::Re(_re) => {
+                        df_group = df_group.filter(
+                            regexp_match_udf
+                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                        )?
+                    }
+                    MatchOp::NotRe(_re) => {
+                        df_group = df_group.filter(
+                            regexp_not_match_udf
+                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                        )?
+                    }
                 }
             }
+            let batch = df_group
+                .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+                .collect()
+                .await?;
+            batches.extend(batch);
         }
-        let batches = df_group
-            .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
-            .collect()
-            .await?;
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
         for batch in &batches {

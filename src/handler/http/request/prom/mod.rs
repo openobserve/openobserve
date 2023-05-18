@@ -144,7 +144,6 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
 
     let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
-        is_range_query: false,
         start,
         end,
         step: 300_000_000, // 5m
@@ -302,7 +301,6 @@ async fn query_range(
 
     let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
-        is_range_query: true,
         start,
         end,
         step,

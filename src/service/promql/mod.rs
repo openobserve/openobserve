@@ -39,13 +39,12 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<(SessionContext, Option<Metadata>)>;
+    ) -> Result<Vec<(SessionContext, Option<Metadata>)>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsQueryRequest {
     pub query: String,
-    pub is_range_query: bool,
     pub start: i64,
     pub end: i64,
     pub step: i64,

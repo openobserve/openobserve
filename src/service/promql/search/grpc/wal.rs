@@ -12,119 +12,86 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use async_trait::async_trait;
 use datafusion::{
     datasource::file_format::file_type::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
-use promql_parser::parser;
-use std::path::Path;
-use std::sync::{atomic::Ordering, Arc};
-use std::time::{Duration, UNIX_EPOCH};
+use futures::future::try_join_all;
+use std::{sync::Arc, time::Duration};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tracing::{info_span, Instrument};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::file::scan_files;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::config::{self, CONFIG};
-use crate::meta::prom::Metadata;
-use crate::meta::search::Session as SearchSession;
-use crate::meta::{stream::StreamParams, StreamType};
-use crate::service::db;
-use crate::service::metrics::get_prom_metadata_from_schema;
-use crate::service::promql::{value, QueryEngine, TableProvider, DEFAULT_LOOKBACK};
-use crate::service::search::datafusion::{exec::register_table, storage::file_list::SessionType};
-use crate::service::search::match_source;
+use crate::infra::{
+    cache::tmpfs,
+    cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
+    config::CONFIG,
+};
+use crate::meta::{
+    prom::Metadata, search::Session as SearchSession, stream::StreamParams, StreamType,
+};
+use crate::service::{
+    db,
+    metrics::get_prom_metadata_from_schema,
+    search::{
+        datafusion::{exec::register_table, storage::file_list::SessionType},
+        MetadataMap,
+    },
+};
 
-struct WalProvider {
-    session_id: String,
-}
-
-#[async_trait]
-impl TableProvider for WalProvider {
-    async fn create_context(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        time_range: (i64, i64),
-        filters: &[(&str, &str)],
-    ) -> Result<(SessionContext, Option<Metadata>)> {
-        // get file list
-        let files = get_file_list(org_id, stream_name, time_range, filters).await?;
-        if files.is_empty() {
-            return Ok((SessionContext::new(), None));
-        }
-
-        // fetch all schema versions, get latest schema
-        let stream_type = StreamType::Metrics;
-        let schema = db::schema::get(org_id, stream_name, Some(stream_type))
-            .await
-            .map_err(|err| {
-                log::error!("get schema error: {}", err);
-                DataFusionError::Execution(err.to_string())
-            })?;
-        let metadata = get_prom_metadata_from_schema(&schema);
-        let schema = Arc::new(
-            schema
-                .to_owned()
-                .with_metadata(std::collections::HashMap::new()),
-        );
-        let session = SearchSession {
-            id: self.session_id.clone(),
-            data_type: SessionType::Wal,
-        };
-
-        let (ctx, _) = register_table(
-            &session,
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type,
-            },
-            Some(schema),
-            stream_name,
-            &files,
-            FileType::JSON,
-        )
-        .await?;
-        Ok((ctx, metadata))
-    }
-}
-
-/// Search in the local WAL, which hasn't been persisted to the object storage yet
-pub async fn search(
+pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
-    query: &cluster_rpc::MetricsQueryStmt,
-) -> Result<value::Value> {
-    // mark searching in wal
-    let searching = Searching::new();
+    stream_name: &str,
+    _time_range: (i64, i64),
+    _filters: &[(&str, &str)],
+) -> Result<(SessionContext, Option<Metadata>)> {
+    // get file list
+    let files = get_file_list(org_id, stream_name).await?;
+    if files.is_empty() {
+        return Ok((SessionContext::new(), None));
+    }
 
-    let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
-
-    let eval_stmt = parser::EvalStmt {
-        expr: prom_expr,
-        start: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.start as _))
-            .unwrap(),
-        end: UNIX_EPOCH
-            .checked_add(Duration::from_micros(query.end as _))
-            .unwrap(),
-        interval: Duration::from_micros(query.step as _),
-        lookback_delta: DEFAULT_LOOKBACK,
+    let work_dir = session_id.to_string();
+    for file in files {
+        let file_name = format!("/{work_dir}/{}.parquet", file.name);
+        tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
+    }
+    // fetch all schema versions, get latest schema
+    let stream_type = StreamType::Metrics;
+    let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+        .await
+        .map_err(|err| {
+            log::error!("get schema error: {}", err);
+            DataFusionError::Execution(err.to_string())
+        })?;
+    let metadata = get_prom_metadata_from_schema(&schema);
+    let schema = Arc::new(
+        schema
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+    let session = SearchSession {
+        id: session_id.to_string(),
+        data_type: SessionType::Tmpfs,
     };
 
-    let mut engine = QueryEngine::new(
-        org_id,
-        WalProvider {
-            session_id: session_id.to_string(),
+    let (ctx, _) = register_table(
+        &session,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type,
         },
-    );
-    let data = engine.exec(eval_stmt).await?;
-
-    // searching done.
-    drop(searching);
-
-    Ok(data)
+        Some(schema),
+        stream_name,
+        &[],
+        FileType::JSON,
+    )
+    .await?;
+    Ok((ctx, metadata))
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
@@ -132,65 +99,91 @@ pub async fn search(
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,
-    time_range: (i64, i64),
-    filters: &[(&str, &str)],
-) -> Result<Vec<String>> {
-    let pattern = format!(
-        "{}/files/{}/{}/{}/*.json",
-        &CONFIG.common.data_wal_dir,
-        org_id,
-        StreamType::Metrics,
-        stream_name
-    );
-    let files = scan_files(&pattern);
+) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
+    let nodes = get_cached_online_ingester_nodes();
+    if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
+        return Ok(vec![]);
+    }
+    let nodes = nodes.unwrap();
 
-    let mut result = Vec::new();
-    let data_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
-        Ok(path) => path,
-        Err(_) => {
-            return Ok(result);
+    let mut tasks = Vec::new();
+    for node in nodes {
+        let grpc_span = info_span!("service:promql:search:cluster:grpc_wal_file");
+        let node_addr = node.grpc_addr.clone();
+        let org_id = org_id.to_string();
+        let req = cluster_rpc::MetricsWalFileRequest {
+            org_id: org_id.clone(),
+            stream_name: stream_name.to_string(),
+        };
+        let task: tokio::task::JoinHandle<
+            std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
+        > = tokio::task::spawn(
+            async move {
+                let org_id: MetadataValue<_> = org_id
+                    .parse()
+                    .map_err(|_| DataFusionError::Execution("invalid org_id".to_string()))?;
+                let mut request = tonic::Request::new(req);
+                request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &tracing::Span::current().context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
+
+                let token: MetadataValue<_> = get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect()
+                    .await
+                    .map_err(|_| {
+                        DataFusionError::Execution("connect search node error".to_string())
+                    })?;
+                let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
+                        req.metadata_mut().insert("authorization", token.clone());
+                        req.metadata_mut()
+                            .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        Ok(req)
+                    },
+                );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip);
+                let response: cluster_rpc::MetricsWalFileResponse =
+                    match client.wal_file(request).await {
+                        Ok(response) => response.into_inner(),
+                        Err(err) => {
+                            log::error!("get wal file list from search node error: {}", err);
+                            return Err(DataFusionError::Execution(
+                                "get wal file list from search node error".to_string(),
+                            ));
+                        }
+                    };
+                Ok(response)
+            }
+            .instrument(grpc_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results: Vec<cluster_rpc::MetricsWalFile> = Vec::new();
+    let task_results = match try_join_all(tasks).await {
+        Ok(res) => res,
+        Err(err) => {
+            return Err(DataFusionError::Execution(format!(
+                "get wal file list from search node error: {}",
+                err
+            )));
         }
     };
-    for file in files {
-        let file = Path::new(&file).canonicalize().unwrap();
-        let file = file.strip_prefix(&data_dir).unwrap();
-        let local_file = file.to_str().unwrap();
-        let file_path = file.parent().unwrap().to_str().unwrap().replace('\\', "/");
-        let file_name = file.file_name().unwrap().to_str().unwrap();
-        let file_name = file_name.replace('_', "/");
-        let source_file = format!("{file_path}/{file_name}");
-        if match_source(
-            StreamParams {
-                org_id,
-                stream_name,
-                stream_type: StreamType::Metrics,
-            },
-            Some(time_range),
-            filters,
-            &source_file,
-            false,
-            true,
-        )
-        .await
-        {
-            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
-        }
+    for task_result in task_results {
+        results.extend(task_result?.files);
     }
-    Ok(result)
-}
 
-/// Searching for marking searching in wal
-struct Searching;
-
-impl Searching {
-    pub fn new() -> Self {
-        config::SEARCHING_IN_WAL.store(1, Ordering::Relaxed);
-        Searching
-    }
-}
-
-impl Drop for Searching {
-    fn drop(&mut self) {
-        config::SEARCHING_IN_WAL.store(0, Ordering::Relaxed);
-    }
+    Ok(results)
 }

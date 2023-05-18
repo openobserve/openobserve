@@ -16,11 +16,12 @@ use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::cluster_rpc::metrics_server::Metrics;
-use crate::handler::grpc::cluster_rpc::MetricsQueryRequest;
-use crate::handler::grpc::cluster_rpc::MetricsQueryResponse;
-use crate::infra::errors;
-use crate::infra::metrics;
+use crate::common::file::{get_file_contents, scan_files};
+use crate::handler::grpc::cluster_rpc::{
+    metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
+    MetricsWalFileRequest, MetricsWalFileResponse,
+};
+use crate::infra::{config::CONFIG, errors, metrics};
 use crate::meta;
 use crate::service::promql::search as SearchService;
 
@@ -68,5 +69,31 @@ impl Metrics for Querier {
             .inc();
 
         Ok(Response::new(result))
+    }
+
+    #[tracing::instrument(name = "grpc:metrics:wal_file", skip_all)]
+    async fn wal_file(
+        &self,
+        req: Request<MetricsWalFileRequest>,
+    ) -> Result<Response<MetricsWalFileResponse>, Status> {
+        let org_id = req.get_ref().org_id.clone();
+        let stream_name = req.get_ref().stream_name.clone();
+        let pattern = format!(
+            "{}/files/{org_id}/metrics/{stream_name}/*.json",
+            &CONFIG.common.data_wal_dir
+        );
+
+        let mut resp = MetricsWalFileResponse::default();
+        let files = scan_files(&pattern);
+        for file in files {
+            if let Ok(body) = get_file_contents(&file) {
+                let name = file.split('/').last().unwrap_or("");
+                resp.files.push(MetricsWalFile {
+                    name: name.to_string(),
+                    body,
+                });
+            }
+        }
+        Ok(Response::new(resp))
     }
 }
