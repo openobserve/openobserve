@@ -283,8 +283,8 @@ async fn query_range(
             }
         },
     };
-    let step = match req.step {
-        None => 300_000_000, // 5m
+    let mut step = match req.step {
+        None => 0,
         Some(v) => match parse_milliseconds(&v) {
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
@@ -298,6 +298,13 @@ async fn query_range(
             }
         },
     };
+    if step == 0 {
+        // Grafana: Time range / max data points = step
+        step = (end - start) / promql::MAX_DATA_POINTS;
+    }
+    if step < promql::micros(promql::MINIMAL_INTERVAL) {
+        step = promql::micros(promql::MINIMAL_INTERVAL);
+    }
 
     let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
