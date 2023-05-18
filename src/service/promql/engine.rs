@@ -34,7 +34,7 @@ use std::{
 };
 
 use crate::infra::config::CONFIG;
-use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
+use crate::meta::prom::{HASH_LABEL, VALUE_LABEL};
 use crate::service::promql::{aggregations, binaries, functions, value::*, TableProvider};
 
 pub struct QueryEngine {
@@ -336,7 +336,7 @@ impl QueryEngine {
             .filter(|mat| mat.op == MatchOp::Equal)
             .map(|mat| (mat.name.as_str(), mat.value.as_str()))
             .collect();
-        let (ctx, metadata) = self
+        let (ctx, _) = self
             .table_provider
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
@@ -432,37 +432,8 @@ impl QueryEngine {
             }
         }
 
-        // We don't need the primary key (FIELD_HASH) any more
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-
-        // TODO fix Extrapolation, it needs reduce by distance
-        // https://ihac.xyz/2018/12/11/Prometheus-Extrapolation%E5%8E%9F%E7%90%86%E8%A7%A3%E6%9E%90/
-
-        // Fix data about app restart
-        let metrics_type = if let Some(meta) = metadata {
-            meta.metric_type
-        } else if table_name.ends_with("_sum") || table_name.ends_with("_count") {
-            MetricType::Counter
-        } else {
-            MetricType::Unknown
-        };
-        if metrics_type == MetricType::Counter {
-            for series in metric_values.iter_mut() {
-                let mut delta: f64 = 0.0;
-                let mut last_value = 0.0;
-                for sample in series.samples.iter_mut() {
-                    if last_value > sample.value {
-                        delta += last_value;
-                    }
-                    last_value = sample.value;
-                    if delta > 0.0 {
-                        sample.value += delta;
-                    }
-                }
-            }
-        }
-
         // cache data
+        let metric_values = metrics.into_values().collect::<Vec<_>>();
         let values = if metric_values.is_empty() {
             Value::None
         } else {

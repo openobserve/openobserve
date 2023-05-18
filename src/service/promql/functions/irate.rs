@@ -21,10 +21,8 @@ pub(crate) fn irate(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.samples.is_empty() {
+    if data.samples.len() < 2 {
         return None;
-    } else if data.samples.len() == 1 {
-        return Some(0.0);
     }
     let (last, data) = data.samples.split_last().unwrap();
     let previous = data.last().unwrap();
