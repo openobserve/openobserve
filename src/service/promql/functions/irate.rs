@@ -30,5 +30,10 @@ fn exec(data: &RangeValue) -> Option<f64> {
     if dt_seconds == 0.0 {
         return Some(0.0);
     }
-    Some((last.value - previous.value) / dt_seconds)
+    let dt_value = if last.value - previous.value >= 0.0 {
+        last.value - previous.value
+    } else {
+        last.value
+    };
+    Some(dt_value / dt_seconds)
 }

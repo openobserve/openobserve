@@ -26,6 +26,7 @@ lazy_static! {
 pub enum SessionType {
     Wal,
     Storage,
+    Tmpfs,
 }
 
 pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {

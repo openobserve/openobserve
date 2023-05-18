@@ -15,9 +15,8 @@
 use async_trait::async_trait;
 use datafusion::{error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use utoipa::ToSchema;
-
-use crate::meta::prom::Metadata;
 
 mod aggregations;
 mod binaries;
@@ -28,6 +27,10 @@ pub mod value;
 
 pub use engine::QueryEngine;
 
+pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
+pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s
+pub(crate) const MAX_DATA_POINTS: i64 = 1000; // Width of panel
+
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
     async fn create_context(
@@ -36,13 +39,12 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<(SessionContext, Option<Metadata>)>;
+    ) -> Result<Vec<SessionContext>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsQueryRequest {
     pub query: String,
-    pub is_range_query: bool,
     pub start: i64,
     pub end: i64,
     pub step: i64,
@@ -118,6 +120,20 @@ pub enum ApiErrorType {
     Internal,
     Unavailable,
     NotFound,
+}
+
+/// Converts `t` to the number of microseconds elapsed since the beginning of the Unix epoch.
+pub(crate) fn micros_since_epoch(t: SystemTime) -> i64 {
+    micros(
+        t.duration_since(UNIX_EPOCH)
+            .expect("BUG: {t} is earlier than Unix epoch"),
+    )
+}
+
+pub(crate) fn micros(t: Duration) -> i64 {
+    t.as_micros()
+        .try_into()
+        .expect("BUG: time value is too large to fit in i64")
 }
 
 #[cfg(test)]
