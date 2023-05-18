@@ -14,14 +14,22 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
 
 pub(crate) fn delta(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "delta", exec)
 }
 
-fn exec(range: &RangeValue) -> Option<f64> {
-    range
-        .extrapolate()
-        .map(|(first, last)| last.value - first.value)
+fn exec(series: &RangeValue) -> Option<f64> {
+    let tw = series
+        .time_window
+        .as_ref()
+        .expect("BUG: `delta` function requires time window");
+    extrapolated_rate(
+        &series.samples,
+        tw.eval_ts,
+        tw.range,
+        tw.offset,
+        ExtrapolationKind::Delta,
+    )
 }
