@@ -37,13 +37,10 @@ pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
     let values = score_values
         .unwrap()
         .values()
-        .map(|v| InstantValue {
-            labels: v.labels.clone(),
-            sample: Sample {
-                timestamp,
-                value: v.value,
-            },
+        .map(|it| InstantValue {
+            labels: it.labels.clone(),
+            sample: Sample::new(timestamp, it.value),
         })
-        .collect::<Vec<_>>();
+        .collect();
     Ok(Value::Vector(values))
 }

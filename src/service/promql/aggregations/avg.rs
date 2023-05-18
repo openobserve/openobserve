@@ -27,11 +27,8 @@ pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
         .values()
         .map(|v| InstantValue {
             labels: v.labels.clone(),
-            sample: Sample {
-                timestamp,
-                value: v.value / v.num as f64,
-            },
+            sample: Sample::new(timestamp, v.value / v.num as f64),
         })
-        .collect::<Vec<_>>();
+        .collect();
     Ok(Value::Vector(values))
 }

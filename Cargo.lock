@@ -6403,6 +6403,7 @@ dependencies = [
  "expect-test",
  "flate2",
  "flatten-json-object",
+ "float-cmp",
  "futures",
  "get_if_addrs",
  "glob",

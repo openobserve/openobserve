@@ -115,20 +115,16 @@ pub(crate) fn eval_idelta(
     };
 
     let mut rate_values = Vec::with_capacity(data.len());
-    for metric in data.iter() {
+    for metric in data {
         let mut labels = metric.labels.clone();
         labels.retain(|l| l.name != NAME_LABEL);
-        let value = fn_handler(metric);
-        if value.is_none() {
-            continue;
+        if let Some(value) = fn_handler(metric) {
+            let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
+            rate_values.push(InstantValue {
+                labels,
+                sample: Sample::new(eval_ts, value),
+            });
         }
-        rate_values.push(InstantValue {
-            labels,
-            sample: Sample {
-                timestamp: metric.time_range.unwrap().1,
-                value: value.unwrap(),
-            },
-        });
     }
     Ok(Value::Vector(rate_values))
 }

@@ -14,19 +14,22 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
 
 pub(crate) fn rate(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "rate", exec)
 }
 
-fn exec(range: &RangeValue) -> Option<f64> {
-    range.extrapolate().map(|(first, last)| {
-        let dt_seconds = ((last.timestamp - first.timestamp) / 1_000_000) as f64;
-        if dt_seconds == 0.0 {
-            0.0
-        } else {
-            (last.value - first.value) / dt_seconds
-        }
-    })
+fn exec(series: &RangeValue) -> Option<f64> {
+    let tw = series
+        .time_window
+        .as_ref()
+        .expect("BUG: `rate` function requires time window");
+    extrapolated_rate(
+        &series.samples,
+        tw.eval_ts,
+        tw.range,
+        tw.offset,
+        ExtrapolationKind::Rate,
+    )
 }

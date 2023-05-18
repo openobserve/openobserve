@@ -33,9 +33,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use super::{aggregations, binaries, functions, value::*, TableProvider};
 use crate::infra::config::CONFIG;
 use crate::meta::prom::{MetricType, HASH_LABEL, VALUE_LABEL};
+use crate::service::promql::{aggregations, binaries, functions, value::*, TableProvider};
 
 pub struct QueryEngine {
     org_id: String,
@@ -88,11 +88,8 @@ impl QueryEngine {
         if self.start == self.end {
             // Instant query
             let mut value = self.exec_expr(&stmt.expr).await?;
-            if let Value::Float(v) = value {
-                value = Value::Sample(Sample {
-                    timestamp: self.end,
-                    value: v,
-                });
+            if let Value::Float(val) = value {
+                value = Value::Sample(Sample::new(self.end, val));
             }
             value.sort();
             return Ok(value);
@@ -105,31 +102,23 @@ impl QueryEngine {
         for i in 0..nr_steps {
             self.time_window_idx = i;
             match self.exec_expr(&stmt.expr).await? {
-                Value::Instant(v) => instant_vectors.push(RangeValue {
-                    labels: v.labels.to_owned(),
-                    time_range: None,
-                    samples: vec![v.sample],
-                }),
-                Value::Vector(vs) => instant_vectors.extend(vs.into_iter().map(|v| RangeValue {
-                    labels: v.labels.to_owned(),
-                    time_range: None,
-                    samples: vec![v.sample],
-                })),
+                Value::Instant(v) => {
+                    instant_vectors.push(RangeValue::new(v.labels.to_owned(), [v.sample]))
+                }
+                Value::Vector(vs) => instant_vectors.extend(
+                    vs.into_iter()
+                        .map(|v| RangeValue::new(v.labels.to_owned(), [v.sample])),
+                ),
                 Value::Range(v) => instant_vectors.push(v),
-                Value::Matrix(v) => instant_vectors.extend(v),
-                Value::Sample(v) => instant_vectors.push(RangeValue {
-                    labels: Labels::default(),
-                    time_range: None,
-                    samples: vec![v],
-                }),
-                Value::Float(v) => instant_vectors.push(RangeValue {
-                    labels: Labels::default(),
-                    time_range: None,
-                    samples: vec![Sample {
-                        timestamp: self.start + (self.interval * self.time_window_idx),
-                        value: v,
-                    }],
-                }),
+                Value::Matrix(vs) => instant_vectors.extend(vs),
+                Value::Sample(s) => instant_vectors.push(RangeValue::new(Labels::default(), [s])),
+                Value::Float(val) => instant_vectors.push(RangeValue::new(
+                    Labels::default(),
+                    [Sample::new(
+                        self.start + (self.interval * self.time_window_idx),
+                        val,
+                    )],
+                )),
                 Value::None => continue,
             };
         }
@@ -151,10 +140,8 @@ impl QueryEngine {
         }
         let merged_data = merged_data
             .into_iter()
-            .map(|(sig, values)| RangeValue {
-                labels: merged_metrics.get(&sig).unwrap().to_owned(),
-                time_range: None,
-                samples: values,
+            .map(|(sig, samples)| {
+                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
             })
             .collect::<Vec<_>>();
 
@@ -241,6 +228,9 @@ impl QueryEngine {
         })
     }
 
+    /// Instant vector selector --- select a single sample at each evaluation timestamp.
+    ///
+    /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
@@ -257,25 +247,23 @@ impl QueryEngine {
             None => return Ok(vec![]),
         };
 
-        let end = self.start + (self.interval * self.time_window_idx);
-        let start = end - self.lookback_delta;
+        // Evaluation timestamp.
+        let eval_ts = self.start + (self.interval * self.time_window_idx);
+        let start = eval_ts - self.lookback_delta;
 
         let mut values = vec![];
         for metric in metrics_cache {
             if let Some(last_value) = metric
                 .samples
                 .iter()
-                .filter_map(|s| (start < s.timestamp && s.timestamp <= end).then_some(s.value))
+                .filter_map(|s| (start < s.timestamp && s.timestamp <= eval_ts).then_some(s.value))
                 .last()
             {
                 values.push(
                     // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
                     InstantValue {
                         labels: metric.labels.clone(),
-                        sample: Sample {
-                            timestamp: end,
-                            value: last_value,
-                        },
+                        sample: Sample::new(eval_ts, last_value),
                     },
                 );
             }
@@ -283,6 +271,10 @@ impl QueryEngine {
         Ok(values)
     }
 
+    /// Range vector selector --- select a whole time range at each evaluation timestamp.
+    ///
+    /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
+    ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix of samples.
     async fn eval_matrix_selector(
         &mut self,
@@ -301,21 +293,23 @@ impl QueryEngine {
             None => return Ok(vec![]),
         };
 
-        let end = self.start + (self.interval * self.time_window_idx); // 15s
-        let start = end - micros(range); // 5m
+        // Evaluation timestamp --- end of the time window.
+        let eval_ts = self.start + (self.interval * self.time_window_idx);
+        // Start of the time window.
+        let start = eval_ts - micros(range); // e.g. [5m]
 
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
-            let metric_data = metric
+            let samples = metric
                 .samples
                 .iter()
-                .filter(|v| v.timestamp > start && v.timestamp <= end)
+                .filter(|v| start < v.timestamp && v.timestamp <= eval_ts)
                 .cloned()
-                .collect::<Vec<_>>();
+                .collect();
             values.push(RangeValue {
                 labels: metric.labels.clone(),
-                time_range: Some((start, end)),
-                samples: metric_data,
+                samples,
+                time_window: Some(TimeWindow::new(eval_ts, range)),
             });
         }
         Ok(values)
@@ -430,16 +424,11 @@ impl QueryEngine {
                         }));
                     }
                     labels.sort_by(|a, b| a.name.cmp(&b.name));
-                    RangeValue {
-                        labels,
-                        time_range: None,
-                        samples: Vec::with_capacity(20),
-                    }
+                    RangeValue::new(labels, Vec::with_capacity(20))
                 });
-                entry.samples.push(Sample {
-                    timestamp: time_values.value(i),
-                    value: value_values.value(i),
-                });
+                entry
+                    .samples
+                    .push(Sample::new(time_values.value(i), value_values.value(i)));
             }
         }
 
