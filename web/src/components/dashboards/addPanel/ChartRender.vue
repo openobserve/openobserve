@@ -77,7 +77,7 @@ export default defineComponent({
       const $q = useQuasar();
       const store = useStore();
       const searchQueryData = reactive({
-          data: [],
+          data: [] as (any | Array<any>),
           loading: false
       });
       // const noData = ref('')
@@ -178,7 +178,11 @@ export default defineComponent({
           }
       })
       const noData = computed(()=> {
-          return !searchQueryData.data.length ? "No Data" : ""
+        if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
+            return searchQueryData.data?.result?.length ? "" : "No Data"
+        } else {
+            return !searchQueryData.data.length ? "No Data" : ""
+        }
       })
 
       // wrap the text for long x axis names for pie charts
@@ -272,7 +276,7 @@ export default defineComponent({
                     .then((res) => {
                         console.log("-----", res);
                         
-                        searchQueryData.data = res.data.hits;
+                        searchQueryData.data = res.data.data;
                         searchQueryData.loading = false
                     })
                     .catch((error) => {
@@ -316,8 +320,16 @@ export default defineComponent({
           { deep: true }
       );
 
-      // multiple x axis and multiple y axis
       const renderChart = async () => {
+        if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
+            renderPromQlBasedChart()
+        } else {
+            renderSqlBasedChart()
+        }
+      }
+
+      // multiple x axis and multiple y axis
+      const renderSqlBasedChart = async () => {
           // console.log("Query: rendering chart");
           // console.log("Query: chart type", props.data.type);
           // Step 1: Get the X-Axis key
@@ -477,7 +489,7 @@ export default defineComponent({
                   // get second x axis key
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
-                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
+                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
                 //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
@@ -488,9 +500,9 @@ export default defineComponent({
                           name: key,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
-                          x: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
-                          y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
-                          customdata: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                          customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
                       };
@@ -505,7 +517,7 @@ export default defineComponent({
                   // get second x axis key
                   const key1 = xAxisKeys[1]
                   // get the unique value of the second xAxis's key
-                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map(obj => obj[key1])) ].filter((it)=> it);
+                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
                 //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
                   
                   // create a trace based on second xAxis's unique values
@@ -516,8 +528,8 @@ export default defineComponent({
                           name: key,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
-                          x: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
-                          y: searchQueryData.data.filter((item) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
                           customdata: getAxisDataFromKey(key), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
@@ -573,6 +585,59 @@ export default defineComponent({
           });
       };
 
+      const renderPromQlBasedChart = () => {
+        
+        console.log(searchQueryData.data)
+
+        const traces = searchQueryData.data?.result?.map((metric: any) => {
+            const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
+            return  {
+                name: JSON.stringify(metric.metric),
+                x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
+                y: values.map((value: any) => value[1]),
+            }
+        })
+
+        const layout: any = {
+              title: false,
+              showlegend: props.data.config?.show_legends,
+              font: { size: 12 },
+              autosize: true,
+              legend: {
+                  bgcolor: "#f7f7f7",
+              },
+              margin: {
+                  l: props.data.type == 'pie' ? 60 : 32,
+                  r: props.data.type == 'pie' ? 60 : 16,
+                  t: 38,
+                  b: 32,
+              },
+            //   ...getPropsByChartTypeForLayout(),
+          };
+
+        Plotly.react(plotRef.value, traces, layout, {
+              responsive: true,
+              displaylogo: false,
+              displayModeBar: false,
+          });
+        // const trace = {
+        //                   name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+        //                   ...getPropsByChartTypeForTraces(),
+        //                   showlegend: props.data.config?.show_legends,
+        //                   marker: {
+        //                       color:
+        //                           props.data.fields?.y.find((it: any) => it.alias == key).color ||
+        //                           "#5960b2",
+        //                       opacity: 0.8,
+        //                   },
+        //                   x: xData,
+        //                   y: getAxisDataFromKey(key),
+        //                   customdata: getAxisDataFromKey(xAxisKeys[0]), //TODO: need to check for the data value, check for multiple x
+        //                   hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
+
+        //               };
+      }
+
       // get the x axis key
       const getXAxisKeys = () => {
           return props.data.fields?.x?.length ? props.data.fields?.x.map((it: any) => it.alias) : [];
@@ -586,7 +651,7 @@ export default defineComponent({
       // get the axis data using key
       const getAxisDataFromKey = (key: string) => {
           // when the key is not available in the data that is not show the default value
-          let result: string[] = searchQueryData.data.map((item) => item[key]);
+          let result: string[] = searchQueryData.data.map((item: any) => item[key]);
           // when the key is not available in the data make default value null using below line
           // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
 
