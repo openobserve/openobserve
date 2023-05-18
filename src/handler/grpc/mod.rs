@@ -102,7 +102,6 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
     fn from(req: promql::MetricsQueryRequest) -> Self {
         let req_query = cluster_rpc::MetricsQueryStmt {
             query: req.query.to_owned(),
-            is_range_query: req.is_range_query,
             start: req.start,
             end: req.end,
             step: req.step,
@@ -119,6 +118,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             job: Some(job),
             org_id: "".to_string(),
             stype: cluster_rpc::SearchType::User.into(),
+            need_wal: false,
             query: Some(req_query),
         }
     }

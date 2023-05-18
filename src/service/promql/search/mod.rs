@@ -12,18 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::future::try_join_all;
 use rustc_hash::FxHashMap;
-use std::{cmp::min, sync::Arc, time::Duration};
+use std::{
+    cmp::{max, min},
+    sync::Arc,
+    time::Duration,
+};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, instrument, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::errors::{Error, ErrorCodes, Result};
-use crate::infra::{cluster, config::CONFIG, db::etcd};
-use crate::service::promql::{value::*, MetricsQueryRequest};
-use crate::service::search::{server_internal_error, MetadataMap};
+use crate::infra::{
+    cluster,
+    config::CONFIG,
+    db::etcd,
+    errors::{Error, ErrorCodes, Result},
+};
+use crate::service::{
+    promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
+    search::{server_internal_error, MetadataMap},
+};
 
 pub mod grpc;
 
@@ -37,7 +48,7 @@ pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
 
 #[inline(always)]
 async fn get_queue_lock() -> Result<etcd::Locker> {
-    let mut lock = etcd::Locker::new("search/cluster_queue");
+    let mut lock = etcd::Locker::new("search/cluster_queue_metrics");
     lock.lock(0).await.map_err(server_internal_error)?;
     Ok(lock)
 }
@@ -54,35 +65,39 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     };
     let took_wait = op_start.elapsed().as_millis() as usize;
 
-    // get nodes from cluster
-    let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
+    // get querier nodes from cluster
+    let mut nodes = cluster::get_cached_online_querier_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
-
-    let nr_queriers = match nodes
-        .iter()
-        .filter(|node| cluster::is_querier(&node.role))
-        .count()
-    {
-        0 => 1,
-        n => n as i64,
-    };
+    if nodes.is_empty() {
+        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+            "no querier node found".to_string(),
+        )));
+    }
+    let nr_queriers = nodes.len() as i64;
 
     let &cluster_rpc::MetricsQueryStmt {
         query: _,
-        is_range_query,
         start,
         end,
         step,
     } = req.query.as_ref().unwrap();
 
+    // if end is older than max_file_retention_time * 2, we don't need search wal
+    let need_wal = end
+        + chrono::Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+            .num_microseconds()
+            .unwrap()
+            * 2
+        > chrono::Utc::now().timestamp_micros();
+
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-    let nr_steps = if !is_range_query || start == end {
-        1
-    } else {
-        (end - start) / step
+    let step = max(micros(DEFAULT_LOOKBACK), step);
+    let nr_steps = match (end - start) / step {
+        0 => 1,
+        n => n,
     };
     // A span of time covered by an individual querier (worker).
     let worker_dt = if nr_steps > nr_queriers {
@@ -105,32 +120,33 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     // make cluster request
     let mut tasks = Vec::new();
     let mut worker_start = start;
-    for (partition_no, node) in nodes.iter().cloned().enumerate() {
+    for node in nodes.iter() {
+        let node = node.clone();
+        if worker_start > end {
+            break;
+        }
         let job = Some(cluster_rpc::Job {
-            partition: partition_no as _,
+            partition: node.id as _,
             ..job.clone()
         });
         let mut req = cluster_rpc::MetricsQueryRequest {
             job,
-            stype: cluster_rpc::SearchType::WalOnly as _,
+            stype: cluster_rpc::SearchType::Cluster as _,
             ..req.clone()
         };
         let mut req_query = req.query.as_mut().unwrap();
-        let is_querier = cluster::is_querier(&node.role);
-        if is_querier {
-            if worker_start <= end {
-                req.stype = cluster_rpc::SearchType::Cluster as _;
-                req_query.start = worker_start;
-                req_query.end = min(end, worker_start + worker_dt);
-                worker_start += worker_dt;
-            } else if !cluster::is_ingester(&node.role) {
-                continue; // no need more querier
-            }
+        req_query.start = worker_start;
+        req_query.end = min(end, worker_start + worker_dt);
+        if need_wal && req_query.end == end {
+            req.need_wal = true;
         }
+        let req_need_wal = req.need_wal;
+        worker_start += worker_dt;
+
         log::info!(
-            "[TRACE] promql->search->partition: node: {}, is_querier: {}, start: {}, end: {}",
+            "[TRACE] promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
             node.id,
-            is_querier,
+            req_need_wal,
             req_query.start,
             req_query.end,
         );
@@ -189,9 +205,9 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 };
 
                 log::info!(
-                    "[TRACE] promql->search->grpc: result node: {}, is_querier: {}, took: {}, files: {}",
+                    "[TRACE] promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}",
                     node.id,
-                    is_querier,
+                    req_need_wal,
                     response.took,
                     response.file_count
                 );
@@ -203,27 +219,32 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     }
 
     let mut results = Vec::new();
-    for task in tasks {
-        // XXX-OPTIMIZE: use [`futures::future::try_join_all`]
-        //
-        // [`futures::future::try_join_all`]: https://docs.rs/futures/0.3.28/futures/future/fn.try_join_all.html
-        let res = match task.await {
-            Err(task_err) => Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                task_err.to_string(),
-            ))),
-            Ok(Err(err)) => Err(err),
-            Ok(Ok(res)) => {
-                results.push(res);
-                Ok(())
-            }
-        };
-        if let Err(err) = res {
+    let task_results = match try_join_all(tasks).await {
+        Ok(res) => res,
+        Err(err) => {
             if locker.is_some() {
                 if let Err(e) = locker.unwrap().unlock().await {
                     log::error!("search in cluster unlock error: {}", e);
                 }
             }
-            return Err(err);
+            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                err.to_string(),
+            )));
+        }
+    };
+    for res in task_results {
+        match res {
+            Ok(res) => {
+                results.push(res);
+            }
+            Err(err) => {
+                if locker.is_some() {
+                    if let Err(e) = locker.unwrap().unlock().await {
+                        log::error!("search in cluster unlock error: {}", e);
+                    }
+                }
+                return Err(err);
+            }
         }
     }
 
@@ -277,18 +298,27 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
         let labels: Labels = ser
             .metric
             .iter()
-            .map(|l| Arc::new(Label::from(l)))
+            .map(|v| Arc::new(Label::from(v)))
             .collect();
-        let samples: Vec<Sample> = ser.samples.iter().map(Sample::from).collect();
-        merged_data
+        let entry = merged_data
             .entry(signature(&labels))
-            .or_insert_with(Vec::new)
-            .extend(samples);
+            .or_insert_with(FxHashMap::default);
+        ser.samples.iter().for_each(|v| {
+            entry.insert(v.time, v.value);
+        });
         merged_metrics.insert(signature(&labels), labels);
     }
     let merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
+            let mut samples = samples
+                .into_iter()
+                .map(|(ts, v)| Sample {
+                    timestamp: ts,
+                    value: v,
+                })
+                .collect::<Vec<_>>();
+            samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect();

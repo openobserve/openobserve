@@ -30,12 +30,15 @@ use rustc_hash::FxHashMap;
 use std::{
     str::FromStr,
     sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 
 use crate::infra::config::CONFIG;
 use crate::meta::prom::{HASH_LABEL, VALUE_LABEL};
-use crate::service::promql::{aggregations, binaries, functions, value::*, TableProvider};
+use crate::service::promql::{
+    aggregations, binaries, functions, micros, micros_since_epoch, value::*, TableProvider,
+    DEFAULT_LOOKBACK,
+};
 
 pub struct QueryEngine {
     org_id: String,
@@ -62,7 +65,7 @@ impl QueryEngine {
         P: TableProvider,
     {
         let now = micros_since_epoch(SystemTime::now());
-        let five_min = micros(Duration::from_secs(300));
+        let five_min = micros(DEFAULT_LOOKBACK);
         Self {
             org_id: org_id.to_string(),
             table_provider: Box::new(provider),
@@ -336,54 +339,61 @@ impl QueryEngine {
             .filter(|mat| mat.op == MatchOp::Equal)
             .map(|mat| (mat.name.as_str(), mat.value.as_str()))
             .collect();
-        let (ctx, _) = self
+        let ctxs = self
             .table_provider
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
-        let table = match ctx.table(table_name).await {
-            Ok(v) => v,
-            Err(_) => {
-                self.metrics_cache
-                    .insert(table_name.to_string(), Value::None);
-                return Ok(()); // table not found
-            }
-        };
 
-        let mut df_group = table.clone().filter(
-            col(&CONFIG.common.column_timestamp)
-                .gt(lit(start))
-                .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
-        )?;
         let regexp_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
         let regexp_not_match_udf =
             crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
-        for mat in selector.matchers.matchers.iter() {
-            match &mat.op {
-                MatchOp::Equal => {
-                    df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+
+        let mut batches = Vec::new();
+        for ctx in ctxs {
+            let table = match ctx.table(table_name).await {
+                Ok(v) => v,
+                Err(_) => {
+                    continue;
                 }
-                MatchOp::NotEqual => {
-                    df_group =
-                        df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-                }
-                MatchOp::Re(_re) => {
-                    df_group = df_group.filter(
-                        regexp_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                    )?
-                }
-                MatchOp::NotRe(_re) => {
-                    df_group = df_group.filter(
-                        regexp_not_match_udf
-                            .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                    )?
+            };
+            let mut df_group = table.clone();
+            for mat in selector.matchers.matchers.iter() {
+                match &mat.op {
+                    MatchOp::Equal => {
+                        df_group =
+                            df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+                    }
+                    MatchOp::NotEqual => {
+                        df_group =
+                            df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
+                    }
+                    MatchOp::Re(_re) => {
+                        df_group = df_group.filter(
+                            regexp_match_udf
+                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                        )?
+                    }
+                    MatchOp::NotRe(_re) => {
+                        df_group = df_group.filter(
+                            regexp_not_match_udf
+                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                        )?
+                    }
                 }
             }
+            let batch = df_group
+                .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+                .collect()
+                .await?;
+            batches.extend(batch);
         }
-        let batches = df_group
-            .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
-            .collect()
-            .await?;
+
+        if batches.is_empty() {
+            self.metrics_cache
+                .insert(table_name.to_string(), Value::None);
+            return Ok(());
+        }
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
         for batch in &batches {
@@ -757,18 +767,4 @@ impl QueryEngine {
             }
         })
     }
-}
-
-/// Converts `t` to the number of microseconds elapsed since the beginning of the Unix epoch.
-fn micros_since_epoch(t: SystemTime) -> i64 {
-    micros(
-        t.duration_since(UNIX_EPOCH)
-            .expect("BUG: {t} is earlier than Unix epoch"),
-    )
-}
-
-fn micros(t: Duration) -> i64 {
-    t.as_micros()
-        .try_into()
-        .expect("BUG: time value is too large to fit in i64")
 }
