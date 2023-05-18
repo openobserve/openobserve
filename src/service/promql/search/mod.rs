@@ -313,13 +313,9 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 })
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            RangeValue {
-                labels: merged_metrics.get(&sig).unwrap().to_owned(),
-                samples,
-                time_range: None,
-            }
+            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
-        .collect::<Vec<_>>();
+        .collect();
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
