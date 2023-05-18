@@ -53,9 +53,11 @@ pub(crate) async fn create_context(
 
     let work_dir = session_id.to_string();
     for file in files {
-        let file_name = format!("/{work_dir}/{}.parquet", file.name);
+        dbg!(file.name.clone(), file.body.len());
+        let file_name = format!("/{work_dir}/{}.json", file.name);
         tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
     }
+
     // fetch all schema versions, get latest schema
     let stream_type = StreamType::Metrics;
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))

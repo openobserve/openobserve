@@ -354,17 +354,10 @@ impl QueryEngine {
             let table = match ctx.table(table_name).await {
                 Ok(v) => v,
                 Err(_) => {
-                    self.metrics_cache
-                        .insert(table_name.to_string(), Value::None);
-                    return Ok(()); // table not found
+                    continue;
                 }
             };
-
-            let mut df_group = table.clone().filter(
-                col(&CONFIG.common.column_timestamp)
-                    .gt(lit(start))
-                    .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
-            )?;
+            let mut df_group = table.clone();
             for mat in selector.matchers.matchers.iter() {
                 match &mat.op {
                     MatchOp::Equal => {
@@ -394,6 +387,12 @@ impl QueryEngine {
                 .collect()
                 .await?;
             batches.extend(batch);
+        }
+
+        if batches.is_empty() {
+            self.metrics_cache
+                .insert(table_name.to_string(), Value::None);
+            return Ok(());
         }
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
