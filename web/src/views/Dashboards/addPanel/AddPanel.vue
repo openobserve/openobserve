@@ -211,6 +211,11 @@ export default defineComponent({
       errors.splice(0)
       const dashboardData = dashboardPanelData
 
+      // TODO: make sure this is applied for all charts except the promql panel
+      if(dashboardData.data.fields.stream_type == "metrics" && dashboardData.data.customQuery && dashboardData.data.queryType == "promql"){
+        return true;
+      }
+
       switch (dashboardPanelData.data.type) {
         case 'donut':
         case 'pie': {

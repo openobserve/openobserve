@@ -291,7 +291,7 @@
     "apply": "Apply",
     "fields": "Fields",
     "layout": "Layout",
-    "sql": "SQL",
+    "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
     "promQL":"PromQL"

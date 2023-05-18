@@ -50,12 +50,16 @@ const search = {
   },
   query: ({
     org_identifier,
-    query
+    query,
+    start_time,
+    end_time,
   }:{
     org_identifier: string;
-    query: any;
+    query: string;
+    start_time: number;
+    end_time: number;
   }) => {
-    const url = `/api/${org_identifier}/prometheus/api/v1/query?query=${query}`;
+    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&query=${query}`;
     return http().get(url);
   }
 };

@@ -265,7 +265,9 @@ export default defineComponent({
                 await queryService
                     .query({
                         org_identifier: store.state.selectedOrganization.identifier,
-                        query: query,
+                        query: queryData,
+                        start_time: startISOTimestamp,
+                        end_time: endISOTimestamp
                     })
                     .then((res) => {
                         console.log("-----", res);
