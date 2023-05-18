@@ -261,6 +261,7 @@ export const getPath = () => {
       ? window.location.pathname.slice(0, pos + 5)
       : window.location.pathname;
   const cloudPath = import.meta.env.BASE_URL;
+  console.log("configpath:", cloudPath);
   return config.isZincObserveCloud == "true" ? cloudPath : path;
 };
 
@@ -286,7 +287,7 @@ export const routeGuardPendingSubscriptions = (
       persistent: true,
     })
       .onOk(() => {
-        const nextURL = getPath() + "billings/plans";
+        const nextURL = getPath().replace(".", "") + "billings/plans";
         next(nextURL);
       })
       .onCancel(() => {
