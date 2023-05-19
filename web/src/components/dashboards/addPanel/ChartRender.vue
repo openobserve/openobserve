@@ -267,7 +267,7 @@ export default defineComponent({
           searchQueryData.loading = true
             if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
                 await queryService
-                    .query({
+                    .metrics_query_range({
                         org_identifier: store.state.selectedOrganization.identifier,
                         query: queryData,
                         start_time: startISOTimestamp,
@@ -586,40 +586,92 @@ export default defineComponent({
       };
 
       const renderPromQlBasedChart = () => {
+
+        const hashCode = function(s: string) {
+            return s.split("").reduce(function(a, b) {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+            }, 0);
+        }
         
         console.log(searchQueryData.data)
 
-        const traces = searchQueryData.data?.result?.map((metric: any) => {
-            const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
-            return  {
-                name: JSON.stringify(metric.metric),
-                x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
-                y: values.map((value: any) => value[1]),
+        switch(searchQueryData.data.resultType) { 
+            case 'matrix': {
+                const traces = searchQueryData.data?.result?.map((metric: any) => {
+                    const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
+                    return  {
+                        name: JSON.stringify(metric.metric),
+                        x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
+                        y: values.map((value: any) => value[1]),
+                    }
+                })
+
+                const layout: any = {
+                    title: false,
+                    showlegend: props.data.config?.show_legends,
+                    font: { size: 12 },
+                    autosize: true,
+                    legend: {
+                        bgcolor: "#f7f7f7",
+                    },
+                    margin: {
+                        l: props.data.type == 'pie' ? 60 : 32,
+                        r: props.data.type == 'pie' ? 60 : 16,
+                        t: 38,
+                        b: 32,
+                    },
+                    //   ...getPropsByChartTypeForLayout(),
+                };
+
+                Plotly.react(plotRef.value, traces, layout, {
+                    responsive: true,
+                    displaylogo: false,
+                    displayModeBar: false,
+                });
+
+                break;
             }
-        })
+            case 'vector': {
+                const traces = searchQueryData.data?.result?.map((metric: any) => {
+                    const values = [metric.value]
+                    console.log('vector',values);
+                    
+                    return  {
+                        name: hashCode(JSON.stringify(metric.metric)),
+                        x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
+                        y: values.map((value: any) => value[1]),
+                    }
+                })
 
-        const layout: any = {
-              title: false,
-              showlegend: props.data.config?.show_legends,
-              font: { size: 12 },
-              autosize: true,
-              legend: {
-                  bgcolor: "#f7f7f7",
-              },
-              margin: {
-                  l: props.data.type == 'pie' ? 60 : 32,
-                  r: props.data.type == 'pie' ? 60 : 16,
-                  t: 38,
-                  b: 32,
-              },
-            //   ...getPropsByChartTypeForLayout(),
-          };
+                const layout: any = {
+                    title: false,
+                    showlegend: props.data.config?.show_legends,
+                    font: { size: 12 },
+                    autosize: true,
+                    legend: {
+                        bgcolor: "#f7f7f7",
+                    },
+                    margin: {
+                        l: props.data.type == 'pie' ? 60 : 32,
+                        r: props.data.type == 'pie' ? 60 : 16,
+                        t: 38,
+                        b: 32,
+                    },
+                    //   ...getPropsByChartTypeForLayout(),
+                };
 
-        Plotly.react(plotRef.value, traces, layout, {
-              responsive: true,
-              displaylogo: false,
-              displayModeBar: false,
-          });
+                Plotly.react(plotRef.value, traces, layout, {
+                    responsive: true,
+                    displaylogo: false,
+                    displayModeBar: false,
+                });
+
+                break;
+            }
+        }
+
+        
         // const trace = {
         //                   name: props.data.fields?.y.find((it: any) => it.alias == key).label,
         //                   ...getPropsByChartTypeForTraces(),
