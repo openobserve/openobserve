@@ -1319,7 +1319,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
+            .uri("/config")
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -1331,6 +1331,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "orgId": "acceptLogs",
+                                "streamName":"syslog",
                                 "subnets": [
                                             "192.168.0.0/16",
                                             "127.0.0.0/8",
@@ -1353,7 +1354,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
