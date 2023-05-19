@@ -242,8 +242,10 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION", default = 0)] // in days
-    pub data_retention: i64,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_ENABLED", default = false)]
+    pub data_retention_enabled: bool,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 0)] // in days
+    pub data_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
@@ -399,7 +401,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 600;
     }
-    if cfg.compact.data_retention > 0 && cfg.compact.data_retention < 3 {
+    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
         ));

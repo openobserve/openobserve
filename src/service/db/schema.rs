@@ -268,6 +268,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     log::error!("del_offset: {}", e);
                 }
+                super::compact::retention::del(org_id, stream_name, stream_type).await?;
             }
         }
     }

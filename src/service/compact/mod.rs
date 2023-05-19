@@ -25,10 +25,8 @@ mod merge;
 /// compactor delete run steps:
 pub async fn run_delete() -> Result<(), anyhow::Error> {
     // check data lifecyle date
-    if CONFIG.compact.data_retention > 0 {
+    if CONFIG.compact.data_retention_enabled {
         let now = chrono::Utc::now();
-        let date = now - chrono::Duration::days(CONFIG.compact.data_retention);
-        let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = cache::file_list::get_all_organization()?;
         let stream_types = [
@@ -41,6 +39,10 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             for stream_type in stream_types {
                 let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
                 for stream_name in streams {
+                    let stream_retention =
+                        db::compact::retention::get(&org_id, &stream_name, stream_type).await?;
+                    let date = now - chrono::Duration::days(stream_retention);
+                    let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
                     if let Err(e) = lifecycle::delete_by_stream(
                         &data_lifecycle_end,
                         &org_id,
