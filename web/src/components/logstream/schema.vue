@@ -82,7 +82,7 @@
             </table>
           </div>
 
-          <q-separator class="q-mt-xl q-mb-lg" />
+          <q-separator class="q-mt-lg q-mb-lg" />
 
           <div class="title" data-test="schema-log-stream-mapping-title-text">
             {{ t("logStream.mapping") }}

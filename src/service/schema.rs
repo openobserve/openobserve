@@ -328,6 +328,7 @@ pub async fn add_stream_schema(
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
             schema_validation: false,
+            data_retention: 0,
         };
         metadata.insert(
             "settings".to_string(),
