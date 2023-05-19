@@ -474,7 +474,7 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.memory_cache.max_size == 0 {
         // meminfo unit is KB
         let meminfo = sys_info::mem_info()?;
-        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 100 * 30; // 30%
+        cfg.memory_cache.max_size = meminfo.total as usize * 1024 * 3 / 10; // 30%
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
