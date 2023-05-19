@@ -153,7 +153,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "UserPageCloud",
@@ -447,6 +447,7 @@ export default defineComponent({
       currentUserRole,
       updateUserRole,
       getImageURL,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -456,6 +457,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.orgMembers.value == undefined) &&

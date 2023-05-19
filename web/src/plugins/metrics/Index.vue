@@ -155,6 +155,7 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -662,6 +663,7 @@ export default defineComponent({
       refreshData,
       setQuery,
       updateDateTime,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -687,6 +689,10 @@ export default defineComponent({
   watch: {
     changeOrganization() {
       // Fetch and update selected metrics
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       this.loadPageData();
     },
     selectedMetrics: {

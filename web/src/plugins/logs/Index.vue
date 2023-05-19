@@ -191,6 +191,7 @@ import {
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -1312,6 +1313,7 @@ export default defineComponent({
       setQuery,
       useLocalLogsObj,
       searchAroundData,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -1396,6 +1398,10 @@ export default defineComponent({
       }
     },
     changeOrganization() {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       if (this.router.currentRoute.value.name == "logs") {
         this.searchObj.data.tempFunctionContent = "";
         this.searchBarRef.resetFunctionContent();

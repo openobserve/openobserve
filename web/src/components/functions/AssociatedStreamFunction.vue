@@ -153,7 +153,7 @@ import streamService from "../../services/stream";
 import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -558,7 +558,8 @@ export default defineComponent({
         return filtered;
       },
       getImageURL,
-      loadingFunctions
+      loadingFunctions,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -568,6 +569,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.logStream.values == undefined) &&
