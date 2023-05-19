@@ -80,6 +80,11 @@ use crate::meta;
         request::prom::labels_get,
         request::prom::label_values,
         request::traces::traces_write,
+        request::syslog::create_route,
+        request::syslog::update_route,
+        request::syslog::list_routes,
+        request::syslog::delete_route,
+        request::lookup_table::save_enrichment_table,
     ),
     components(
         schemas(
@@ -143,8 +148,10 @@ use crate::meta;
             meta::ingestion::BulkResponse,
             meta::ingestion::BulkResponseItem,
             meta::ingestion::ShardResponse,
-            meta::ingestion::BulkResponseError
-        ),
+            meta::ingestion::BulkResponseError,
+            meta::syslog::SyslogRoute,
+            meta::syslog::SyslogRoutes,
+         ),
     ),
     modifiers(&SecurityAddon),
     tags(
@@ -161,6 +168,7 @@ use crate::meta;
         (name = "KV", description = "Key Value retrieval & management operations"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
+        (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
     ),
     info(
         description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",

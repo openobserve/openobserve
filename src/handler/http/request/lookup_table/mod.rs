@@ -18,6 +18,22 @@ use std::io::Error;
 
 use crate::{meta, service::lookup_table::save_metadata};
 
+/** CreateEnrichmentTable */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "CreateEnrichmentTable",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+    ),
+    
+    responses(
+        (status = StatusCode::CREATED, description = "Saved enrichment table", body = HttpResponse),
+        (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),
+    ),
+)]
 #[post("/{org_id}/metadata/{table_name}")]
 pub async fn save_enrichment_table(
     path: web::Path<(String, String)>,
