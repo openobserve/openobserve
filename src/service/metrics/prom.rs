@@ -37,9 +37,7 @@ use crate::{
     meta::{
         self,
         alert::{Alert, Trigger},
-        prom::{
-            self, CLUSTER_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, REPLICA_LABEL, VALUE_LABEL,
-        },
+        prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
         StreamType,
     },
     service::{
@@ -122,11 +120,11 @@ pub async fn remote_write(
             None => continue,
         };
         if !has_entry {
-            if let Some(v) = labels_value(&event.labels, REPLICA_LABEL) {
+            if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_replica_label) {
                 replica_label = v;
             };
             if cluster_name.is_empty() {
-                if let Some(v) = labels_value(&event.labels, CLUSTER_LABEL) {
+                if let Some(v) = labels_value(&event.labels, &CONFIG.prom.ha_cluster_label) {
                     cluster_name = format!("{}/{}", org_id, v);
                 }
             }
@@ -134,7 +132,10 @@ pub async fn remote_write(
         let labels: prom::FxIndexMap<String, String> = event
             .labels
             .iter()
-            .filter(|label| label.name != REPLICA_LABEL && label.name != CLUSTER_LABEL)
+            .filter(|label| {
+                label.name != CONFIG.prom.ha_replica_label
+                    && label.name != CONFIG.prom.ha_cluster_label
+            })
             .map(|label| (label.name.clone(), label.value.clone()))
             .collect();
 
