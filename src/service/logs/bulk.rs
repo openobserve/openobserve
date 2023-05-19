@@ -30,6 +30,7 @@ use crate::infra::metrics;
 use crate::meta::alert::Alert;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::StreamTransform;
+#[cfg(feature = "zo_functions")]
 use crate::meta::functions::VRLRuntimeConfig;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{

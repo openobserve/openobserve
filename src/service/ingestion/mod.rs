@@ -18,23 +18,30 @@ use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
+#[cfg(feature = "zo_functions")]
 use std::collections::BTreeMap;
+#[cfg(feature = "zo_functions")]
 use vector_enrichment::TableRegistry;
+#[cfg(feature = "zo_functions")]
 use vrl::compiler::TargetValueRef;
+#[cfg(feature = "zo_functions")]
 use vrl::compiler::{runtime::Runtime, CompilationResult};
+#[cfg(feature = "zo_functions")]
 use vrl::prelude::state;
 
-#[cfg(feature = "zo_functions")]
 use super::triggers;
+#[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
+#[cfg(feature = "zo_functions")]
 use crate::common::json;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::metrics;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::StreamTransform;
-use crate::meta::functions::VRLRuntimeConfig;
 #[cfg(feature = "zo_functions")]
+use crate::meta::functions::VRLRuntimeConfig;
+
 use crate::meta::StreamType;
 use crate::{
     common::json::{Map, Value},

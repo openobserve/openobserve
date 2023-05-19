@@ -968,7 +968,11 @@ pub async fn register_table(
 }
 
 #[cfg(not(feature = "zo_functions"))]
-fn handle_query_fn(_query_fn: String, _batches: Vec<RecordBatch>) -> Option<Vec<RecordBatch>> {
+fn handle_query_fn(
+    _query_fn: String,
+    _batches: Vec<RecordBatch>,
+    _org_id: &str,
+) -> Option<Vec<RecordBatch>> {
     None
 }
 
@@ -978,15 +982,9 @@ fn handle_query_fn(
     batches: Vec<RecordBatch>,
     org_id: &str,
 ) -> Option<Vec<RecordBatch>> {
-    /* match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
-       Some(query_fn_src) => {
-    */
     match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
         Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id).unwrap_or(None),
         Err(_) => None,
-        /*  }
-        }
-        None => None, */
     }
 }
 
