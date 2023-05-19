@@ -88,6 +88,7 @@ pub struct Config {
     pub sled: Sled,
     pub s3: S3,
     pub tcp: TCP,
+    pub prom: Prometheus,
 }
 
 #[derive(EnvConfig)]
@@ -323,6 +324,14 @@ pub struct S3 {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
+}
+
+#[derive(Debug, EnvConfig)]
+pub struct Prometheus {
+    #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
+    pub ha_cluster_label: String,
+    #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
+    pub ha_replica_label: String,
 }
 
 pub fn init() -> Config {
