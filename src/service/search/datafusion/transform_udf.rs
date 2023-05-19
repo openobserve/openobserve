@@ -27,10 +27,15 @@ use datafusion::{
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
 use vrl::compiler::{TargetValueRef, VrlRuntime};
 
-use crate::{common::json, infra::config::QUERY_FUNCTIONS, service::logs::get_value};
+use crate::{
+    common::json,
+    infra::config::QUERY_FUNCTIONS,
+    service::{ingestion::compile_vrl_function, logs::get_value},
+};
 
 fn create_user_df(
     fn_name: &str,
@@ -112,8 +117,8 @@ fn get_udf_vrl(
     }
     in_obj_str.push_str(&format!(" \n {}", &local_func));
     let res_cols = match compile_vrl_function(&in_obj_str) {
-        Some((_, cols)) => cols,
-        None => vec![],
+        Ok(res) => res.fields,
+        Err(_) => vec![],
     };
     // end pre computation stage
 
@@ -139,15 +144,16 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Some(mut func) = compile_vrl_function(&obj_str) {
-                let result = apply_vrl_fn(&mut runtime, func.0);
-
+            if let Ok(mut res) = compile_vrl_function(&obj_str) {
+                let registry = res.config.get_custom::<TableRegistry>().unwrap();
+                registry.finish_load();
+                let result = apply_vrl_fn(&mut runtime, res.program);
                 if result != json::Value::Null {
                     if result.is_object() {
                         is_multi_value = true;
                         let res_map = result.as_object().unwrap();
-                        func.1.sort();
-                        for col in func.1 {
+                        res.fields.sort();
+                        for col in res.fields {
                             let field_builder =
                                 col_val_map.entry(col.to_string()).or_insert_with(Vec::new);
                             if res_map.contains_key(&col) {
@@ -170,7 +176,6 @@ fn get_udf_vrl(
                     Arc::new(StringArray::from(v)) as ArrayRef,
                 ));
             }
-
             data_vec.sort_by(|a, b| a.0.name().cmp(b.0.name()));
 
             let result = StructArray::from(data_vec);
@@ -196,7 +201,7 @@ fn get_udf_vrl(
     pow_udf
 }
 
-pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
+pub fn _compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
     let mut fields = vec![];
     let result = vrl::compiler::compile(func, &vrl_stdlib::all());
     match result {
@@ -214,7 +219,6 @@ pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
             Some((program, fields))
         }
         Err(e) => {
-            println!("Error compiling vrl {:?}", e);
             log::info!("Error compiling vrl {:?}", e);
             None
         }

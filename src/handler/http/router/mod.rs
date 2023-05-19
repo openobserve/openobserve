@@ -34,7 +34,7 @@ use super::request::stream;
 use super::request::syslog;
 use super::request::traces::*;
 use super::request::users;
-use super::request::{alerts::*, metadata};
+use super::request::{alerts::*, lookup_table};
 use crate::infra::config::CONFIG;
 
 pub mod openapi;
@@ -190,7 +190,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::delete_route)
             .service(syslog::update_route)
             .service(syslog::toggle_state)
-            .service(metadata::save_enrichment_table),
+            .service(lookup_table::save_enrichment_table),
     );
 }
 

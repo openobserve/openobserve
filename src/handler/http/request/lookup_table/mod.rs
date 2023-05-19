@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use actix_multipart::Multipart;
-use actix_web::{post, web, HttpRequest, HttpResponse};
+use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::service::lookup_table::save_metadata;
+use crate::{meta, service::lookup_table::save_metadata};
 
 #[post("/{org_id}/metadata/{table_name}")]
 pub async fn save_enrichment_table(
@@ -26,18 +26,26 @@ pub async fn save_enrichment_table(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, table_name) = path.into_inner();
-    for header in req.headers() {
-        println!("{}: {:?}", header.0, header.1);
+    let content_type = req.headers().get("content-type");
+    match content_type {
+        Some(content_type) => {
+            if content_type
+                .to_str()
+                .unwrap_or("")
+                .starts_with("multipart/form-data")
+            {
+                save_metadata(&org_id, &table_name, payload, thread_id).await
+            } else {
+                Ok(bad_request())
+            }
+        }
+        None => Ok(bad_request()),
     }
-    let _content_type = req.headers().get("content-type").unwrap();
-    //if content_type == "text/csv" {
-    save_metadata(&org_id, &table_name, payload, thread_id).await
-    /*  } else {
-        Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Bad Request".to_string(),
-            )),
-        )
-    } */
+}
+
+fn bad_request() -> HttpResponse {
+    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+        http::StatusCode::BAD_REQUEST.into(),
+        "Bad Request".to_string(),
+    ))
 }

@@ -14,10 +14,10 @@
 
 pub mod alerts;
 pub mod dashboards;
-pub mod metadata;
 pub mod functions;
 pub mod kv;
 pub mod logs;
+pub mod lookup_table;
 pub mod organization;
 pub mod prom;
 pub mod search;
