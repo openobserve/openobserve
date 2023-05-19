@@ -136,7 +136,7 @@ import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 
 export default defineComponent({
@@ -354,6 +354,7 @@ export default defineComponent({
       deleteDashboard,
       getDashboards,
       getImageURL,
+      verifyOrganizationStatus,
     };
   },
   methods: {
@@ -383,6 +384,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       this.orgData.identifier = newVal;
       if (
         (newVal != oldVal || this.dashboards.value == undefined) &&

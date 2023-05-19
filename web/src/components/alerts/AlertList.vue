@@ -13,21 +13,52 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page data-test="alert-list-page" class="q-pa-none" style="min-height: inherit">
+  <q-page
+    data-test="alert-list-page"
+    class="q-pa-none"
+    style="min-height: inherit"
+  >
     <div v-if="!showAddAlertDialog">
-      <q-table data-test="alert-list-table" ref="qTable" :rows="alerts" :columns="columns" row-key="id"
-        :pagination="pagination" :filter="filterQuery" :filter-method="filterData" style="width: 100%">
+      <q-table
+        data-test="alert-list-table"
+        ref="qTable"
+        :rows="alerts"
+        :columns="columns"
+        row-key="id"
+        :pagination="pagination"
+        :filter="filterQuery"
+        :filter-method="filterData"
+        style="width: 100%"
+      >
         <template #no-data>
           <NoData />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn :data-test="`alert-list-${props.row.name}-udpate-alert`" icon="edit" class="q-ml-xs iconHoverBtn"
-              padding="sm" unelevated size="sm" round flat :title="t('alerts.edit')"
-              @click="showAddUpdateFn(props)"></q-btn>
-            <q-btn :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')" class="q-ml-xs iconHoverBtn" padding="sm"
-              unelevated size="sm" round flat :title="t('alerts.delete')" @click="showDeleteDialogFn(props)"></q-btn>
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              icon="edit"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.edit')"
+              @click="showAddUpdateFn(props)"
+            ></q-btn>
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-delete-alert`"
+              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.delete')"
+              @click="showDeleteDialogFn(props)"
+            ></q-btn>
           </q-td>
         </template>
 
@@ -43,31 +74,65 @@
           <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
-          <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alerts.search')"
+          >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
             </template>
           </q-input>
-          <q-btn data-test="alert-list-add-alert-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
-            color="secondary" no-caps :label="t(`alerts.add`)" @click="showAddUpdateFn({})" />
+          <q-btn
+            data-test="alert-list-add-alert-btn"
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`alerts.add`)"
+            @click="showAddUpdateFn({})"
+          />
 
-          <QTablePagination :scope="scope" :pageTitle="t('alerts.header')" :position="'top'" :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
+          <QTablePagination
+            :scope="scope"
+            :pageTitle="t('alerts.header')"
+            :position="'top'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
 
         <template #bottom="scope">
-          <QTablePagination :scope="scope" :position="'bottom'" :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions" @update:changeRecordPerPage="changePagination" />
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
       </q-table>
     </div>
     <div v-else>
-      <AddAlert v-model="formData" :isUpdated="isUpdated" :destinations="destinations" @update:list="refreshList"
-        @cancel:hideform="hideForm" />
+      <AddAlert
+        v-model="formData"
+        :isUpdated="isUpdated"
+        :destinations="destinations"
+        @update:list="refreshList"
+        @cancel:hideform="hideForm"
+      />
     </div>
-    <ConfirmDialog title="Delete Alert" message="Are you sure you want to delete alert?" @update:ok="deleteAlert"
-      @update:cancel="confirmDelete = false" v-model="confirmDelete" />
+    <ConfirmDialog
+      title="Delete Alert"
+      message="Are you sure you want to delete alert?"
+      @update:ok="deleteAlert"
+      @update:cancel="confirmDelete = false"
+      v-model="confirmDelete"
+    />
   </q-page>
 </template>
 
@@ -86,7 +151,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
 export default defineComponent({
   name: "AlertList",
@@ -422,6 +487,7 @@ export default defineComponent({
       getImageURL,
       activeTab,
       destinations,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -431,6 +497,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       if (
         newVal != oldVal &&
         this.router.currentRoute.value.name == "alertList"
@@ -466,7 +536,7 @@ export default defineComponent({
 
         &__content.tab_content {
           .q-tab {
-            &__icon+&__label {
+            &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;
             }

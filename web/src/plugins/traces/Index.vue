@@ -175,6 +175,7 @@ import {
   useLocalLogsObj,
   b64EncodeUnicode,
   useLocalTraceFilterField,
+  verifyOrganizationStatus,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -1194,6 +1195,7 @@ export default defineComponent({
       useLocalLogsObj,
       searchAroundData,
       getTraceDetails,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -1267,6 +1269,10 @@ export default defineComponent({
       }
     },
     changeOrganization() {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       if (this.router.currentRoute.value.name == "logs") {
         this.searchObj.data.query = "";
         this.setQuery("");

@@ -304,3 +304,15 @@ export const convertToTitleCase = (str: string) => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 };
+
+export const verifyOrganizationStatus = (Organizations: any, Router: any) => {
+  for (const org of Organizations) {
+    if (org.status == "pending-subscription") {
+      Dialog.create({
+        title: "Warning",
+        message: "Please subscribe to a paid plan to continue."
+      });
+      Router.push({ name: "plans" });
+    }
+  }
+};
