@@ -12,8 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
+use arrow_schema::Schema;
+use bytes::{BufMut, BytesMut};
+use chrono::{TimeZone, Utc};
+#[cfg(feature = "zo_functions")]
+use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
+use std::collections::BTreeMap;
+use vector_enrichment::TableRegistry;
+use vrl::compiler::TargetValueRef;
+use vrl::compiler::{runtime::Runtime, CompilationResult};
+use vrl::prelude::state;
+
 #[cfg(feature = "zo_functions")]
 use super::triggers;
+use crate::common::functions::get_vrl_compiler_config;
+use crate::common::json;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::metrics;
@@ -31,23 +45,11 @@ use crate::{
     infra::config::STREAM_ALERTS,
     meta::alert::{Alert, Trigger},
 };
-use ahash::AHashMap;
-use arrow_schema::Schema;
-use bytes::{BufMut, BytesMut};
-use chrono::{TimeZone, Utc};
-#[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-use std::collections::BTreeMap;
-use vrl::compiler::TargetValueRef;
-use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
-use vrl::prelude::state;
-
-use crate::common::functions::get_vrl_compiler_config;
 
 #[cfg(feature = "zo_functions")]
-pub fn compile_vrl_function(func: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
+pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     let external = state::ExternalEnv::default();
-    let vrl_config = get_vrl_compiler_config();
+    let vrl_config = get_vrl_compiler_config(org_id);
     match vrl::compiler::compile_with_external(
         func,
         &vrl_config.functions,
@@ -71,7 +73,7 @@ pub fn compile_vrl_function(func: &str) -> Result<VRLRuntimeConfig, std::io::Err
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: Program, row: &Value) -> Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: &Value) -> Value {
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
         value: &mut vrl_value::Value::from(row),
@@ -80,7 +82,9 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: Program, row: &Value) -> Val
     };
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match vrl::compiler::VrlRuntime::default() {
-        vrl::compiler::VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
+        vrl::compiler::VrlRuntime::Ast => {
+            runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
+        }
     };
     match result {
         Ok(res) => match res.try_into() {
@@ -266,8 +270,15 @@ pub fn register_stream_transforms<'a>(
                 {
                     stream_lua_map.insert(func_key, local_fn.to_owned());
                 }
-            } else if let Ok(program) = compile_vrl_function(&trans.transform.function) {
-                stream_vrl_map.insert(func_key, program);
+            } else if let Ok(vrl_runtime_config) =
+                compile_vrl_function(&trans.transform.function, org_id)
+            {
+                let registry = vrl_runtime_config
+                    .config
+                    .get_custom::<TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                stream_vrl_map.insert(func_key, vrl_runtime_config);
             }
         }
     }
@@ -285,10 +296,6 @@ pub fn apply_stream_transform<'a>(
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Value {
-    use vector_enrichment::TableRegistry;
-
-    use crate::common::json;
-
     let mut value = value.clone();
     let empty_map = AHashMap::new();
     for trans in local_tans {
@@ -301,9 +308,7 @@ pub fn apply_stream_transform<'a>(
             value = lua_transform(lua, &value, local_map.get(&func_key).unwrap());
         } else if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
-            let registry = vrl_runtime.config.get_custom::<TableRegistry>().unwrap();
-            registry.finish_load();
-            value = apply_vrl_fn(runtime, vrl_runtime.program.clone(), &value);
+            value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
     }
     json::flatten_json_and_format_field(&value)
@@ -425,6 +430,7 @@ mod tests {
             r#"if .country == "USA" {
                 ..country = "United States"
             }"#,
+            "default",
         );
         assert!(result.is_err())
     }

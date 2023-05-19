@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use vrl::prelude::NotNan;
 
+use crate::infra::cache::stats;
 use crate::service::search as SearchService;
 use crate::{
     common::json,
@@ -8,8 +9,16 @@ use crate::{
 };
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl_value::value::Value>, anyhow::Error> {
+    let stats = stats::get_stream_stats(org_id, name, meta::StreamType::LookUpTable);
+
+    let rec_num = if stats.doc_num == 0 {
+        100000
+    } else {
+        stats.doc_num
+    };
+
     let query = meta::search::Query {
-        sql: format!("SELECT * FROM \"{}\"", name),
+        sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
         sql_mode: "full".to_owned(),
         ..Default::default()
     };

@@ -10,8 +10,9 @@ pub struct StreamTableConfig {}
 
 #[derive(Debug, Clone)]
 pub struct StreamTable {
-    pub(crate) stream_name: String,
-    pub(crate) data: Vec<vrl_value::Value>,
+    pub org_id: String,
+    pub stream_name: String,
+    pub data: Vec<vrl_value::Value>,
 }
 impl StreamTable {}
 
@@ -78,14 +79,14 @@ fn get_data(
                     match cond {
                         vector_enrichment::Condition::Equals { field, value } => match case {
                             Case::Insensitive => {
-                                if let Value::Bytes(bytes1) = map.get(field.to_owned()).unwrap() {
+                                if let Some(Value::Bytes(bytes1)) = map.get(field.to_owned()) {
                                     if let Value::Bytes(bytes2) = value {
                                         match (
                                             std::str::from_utf8(bytes1),
                                             std::str::from_utf8(bytes2),
                                         ) {
                                             (Ok(s1), Ok(s2)) => {
-                                                return s1.to_lowercase() == s2.to_lowercase();
+                                                return s1.eq_ignore_ascii_case(s2);
                                             }
                                             (Err(_), Err(_)) => return bytes1 == bytes2,
                                             _ => return false,

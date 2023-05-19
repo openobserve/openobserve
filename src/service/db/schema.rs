@@ -265,6 +265,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     LOOKUP_TABLES.insert(
                         item_key.to_owned(),
                         StreamTable {
+                            org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
                             data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
                         },
@@ -343,6 +344,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             LOOKUP_TABLES.insert(
                 item_key.to_owned(),
                 StreamTable {
+                    org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
                     data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
                 },

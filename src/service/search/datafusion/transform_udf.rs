@@ -90,6 +90,7 @@ pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::Sc
                     transform.function.to_owned().as_str(),
                     &transform.params,
                     transform.num_args,
+                    org_id,
                 );
             }
 
@@ -104,10 +105,12 @@ fn get_udf_vrl(
     func: &str,
     params: &str,
     num_args: u8,
+    org_id: &str,
 ) -> datafusion::logical_expr::ScalarUDF {
     let local_fn_name = fn_name;
     let local_func = func.trim().to_owned();
     let local_fn_params = params.to_owned();
+    let local_org_id = org_id.to_owned();
 
     //pre computation stage
     let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
@@ -116,7 +119,7 @@ fn get_udf_vrl(
         in_obj_str.push_str(&format!(" {} = \"{}\" \n", param, ""));
     }
     in_obj_str.push_str(&format!(" \n {}", &local_func));
-    let res_cols = match compile_vrl_function(&in_obj_str) {
+    let res_cols = match compile_vrl_function(&in_obj_str, &local_org_id) {
         Ok(res) => res.fields,
         Err(_) => vec![],
     };
@@ -144,7 +147,7 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Ok(mut res) = compile_vrl_function(&obj_str) {
+            if let Ok(mut res) = compile_vrl_function(&obj_str, &local_org_id) {
                 let registry = res.config.get_custom::<TableRegistry>().unwrap();
                 registry.finish_load();
                 let result = apply_vrl_fn(&mut runtime, res.program);
@@ -350,6 +353,7 @@ mod tests {
             //" . =  col1 + 10 \n .",
             "col1",
             1,
+            "org1",
         );
 
         ctx.register_udf(lua_udf.clone());
