@@ -86,7 +86,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::yield_now().await; // yield let other tasks run
     db::functions::cache().await?;
     db::user::cache().await?;
-    db::schema::cache().await?;
+ 
     db::compact::delete::cache().await?;
     db::cache_prom_cluster_leader().await?;
     db::alerts::cache().await?;

@@ -14,13 +14,18 @@
 
 #[cfg(feature = "zo_functions")]
 use super::triggers;
-use crate::common::json::{Map, Value};
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
+use crate::infra::metrics;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::StreamTransform;
+use crate::meta::functions::VRLRuntimeConfig;
 #[cfg(feature = "zo_functions")]
 use crate::meta::StreamType;
+use crate::{
+    common::json::{Map, Value},
+    infra::config::CONFIG,
+};
 use crate::{
     common::notification::send_notification,
     infra::config::STREAM_ALERTS,
@@ -28,24 +33,36 @@ use crate::{
 };
 use ahash::AHashMap;
 use arrow_schema::Schema;
+use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
 use std::collections::BTreeMap;
 use vrl::compiler::TargetValueRef;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
+use vrl::prelude::state;
+
+use crate::common::functions::get_vrl_compiler_config;
 
 #[cfg(feature = "zo_functions")]
-pub fn compile_vrl_function(func: &str) -> Result<Program, std::io::Error> {
-    let mut functions = vrl::stdlib::all();
-    functions.append(&mut vector_enrichment::vrl_functions());
-
-    match vrl::compiler::compile(func, &functions) {
+pub fn compile_vrl_function(func: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
+    let external = state::ExternalEnv::default();
+    let vrl_config = get_vrl_compiler_config();
+    match vrl::compiler::compile_with_external(
+        func,
+        &vrl_config.functions,
+        &external,
+        vrl_config.config,
+    ) {
         Ok(CompilationResult {
             program,
             warnings: _,
-            config: _,
-        }) => Ok(program),
+            config,
+        }) => Ok(VRLRuntimeConfig {
+            program,
+            config,
+            fields: vec![],
+        }),
         Err(e) => Err(std::io::Error::new(
             std::io::ErrorKind::Other,
             vrl::diagnostic::Formatter::new(func, e).to_string(),
@@ -70,7 +87,10 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: Program, row: &Value) -> Val
             Ok(val) => val,
             Err(_) => row.clone(),
         },
-        Err(_) => row.clone(),
+        Err(err) => {
+            println!("Error from vrl {:?}", err);
+            row.clone()
+        }
     }
 }
 
@@ -107,7 +127,7 @@ pub async fn get_stream_transforms<'a>(
     org_id: String,
     stream_type: StreamType,
     stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
-    stream_vrl_map: &mut AHashMap<String, Program>,
+    stream_vrl_map: &mut AHashMap<String, VRLRuntimeConfig>,
     stream_lua_map: &mut AHashMap<String, Function<'a>>,
     lua: &'a Lua,
 ) {
@@ -228,10 +248,10 @@ pub fn register_stream_transforms<'a>(
 ) -> (
     Vec<StreamTransform>,
     AHashMap<String, Function<'a>>,
-    AHashMap<String, Program>,
+    AHashMap<String, VRLRuntimeConfig>,
 ) {
     let mut local_tans = vec![];
-    let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
+    let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
@@ -261,10 +281,14 @@ pub fn apply_stream_transform<'a>(
     value: &'a Value,
     lua: Option<&'a Lua>,
     stream_lua_map: Option<&'a AHashMap<String, Function>>,
-    stream_vrl_map: &'a AHashMap<String, Program>,
+    stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Value {
+    use vector_enrichment::TableRegistry;
+
+    use crate::common::json;
+
     let mut value = value.clone();
     let empty_map = AHashMap::new();
     for trans in local_tans {
@@ -276,18 +300,58 @@ pub fn apply_stream_transform<'a>(
         if local_map.contains_key(&func_key) && lua.is_some() {
             value = lua_transform(lua, &value, local_map.get(&func_key).unwrap());
         } else if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
-            value = apply_vrl_fn(
-                runtime,
-                stream_vrl_map.get(&func_key).unwrap().clone(),
-                &value,
-            );
+            let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
+            let registry = vrl_runtime.config.get_custom::<TableRegistry>().unwrap();
+            registry.finish_load();
+            value = apply_vrl_fn(runtime, vrl_runtime.program.clone(), &value);
         }
     }
-    value
+    json::flatten_json_and_format_field(&value)
 }
 
 pub fn format_stream_name(stream_name: &str) -> String {
     stream_name.replace('/', "_").replace('=', "-")
+}
+
+pub fn write_file(
+    buf: AHashMap<String, Vec<String>>,
+    thread_id: actix_web::web::Data<usize>,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_file_name: &mut String,
+) {
+    let mut write_buf = BytesMut::new();
+    for (key, entry) in buf {
+        if entry.is_empty() {
+            continue;
+        }
+        write_buf.clear();
+        for row in &entry {
+            write_buf.put(row.as_bytes());
+            write_buf.put("\n".as_bytes());
+        }
+        let file = crate::infra::file_lock::get_or_create(
+            *thread_id.as_ref(),
+            org_id,
+            stream_name,
+            stream_type,
+            &key,
+            CONFIG.common.wal_memory_mode_enabled,
+        );
+        if stream_file_name.is_empty() {
+            *stream_file_name = file.full_name();
+        }
+        file.write(write_buf.as_ref());
+
+        // metrics
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .inc_by(entry.len() as u64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .inc_by(write_buf.len() as u64);
+    }
 }
 
 #[cfg(feature = "zo_functions")]

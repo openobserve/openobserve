@@ -21,8 +21,6 @@ use mlua::Function;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
-#[cfg(feature = "zo_functions")]
-use vrl::compiler::Program;
 
 use super::StreamMeta;
 use crate::common::json;
@@ -32,6 +30,7 @@ use crate::infra::metrics;
 use crate::meta::alert::Alert;
 #[cfg(feature = "zo_functions")]
 use crate::meta::functions::StreamTransform;
+use crate::meta::functions::VRLRuntimeConfig;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{
     BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
@@ -39,6 +38,7 @@ use crate::meta::ingestion::{
 };
 use crate::meta::StreamType;
 use crate::service::db;
+use crate::service::ingestion::write_file;
 use crate::service::schema::stream_schema_exists;
 use crate::{common::time::parse_timestamp_micro_from_value, meta::alert::Trigger};
 
@@ -74,7 +74,7 @@ pub async fn ingest(
     #[cfg(feature = "zo_functions")]
     let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
     #[cfg(feature = "zo_functions")]
-    let mut stream_vrl_map: AHashMap<String, Program> = AHashMap::new();
+    let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
     #[cfg(feature = "zo_functions")]
     let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -207,7 +207,6 @@ pub async fn ingest(
                     value = ret_value;
                 }
             }
-
             //End row based transform
 
             // get json object
@@ -311,11 +310,12 @@ pub async fn ingest(
     for (stream_name, stream_data) in stream_data_map {
         // write to file
         let mut stream_file_name = "".to_string();
-        super::write_file(
+        write_file(
             stream_data.data,
             thread_id.clone(),
             org_id,
             &stream_name,
+            StreamType::Logs,
             &mut stream_file_name,
         );
     }

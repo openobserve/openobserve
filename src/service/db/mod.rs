@@ -27,6 +27,7 @@ pub mod dashboard;
 pub mod file_list;
 pub mod functions;
 pub mod kv;
+pub mod lookup_table;
 pub mod schema;
 pub mod syslog;
 pub mod triggers;

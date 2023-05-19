@@ -17,7 +17,7 @@ use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
-mod delete;
+pub(crate) mod delete;
 mod file_list;
 mod lifecycle;
 mod merge;
@@ -35,7 +35,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             StreamType::Logs,
             StreamType::Metrics,
             StreamType::Traces,
-            StreamType::Metadata,
+            StreamType::LookUpTable,
         ];
         for org_id in orgs {
             for stream_type in stream_types {
@@ -129,7 +129,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::Logs,
         StreamType::Metrics,
         StreamType::Traces,
-        StreamType::Metadata,
+        StreamType::LookUpTable,
     ];
     for org_id in orgs {
         for stream_type in stream_types {

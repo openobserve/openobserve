@@ -991,16 +991,22 @@ fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
 ) -> Result<Option<Vec<RecordBatch>>> {
+    use vector_enrichment::TableRegistry;
+
     let mut resp = vec![];
     let mut runtime = crate::common::functions::init_vrl_runtime();
     match crate::service::ingestion::compile_vrl_function(&query_fn_src) {
         Ok(program) => {
+            
+            let registry = program.config.get_custom::<TableRegistry>().unwrap();
+            registry.finish_load();
+
             let rows_val: Vec<json::Value> = in_batch
                 .iter()
                 .filter_map(|hit| {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        program.clone(),
+                        program.program.clone(),
                         &json::Value::Object(hit.clone()),
                     );
                     (!ret_val.is_null()).then_some(ret_val)
