@@ -255,7 +255,7 @@ pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
-    // MB, default is half of system memory
+    // MB, default is 30% of system memory
     pub max_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     // MB, default is 1% of max_size
@@ -474,7 +474,7 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.memory_cache.max_size == 0 {
         // meminfo unit is KB
         let meminfo = sys_info::mem_info()?;
-        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 2;
+        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 100 * 30; // 30%
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
@@ -574,13 +574,13 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention = 10;
+        cfg.compact.data_retention_days = 10;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention, 10);
+        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention = 2;
+        cfg.compact.data_retention_days = 2;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_err());
 
