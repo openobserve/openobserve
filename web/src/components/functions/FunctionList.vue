@@ -86,7 +86,7 @@ import AddFunction from "./AddFunction.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "FunctionList",
@@ -383,6 +383,7 @@ export default defineComponent({
         return filtered;
       },
       getImageURL,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -392,6 +393,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
         this.router.currentRoute.value.name == "functions"

@@ -90,7 +90,7 @@ import organizationsService from "@/services/organizations";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IngestMetrics",
@@ -236,6 +236,7 @@ export default defineComponent({
       showUpdateDialogFn,
       confirmUpdate,
       getImageURL,
+      verifyOrganizationStatus,
     };
   },
   computed: {
@@ -245,7 +246,10 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      console.log(this.router.currentRoute.value.name);
+      this.verifyOrganizationStatus(
+        this.store.state.organizations,
+        this.router
+      );
       if (
         newVal != oldVal &&
         (this.router.currentRoute.value.name === "ingestMetrics" ||
