@@ -273,6 +273,8 @@ pub async fn delete_stream(
     )))
 }
 
+
+
 pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, anyhow::Error> {
     let mut full_text_search_keys = vec![];
     let settings = schema.metadata.get("settings");

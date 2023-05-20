@@ -47,7 +47,6 @@ use crate::{
 use super::ingestion::{format_stream_name, get_partition_key_record};
 use super::schema::add_stream_schema;
 
-pub mod metadata;
 pub mod otlp_http;
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";

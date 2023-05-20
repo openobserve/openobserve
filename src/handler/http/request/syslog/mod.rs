@@ -30,7 +30,7 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
 /** CreateSyslogRoute */
 #[utoipa::path(
     context_path = "/api",
-    tag = "SyslogRoutes",
+    tag = "Syslog Routes",
     operation_id = "CreateSyslogRoute",
     security(
         ("Authorization" = [])
@@ -39,11 +39,7 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
     ),
     request_body(
         content = SyslogRoute,
-        description = "SyslogRoute details",
-        example = json!({
-            "org_id": "org1",
-            "subnets": "",
-        }),
+        description = "SyslogRoute details",        
     ),
     responses(
         (status = StatusCode::CREATED, description = "Route created", body = SyslogRoute),
@@ -58,7 +54,7 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
 /// UpdateSyslogRoute
 #[utoipa::path(
     context_path = "/api",
-    tag = "SyslogRoutes",
+    tag = "Syslog Routes",
     operation_id = "UpdateSyslogRoute",
     security(
         ("Authorization" = [])
@@ -71,7 +67,7 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
         description = "SyslogRoute details",
     ),
     responses(
-        (status = StatusCode::OK, description = "SyslogRoute updated", body = HttpResponse),
+        (status = StatusCode::OK, description = "SyslogRoute updated", body = SyslogRoute),
         (status = StatusCode::NOT_FOUND, description = "SyslogRoute not found", body = HttpResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the SyslogRoute", body = HttpResponse),
     ),
@@ -88,7 +84,7 @@ async fn update_route(
 /// ListSyslogRoutes
 #[utoipa::path(
     context_path = "/api",
-   tag = "SyslogRoutes",
+   tag = "Syslog Routes",
     operation_id = "ListSyslogRoutes",
     security(
         ("Authorization" = [])
@@ -96,7 +92,7 @@ async fn update_route(
     params(
     ),
     responses(
-        (status = StatusCode::OK, body = Routes),
+        (status = StatusCode::OK, body = SyslogRoutes),
     ),
 )]
 #[get("/{org_id}/syslog-routes")]
@@ -107,7 +103,7 @@ async fn list_routes() -> impl Responder {
 /// DeleteSyslogRoute
 #[utoipa::path(
     context_path = "/api",
-   tag = "SyslogRoutes",
+   tag = "Syslog Routes",
     operation_id = "DeleteSyslogRoute",
     security(
         ("Authorization" = [])

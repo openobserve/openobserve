@@ -51,11 +51,7 @@ pub fn generate_partioned_file_key(
     let id = ider::generate();
     let time = Utc.timestamp_nanos(min_ts * 1000);
 
-    let prefix = if stream_type.eq(&StreamType::Metadata) {
-        time.format("%Y/00/00/00").to_string()
-    } else {
-        time.format("%Y/%m/%d/%H").to_string()
-    };
+    let prefix = time.format("%Y/%m/%d/%H").to_string();
     (
         format!("{org_id}/{stream_type}/{stream_name}/{prefix}/"),
         format!("{id}{extn}"),

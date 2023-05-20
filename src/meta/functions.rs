@@ -14,7 +14,10 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use vrl::{TimeZone, VrlRuntime};
+use vrl::{
+    compiler::{CompileConfig, Program, TimeZone, VrlRuntime},
+    prelude::Function,
+};
 
 use super::StreamType;
 
@@ -114,6 +117,17 @@ pub struct VRLConfig {
 
 fn default_trans_type() -> Option<u8> {
     Some(0)
+}
+
+pub struct VRLCompilerConfig {
+    pub config: CompileConfig,
+    pub functions: Vec<Box<dyn Function>>,
+}
+
+pub struct VRLRuntimeConfig {
+    pub config: CompileConfig,
+    pub program: Program,
+    pub fields: Vec<String>,
 }
 
 #[cfg(test)]
