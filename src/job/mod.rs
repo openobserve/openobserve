@@ -84,21 +84,39 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::syslog::watch().await });
     tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
     tokio::task::yield_now().await; // yield let other tasks run
-    db::functions::cache().await?;
-    db::user::cache().await?;
-    db::schema::cache().await?;
-    db::compact::delete::cache().await?;
-    db::cache_prom_cluster_leader().await?;
-    db::alerts::cache().await?;
-    db::triggers::cache().await?;
-    db::alerts::templates::cache().await?;
-    db::alerts::destinations::cache().await?;
-    db::syslog::cache().await?;
-    db::syslog::cache_syslog_settings().await?;
+    db::functions::cache()
+        .await
+        .expect("functions cache failed");
+    db::user::cache().await.expect("user cache failed");
+    db::schema::cache().await.expect("schema cache failed");
+    db::compact::delete::cache()
+        .await
+        .expect("compact delete cache failed");
+    db::cache_prom_cluster_leader()
+        .await
+        .expect("prom cluster leader cache failed");
+    db::alerts::cache().await.expect("alerts cache failed");
+    db::triggers::cache()
+        .await
+        .expect("alerts triggers cache failed");
+    db::alerts::templates::cache()
+        .await
+        .expect("alerts templates cache failed");
+    db::alerts::destinations::cache()
+        .await
+        .expect("alerts destinations cache failed");
+    db::syslog::cache().await.expect("syslog cache failed");
+    db::syslog::cache_syslog_settings()
+        .await
+        .expect("syslog settings cache failed");
 
     // cache file list
-    db::file_list::local::cache().await?;
-    db::file_list::remote::cache().await?;
+    db::file_list::local::cache()
+        .await
+        .expect("file list local cache failed");
+    db::file_list::remote::cache()
+        .await
+        .expect("file list remote cache failed");
 
     // Shouldn't serve request until initialization finishes
     log::info!("[TRACE] Start job");
@@ -119,7 +137,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();
     if start_syslog {
-        syslog_server::run(start_syslog, true).await?;
+        syslog_server::run(start_syslog, true)
+            .await
+            .expect("syslog server run failed");
     }
 
     Ok(())
