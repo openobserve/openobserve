@@ -34,6 +34,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     )
     .expect("Email regex is valid");
 
+    // init root user
     if !db::user::root_user_exists().await {
         if CONFIG.auth.root_user_email.is_empty()
             || !email_regex.is_match(&CONFIG.auth.root_user_email)
@@ -53,6 +54,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         )
         .await;
     }
+    // cache users
+    tokio::task::spawn(async move { db::user::watch().await });
+    db::user::cache().await.expect("user cache failed");
+
     //set instance id
     let instance_id = match db::get_instance().await {
         Ok(Some(instance)) => instance,
@@ -67,16 +72,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // check version
     db::version::set().await.expect("db version set failed");
 
+    // Router doesn't need to initialize job
+    if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+        return Ok(());
+    }
+
     // telemetry run
     if CONFIG.common.telemetry_enabled {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
+    // initialize metadata
     tokio::task::spawn(async move { db::functions::watch().await });
-    tokio::task::spawn(async move { db::user::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });
     tokio::task::spawn(async move { db::compact::delete::watch().await });
-    tokio::task::spawn(async move { db::watch_prom_cluster_leader().await });
+    tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
@@ -87,12 +97,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::functions::cache()
         .await
         .expect("functions cache failed");
-    db::user::cache().await.expect("user cache failed");
     db::schema::cache().await.expect("schema cache failed");
     db::compact::delete::cache()
         .await
         .expect("compact delete cache failed");
-    db::cache_prom_cluster_leader()
+    db::metrics::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
     db::alerts::cache().await.expect("alerts cache failed");
