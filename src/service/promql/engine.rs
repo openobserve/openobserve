@@ -352,14 +352,19 @@ impl QueryEngine {
                 selector_load_data_from_datafusion(ctx, selector).await
             });
             tasks.push(task);
-            // batches.extend(batch);
         }
         let task_results = try_join_all(tasks)
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
 
         let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
+        let task_results_len = task_results.len();
         for task_result in task_results {
+            if task_results_len == 1 {
+                // only one ctx, no need to merge, just set it to metrics
+                metrics = task_result?;
+                break;
+            }
             for (key, value) in task_result? {
                 let metric = metrics
                     .entry(key)
@@ -368,6 +373,7 @@ impl QueryEngine {
             }
         }
 
+        // no data, return immediately
         if metrics.is_empty() {
             self.metrics_cache
                 .insert(table_name.to_string(), Value::None);

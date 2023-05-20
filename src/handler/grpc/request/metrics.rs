@@ -47,10 +47,10 @@ impl Metrics for Querier {
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/prometheus/api/v1/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/metrics/query", "500", &org_id, "", &stream_type])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/prometheus/api/v1/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/metrics/query", "500", &org_id, "", &stream_type])
                 .inc();
             let message = if let errors::Error::ErrorCode(code) = err {
                 code.to_json()
@@ -62,10 +62,10 @@ impl Metrics for Querier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/prometheus/api/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", &org_id, "", &stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/prometheus/api/v1/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", &org_id, "", &stream_type])
             .inc();
 
         Ok(Response::new(result))
@@ -76,6 +76,7 @@ impl Metrics for Querier {
         &self,
         req: Request<MetricsWalFileRequest>,
     ) -> Result<Response<MetricsWalFileResponse>, Status> {
+        let start = std::time::Instant::now();
         let org_id = req.get_ref().org_id.clone();
         let stream_name = req.get_ref().stream_name.clone();
         let pattern = format!(
@@ -94,6 +95,15 @@ impl Metrics for Querier {
                 });
             }
         }
+
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/metrics/wal_file", "200", &org_id, &stream_name, "metrics"])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/metrics/wal_file", "200", &org_id, &stream_name, "metrics"])
+            .inc();
+
         Ok(Response::new(resp))
     }
 }
