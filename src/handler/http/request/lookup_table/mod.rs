@@ -18,7 +18,6 @@ use std::io::Error;
 
 use crate::{meta, service::lookup_table::save_metadata};
 
-
 /** CreateEnrichmentTable */
 #[utoipa::path(
     context_path = "/api",
@@ -28,8 +27,9 @@ use crate::{meta, service::lookup_table::save_metadata};
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("table_name" = String, Path, description = "Table name"),
     ),
-    
     responses(
         (status = StatusCode::CREATED, description = "Saved enrichment table", body = HttpResponse),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),

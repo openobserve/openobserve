@@ -24,8 +24,8 @@ fn exec(data: &RangeValue) -> Option<f64> {
     if data.samples.len() < 2 {
         return None;
     }
-    let (last, data) = data.samples.split_last().unwrap();
-    let previous = data.last().unwrap();
+    let last = data.samples.last().unwrap();
+    let previous = data.samples.get(data.samples.len() - 2).unwrap();
     let dt_seconds = ((last.timestamp - previous.timestamp) / 1_000_000) as f64;
     if dt_seconds == 0.0 {
         return Some(0.0);

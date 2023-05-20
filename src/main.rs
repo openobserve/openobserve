@@ -135,8 +135,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online().await;
 
-    //This is specifically for lookup tables caching happening using search service
-    db::schema::cache().await?;
+    //This is specifically for lookup tables caching happening using search service 
+    db::schema::cache().await.expect("schema cache failed");
 
     // metrics
     let prometheus = metrics::create_prometheus_handler();

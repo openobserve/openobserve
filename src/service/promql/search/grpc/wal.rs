@@ -53,8 +53,7 @@ pub(crate) async fn create_context(
 
     let work_dir = session_id.to_string();
     for file in files {
-        dbg!(file.name.clone(), file.body.len());
-        let file_name = format!("/{work_dir}/{}.json", file.name);
+        let file_name = format!("/{work_dir}/{}", file.name);
         tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
     }
 
