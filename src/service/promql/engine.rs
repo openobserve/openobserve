@@ -16,8 +16,9 @@ use async_recursion::async_recursion;
 use datafusion::{
     arrow::array::{Float64Array, Int64Array, StringArray},
     error::{DataFusionError, Result},
-    prelude::{col, lit},
+    prelude::{col, lit, SessionContext},
 };
+use futures::future::try_join_all;
 use promql_parser::{
     label::MatchOp,
     parser::{
@@ -344,102 +345,33 @@ impl QueryEngine {
             .create_context(&self.org_id, table_name, (start, end), &filters)
             .await?;
 
-        let regexp_match_udf =
-            crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
-        let regexp_not_match_udf =
-            crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
-
-        let mut batches = Vec::new();
+        let mut tasks = Vec::new();
         for ctx in ctxs {
-            let table = match ctx.table(table_name).await {
-                Ok(v) => v,
-                Err(_) => {
-                    continue;
-                }
-            };
-            let mut df_group = table.clone();
-            for mat in selector.matchers.matchers.iter() {
-                match &mat.op {
-                    MatchOp::Equal => {
-                        df_group =
-                            df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
-                    }
-                    MatchOp::NotEqual => {
-                        df_group =
-                            df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-                    }
-                    MatchOp::Re(_re) => {
-                        df_group = df_group.filter(
-                            regexp_match_udf
-                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                        )?
-                    }
-                    MatchOp::NotRe(_re) => {
-                        df_group = df_group.filter(
-                            regexp_not_match_udf
-                                .call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
-                        )?
-                    }
-                }
+            let selector = selector.clone();
+            let task = tokio::task::spawn(async move {
+                selector_load_data_from_datafusion(ctx, selector).await
+            });
+            tasks.push(task);
+            // batches.extend(batch);
+        }
+        let task_results = try_join_all(tasks)
+            .await
+            .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
+
+        let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
+        for task_result in task_results {
+            for (key, value) in task_result? {
+                let metric = metrics
+                    .entry(key)
+                    .or_insert_with(|| RangeValue::new(value.labels, Vec::with_capacity(20)));
+                metric.samples.extend(value.samples);
             }
-            let batch = df_group
-                .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
-                .collect()
-                .await?;
-            batches.extend(batch);
         }
 
-        if batches.is_empty() {
+        if metrics.is_empty() {
             self.metrics_cache
                 .insert(table_name.to_string(), Value::None);
             return Ok(());
-        }
-
-        let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
-        for batch in &batches {
-            let hash_values = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
-            let time_values = batch
-                .column_by_name(&CONFIG.common.column_timestamp)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap();
-            let value_values = batch
-                .column_by_name(VALUE_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Float64Array>()
-                .unwrap();
-            for i in 0..batch.num_rows() {
-                let hash = hash_values.value(i).to_string();
-                let entry = metrics.entry(hash).or_insert_with(|| {
-                    let mut labels = Vec::with_capacity(batch.num_columns());
-                    for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                        let name = k.name();
-                        if name == &CONFIG.common.column_timestamp
-                            || name == HASH_LABEL
-                            || name == VALUE_LABEL
-                        {
-                            continue;
-                        }
-                        let value = v.as_any().downcast_ref::<StringArray>().unwrap();
-                        labels.push(Arc::new(Label {
-                            name: name.to_string(),
-                            value: value.value(i).to_string(),
-                        }));
-                    }
-                    labels.sort_by(|a, b| a.name.cmp(&b.name));
-                    RangeValue::new(labels, Vec::with_capacity(20))
-                });
-                entry
-                    .samples
-                    .push(Sample::new(time_values.value(i), value_values.value(i)));
-            }
         }
 
         // cache data
@@ -770,4 +702,95 @@ impl QueryEngine {
             }
         })
     }
+}
+
+async fn selector_load_data_from_datafusion(
+    ctx: SessionContext,
+    selector: VectorSelector,
+) -> Result<FxHashMap<String, RangeValue>> {
+    let table_name = selector.name.as_ref().unwrap();
+    let table = match ctx.table(table_name).await {
+        Ok(v) => v,
+        Err(_) => {
+            return Ok(FxHashMap::default());
+        }
+    };
+
+    let mut df_group = table.clone();
+    for mat in selector.matchers.matchers.iter() {
+        match &mat.op {
+            MatchOp::Equal => {
+                df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+            }
+            MatchOp::NotEqual => {
+                df_group = df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
+            }
+            MatchOp::Re(_re) => {
+                let regexp_match_udf =
+                    crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
+                df_group = df_group.filter(
+                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                )?
+            }
+            MatchOp::NotRe(_re) => {
+                let regexp_not_match_udf =
+                    crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
+                df_group = df_group.filter(
+                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
+                )?
+            }
+        }
+    }
+    let batches = df_group
+        .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+        .collect()
+        .await?;
+
+    let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
+    for batch in &batches {
+        let hash_values = batch
+            .column_by_name(HASH_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let time_values = batch
+            .column_by_name(&CONFIG.common.column_timestamp)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let value_values = batch
+            .column_by_name(VALUE_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        for i in 0..batch.num_rows() {
+            let hash = hash_values.value(i).to_string();
+            let entry = metrics.entry(hash).or_insert_with(|| {
+                let mut labels = Vec::with_capacity(batch.num_columns());
+                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
+                    let name = k.name();
+                    if name == &CONFIG.common.column_timestamp
+                        || name == HASH_LABEL
+                        || name == VALUE_LABEL
+                    {
+                        continue;
+                    }
+                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
+                    labels.push(Arc::new(Label {
+                        name: name.to_string(),
+                        value: value.value(i).to_string(),
+                    }));
+                }
+                labels.sort_by(|a, b| a.name.cmp(&b.name));
+                RangeValue::new(labels, Vec::with_capacity(20))
+            });
+            entry
+                .samples
+                .push(Sample::new(time_values.value(i), value_values.value(i)));
+        }
+    }
+    Ok(metrics)
 }
