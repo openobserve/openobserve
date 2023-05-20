@@ -15,7 +15,6 @@
 use actix_cors::Cors;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{body::MessageBody, http::header, web, HttpResponse};
-
 use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
 use std::sync::Arc;
@@ -23,7 +22,6 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 use super::auth::{validator, validator_aws};
-use super::request::alerts::*;
 use super::request::dashboards::*;
 use super::request::functions;
 use super::request::kv;
@@ -36,6 +34,7 @@ use super::request::stream;
 use super::request::syslog;
 use super::request::traces::*;
 use super::request::users;
+use super::request::{alerts::*, lookup_table};
 use crate::infra::config::CONFIG;
 
 pub mod openapi;
@@ -190,7 +189,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(syslog::create_route)
             .service(syslog::delete_route)
             .service(syslog::update_route)
-            .service(syslog::toggle_state),
+            .service(syslog::toggle_state)
+            .service(lookup_table::save_enrichment_table),
     );
 }
 

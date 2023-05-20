@@ -94,6 +94,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::syslog::watch().await });
     tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
     tokio::task::yield_now().await; // yield let other tasks run
+
     db::functions::cache()
         .await
         .expect("functions cache failed");

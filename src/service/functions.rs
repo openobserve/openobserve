@@ -59,7 +59,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     } else {
         #[cfg(feature = "zo_functions")]
         if func.trans_type.unwrap() == 0 {
-            match compile_vrl_function(func.function.as_str()) {
+            match compile_vrl_function(func.function.as_str(), &org_id) {
                 Ok(_) => {}
                 Err(error) => {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -71,7 +71,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         }
         extract_num_args(&mut func);
         let name = func.name.to_owned();
-        if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
+        if let Err(error) = db::functions::set(&org_id, name.as_str(), func).await {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -115,7 +115,7 @@ pub async fn update_function(
     func.streams = existing_fn.streams;
     #[cfg(feature = "zo_functions")]
     if func.trans_type.unwrap() == 0 {
-        match compile_vrl_function(func.function.as_str()) {
+        match compile_vrl_function(&func.function, &org_id) {
             Ok(_) => {}
             Err(error) => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -127,7 +127,7 @@ pub async fn update_function(
     }
     extract_num_args(&mut func);
     let name = func.name.to_owned();
-    if let Err(error) = db::functions::set(org_id.as_str(), name.as_str(), func).await {
+    if let Err(error) = db::functions::set(&org_id, &name, func).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -143,7 +143,7 @@ pub async fn update_function(
 
 #[instrument()]
 pub async fn list_functions(org_id: String) -> Result<HttpResponse, Error> {
-    if let Ok(functions) = db::functions::list(org_id.as_str()).await {
+    if let Ok(functions) = db::functions::list(&org_id).await {
         Ok(HttpResponse::Ok().json(FunctionList { list: functions }))
     } else {
         Ok(HttpResponse::Ok().json(FunctionList { list: vec![] }))
@@ -174,7 +174,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             )));
         }
     }
-    let result = db::functions::delete(org_id.as_str(), fn_name.as_str()).await;
+    let result = db::functions::delete(&org_id, &fn_name).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
@@ -228,8 +228,7 @@ pub async fn delete_stream_function(
                     .collect::<Vec<StreamOrder>>(),
             );
         }
-        if let Err(error) = db::functions::set(org_id.as_str(), fn_name.as_str(), existing_fn).await
-        {
+        if let Err(error) = db::functions::set(&org_id, &fn_name, existing_fn).await {
             Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -281,7 +280,7 @@ pub async fn add_function_to_stream(
         existing_fn.streams = Some(vec![stream_order]);
     }
 
-    if let Err(error) = db::functions::set(org_id.as_str(), fn_name.as_str(), existing_fn).await {
+    if let Err(error) = db::functions::set(&org_id, &fn_name, existing_fn).await {
         Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

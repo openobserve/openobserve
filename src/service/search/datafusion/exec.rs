@@ -168,7 +168,7 @@ pub async fn sql(
     if field_fns.is_empty() || sql.query_fn.is_some() {
         let batches = df.clone().collect().await?;
         if sql.query_fn.is_some() {
-            resp = handle_query_fn(sql.query_fn.clone().unwrap(), batches);
+            resp = handle_query_fn(sql.query_fn.clone().unwrap(), batches, &sql.org_id);
         } else {
             result.insert("query".to_string(), batches);
             log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
@@ -968,21 +968,23 @@ pub async fn register_table(
 }
 
 #[cfg(not(feature = "zo_functions"))]
-fn handle_query_fn(_query_fn: String, _batches: Vec<RecordBatch>) -> Option<Vec<RecordBatch>> {
+fn handle_query_fn(
+    _query_fn: String,
+    _batches: Vec<RecordBatch>,
+    _org_id: &str,
+) -> Option<Vec<RecordBatch>> {
     None
 }
 
 #[cfg(feature = "zo_functions")]
-fn handle_query_fn(query_fn: String, batches: Vec<RecordBatch>) -> Option<Vec<RecordBatch>> {
-    /* match QUERY_FUNCTIONS.get(&format!("{}/{}", org_id, query_fn)) {
-       Some(query_fn_src) => {
-    */
+fn handle_query_fn(
+    query_fn: String,
+    batches: Vec<RecordBatch>,
+    org_id: &str,
+) -> Option<Vec<RecordBatch>> {
     match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows).unwrap_or(None),
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id).unwrap_or(None),
         Err(_) => None,
-        /*  }
-        }
-        None => None, */
     }
 }
 
@@ -990,17 +992,23 @@ fn handle_query_fn(query_fn: String, batches: Vec<RecordBatch>) -> Option<Vec<Re
 fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
+    org_id: &str,
 ) -> Result<Option<Vec<RecordBatch>>> {
+    use vector_enrichment::TableRegistry;
+
     let mut resp = vec![];
     let mut runtime = crate::common::functions::init_vrl_runtime();
-    match crate::service::ingestion::compile_vrl_function(&query_fn_src) {
+    match crate::service::ingestion::compile_vrl_function(&query_fn_src, org_id) {
         Ok(program) => {
+            let registry = program.config.get_custom::<TableRegistry>().unwrap();
+            registry.finish_load();
+
             let rows_val: Vec<json::Value> = in_batch
                 .iter()
                 .filter_map(|hit| {
                     let ret_val = crate::service::ingestion::apply_vrl_fn(
                         &mut runtime,
-                        program.clone(),
+                        &program,
                         &json::Value::Object(hit.clone()),
                     );
                     (!ret_val.is_null()).then_some(ret_val)

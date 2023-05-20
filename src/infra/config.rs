@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use sys_info::hostname;
 use tokio::sync::Mutex;
+use vector_enrichment::TableRegistry;
 
 use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
@@ -31,6 +32,7 @@ use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
 use crate::meta::syslog::SyslogRoute;
 use crate::meta::user::User;
+use crate::service::enrichment::StreamTable;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -72,6 +74,9 @@ pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
+pub static LOOKUP_TABLES: Lazy<DashMap<String, StreamTable>> = Lazy::new(DashMap::new);
+pub static LOOKUP_REGISTRY: Lazy<Arc<TableRegistry>> =
+    Lazy::new(|| Arc::new(TableRegistry::default()));
 
 #[derive(EnvConfig)]
 pub struct Config {
