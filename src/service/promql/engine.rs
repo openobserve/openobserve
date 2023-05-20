@@ -443,7 +443,10 @@ impl QueryEngine {
         }
 
         // cache data
-        let metric_values = metrics.into_values().collect::<Vec<_>>();
+        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
+        for metric in metric_values.iter_mut() {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        }
         let values = if metric_values.is_empty() {
             Value::None
         } else {
