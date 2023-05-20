@@ -18,6 +18,7 @@ use std::io::Error;
 
 use crate::{meta, service::lookup_table::save_metadata};
 
+
 /** CreateEnrichmentTable */
 #[utoipa::path(
     context_path = "/api",
