@@ -24,13 +24,14 @@ pub struct SyslogRoute {
     #[serde(default)]
     pub stream_name: String,
     #[serde(default)]
+    #[schema(value_type = Vec<String>)]
     pub subnets: Vec<IpNetwork>,
     #[serde(default)]
     pub id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Routes {
+pub struct SyslogRoutes {
     pub routes: Vec<SyslogRoute>,
 }
 

@@ -20,7 +20,7 @@ use tracing::instrument;
 use crate::infra::config::SYSLOG_ROUTES;
 use crate::job;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::syslog::{Routes, SyslogRoute, SyslogServer};
+use crate::meta::syslog::{SyslogRoute, SyslogRoutes, SyslogServer};
 use crate::service::db::syslog;
 
 #[instrument(skip(route))]
@@ -104,7 +104,7 @@ pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpRespo
 
 #[instrument]
 pub async fn list_routes() -> Result<HttpResponse, io::Error> {
-    Ok(HttpResponse::Ok().json(Routes {
+    Ok(HttpResponse::Ok().json(SyslogRoutes {
         routes: syslog::list().await.unwrap(),
     }))
 }

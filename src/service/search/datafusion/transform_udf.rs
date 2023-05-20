@@ -25,11 +25,17 @@ use datafusion::{
     prelude::create_udf,
 };
 use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
+use std::collections::BTreeMap;
 use std::sync::Arc;
-use vrl::{prelude::BTreeMap, TargetValueRef, VrlRuntime};
-use vrl::{CompilationResult, Program, Runtime};
+use vector_enrichment::TableRegistry;
+use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
+use vrl::compiler::{TargetValueRef, VrlRuntime};
 
-use crate::{common::json, infra::config::QUERY_FUNCTIONS, service::logs::get_value};
+use crate::{
+    common::json,
+    infra::config::QUERY_FUNCTIONS,
+    service::{ingestion::compile_vrl_function, logs::get_value},
+};
 
 fn create_user_df(
     fn_name: &str,
@@ -84,6 +90,7 @@ pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::Sc
                     transform.function.to_owned().as_str(),
                     &transform.params,
                     transform.num_args,
+                    org_id,
                 );
             }
 
@@ -98,10 +105,12 @@ fn get_udf_vrl(
     func: &str,
     params: &str,
     num_args: u8,
+    org_id: &str,
 ) -> datafusion::logical_expr::ScalarUDF {
     let local_fn_name = fn_name;
     let local_func = func.trim().to_owned();
     let local_fn_params = params.to_owned();
+    let local_org_id = org_id.to_owned();
 
     //pre computation stage
     let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
@@ -110,9 +119,9 @@ fn get_udf_vrl(
         in_obj_str.push_str(&format!(" {} = \"{}\" \n", param, ""));
     }
     in_obj_str.push_str(&format!(" \n {}", &local_func));
-    let res_cols = match compile_vrl_function(&in_obj_str) {
-        Some((_, cols)) => cols,
-        None => vec![],
+    let res_cols = match compile_vrl_function(&in_obj_str, &local_org_id) {
+        Ok(res) => res.fields,
+        Err(_) => vec![],
     };
     // end pre computation stage
 
@@ -138,15 +147,16 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", &local_func));
-            if let Some(mut func) = compile_vrl_function(&obj_str) {
-                let result = apply_vrl_fn(&mut runtime, func.0);
-
+            if let Ok(mut res) = compile_vrl_function(&obj_str, &local_org_id) {
+                let registry = res.config.get_custom::<TableRegistry>().unwrap();
+                registry.finish_load();
+                let result = apply_vrl_fn(&mut runtime, res.program);
                 if result != json::Value::Null {
                     if result.is_object() {
                         is_multi_value = true;
                         let res_map = result.as_object().unwrap();
-                        func.1.sort();
-                        for col in func.1 {
+                        res.fields.sort();
+                        for col in res.fields {
                             let field_builder =
                                 col_val_map.entry(col.to_string()).or_insert_with(Vec::new);
                             if res_map.contains_key(&col) {
@@ -169,7 +179,6 @@ fn get_udf_vrl(
                     Arc::new(StringArray::from(v)) as ArrayRef,
                 ));
             }
-
             data_vec.sort_by(|a, b| a.0.name().cmp(b.0.name()));
 
             let result = StructArray::from(data_vec);
@@ -195,9 +204,9 @@ fn get_udf_vrl(
     pow_udf
 }
 
-pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
+pub fn _compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
     let mut fields = vec![];
-    let result = vrl::compile(func, &vrl_stdlib::all());
+    let result = vrl::compiler::compile(func, &vrl_stdlib::all());
     match result {
         Ok(CompilationResult {
             program,
@@ -213,14 +222,13 @@ pub fn compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
             Some((program, fields))
         }
         Err(e) => {
-            println!("Error compiling vrl {:?}", e);
             log::info!("Error compiling vrl {:?}", e);
             None
         }
     }
 }
 
-pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> json::Value {
+pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> json::Value {
     let obj_str = String::from("");
 
     let mut metadata = vrl_value::Value::from(BTreeMap::new());
@@ -229,7 +237,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::Program) -> json::Value
         metadata: &mut metadata,
         secrets: &mut vrl_value::Secrets::new(),
     };
-    let timezone = vrl::TimeZone::Local;
+    let timezone = vrl::compiler::TimeZone::Local;
     let result = match VrlRuntime::default() {
         VrlRuntime::Ast => runtime.resolve(&mut target, &program, &timezone),
     };
@@ -345,6 +353,7 @@ mod tests {
             //" . =  col1 + 10 \n .",
             "col1",
             1,
+            "org1",
         );
 
         ctx.register_udf(lua_udf.clone());
