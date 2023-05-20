@@ -97,8 +97,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     db::functions::cache()
         .await
-        .expect("functions cache failed");
-    db::schema::cache().await.expect("schema cache failed");
+        .expect("functions cache failed"); 
     db::compact::delete::cache()
         .await
         .expect("compact delete cache failed");
