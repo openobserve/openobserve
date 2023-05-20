@@ -58,7 +58,7 @@ impl std::fmt::Display for Tmpfs {
 #[async_trait]
 impl ObjectStore for Tmpfs {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        log::info!("get: {}", location);
+        // log::info!("get: {}", location);
         let data = self.get_bytes(location).await?;
 
         Ok(GetResult::Stream(

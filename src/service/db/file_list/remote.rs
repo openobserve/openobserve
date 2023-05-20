@@ -14,6 +14,7 @@
 
 use bytes::Buf;
 use dashmap::DashMap;
+use futures::future::try_join_all;
 use std::io::{BufRead, BufReader};
 use tokio::sync::Semaphore;
 
@@ -46,20 +47,16 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
 
     let mut count = 0;
-    for task in tasks {
-        match task.await {
-            Ok(ret) => match ret {
-                Ok(v) => {
-                    count += v;
-                }
-                Err(e) => {
-                    return Err(anyhow::anyhow!("[TRACE] Load file_list err: {:?}", e));
-                }
-            },
-            Err(e) => {
-                return Err(anyhow::anyhow!(e));
+    let task_results = try_join_all(tasks).await?;
+    for task_result in task_results {
+        match task_result {
+            Ok(v) => {
+                count += v;
             }
-        };
+            Err(e) => {
+                return Err(anyhow::anyhow!("[TRACE] Load file_list err: {:?}", e));
+            }
+        }
     }
 
     // delete files

@@ -46,16 +46,26 @@ pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::new();
     let pattern = format!("{}/file_list/*.json", &CONFIG.common.data_wal_dir);
     let files = scan_files(&pattern);
+    let mut line_num = 0;
     for file in files {
-        let file = File::open(file)?;
-        let reader = BufReader::new(file);
+        line_num += 1;
+        let f = File::open(&file).expect("open file list failed");
+        let reader = BufReader::new(f);
         // parse file list
         for line in reader.lines() {
             let line = line?;
             if line.is_empty() {
                 continue;
             }
-            let item: FileKey = json::from_slice(line.as_bytes())?;
+            let item: FileKey = match json::from_slice(line.as_bytes()) {
+                Ok(item) => item,
+                Err(err) => {
+                    panic!(
+                        "parse file list failed:\nfile: {}\nline_no: {}\nline: {}\nerr: {}",
+                        file, line_num, line, err
+                    );
+                }
+            };
             result.push(item);
         }
     }
