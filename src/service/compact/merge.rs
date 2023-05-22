@@ -380,11 +380,7 @@ async fn merge_files(
             datafusion::exec::convert_parquet_file(&mut buf, Arc::new(schema), diff_fields, file)
                 .await
                 .map_err(|e| {
-                    DataFusionError::Plan(format!(
-                        "convert_parquet_file {}, err: {}",
-                        file,
-                        e.to_string()
-                    ))
+                    DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
                 })?;
             file_meta.compressed_size = buf.len() as u64;
             cache::file_list::set_file_to_cache(file, Some(file_meta), false)?;
@@ -396,9 +392,7 @@ async fn merge_files(
     let mut new_file_meta =
         datafusion::exec::merge_parquet_files(&mut buf, schema, &new_file_list.clone())
             .await
-            .map_err(|e| {
-                DataFusionError::Plan(format!("merge_parquet_files err: {}", e.to_string()))
-            })?;
+            .map_err(|e| DataFusionError::Plan(format!("merge_parquet_files err: {}", e)))?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
 

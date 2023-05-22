@@ -29,7 +29,7 @@ use crate::infra::cache::file_data;
 #[allow(missing_docs)]
 enum Error {
     #[error("Out of range")]
-    OutOfRange(String), 
+    OutOfRange(String),
     #[error("Bad range")]
     BadRange(String),
 }
