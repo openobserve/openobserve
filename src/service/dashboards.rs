@@ -14,12 +14,11 @@
 
 use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
-use tracing::instrument;
 
 use crate::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboard;
 
-#[instrument(skip(dashboard))]
+#[tracing::instrument(skip(dashboard))]
 pub async fn create_dashboard(
     org_id: &str,
     mut dashboard: Dashboard,
@@ -33,7 +32,7 @@ pub async fn create_dashboard(
     Ok(HttpResponse::Created().json(dashboard))
 }
 
-#[instrument(skip(dashboard))]
+#[tracing::instrument(skip(dashboard))]
 pub async fn update_dashboard(
     org_id: &str,
     dashboard_id: &str,
@@ -61,7 +60,7 @@ pub async fn update_dashboard(
     Ok(HttpResponse::Ok().json(dashboard))
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     use meta::dashboards::Dashboards;
 
@@ -70,7 +69,7 @@ pub async fn list_dashboards(org_id: &str) -> Result<HttpResponse, io::Error> {
     }))
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if let Ok(dashboard) = dashboard::get(org_id, dashboard_id).await {
         HttpResponse::Ok().json(dashboard)
@@ -80,7 +79,7 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpRespo
     Ok(resp)
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if dashboard::delete(org_id, dashboard_id).await.is_err() {
         Response::NotFound

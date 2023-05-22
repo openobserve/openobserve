@@ -28,7 +28,6 @@ pub struct Eventer {}
 
 #[tonic::async_trait]
 impl Event for Eventer {
-    #[tracing::instrument(name = "grpc:event:SendFileList:enter", skip(self, req))]
     async fn send_file_list(
         &self,
         req: Request<FileList>,
@@ -41,7 +40,6 @@ impl Event for Eventer {
 
         let req = req.get_ref();
         for file in req.items.iter() {
-            log::info!("received event:file, {:?}", file);
             if let Err(e) = file_list::progress(
                 &file.key,
                 FileMeta::from(file.meta.as_ref().unwrap()),

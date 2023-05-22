@@ -17,7 +17,6 @@ use datafusion::datasource::file_format::file_type::FileType;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tracing::info_span;
 
 use crate::common::file::scan_files;
 use crate::infra::config::{self, CONFIG};
@@ -35,23 +34,17 @@ pub async fn search(
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    let span1 = info_span!("service:search:wal:get_file_list");
-    let guard1 = span1.enter();
-
     // mark searching in WAL
     let searching = Searching::new();
 
     // get file list
     let files = get_file_list(&sql, stream_type).await?;
     let file_count = files.len();
-    drop(guard1);
 
     if file_count == 0 {
         return Ok((HashMap::new(), 0, 0));
     }
 
-    let span2 = info_span!("service:search:wal:calculate_files_size");
-    let guard2 = span2.enter();
     let scan_size = match calculate_local_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
@@ -66,10 +59,6 @@ pub async fn search(
         file_count,
         scan_size
     );
-
-    drop(guard2);
-    let span3 = info_span!("service:search:wal:datafusion");
-    let _guard3 = span3.enter();
 
     // fetch all schema versions, get latest schema
     let schema = match db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
@@ -116,7 +105,7 @@ pub async fn search(
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
-#[inline]
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all)]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let pattern = format!(
         "{}/files/{}/{stream_type}/{}/*.json",

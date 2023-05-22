@@ -19,7 +19,6 @@ use datafusion::arrow::json::reader::infer_json_schema;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
-use tracing::info_span;
 
 use crate::common::json;
 use crate::infra::config::CONFIG;
@@ -27,6 +26,7 @@ use crate::meta::prom::METADATA_LABEL;
 use crate::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
 
+#[tracing::instrument(name = "service:schema:schema_evolution", skip(inferred_schema))]
 pub async fn schema_evolution(
     org_id: &str,
     stream_name: &str,
@@ -34,9 +34,6 @@ pub async fn schema_evolution(
     inferred_schema: Schema,
     min_ts: i64,
 ) {
-    let loc_span = info_span!("service:schema:schema_evolution");
-    let _guard = loc_span.enter();
-
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();

@@ -25,7 +25,6 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time;
 use tonic::transport::{Certificate, ClientTlsConfig, Identity};
-use tracing::info_span;
 
 use super::{Event, EventData};
 use crate::infra::cluster;
@@ -364,8 +363,6 @@ impl super::Db for Etcd {
         and_ops: Vec<Event>,
         else_ops: Vec<Event>,
     ) -> Result<()> {
-        let db_span = info_span!("infra:db:etcd:transaction");
-        let _guard = db_span.enter();
         let mut client = ETCD_CLIENT.get().await.clone().unwrap();
         let mut txn = etcd_client::Txn::new();
         let compares = vec![Compare::value(

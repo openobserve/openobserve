@@ -18,7 +18,6 @@ use bytes::Bytes;
 use sled::transaction::ConflictableTransactionError;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::info_span;
 
 use super::{Event, EventData};
 use crate::infra::cluster;
@@ -246,8 +245,6 @@ impl super::Db for Sled {
         and_ops: Vec<Event>,
         else_ops: Vec<Event>,
     ) -> Result<()> {
-        let db_span = info_span!("infra:db:sled:transaction");
-        let _guard = db_span.enter();
         let client = SLED_CLIENT.clone().unwrap();
         let mut check_result = false;
         let key = format!("{}{}", self.prefix, check_key);

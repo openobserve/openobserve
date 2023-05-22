@@ -26,7 +26,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::fs::OpenOptions;
 use std::io::Error;
-use tracing::info_span;
 
 use crate::common::json::{json, Map, Value};
 use crate::infra::config::CONFIG;
@@ -60,8 +59,6 @@ pub async fn handle_trace_request(
     thread_id: std::sync::Arc<usize>,
     request: ExportTraceServiceRequest,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:mod:handle_trace_request");
-    let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(

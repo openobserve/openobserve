@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tracing::info_span;
-
 use crate::common::json;
 
 pub mod alerts;
@@ -31,8 +29,6 @@ pub mod user;
 pub mod version;
 
 pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
-    let db_span = info_span!("db:get_instance");
-    let _guard = db_span.enter();
     let db = &crate::infra::db::DEFAULT;
     let key = "/instance/";
     let ret = db.get(key).await?;
@@ -42,8 +38,6 @@ pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
 }
 
 pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
-    let db_span = info_span!("db:set_instance");
-    let _guard = db_span.enter();
     let db = &crate::infra::db::DEFAULT;
     let key = "/instance/";
     match db.put(key, json::to_vec(&id).unwrap().into()).await {

@@ -79,6 +79,7 @@ impl QueryEngine {
         }
     }
 
+    #[tracing::instrument(name = "promql:engine:exec", skip_all)]
     pub async fn exec(&mut self, stmt: EvalStmt) -> Result<Value> {
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
@@ -235,6 +236,7 @@ impl QueryEngine {
     /// Instant vector selector --- select a single sample at each evaluation timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
+    #[tracing::instrument(name = "promql:engine:vector_selector", skip_all)]
     async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
@@ -280,6 +282,7 @@ impl QueryEngine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix of samples.
+    #[tracing::instrument(name = "promql:engine:matrix_selector", skip_all)]
     async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
@@ -319,6 +322,7 @@ impl QueryEngine {
         Ok(values)
     }
 
+    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
     async fn selector_load_data(
         &mut self,
         selector: &VectorSelector,
