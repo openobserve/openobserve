@@ -87,7 +87,21 @@ async fn settings(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
+        Ok(v) => {
+            if let Some(s_type) = v {
+                if s_type == StreamType::LookUpTable {
+                    return Ok(
+                        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                            http::StatusCode::BAD_REQUEST.into(),
+                            "Stream type 'LookUpTable' not allowed".to_string(),
+                        )),
+                    );
+                }
+                Some(s_type)
+            } else {
+                v
+            }
+        }
         Err(e) => {
             return Ok(
                 HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
