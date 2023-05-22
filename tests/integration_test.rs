@@ -1319,7 +1319,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/syslog-routes", "e2e"))
+            .uri("/config")
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -1331,6 +1331,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "orgId": "acceptLogs",
+                                "streamName":"syslog",
                                 "subnets": [
                                             "192.168.0.0/16",
                                             "127.0.0.0/8",
@@ -1353,7 +1354,6 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp);
         assert!(resp.status().is_success());
     }
 
@@ -1375,50 +1375,4 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
-
-    /* async fn e2e_post_kinesis_data() {
-        let auth = setup();
-        let ts = Utc::now().timestamp_micros();
-        let data = serde_json::json!({
-          "messageType": "CONTROL_MESSAGE",
-          "owner": "CloudwatchLogs",
-          "logGroup": "",
-          "logStream": "",
-          "subscriptionFilters": [],
-          "logEvents": [
-            {
-              "id": "",
-              "timestamp": ts,
-              "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose."
-            },
-          ]
-        });
-        let data = zincobserve::common::json::to_vec(&data).unwrap();
-        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-        gz.write_all(&data).unwrap_or_default();
-        let compressed_bytes = gz.finish().unwrap_or_default();
-
-        // Base64-encode the compressed bytes.
-        let encoded_data = base64::engine::general_purpose::STANDARD.encode(&compressed_bytes);
-
-        let thread_id: usize = 1;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_kinesis_firehose", "e2e", "kfhdata"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(encoded_data)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        print!("{:?}", resp);
-        assert!(resp.status().is_success());
-    } */
 }

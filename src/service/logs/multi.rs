@@ -29,6 +29,7 @@ use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
 use crate::meta::StreamType;
 use crate::service::db;
+use crate::service::ingestion::write_file;
 use crate::service::logs::StreamMeta;
 use crate::service::schema::stream_schema_exists;
 
@@ -192,7 +193,14 @@ pub async fn ingest(
     // write to file
     let mut stream_file_name = "".to_string();
 
-    super::write_file(buf, thread_id, org_id, stream_name, &mut stream_file_name);
+    write_file(
+        buf,
+        thread_id,
+        org_id,
+        stream_name,
+        StreamType::Logs,
+        &mut stream_file_name,
+    );
 
     if stream_file_name.is_empty() {
         return Ok(HttpResponse::Ok().json(IngestionResponse::new(

@@ -33,6 +33,7 @@ strip = true
 
 [dependencies]
 actix-cors = "0.6"
+actix-multipart = "0.6.0"
 actix-web = "4.3"
 actix-web-httpauth = "0.8"
 actix-web-opentelemetry = { version = "0.13", features = ["metrics"] }
@@ -61,6 +62,7 @@ clap = { version = "4.1", default-features = false, features = [
   "suggestions",
   "cargo",
 ] }
+csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "22", features = ["simd"] }
 datafusion-common = "22"
@@ -142,9 +144,10 @@ url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-vrl = { git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
-vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
-vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "e723f96c9305d77c853d8f95a1955ff393c8aff1" }
+vrl = { git = "https://github.com/zinclabs/vrl", rev = "113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"}
+vrl-value = { package = "value", git = "https://github.com/zinclabs/vrl", rev = "113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125" }
+vrl-stdlib = { package = "vrl-stdlib", git = "https://github.com/zinclabs/vrl", rev = "113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125" }
+vector-enrichment = { package = "enrichment", git = "https://github.com/zinclabs/vector", rev = "ce014974f814d05779b92e42027e5952d19848af"}
 walkdir = "2"
 zstd = "0.12"
 

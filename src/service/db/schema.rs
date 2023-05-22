@@ -17,11 +17,13 @@ use datafusion::arrow::datatypes::Schema;
 use std::sync::Arc;
 
 use crate::common::json;
+use crate::common::utils::is_local_disk_storage;
 use crate::infra::cache;
-use crate::infra::config::STREAM_SCHEMAS;
+use crate::infra::config::{CONFIG, LOOKUP_TABLES, STREAM_SCHEMAS};
 use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
 use crate::meta::StreamType;
+use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
@@ -253,7 +255,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
-                STREAM_SCHEMAS.insert(item_key.to_owned(), item_value);
+                STREAM_SCHEMAS.insert(item_key.to_owned(), item_value.clone());
+                let keys = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = keys[0];
+                let stream_type = StreamType::from(keys[1]);
+                let stream_name = keys[2];
+
+                if stream_type.eq(&StreamType::LookUpTable) {
+                    LOOKUP_TABLES.insert(
+                        item_key.to_owned(),
+                        StreamTable {
+                            org_id: org_id.to_string(),
+                            stream_name: stream_name.to_string(),
+                            data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
+                        },
+                    );
+                }
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -267,6 +284,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     super::compact::files::del_offset(org_id, stream_name, stream_type).await
                 {
                     log::error!("del_offset: {}", e);
+                }
+
+                if stream_type.eq(&StreamType::LookUpTable) && is_local_disk_storage() {
+                    let data_dir = format!(
+                        "{}/files/{org_id}/{stream_type}/{stream_name}",
+                        CONFIG.common.data_wal_dir
+                    );
+                    let path = std::path::Path::new(&data_dir);
+                    if path.exists() {
+                        std::fs::remove_dir_all(path).unwrap();
+                    }
                 }
             }
         }
@@ -307,6 +335,21 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
         };
         STREAM_SCHEMAS.insert(item_key_str.to_string(), json_val);
+
+        let keys = item_key_str.split('/').collect::<Vec<&str>>();
+        let org_id = keys[0];
+        let stream_type = StreamType::from(keys[1]);
+        let stream_name = keys[2];
+        if stream_type.eq(&StreamType::LookUpTable) {
+            LOOKUP_TABLES.insert(
+                item_key.to_owned(),
+                StreamTable {
+                    org_id: org_id.to_string(),
+                    stream_name: stream_name.to_string(),
+                    data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
+                },
+            );
+        }
     }
     log::info!("[TRACE] Stream schemas Cached");
     Ok(())

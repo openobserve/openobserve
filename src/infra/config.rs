@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use sys_info::hostname;
 use tokio::sync::Mutex;
+use vector_enrichment::TableRegistry;
 
 use crate::common::file::get_file_meta;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
@@ -31,6 +32,7 @@ use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
 use crate::meta::syslog::SyslogRoute;
 use crate::meta::user::User;
+use crate::service::enrichment::StreamTable;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -72,6 +74,9 @@ pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
+pub static LOOKUP_TABLES: Lazy<DashMap<String, StreamTable>> = Lazy::new(DashMap::new);
+pub static LOOKUP_REGISTRY: Lazy<Arc<TableRegistry>> =
+    Lazy::new(|| Arc::new(TableRegistry::default()));
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -242,8 +247,10 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION", default = 0)] // in days
-    pub data_retention: i64,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_ENABLED", default = false)]
+    pub data_retention_enabled: bool,
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 0)] // in days
+    pub data_retention_days: i64,
 }
 
 #[derive(EnvConfig)]
@@ -253,7 +260,7 @@ pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
-    // MB, default is half of system memory
+    // MB, default is 30% of system memory
     pub max_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     // MB, default is 1% of max_size
@@ -399,7 +406,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 600;
     }
-    if cfg.compact.data_retention > 0 && cfg.compact.data_retention < 3 {
+    if cfg.compact.data_retention_days > 0 && cfg.compact.data_retention_days < 3 {
         return Err(anyhow::anyhow!(
             "Data retention is not allowed to be less than 3 days."
         ));
@@ -472,7 +479,7 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.memory_cache.max_size == 0 {
         // meminfo unit is KB
         let meminfo = sys_info::mem_info()?;
-        cfg.memory_cache.max_size = meminfo.total as usize * 1024 / 2;
+        cfg.memory_cache.max_size = meminfo.total as usize * 1024 * 3 / 10; // 30%
     } else {
         cfg.memory_cache.max_size *= 1024 * 1024;
     }
@@ -572,13 +579,13 @@ mod tests {
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
         cfg.compact.interval = 0;
-        cfg.compact.data_retention = 10;
+        cfg.compact.data_retention_days = 10;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_ok());
-        assert_eq!(cfg.compact.data_retention, 10);
+        assert_eq!(cfg.compact.data_retention_days, 10);
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
-        cfg.compact.data_retention = 2;
+        cfg.compact.data_retention_days = 2;
         let ret = check_common_config(&mut cfg);
         assert!(ret.is_err());
 

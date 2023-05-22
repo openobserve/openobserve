@@ -17,7 +17,7 @@ use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
-mod delete;
+pub(crate) mod delete;
 mod file_list;
 mod lifecycle;
 mod merge;
@@ -25,9 +25,9 @@ mod merge;
 /// compactor delete run steps:
 pub async fn run_delete() -> Result<(), anyhow::Error> {
     // check data lifecyle date
-    if CONFIG.compact.data_retention > 0 {
+    if CONFIG.compact.data_retention_enabled {
         let now = chrono::Utc::now();
-        let date = now - chrono::Duration::days(CONFIG.compact.data_retention);
+        let date = now - chrono::Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = cache::file_list::get_all_organization()?;
@@ -35,14 +35,22 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             StreamType::Logs,
             StreamType::Metrics,
             StreamType::Traces,
-            StreamType::Metadata,
+            StreamType::LookUpTable,
         ];
         for org_id in orgs {
             for stream_type in stream_types {
                 let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
                 for stream_name in streams {
+                    let schema = db::schema::get(&org_id, &stream_name, Some(stream_type)).await?;
+                    let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
+                    let stream_data_lifecycle_end = if stream.settings.data_retention > 0 {
+                        let date = now - chrono::Duration::days(stream.settings.data_retention);
+                        date.format("%Y-%m-%d").to_string()
+                    } else {
+                        data_lifecycle_end.clone()
+                    };
                     if let Err(e) = lifecycle::delete_by_stream(
-                        &data_lifecycle_end,
+                        &stream_data_lifecycle_end,
                         &org_id,
                         &stream_name,
                         stream_type,
@@ -121,7 +129,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::Logs,
         StreamType::Metrics,
         StreamType::Traces,
-        StreamType::Metadata,
+        StreamType::LookUpTable,
     ];
     for org_id in orgs {
         for stream_type in stream_types {

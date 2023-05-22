@@ -164,6 +164,13 @@ async fn upload_file(
 ) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
     let file_size = buf.len() as u64;
     log::info!("[JOB] File upload begin: memory: {}", path_str);
+    if file_size == 0 {
+        if file_lock::FILES.write().unwrap().remove(path_str).is_none() {
+            log::error!("[JOB] Failed to remove memory file: {}", path_str)
+        }
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
+
     let mut res_records = vec![];
     let mut records = vec![];
     // metrics

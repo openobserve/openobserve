@@ -791,12 +791,12 @@ async fn prom_ha_handler(
         if !replica_list.contains(&replica_label.clone()) {
             replica_list.push(replica_label.clone());
             METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-            let _ = db::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
+            let _ = db::metrics::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
         }
     } else {
         replica_list.push(replica_label.clone());
         METRIC_CLUSTER_MAP.insert(cluster_name.clone(), replica_list.clone());
-        let _ = db::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
+        let _ = db::metrics::set_prom_cluster_info(&cluster_name, replica_list.to_vec()).await;
     }
 
     _accept_record
