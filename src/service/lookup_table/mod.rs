@@ -29,7 +29,7 @@ use crate::infra::cache::stats;
 use crate::infra::cluster;
 use crate::infra::config::{CONFIG, STREAM_SCHEMAS};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::StreamType;
+use crate::meta::{self, StreamType};
 
 pub async fn save_metadata(
     org_id: &str,
@@ -40,7 +40,7 @@ pub async fn save_metadata(
     let mut hour_key = String::new();
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let stream_name =
-        &crate::service::ingestion::format_stream_name(&format!("lookup-{}", table_name));
+        &crate::service::ingestion::format_stream_name(&format!("lookup_{}", table_name));
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -110,6 +110,15 @@ pub async fn save_metadata(
         }
     }
 
+    if records.is_empty() {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "No records to ingest for look up table".to_string(),
+            )),
+        );
+    }
+
     let mut stream_file_name = "".to_string();
     buf.insert(hour_key.clone(), records.clone());
 
@@ -121,8 +130,6 @@ pub async fn save_metadata(
         StreamType::LookUpTable,
         &mut stream_file_name,
     );
-
-    //let _ = db::lookup_table::set(org_id, &stream_name, records).await;
 
     let file = OpenOptions::new()
         .read(true)
