@@ -22,7 +22,6 @@ use promql_parser::parser;
 use prost::Message;
 use rustc_hash::FxHashSet;
 use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
-use tracing::info_span;
 
 use crate::infra::cache::stats;
 use crate::service::search as search_service;
@@ -56,8 +55,6 @@ pub async fn remote_write(
     body: actix_web::web::Bytes,
 ) -> std::result::Result<HttpResponse, io::Error> {
     let start = Instant::now();
-    let loc_span = info_span!("service:metrics::prom:remote_write");
-    let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(

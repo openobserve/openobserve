@@ -16,7 +16,6 @@ use actix_web::http;
 use actix_web::{http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
 use std::io::Error;
-use tracing::info_span;
 
 use crate::common::json;
 use crate::common::utils::is_local_disk_storage;
@@ -31,13 +30,12 @@ const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
 
+#[tracing::instrument]
 pub async fn get_stream(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:streams:get_stream");
-    let _guard = loc_span.enter();
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
@@ -54,13 +52,12 @@ pub async fn get_stream(
     }
 }
 
+#[tracing::instrument]
 pub async fn list_streams(
     org_id: &str,
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:streams:list_streams");
-    let _guard = loc_span.enter();
     let indices_res = get_streams(org_id, stream_type, fetch_schema).await;
     Ok(HttpResponse::Ok().json(ListStream { list: indices_res }))
 }
@@ -169,15 +166,13 @@ pub fn stream_res(
     }
 }
 
+#[tracing::instrument(skip(setting))]
 pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     setting: StreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:streams:set_partition_keys");
-    let _guard = loc_span.enter();
-
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, stream_type, None) {
         return Ok(
@@ -212,13 +207,12 @@ pub async fn save_stream_settings(
     )))
 }
 
+#[tracing::instrument]
 pub async fn delete_stream(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:streams:delete_stream");
-    let _guard = loc_span.enter();
     let schema = db::schema::get_versions(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();

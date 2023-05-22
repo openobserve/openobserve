@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use rand::distributions::{Alphanumeric, DistString};
-use tracing::info_span;
 
 use super::stream::get_streams;
 use crate::common::auth::is_root_user;
@@ -21,9 +20,8 @@ use crate::meta::organization::{IngestionPasscode, OrgSummary};
 use crate::meta::user::UserOrg;
 use crate::service::db;
 
+#[tracing::instrument]
 pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let loc_span = info_span!("service:organization:get_summary");
-    let _guard = loc_span.enter();
     let streams = get_streams(org_id, None, false).await;
     let functions = db::functions::list(org_id).await.unwrap();
     let alerts = db::alerts::list(org_id, None, None).await.unwrap();
@@ -34,9 +32,8 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     }
 }
 
+#[tracing::instrument]
 pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPasscode {
-    let loc_span = info_span!("service:organization:get_user_passcode");
-    let _guard = loc_span.enter();
     let user = db::user::get(org_id, user_id).await.unwrap().unwrap();
     IngestionPasscode {
         user: user.email,
@@ -44,9 +41,8 @@ pub async fn get_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPassc
     }
 }
 
+#[tracing::instrument]
 pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPasscode {
-    let loc_span = info_span!("service:organization:update_passcode");
-    let _guard = loc_span.enter();
     let mut local_org_id = "dummy";
     let mut db_user = db::user::get_db_user(user_id).await.unwrap();
 

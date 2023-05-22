@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
-use tracing::{info_span, instrument, Instrument};
+use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
@@ -38,12 +38,12 @@ use crate::service::{
 
 pub mod grpc;
 
+#[tracing::instrument(skip_all)]
 pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
-    let root_span = info_span!("service:promql:search:enter");
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as _;
-    search_in_cluster(req).instrument(root_span).await
+    search_in_cluster(req).await
 }
 
 #[inline(always)]
@@ -53,7 +53,7 @@ async fn get_queue_lock() -> Result<etcd::Locker> {
     Ok(lock)
 }
 
-#[instrument(name = "service:promql:search:cluster", skip(req))]
+#[tracing::instrument(name = "promql:search:cluster", skip_all)]
 async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
     let op_start = std::time::Instant::now();
 
@@ -151,9 +151,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
             req_query.end,
         );
 
-        let grpc_span = info_span!("service:promql:search:cluster:grpc_search");
-
         let node_addr = node.grpc_addr.clone();
+        let grpc_span = info_span!("promql:search:cluster:grpc_search");
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {

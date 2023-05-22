@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::Context as _;
-use tracing::instrument;
-
 use crate::{common::json, infra::db, meta::dashboards::Dashboard};
 
-#[instrument(err)]
+#[tracing::instrument]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
     let bytes = db::DEFAULT.get(&key).await?;
-    json::from_slice(&bytes)
-        .with_context(|| format!("Failed to deserialize the value for key {key:?} as `Dashboard`"))
+    json::from_slice(&bytes).map_err(|_| {
+        anyhow::anyhow!("Failed to deserialize the value for key {key:?} as `Dashboard`")
+    })
 }
 
-#[instrument(err, skip(dashboard))]
+#[tracing::instrument(skip(dashboard))]
 pub(crate) async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{}", dashboard.dashboard_id);
     Ok(db::DEFAULT
@@ -33,7 +31,7 @@ pub(crate) async fn put(org_id: &str, dashboard: &Dashboard) -> Result<(), anyho
         .await?)
 }
 
-#[instrument(err)]
+#[tracing::instrument]
 pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db_key = format!("/dashboard/{org_id}/");
     db::DEFAULT
@@ -41,20 +39,22 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> 
         .await?
         .into_values()
         .map(|val| {
-            json::from_slice(&val).with_context(|| {
-                format!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
+            json::from_slice(&val).map_err(|_| {
+                anyhow::anyhow!(format!(
+                    "Failed to deserialize the value for key {db_key:?} as `Dashboard`"
+                ))
             })
         })
         .collect()
 }
 
-#[instrument(err)]
+#[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{dashboard_id}");
     Ok(db::DEFAULT.delete(&key, false).await?)
 }
 
-#[instrument(err)]
+#[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
     Ok(db::DEFAULT.delete(key, true).await?)

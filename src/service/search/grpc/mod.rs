@@ -29,7 +29,7 @@ mod wal;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
 
-#[tracing::instrument(name = "service:search:grpc:search", skip(req))]
+#[tracing::instrument(name = "service:search:grpc:search", skip_all)]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
@@ -42,11 +42,10 @@ pub async fn search(
     let mut file_count = 0;
     let mut scan_size = 0;
 
-    let span1 = info_span!("service:search:grpc:in_wal");
-
     // search in WAL
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
+    let wal_span = info_span!("service:search:grpc:in_wal");
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -55,16 +54,15 @@ pub async fn search(
                 Ok((HashMap::new(), 0, 0))
             }
         }
-        .instrument(span1),
+        .instrument(wal_span),
     );
-
-    let span2 = info_span!("service:search:grpc:in_storage");
 
     // search in object storage
     let req_stype = req.stype;
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
     let file_list = req.file_list.to_owned();
+    let storage_span = info_span!("service:search:grpc:in_storage");
     let task2 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
@@ -73,7 +71,7 @@ pub async fn search(
                 storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
             }
         }
-        .instrument(span2),
+        .instrument(storage_span),
     );
 
     // merge data from local WAL
@@ -124,9 +122,6 @@ pub async fn search(
     file_count += file_count2;
     scan_size += scan_size2;
 
-    let span3 = info_span!("service:search:grpc:merge");
-    let guard3 = span3.enter();
-
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
     for (name, batches) in results.iter_mut() {
@@ -155,10 +150,6 @@ pub async fn search(
     datafusion::storage::file_list::clear(&session_id)
         .await
         .unwrap();
-
-    drop(guard3);
-    let span4 = info_span!("service:search:grpc:response");
-    let _guard4 = span4.enter();
 
     // final result
     let mut hits_buf = Vec::new();

@@ -16,7 +16,6 @@ use async_trait::async_trait;
 use datafusion::{error::DataFusionError, prelude::SessionContext};
 use promql_parser::parser;
 use std::time::{Duration, UNIX_EPOCH};
-use tracing::info_span;
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{cache::tmpfs, errors::Result};
@@ -59,7 +58,7 @@ impl TableProvider for StorageProvider {
     }
 }
 
-#[tracing::instrument(name = "service:promql:search:grpc:search", skip(req))]
+#[tracing::instrument(name = "promql:search:grpc:search", skip_all)]
 pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
@@ -85,9 +84,6 @@ pub async fn search(
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
-    let span1 = info_span!("service:promql:search:grpc:query_engine");
-    let guard1 = span1.enter();
-
     let mut engine = QueryEngine::new(
         org_id,
         StorageProvider {
@@ -103,10 +99,6 @@ pub async fn search(
         .unwrap();
     // clear tmpfs
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
-
-    drop(guard1);
-    let span2 = info_span!("service:promql:search:grpc:merge_result");
-    let guard2 = span2.enter();
 
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
@@ -172,8 +164,6 @@ pub async fn search(
             });
         }
     }
-
-    drop(guard2);
 
     Ok(resp)
 }

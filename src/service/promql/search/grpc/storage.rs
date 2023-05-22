@@ -30,6 +30,7 @@ use crate::service::{
     },
 };
 
+#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all)]
 pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
@@ -117,7 +118,7 @@ pub(crate) async fn create_context(
     Ok(ctx)
 }
 
-#[inline]
+#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all)]
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,

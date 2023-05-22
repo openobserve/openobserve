@@ -15,7 +15,6 @@
 use actix_web::{http::StatusCode, HttpResponse};
 use ipnetwork::IpNetwork;
 use std::io;
-use tracing::instrument;
 
 use crate::infra::config::SYSLOG_ROUTES;
 use crate::job;
@@ -23,7 +22,7 @@ use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::syslog::{SyslogRoute, SyslogRoutes, SyslogServer};
 use crate::service::db::syslog;
 
-#[instrument(skip(route))]
+#[tracing::instrument(skip_all)]
 pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Error> {
     if route.org_id.trim().is_empty()
         || route.stream_name.trim().is_empty()
@@ -59,7 +58,7 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
     Ok(HttpResponse::Created().json(route))
 }
 
-#[instrument(skip(route))]
+#[tracing::instrument(skip_all)]
 pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpResponse, io::Error> {
     if route.org_id.trim().is_empty()
         && route.stream_name.trim().is_empty()
@@ -102,14 +101,14 @@ pub async fn update_route(id: &str, route: &mut SyslogRoute) -> Result<HttpRespo
     Ok(HttpResponse::Ok().json(route))
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn list_routes() -> Result<HttpResponse, io::Error> {
     Ok(HttpResponse::Ok().json(SyslogRoutes {
         routes: syslog::list().await.unwrap(),
     }))
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn get_route(id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if let Ok(route) = syslog::get(id).await {
         HttpResponse::Ok().json(route)
@@ -119,7 +118,7 @@ pub async fn get_route(id: &str) -> Result<HttpResponse, io::Error> {
     Ok(resp)
 }
 
-#[instrument]
+#[tracing::instrument]
 pub async fn delete_route(id: &str) -> Result<HttpResponse, io::Error> {
     let resp = if syslog::delete(id).await.is_err() {
         Response::NotFound
@@ -129,7 +128,7 @@ pub async fn delete_route(id: &str) -> Result<HttpResponse, io::Error> {
     Ok(resp.into())
 }
 
-#[instrument(skip(server))]
+#[tracing::instrument(skip_all)]
 pub async fn toggle_state(server: SyslogServer) -> Result<HttpResponse, io::Error> {
     if job::syslog_server::run(server.state, false).await.is_err() {
         return Ok(Response::InternalServerError(anyhow::anyhow!(

@@ -21,7 +21,6 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error};
-use tracing::info_span;
 
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
@@ -51,9 +50,6 @@ pub async fn traces_proto(
     thread_id: std::sync::Arc<usize>,
     body: actix_web::web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:otlp_http:traces_proto");
-    let _guard = loc_span.enter();
-
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
     super::handle_trace_request(org_id, thread_id, request).await
 }
@@ -63,8 +59,6 @@ pub async fn traces_json(
     thread_id: std::sync::Arc<usize>,
     body: actix_web::web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:otlp_http:traces_json");
-    let _guard = loc_span.enter();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(

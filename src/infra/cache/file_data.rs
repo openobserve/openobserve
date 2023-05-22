@@ -151,7 +151,6 @@ pub fn stats() -> (usize, usize) {
 }
 
 #[inline]
-#[tracing::instrument(name = "infra:cache:file_data:download")]
 pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
     let store = &storage::DEFAULT;
     let data = store.get(file).await?;

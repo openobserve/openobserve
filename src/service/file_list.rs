@@ -18,7 +18,6 @@ use crate::meta::common::FileMeta;
 use crate::meta::StreamType;
 
 #[inline]
-#[tracing::instrument(name = "service:file_list:get_file_list")]
 pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
@@ -39,7 +38,6 @@ pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
 }
 
 #[inline]
-#[tracing::instrument(name = "service:file_list:calculate_files_size", skip(files))]
 pub async fn calculate_files_size(files: &[String]) -> Result<u64, anyhow::Error> {
     let mut size = 0;
     for file in files {
@@ -50,7 +48,6 @@ pub async fn calculate_files_size(files: &[String]) -> Result<u64, anyhow::Error
 }
 
 #[inline]
-#[tracing::instrument(name = "service:file_list:calculate_local_files_size", skip(files))]
 pub async fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error> {
     let mut size = 0;
     for file in files {
