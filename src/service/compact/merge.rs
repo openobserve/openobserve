@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::arrow::datatypes::Schema;
+use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use ahash::AHashMap as HashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::io::Write;
@@ -378,7 +378,14 @@ async fn merge_files(
             // do the convert
             let mut buf = Vec::new();
             datafusion::exec::convert_parquet_file(&mut buf, Arc::new(schema), diff_fields, file)
-                .await?;
+                .await
+                .map_err(|e| {
+                    DataFusionError::Plan(format!(
+                        "convert_parquet_file {}, err: {}",
+                        file,
+                        e.to_string()
+                    ))
+                })?;
             file_meta.compressed_size = buf.len() as u64;
             cache::file_list::set_file_to_cache(file, Some(file_meta), false)?;
             cache::file_data::set(file, buf.into())?;
@@ -387,7 +394,11 @@ async fn merge_files(
 
     let mut buf = Vec::new();
     let mut new_file_meta =
-        datafusion::exec::merge_parquet_files(&mut buf, schema, &new_file_list.clone()).await?;
+        datafusion::exec::merge_parquet_files(&mut buf, schema, &new_file_list.clone())
+            .await
+            .map_err(|e| {
+                DataFusionError::Plan(format!("merge_parquet_files err: {}", e.to_string()))
+            })?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
 

@@ -29,10 +29,9 @@ use crate::infra::cache::file_data;
 #[allow(missing_docs)]
 enum Error {
     #[error("Out of range")]
-    OutOfRange,
-
+    OutOfRange(String), 
     #[error("Bad range")]
-    BadRange,
+    BadRange(String),
 }
 
 impl From<Error> for object_store::Error {
@@ -70,10 +69,10 @@ impl ObjectStore for InMemory {
         // log::info!("get_range: {}, {:?}", location, range);
         let data = self.get_bytes(location).await?;
         if range.end > data.len() {
-            return Err(Error::OutOfRange.into());
+            return Err(Error::OutOfRange(location.to_string()).into());
         }
         if range.start > range.end {
-            return Err(Error::BadRange.into());
+            return Err(Error::BadRange(location.to_string()).into());
         }
         Ok(data.slice(range))
     }
@@ -85,10 +84,10 @@ impl ObjectStore for InMemory {
             .iter()
             .map(|range| {
                 if range.end > data.len() {
-                    return Err(Error::OutOfRange.into());
+                    return Err(Error::OutOfRange(location.to_string()).into());
                 }
                 if range.start > range.end {
-                    return Err(Error::BadRange.into());
+                    return Err(Error::BadRange(location.to_string()).into());
                 }
                 Ok(data.slice(range.clone()))
             })
