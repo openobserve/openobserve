@@ -774,11 +774,11 @@ async fn prom_ha_handler(
             leader.last_received = curr_ts;
             _accept_record = true;
         } else {
-            log::info!(
-                "Rejecting entry from {}  as leader is {}",
-                replica_label,
-                &leader.name,
-            );
+            // log::info!(
+            //     "Rejecting entry from {}  as leader is {}",
+            //     replica_label,
+            //     &leader.name,
+            // );
             _accept_record = false;
         }
     }
