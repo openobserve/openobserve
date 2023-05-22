@@ -222,8 +222,11 @@
     "lua": "Lua",
     "params": "Parameters",
     "associatedWithStream": "Stream Association",
-    "paramsHint":"param1, param2,...",
-    "associatedFunctionHeader": "Associated Functions"
+    "paramsHint": "param1, param2,...",
+    "associatedFunctionHeader": "Associated Functions",
+    "lookupTables": "Lookup Tables",
+    "addLookupTable": "Add Lookup Table",
+    "updateLookupTable": "Update Lookup Table"
   },
   "confirmDialog": {
     "cancel": "Cancel",

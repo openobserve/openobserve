@@ -20,19 +20,29 @@
         <div v-if="beingUpdated" class="text-h6">
           {{ t("function.updateTitle") }}
         </div>
-      <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
+        <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
+      </div>
     </div>
-  </div>
 
-  <q-separator />
-  <div>
-    <q-form ref="addJSTransformForm" @submit="onSubmit">
-
+    <q-separator />
+    <div>
+      <q-form ref="addJSTransformForm" @submit="onSubmit">
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
-          <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
-            class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-            tabindex="0" />
+          <q-input
+            v-model="formData.name"
+            :label="t('function.name')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-4 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+            tabindex="0"
+          />
 
           <!--  <q-select v-if="formData.ingest" v-model="formData.stream_type" :options="streamTypes"
                                 :label="t('alerts.stream_type')" :popup-content-style="{ textTransform: 'capitalize' }" color="input-border"
@@ -45,33 +55,90 @@
         </div>
 
         <div class="q-gutter-sm">
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
-            :checked="formData.transType === '0'" val="0" :label="t('function.vrl')" class="q-ml-none"
-            @update:model-value="updateFunction" />
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
-            :checked="formData.transType === '1'" val="1" :label="t('function.lua')" class="q-ml-none"
-            @update:model-value="updateFunction" />
-
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.transType"
+            :checked="formData.transType === '0'"
+            val="0"
+            :label="t('function.vrl')"
+            class="q-ml-none"
+            @update:model-value="updateFunction"
+          />
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.transType"
+            :checked="formData.transType === '1'"
+            val="1"
+            :label="t('function.lua')"
+            class="q-ml-none"
+            @update:model-value="updateFunction"
+          />
         </div>
 
-        <q-input v-model="formData.params" :label="t('function.params')" color="input-border" bg-color="input-bg"
-          class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-          tabindex="0" />
+        <q-input
+          v-model="formData.params"
+          :label="t('function.params')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-4 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+          tabindex="0"
+        />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px" @keyup="editorUpdate" class="q-py-md showLabelOnTop"
-          resize></div>
+        <div
+          ref="editorRef"
+          id="editor"
+          :label="t('function.jsfunction')"
+          stack-label
+          style="border: 1px solid #dbdbdb; border-radius: 5px"
+          @keyup="editorUpdate"
+          class="q-py-md showLabelOnTop"
+          resize
+        ></div>
 
-        <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
-          bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" />
+        <q-input
+          v-if="formData.ingest"
+          v-model="formData.order"
+          :label="t('function.order')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          type="number"
+          min="1"
+        />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('function.cancel')" text-color="light-text"
-            padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
-          <q-btn :label="t('function.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-            type="submit" no-caps />
+          <q-btn
+            v-close-popup
+            class="q-mb-md text-bold no-border"
+            :label="t('function.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            :label="t('function.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </div>
@@ -135,7 +202,7 @@ export default defineComponent({
     const streamTypes = ["logs", "metrics"];
 
     const editorUpdate = (e: any) => {
-      formData.function = e.target.value;
+      formData.value.function = e.target.value;
     };
     const editorData = ref("");
     const prefixCode = ref("");
@@ -191,7 +258,6 @@ export default defineComponent({
       }
 
       if (formData.value.transType == "1") {
-
         if (formData.value.ingest) {
           prefixCode.value = `function(row)`;
           suffixCode.value = `
@@ -305,7 +371,10 @@ end`;
         return false;
       }
 
-      if (this.formData.trans_type == "0" && this.formData.function.indexOf("function") == -1) {
+      if (
+        this.formData.trans_type == "0" &&
+        this.formData.function.indexOf("function") == -1
+      ) {
         this.$q.notify({
           type: "negative",
           message:

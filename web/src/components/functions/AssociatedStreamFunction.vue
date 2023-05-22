@@ -17,8 +17,18 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table data-test="log-stream-table" ref="qTable" v-model:selected="selected" :rows="logStream" :columns="columns"
-      row-key="name" :pagination="pagination" :filter="filterQuery" :filter-method="filterData" style="width: 100%">
+    <q-table
+      data-test="log-stream-table"
+      ref="qTable"
+      v-model:selected="selected"
+      :rows="logStream"
+      :columns="columns"
+      row-key="name"
+      :pagination="pagination"
+      :filter="filterQuery"
+      :filter-method="filterData"
+      style="width: 100%"
+    >
       <template #no-data>
         <NoData />
       </template>
@@ -31,33 +41,84 @@
         </q-tr>
       </template>
       <template v-slot:body="props">
-        <q-tr :props="props" style="cursor: pointer;" @click="toggleStreamRow(props)">
+        <q-tr
+          :props="props"
+          style="cursor: pointer"
+          @click="toggleStreamRow(props)"
+        >
           <q-td auto-width>
-            <q-btn dense flat size="xs"
-              :icon="expandedRow != props.row.name ? 'img:' + getImageURL('images/common/down-solid.svg') : 'img:' + getImageURL('images/common/up-solid.svg')" />
+            <q-btn
+              dense
+              flat
+              size="xs"
+              :icon="
+                expandedRow != props.row.name
+                  ? 'img:' + getImageURL('images/common/down-solid.svg')
+                  : 'img:' + getImageURL('images/common/up-solid.svg')
+              "
+            />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             {{ col.value }}
           </q-td>
         </q-tr>
-        <q-tr v-show="expandedRow == props.row.name" :props="props" no-hover
-          style="height: min-content; background-color: white; border: 1px solid black;">
+        <q-tr
+          v-show="expandedRow == props.row.name"
+          :props="props"
+          no-hover
+          style="
+            height: min-content;
+            background-color: white;
+            border: 1px solid black;
+          "
+        >
           <q-td colspan="100%">
-            <div v-show="loadingFunctions == props.row.name" class="q-pl-md q-py-xs" style="height: 60px">
-              <q-inner-loading size="sm" :showing="loadingFunctions == props.row.name" label="Fetching functions..."
-                label-style="font-size: 1.1em" />
+            <div
+              v-show="loadingFunctions == props.row.name"
+              class="q-pl-md q-py-xs"
+              style="height: 60px"
+            >
+              <q-inner-loading
+                size="sm"
+                :showing="loadingFunctions == props.row.name"
+                label="Fetching functions..."
+                label-style="font-size: 1.1em"
+              />
             </div>
             <div v-show="loadingFunctions != props.row.name">
-              <q-table class="border" hide-bottom bordered :rows="functionsList" :columns="functionsColumns" :title="t('function.associatedFunctionHeader')">
+              <q-table
+                class="border"
+                hide-bottom
+                bordered
+                :rows="functionsList"
+                :columns="functionsColumns"
+                :title="t('function.associatedFunctionHeader')"
+              >
                 <template v-slot:body="props">
                   <q-tr :props="props">
-                    <q-td key="#" :props="props"> {{ props.pageIndex + 1 }} </q-td>
-                    <q-td key="name" :props="props"> {{ props.row.name }} </q-td>
-                    <q-td key="order" :props="props"> {{ props.row.order }} </q-td>
+                    <q-td key="#" :props="props">
+                      {{ props.pageIndex + 1 }}
+                    </q-td>
+                    <q-td key="name" :props="props">
+                      {{ props.row.name }}
+                    </q-td>
+                    <q-td key="order" :props="props">
+                      {{ props.row.order }}
+                    </q-td>
                     <q-td key="actions" :props="props">
-                      <q-btn 
-                        :icon="'img:' + getImageURL('images/common/delete_icon.svg')" :title="t('dashboard.delete')"
-                        class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat @click.stop="deleteFunctionFromStream(props.row.name)"></q-btn>
+                      <q-btn
+                        :icon="
+                          'img:' + getImageURL('images/common/delete_icon.svg')
+                        "
+                        :title="t('dashboard.delete')"
+                        class="q-ml-xs iconHoverBtn"
+                        padding="sm"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        @click.stop="deleteFunctionFromStream(props.row.name)"
+                      ></q-btn>
                     </q-td>
                   </q-tr>
                 </template>
@@ -65,7 +126,8 @@
                   <q-tr v-if="addFunctionInProgress">
                     <q-td></q-td>
                     <q-td>
-                      <q-select v-model="selectedFunction"
+                      <q-select
+                        v-model="selectedFunction"
                         option-value="name"
                         option-label="name"
                         label="Select function..."
@@ -78,35 +140,55 @@
                         use-input
                         hide-selected
                         fill-input
-                        @filter = 'filterFn'></q-select>
+                        @filter="filterFn"
+                      ></q-select>
                     </q-td>
                     <q-td></q-td>
                     <q-td></q-td>
                   </q-tr>
                 </template>
                 <template v-slot:top>
-                  <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
-                    <div class="q-table__title row items-center" data-test="log-stream-title-text">
-                      {{ t('function.associatedFunctionHeader') }}
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: row;
+                      width: 100%;
+                      justify-content: space-between;
+                    "
+                  >
+                    <div
+                      class="q-table__title row items-center"
+                      data-test="log-stream-title-text"
+                    >
+                      {{ t("function.associatedFunctionHeader") }}
                     </div>
-                    <q-btn color="secondary" class="q-ml-md q-mb-xs text-bold no-border"
-                     @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                    <q-btn
+                      color="secondary"
+                      class="q-ml-md q-mb-xs text-bold no-border"
+                      @click="addFunctionInProgress = true"
+                      no-caps
+                      >Associate Function</q-btn
+                    >
                   </div>
                 </template>
                 <template v-slot:no-data>
-                <div style="width:100%; display: flex; flex-direction: column;">
-                  <div v-if="!functionsList.length && !addFunctionInProgress" style="width: 100%; text-align: center;">
-                    No functions found
-                  </div>
-                  <!-- <div>
+                  <div
+                    style="width: 100%; display: flex; flex-direction: column"
+                  >
+                    <div
+                      v-if="!functionsList.length && !addFunctionInProgress"
+                      style="width: 100%; text-align: center"
+                    >
+                      No functions found
+                    </div>
+                    <!-- <div>
                     <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
                   </div> -->
-                </div>
+                  </div>
                 </template>
               </q-table>
             </div>
           </q-td>
-
         </q-tr>
       </template>
 
@@ -114,29 +196,59 @@
         <div class="q-table__title" data-test="log-stream-title-text">
           {{ t("logStream.header") }}
         </div>
-        <q-input v-model="filterQuery" borderless filled dense class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('logStream.search')">
+        <q-input
+          v-model="filterQuery"
+          borderless
+          filled
+          dense
+          class="q-ml-auto q-mb-xs no-border"
+          :placeholder="t('logStream.search')"
+        >
           <template #prepend>
             <q-icon name="search" />
           </template>
         </q-input>
-        <q-btn data-test="log-stream-refresh-stats-btn" class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg"
-          color="secondary" no-caps icon="refresh" :label="t(`logStream.refreshStats`)" @click="getLogStream" />
+        <q-btn
+          data-test="log-stream-refresh-stats-btn"
+          class="q-ml-md q-mb-xs text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          icon="refresh"
+          :label="t(`logStream.refreshStats`)"
+          @click="getLogStream"
+        />
 
-        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :pageTitle="t('logStream.header')"
-          :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="top"
-          @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          data-test="log-stream-table-pagination"
+          :scope="scope"
+          :pageTitle="t('logStream.header')"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination data-test="log-stream-table-pagination" :scope="scope" :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions" position="bottom" @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          data-test="log-stream-table-pagination"
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="bottom"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
     </q-table>
-    <q-dialog v-model="showIndexSchemaDialog" position="right" full-height maximized>
+    <q-dialog
+      v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
+    >
       <SchemaIndex v-model="schemaData" />
     </q-dialog>
-
   </q-page>
 </template>
 
@@ -146,7 +258,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
-import jsTransformService from "../../services/jstransform"
+import jsTransformService from "../../services/jstransform";
 
 import QTablePagination from "../shared/grid/Pagination.vue";
 import streamService from "../../services/stream";
@@ -172,7 +284,7 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
-    const functionsList = ref<any>([])
+    const functionsList = ref<any>([]);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -222,8 +334,8 @@ export default defineComponent({
       //   align: "center",
       // },
     ]);
-    const addFunctionInProgress = ref(false)
-    const addFunctionInProgressLoading = ref(false)
+    const addFunctionInProgress = ref(false);
+    const addFunctionInProgressLoading = ref(false);
 
     const functionsColumns = ref<QTableProps["columns"]>([
       {
@@ -256,11 +368,11 @@ export default defineComponent({
 
     let deleteStreamName = "";
     let deleteStreamType = "";
-    const loadingFunctions = ref(false)
-    const expandedRow = ref(null)
+    const loadingFunctions = ref(false);
+    const expandedRow = ref(null);
     const allFunctionsList = ref([]);
-    const selectedFunction = ref<any|null>(null);
-    const filterFunctions = ref([])
+    const selectedFunction = ref<any | null>(null);
+    const filterFunctions = ref([]);
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
@@ -279,26 +391,28 @@ export default defineComponent({
             let storage_size = "";
             let compressed_size = "";
             resultTotal.value = res.data.list.length;
-            logStream.value = res.data.list.map((data: any) => {
-              doc_num = "--";
-              storage_size = "--";
-              if (data.stats) {
-                doc_num = data.stats.doc_num;
-                storage_size = data.stats.storage_size + " MB";
-                compressed_size = data.stats.compressed_size + " MB";
-              }
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                name: data.name,
-                doc_num: doc_num,
-                storage_size: storage_size,
-                compressed_size: compressed_size,
-                storage_type: data.storage_type,
-                actions: "action buttons",
-                schema: data.schema ? data.schema : [],
-                stream_type: data.stream_type,
-              };
-            });
+            logStream.value = res.data.list
+              .filter((stream: any) => stream.stream_type !== "lookuptable")
+              .map((data: any) => {
+                doc_num = "--";
+                storage_size = "--";
+                if (data.stats) {
+                  doc_num = data.stats.doc_num;
+                  storage_size = data.stats.storage_size + " MB";
+                  compressed_size = data.stats.compressed_size + " MB";
+                }
+                return {
+                  "#": counter <= 9 ? `0${counter++}` : counter++,
+                  name: data.name,
+                  doc_num: doc_num,
+                  storage_size: storage_size,
+                  compressed_size: compressed_size,
+                  storage_type: data.storage_type,
+                  actions: "action buttons",
+                  schema: data.schema ? data.schema : [],
+                  stream_type: data.stream_type,
+                };
+              });
 
             // logStream.value.forEach((element: any) => {
             //   if (element.name == router.currentRoute.value.query.dialog) {
@@ -330,7 +444,10 @@ export default defineComponent({
       update(() => {
         const needle = val.toLowerCase();
         filterFunctions.value = allFunctionsList.value
-          .filter((item: any) => !functionsList.value.some((obj: any) => obj.name === item.name)) // filter existing applied functions 
+          .filter(
+            (item: any) =>
+              !functionsList.value.some((obj: any) => obj.name === item.name)
+          ) // filter existing applied functions
           .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
       });
     };
@@ -348,89 +465,100 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         )
         .then((res: any) => {
-          allFunctionsList.value = res.data?.list || []
-          filterFunctions.value = res.data?.list || []
-        }).catch((err) => {
+          allFunctionsList.value = res.data?.list || [];
+          filterFunctions.value = res.data?.list || [];
+        })
+        .catch((err) => {
           $q.notify({
             type: "negative",
-            message: JSON.stringify(err.response.data["error"]) || "Function fetching failed",
+            message:
+              JSON.stringify(err.response.data["error"]) ||
+              "Function fetching failed",
             timeout: 2000,
           });
-        })
-    }
+        });
+    };
 
     watch([selectedFunction], async () => {
-      console.log('selected function value triggered')
-      if(selectedFunction.value) {
-      console.log('selected function save triggered', functionsList.value )
+      if (selectedFunction.value) {
         // save it
-        const order = functionsList.value.reduce((prev: any, current:any) => {
-           return (prev == null || prev.order < current.order) ? current : prev
-        }, null)?.order || 0
+        const order =
+          functionsList.value.reduce((prev: any, current: any) => {
+            return prev == null || prev.order < current.order ? current : prev;
+          }, null)?.order || 0;
 
         const apiData = {
-          order: order + 1
-        }
-        console.log(apiData)
-        addFunctionInProgressLoading.value = true
-        await jsTransformService.apply_stream_function(
-          store.state.selectedOrganization.identifier,
-          expandedRow.value || "",
-          selectedFunction.value.name,
-          apiData
-        ).then(() => {
-          return getStreamFunctions(expandedRow.value)
-        }).finally(() => {
-          addFunctionInProgressLoading.value = false
-          addFunctionInProgress.value = false
-          selectedFunction.value = null
-        })
+          order: order + 1,
+        };
+        addFunctionInProgressLoading.value = true;
+        await jsTransformService
+          .apply_stream_function(
+            store.state.selectedOrganization.identifier,
+            expandedRow.value || "",
+            selectedFunction.value.name,
+            apiData
+          )
+          .then(() => {
+            return getStreamFunctions(expandedRow.value);
+          })
+          .finally(() => {
+            addFunctionInProgressLoading.value = false;
+            addFunctionInProgress.value = false;
+            selectedFunction.value = null;
+          });
       }
-    })
+    });
 
     const toggleStreamRow = (props: any) => {
       if (expandedRow.value == props.row.name) {
-        expandedRow.value = null
+        expandedRow.value = null;
       } else {
-        expandedRow.value = props.row.name
+        expandedRow.value = props.row.name;
       }
       if (expandedRow.value) {
-        addFunctionInProgress.value = false
-        getStreamFunctions(props.row.name)
+        addFunctionInProgress.value = false;
+        getStreamFunctions(props.row.name);
       }
-    }
+    };
 
-    const getStreamFunctions = async(stream_name: any) => {
-      loadingFunctions.value = stream_name
-        await jsTransformService.stream_function(
+    const getStreamFunctions = async (stream_name: any) => {
+      loadingFunctions.value = stream_name;
+      await jsTransformService
+        .stream_function(
           store.state.selectedOrganization.identifier,
           stream_name
-        ).then((res: any) => {
-          functionsList.value = res.data?.list || []
-        }).catch((err) => {
+        )
+        .then((res: any) => {
+          functionsList.value = res.data?.list || [];
+        })
+        .catch((err) => {
           $q.notify({
             type: "negative",
-            message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
+            message:
+              JSON.stringify(err.response.data["error"]) ||
+              "Function creation failed",
             timeout: 2000,
           });
         })
-          .finally(() => {
-            loadingFunctions.value = false
-          })
-    }
+        .finally(() => {
+          loadingFunctions.value = false;
+        });
+    };
 
-    const deleteFunctionFromStream = async(functionName: any) => {
-      console.log("000",functionName)
-      await jsTransformService.remove_stream_function(
+    const deleteFunctionFromStream = async (functionName: any) => {
+      await jsTransformService
+        .remove_stream_function(
           store.state.selectedOrganization.identifier,
           expandedRow.value || "",
-          functionName,
-        ).then(() => {
-          return getStreamFunctions(expandedRow.value)
-        }).finally(() => {
-          addFunctionInProgressLoading.value = false
+          functionName
+        )
+        .then(() => {
+          return getStreamFunctions(expandedRow.value);
         })
-    }
+        .finally(() => {
+          addFunctionInProgressLoading.value = false;
+        });
+    };
 
     // const listSchema = (props: any) => {
     //   schemaData.value.name = props.row.name;
@@ -471,7 +599,11 @@ export default defineComponent({
 
     const deleteStream = () => {
       streamService
-        .delete(store.state.selectedOrganization.identifier, deleteStreamName, deleteStreamType)
+        .delete(
+          store.state.selectedOrganization.identifier,
+          deleteStreamName,
+          deleteStreamType
+        )
         .then((res: any) => {
           if (res.data.code == 200) {
             $q.notify({
@@ -491,7 +623,7 @@ export default defineComponent({
 
     onMounted(() => {
       getAllFunctions();
-    })
+    });
 
     onActivated(() => {
       // if (logStream.value.length > 0) {

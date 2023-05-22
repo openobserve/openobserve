@@ -26,6 +26,7 @@ import LogStream from "@/views/LogStream.vue";
 import {
   FunctionList,
   AssociatedStreamFunction,
+  LookupTables,
 } from "../../components/functions/index";
 import Alerts from "@/views/AppAlerts.vue";
 import Ingestion from "@/views/Ingestion.vue";
@@ -214,6 +215,11 @@ const useRoutes = () => {
           path: "stream-association",
           name: "streamFunctions",
           component: AssociatedStreamFunction,
+        },
+        {
+          path: "lookup-tables",
+          name: "lookupTables",
+          component: LookupTables,
         },
       ],
     },

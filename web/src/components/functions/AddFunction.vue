@@ -27,48 +27,107 @@
     <q-separator />
     <div>
       <q-form ref="addJSTransformForm" @submit="onSubmit">
-
         <div class="row q-pb-sm q-pt-md q-col-gutter-md">
-          <q-input v-model="formData.name" :label="t('function.name')" color="input-border" bg-color="input-bg"
-            class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-            tabindex="0" />
+          <q-input
+            v-model="formData.name"
+            :label="t('function.name')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-4 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
+            tabindex="0"
+          />
         </div>
 
         <div v-if="store.state.zoConfig.lua_fn_enabled" class="q-gutter-sm">
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
-            :checked="formData.transType === '0'" val="0" :label="t('function.vrl')" class="q-ml-none"
-            @update:model-value="updateEditorContent" />
-          <q-radio v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" v-model="formData.transType"
-            :checked="formData.transType === '1'" val="1" :label="t('function.lua')" class="q-ml-none"
-            @update:model-value="updateEditorContent" />
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.transType"
+            :checked="formData.transType === '0'"
+            val="0"
+            :label="t('function.vrl')"
+            class="q-ml-none"
+            @update:model-value="updateEditorContent"
+          />
+          <q-radio
+            v-bind:readonly="beingUpdated"
+            v-bind:disable="beingUpdated"
+            v-model="formData.transType"
+            :checked="formData.transType === '1'"
+            val="1"
+            :label="t('function.lua')"
+            class="q-ml-none"
+            @update:model-value="updateEditorContent"
+          />
         </div>
 
-        <q-input v-if="formData.transType === '0'" v-model="formData.params" :label="t('function.params')"
-          :placeholder="t('function.paramsHint')" color="input-border" bg-color="input-bg"
-          class="col-4 q-py-md showLabelOnTop" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated" :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
-          tabindex="0" />
+        <q-input
+          v-if="formData.transType === '0'"
+          v-model="formData.params"
+          :label="t('function.params')"
+          :placeholder="t('function.paramsHint')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-4 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
+          tabindex="0"
+        />
 
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <div ref="editorRef" id="editor" :label="t('function.jsfunction')" stack-label
-          style="border: 1px solid #dbdbdb; border-radius: 5px" @keyup="editorUpdate" class="q-py-md showLabelOnTop"
-          resize></div>
+        <div
+          ref="editorRef"
+          id="editor"
+          :label="t('function.jsfunction')"
+          stack-label
+          style="border: 1px solid #dbdbdb; border-radius: 5px"
+          @keyup="editorUpdate"
+          class="q-py-md showLabelOnTop"
+          resize
+        ></div>
 
         <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
-        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{ compilationErr }}</pre>
+        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
+          compilationErr
+        }}</pre>
         <div class="flex justify-center q-mt-lg">
-          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('function.cancel')" text-color="light-text"
-            padding="sm md" color="accent" no-caps @click="$emit('cancel:hideform')" />
-          <q-btn :label="t('function.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
-            type="submit" no-caps />
+          <q-btn
+            v-close-popup
+            class="q-mb-md text-bold no-border"
+            :label="t('function.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            :label="t('function.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </div>
   </div>
 </template>
-  
+
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed } from "vue";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
@@ -121,7 +180,7 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
-    const beingUpdated = computed(() => props.isUpdated)
+    const beingUpdated = computed(() => props.isUpdated);
 
     const streamTypes = ["logs", "metrics"];
 
@@ -171,21 +230,18 @@ export default defineComponent({
     const isValidParam = () => {
       const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;
       return methodPattern.test(formData.value.params) || "Invalid params.";
-    }
+    };
 
     const isValidMethodName = () => {
       const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
       return methodPattern.test(formData.value.name) || "Invalid method name.";
-    }
+    };
     const updateEditorContent = () => {
-
-
       if (formData.value.transType == "1") {
         prefixCode.value = `function(row)`;
         suffixCode.value = `
 end`;
       } else {
-
         prefixCode.value = ``;
         suffixCode.value = ``;
       }
@@ -198,7 +254,6 @@ end`;
     };
 
     const onSubmit = () => {
-
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
@@ -206,16 +261,15 @@ end`;
       });
 
       addJSTransformForm.value.validate().then((valid: any) => {
-        console.log('valid? ', valid)
         if (!valid) {
           return false;
         }
 
         if (!beingUpdated.value) {
-          formData.value.transType = parseInt(formData.value.transType)
+          formData.value.transType = parseInt(formData.value.transType);
           //trans type is lua remove params from form
           if (formData.value.transType == 1) {
-            formData.value.params = ""
+            formData.value.params = "";
           }
 
           callTransform = jsTransformService.create(
@@ -223,10 +277,10 @@ end`;
             formData.value
           );
         } else {
-          formData.value.transType = parseInt(formData.value.transType)
+          formData.value.transType = parseInt(formData.value.transType);
           //trans type is lua remove params from form
           if (formData.value.transType == 1) {
-            formData.value.params = ""
+            formData.value.params = "";
           }
 
           callTransform = jsTransformService.update(
@@ -235,37 +289,39 @@ end`;
           );
         }
 
+        callTransform
+          .then((res: { data: any }) => {
+            const data = res.data;
+            formData.value = { ...defaultValue() };
 
-        callTransform.then((res: { data: any }) => {
-          const data = res.data;
-          formData.value = { ...defaultValue() };
-
-          emit("update:list");
-          addJSTransformForm.value.resetValidation();
-          dismiss();
-          $q.notify({
-            type: "positive",
-            message: res.data.message,
+            emit("update:list");
+            addJSTransformForm.value.resetValidation();
+            dismiss();
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+            });
+          })
+          .catch((err) => {
+            compilationErr.value = err.response.data["message"];
+            $q.notify({
+              type: "negative",
+              message:
+                JSON.stringify(err.response.data["error"]) ||
+                "Function creation failed",
+            });
+            dismiss();
           });
-        }).catch((err) => {
-          compilationErr.value = err.response.data["message"]
-          $q.notify({
-            type: "negative",
-            message: JSON.stringify(err.response.data["error"]) || "Function creation failed",
-          });
-          dismiss();
-        })
-
 
         segment.track("Button Click", {
           button: "Save Function",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
-          function_name: formData.name,
+          function_name: formData.value.name,
           page: "Add/Update Function",
         });
       });
-    }
+    };
 
     return {
       t,
@@ -288,12 +344,10 @@ end`;
       isFetchingStreams,
       isValidParam,
       isValidMethodName,
-      onSubmit
+      onSubmit,
     };
   },
   created() {
-    console.log('created -- ', this.modelValue);
-
     this.formData = { ...defaultValue(), ...this.modelValue };
     this.beingUpdated = this.isUpdated;
 
@@ -306,10 +360,10 @@ end`;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
     }
-  }
+  },
 });
 </script>
-  
+
 <style scoped>
 #editor {
   width: 100%;
@@ -323,4 +377,3 @@ end`;
   text-transform: none !important;
 }
 </style>
-  
