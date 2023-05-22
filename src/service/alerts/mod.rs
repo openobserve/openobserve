@@ -17,7 +17,6 @@ use arrow_schema::DataType;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::io::Error;
-use tracing::info_span;
 
 use super::search::sql::Sql;
 use super::{db, triggers};
@@ -30,6 +29,7 @@ use crate::meta::{self, StreamType};
 pub mod destinations;
 pub mod templates;
 
+#[tracing::instrument(skip_all)]
 pub async fn save_alert(
     org_id: String,
     stream_name: String,
@@ -37,9 +37,6 @@ pub async fn save_alert(
     name: String,
     mut alert: Alert,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:save");
-    let _guard = loc_span.enter();
-
     alert.stream = stream_name.to_string();
     alert.name = name.to_string();
     alert.stream_type = Some(stream_type);
@@ -149,27 +146,25 @@ pub async fn save_alert(
     )))
 }
 
+#[tracing::instrument]
 pub async fn list_alert(
     org_id: String,
     stream_name: Option<&str>,
     stream_type: Option<StreamType>,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:list");
-    let _guard = loc_span.enter();
     let alerts_list = db::alerts::list(org_id.as_str(), stream_name, stream_type)
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(AlertList { list: alerts_list }))
 }
 
+#[tracing::instrument]
 pub async fn delete_alert(
     org_id: String,
     stream_name: String,
     stream_type: StreamType,
     name: String,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:delete");
-    let _guard = loc_span.enter();
     let result = db::alerts::delete(
         org_id.as_str(),
         stream_name.as_str(),
@@ -189,14 +184,13 @@ pub async fn delete_alert(
     }
 }
 
+#[tracing::instrument]
 pub async fn get_alert(
     org_id: String,
     stream_name: String,
     stream_type: StreamType,
     name: String,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:get");
-    let _guard = loc_span.enter();
     let result = db::alerts::get(
         org_id.as_str(),
         stream_name.as_str(),

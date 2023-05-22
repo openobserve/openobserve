@@ -38,6 +38,7 @@ use crate::service::{
     },
 };
 
+#[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
 pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
@@ -92,7 +93,7 @@ pub(crate) async fn create_context(
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
-#[inline]
+#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list")]
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,
@@ -105,13 +106,13 @@ async fn get_file_list(
 
     let mut tasks = Vec::new();
     for node in nodes {
-        let grpc_span = info_span!("service:promql:search:cluster:grpc_wal_file");
         let node_addr = node.grpc_addr.clone();
         let org_id = org_id.to_string();
         let req = cluster_rpc::MetricsWalFileRequest {
             org_id: org_id.clone(),
             stream_name: stream_name.to_string(),
         };
+        let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file");
         let task: tokio::task::JoinHandle<
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(

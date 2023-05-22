@@ -14,21 +14,18 @@
 
 use actix_web::{http, HttpResponse};
 use std::io::Error;
-use tracing::info_span;
 
 use crate::infra::config::STREAM_ALERTS;
 use crate::meta::alert::AlertDestination;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
 
+#[tracing::instrument(skip(destination))]
 pub async fn save_destination(
     org_id: String,
     name: String,
     destination: AlertDestination,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:destinations:save");
-    let _guard = loc_span.enter();
-
     db::alerts::destinations::set(org_id.as_str(), name.as_str(), destination.clone())
         .await
         .unwrap();
@@ -39,19 +36,16 @@ pub async fn save_destination(
     )))
 }
 
+#[tracing::instrument]
 pub async fn list_destinations(org_id: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:destinations:list");
-    let _guard = loc_span.enter();
     let list = db::alerts::destinations::list(org_id.as_str())
         .await
         .unwrap();
     Ok(HttpResponse::Ok().json(list))
 }
 
+#[tracing::instrument]
 pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:destinations:delete");
-    let _guard = loc_span.enter();
-
     for alert_list in STREAM_ALERTS.iter() {
         for alert in alert_list.value().list.clone() {
             if alert_list.key().starts_with(&org_id) && alert.destination.eq(&name) {
@@ -76,9 +70,8 @@ pub async fn delete_destination(org_id: String, name: String) -> Result<HttpResp
     }
 }
 
+#[tracing::instrument]
 pub async fn get_destination(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:destinations:get");
-    let _guard = loc_span.enter();
     let result = db::alerts::destinations::get(org_id.as_str(), name.as_str()).await;
     match result {
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),

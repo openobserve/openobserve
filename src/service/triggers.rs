@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::db;
-use crate::meta::alert::Trigger;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
 use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
 use std::io::Error;
-use tracing::info_span;
 
+use super::db;
+use crate::meta::alert::Trigger;
+use crate::meta::http::HttpResponse as MetaHttpResponse;
+
+#[tracing::instrument(skip_all)]
 pub async fn save_trigger(
     alert_name: String,
     trigger: Trigger,
 ) -> Result<HttpResponse, anyhow::Error> {
-    let loc_span = info_span!("service:triggers:save");
-    let _guard = loc_span.enter();
-
     db::triggers::set(&alert_name, trigger).await.unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
@@ -36,9 +34,8 @@ pub async fn save_trigger(
     )))
 }
 
+#[tracing::instrument]
 pub async fn delete_trigger(alert_name: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:trigger:delete");
-    let _guard = loc_span.enter();
     let result = db::triggers::delete(&alert_name).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

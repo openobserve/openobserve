@@ -14,23 +14,19 @@
 
 use actix_web::{http, HttpResponse};
 use std::io::Error;
-use tracing::info_span;
 
 use crate::infra::config::ALERTS_DESTINATIONS;
 use crate::meta::alert::DestinationTemplate;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
 
+#[tracing::instrument(skip_all)]
 pub async fn save_template(
     org_id: String,
     name: String,
     mut template: DestinationTemplate,
 ) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:templates:save");
-    let _guard = loc_span.enter();
-
     template.name = Some(name.clone());
-
     db::alerts::templates::set(org_id.as_str(), name.as_str(), template.clone())
         .await
         .unwrap();
@@ -41,17 +37,14 @@ pub async fn save_template(
     )))
 }
 
+#[tracing::instrument]
 pub async fn list_templates(org_id: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:templates:list");
-    let _guard = loc_span.enter();
     let list = db::alerts::templates::list(org_id.as_str()).await.unwrap();
     Ok(HttpResponse::Ok().json(list))
 }
 
+#[tracing::instrument]
 pub async fn delete_template(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:templates:delete");
-    let _guard = loc_span.enter();
-
     for dest in ALERTS_DESTINATIONS.iter() {
         if dest.key().starts_with(&org_id) && dest.value().template.eq(&name) {
             return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
@@ -77,9 +70,8 @@ pub async fn delete_template(org_id: String, name: String) -> Result<HttpRespons
     }
 }
 
+#[tracing::instrument]
 pub async fn get_template(org_id: String, name: String) -> Result<HttpResponse, Error> {
-    let loc_span = info_span!("service:alerts:templates:get");
-    let _guard = loc_span.enter();
     let result = db::alerts::templates::get(org_id.as_str(), name.as_str()).await;
     match result {
         Ok(alert) => Ok(HttpResponse::Ok().json(alert)),

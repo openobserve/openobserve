@@ -17,7 +17,6 @@ use actix_web::{
     HttpResponse,
 };
 use std::io::Error;
-use tracing::instrument;
 
 #[cfg(feature = "zo_functions")]
 use super::ingestion::compile_vrl_function;
@@ -42,7 +41,7 @@ const FN_IN_USE: &str =
     "Function is used in streams , please remove it from the streams before deleting :";
 const LUA_FN_DISABLED: &str = "Lua functions are disabled";
 
-#[instrument(skip(func))]
+#[tracing::instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -86,7 +85,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     }
 }
 
-#[instrument(skip(func))]
+#[tracing::instrument(skip(func))]
 pub async fn update_function(
     org_id: String,
     fn_name: String,
@@ -141,7 +140,7 @@ pub async fn update_function(
     )))
 }
 
-#[instrument()]
+#[tracing::instrument]
 pub async fn list_functions(org_id: String) -> Result<HttpResponse, Error> {
     if let Ok(functions) = db::functions::list(&org_id).await {
         Ok(HttpResponse::Ok().json(FunctionList { list: functions }))
@@ -150,7 +149,7 @@ pub async fn list_functions(org_id: String) -> Result<HttpResponse, Error> {
     }
 }
 
-#[instrument()]
+#[tracing::instrument]
 pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
@@ -187,7 +186,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     }
 }
 
-#[instrument()]
+#[tracing::instrument]
 pub async fn list_stream_functions(
     org_id: String,
     stream_type: StreamType,
@@ -201,7 +200,7 @@ pub async fn list_stream_functions(
     }
 }
 
-#[instrument()]
+#[tracing::instrument]
 pub async fn delete_stream_function(
     org_id: String,
     stream_type: StreamType,
@@ -252,7 +251,7 @@ pub async fn delete_stream_function(
     }
 }
 
-#[instrument()]
+#[tracing::instrument]
 pub async fn add_function_to_stream(
     org_id: String,
     stream_type: StreamType,

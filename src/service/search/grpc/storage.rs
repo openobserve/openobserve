@@ -35,16 +35,12 @@ pub async fn search(
     file_list: &[String],
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    let span1 = info_span!("service:search:storage:get_file_list");
-    let guard1 = span1.enter();
-
     // get file list
     let files = match file_list.is_empty() {
         true => get_file_list(&sql, stream_type).await?,
         false => file_list.to_vec(),
     };
     let file_count = files.len();
-    drop(guard1);
 
     if file_count == 0 {
         return Ok((HashMap::new(), 0, 0));
@@ -86,9 +82,6 @@ pub async fn search(
         };
     }
     log::info!("[TRACE] storage->search: load files {} done", file_count);
-
-    let span3 = info_span!("service:search:storage:group_and_calc_files_size");
-    let guard3 = span3.enter();
 
     // fetch all schema versions, group files by version
     let schema_versions =
@@ -155,11 +148,9 @@ pub async fn search(
         file_count,
         scan_size
     );
-    drop(guard3);
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
-        let span = info_span!("service:search:storage:datafusion");
         let schema = Arc::new(
             schema_versions[ver]
                 .clone()
@@ -182,6 +173,7 @@ pub async fn search(
                 }
             }
         }
+        let datafusion_span = info_span!("service:search:storage:datafusion");
         let task = tokio::task::spawn(
             async move {
                 super::datafusion::exec::sql(
@@ -195,7 +187,7 @@ pub async fn search(
                 )
                 .await
             }
-            .instrument(span),
+            .instrument(datafusion_span),
         );
         tasks.push(task);
     }
@@ -226,7 +218,7 @@ pub async fn search(
     Ok((results, file_count, scan_size as usize))
 }
 
-#[inline]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let results = match file_list::get_file_list(

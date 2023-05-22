@@ -13,17 +13,14 @@
 // limitations under the License.
 
 use std::sync::Arc;
-use tracing::info_span;
 
 use crate::common::json;
 use crate::infra::config::{ROOT_USER, USERS};
 use crate::infra::db::Event;
 use crate::meta::user::{DBUser, User, UserRole};
 
+#[tracing::instrument]
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
-    let db_span = info_span!("db:user:get");
-    let _guard = db_span.enter();
-
     let user = match org_id {
         None => ROOT_USER.get("root"),
         Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
@@ -42,20 +39,16 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     Ok(db_user.get_user(org_id.to_string()))
 }
 
+#[tracing::instrument]
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let db_span = info_span!("db:user:get");
-    let _guard = db_span.enter();
-
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
-    let db_span = info_span!("db:user:set");
-    let _guard = db_span.enter();
-
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/user/{}", user.email);
     db.put(&key, json::to_vec(&user).unwrap().into()).await?;
@@ -78,10 +71,8 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tracing::instrument]
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let db_span = info_span!("db:user:delete");
-    let _guard = db_span.enter();
-
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/user/{name}");
     Ok(db.delete(&key, false).await?)
@@ -147,8 +138,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn root_user_exists() -> bool {
-    let db_span = info_span!("db:user:root_user_exists");
-    let _guard = db_span.enter();
     let db = &crate::infra::db::DEFAULT;
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
