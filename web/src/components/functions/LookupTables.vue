@@ -78,7 +78,7 @@
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('function.search')"
+            :placeholder="t('function.searchLookupTable')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />

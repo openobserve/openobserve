@@ -226,7 +226,8 @@
     "associatedFunctionHeader": "Associated Functions",
     "lookupTables": "Lookup Tables",
     "addLookupTable": "Add Lookup Table",
-    "updateLookupTable": "Update Lookup Table"
+    "updateLookupTable": "Update Lookup Table",
+    "searchLookupTable": "Search Lookup Table"
   },
   "confirmDialog": {
     "cancel": "Cancel",

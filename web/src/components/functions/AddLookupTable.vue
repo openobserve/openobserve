@@ -166,17 +166,17 @@ export default defineComponent({
             type: "negative",
             message:
               JSON.stringify(err.response.data["error"]) ||
-              "Function creation failed",
+              "Lookup Table creation failed",
           });
           dismiss();
         });
 
       segment.track("Button Click", {
-        button: "Save Function",
+        button: "Save Lookup Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         function_name: formData.value.name,
-        page: "Add/Update Function",
+        page: "Add/Update Lookup Table",
       });
     };
 
