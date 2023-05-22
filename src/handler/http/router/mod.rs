@@ -19,7 +19,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use futures::FutureExt;
 use std::sync::Arc;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::{SwaggerUi, Url};
+use utoipa_swagger_ui::SwaggerUi;
 
 use super::auth::{validator, validator_aws};
 use super::request::dashboards::*;
@@ -61,10 +61,14 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     );
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
 
-    cfg.service(SwaggerUi::new("/swagger/{_:.*}").urls(vec![(
-        Url::new("api", "/api-doc/openapi.json"),
-        openapi::ApiDoc::openapi(),
-    )]));
+    cfg.service(
+        SwaggerUi::new("/swagger/{_:.*}")
+            .url(
+                format!("{}/api-doc/openapi.json", CONFIG.common.base_uri),
+                openapi::ApiDoc::openapi(),
+            )
+            .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
+    );
 
     if CONFIG.common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
