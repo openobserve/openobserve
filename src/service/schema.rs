@@ -201,7 +201,7 @@ pub async fn check_for_schema(
         let stream_settings = meta.get("settings");
         if let Some(value) = stream_settings {
             let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-            if let Some(keys) = settings.get("schema_validation") {
+            if let Some(keys) = settings.get("skip_schema_validation") {
                 if keys.as_bool().unwrap_or(false) {
                     return (true, None);
                 }
@@ -324,7 +324,7 @@ pub async fn add_stream_schema(
         let settings = crate::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
-            schema_validation: false,
+            skip_schema_validation: false,
             data_retention: 0,
         };
         metadata.insert(
