@@ -123,8 +123,8 @@
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      title="Delete Lookup Table"
+      message="Are you sure you want to delete lookup table?"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -325,7 +325,7 @@ export default defineComponent({
           if (res.data.code == 200) {
             $q.notify({
               color: "positive",
-              message: "Stream deleted successfully.",
+              message: `${selectedDelete.value.name} deleted successfully.`,
             });
             getLookupTables();
           }
