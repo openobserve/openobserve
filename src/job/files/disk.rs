@@ -209,6 +209,16 @@ async fn upload_file(
     let mut res_records = vec![];
     let mut records = vec![];
     log::info!("[JOB] File upload begin: disk: {}", path_str);
+    if file_size == 0 {
+        if let Err(e) = fs::remove_file(path_str) {
+            log::error!(
+                "[JOB] Failed to remove disk file from disk: {}, {}",
+                path_str,
+                e
+            );
+        }
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
 
     // metrics
     metrics::INGEST_WAL_READ_BYTES
