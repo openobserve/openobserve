@@ -92,7 +92,15 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
 
 async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error> {
     let mut file = fs::File::open(path_str).unwrap();
+    let file_meta = file.metadata().unwrap();
+    let file_size = file_meta.len();
     log::info!("[JOB] File_list upload begin: local: {}", path_str);
+    if file_size == 0 {
+        if let Err(e) = fs::remove_file(path_str) {
+            log::error!("[JOB] File_list failed to remove: {}, {}", path_str, e);
+        }
+        return Err(anyhow::anyhow!("File_list is empty: {}", path_str));
+    }
 
     let mut encoder = zstd::Encoder::new(Vec::new(), 3)?;
     std::io::copy(&mut file, &mut encoder)?;
