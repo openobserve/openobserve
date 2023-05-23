@@ -91,6 +91,10 @@ export default defineComponent({
             else if (selectedButtonType.value == "promql") {
                 dashboardPanelData.data.customQuery = true;
                 dashboardPanelData.data.queryType = "promql";
+                
+                // set some defaults for the promql query
+                dashboardPanelData.data.query = "";
+                dashboardPanelData.data.type = 'line';
             }
             else {
                 dashboardPanelData.data.customQuery = false;
