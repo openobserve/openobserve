@@ -20,6 +20,7 @@ use std::io::Error;
 
 use super::search::sql::Sql;
 use super::{db, triggers};
+use crate::common::notification::send_notification;
 use crate::handler::grpc::cluster_rpc;
 use crate::meta::alert::{Alert, AlertList, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -207,17 +208,57 @@ pub async fn get_alert(
     }
 }
 
+#[tracing::instrument]
+pub async fn trigger_alert(
+    org_id: String,
+    stream_name: String,
+    stream_type: StreamType,
+    name: String,
+) -> Result<HttpResponse, Error> {
+    let result = db::alerts::get(
+        org_id.as_str(),
+        stream_name.as_str(),
+        stream_type,
+        name.as_str(),
+    )
+    .await;
+
+    match result {
+        Ok(Some(alert)) => {
+            let trigger = Trigger {
+                timestamp: Utc::now().timestamp_micros(),
+                is_valid: false,
+                alert_name: name,
+                stream: stream_name,
+                org: org_id,
+                last_sent_at: 0,
+                count: 0,
+                is_ingest_time: false, // Check with folks if this is correct
+                stream_type,
+            };
+            let _ = send_notification(&alert, &trigger).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "Alert successfully triggered ".to_string(),
+            )))
+        }
+        _ => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Alert not found".to_string(),
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::common::json;
     use crate::meta::alert::{AllOperator, Condition};
 
-    #[actix_web::test]
-    async fn test_alerts() {
-        let alert = Alert {
-            name: "500error".to_string(),
-            stream: "olympics".to_string(),
+    fn prepare_test_alert_object(name: &str, stream: &str) -> Alert {
+        Alert {
+            name: name.to_string(),
+            stream: stream.to_string(),
             stream_type: Some(StreamType::Logs),
             query: Some(Query {
                 sql: format!("select count(*) as occurance from olympics"),
@@ -245,7 +286,14 @@ mod test {
             destination: "test".to_string(),
             is_real_time: false,
             context_attributes: None,
-        };
+        }
+    }
+
+    #[actix_web::test]
+    async fn test_alerts() {
+        let alert_name = "500error";
+        let alert_stream: &str = "olympics";
+        let alert = prepare_test_alert_object(alert_name, alert_stream);
         let res = save_alert(
             "nexus".to_string(),
             "olympics".to_string(),
@@ -277,6 +325,31 @@ mod test {
         assert!(get_res.is_ok());
 
         let del_res = delete_alert(
+            "nexus".to_string(),
+            "olympics".to_string(),
+            StreamType::Logs,
+            "500error".to_string(),
+        )
+        .await;
+        assert!(del_res.is_ok());
+    }
+
+    #[actix_web::test]
+    async fn test_trigger_alert() {
+        let alert_name = "500error";
+        let alert_stream: &str = "olympics";
+        let alert = prepare_test_alert_object(alert_name, alert_stream);
+        let res = save_alert(
+            "nexus".to_string(),
+            "olympics".to_string(),
+            StreamType::Logs,
+            "500error".to_string(),
+            alert,
+        )
+        .await;
+        assert!(res.is_ok());
+
+        let del_res = trigger_alert(
             "nexus".to_string(),
             "olympics".to_string(),
             StreamType::Logs,
