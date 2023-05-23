@@ -77,8 +77,17 @@ export default defineComponent({
             // dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
             // removeXYFilters()
         };
+
+        watch(() => dashboardPanelData.data.fields.stream_type, () => {
+            if(dashboardPanelData.data.fields.stream_type != 'metrics' && selectedButtonType.value == 'promql'
+            ){
+                selectedButtonType.value = "auto"
+            }
+        })
+
         watch(selectedButtonType, () => {
             console.log("selectedButtonType watcher");
+            window.dispatchEvent(new Event("resize"))
             
             if (selectedButtonType.value == "auto") {
                 dashboardPanelData.data.customQuery = false;
