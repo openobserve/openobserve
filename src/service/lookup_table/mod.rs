@@ -39,8 +39,7 @@ pub async fn save_metadata(
 ) -> Result<HttpResponse, Error> {
     let mut hour_key = String::new();
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let stream_name =
-        &crate::service::ingestion::format_stream_name(&format!("lookup_{}", table_name));
+    let stream_name = &crate::service::ingestion::format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
