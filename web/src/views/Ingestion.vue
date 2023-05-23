@@ -198,6 +198,10 @@ export default defineComponent({
       }
     });
 
+    onMounted(() => {
+      console.log("mounted");
+    });
+
     const getOrganizationPasscode = () => {
       organizationsService
         .get_organization_passcode(store.state.selectedOrganization.identifier)
