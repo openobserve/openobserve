@@ -235,7 +235,12 @@
   },
   "ingestion": {
     "header": "Ingestion",
-    "passwordLabel": "Reset Token"
+    "passwordLabel": "Reset Token",
+    "stream": "Stream",
+    "organization": "Organization",
+    "subnets": "Subnets",
+    "deleteRoute": "Delete Route",
+    "syslog_addroute": "Add Route"
   },
   "dashboard": {
     "selectIndex": "Stream",
@@ -294,7 +299,7 @@
     "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
-    "promQL":"PromQL"
+    "promQL": "PromQL"
   },
   "alerts": {
     "header": "Alerts",

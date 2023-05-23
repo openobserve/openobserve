@@ -29,7 +29,6 @@
         vertical
       >
         <q-route-tab
-          default
           name="curl"
           :to="{
             name: 'curl',
@@ -102,84 +101,36 @@
           label="Kinesis Firehose"
           content-class="tab_content"
         />
+        <q-route-tab
+          name="syslog"
+          :to="{
+            name: 'syslog',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+          label="Syslog"
+          content-class="tab_content"
+        />
       </q-tabs>
     </template>
 
     <template v-slot:after>
-      <q-tab-panels
-        v-model="ingestiontabs"
-        animated
-        swipeable
-        vertical
-        transition-prev="jump-up"
-        transition-next="jump-up"
+      <router-view
+        :title="ingestiontabs"
+        :currOrgIdentifier="currentOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
       >
-        <q-tab-panel name="curl">
-          <router-view
-            title="CURL"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-        <q-tab-panel name="fluentbit">
-          <router-view
-            title="Fluent Bit"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-
-        <q-tab-panel name="fluentd">
-          <router-view
-            title="Fluentd"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-
-        <q-tab-panel name="vector">
-          <router-view
-            title="Vector"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-
-        <q-tab-panel name="kinesisfirehose">
-          <router-view
-            title="Kinesis Firehose"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-
-        <q-tab-panel name="filebeat">
-          <router-view
-            title="Filebeat"
-            :currOrgIdentifier="currentOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </q-tab-panel>
-      </q-tab-panels>
+      </router-view>
     </template>
   </q-splitter>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onActivated } from "vue";
+import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -193,11 +144,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestLogs",
   components: {},
-  data() {
-    return {
-      ingestiontabs: "curl",
-    };
-  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -205,11 +151,13 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const ingestiontabs = ref("");
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
 
-    onMounted(() => {
+    onBeforeMount(() => {
+      console.log(router.currentRoute.value.name, ingestiontabs.value);
       const ingestRoutes = [
         "curl",
         "fluentbit",
@@ -341,6 +289,7 @@ export default defineComponent({
       confirmUpdate,
       getImageURL,
       verifyOrganizationStatus,
+      ingestiontabs,
     };
   },
   computed: {
