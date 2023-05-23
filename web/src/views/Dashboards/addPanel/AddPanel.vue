@@ -128,7 +128,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { dashboardPanelData, resetDashboardPanelData } =
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref()
@@ -212,135 +212,151 @@ export default defineComponent({
       const dashboardData = dashboardPanelData
 
       // TODO: make sure this is applied for all charts except the promql panel
-      if(dashboardData.data.fields.stream_type == "metrics" && dashboardData.data.customQuery && dashboardData.data.queryType == "promql"){
-        return true;
-      }
+      if (promqlMode) {
+        // 1. chart type: only line chart is supported
+        const allowedChartTypes = ['line']
+        if(!allowedChartTypes.includes(dashboardPanelData.data.type)) {
+          errors.push('Selected chart type is not supported for PromQL. Only line chart is supported.')
+        }
 
-      switch (dashboardPanelData.data.type) {
-        case 'donut':
-        case 'pie': {
+        // 2. x axis, y axis, filters should be blank
+        if (dashboardData.data.fields.x.length > 0) {
+          errors.push("X-Axis is not supported for PromQL. Remove anything added to the X-Axis.")
+        }
 
-          if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
-            errors.push("Only one values field is allowed for donut and pie charts")
+        if (dashboardData.data.fields.y.length > 0) {
+          errors.push("Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.")
+        }
+
+        if (dashboardData.data.fields.filter.length > 0) {
+          errors.push("Filters are not supported for PromQL. Remove anything added to the Fitlers.")
+        }
+      } else {
+        switch (dashboardPanelData.data.type) {
+          case 'donut':
+          case 'pie': {
+
+            if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
+              errors.push("Only one values field is allowed for donut and pie charts")
+            }
+
+            if (dashboardData.data.fields.x.length > 1 || dashboardData.data.fields.x.length == 0) {
+              errors.push("Only one label field is allowed for donut and pie charts")
+            }
+
+            break;
+          }
+          case 'metric': {
+
+            if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
+              errors.push("Only one Y-Axis field should be there for metric charts")
+            }
+
+            if (dashboardData.data.fields.x.length) {
+              errors.push(`${currentXLabel.value} field is not allowed for Metric chart`)
+            }
+
+            break;
+          }
+          case 'h-bar':
+          case 'area':
+          case 'line':
+          case 'scatter':
+          case 'bar': {
+
+            if (dashboardData.data.fields.y.length < 1) {
+              errors.push("Add at least one field for the Y-Axis")
+            }
+
+            if (dashboardData.data.fields.x.length > 2 || dashboardData.data.fields.x.length == 0) {
+              errors.push(`Add one or two fields for the X-Axis`)
+            }
+
+            break;
+          }
+          case 'table': {
+            if (dashboardData.data.fields.y.length == 0 && dashboardData.data.fields.x.length == 0) {
+              errors.push("Add at least one field on X-Axis or Y-Axis")
+            }
+
+            break;
+          }
+          case 'stacked':
+          case 'h-stacked': {
+            if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
+              errors.push("Add exactly one field on Y-Axis for stacked and h-stacked charts")
+            }
+            if (dashboardData.data.fields.x.length != 2) {
+              errors.push(`Add exactly two fields on the X-Axis for stacked and h-stacked charts`)
+            }
+
+            break;
+          }
+          default:
+            break;
+        }
+
+        // check if aggregation function is selected or not
+        const aggregationFunctionError = dashboardData.data.fields.y.filter((it: any) => (it.aggregationFunction == null || it.aggregationFunction == ''))
+        if (dashboardData.data.fields.y.length && aggregationFunctionError.length) {
+          errors.push(...aggregationFunctionError.map((it: any) => `${currentYLabel.value}: ${it.column}: Aggregation function required`))
+        }
+
+        // check if labels are there for y axis items
+        const labelError = dashboardData.data.fields.y.filter((it: any) => (it.label == null || it.label == ''))
+        if (dashboardData.data.fields.y.length && labelError.length) {
+          errors.push(...labelError.map((it: any) => `${currentYLabel.value}: ${it.column}: Label required`))
+        }
+
+        // check if name of panel is there
+        if (!onlyChart) {
+          if (dashboardData.data.config.title == null || dashboardData.data.config.title == '') {
+            errors.push("Name of Panel is required")
+          }
+        }
+
+        // if there are filters
+        if (dashboardData.data.fields.filter.length) {
+
+          // check if at least 1 item from the list is selected
+          const listFilterError = dashboardData.data.fields.filter.filter((it: any) => ((it.type == "list" && !it.values?.length)))
+          if (listFilterError.length) {
+            errors.push(...listFilterError.map((it: any) => `Filter: ${it.column}: Select at least 1 item from the list`))
           }
 
-          if (dashboardData.data.fields.x.length > 1 || dashboardData.data.fields.x.length == 0) {
-            errors.push("Only one label field is allowed for donut and pie charts")
+          // check if condition operator is selected
+          const conditionFilterError = dashboardData.data.fields.filter.filter((it: any) => (it.type == "condition" && it.operator == null))
+          if (conditionFilterError.length) {
+            errors.push(...conditionFilterError.map((it: any) => `Filter: ${it.column}: Operator selection required`))
           }
 
-          break;
-        }
-        case 'metric': {
-
-          if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
-            errors.push("Only one Y-Axis field should be there for metric charts")
+          // check if condition value is selected
+          const conditionValueFilterError = dashboardData.data.fields.filter.filter((it: any) => (it.type == "condition" && !["Is Null", "Is Not Null"].includes(it.operator) && (it.value == null || it.value == '')))
+          if (conditionValueFilterError.length) {
+            errors.push(...conditionValueFilterError.map((it: any) => `Filter: ${it.column}: Condition value required`))
           }
 
-          if (dashboardData.data.fields.x.length) {
-            errors.push(`${currentXLabel.value} field is not allowed for Metric chart`)
+        }
+
+        // check if query syntax is valid
+        if (dashboardData.data.customQuery && dashboardData.meta.errors.queryErrors.length) {
+          errors.push("Please add valid query syntax")
+        }
+
+        // check if field selection is from the custom query fields when the custom query mode is ON
+        if (dashboardData.data.customQuery) {
+
+          // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
+
+          const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it: any) => !dashboardPanelData.meta.stream.customQueryFields.find((i: any) => i.name == it.column))
+          if (customQueryXFieldError.length) {
+            errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
           }
 
-          break;
-        }
-        case 'h-bar':
-        case 'area':
-        case 'line':
-        case 'scatter':
-        case 'bar': {
-
-          if (dashboardData.data.fields.y.length < 1) {
-            errors.push("Add at least one field for the Y-Axis")
+          const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.customQueryFields.find((i: any) => i.name == it.column))
+          if (customQueryYFieldError.length) {
+            errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
           }
-
-          if (dashboardData.data.fields.x.length > 2 || dashboardData.data.fields.x.length == 0) {
-            errors.push(`Add one or two fields for the X-Axis`)
-          }
-
-          break;
-        }
-        case 'table': {
-          if (dashboardData.data.fields.y.length == 0 && dashboardData.data.fields.x.length == 0) {
-            errors.push("Add at least one field on X-Axis or Y-Axis")
-          }
-
-          break;
-        }
-        case 'stacked':
-        case 'h-stacked': {
-          if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {
-            errors.push("Add exactly one field on Y-Axis for stacked and h-stacked charts")
-          }
-          if(dashboardData.data.fields.x.length != 2){
-            errors.push(`Add exactly two fields on the X-Axis for stacked and h-stacked charts`)
-          }
-
-          break;
-        }
-        default:
-          break;
-      }
-
-      // check if aggregation function is selected or not
-      const aggregationFunctionError = dashboardData.data.fields.y.filter((it: any) => (it.aggregationFunction == null || it.aggregationFunction == ''))
-      if (dashboardData.data.fields.y.length && aggregationFunctionError.length) {
-        errors.push(...aggregationFunctionError.map((it: any) => `${currentYLabel.value}: ${it.column}: Aggregation function required`))
-      }
-
-      // check if labels are there for y axis items
-      const labelError = dashboardData.data.fields.y.filter((it: any) => (it.label == null || it.label == ''))
-      if (dashboardData.data.fields.y.length && labelError.length) {
-        errors.push(...labelError.map((it: any) => `${currentYLabel.value}: ${it.column}: Label required`))
-      }
-
-      // check if name of panel is there
-      if (!onlyChart) {
-        if (dashboardData.data.config.title == null || dashboardData.data.config.title == '') {
-          errors.push("Name of Panel is required")
-        }
-      }
-
-      // if there are filters
-      if (dashboardData.data.fields.filter.length) {
-
-        // check if at least 1 item from the list is selected
-        const listFilterError = dashboardData.data.fields.filter.filter((it: any) => ((it.type == "list" && !it.values?.length)))
-        if (listFilterError.length) {
-          errors.push(...listFilterError.map((it: any) => `Filter: ${it.column}: Select at least 1 item from the list`))
-        }
-
-        // check if condition operator is selected
-        const conditionFilterError = dashboardData.data.fields.filter.filter((it: any) => (it.type == "condition" && it.operator == null))
-        if (conditionFilterError.length) {
-          errors.push(...conditionFilterError.map((it: any) => `Filter: ${it.column}: Operator selection required`))
-        }
-
-        // check if condition value is selected
-        const conditionValueFilterError = dashboardData.data.fields.filter.filter((it: any) => (it.type == "condition" && !["Is Null", "Is Not Null"].includes(it.operator) && (it.value == null || it.value == '')))
-        if (conditionValueFilterError.length) {
-          errors.push(...conditionValueFilterError.map((it: any) => `Filter: ${it.column}: Condition value required`))
-        }
-
-      }
-
-      // check if query syntax is valid
-      if (dashboardData.data.customQuery && dashboardData.meta.errors.queryErrors.length) {
-        errors.push("Please add valid query syntax")
-      }
-
-      // check if field selection is from the custom query fields when the custom query mode is ON
-      if (dashboardData.data.customQuery) {
-
-        // console.log("-data-",dashboardPanelData.data.fields.x.filter((it:any) => !dashboardPanelData.meta.stream.customQueryFields.find((i:any) => i.name == it.column)) );
-
-        const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it: any) => !dashboardPanelData.meta.stream.customQueryFields.find((i: any) => i.name == it.column))
-        if (customQueryXFieldError.length) {
-          errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`))
-        }
-
-        const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.customQueryFields.find((i: any) => i.name == it.column))
-        if (customQueryYFieldError.length) {
-          errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
-        }
 
       } else {
         // check if field selection is from the selected stream fields when the custom query mode is OFF
@@ -349,9 +365,10 @@ export default defineComponent({
           errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`))
         }
 
-        const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
-        if (customQueryYFieldError.length) {
-          errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
+          const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
+          if (customQueryYFieldError.length) {
+            errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
+          }
         }
       }
 
@@ -364,7 +381,7 @@ export default defineComponent({
       //   });
       // }
 
-      if(errors.length){
+      if (errors.length) {
         $q.notify({
           type: "negative",
           message: 'There are some errors, please fix them and try again',
@@ -378,7 +395,7 @@ export default defineComponent({
         return true
       }
 
-      
+
 
     }
 
