@@ -211,7 +211,7 @@ export default defineComponent({
       errors.splice(0)
       const dashboardData = dashboardPanelData
 
-      if (promqlMode) {
+      if (promqlMode.value) {
         // 1. chart type: only line chart is supported
         const allowedChartTypes = ['line']
         if(!allowedChartTypes.includes(dashboardPanelData.data.type)) {
