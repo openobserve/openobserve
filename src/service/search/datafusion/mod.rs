@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use datafusion::arrow::datatypes::Schema;
+use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
+use std::sync::Arc;
+
+use crate::infra::config::{get_parquet_compression, CONFIG};
 use crate::meta::functions::ZoFunction;
 
 mod date_format_udf;
@@ -58,3 +63,20 @@ pub const DEFAULT_FUNCTIONS: [ZoFunction; 6] = [
         text: "re_not_match(field, 'pattern')",
     },
 ];
+
+pub fn new_writer<'a>(
+    buf: &'a mut Vec<u8>,
+    schema: &'a Arc<Schema>,
+) -> ArrowWriter<&'a mut Vec<u8>> {
+    let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
+    let writer_props = WriterProperties::builder()
+        .set_compression(get_parquet_compression())
+        .set_write_batch_size(8192)
+        .set_data_pagesize_limit(1024 * 512)
+        .set_max_row_group_size(1024 * 1024 * 256)
+        .set_sorting_columns(Some(
+            [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
+        ))
+        .build();
+    ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+}

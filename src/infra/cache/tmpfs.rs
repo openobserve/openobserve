@@ -16,6 +16,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
+use uuid::Uuid;
 
 use crate::infra::errors::*;
 
@@ -31,6 +32,38 @@ pub struct File {
     pub location: String,
     pub size: usize,
     pub last_modified: DateTime<Utc>,
+}
+
+pub struct Directory {
+    location: String,
+}
+
+impl Directory {
+    pub fn new(location: String) -> Self {
+        Self { location }
+    }
+    pub fn name(&self) -> &str {
+        &self.location
+    }
+    pub fn set(&self, path: &str, data: Bytes) -> Result<()> {
+        let key = format!("/{}/{}", self.location, path);
+        set(&key, data)
+    }
+}
+
+impl Default for Directory {
+    fn default() -> Self {
+        Self {
+            location: Uuid::new_v4().to_string(),
+        }
+    }
+}
+
+impl Drop for Directory {
+    fn drop(&mut self) {
+        println!("Dropping directory: {}", self.location);
+        delete(&self.location, true).unwrap();
+    }
 }
 
 pub fn list(path: &str) -> Result<Vec<File>> {
@@ -75,13 +108,15 @@ pub fn delete(path: &str, prefix: bool) -> Result<()> {
     if !prefix {
         FILES.remove(&path);
         DATA.remove(&path);
-        return Ok(());
+    } else {
+        let files = list(&path)?;
+        for f in files {
+            FILES.remove(&f.location);
+            DATA.remove(&f.location);
+        }
     }
-    let files = list(&path)?;
-    for f in files {
-        FILES.remove(&f.location);
-        DATA.remove(&f.location);
-    }
+    FILES.shrink_to_fit();
+    DATA.shrink_to_fit();
     Ok(())
 }
 
