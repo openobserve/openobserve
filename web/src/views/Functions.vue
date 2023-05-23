@@ -49,6 +49,18 @@
               :label="t('function.associatedWithStream')"
               content-class="tab_content"
             />
+            <q-route-tab
+              data-test="function-lookup-table-tab"
+              name="lookupTables"
+              :to="{
+                name: 'lookupTables',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('function.lookupTables')"
+              content-class="tab_content"
+            />
           </q-tabs>
         </div>
       </template>

@@ -41,7 +41,7 @@
               size="sm"
               round
               flat
-              :title="t('function.updateTitle')"
+              :title="t('function.lookupTables')"
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
@@ -70,7 +70,7 @@
         </template>
         <template #top="scope">
           <div class="q-table__title">
-            {{ t("function.header") }}
+            {{ t("function.lookupTables") }}
           </div>
           <q-input
             v-model="filterQuery"
@@ -78,7 +78,7 @@
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('function.search')"
+            :placeholder="t('function.searchLookupTable')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -89,13 +89,13 @@
             padding="sm lg"
             color="secondary"
             no-caps
-            :label="t(`function.add`)"
+            :label="t(`function.addLookupTable`)"
             @click="showAddUpdateFn({})"
           />
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('function.header')"
+            :pageTitle="t('function.lookupTables')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -115,17 +115,17 @@
       </q-table>
     </div>
     <div v-else>
-      <AddFunction
+      <add-lookup-table
         v-model="formData"
-        :isUpdated="isUpdated"
+        :isUpdating="isUpdated"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
-      @update:ok="deleteFn"
+      title="Delete Lookup Table"
+      message="Are you sure you want to delete lookup table?"
+      @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
@@ -133,7 +133,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, onBeforeMount, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -141,15 +141,16 @@ import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../shared/grid/Pagination.vue";
 import jsTransformService from "../../services/jstransform";
-import AddFunction from "./AddFunction.vue";
+import AddLookupTable from "./AddLookupTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import streamService from "@/services/stream";
 
 export default defineComponent({
-  name: "FunctionList",
-  components: { QTablePagination, AddFunction, NoData, ConfirmDialog },
+  name: "LookupTables",
+  components: { QTablePagination, AddLookupTable, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -190,48 +191,34 @@ export default defineComponent({
       },
     ]);
 
-    const getJSTransforms = () => {
+    onBeforeMount(() => {
+      getLookupTables();
+    });
+
+    const getLookupTables = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading functions...",
       });
 
-      jsTransformService
-        .list(
-          1,
-          100000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
+      streamService
+        .nameList(
+          store.state.selectedOrganization.identifier,
+          "lookuptable",
+          false
         )
         .then((res) => {
-          var counter = 1;
+          let counter = 1;
           resultTotal.value = res.data.list.length;
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
           jsTransforms.value = res.data.list.map((data: any) => {
-            if (router.currentRoute.value.query.action == "update") {
-              if (router.currentRoute.value.query.name == data.name) {
-                showAddUpdateFn({ row: data });
-              }
-            }
-
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
+              id: data.name + counter,
               name: data.name,
-              function: data.function,
-              params: data.params,
-              // order: data.order ? data.order : 1,
-              // stream_name: data.stream_name ? data.stream_name : "--",
-              // stream_type: data.stream_type ? data.stream_type : "--",
-              transType: data.transType.toString(),
-              // ingest: data.stream_name ? true : false,
-              actions: "",
+              actions: "action buttons",
+              stream_type: data.stream_type,
             };
           });
-
           dismiss();
         })
         .catch((err) => {
@@ -246,14 +233,6 @@ export default defineComponent({
         });
     };
 
-    if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms();
-    }
-
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
     const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -262,6 +241,7 @@ export default defineComponent({
       { label: "100", value: 100 },
       { label: "All", value: 0 },
     ];
+
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -273,11 +253,8 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
 
-    const addTransform = () => {
+    const addLookupTable = () => {
       showAddJSTransformDialog.value = true;
     };
 
@@ -286,9 +263,9 @@ export default defineComponent({
       let action;
       if (!props.row) {
         isUpdated.value = false;
-        action = "Add Function";
+        action = "Add Lookup Table";
         router.push({
-          name: "functionList",
+          name: "lookupTables",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
@@ -296,9 +273,9 @@ export default defineComponent({
         });
       } else {
         isUpdated.value = true;
-        action = "Update Function";
+        action = "Update Lookup Table";
         router.push({
-          name: "functionList",
+          name: "lookupTables",
           query: {
             action: "update",
             name: props.row.name,
@@ -306,7 +283,7 @@ export default defineComponent({
           },
         });
       }
-      addTransform();
+      addLookupTable();
 
       segment.track("Button Click", {
         button: action,
@@ -318,82 +295,50 @@ export default defineComponent({
 
     const refreshList = () => {
       router.push({
-        name: "functions",
+        name: "lookupTables",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
       showAddJSTransformDialog.value = false;
-      getJSTransforms();
+      getLookupTables();
     };
 
     const hideForm = () => {
       showAddJSTransformDialog.value = false;
       router.replace({
-        name: "functions",
+        name: "lookupTables",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
 
-    const deleteFn = () => {
-      // if (selectedDelete.value.ingest) {
-      //   jsTransformService
-      //     .delete_stream_function(
-      //       store.state.selectedOrganization.identifier,
-      //       selectedDelete.value.stream_name,
-      //       selectedDelete.value.name
-      //     )
-      //     .then((res: any) => {
-      //       if (res.data.code == 200) {
-      //         $q.notify({
-      //           type: "positive",
-      //           message: res.data.message,
-      //           timeout: 2000,
-      //         });
-      //         getJSTransforms();
-      //       } else {
-      //         $q.notify({
-      //           type: "negative",
-      //           message: res.data.message,
-      //           timeout: 2000,
-      //         });
-      //       }
-      //     });
-      // } else {
-      jsTransformService
+    const deleteLookupTable = () => {
+      streamService
         .delete(
           store.state.selectedOrganization.identifier,
-          selectedDelete.value.name
+          selectedDelete.value.name,
+          "lookuptable"
         )
         .then((res: any) => {
           if (res.data.code == 200) {
             $q.notify({
-              type: "positive",
-              message: res.data.message,
-              timeout: 2000,
+              color: "positive",
+              message: `${selectedDelete.value.name} deleted successfully.`,
             });
-            getJSTransforms();
-          } else {
-            $q.notify({
-              type: "negative",
-              message: res.data.message,
-              timeout: 2000,
-            });
+            getLookupTables();
           }
         })
-        .catch((err) => {
+        .catch((err: any) => {
           $q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response.data["message"]) ||
-              "Function deletion failed.",
+            color: "negative",
+            message: "Error while deleting stream.",
           });
         });
 
       segment.track("Button Click", {
-        button: "Delete Function",
+        button: "Delete Lookup Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
@@ -418,21 +363,20 @@ export default defineComponent({
       hideForm,
       confirmDelete,
       selectedDelete,
-      getJSTransforms,
+      getLookupTables,
       pagination,
       resultTotal,
       refreshList,
       perPageOptions,
       selectedPerPage,
-      addTransform,
-      deleteFn,
+      addLookupTable,
+      deleteLookupTable,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
-      changeMaxRecordToReturn,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -465,7 +409,7 @@ export default defineComponent({
       ) {
         this.resultTotal = 0;
         this.jsTransforms = [];
-        this.getJSTransforms();
+        this.getLookupTables();
       }
     },
   },
