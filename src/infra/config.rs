@@ -398,6 +398,21 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.instance_name = hostname().unwrap();
     }
 
+    // HACK for tracing, always disable tracing except ingester and querier
+    let local_node_role: Vec<super::cluster::Role> = cfg
+        .common
+        .node_role
+        .clone()
+        .split(',')
+        .map(|s| s.parse().unwrap())
+        .collect();
+    if !local_node_role.contains(&super::cluster::Role::All)
+        && !local_node_role.contains(&super::cluster::Role::Ingester)
+        && !local_node_role.contains(&super::cluster::Role::Querier)
+    {
+        cfg.common.tracing_enabled = false;
+    }
+
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
