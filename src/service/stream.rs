@@ -117,12 +117,12 @@ pub fn stream_res(
     let mut partition_keys = Vec::new();
     let mut full_text_search_keys = vec![];
     let stream_settings = meta.get("settings");
-    let mut schema_validation = false;
+    let mut skip_schema_validation = false;
     let mut data_retention = 0;
     if let Some(value) = stream_settings {
         let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if let Some(v) = settings.get("schema_validation") {
-            schema_validation = v.as_bool().unwrap();
+        if let Some(v) = settings.get("skip_schema_validation") {
+            skip_schema_validation = v.as_bool().unwrap();
         }
         let keys = settings.get("partition_keys");
 
@@ -160,7 +160,7 @@ pub fn stream_res(
         settings: StreamSettings {
             partition_keys,
             full_text_search_keys,
-            schema_validation,
+            skip_schema_validation,
             data_retention,
         },
     }
