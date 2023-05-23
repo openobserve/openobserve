@@ -366,7 +366,7 @@ export default defineComponent({
 
           const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
           if (customQueryYFieldError.length) {
-            errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
+            errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`))
           }
         }
       }
