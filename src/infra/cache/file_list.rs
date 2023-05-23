@@ -366,7 +366,6 @@ async fn scan_prefix(
     Ok(resp)
 }
 
-#[tracing::instrument(name = "cache:file_list:get_file_list")]
 pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
