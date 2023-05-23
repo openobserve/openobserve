@@ -233,7 +233,7 @@ pub async fn trigger_alert(
                 org: org_id,
                 last_sent_at: 0,
                 count: 0,
-                is_ingest_time: false, // Check with folks if this is correct
+                is_ingest_time: alert.is_real_time,
                 stream_type,
             };
             let _ = send_notification(&alert, &trigger).await;
