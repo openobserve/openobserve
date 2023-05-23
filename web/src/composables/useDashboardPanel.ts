@@ -81,6 +81,7 @@ const getDefaultDashboardPanelData = () => (
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
+
 const useDashboardPanelData = () => {
   const store = useStore();
   const $q = useQuasar();
@@ -93,6 +94,8 @@ const useDashboardPanelData = () => {
   const generateLabelFromName = (name: string) => {
     return name.replace(/[\_\-\s\.]/g,' ').split(' ').map(string => string.charAt(0).toUpperCase() + string.slice(1)).filter(it => it).join(' ')
   }
+
+  const promqlMode = computed(() => dashboardPanelData.data.fields.stream_type == "metrics" && dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType == "promql")
 
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
@@ -281,7 +284,8 @@ const useDashboardPanelData = () => {
     addFilteredItem,
     removeXYFilters,
     isAddXAxisNotAllowed,
-    isAddYAxisNotAllowed
+    isAddYAxisNotAllowed,
+    promqlMode,
   };
 };
 
