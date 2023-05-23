@@ -15,7 +15,7 @@
 
 <template>
   <div>
-    <q-bar class="row q-pa-sm sql-bar">
+    <q-bar class="row sql-bar">
       <div style="flex: 1;" @click="onDropDownClick">
         <q-icon
           flat
@@ -308,6 +308,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .sql-bar {
+  height: 40px !important;
   overflow: hidden;
   cursor: pointer;
   background-color: white;

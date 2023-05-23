@@ -1,6 +1,6 @@
 <template>
-    <div>
-        <div class="row">
+    <div class="q-py-sm">
+        <div class="row button-group">
             <div>
                 <button :class="selectedButtonType === 'auto'? 'selected' : ''" 
                     class='button button-left'
@@ -139,11 +139,18 @@ export default defineComponent({
     color: white;
 }
 
+.button-group {
+    border: 1px solid gray !important;
+    border-radius: 9px;
+}
+
 .button {
     display: block;
     cursor: pointer;
     background-color:  #f0eaea;
     border: none;
+    font-size: 14px;
+    padding: 3px 10px;
 }
 
 .button-left {
