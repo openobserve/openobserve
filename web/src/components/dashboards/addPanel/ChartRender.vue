@@ -587,15 +587,6 @@ export default defineComponent({
 
       const renderPromQlBasedChart = () => {
 
-        const hashCode = function(s: string) {
-            return s.split("").reduce(function(a, b) {
-                a = ((a << 5) - a) + b.charCodeAt(0);
-                return a & a;
-            }, 0);
-        }
-        
-        console.log(searchQueryData.data)
-
         switch(searchQueryData.data.resultType) { 
             case 'matrix': {
                 const traces = searchQueryData.data?.result?.map((metric: any) => {
@@ -614,14 +605,14 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
+                        orientation: "h"
                     },
                     margin: {
                         l: props.data.type == 'pie' ? 60 : 32,
                         r: props.data.type == 'pie' ? 60 : 16,
                         t: 38,
                         b: 32,
-                    },
-                    //   ...getPropsByChartTypeForLayout(),
+                    }
                 };
 
                 Plotly.react(plotRef.value, traces, layout, {
@@ -638,7 +629,7 @@ export default defineComponent({
                     console.log('vector',values);
                     
                     return  {
-                        name: hashCode(JSON.stringify(metric.metric)),
+                        name: JSON.stringify(metric.metric),
                         x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
                         y: values.map((value: any) => value[1]),
                     }
@@ -651,14 +642,14 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
+                        orientation: "h"
                     },
                     margin: {
                         l: props.data.type == 'pie' ? 60 : 32,
                         r: props.data.type == 'pie' ? 60 : 16,
                         t: 38,
                         b: 32,
-                    },
-                    //   ...getPropsByChartTypeForLayout(),
+                    }
                 };
 
                 Plotly.react(plotRef.value, traces, layout, {
