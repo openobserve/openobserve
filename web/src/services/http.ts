@@ -13,12 +13,10 @@
 //  limitations under the License.
 
 import store from "../stores";
-import router from "../router";
 import axios from "axios";
-import { Notify } from "quasar";
 import config from "../aws-exports";
 
-const http = () => {
+const http = ({ headers } = {} as any) => {
   const instance = axios.create({
     // timeout: 10000,
     baseURL: store.state.API_ENDPOINT,
@@ -27,6 +25,7 @@ const http = () => {
         config.isZincObserveCloud == "true"
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
+      ...headers,
     },
   });
 

@@ -18,19 +18,31 @@
     <q-card-section class="q-pa-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold text-dark" data-test="schema-title-text">
+          <div
+            class="text-body1 text-bold text-dark"
+            data-test="schema-title-text"
+          >
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup round flat :icon="'img:' + getImageURL('images/common/close_icon.svg')" />
+          <q-btn
+            v-close-popup
+            round
+            flat
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <q-card-section>
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
-        <div v-if="indexData.schema.length == 0" class="q-pt-md text-center q-w-md q-mx-lg" style="max-width: 450px">
+        <div
+          v-if="indexData.schema.length == 0"
+          class="q-pt-md text-center q-w-md q-mx-lg"
+          style="max-width: 450px"
+        >
           No data available.
         </div>
         <div v-else class="indexDetailsContainer">
@@ -86,33 +98,57 @@
 
           <div class="title" data-test="schema-log-stream-mapping-title-text">
             {{ t("logStream.mapping") }}
-            <label v-show="indexData.defaultFts" class="warning-msg" style="font-weight: normal">- Using default fts keys,
-              as no fts keys are set for
-              stream.</label>
+            <label
+              v-show="indexData.defaultFts"
+              class="warning-msg"
+              style="font-weight: normal"
+              >- Using default fts keys, as no fts keys are set for
+              stream.</label
+            >
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div class="q-table__container q-table--cell-separator" style="height: calc(100vh - 460px); overflow: auto">
-            <table class="q-table" data-test="schema-log-stream-field-mapping-table">
+          <div
+            class="q-table__container q-table--cell-separator"
+            style="height: calc(100vh - 460px); overflow: auto"
+          >
+            <table
+              class="q-table"
+              data-test="schema-log-stream-field-mapping-table"
+            >
               <thead>
                 <tr>
                   <th>{{ t("logStream.propertyName") }}</th>
                   <th>{{ t("logStream.propertyType") }}</th>
-                  <th>{{ t("logStream.streamftsKey") }}</th>
-                  <th>{{ t("logStream.streamPartitionKey") }}</th>
+                  <th v-if="showFullTextSearchColumn">
+                    {{ t("logStream.streamftsKey") }}
+                  </th>
+                  <th v-if="showPartitionColumn">
+                    {{ t("logStream.streamPartitionKey") }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(schema, index) in indexData.schema" :key="index + '_' + schema.name" class="list-item">
+                <tr
+                  v-for="(schema, index) in indexData.schema"
+                  :key="index + '_' + schema.name"
+                  class="list-item"
+                >
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
-                  <td class="text-center">
-                    <q-checkbox :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`" v-model="schema.ftsKey"
-                      size="sm" />
+                  <td v-if="showFullTextSearchColumn" class="text-center">
+                    <q-checkbox
+                      :data-test="`schema-stream-${schema.name}-field-fts-key-checkbox`"
+                      v-model="schema.ftsKey"
+                      size="sm"
+                    />
                   </td>
-                  <td class="text-center">
-                    <q-checkbox :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
-                      v-model="schema.partitionKey" size="sm">
+                  <td v-if="showPartitionColumn" class="text-center">
+                    <q-checkbox
+                      :data-test="`schema-stream-${schema.name}-field-partition-key-checkbox`"
+                      v-model="schema.partitionKey"
+                      size="sm"
+                    >
                     </q-checkbox>
                   </td>
                 </tr>
@@ -121,11 +157,29 @@
           </div>
         </div>
 
-        <div v-if="indexData.schema.length > 0" class="flex justify-center q-mt-sm">
-          <q-btn v-close-popup data-test="schema-cancel-button" class="q-mb-md text-bold no-border"
-            :label="t('logStream.cancel')" text-color="light-text" padding="sm md" color="accent" no-caps />
-          <q-btn data-test="schema-update-settings-button" :label="t('logStream.updateSettings')"
-            class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl" type="submit" no-caps />
+        <div
+          v-if="indexData.schema.length > 0 && showSchemaActions"
+          class="flex justify-center q-mt-sm"
+        >
+          <q-btn
+            v-close-popup
+            data-test="schema-cancel-button"
+            class="q-mb-md text-bold no-border"
+            :label="t('logStream.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            color="accent"
+            no-caps
+          />
+          <q-btn
+            data-test="schema-update-settings-button"
+            :label="t('logStream.updateSettings')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
         </div>
       </q-form>
     </q-card-section>
@@ -137,7 +191,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
@@ -163,7 +217,7 @@ export default defineComponent({
       default: () => defaultValue(),
     },
   },
-  setup() {
+  setup({ modelValue }) {
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
@@ -191,8 +245,10 @@ export default defineComponent({
             parseInt(res.data.stats.doc_time_min) / 1000,
             "YYYY-MM-DDTHH:mm:ss:SSZ"
           );
-
-          if (res.data.settings.full_text_search_keys.length == 0) {
+          if (
+            res.data.settings.full_text_search_keys.length == 0 &&
+            (showFullTextSearchColumn.value || showPartitionColumn.value)
+          ) {
             indexData.value.defaultFts = true;
           } else {
             indexData.value.defaultFts = false;
@@ -287,6 +343,18 @@ export default defineComponent({
         });
     };
 
+    const showPartitionColumn = computed(
+      () => modelValue.stream_type !== "lookuptable"
+    );
+
+    const showFullTextSearchColumn = computed(
+      () => modelValue.stream_type !== "lookuptable"
+    );
+
+    const showSchemaActions = computed(
+      () => showFullTextSearchColumn.value && showPartitionColumn.value
+    );
+
     return {
       t,
       q,
@@ -295,7 +363,10 @@ export default defineComponent({
       onSubmit,
       updateSettingsForm,
       format,
+      showPartitionColumn,
+      showFullTextSearchColumn,
       getImageURL,
+      showSchemaActions,
     };
   },
   created() {
