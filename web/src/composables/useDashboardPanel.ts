@@ -81,7 +81,6 @@ const getDefaultDashboardPanelData = () => (
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
-
 const useDashboardPanelData = () => {
   const store = useStore();
   const $q = useQuasar();
