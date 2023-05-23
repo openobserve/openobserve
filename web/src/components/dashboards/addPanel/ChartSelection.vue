@@ -22,6 +22,7 @@
             selectedChartType === item.id ? 'q-pa-none bg-grey-3' : 'q-pa-none'
           "
           v-for="(item, index) in ChartsArray"
+          :disable="promqlMode && item.id != 'line'"
           :key="index"
           clickable
           v-ripple
@@ -47,6 +48,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
+import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
 export default defineComponent({
   name: "ChartSelection",
@@ -115,8 +117,14 @@ export default defineComponent({
       },
     ]);
 
+    const {
+      promqlMode,
+      dashboardPanelData,
+    } = useDashboardPanelData()
     return {
       ChartsArray: chartsArray,
+      promqlMode,
+      dashboardPanelData
     };
   },
   components: {},

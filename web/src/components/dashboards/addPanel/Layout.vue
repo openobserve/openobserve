@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div>
+  <div v-if="!promqlMode">
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name">{{ dashboardPanelData.data.type == 'table' ? t('panel.firstColumn') :dashboardPanelData.data.type == 'h-bar' || dashboardPanelData.data.type == 'h-stacked' ? t('panel.yAxis') :  t('panel.xAxis') }}
       <q-icon name="info_outline" class="q-ml-xs" >
@@ -369,6 +369,7 @@ export default defineComponent({
       removeYAxisItem,
       removeFilterItem,
       addFilteredItem,
+      promqlMode,
     } = useDashboardPanelData();
     const triggerOperators = [
       {label: "Count", value: "count"},
@@ -496,7 +497,8 @@ export default defineComponent({
       expansionItems,
       triggerOperatorsWithHistogram,
       xAxisHint,
-      yAxisHint
+      yAxisHint,
+      promqlMode
     };
   },
 });
