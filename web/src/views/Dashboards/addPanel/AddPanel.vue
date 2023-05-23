@@ -150,7 +150,7 @@ export default defineComponent({
         // console.log("panel data", JSON.stringify(panelData, null , 2));
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         // console.log("dashboard panel data",JSON.stringify(dashboardPanelData.data, null, 2));
-        chartData.value = dashboardPanelData.data
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
       } else {
         editMode.value = false;
         resetDashboardPanelData();
