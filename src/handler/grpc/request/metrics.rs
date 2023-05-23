@@ -42,7 +42,7 @@ impl Metrics for Querier {
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
-        let org_id = req.org_id.clone();
+        let org_id = &req.org_id;
         let stream_type = meta::StreamType::Metrics.to_string();
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
@@ -77,10 +77,10 @@ impl Metrics for Querier {
         req: Request<MetricsWalFileRequest>,
     ) -> Result<Response<MetricsWalFileResponse>, Status> {
         let start = std::time::Instant::now();
-        let org_id = req.get_ref().org_id.clone();
         let start_time = req.get_ref().start_time;
         let end_time = req.get_ref().end_time;
-        let stream_name = req.get_ref().stream_name.clone();
+        let org_id = &req.get_ref().org_id;
+        let stream_name = &req.get_ref().stream_name;
         let pattern = format!(
             "{}/files/{org_id}/metrics/{stream_name}/*.json",
             &CONFIG.common.data_wal_dir
