@@ -71,6 +71,8 @@ pub struct Panel {
     pub fields: PanelFields,
     pub config: PanelConfig,
     pub query: String,
+    #[serde(default)]
+    pub query_type: String,
     pub custom_query: bool,
 }
 
