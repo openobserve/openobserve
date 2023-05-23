@@ -178,7 +178,7 @@ export default defineComponent({
           }
       })
       const noData = computed(()=> {
-        if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
+        if (props.data?.fields?.stream_type == "metrics" && props.data?.customQuery && props.data?.queryType == "promql") {
             return searchQueryData.data?.result?.length ? "" : "No Data"
         } else {
             return !searchQueryData.data.length ? "No Data" : ""
@@ -321,7 +321,7 @@ export default defineComponent({
       );
 
       const renderChart = async () => {
-        if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
+        if (props.data?.fields?.stream_type == "metrics" && props.data?.customQuery && props.data?.queryType == "promql") {
             renderPromQlBasedChart()
         } else {
             renderSqlBasedChart()
