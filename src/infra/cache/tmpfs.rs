@@ -61,8 +61,7 @@ impl Default for Directory {
 
 impl Drop for Directory {
     fn drop(&mut self) {
-        println!("Dropping directory: {}", self.location);
-        delete(&self.location, true).unwrap();
+        delete(&format!("/{}/", self.location), true).unwrap();
     }
 }
 
