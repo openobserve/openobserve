@@ -442,6 +442,9 @@ pub async fn merge(
 fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     for (i, item) in batches.iter().enumerate() {
+        if item.is_empty() {
+            continue;
+        }
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
         let mut writer = ArrowWriter::try_new(&mut buf_parquet, item[0].schema().clone(), None)?;
