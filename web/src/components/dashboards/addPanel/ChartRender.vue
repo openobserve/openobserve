@@ -694,7 +694,7 @@ export default defineComponent({
       // get the axis data using key
       const getAxisDataFromKey = (key: string) => {
           // when the key is not available in the data that is not show the default value
-          let result: string[] = searchQueryData.data.map((item: any) => item[key]);
+          let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
           // when the key is not available in the data make default value null using below line
           // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
 
