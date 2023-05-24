@@ -342,14 +342,19 @@ pub async fn merge(
 
     let start = Instant::now();
     // write temp file
-    let work_dir = merge_write_recordbatch(batches)?;
+    let (schema, work_dir) = merge_write_recordbatch(batches)?;
     log::info!(
         "merge_write_recordbatch took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
     // rewrite sql
-    let schema = batches[0][0].schema();
+    let schema = match schema {
+        Some(schema) => schema,
+        None => {
+            return Ok(vec![]);
+        }
+    };
     let query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
             if offset > 0
@@ -439,11 +444,15 @@ pub async fn merge(
     Ok(vec![batches])
 }
 
-fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
+fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Option<Arc<Schema>>, String)> {
+    let mut schema = None;
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     for (i, item) in batches.iter().enumerate() {
         if item.is_empty() {
             continue;
+        }
+        if schema.is_none() {
+            schema = Some(item[0].schema().clone());
         }
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
@@ -454,7 +463,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
         writer.close().unwrap();
         tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-    Ok(work_dir)
+    Ok((schema, work_dir))
 }
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
@@ -1039,8 +1048,8 @@ mod test {
         .unwrap();
 
         let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
-
-        assert!(!res.is_empty())
+        assert!(res.0.is_some());
+        assert!(!res.1.is_empty())
     }
 
     #[actix_web::test]
