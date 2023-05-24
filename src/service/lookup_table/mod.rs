@@ -15,7 +15,6 @@ use actix_multipart::Multipart;
 use actix_web::http::{self, StatusCode};
 use actix_web::{web, HttpResponse};
 use ahash::AHashMap;
-use chrono::{TimeZone, Utc};
 use futures::{StreamExt, TryStreamExt};
 use std::fs::OpenOptions;
 use std::io::Error;
@@ -73,7 +72,7 @@ pub async fn save_metadata(
     }
 
     let mut records = vec![];
-    let timestamp = Utc.timestamp_opt(0, 0).unwrap().timestamp_micros();
+    let timestamp = chrono::Utc::now().timestamp_micros();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();

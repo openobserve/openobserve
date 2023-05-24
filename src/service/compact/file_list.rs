@@ -41,8 +41,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         // get earilest date from schema
         offset = Utc::now().timestamp_micros();
         for item in STREAM_SCHEMAS.iter() {
-            let schema = item.value();
-            if let Some(val) = schema.first().unwrap().metadata.get("created_at") {
+            if let Some(val) = item.value().first().unwrap().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
                 if time_min < offset {
                     offset = time_min;
