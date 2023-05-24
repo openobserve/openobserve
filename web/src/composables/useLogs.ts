@@ -83,6 +83,7 @@ const defaultObject = {
       filterField: "",
       addToFilter: "",
       functions: [],
+      streamType: "logs",
     },
     resultGrid: {
       currentDateTime: new Date(),
