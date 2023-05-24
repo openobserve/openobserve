@@ -235,12 +235,20 @@
   },
   "ingestion": {
     "header": "Ingestion",
-    "passwordLabel": "Reset Token",
+    "passwordLabel": "Reset Token"
+  },
+  "syslog": {
     "stream": "Stream",
     "organization": "Organization",
     "subnets": "Subnets",
     "deleteRoute": "Delete Route",
-    "syslog_addroute": "Add Route"
+    "syslog_addroute": "Add Route",
+    "save": "Save",
+    "cancel": "cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "on": "Turn On",
+    "off": "Turn Off"
   },
   "dashboard": {
     "selectIndex": "Stream",

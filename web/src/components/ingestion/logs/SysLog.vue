@@ -23,16 +23,16 @@
     <div v-else>
       <q-toggle
         v-model="syslogEnabled"
-        :label="syslogEnabled ? 'Turn off' : 'Turn On'"
+        :label="syslogEnabled ? t('syslog.off') : t('syslog.on')"
       />
 
       <div v-if="syslogEnabled" class="syslog-inputs row">
         <div class="col-12 flex justify-end">
           <q-btn
-            :label="t('ingestion.syslog_addroute')"
+            :label="t('syslog.syslog_addroute')"
             color="secondary"
             data-test="syslog-connect"
-            class="q-mb-md q-mt-md text-bold no-border"
+            class="q-mb-md text-bold no-border"
             padding="sm xl"
             type="submit"
             no-caps
@@ -95,10 +95,11 @@
                   <template v-else-if="col.name === 'subnets'">
                     <q-input
                       v-model="editingRoute.subnets"
+                      label="Enter comma seperated subnets"
                       data-test="add-alert-name-input"
                       color="input-border"
                       bg-color="input-bg"
-                      class="showLabelOnTop q-py-sm"
+                      class="showLabelOnTop subnets-input q-py-sm"
                       stack-label
                       outlined
                       filled
@@ -116,8 +117,8 @@
                       size="sm"
                       round
                       flat
-                      :title="t('alerts.edit')"
-                      @click="saveRoute(props.row)"
+                      :title="t('syslog.edit')"
+                      @click="saveEditingRoute"
                     ></q-btn>
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -128,7 +129,7 @@
                       size="sm"
                       round
                       flat
-                      :title="t('alerts.delete')"
+                      :title="t('syslog.delete')"
                       @click="resetEditingRoute"
                     ></q-btn>
                   </template>
@@ -150,7 +151,7 @@
                       size="sm"
                       round
                       flat
-                      :title="t('alerts.edit')"
+                      :title="t('syslog.edit')"
                       @click="editRoute(props.row)"
                     ></q-btn>
                     <q-btn
@@ -164,178 +165,15 @@
                       size="sm"
                       round
                       flat
-                      :title="t('alerts.delete')"
+                      :title="t('syslog.delete')"
                       @click="deleteRoute(props.row)"
                     ></q-btn>
                   </template>
                 </q-td>
               </template>
             </q-tr>
-            <!-- <q-tr
-            v-show="editingRoute.id == props.row.id"
-            :props="props"
-            no-hover
-            style="
-              height: min-content;
-              background-color: white;
-              border: 1px solid black;
-            "
-          >
-            <q-td colspan="100%">
-              <div
-                v-show="loadingFunctions == props.row.name"
-                class="q-pl-md q-py-xs"
-                style="height: 60px"
-              >
-                <q-inner-loading
-                  size="sm"
-                  :showing="loadingFunctions == props.row.name"
-                  label="Fetching functions..."
-                  label-style="font-size: 1.1em"
-                />
-              </div>
-              <div v-show="loadingFunctions != props.row.name"></div>
-            </q-td>
-          </q-tr> -->
           </template>
-
-          <!-- <template #top="scope">
-          <div class="q-table__title" data-test="log-stream-title-text">
-            {{ t("logStream.header") }}
-          </div>
-          <q-input
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('logStream.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-          <q-btn
-            data-test="log-stream-refresh-stats-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            icon="refresh"
-            :label="t(`logStream.refreshStats`)"
-            @click="getLogStream"
-          />
-
-          <QTablePagination
-            data-test="log-stream-table-pagination"
-            :scope="scope"
-            :pageTitle="t('logStream.header')"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="top"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            data-test="log-stream-table-pagination"
-            :scope="scope"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            position="bottom"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template> -->
         </q-table>
-        <!-- <div class="row flex justify-end">
-          <q-btn
-            data-test="syslog-delete-route"
-            icon="edit"
-            class="q-ml-xs iconHoverBtn"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('ingestion.deleteRoute')"
-            @click="deleteRoute"
-          />
-          <q-btn
-            data-test="syslog-delete-route"
-            icon="delete"
-            class="q-ml-xs iconHoverBtn"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('ingestion.deleteRoute')"
-            @click="deleteRoute"
-          />
-        </div>
-        <q-select
-          data-test="syslog-select-stream"
-          v-model="editingRoute.orgId"
-          :label="t('ingestion.organization')"
-          :options="organizations"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          tabindex="0"
-        />
-        <q-input
-          data-test="syslog-select-stream"
-          v-model="editingRoute.streamName"
-          :label="t('ingestion.stream')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          tabindex="0"
-        />
-        <div class="q-pt-xs">
-          <div class="text-bold">Subnets</div>
-          <q-input
-            v-model="editingRoute.subnets"
-            data-test="add-alert-name-input"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop q-pb-none"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-          />
-        </div>
-        <q-btn
-          :label="t('alerts.save')"
-          color="secondary"
-          data-test="syslog-connect"
-          class="q-mb-md q-mt-md text-bold no-border"
-          padding="sm xl"
-          type="submit"
-          no-caps
-          @click="connect"
-        />
-        <q-btn
-          :label="t('alerts.save')"
-          color="secondary"
-          data-test="syslog-connect"
-          class="q-mb-md q-mt-md text-bold no-border"
-          padding="sm xl"
-          type="submit"
-          no-caps
-          @click="connect"
-        /> -->
       </div>
     </div>
   </div>
@@ -355,7 +193,7 @@ import { useI18n } from "vue-i18n";
 import syslogService from "@/services/syslog";
 import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 
 interface SyslogRoute {
   orgId: string;
@@ -383,6 +221,7 @@ export default defineComponent({
     const isLoading = ref(false);
     const routeList: Ref<SyslogRoute[]> = ref([]);
     const organizations = ref([]);
+    const q = useQuasar();
 
     const editingRoute: Ref<SyslogRoute> = ref({
       orgId: "",
@@ -396,38 +235,38 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
-        style: "width: 30px",
+        style: "width: 8%",
       },
       {
         name: "orgId",
         field: "orgId",
-        label: t("ingestion.organization"),
+        label: t("syslog.organization"),
         align: "left",
         sortable: true,
-        style: "width: 150px",
+        style: "width: 20%",
       },
       {
         name: "streamName",
         field: "streamName",
-        label: t("ingestion.stream"),
+        label: t("syslog.stream"),
         align: "left",
         sortable: true,
-        style: "width: 150px",
+        style: "width: 20%",
       },
       {
         name: "subnets",
         field: "subnets",
-        label: t("ingestion.subnets"),
+        label: t("syslog.subnets"),
         align: "left",
         sortable: true,
-        style: "width: auto",
+        style: "width: 40%",
       },
       {
         name: "actions",
         field: "actions",
         label: t("user.actions"),
         align: "center",
-        style: "width: 100px",
+        style: "width: 12%",
       },
     ]);
     const toggleSyslog = () => {
@@ -441,43 +280,88 @@ export default defineComponent({
         );
     };
 
-    const saveRoute = () => {
+    const saveEditingRoute = () => {
       if (editingRoute.value.isSaved) updateRoute();
       else createRoute();
     };
 
     const createRoute = () => {
       const payload = getRoutePayload();
-      syslogService.create(organization.value, payload).then((res) => {
-        resetEditingRoute();
-        getSyslogRoutes();
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while saving route...",
       });
+      syslogService
+        .create(organization.value, payload)
+        .then(() => {
+          resetEditingRoute();
+          getSyslogRoutes();
+          q.notify({
+            message: "Route saved successfully",
+            type: "positive",
+            timeout: 2000,
+          });
+        })
+        .catch((err) => {
+          let errorMessage = "";
+          if (err.response?.data?.message) {
+            errorMessage = err.response?.data?.message;
+          } else if (err.response?.data) {
+            errorMessage = err.response?.data;
+          }
+          q.notify({
+            message: `Error while saving route ${
+              typeof errorMessage === "string" ? `( ${errorMessage} )` : ""
+            }`,
+            type: "negative",
+            timeout: 4000,
+          });
+        })
+        .finally(() => dismiss());
     };
 
     const updateRoute = () => {
       const payload = getRoutePayload();
-      console.log(payload);
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while saving route...",
+      });
       syslogService
         .update(organization.value, editingRoute.value?.id || "", payload)
         .then(() => {
           resetEditingRoute();
           getSyslogRoutes();
-        });
-    };
-
-    const updateExistingRoute = (route: SyslogRoute) => {
-      routeList.value.map((_route) => {
-        if (route.id === _route.id) {
-          return cloneDeep({ ...route, "#": editRoute });
-        }
-      });
+          q.notify({
+            message: "Route saved successfully",
+            type: "positive",
+            timeout: 2000,
+          });
+        })
+        .catch((err) => {
+          let errorMessage = "";
+          if (err.response?.data?.message) {
+            errorMessage = err.response?.data?.message;
+          } else if (err.response?.data) {
+            errorMessage = err.response?.data;
+          }
+          q.notify({
+            message: `Error while saving route ${
+              typeof errorMessage === "string" ? `( ${errorMessage} )` : ""
+            }`,
+            type: "negative",
+            timeout: 4000,
+          });
+        })
+        .finally(() => dismiss());
     };
 
     const getRoutePayload = () => {
       const payload: any = {
         orgId: editingRoute.value.orgId,
         streamName: editingRoute.value.streamName,
-        subnets: editingRoute.value.subnets.split(","),
+        subnets: editingRoute.value.subnets
+          .split(",")
+          .map((subnet) => subnet.trim()),
       };
       if (editingRoute.value.id) payload["id"] = editingRoute.value.id;
       return payload;
@@ -490,28 +374,39 @@ export default defineComponent({
       ).toString();
     };
 
-    const addSubnet = (value: string = "") => {
-      editingRoute.value.subnets.push({ value: value, uuid: getUUID() });
-    };
-
-    const deleteSubnet = (subnet: any) => {
-      editingRoute.value.subnets = editingRoute.value.subnets.filter(
-        (_subnet: any) => _subnet.uuid !== subnet.uuid
-      );
-
-      if (!editingRoute.value.subnets.length) addSubnet();
-    };
-
     const getSyslogRoutes = () => {
-      syslogService.list(organization.value).then((response: any) => {
-        routeList.value = response.data.routes.map(
-          (route: any, index: number) => ({
-            ...route,
-            "#": index + 1,
-            isSaved: true,
-          })
-        );
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while loading route...",
       });
+      syslogService
+        .list(organization.value)
+        .then((response: any) => {
+          routeList.value = response.data.routes.map(
+            (route: any, index: number) => ({
+              ...route,
+              "#": index + 1,
+              isSaved: true,
+              subnets: route.subnets.join(", "),
+            })
+          );
+        })
+        .catch((err) => {
+          let errorMessage = "";
+          if (err.response?.data?.message) {
+            errorMessage = err.response?.data?.message;
+          } else if (err.response?.data) {
+            errorMessage = err.response?.data;
+          }
+          q.notify({
+            message: `Error while getting routes ${
+              typeof errorMessage === "string" ? `( ${errorMessage} )` : ""
+            }`,
+            type: "negative",
+            timeout: 3000,
+          });
+        })
+        .finally(() => dismiss());
     };
 
     const deleteRoute = (route: any) => {
@@ -521,9 +416,36 @@ export default defineComponent({
           .map((route, index) => ({ ...route, "#": index + 1 }));
         return;
       }
+      const dismiss = q.notify({
+        spinner: true,
+        message: "Please wait while deleting route...",
+      });
       syslogService
         .delete(editingRoute.value.orgId, route.id || "")
-        .then(() => getSyslogRoutes());
+        .then(() => {
+          getSyslogRoutes();
+          q.notify({
+            message: "Route deleted successfully",
+            type: "positive",
+            timeout: 2000,
+          });
+        })
+        .catch((err) => {
+          let errorMessage = "";
+          if (err.response?.data?.message) {
+            errorMessage = err.response?.data?.message;
+          } else if (err.response?.data) {
+            errorMessage = err.response?.data;
+          }
+          q.notify({
+            message: `Error while deleting route ${
+              typeof errorMessage === "string" ? `( ${errorMessage} )` : ""
+            }`,
+            type: "negative",
+            timeout: 3000,
+          });
+        })
+        .finally(() => dismiss());
     };
 
     const resetEditingRoute = () => {
@@ -552,10 +474,6 @@ export default defineComponent({
           isLoading.value = false;
           syslogEnabled.value = value;
         }
-      },
-      {
-        deep: true,
-        immediate: true,
       }
     );
 
@@ -577,10 +495,7 @@ export default defineComponent({
     });
 
     const editRoute = (route: any) => {
-      editingRoute.value = cloneDeep({
-        ...route,
-        subnets: route.subnets.join(","),
-      });
+      editingRoute.value = cloneDeep(route);
     };
 
     const getDefaultRoute = () => {
@@ -604,8 +519,6 @@ export default defineComponent({
       editingRoute,
       toggleSyslog,
       getImageURL,
-      deleteSubnet,
-      addSubnet,
       isLoading,
       organizations,
       deleteRoute,
@@ -613,7 +526,7 @@ export default defineComponent({
       columns,
       editRoute,
       addNewRoute,
-      saveRoute,
+      saveEditingRoute,
       resetEditingRoute,
     };
   },
@@ -644,7 +557,19 @@ export default defineComponent({
 .syslog-table {
   .q-table td,
   .q-table th {
-    padding: 7px 8px !important;
+    padding: 10px 10px !important;
+  }
+
+  .q-field--labeled.showLabelOnTop {
+    &.subnets-input {
+      padding-top: 8px !important;
+
+      .q-field__label {
+        font-size: 12px;
+        top: 15px;
+        font-weight: normal;
+      }
+    }
   }
 }
 </style>
