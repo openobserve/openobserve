@@ -1,4 +1,3 @@
-use actix_multipart::Multipart;
 // Copyright 2022 Zinc Labs Inc. and Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +11,12 @@ use actix_multipart::Multipart;
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use actix_multipart::Multipart;
 use actix_web::http::{self, StatusCode};
 use actix_web::{web, HttpResponse};
 use ahash::AHashMap;
+use chrono::{TimeZone, Utc};
 use futures::{StreamExt, TryStreamExt};
 use std::fs::OpenOptions;
 use std::io::Error;
@@ -72,7 +74,7 @@ pub async fn save_metadata(
     }
 
     let mut records = vec![];
-    let timestamp = chrono::Utc::now().timestamp_micros();
+    let timestamp = Utc.timestamp_opt(0, 0).unwrap().timestamp_micros();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();

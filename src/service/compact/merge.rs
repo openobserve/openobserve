@@ -381,7 +381,12 @@ async fn merge_files(
             if diff_fields.is_empty() {
                 continue;
             }
+
             // do the convert
+            if CONFIG.compact.fake_mode {
+                log::info!("[COMPACT] fake convert parquet file: {file}");
+                continue;
+            }
             let mut buf = Vec::new();
             let file_tmp_dir = tmpfs::Directory::default();
             let file_data = storage.get(file).await?;
@@ -400,6 +405,14 @@ async fn merge_files(
             // replace the file in tmpfs
             tmp_dir.set(file, buf.into())?;
         }
+    }
+
+    // FAKE MODE
+    if CONFIG.compact.fake_mode {
+        log::info!(
+            "[COMPACT] fake merge file succeeded, new file: fake.parquet, orginal_size: {new_file_size}, compressed_size: 0", 
+        );
+        return Ok(("".to_string(), FileMeta::default(), vec![]));
     }
 
     let mut buf = Vec::new();
