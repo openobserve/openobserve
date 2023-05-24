@@ -63,6 +63,10 @@ export default defineComponent({
                 selectedButtonType.value = "promql"
             } else {
                 selectedButtonType.value = "auto"
+                // if the query type is not present, set the value to "sql"
+                if(!dashboardPanelData.data.queryType || dashboardPanelData.data.queryType == "") {
+                    dashboardPanelData.data.queryType = "sql"
+                }
             }
             await nextTick()
 
@@ -91,8 +95,7 @@ export default defineComponent({
         };
         const changeToggle = () => {
             selectedButtonType.value = popupSelectedButtonType.value;
-            // dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
-            // removeXYFilters()
+            removeXYFilters()
         };
 
         watch(() => dashboardPanelData.data.fields.stream_type, () => {
@@ -128,11 +131,6 @@ export default defineComponent({
             }
         });
 
-        watch(selectedButtonType, () => {
-            if (!ignoreSelectedButtonTypeUpdate.value) {
-                removeXYFilters();
-            }
-        });
 
         return {
             t,
