@@ -45,7 +45,7 @@ const MainLayoutCloudMixin = {
     /**
      * Get default organization
      */
-    const getDefaultOrganization = async (store:any) => {
+    const getDefaultOrganization = async (store: any) => {
       await organizationService
         .list(0, 1000, "id", false, "")
         .then((res: any) => {
@@ -59,7 +59,7 @@ const MainLayoutCloudMixin = {
      * if plan is free, get the threshold and extract search and ingest threshold
      * if one of the threshold exceed the threshold, show the warning message else show error message
      */
-    const getOrganizationThreshold = async (store:any) => {
+    const getOrganizationThreshold = async (store: any) => {
       const organization: {
         identifier: "";
         subscription_type: "Free-Plan-USD-Monthly";
@@ -138,7 +138,7 @@ const MainLayoutCloudMixin = {
     /**
      * Get refresh token
      */
-    const getRefreshToken = (store:any) => {
+    const getRefreshToken = (store: any) => {
       userService
         .getRefreshToken()
         .then((res) => {

@@ -133,7 +133,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onActivated } from "vue";
+import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -148,11 +148,7 @@ import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
 export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
-  data() {
-    return {
-      ingestTabType: "ingestLogs",
-    };
-  },
+
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -163,9 +159,32 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
+    const ingestTabType = ref("");
 
-    onMounted(() => {
-      if (router.currentRoute.value.name == "ingestion") {
+    onBeforeMount(() => {
+      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics"];
+      const logRoutes = [
+        "curl",
+        "fluentbit",
+        "fluentd",
+        "kinesisfirehose",
+        "vector",
+        "filebeat",
+        "syslog",
+      ];
+      const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
+      const traceRoutes = ["tracesOTLP"];
+
+      if (logRoutes.includes(router.currentRoute.value.name)) {
+        ingestTabType.value = "ingestLogs";
+      } else if (metricRoutes.includes(router.currentRoute.value.name)) {
+        ingestTabType.value = "ingestMetrics";
+      } else if (traceRoutes.includes(router.currentRoute.value.name)) {
+        ingestTabType.value = "ingestTraces";
+      } else if (ingestRoutes.includes(router.currentRoute.value.name)) {
+        ingestTabType.value = router.currentRoute.value.name;
+      } else if (router.currentRoute.value.name === "ingestion") {
+        ingestTabType.value = "ingestLogs";
         router.push({
           name: "ingestLogs",
           query: {
@@ -282,6 +301,7 @@ export default defineComponent({
       confirmUpdate,
       getImageURL,
       verifyOrganizationStatus,
+      ingestTabType,
     };
   },
   computed: {
