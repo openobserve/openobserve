@@ -198,7 +198,6 @@ export default defineComponent({
       useDashboardPanelData();
 
     onActivated(() => {
-      // console.log("inside mounted");
       getStreamList();
     });
 

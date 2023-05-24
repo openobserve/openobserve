@@ -274,8 +274,6 @@ export default defineComponent({
                         end_time: endISOTimestamp
                     })
                     .then((res) => {
-                        console.log("-----", res);
-                        
                         searchQueryData.data = res.data.data;
                         searchQueryData.loading = false
                     })
@@ -626,7 +624,7 @@ export default defineComponent({
             case 'vector': {
                 const traces = searchQueryData.data?.result?.map((metric: any) => {
                     const values = [metric.value]
-                    console.log('vector',values);
+                    // console.log('vector',values);
                     
                     return  {
                         name: JSON.stringify(metric.metric),

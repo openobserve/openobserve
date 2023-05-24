@@ -54,8 +54,6 @@ export default defineComponent({
         const initializeSelectedButtonType = async () => {
             // set a variable to ignore updates for selectedButtonType
             ignoreSelectedButtonTypeUpdate.value = true;
-            console.log('ignored');
-
 
             if (dashboardPanelData.data.customQuery == false && dashboardPanelData.data.queryType == "sql") {
                 selectedButtonType.value = "auto"
@@ -68,7 +66,6 @@ export default defineComponent({
             }
             await nextTick()
 
-            console.log('resuming');
             // set a variable to allow watcher updates for selectedButtonType
             ignoreSelectedButtonTypeUpdate.value = false;
         }
@@ -87,16 +84,12 @@ export default defineComponent({
         })
 
         const onUpdateButton = (selectedQueryType: any) => {
-            console.log("on update button: " + selectedQueryType);
-
             if (selectedQueryType != selectedButtonType.value) {
                 popupSelectedButtonType.value = selectedQueryType;
                 confirmQueryModeChangeDialog.value = true;
             }
         };
         const changeToggle = () => {
-            console.log("changetoggle method");
-
             selectedButtonType.value = popupSelectedButtonType.value;
             // dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
             // removeXYFilters()
@@ -110,10 +103,8 @@ export default defineComponent({
         })
 
         watch(selectedButtonType, () => {
-            console.log("selectedButtonType watcher");
             window.dispatchEvent(new Event("resize"))
             if (!ignoreSelectedButtonTypeUpdate.value) {
-                console.log("selectedButtonType watcher - updating");
                 if (selectedButtonType.value == "auto") {
                     dashboardPanelData.data.customQuery = false;
                     dashboardPanelData.data.queryType = "sql";
