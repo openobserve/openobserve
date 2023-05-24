@@ -391,7 +391,21 @@ export default defineComponent({
         event.preventDefault();
         return;
       }
-      const timestamps = getConsumableDateTime(searchObj.data.datetime);
+
+      let timestamps = getConsumableDateTime(searchObj.data.datetime);
+
+      if (searchObj.data.stream.streamType === "lookuptable") {
+        const stream = searchObj.data.streamResults.list.find(
+          (stream: any) =>
+            stream.name === searchObj.data.stream.selectedStream.value
+        );
+        if (stream.stats) {
+          timestamps = {
+            start_time: new Date(stream.stats.doc_time_min),
+            end_time: new Date(stream.stats.doc_time_max),
+          };
+        }
+      }
       const startISOTimestamp: any =
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
       const endISOTimestamp: any =
