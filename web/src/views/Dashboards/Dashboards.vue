@@ -266,7 +266,7 @@ export default defineComponent({
         )
         .then((res) => {
           resultTotal.value = res.data.dashboards.length;
-          store.dispatch("setAllDashboardList", res.data.dashboards);
+          store.dispatch("setAllDashboardList", res.data.dashboards.sort((a,b) => b.created.localeCompare(a.created)));
           dismiss();
         })
         .catch((error) => {

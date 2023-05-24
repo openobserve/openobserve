@@ -15,7 +15,7 @@
 
 <template>
   <div>
-    <q-bar class="row q-pa-sm sql-bar">
+    <q-bar class="row sql-bar">
       <div style="flex: 1;" @click="onDropDownClick">
         <q-icon
           flat
@@ -26,14 +26,8 @@
         <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
       </div>
-      <div @click.prevent="showWarning" class="q-px-md" style="cursor: pointer;">
-        <div style="pointer-events: none;">
-          <q-toggle
-            v-model="dashboardPanelData.data.customQuery"
-            :label="t('panel.customSql')"
-            @update:model-value="onUpdateToggle(dashboardPanelData.data.customQuery)"
-          />
-        </div>
+      <div>
+        <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
   </div>
@@ -53,13 +47,6 @@
       <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
     </div>
   </div>
-  <ConfirmDialog
-    title="Change Query Mode"
-    message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
-    @update:ok="changeToggle"
-    @update:cancel="confirmQueryModeChangeDialog = false"
-    v-model="confirmQueryModeChangeDialog"
-  />
 </template>
 
 <script lang="ts">
@@ -73,13 +60,15 @@ import { Parser } from "node-sql-parser";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import QueryEditor from "./QueryEditor.vue";
 import useDashboardPanelData from "../../composables/useDashboardPanel";
+import QueryTypeSelector from "./addPanel/QueryTypeSelector.vue";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     QueryEditor,
-    ConfirmDialog
-  },
+    ConfirmDialog,
+    QueryTypeSelector
+},
   emits: ["searchdata"],
   methods: {
     searchData() {
@@ -237,7 +226,7 @@ export default defineComponent({
       // dashboardPanelData.meta.editorValue = value;
       // dashboardPanelData.data.query = value;
 
-      if (dashboardPanelData.data.customQuery) {
+      if (dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType != "promql") {
         // console.log("query: value", dashboardPanelData.data.query);
 
         // empty the errors
@@ -303,17 +292,6 @@ export default defineComponent({
       dashboardPanelData.meta.errors.queryErrors = []
     }
 
-    const changeToggle = () => {
-      dashboardPanelData.data.customQuery = !dashboardPanelData.data.customQuery
-      removeXYFilters()
-    }
-
-    const showWarning = (e) => {
-      e.preventDefault();
-      confirmQueryModeChangeDialog.value = true
-    }
-
-
     return {
       t,
       router,
@@ -322,9 +300,7 @@ export default defineComponent({
       dashboardPanelData,
       showQuery,
       confirmQueryModeChangeDialog,
-      onUpdateToggle,
-      changeToggle,
-      showWarning
+      onUpdateToggle
     };
   },
 });
@@ -332,6 +308,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .sql-bar {
+  height: 40px !important;
   overflow: hidden;
   cursor: pointer;
   background-color: white;
