@@ -175,7 +175,6 @@ export default defineComponent({
       const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
       const traceRoutes = ["tracesOTLP"];
 
-      console.log(router.currentRoute.value.name);
       if (logRoutes.includes(router.currentRoute.value.name)) {
         ingestTabType.value = "ingestLogs";
       } else if (metricRoutes.includes(router.currentRoute.value.name)) {
@@ -197,10 +196,6 @@ export default defineComponent({
           getOrganizationPasscode();
         }
       }
-    });
-
-    onMounted(() => {
-      console.log("mounted");
     });
 
     const getOrganizationPasscode = () => {

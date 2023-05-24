@@ -109,7 +109,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+          :icon="'img:' + getImageURL('images/ingestion/syslog.svg')"
           label="Syslog"
           content-class="tab_content"
         />
@@ -157,7 +157,6 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
-      console.log(router.currentRoute.value.name, ingestiontabs.value);
       const ingestRoutes = [
         "curl",
         "fluentbit",

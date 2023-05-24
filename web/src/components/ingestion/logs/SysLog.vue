@@ -22,6 +22,8 @@
     </div>
     <div v-else>
       <q-toggle
+        :disable="disableToggle"
+        class="q-mt-sm"
         v-model="syslogEnabled"
         :label="syslogEnabled ? t('syslog.off') : t('syslog.on')"
       />
@@ -95,8 +97,9 @@
                   <template v-else-if="col.name === 'subnets'">
                     <q-input
                       v-model="editingRoute.subnets"
-                      label="Enter comma seperated subnets"
+                      label="Enter multiple subnets separated by commas"
                       data-test="add-alert-name-input"
+                      placeholder="192.168.1.0/24, 10.0.0.0/16"
                       color="input-border"
                       bg-color="input-bg"
                       class="showLabelOnTop subnets-input q-py-sm"
@@ -166,7 +169,7 @@
                       round
                       flat
                       :title="t('syslog.delete')"
-                      @click="deleteRoute(props.row)"
+                      @click="conformDeleteRoute(props.row)"
                     ></q-btn>
                   </template>
                 </q-td>
@@ -177,6 +180,13 @@
       </div>
     </div>
   </div>
+  <ConfirmDialog
+    title="Delete Alert"
+    message="Are you sure you want to delete route?"
+    @update:ok="deleteRoute"
+    @update:cancel="cancelDeleteRoute"
+    v-model="showConformDelete"
+  />
 </template>
 
 <script lang="ts">
@@ -194,6 +204,7 @@ import syslogService from "@/services/syslog";
 import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
 import { useQuasar, type QTableProps } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 interface SyslogRoute {
   orgId: string;
@@ -213,6 +224,7 @@ export default defineComponent({
       type: String,
     },
   },
+  components: { ConfirmDialog },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -222,6 +234,10 @@ export default defineComponent({
     const routeList: Ref<SyslogRoute[]> = ref([]);
     const organizations = ref([]);
     const q = useQuasar();
+    const disableToggle = ref(false);
+
+    const showConformDelete = ref(false);
+    const routeToDelete: Ref<SyslogRoute | null> = ref(null);
 
     const editingRoute: Ref<SyslogRoute> = ref({
       orgId: "",
@@ -269,7 +285,57 @@ export default defineComponent({
         style: "width: 12%",
       },
     ]);
+
+    onBeforeMount(() => {
+      isLoading.value = true;
+      organization.value = store.state.selectedOrganization.identifier;
+      organizations.value = store.state.organizations.map(
+        (org: any) => org.name
+      );
+      getSyslogRoutes();
+    });
+
+    onMounted(() => {
+      if (store.state.zoConfig.syslog_enabled !== undefined) {
+        isLoading.value = false;
+      }
+    });
+
+    watch(
+      () => store.state.zoConfig.syslog_enabled,
+      (value) => {
+        if (store.state.zoConfig.syslog_enabled !== undefined) {
+          isLoading.value = false;
+          syslogEnabled.value = value;
+        }
+      }
+    );
+
+    watch(
+      () => store.state.organizations,
+      (orgs) => {
+        if (orgs.length) {
+          organizations.value = orgs.map((org: any) => org.identifier);
+        }
+      },
+      {
+        deep: true,
+        immediate: true,
+      }
+    );
+
+    watch(syslogEnabled, () => {
+      toggleSyslog();
+    });
+
     const toggleSyslog = () => {
+      const dismiss = q.notify({
+        spinner: true,
+        message: `Please wait while turning ${
+          syslogEnabled.value ? "Off" : "On"
+        } syslog...`,
+      });
+      disableToggle.value = true;
       syslogService
         .toggle(organization.value, { state: syslogEnabled.value })
         .then((res) =>
@@ -277,7 +343,11 @@ export default defineComponent({
             ...store.state.zoConfig,
             syslog_enabled: res.data,
           })
-        );
+        )
+        .finally(() => {
+          disableToggle.value = false;
+          dismiss();
+        });
     };
 
     const saveEditingRoute = () => {
@@ -409,19 +479,22 @@ export default defineComponent({
         .finally(() => dismiss());
     };
 
-    const deleteRoute = (route: any) => {
-      if (!route.isSaved) {
+    const deleteRoute = () => {
+      if (!routeToDelete.value) return;
+
+      if (!routeToDelete.value?.isSaved) {
         routeList.value = routeList.value
-          .filter((_route) => route.id !== _route.id)
+          .filter((_route) => routeToDelete.value?.id !== _route.id)
           .map((route, index) => ({ ...route, "#": index + 1 }));
         return;
       }
+
       const dismiss = q.notify({
         spinner: true,
         message: "Please wait while deleting route...",
       });
       syslogService
-        .delete(editingRoute.value.orgId, route.id || "")
+        .delete(editingRoute.value.orgId, routeToDelete.value.id || "")
         .then(() => {
           getSyslogRoutes();
           q.notify({
@@ -452,48 +525,6 @@ export default defineComponent({
       editingRoute.value = getDefaultRoute();
     };
 
-    onBeforeMount(() => {
-      isLoading.value = true;
-      organization.value = store.state.selectedOrganization.identifier;
-      organizations.value = store.state.organizations.map(
-        (org: any) => org.name
-      );
-      getSyslogRoutes();
-    });
-
-    onMounted(() => {
-      if (store.state.zoConfig.syslog_enabled !== undefined) {
-        isLoading.value = false;
-      }
-    });
-
-    watch(
-      () => store.state.zoConfig.syslog_enabled,
-      (value) => {
-        if (store.state.zoConfig.syslog_enabled !== undefined) {
-          isLoading.value = false;
-          syslogEnabled.value = value;
-        }
-      }
-    );
-
-    watch(
-      () => store.state.organizations,
-      (orgs) => {
-        if (orgs.length) {
-          organizations.value = orgs.map((org: any) => org.identifier);
-        }
-      },
-      {
-        deep: true,
-        immediate: true,
-      }
-    );
-
-    watch(syslogEnabled, () => {
-      toggleSyslog();
-    });
-
     const editRoute = (route: any) => {
       editingRoute.value = cloneDeep(route);
     };
@@ -513,6 +544,16 @@ export default defineComponent({
       editingRoute.value = routeList.value[routeList.value.length - 1];
     };
 
+    const conformDeleteRoute = (route: SyslogRoute) => {
+      showConformDelete.value = true;
+      routeToDelete.value = route;
+    };
+
+    const cancelDeleteRoute = () => {
+      showConformDelete.value = false;
+      routeToDelete.value = null;
+    };
+
     return {
       t,
       syslogEnabled,
@@ -528,6 +569,10 @@ export default defineComponent({
       addNewRoute,
       saveEditingRoute,
       resetEditingRoute,
+      conformDeleteRoute,
+      showConformDelete,
+      cancelDeleteRoute,
+      disableToggle,
     };
   },
 });
