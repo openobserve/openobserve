@@ -192,7 +192,7 @@
 
     <q-separator />
     <q-card-section class="q-pa-md q-pb-md">
-      <div class="row items-center no-wrap">
+      <div class="row items-center no-wrap justify-between">
         <div class="col-2">
           <q-btn
             class="text-bold"
@@ -205,7 +205,10 @@
             label="Previous"
           />
         </div>
-        <div class="col-8 row justify-center align-center q-gutter-sm">
+        <div
+          v-show="streamType !== 'lookuptable'"
+          class="col-8 row justify-center align-center q-gutter-sm"
+        >
           <div style="line-height: 40px; font-weight: bold">No of Records:</div>
           <div class="" style="minwidth: 150px">
             <q-select
@@ -248,11 +251,19 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
+import {
+  defineComponent,
+  ref,
+  onBeforeMount,
+  onBeforeUnmount,
+  computed,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
+import dashboards from "@/services/dashboards";
+import useLogs from "@/composables/useLogs";
 
 const defaultValue: any = () => {
   return {
@@ -282,6 +293,10 @@ export default defineComponent({
       type: Number,
       required: true,
     },
+    streamType: {
+      type: String,
+      default: "logs",
+    },
   },
   methods: {
     toggleIncludeSearchTerm(term: string) {
@@ -305,7 +320,7 @@ export default defineComponent({
       });
     },
   },
-  setup() {
+  setup(props) {
     const { t } = useI18n();
     const rowData: any = ref({});
     const router = useRouter();
@@ -314,6 +329,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(false);
+    const searchObj = useLogs();
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {

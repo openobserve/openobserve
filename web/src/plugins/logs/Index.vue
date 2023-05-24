@@ -167,6 +167,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  computed,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -262,6 +263,8 @@ export default defineComponent({
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
 
+    const getStreamType = computed(() => searchObj.data.stream.streamType);
+
     function ErrorException(message) {
       searchObj.loading = false;
       // searchObj.data.errorMsg = message;
@@ -339,8 +342,13 @@ export default defineComponent({
 
     function getStreamList() {
       try {
+        const streamType = searchObj.data.stream.streamType || "logs";
         streamService
-          .nameList(store.state.selectedOrganization.identifier, "logs", true)
+          .nameList(
+            store.state.selectedOrganization.identifier,
+            streamType,
+            true
+          )
           .then((res) => {
             searchObj.data.streamResults = res.data;
 
@@ -424,6 +432,18 @@ export default defineComponent({
 
     function getConsumableDateTime() {
       try {
+        if (searchObj.data.stream.streamType === "lookuptable") {
+          const stream = searchObj.data.streamResults.list.find(
+            (stream) =>
+              stream.name === searchObj.data.stream.selectedStream.value
+          );
+          if (stream.stats) {
+            return {
+              start_time: new Date(stream.stats.doc_time_min),
+              end_time: new Date(stream.stats.doc_time_max),
+            };
+          }
+        }
         if (searchObj.data.datetime.tab == "relative") {
           let period = "";
           let periodValue = 0;
@@ -711,7 +731,7 @@ export default defineComponent({
           return false;
         }
 
-        searchObj.data.searchAround.indexTimestamp = 0;
+        searchObj.data.searchAround.indexTimestamp = -1;
         searchObj.data.searchAround.size = 0;
         if (searchObj.data.searchAround.histogramHide) {
           searchObj.data.searchAround.histogramHide = false;
@@ -756,7 +776,7 @@ export default defineComponent({
           .search({
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
-            page_type: "logs",
+            page_type: getStreamType.value,
           })
           .then((res) => {
             searchObj.loading = false;
@@ -1314,6 +1334,7 @@ export default defineComponent({
       useLocalLogsObj,
       searchAroundData,
       verifyOrganizationStatus,
+      getStreamList,
     };
   },
   computed: {
@@ -1352,6 +1373,9 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
+    },
+    getStreamType() {
+      return this.searchObj.data.stream.streamType;
     },
   },
   watch: {
@@ -1448,6 +1472,9 @@ export default defineComponent({
     },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
+    },
+    getStreamType() {
+      this.getStreamList();
     },
   },
 });
