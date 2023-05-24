@@ -55,7 +55,7 @@ export default defineComponent({
             // set a variable to ignore updates for selectedButtonType
             ignoreSelectedButtonTypeUpdate.value = true;
             console.log('ignored');
-            
+
 
             if (dashboardPanelData.data.customQuery == false && dashboardPanelData.data.queryType == "sql") {
                 selectedButtonType.value = "auto"
@@ -138,7 +138,9 @@ export default defineComponent({
         });
 
         watch(selectedButtonType, () => {
-            removeXYFilters();
+            if (!ignoreSelectedButtonTypeUpdate.value) {
+                removeXYFilters();
+            }
         });
 
         return {
