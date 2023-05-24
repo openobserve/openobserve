@@ -115,7 +115,7 @@ export const getAllDashboards = async (store: any) => {
     )
     .then((res) => {
       // save to store
-      store.dispatch("setAllDashboardList", res.data.dashboards);
+      store.dispatch("setAllDashboardList", res.data.dashboards.sort((a: any, b: any) => b.created.localeCompare(a.created)));
     })
     .catch((error) => {
       // console.log(error);
