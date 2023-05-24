@@ -98,6 +98,7 @@
                     name="drag_indicator"
                     color="grey-13"
                     class="drag_indicator q-mr-xs"
+                    v-if="!promqlMode"
                   />
 
                   <q-icon
@@ -107,7 +108,7 @@
                   />
                   {{ props.row.name }}
                 </div>
-                <div class="field_icons">
+                <div class="field_icons" v-if="!promqlMode">
                   <q-btn
                     color="white"
                     padding="sm"
@@ -193,11 +194,10 @@ export default defineComponent({
     });
     const filteredStreams = ref([]);
     const $q = useQuasar();
-    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed } =
+    const { dashboardPanelData, addXAxisItem, addYAxisItem, addFilteredItem, isAddXAxisNotAllowed, isAddYAxisNotAllowed, promqlMode } =
       useDashboardPanelData();
 
     onActivated(() => {
-      // console.log("inside mounted");
       getStreamList();
     });
 
@@ -332,7 +332,8 @@ export default defineComponent({
       filterStreamFn,
       filteredStreams,
       isAddXAxisNotAllowed,
-      isAddYAxisNotAllowed
+      isAddYAxisNotAllowed,
+      promqlMode
     };
   },
 });
