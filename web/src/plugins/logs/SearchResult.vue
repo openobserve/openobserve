@@ -21,7 +21,11 @@
       <BarChart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
-        v-show="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
+        v-show="
+          searchObj.meta.showHistogram &&
+          !searchObj.meta.sqlMode &&
+          searchObj.data.stream.streamType !== 'lookuptable'
+        "
         @updated:chart="onChartUpdate"
       ></BarChart>
 
@@ -71,12 +75,15 @@
 
         <template v-slot="{ item: row, index }">
           <q-tr
-            :data-test="`logs-search-result-detail-${row[store.state.zoConfig.timestamp_column]}`"
+            :data-test="`logs-search-result-detail-${
+              row[store.state.zoConfig.timestamp_column]
+            }`"
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
             :style="
-              row[store.state.zoConfig.timestamp_column] == searchObj.data.searchAround.indexTimestamp
+              row[store.state.zoConfig.timestamp_column] ==
+              searchObj.data.searchAround.indexTimestamp
                 ? 'background-color:lightgray'
                 : ''
             "
@@ -148,6 +155,7 @@
               searchObj.meta.resultGrid.navigation.currentRowIndex
             ]
           "
+          :stream-type="searchObj.data.stream.streamType"
           style="margin-bottom: 15px"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"

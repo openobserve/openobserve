@@ -1,5 +1,8 @@
 🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).
 
+
+# [Zinc Cloud](https://observe.zinc.dev) | [Docs](https://zinc.dev/docs) | [Slack](https://join.slack.com/t/zinc-nvh4832/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://zinc.dev) 
+
 # ZincObserve
 ZincObserve is a cloud native observability platform built specifically for logs, metrics, traces and analytics designed to work at petabyte scale.
 
