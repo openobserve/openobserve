@@ -31,7 +31,7 @@ import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
 
 const useIngestionRoutes = () => {
-  const ingestionRoutes = [
+  const ingestionRoutes: any = [
     {
       path: "ingestion",
       name: "ingestion",
@@ -123,10 +123,9 @@ const useIngestionRoutes = () => {
 
   if (config.isZincObserveCloud === "false" || !config.isZincObserveCloud) {
     ingestionRoutes[0].children
-      .find((child) => child.name === "ingestLogs")
-      ?.children.push(sysLog);
+      .find((child: any) => child.name === "ingestLogs")
+      .children.push(sysLog);
   }
-  console.log(ingestionRoutes);
   return ingestionRoutes;
 };
 
