@@ -53,6 +53,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     // still not found, just return
     if offset == 0 {
+        log::info!("no stream, no need to compact");
         return Ok(()); // no stream
     }
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
@@ -71,13 +72,14 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
+        log::info!("no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
-    for (_, val) in offsets {
-        let val = val - Duration::hours(1).num_microseconds().unwrap();
-        if val < offset {
-            return Ok(()); // compact is not done
+    for (key, val) in offsets {
+        if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
+            log::info!("stream [{key}] offset [{val}] haven't done compact, just waiting");
+            return Ok(());
         }
     }
 
