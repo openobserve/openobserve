@@ -62,7 +62,7 @@ impl FileData {
     }
 
     pub fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-        let data_size = data.len();
+        let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[TRACE] File cache is full {}/{}, can't cache {} bytes",
@@ -89,7 +89,7 @@ impl FileData {
                         .with_label_values(&[columns[1], columns[3], columns[2]])
                         .sub(val.len() as i64);
                 }
-                release_size += val.len();
+                release_size += key.len() + val.len();
                 if release_size >= need_release_size {
                     break;
                 }

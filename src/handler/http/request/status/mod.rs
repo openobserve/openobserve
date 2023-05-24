@@ -14,13 +14,16 @@
 
 use actix_web::{get, HttpResponse};
 use ahash::AHashMap;
+use datafusion::arrow::datatypes::{Field, Schema};
 use serde::Serialize;
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 use utoipa::ToSchema;
 
 use crate::common::json;
-use crate::infra::config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::infra::{cache, cluster};
+use crate::infra::{
+    cache, cluster,
+    config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
+};
 use crate::meta::functions::ZoFunction;
 use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
 
@@ -97,12 +100,22 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!(&config::CONFIG.common.node_role),
     );
 
-    stats.insert("STREAM_STATS", json::json!({"stream_num": cache::stats::get_stream_stats_len(), "mem_size": cache::stats::get_stream_stats_in_memory_size()}));
+    let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status();
+    stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
+
+    let stream_num = cache::stats::get_stream_stats_len();
+    let mem_size = cache::stats::get_stream_stats_in_memory_size();
+    stats.insert(
+        "STREAM_STATS",
+        json::json!({"stream_num": stream_num, "mem_size": mem_size}),
+    );
+
     let (max_size, cur_size) = cache::file_data::stats();
     stats.insert(
         "FILE_DATA",
         json::json!({"memory_limit":max_size,"mem_size": cur_size}),
     );
+
     let (file_list_num, files_num, mem_size) = cache::file_list::get_file_num().unwrap();
     stats.insert(
         "FILE_LIST",
@@ -113,4 +126,28 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
 
     Ok(HttpResponse::Ok().json(stats))
+}
+
+fn get_stream_schema_status() -> (usize, usize, usize) {
+    let mut stream_num = 0;
+    let mut stream_schema_num = 0;
+    let mut mem_size = 0;
+    for item in config::STREAM_SCHEMAS.iter() {
+        stream_num += 1;
+        mem_size += std::mem::size_of::<Vec<Schema>>();
+        mem_size += item.key().len();
+        for schema in item.value().iter() {
+            stream_schema_num += 1;
+            for (key, val) in schema.metadata.iter() {
+                mem_size += std::mem::size_of::<HashMap<String, String>>();
+                mem_size += key.len() + val.len();
+            }
+            mem_size += std::mem::size_of::<Vec<Field>>();
+            for field in schema.fields() {
+                mem_size += std::mem::size_of::<Field>();
+                mem_size += field.name().len();
+            }
+        }
+    }
+    (stream_num, stream_schema_num, mem_size)
 }

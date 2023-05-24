@@ -20,6 +20,7 @@ use crate::meta::{common::FileMeta, StreamType};
 
 static FILES: Lazy<DashMap<String, Box<FileList>>> = Lazy::new(DashMap::new);
 
+const STRING_MEM_SIZE: usize = std::mem::size_of::<String>();
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<Box<FileList>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<Option<FileMeta>>();
 
@@ -45,7 +46,7 @@ pub fn set_file_to_cache(
     }
     let _ = columns[0].to_string();
     let org_id = columns[1].to_string();
-    let data_type = columns[2].to_string();
+    let stream_type = columns[2].to_string();
     let stream_name = columns[3].to_string();
     let year = columns[4].to_string();
     let month = columns[5].to_string();
@@ -53,54 +54,63 @@ pub fn set_file_to_cache(
     let hour = columns[7].to_string();
     let file_name = columns[8..].join("/");
 
+    let org_id_len = org_id.len();
+    let stream_type_len = stream_type.len();
+    let stream_name_len = stream_name.len();
+    let year_len = year.len();
+    let month_len = month.len();
+    let day_len = day.len();
+    let hour_len = hour.len();
+    let file_name_len = file_name.len();
+
     let mut org_cache = FILES.entry(org_id).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + org_id_len,
     }));
     let cache = org_cache.sub.as_mut().unwrap();
-    let mut type_cache = cache.entry(data_type).or_insert(Box::new(FileList {
+    let mut type_cache = cache.entry(stream_type).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + stream_type_len,
     }));
     let cache = type_cache.sub.as_mut().unwrap();
     let mut stream_cache = cache.entry(stream_name).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + stream_name_len,
     }));
     let cache = stream_cache.sub.as_mut().unwrap();
     let mut year_cache = cache.entry(year).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + year_len,
     }));
     let cache = year_cache.sub.as_mut().unwrap();
     let mut month_cache = cache.entry(month).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + month_len,
     }));
     let cache = month_cache.sub.as_mut().unwrap();
     let mut day_cache = cache.entry(day).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: None,
-        size: 0,
+        size: STRING_MEM_SIZE + day_len,
     }));
     let cache = day_cache.sub.as_mut().unwrap();
     let mut hour_cache = cache.entry(hour).or_insert(Box::new(FileList {
         sub: Some(DashMap::new()),
         files: Some(DashMap::with_capacity(8)),
-        size: 0,
+        size: STRING_MEM_SIZE + hour_len,
     }));
     let cache = hour_cache.files.as_mut().unwrap();
     if delete {
         cache.remove(&file_name);
-        hour_cache.size -= key.len() + FILE_META_MEM_SIZE;
+        hour_cache.size -= STRING_MEM_SIZE + file_name_len + FILE_META_MEM_SIZE;
     } else {
         cache.insert(file_name, val.unwrap());
-        hour_cache.size += key.len() + FILE_META_MEM_SIZE;
+        hour_cache.size += STRING_MEM_SIZE + file_name_len + FILE_META_MEM_SIZE;
     }
 
     Ok(())
@@ -111,7 +121,7 @@ pub fn get_file_from_cache(key: &str) -> Result<FileMeta, anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     let _ = columns[0].to_string();
     let org_id = columns[1].to_string();
-    let data_type = columns[2].to_string();
+    let stream_type = columns[2].to_string();
     let stream_name = columns[3].to_string();
     let year = columns[4].to_string();
     if year.len() != 4 {
@@ -130,11 +140,11 @@ pub fn get_file_from_cache(key: &str) -> Result<FileMeta, anyhow::Error> {
         None => return Err(anyhow::anyhow!("file_list: org_id not found, key: {}", key)),
     };
     let cache = org_cache.sub.as_ref().unwrap();
-    let type_cache = match cache.get(&data_type) {
+    let type_cache = match cache.get(&stream_type) {
         Some(v) => v,
         None => {
             return Err(anyhow::anyhow!(
-                "file_list: data_type not found, key: {}",
+                "file_list: stream_type not found, key: {}",
                 key
             ))
         }
@@ -424,20 +434,26 @@ pub fn get_file_num() -> Result<(usize, usize, usize), anyhow::Error> {
     let mut mem_size = 0;
     let mut file_list_num = 0;
     for cache in FILES.iter() {
+        mem_size += cache.size;
         let org_cache = cache.sub.as_ref().unwrap();
         for cache in org_cache.iter() {
+            mem_size += cache.size;
             let type_cache = cache.sub.as_ref().unwrap();
             for cache in type_cache.iter() {
+                mem_size += cache.size;
                 let stream_cache = cache.sub.as_ref().unwrap();
                 for cache in stream_cache.iter() {
+                    mem_size += cache.size;
                     let year_cache = cache.sub.as_ref().unwrap();
                     for cache in year_cache.iter() {
+                        mem_size += cache.size;
                         let month_cache = cache.sub.as_ref().unwrap();
                         for cache in month_cache.iter() {
+                            mem_size += cache.size;
                             let day_cache = cache.sub.as_ref().unwrap();
                             for cache in day_cache.iter() {
-                                files_num += cache.files.as_ref().unwrap().len();
                                 mem_size += cache.size;
+                                files_num += cache.files.as_ref().unwrap().len();
                                 file_list_num += 1;
                             }
                         }
