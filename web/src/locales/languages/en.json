@@ -237,6 +237,32 @@
     "header": "Ingestion",
     "passwordLabel": "Reset Token"
   },
+  "syslog": {
+    "stream": "Stream",
+    "organization": "Organization",
+    "subnets": "Subnets",
+    "deleteRoute": "Delete Route",
+    "syslog_addroute": "Add Route",
+    "save": "Save",
+    "cancel": "cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "on": "Turn On",
+    "off": "Turn Off"
+  },
+  "syslog": {
+    "stream": "Stream",
+    "organization": "Organization",
+    "subnets": "Subnets",
+    "deleteRoute": "Delete Route",
+    "syslog_addroute": "Add Route",
+    "save": "Save",
+    "cancel": "cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "on": "Turn On",
+    "off": "Turn Off"
+  },
   "dashboard": {
     "selectIndex": "Stream",
     "selectStreamType": "Stream Type",
@@ -294,7 +320,7 @@
     "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
-    "promQL":"PromQL"
+    "promQL": "PromQL"
   },
   "alerts": {
     "header": "Alerts",

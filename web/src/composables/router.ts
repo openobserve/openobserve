@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import Login from "@/views/Login.vue";
 import {
@@ -18,6 +18,7 @@ import {
   useLocalToken,
   useLocalCurrentUser,
 } from "@/utils/zincutils";
+import useIngestionRoutes from "./shared/useIngestionRoutes";
 
 const useOSRoutes = () => {
   const parentRoutes = [
@@ -37,7 +38,7 @@ const useOSRoutes = () => {
     },
   ];
 
-  const homeChildRoutes: never[] = [];
+  const homeChildRoutes: any[] = [...useIngestionRoutes()];
 
   return { parentRoutes, homeChildRoutes };
 };

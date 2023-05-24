@@ -29,22 +29,8 @@ import {
   LookupTables,
 } from "../../components/functions/index";
 import Alerts from "@/views/AppAlerts.vue";
-import Ingestion from "@/views/Ingestion.vue";
 import Error404 from "@/views/Error404.vue";
 import Dashboards from "@/views/Dashboards/Dashboards.vue";
-import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
-import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
-import Vector from "@/components/ingestion/logs/Vector.vue";
-import Curl from "@/components/ingestion/logs/Curl.vue";
-import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
-import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
-import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
-import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
-import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
-import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
-import IngestLogs from "@/components/ingestion/logs/Index.vue";
-import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
-import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import {
   AlertList,
   TemplateList,
@@ -53,6 +39,7 @@ import {
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Functions from "../../views/Functions.vue";
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
+import useIngestionRoutes from "./useIngestionRoutes";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -224,87 +211,6 @@ const useRoutes = () => {
       ],
     },
     {
-      path: "ingestion",
-      name: "ingestion",
-      component: Ingestion,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuardPendingSubscriptions(to, from, next);
-      },
-      children: [
-        {
-          path: "logs",
-          name: "ingestLogs",
-          component: IngestLogs,
-          children: [
-            {
-              path: "curl",
-              name: "curl",
-              component: Curl,
-            },
-            {
-              path: "fluentbit",
-              name: "fluentbit",
-              component: FluentBit,
-            },
-            {
-              path: "fluentd",
-              name: "fluentd",
-              component: Fluentd,
-            },
-            {
-              path: "vector",
-              name: "vector",
-              component: Vector,
-            },
-            {
-              path: "kinesisfirehose",
-              name: "kinesisfirehose",
-              component: KinesisFirehose,
-            },
-            {
-              path: "filebeat",
-              name: "filebeat",
-              component: FileBeat,
-            },
-          ],
-        },
-        {
-          path: "metrics",
-          name: "ingestMetrics",
-          component: IngestMetrics,
-          children: [
-            {
-              path: "prometheus",
-              name: "prometheus",
-              component: PrometheusConfig,
-            },
-            {
-              path: "otelcollector",
-              name: "otelCollector",
-              component: OtelCollector,
-            },
-            {
-              path: "telegraf",
-              name: "telegraf",
-              component: TelegrafConfig,
-            },
-          ],
-        },
-        {
-          path: "traces",
-          name: "ingestTraces",
-          component: IngestTraces,
-          children: [
-            {
-              path: "opentelemetry",
-              name: "tracesOTLP",
-              component: OpenTelemetry,
-            },
-          ],
-        },
-      ],
-    },
-    {
       path: "alerts",
       name: "alerts",
       component: Alerts,
@@ -329,6 +235,7 @@ const useRoutes = () => {
         },
       ],
     },
+    ...useIngestionRoutes(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,
