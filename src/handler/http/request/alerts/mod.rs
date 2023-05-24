@@ -15,7 +15,7 @@
 pub mod destinations;
 pub mod templates;
 
-use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
 use std::{collections::HashMap, io::Error};
 
 use crate::{
@@ -225,4 +225,47 @@ async fn delete_alert(
         stream_type = Some(StreamType::Logs)
     }
     alerts::delete_alert(org_id, stream_name, stream_type.unwrap(), name).await
+}
+
+/** TriggerAlert */
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TriggerAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse),
+        (status = 404, description="NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/{stream_name}/alerts/{alert_name}/trigger")]
+async fn trigger_alert(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> impl Responder {
+    let (org_id, stream_name, name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let mut stream_type = match crate::common::http::get_stream_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            )
+        }
+    };
+    if stream_type.is_none() {
+        stream_type = Some(StreamType::Logs)
+    }
+
+    alerts::trigger_alert(org_id, stream_name, stream_type.unwrap(), name).await
 }

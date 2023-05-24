@@ -163,6 +163,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(save_alert)
             .service(get_alert)
             .service(list_alerts)
+            .service(trigger_alert)
             .service(list_stream_alerts)
             .service(delete_alert)
             .service(organization::organizations)
