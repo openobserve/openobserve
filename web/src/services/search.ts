@@ -48,6 +48,34 @@ const search = {
     }
     return http().get(url);
   },
+  metrics_query_range: ({
+    org_identifier,
+    query,
+    start_time,
+    end_time,
+  }:{
+    org_identifier: string;
+    query: string;
+    start_time: number;
+    end_time: number;
+  }) => {
+    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&query=${query}`;
+    return http().get(url);
+  },
+  metrics_query: ({
+    org_identifier,
+    query,
+    start_time,
+    end_time,
+  }:{
+    org_identifier: string;
+    query: string;
+    start_time: number;
+    end_time: number;
+  }) => {
+    const url = `/api/${org_identifier}/prometheus/api/v1/query?time=${end_time}&query=${query}`;
+    return http().get(url);
+  }
 };
 
 export default search;
