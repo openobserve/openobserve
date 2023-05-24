@@ -102,6 +102,7 @@
           content-class="tab_content"
         />
         <q-route-tab
+          v-if="showSyslog"
           name="syslog"
           :to="{
             name: 'syslog',
@@ -130,7 +131,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
+import { defineComponent, ref, onMounted, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -163,6 +164,7 @@ export default defineComponent({
         "fluentd",
         "kinesisfirehose",
         "vector",
+        "syslog",
       ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -272,6 +274,10 @@ export default defineComponent({
       confirmUpdate.value = true;
     };
 
+    const showSyslog = computed(() => {
+      return config.isZincObserveCloud !== "true";
+    });
+
     return {
       t,
       store,
@@ -289,6 +295,7 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       ingestiontabs,
+      showSyslog,
     };
   },
   computed: {
