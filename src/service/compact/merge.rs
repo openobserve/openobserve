@@ -330,10 +330,10 @@ async fn merge_files(
     }
 
     // write parquet files into tmpfs
-    let store = &storage::DEFAULT;
+    let storage = &storage::DEFAULT;
     let tmp_dir = tmpfs::Directory::default();
     for file in &new_file_list {
-        let data = store.get(file).await?;
+        let data = storage.get(file).await?;
         tmp_dir.set(file, data)?;
     }
 
@@ -384,7 +384,7 @@ async fn merge_files(
             // do the convert
             let mut buf = Vec::new();
             let file_tmp_dir = tmpfs::Directory::default();
-            let file_data = store.get(file).await?;
+            let file_data = storage.get(file).await?;
             file_tmp_dir.set(file, file_data)?;
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
@@ -420,7 +420,6 @@ async fn merge_files(
     );
 
     // upload file
-    let storage = &storage::DEFAULT;
     match storage.put(&new_file_key, buf.into()).await {
         Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
         Err(e) => Err(e),
