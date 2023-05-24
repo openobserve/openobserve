@@ -84,9 +84,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // compact offset already is next hour, we need fix it, get the latest compact offset
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
-            log::info!(
-                "[COMPACT] stream [{key}] offset [{val}] haven't done compact, just waiting"
-            );
+            log::info!("[COMPACT] waiting for stream [{key}] offset [{val}]");
             return Ok(());
         }
     }

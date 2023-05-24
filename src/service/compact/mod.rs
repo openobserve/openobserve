@@ -132,10 +132,6 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::LookUpTable,
     ];
     for org_id in orgs {
-        log::info!(
-            "[COMPACTOR] start to merge for org: {org_id}, last offset: {last_file_list_offset}"
-        );
-
         for stream_type in stream_types {
             let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
             for stream_name in streams {
