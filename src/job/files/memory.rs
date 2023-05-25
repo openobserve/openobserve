@@ -13,23 +13,14 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use datafusion::arrow;
-use datafusion::arrow::json::reader::infer_json_schema;
-use std::io::BufReader;
-use std::sync::Arc;
+use datafusion::arrow::json::{reader::infer_json_schema, RawReaderBuilder};
+use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::utils::populate_file_meta;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
-use crate::infra::metrics;
-use crate::infra::storage;
-use crate::infra::storage::generate_partioned_file_key;
-use crate::meta::common::FileMeta;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::schema::schema_evolution;
+use crate::common::{json, utils::populate_file_meta};
+use crate::infra::{cluster, config::CONFIG, file_lock, metrics, storage};
+use crate::meta::{common::FileMeta, StreamType};
+use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 /// TaskResult (local file path, remote file key, file meta, stream type)
 type TaskResult = (String, String, FileMeta, StreamType);
@@ -171,19 +162,17 @@ async fn upload_file(
         return Err(anyhow::anyhow!("file is empty: {}", path_str));
     }
 
-    let mut res_records = vec![];
-    let mut records = vec![];
     // metrics
     metrics::INGEST_WAL_READ_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
 
+    let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(buf.as_ref());
-    let (arrow_schema, inferred_schema) = match infer_json_schema(&mut schema_reader, None) {
+    let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
         Ok(inferred_schema) => {
-            let arrow_schema = Arc::new(inferred_schema.clone());
             drop(schema_reader);
-            (arrow_schema, inferred_schema)
+            inferred_schema
         }
         Err(err) => {
             // Buf has some corrupt json data....ignore such data & move rest of the records
@@ -193,37 +182,35 @@ async fn upload_file(
                 err.to_string()
             );
 
+            drop(schema_reader);
             let mut json_reader = BufReader::new(buf.as_ref());
             let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
             for value in value_reader {
                 match value {
                     Ok(val) => {
-                        res_records.push(Ok(val.clone()));
-                        records.push(val);
+                        res_records.push(val);
                     }
                     Err(err) => {
                         log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
                     }
                 }
             }
-
-            let inferred_schema =
-                arrow::json::reader::infer_json_schema_from_iterator(res_records.into_iter())
-                    .unwrap();
-            let arrow_schema = Arc::new(inferred_schema.clone());
-            drop(schema_reader);
-
-            (arrow_schema, inferred_schema)
+            if res_records.is_empty() {
+                return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+            }
+            let value_iter = res_records.iter().map(Ok);
+            arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap()
         }
     };
+    let arrow_schema = Arc::new(inferred_schema);
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema);
 
-    if records.is_empty() {
+    if res_records.is_empty() {
         let json_reader = BufReader::new(buf.as_ref());
-        let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+        let json = RawReaderBuilder::new(arrow_schema.clone())
             .build(json_reader)
             .unwrap();
         for batch in json {
@@ -233,12 +220,11 @@ async fn upload_file(
         }
     } else {
         let mut json = vec![];
-        let mut decoder = arrow::json::RawReaderBuilder::new(Arc::new(inferred_schema.clone()))
-            .build_decoder()?;
+        let mut decoder = RawReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
 
-        for value in records {
+        for value in res_records {
             decoder
-                .decode(crate::common::json::to_string(&value).unwrap().as_bytes())
+                .decode(json::to_string(&value).unwrap().as_bytes())
                 .unwrap();
             json.push(decoder.flush()?.unwrap());
         }
@@ -265,12 +251,12 @@ async fn upload_file(
         org_id,
         stream_name,
         stream_type,
-        inferred_schema,
+        arrow_schema,
         file_meta.min_ts,
     )
     .await;
 
-    let new_file = generate_partioned_file_key(
+    let new_file = storage::generate_partioned_file_key(
         org_id,
         stream_name,
         stream_type,
@@ -285,10 +271,10 @@ async fn upload_file(
     };
 
     let storage = &storage::DEFAULT;
-    let result = storage
+    match storage
         .put(&new_file_key, bytes::Bytes::from(buf_parquet))
-        .await;
-    match result {
+        .await
+    {
         Ok(_output) => {
             log::info!("[JOB] memory file upload succeeded: {}", new_file_key);
             Ok((new_file_key, file_meta, stream_type))

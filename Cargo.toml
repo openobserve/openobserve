@@ -31,6 +31,12 @@ debug-assertions = false
 overflow-checks = false
 strip = true
 
+# cargo build --profile release-lto
+[profile.release-lto]
+inherits = "release"
+codegen-units = 1
+lto = true
+
 [dependencies]
 actix-cors = "0.6"
 actix-multipart = "0.6.0"

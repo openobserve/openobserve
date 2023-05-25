@@ -1,4 +1,3 @@
-use actix_multipart::Multipart;
 // Copyright 2022 Zinc Labs Inc. and Contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +11,8 @@ use actix_multipart::Multipart;
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use actix_multipart::Multipart;
 use actix_web::http::{self, StatusCode};
 use actix_web::{web, HttpResponse};
 use ahash::AHashMap;

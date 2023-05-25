@@ -683,6 +683,9 @@ pub(crate) async fn get_label_values(
     if schema.fields().is_empty() {
         return Ok(vec![]);
     }
+    if schema.field_with_name(&label_name).is_err() {
+        return Ok(vec![]);
+    }
     let req = meta::search::Request {
         query: meta::search::Query {
             sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),

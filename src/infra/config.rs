@@ -243,6 +243,9 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
+    #[env_config(name = "ZO_COMPACT_FAKE_MODE", default = false)]
+    // this mode will skip merge file, just print the log
+    pub fake_mode: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
@@ -396,6 +399,21 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = hostname().unwrap();
+    }
+
+    // HACK for tracing, always disable tracing except ingester and querier
+    let local_node_role: Vec<super::cluster::Role> = cfg
+        .common
+        .node_role
+        .clone()
+        .split(',')
+        .map(|s| s.parse().unwrap())
+        .collect();
+    if !local_node_role.contains(&super::cluster::Role::All)
+        && !local_node_role.contains(&super::cluster::Role::Ingester)
+        && !local_node_role.contains(&super::cluster::Role::Querier)
+    {
+        cfg.common.tracing_enabled = false;
     }
 
     // format local_mode_storage
