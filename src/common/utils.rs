@@ -56,28 +56,45 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
 pub fn is_local_disk_storage() -> bool {
     CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
+
 pub async fn populate_file_meta(
     schema: Arc<Schema>,
     batch: Vec<Vec<RecordBatch>>,
     file_meta: &mut FileMeta,
-) {
+) -> Result<(), anyhow::Error> {
+    if schema.fields().is_empty() || batch.is_empty() {
+        return Ok(());
+    }
     let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), batch).unwrap();
-    ctx.register_table("temp", Arc::new(provider)).unwrap();
+    let provider = MemTable::try_new(schema.clone(), batch)?;
+    ctx.register_table("temp", Arc::new(provider))?;
 
     let sql = format!(
-        "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp ;",
+        "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp;",
         CONFIG.common.column_timestamp
     );
-    let df = ctx.sql(sql.as_str()).await.unwrap();
-    let batches = df.collect().await.unwrap();
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..]).unwrap();
+    let df = ctx.sql(sql.as_str()).await?;
+    let batches = df.collect().await?;
+    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..])?;
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
-    let record = result.pop().unwrap();
-    file_meta.min_ts = record.get("min").unwrap().as_i64().unwrap();
-    file_meta.max_ts = record.get("max").unwrap().as_i64().unwrap();
-    file_meta.records = record.get("num_records").unwrap().as_u64().unwrap();
+    let record = result.pop().expect("No record found");
+    file_meta.min_ts = record
+        .get("min")
+        .expect("No field found: min")
+        .as_i64()
+        .expect("No value found: min");
+    file_meta.max_ts = record
+        .get("max")
+        .expect("No field found: max")
+        .as_i64()
+        .expect("No value found: max");
+    file_meta.records = record
+        .get("num_records")
+        .expect("No field found: num_records")
+        .as_u64()
+        .expect("No value found: num_records");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -149,7 +166,9 @@ mod tests {
             original_size: 1000,
             compressed_size: 700,
         };
-        populate_file_meta(schema, vec![vec![batch]], &mut file_meta).await;
+        populate_file_meta(schema, vec![vec![batch]], &mut file_meta)
+            .await
+            .unwrap();
         assert_eq!(file_meta.records, 4);
         assert_eq!(file_meta.min_ts, val - 100);
     }
