@@ -130,7 +130,7 @@ pub async fn save_alert(
         let trigger = Trigger {
             timestamp: Utc::now().timestamp_micros(),
             is_valid: true,
-            alert_name: alert.name.clone(),
+            alert_name: alert.name,
             stream: stream_name,
             stream_type,
             org: org_id,
