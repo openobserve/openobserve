@@ -315,8 +315,8 @@ export default defineComponent({
         .then((res) => {
           resultTotal.value = res.data.data.length;
           let counter = 1;
+          currentUserRole.value = "";
           orgMembers.value = res.data.data.map((data: any) => {
-            currentUserRole.value = "";
             if (store.state.userInfo.email == data.email) {
               currentUserRole.value = data.role;
             }
