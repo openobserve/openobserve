@@ -245,7 +245,7 @@ async fn upload_file(
         compressed_size: buf_parquet.len() as u64,
     };
 
-    populate_file_meta(arrow_schema.clone(), vec![meta_batch], &mut file_meta).await;
+    populate_file_meta(arrow_schema.clone(), vec![meta_batch], &mut file_meta).await?;
 
     schema_evolution(
         org_id,

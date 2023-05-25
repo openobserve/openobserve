@@ -71,8 +71,7 @@ mod tests {
             compressed_size: 1,
         };
         let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
-        let _ret = crate::infra::cache::file_list::set_file_to_cache(file_name, Some(meta), false)
-            .unwrap();
+        let _ret = crate::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
 
         let res = set(session_id, &[file_name.to_string()]).await;

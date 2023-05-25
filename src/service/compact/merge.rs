@@ -402,6 +402,7 @@ async fn merge_files(
                 DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
             })?;
             file_meta.compressed_size = buf.len() as u64;
+
             // replace the file in tmpfs
             tmp_dir.set(file, buf.into())?;
         }

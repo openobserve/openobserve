@@ -32,7 +32,7 @@ pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), any
                     return Ok(());
                 }
             };
-            match cache::file_list::set_file_to_cache(key, None, true) {
+            match cache::file_list::del_file_from_cache(key) {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(
@@ -54,7 +54,7 @@ pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), any
             }
         }
         false => {
-            match cache::file_list::set_file_to_cache(key, Some(data), false) {
+            match cache::file_list::set_file_to_cache(key, data) {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!(
