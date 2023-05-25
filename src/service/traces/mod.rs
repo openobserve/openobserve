@@ -321,11 +321,7 @@ pub async fn handle_trace_request(
 
         alerts.retain(|alert| alert.name.eq(&val.alert_name));
         if !alerts.is_empty() {
-            super::ingestion::send_ingest_notification(
-                val.clone(),
-                alerts.first().unwrap().clone(),
-            )
-            .await;
+            super::ingestion::send_ingest_notification(val, alerts.first().unwrap().clone()).await;
         }
     }
     let res = ExportTraceServiceResponse {};
