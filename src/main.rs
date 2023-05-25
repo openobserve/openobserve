@@ -110,13 +110,13 @@ async fn main() -> Result<(), anyhow::Error> {
     rx.await?;
     if !router::is_router() {
         let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-        let event_svc = EventServer::new(Eventer::default())
+        let event_svc = EventServer::new(Eventer)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let search_svc = SearchServer::new(Searcher::default())
+        let search_svc = SearchServer::new(Searcher)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let metrics_svc = MetricsServer::new(Querier::default())
+        let metrics_svc = MetricsServer::new(Querier)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         let tracer = TraceServer::default();

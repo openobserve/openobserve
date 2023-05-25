@@ -23,8 +23,7 @@ use crate::infra::errors;
 use crate::infra::metrics;
 use crate::service::search as SearchService;
 
-#[derive(Default)]
-pub struct Searcher {}
+pub struct Searcher;
 
 #[tonic::async_trait]
 impl Search for Searcher {
