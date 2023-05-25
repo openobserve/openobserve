@@ -38,24 +38,24 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use object_store::limit::LimitStore;
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
+use parquet::arrow::ArrowWriter;
 use regex::Regex;
 use std::{sync::Arc, time::Instant};
-use uuid::Uuid;
 
 use super::storage::file_list;
 #[cfg(feature = "zo_functions")]
 use super::transform_udf::get_all_transform;
 use crate::common::json;
-use crate::infra::cache::tmpfs;
-use crate::infra::config::{get_parquet_compression, CONFIG};
-use crate::meta::{self, common::FileMeta, stream::StreamParams, StreamType};
+use crate::infra::{cache::tmpfs, config::CONFIG};
+use crate::meta::{
+    common::FileMeta, search::Session as SearchSession, sql, stream::StreamParams, StreamType,
+};
 use crate::service::search::sql::Sql;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
 
 pub async fn sql(
-    session: &meta::search::Session,
+    session: &SearchSession,
     stream_type: StreamType,
     schema: Option<Arc<Schema>>,
     rules: HashMap<String, DataType>,
@@ -242,7 +242,7 @@ pub async fn sql(
     }
 
     //get alias from context query for agg sql
-    let meta_sql = meta::sql::Sql::new(&sql.query_context);
+    let meta_sql = sql::Sql::new(&sql.query_context);
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
@@ -342,14 +342,19 @@ pub async fn merge(
 
     let start = Instant::now();
     // write temp file
-    let work_dir = merge_write_recordbatch(batches)?;
+    let (schema, work_dir) = merge_write_recordbatch(batches)?;
     log::info!(
         "merge_write_recordbatch took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
     // rewrite sql
-    let schema = batches[0][0].schema();
+    let schema = match schema {
+        Some(schema) => schema,
+        None => {
+            return Ok(vec![]);
+        }
+    };
     let query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
             if offset > 0
@@ -439,9 +444,16 @@ pub async fn merge(
     Ok(vec![batches])
 }
 
-fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
+fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Option<Arc<Schema>>, String)> {
+    let mut schema = None;
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     for (i, item) in batches.iter().enumerate() {
+        if item.is_empty() {
+            continue;
+        }
+        if schema.is_none() {
+            schema = Some(item[0].schema().clone());
+        }
         let file_name = format!("{work_dir}{i}.parquet");
         let mut buf_parquet = Vec::new();
         let mut writer = ArrowWriter::try_new(&mut buf_parquet, item[0].schema().clone(), None)?;
@@ -451,7 +463,7 @@ fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<String> {
         writer.close().unwrap();
         tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-    Ok(work_dir)
+    Ok((schema, work_dir))
 }
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
@@ -646,10 +658,10 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
 }
 
 pub async fn convert_parquet_file(
+    session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     rules: HashMap<String, DataType>,
-    file: &str,
 ) -> Result<()> {
     let start = Instant::now();
     // query data
@@ -665,12 +677,7 @@ pub async fn convert_parquet_file(
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
 
-    let session_id = Uuid::new_v4().to_string();
-    file_list::set(&session_id, &[file.to_string()])
-        .await
-        .unwrap();
-
-    let prefix = match ListingTableUrl::parse(format!("mem:///{session_id}/")) {
+    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{session_id}/")) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
@@ -678,9 +685,8 @@ pub async fn convert_parquet_file(
             )));
         }
     };
-    let prefixes = vec![prefix];
 
-    let config = ListingTableConfig::new_with_multi_paths(prefixes)
+    let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
@@ -722,22 +728,15 @@ pub async fn convert_parquet_file(
         df = df.select(exprs)?;
     }
     let schema: Schema = df.schema().into();
+    let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256);
-    let writer_props = props.build();
-    let mut writer = ArrowWriter::try_new(buf, Arc::new(schema), Some(writer_props)).unwrap();
+    let mut writer = super::new_writer(buf, &schema);
     for batch in batches {
         writer.write(&batch)?;
     }
     writer.close().unwrap();
     ctx.deregister_table("tbl")?;
-
-    // clear session
-    file_list::clear(&session_id).await.unwrap();
+    drop(ctx);
 
     log::info!(
         "convert_parquet_file took {:.3} seconds.",
@@ -748,9 +747,9 @@ pub async fn convert_parquet_file(
 }
 
 pub async fn merge_parquet_files(
+    session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
-    files: &[String],
 ) -> Result<FileMeta> {
     let start = Instant::now();
     // query data
@@ -766,10 +765,7 @@ pub async fn merge_parquet_files(
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
 
-    let session_id = Uuid::new_v4().to_string();
-    file_list::set(&session_id, files).await.unwrap();
-
-    let prefix = match ListingTableUrl::parse(format!("mem:///{session_id}/")) {
+    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{session_id}/")) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
@@ -777,9 +773,8 @@ pub async fn merge_parquet_files(
             )));
         }
     };
-    let prefixes = vec![prefix];
 
-    let config = ListingTableConfig::new_with_multi_paths(prefixes)
+    let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
@@ -811,26 +806,15 @@ pub async fn merge_parquet_files(
     );
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
+    let schema = Arc::new(schema);
     let batches = df.collect().await?;
-    let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
-    let props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256)
-        .set_sorting_columns(Some(
-            [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
-        ));
-    let writer_props = props.build();
-    let mut writer = ArrowWriter::try_new(buf, Arc::new(schema), Some(writer_props)).unwrap();
+    let mut writer = super::new_writer(buf, &schema);
     for batch in batches {
         writer.write(&batch)?;
     }
     writer.close().unwrap();
     ctx.deregister_table("tbl")?;
-
-    // clear session
-    file_list::clear(&session_id).await.unwrap();
+    drop(ctx);
 
     log::info!(
         "merge_parquet_files took {:.3} seconds.",
@@ -875,7 +859,7 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
 }
 
 pub async fn register_table(
-    session: &meta::search::Session,
+    session: &SearchSession,
     stream: StreamParams<'_>,
     schema: Option<Arc<Schema>>,
     table_name: &str,
@@ -933,10 +917,8 @@ pub async fn register_table(
             )));
         }
     };
-    let prefixes = vec![prefix];
 
-    let mut config =
-        ListingTableConfig::new_with_multi_paths(prefixes).with_listing_options(listing_options);
+    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
     let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Wal) {
         config = config.infer_schema(&ctx.state()).await.unwrap();
         let table = ListingTable::try_new(config.clone())?;
@@ -1066,8 +1048,8 @@ mod test {
         .unwrap();
 
         let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
-
-        assert!(!res.is_empty())
+        assert!(res.0.is_some());
+        assert!(!res.1.is_empty())
     }
 
     #[actix_web::test]

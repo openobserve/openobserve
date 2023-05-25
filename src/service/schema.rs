@@ -19,6 +19,7 @@ use datafusion::arrow::json::reader::infer_json_schema;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
+use std::sync::Arc;
 
 use crate::common::json;
 use crate::infra::config::CONFIG;
@@ -31,7 +32,7 @@ pub async fn schema_evolution(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    inferred_schema: Schema,
+    inferred_schema: Arc<Schema>,
     min_ts: i64,
 ) {
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
@@ -46,7 +47,7 @@ pub async fn schema_evolution(
             org_id,
             stream_name,
             stream_type,
-            &inferred_schema.clone().with_metadata(metadata),
+            &inferred_schema.as_ref().clone().with_metadata(metadata),
             Some(min_ts),
         )
         .await
@@ -54,9 +55,8 @@ pub async fn schema_evolution(
     } else if !inferred_schema.fields().eq(schema.fields()) {
         let schema_fields: HashSet<_> = schema.fields().iter().collect();
         let field_datatype_delta: Vec<_> = inferred_schema
-            .clone()
             .fields
-            .into_iter()
+            .iter()
             .filter(|item| !schema_fields.contains(item))
             .map(|v| format!("{}:[{}]", v.name(), v.data_type()))
             .collect();
@@ -68,7 +68,7 @@ pub async fn schema_evolution(
             stream_name,
             field_datatype_delta
         );
-        match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
+        match try_merge(vec![schema.clone(), inferred_schema.as_ref().clone()]) {
             Err(e) => {
                 log::error!(
                     "schema_evolution: schema merge failed for {:?} err: {:?}",
