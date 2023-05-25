@@ -200,7 +200,7 @@ pub async fn delete_stream_function(
         }
     };
 
-    if let Some(val) = existing_fn.streams.clone() {
+    if let Some(val) = existing_fn.streams {
         if val.len() == 1 && val.first().unwrap().stream == stream_name {
             existing_fn.streams = None;
         } else {
