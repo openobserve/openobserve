@@ -30,7 +30,7 @@ mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
-        r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )
     .expect("Email regex is valid");
 
@@ -153,6 +153,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+
 
 #[cfg(test)]
 mod tests {
