@@ -138,7 +138,7 @@ pub async fn save_alert(
             count: 0,
             is_ingest_time: false,
         };
-        let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
+        let _ = triggers::save_trigger(&trigger.alert_name, &trigger).await;
     }
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

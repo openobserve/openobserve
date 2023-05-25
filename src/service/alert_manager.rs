@@ -130,11 +130,8 @@ async fn handle_trigger(alert_name: &str, frequency: i64) {
                                     //Update trigger for last sent
 
                                     local_trigger.count += 1;
-                                    let _ = triggers::save_trigger(
-                                        alert.name.clone(),
-                                        local_trigger.clone(),
-                                    )
-                                    .await;
+                                    let _ =
+                                        triggers::save_trigger(&alert.name, &local_trigger).await;
                                 }
                             }
                         }

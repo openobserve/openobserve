@@ -113,7 +113,7 @@ pub async fn ingest(
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.iter() {
         //JSON Flattening
-        let value = json::flatten_json_and_format_field(&item);
+        let value = json::flatten_json_and_format_field(item);
 
         #[cfg(feature = "zo_functions")]
         let mut value = crate::service::ingestion::apply_stream_transform(

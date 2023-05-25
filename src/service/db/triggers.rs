@@ -29,11 +29,11 @@ pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
         .ok())
 }
 
-pub async fn set(alert_name: &str, trigger: Trigger) -> Result<(), anyhow::Error> {
+pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
     Ok(db
-        .put(&key.clone(), json::to_vec(&trigger.clone()).unwrap().into())
+        .put(&key.clone(), json::to_vec(trigger).unwrap().into())
         .await?)
 }
 

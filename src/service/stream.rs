@@ -60,7 +60,7 @@ pub async fn get_streams(
     let indices = db::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap();
-    let mut indices_res = Vec::new();
+    let mut indices_res = Vec::with_capacity(indices.len());
     for stream_loc in indices {
         let mut stats = stats::get_stream_stats(
             org_id,
