@@ -38,6 +38,7 @@
         :chart="traceChart"
         @updated:chart="updateChart"
       />
+      <d3-chart />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -104,6 +105,7 @@ import TraceHeader from "./TraceHeader.vue";
 import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
+import D3Chart from "@/components/D3Chart.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -119,6 +121,7 @@ export default defineComponent({
     TraceTree,
     TraceHeader,
     TraceChart,
+    D3Chart,
   },
 
   setup() {

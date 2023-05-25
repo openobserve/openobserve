@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@types/d3-selection": "^3.0.5"
+  }
+}
