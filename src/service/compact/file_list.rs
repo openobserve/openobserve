@@ -41,9 +41,15 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         // get earilest date from schema
         offset = Utc::now().timestamp_micros();
         for item in STREAM_SCHEMAS.iter() {
-            let schema = item.value();
-            if let Some(val) = schema.first().unwrap().metadata.get("created_at") {
+            if let Some(val) = item.value().first().unwrap().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
+                if time_min == 0 {
+                    log::info!(
+                        "[COMPACT] stream [{}] created_at is 0, just skip",
+                        item.key()
+                    );
+                    continue;
+                }
                 if time_min < offset {
                     offset = time_min;
                 }
@@ -53,6 +59,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     // still not found, just return
     if offset == 0 {
+        log::info!("[COMPACT] no stream, no need to compact");
         return Ok(()); // no stream
     }
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
@@ -71,13 +78,14 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
+        log::info!("[COMPACT] no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
-    for (_, val) in offsets {
-        let val = val - Duration::hours(1).num_microseconds().unwrap();
-        if val < offset {
-            return Ok(()); // compact is not done
+    for (key, val) in offsets {
+        if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
+            log::info!("[COMPACT] waiting for stream [{key}] offset [{val}]");
+            return Ok(());
         }
     }
 

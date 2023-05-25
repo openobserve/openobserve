@@ -14,21 +14,3 @@
 
 pub mod disk;
 pub mod memory;
-
-use crate::infra::config::get_parquet_compression;
-use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
-use std::sync::Arc;
-
-fn get_writer<'a>(
-    buf_parquet: &'a mut Vec<u8>,
-    arrow_schema: &'a Arc<arrow_schema::Schema>,
-) -> ArrowWriter<&'a mut Vec<u8>> {
-    let props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
-        .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
-        .set_max_row_group_size(1024 * 1024 * 256);
-    let writer_props = props.build();
-
-    ArrowWriter::try_new(buf_parquet, arrow_schema.clone(), Some(writer_props)).unwrap()
-}

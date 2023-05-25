@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::json::reader::infer_json_schema_from_seekable;
-use datafusion::arrow;
-
-use std::io::{BufReader, Seek, SeekFrom};
-use std::sync::atomic::Ordering;
-use std::{fs, path::Path, sync::Arc};
+use datafusion::arrow::json::{reader::infer_json_schema_from_seekable, RawReaderBuilder};
+use std::{
+    fs,
+    io::{BufReader, Seek, SeekFrom},
+    path::Path,
+    sync::{atomic::Ordering, Arc},
+};
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::file::scan_files;
-use crate::common::utils::populate_file_meta;
-use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
-use crate::infra::metrics;
-use crate::infra::storage;
-use crate::infra::storage::generate_partioned_file_key;
-use crate::infra::{cluster, config};
-use crate::meta::common::FileMeta;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::schema::schema_evolution;
+use crate::common::{file::scan_files, json, utils::populate_file_meta};
+use crate::infra::{
+    cluster,
+    config::{CONFIG, SEARCHING_IN_WAL},
+    file_lock, metrics, storage,
+};
+use crate::meta::{common::FileMeta, StreamType};
+use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 /// TaskResult (local file path, remote file key, file meta, stream type)
 type TaskResult = (String, String, FileMeta, StreamType);
@@ -151,7 +148,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             loop {
-                                let searching = config::SEARCHING_IN_WAL.load(Ordering::Relaxed);
+                                let searching = SEARCHING_IN_WAL.load(Ordering::Relaxed);
                                 if searching == 0 {
                                     break;
                                 } else {
@@ -206,8 +203,6 @@ async fn upload_file(
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
-    let mut res_records = vec![];
-    let mut records = vec![];
     log::info!("[JOB] File upload begin: disk: {}", path_str);
     if file_size == 0 {
         if let Err(e) = fs::remove_file(path_str) {
@@ -225,56 +220,52 @@ async fn upload_file(
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
 
+    let mut res_records: Vec<json::Value> = vec![];
     let mut schema_reader = BufReader::new(&file);
+    let inferred_schema = match infer_json_schema_from_seekable(&mut schema_reader, None) {
+        Ok(inferred_schema) => {
+            drop(schema_reader);
+            inferred_schema
+        }
+        Err(err) => {
+            // File has some corrupt json data....ignore such data & move rest of the records
+            log::error!(
+                "[JOB] Failed to infer schema from file: {}, error: {}",
+                path_str,
+                err.to_string()
+            );
 
-    let (arrow_schema, inferred_schema) =
-        match infer_json_schema_from_seekable(&mut schema_reader, None) {
-            Ok(inferred_schema) => {
-                let arrow_schema = Arc::new(inferred_schema.clone());
-                drop(schema_reader);
-                (arrow_schema, inferred_schema)
-            }
-            Err(err) => {
-                // File has some corrupt json data....ignore such data & move rest of the records
-                log::error!(
-                    "[JOB] Failed to infer schema from file: {}, error: {}",
-                    path_str,
-                    err.to_string()
-                );
-
-                let mut json_reader = BufReader::new(&file);
-                let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
-
-                for value in value_reader {
-                    match value {
-                        Ok(val) => {
-                            res_records.push(Ok(val.clone()));
-                            records.push(val);
-                        }
-                        Err(err) => {
-                            log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
-                        }
+            drop(schema_reader);
+            file.seek(SeekFrom::Start(0)).unwrap();
+            let mut json_reader = BufReader::new(&file);
+            let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
+            for value in value_reader {
+                match value {
+                    Ok(val) => {
+                        res_records.push(val);
+                    }
+                    Err(err) => {
+                        log::error!("[JOB] Failed to parse record: error: {}", err.to_string())
                     }
                 }
-
-                let inferred_schema =
-                    arrow::json::reader::infer_json_schema_from_iterator(res_records.into_iter())
-                        .unwrap();
-                let arrow_schema = Arc::new(inferred_schema.clone());
-                drop(schema_reader);
-
-                (arrow_schema, inferred_schema)
             }
-        };
+            if res_records.is_empty() {
+                return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+            }
+            let value_iter = res_records.iter().map(Ok);
+            arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap()
+        }
+    };
+    let arrow_schema = Arc::new(inferred_schema);
 
     let mut meta_batch = vec![];
     let mut buf_parquet = Vec::new();
-    let mut writer = crate::job::files::get_writer(&mut buf_parquet, &arrow_schema);
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema);
 
-    if records.is_empty() {
+    if res_records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();
         let json_reader = BufReader::new(&file);
-        let json = arrow::json::RawReaderBuilder::new(arrow_schema.clone())
+        let json = RawReaderBuilder::new(arrow_schema.clone())
             .coerce_primitive(true)
             .build(json_reader)
             .unwrap();
@@ -285,13 +276,13 @@ async fn upload_file(
         }
     } else {
         let mut json = vec![];
-        let mut decoder = arrow::json::RawReaderBuilder::new(Arc::new(inferred_schema.clone()))
+        let mut decoder = RawReaderBuilder::new(arrow_schema.clone())
             .coerce_primitive(true)
             .build_decoder()?;
 
-        for value in records {
+        for value in res_records {
             decoder
-                .decode(crate::common::json::to_string(&value).unwrap().as_bytes())
+                .decode(json::to_string(&value).unwrap().as_bytes())
                 .unwrap();
             json.push(decoder.flush()?.unwrap());
         }
@@ -318,12 +309,12 @@ async fn upload_file(
         org_id,
         stream_name,
         stream_type,
-        inferred_schema,
+        arrow_schema,
         file_meta.min_ts,
     )
     .await;
 
-    let new_file = generate_partioned_file_key(
+    let new_file = storage::generate_partioned_file_key(
         org_id,
         stream_name,
         stream_type,
@@ -338,10 +329,10 @@ async fn upload_file(
     };
 
     let storage = &storage::DEFAULT;
-    let result = storage
+    match storage
         .put(&new_file_key, bytes::Bytes::from(buf_parquet))
-        .await;
-    match result {
+        .await
+    {
         Ok(_output) => {
             log::info!("[JOB] disk file upload succeeded: {}", new_file_key);
             Ok((new_file_key, file_meta, stream_type))

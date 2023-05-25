@@ -109,12 +109,14 @@ pub async fn set(
             let last_schema = versions.pop().unwrap();
             if !last_schema.fields.eq(&schema.fields) {
                 let mut last_meta = last_schema.metadata().clone();
+                let created_at = last_meta.get("created_at").unwrap().to_string();
                 last_meta.insert("end_dt".to_string(), min_ts.unwrap().to_string());
                 versions.push(last_schema.with_metadata(last_meta));
 
                 //update current schema to add start date
                 let mut metadata = schema.metadata().clone();
                 metadata.insert("start_dt".to_string(), min_ts.unwrap().to_string());
+                metadata.insert("created_at".to_string(), created_at);
                 versions.push(schema.clone().with_metadata(metadata));
                 let _ = db.put(&key, json::to_vec(&versions).unwrap().into()).await;
             }
