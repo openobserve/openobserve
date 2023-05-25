@@ -383,7 +383,7 @@ async fn merge_files(
                     DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
                 })?;
             file_meta.compressed_size = buf.len() as u64;
-            cache::file_list::set_file_to_cache(file, Some(file_meta), false)?;
+            cache::file_list::set_file_to_cache(file, file_meta)?;
             cache::file_data::set(file, buf.into())?;
         }
     }

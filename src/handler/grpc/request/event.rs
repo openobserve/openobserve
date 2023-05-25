@@ -19,7 +19,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::handler::grpc::cluster_rpc::event_server::Event;
 use crate::handler::grpc::cluster_rpc::EmptyResponse;
 use crate::handler::grpc::cluster_rpc::FileList;
-use crate::infra::metrics;
+use crate::infra::{cache, metrics};
 use crate::meta::common::FileMeta;
 use crate::service::db::file_list;
 
@@ -67,6 +67,9 @@ impl Event for Eventer {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/event/send_file_list", "200", "", "", ""])
             .inc();
+
+        // after delete, we need to shrink the file list
+        cache::file_list::shrink_to_fit();
 
         Ok(Response::new(EmptyResponse {}))
     }
