@@ -15,20 +15,16 @@
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use ahash::AHashMap as HashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::io::Write;
-use std::sync::Arc;
-use std::time::Instant;
+use std::{io::Write, sync::Arc, time::Instant};
 use tokio::time;
 
 use crate::common::json;
-use crate::infra::db::etcd::MAX_OPS_PER_TXN;
-use crate::infra::metrics;
-use crate::infra::{cache, ider, storage};
-use crate::infra::{config::CONFIG, db::etcd};
-use crate::meta::common::{FileKey, FileMeta};
-use crate::meta::StreamType;
-use crate::service::search::datafusion;
-use crate::service::{db, file_list};
+use crate::infra::{cache::tmpfs, config::CONFIG, db::etcd, ider, metrics, storage};
+use crate::meta::{
+    common::{FileKey, FileMeta},
+    StreamType,
+};
+use crate::service::{db, file_list, search::datafusion};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -312,7 +308,9 @@ async fn merge_files(
     let mut new_file_size = 0;
     let mut new_file_list = Vec::new();
     for (new_files_num, (file, size)) in files_with_size.iter().enumerate() {
-        if new_files_num > MAX_OPS_PER_TXN || new_file_size + size > CONFIG.compact.max_file_size {
+        if new_files_num > etcd::MAX_OPS_PER_TXN
+            || new_file_size + size > CONFIG.compact.max_file_size
+        {
             break;
         }
         new_file_size += size;
@@ -329,6 +327,14 @@ async fn merge_files(
     // no files need to merge
     if new_file_list.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
+    }
+
+    // write parquet files into tmpfs
+    let storage = &storage::DEFAULT;
+    let tmp_dir = tmpfs::Directory::default();
+    for file in &new_file_list {
+        let data = storage.get(file).await?;
+        tmp_dir.set(file, data)?;
     }
 
     // convert the file to the latest version of schema
@@ -375,24 +381,44 @@ async fn merge_files(
             if diff_fields.is_empty() {
                 continue;
             }
+
             // do the convert
+            if CONFIG.compact.fake_mode {
+                log::info!("[COMPACT] fake convert parquet file: {file}");
+                continue;
+            }
             let mut buf = Vec::new();
-            datafusion::exec::convert_parquet_file(&mut buf, Arc::new(schema), diff_fields, file)
-                .await
-                .map_err(|e| {
-                    DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
-                })?;
+            let file_tmp_dir = tmpfs::Directory::default();
+            let file_data = storage.get(file).await?;
+            file_tmp_dir.set(file, file_data)?;
+            datafusion::exec::convert_parquet_file(
+                file_tmp_dir.name(),
+                &mut buf,
+                Arc::new(schema),
+                diff_fields,
+            )
+            .await
+            .map_err(|e| {
+                DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
+            })?;
             file_meta.compressed_size = buf.len() as u64;
-            cache::file_list::set_file_to_cache(file, Some(file_meta), false)?;
-            cache::file_data::set(file, buf.into())?;
+            // replace the file in tmpfs
+            tmp_dir.set(file, buf.into())?;
         }
     }
 
+    // FAKE MODE
+    if CONFIG.compact.fake_mode {
+        log::info!(
+            "[COMPACT] fake merge file succeeded, new file: fake.parquet, orginal_size: {new_file_size}, compressed_size: 0", 
+        );
+        return Ok(("".to_string(), FileMeta::default(), vec![]));
+    }
+
     let mut buf = Vec::new();
-    let mut new_file_meta =
-        datafusion::exec::merge_parquet_files(&mut buf, schema, &new_file_list.clone())
-            .await
-            .map_err(|e| DataFusionError::Plan(format!("merge_parquet_files err: {}", e)))?;
+    let mut new_file_meta = datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema)
+        .await
+        .map_err(|e| DataFusionError::Plan(format!("merge_parquet_files err: {}", e)))?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
 
@@ -407,7 +433,6 @@ async fn merge_files(
     );
 
     // upload file
-    let storage = &storage::DEFAULT;
     match storage.put(&new_file_key, buf.into()).await {
         Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
         Err(e) => Err(e),
