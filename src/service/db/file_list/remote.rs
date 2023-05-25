@@ -68,6 +68,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
     // clean deleted files
     DELETED_FILES.clear();
+    DELETED_FILES.shrink_to_fit();
 
     Ok(())
 }
