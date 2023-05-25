@@ -19,7 +19,7 @@ use std::{io::Write, sync::Arc, time::Instant};
 use tokio::time;
 
 use crate::common::json;
-use crate::infra::{cache::tmpfs, config::CONFIG, db::etcd, ider, metrics, storage};
+use crate::infra::{cache, config::CONFIG, db::etcd, ider, metrics, storage};
 use crate::meta::{
     common::{FileKey, FileMeta},
     StreamType,
@@ -289,6 +289,9 @@ pub async fn merge_by_stream(
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .set((time_now_hour - offset_time_hour) / Duration::hours(1).num_microseconds().unwrap());
 
+    // after delete, we need to shrink the file list
+    cache::file_list::shrink_to_fit();
+
     Ok(())
 }
 
@@ -331,7 +334,7 @@ async fn merge_files(
 
     // write parquet files into tmpfs
     let storage = &storage::DEFAULT;
-    let tmp_dir = tmpfs::Directory::default();
+    let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
         let data = storage.get(file).await?;
         tmp_dir.set(file, data)?;
@@ -388,7 +391,7 @@ async fn merge_files(
                 continue;
             }
             let mut buf = Vec::new();
-            let file_tmp_dir = tmpfs::Directory::default();
+            let file_tmp_dir = cache::tmpfs::Directory::default();
             let file_data = storage.get(file).await?;
             file_tmp_dir.set(file, file_data)?;
             datafusion::exec::convert_parquet_file(
@@ -417,9 +420,8 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let mut new_file_meta = datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema)
-        .await
-        .map_err(|e| DataFusionError::Plan(format!("merge_parquet_files err: {}", e)))?;
+    let mut new_file_meta =
+        datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema).await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
 
