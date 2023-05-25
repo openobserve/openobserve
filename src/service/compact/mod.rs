@@ -190,8 +190,7 @@ mod tests {
         };
         let _ret = cache::file_list::set_file_to_cache(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-            Some(meta),
-            false,
+            meta,
         )
         .unwrap();
         let resp = run_merge().await;

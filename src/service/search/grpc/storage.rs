@@ -81,7 +81,7 @@ pub async fn search(
             }
         };
     }
-    log::info!("[TRACE] storage->search: load files {} done", file_count);
+    log::info!("[TRACE] storage->search: load files {}, done", file_count);
 
     // fetch all schema versions, group files by version
     let schema_versions =

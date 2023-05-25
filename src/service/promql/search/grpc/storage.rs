@@ -77,7 +77,7 @@ pub(crate) async fn create_context(
         };
     }
     log::info!(
-        "[TRACE] promql->search->storage: load files {} done",
+        "[TRACE] promql->search->storage: load files {}, done",
         file_count
     );
 
