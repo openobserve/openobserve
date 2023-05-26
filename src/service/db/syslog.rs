@@ -27,7 +27,7 @@ use crate::{
 pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
     Ok(db::DEFAULT
         .put(
-            "/syslog/enabled/",
+            "/syslog/enabled",
             json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
         )
         .await?)
@@ -105,7 +105,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
-    let key = "/syslog/enabled/";
+    let key = "/syslog/enabled";
     let mut events = db::DEFAULT.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[TRACE] Start watching SyslogServer settings");
@@ -133,9 +133,9 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_syslog_settings() -> Result<(), anyhow::Error> {
-    let key = "/syslog/enabled/";
-    for (_, item_value) in db::DEFAULT.list(key).await? {
-        let item_value: bool = json::from_slice(&item_value).unwrap();
+    let key = "/syslog/enabled";
+    if let Ok(val) = db::DEFAULT.get(key).await {
+        let item_value: bool = json::from_slice(&val).unwrap();
         let mut syslog_enabled = SYSLOG_ENABLED.write();
         *syslog_enabled = item_value;
     }

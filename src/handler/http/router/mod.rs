@@ -40,7 +40,7 @@ use crate::infra::config::CONFIG;
 pub mod openapi;
 pub mod ui;
 
-pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
+fn get_cors() -> Arc<Cors> {
     let cors = Cors::default()
         .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
@@ -51,15 +51,17 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
         ])
         .allow_any_origin()
         .max_age(3600);
-    let cors = Arc::new(cors);
+    Arc::new(cors)
+}
 
+pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
     cfg.service(status::healthz);
     cfg.service(
         web::scope("/auth")
-            .wrap(cors.clone())
+            .wrap(cors)
             .service(users::authentication),
     );
-    cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
 
     cfg.service(
         SwaggerUi::new("/swagger/{_:.*}")
@@ -104,20 +106,14 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     }
 }
 
-pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
-    let auth = HttpAuthentication::basic(validator);
-    let cors = Cors::default()
-        .send_wildcard()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
-        .allowed_headers(vec![
-            header::AUTHORIZATION,
-            header::ACCEPT,
-            header::CONTENT_TYPE,
-        ])
-        .allow_any_origin()
-        .max_age(3600);
-    let cors = Arc::new(cors);
+pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
+    cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
+}
 
+pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
+    let auth = HttpAuthentication::basic(validator);
     cfg.service(
         web::scope("/api")
             .wrap(auth)
@@ -201,18 +197,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 }
 
 pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
     let amz_auth = HttpAuthentication::with_fn(validator_aws);
-    let cors = Cors::default()
-        .send_wildcard()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
-        .allowed_headers(vec![
-            header::AUTHORIZATION,
-            header::ACCEPT,
-            header::CONTENT_TYPE,
-        ])
-        .allow_any_origin()
-        .max_age(3600);
-    let cors = Arc::new(cors);
     cfg.service(
         web::scope("/aws")
             .wrap(cors)
