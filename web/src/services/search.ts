@@ -59,7 +59,7 @@ const search = {
     start_time: number;
     end_time: number;
   }) => {
-    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&query=${query}`;
+    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&query=${encodeURIComponent(query)}`;
     return http().get(url);
   },
   metrics_query: ({
