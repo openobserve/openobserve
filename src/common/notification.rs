@@ -15,7 +15,6 @@
 use std::error::Error as StdError;
 
 use crate::common::json::{self, Value};
-use crate::infra::config::CONFIG;
 use crate::meta::alert::{self, Alert};
 use crate::service::db;
 
@@ -56,8 +55,7 @@ pub async fn send_notification(
                     },
                     _ => msg,
                 };
-                let client = if CONFIG.common.req_accept_invalid_certs || local_dest.skip_tls_verify
-                {
+                let client = if local_dest.skip_tls_verify {
                     reqwest::Client::builder()
                         .danger_accept_invalid_certs(true)
                         .build()?
