@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use datafusion::{error::Result, prelude::SessionContext};
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use utoipa::ToSchema;
 
 mod aggregations;
@@ -39,7 +42,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<Vec<SessionContext>>;
+    ) -> Result<Vec<(SessionContext, Arc<Schema>)>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
