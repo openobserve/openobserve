@@ -128,8 +128,6 @@ pub struct TCP {
     pub tcp_port: u16,
     #[env_config(name = "ZO_UDP_PORT", default = 5541)]
     pub udp_port: u16,
-    #[env_config(name = "ZO_SYSLOGS_ENABLED", default = false)]
-    pub syslogs_enabled: bool,
 }
 
 #[derive(EnvConfig)]
