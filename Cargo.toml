@@ -168,3 +168,4 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "22"
 expect-test = "1.4"
 float-cmp = "0.9"
+

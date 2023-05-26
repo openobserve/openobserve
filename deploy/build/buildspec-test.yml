@@ -15,6 +15,7 @@ phases:
       - rustup default nightly-2023-05-21  
       - rustup component add clippy llvm-tools
       - export RUSTFLAGS='-C target-cpu=native'
+      - rm -rf ~/.cargo/registry
 
   build:
     commands:
@@ -26,5 +27,6 @@ phases:
       - pwd
       - mkdir -p web/dist 
       - touch web/dist/index.html
-      - cargo clippy -- -D warnings
+      - cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
       - ./coverage.sh
+

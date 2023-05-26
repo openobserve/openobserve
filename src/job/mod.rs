@@ -30,7 +30,7 @@ mod telemetry;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
-        r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )
     .expect("Email regex is valid");
 
@@ -40,7 +40,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             || !email_regex.is_match(&CONFIG.auth.root_user_email)
             || CONFIG.auth.root_user_password.is_empty()
         {
-            panic!("Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD enviornment variables");
+            panic!("Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD enviornment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})");
         }
         let _ = users::post_user(
             DEFAULT_ORG,
@@ -153,6 +153,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+
 
 #[cfg(test)]
 mod tests {
