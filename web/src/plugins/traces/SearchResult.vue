@@ -199,6 +199,7 @@ export default defineComponent({
       this.updatedLocalLogFilterField();
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
+      if (!(start && end)) return;
       this.searchObj.meta.showDetailTab = false;
       this.searchObj.runQuery = true;
       this.searchObj.data.datetime.tab = "absolute";
