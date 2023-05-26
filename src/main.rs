@@ -36,9 +36,7 @@ use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
 use zincobserve::handler::grpc::request::{
     event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
 };
-use zincobserve::handler::http::router::{
-    get_basic_routes, get_other_service_routes, get_service_routes,
-};
+use zincobserve::handler::http::router::*;
 
 use zincobserve::infra::cluster;
 use zincobserve::infra::config::{self, CONFIG};
@@ -157,12 +155,14 @@ async fn main() -> Result<(), anyhow::Error> {
             let app = if CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
+                    .service(router::config)
                     .service(router::api)
                     .service(router::aws)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
+                        .service(router::config)
                         .service(router::api)
                         .service(router::aws)
                         .configure(get_basic_routes),
@@ -199,12 +199,14 @@ async fn main() -> Result<(), anyhow::Error> {
             let app = if CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
+                    .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
+                        .configure(get_config_routes)
                         .configure(get_service_routes)
                         .configure(get_other_service_routes)
                         .configure(get_basic_routes),
