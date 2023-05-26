@@ -15,6 +15,7 @@ phases:
       - rustup default nightly-2023-03-28  
       - rustup component add clippy llvm-tools
       - export RUSTFLAGS='-C target-cpu=native'
+      - rm -rf ~/.cargo/registry
 
   build:
     commands:
