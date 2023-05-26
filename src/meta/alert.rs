@@ -42,11 +42,13 @@ pub struct Alert {
     pub stream_type: Option<StreamType>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestination {
     pub name: Option<String>,
     pub url: String,
     pub method: AlertHTTPType,
+    #[serde(default)]
+    pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     pub template: String,
@@ -57,6 +59,7 @@ impl AlertDestination {
         AlertDestinationResponse {
             url: self.url.clone(),
             method: self.method.clone(),
+            skip_tls_verify: self.skip_tls_verify,
             headers: self.headers.clone(),
             template,
             name: self.name.clone().unwrap(),
@@ -64,11 +67,13 @@ impl AlertDestination {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AlertDestinationResponse {
     pub name: String,
     pub url: String,
     pub method: AlertHTTPType,
+    #[serde(default)]
+    pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     pub template: Option<DestinationTemplate>,
