@@ -332,7 +332,7 @@ export default defineComponent({
       const dismiss = q.notify({
         spinner: true,
         message: `Please wait while turning ${
-          syslogEnabled.value ? "Off" : "On"
+          syslogEnabled.value ? "On" : "Off"
         } syslog...`,
       });
       disableToggle.value = true;
@@ -481,8 +481,6 @@ export default defineComponent({
 
     const deleteRoute = () => {
       if (!routeToDelete.value) return;
-
-      console.log(editingRoute.value);
 
       if (!routeToDelete.value?.isSaved) {
         routeList.value = routeList.value
