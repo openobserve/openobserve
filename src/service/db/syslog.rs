@@ -121,7 +121,7 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_value: bool = json::from_slice(&ev.value.unwrap()).unwrap();
                 let mut syslog_enabled = SYSLOG_ENABLED.write();
-                *syslog_enabled = item_value; 
+                *syslog_enabled = item_value;
             }
             Event::Delete(_) => {
                 let mut syslog_enabled = SYSLOG_ENABLED.write();

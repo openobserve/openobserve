@@ -163,6 +163,7 @@ async fn main() -> Result<(), anyhow::Error> {
             } else {
                 App::new().wrap(prometheus.clone()).service(
                     web::scope(&CONFIG.common.base_uri)
+                        .service(router::config)
                         .service(router::api)
                         .service(router::aws)
                         .configure(get_basic_routes),
