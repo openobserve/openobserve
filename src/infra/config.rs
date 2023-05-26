@@ -124,9 +124,9 @@ pub struct Grpc {
 
 #[derive(EnvConfig)]
 pub struct TCP {
-    #[env_config(name = "ZO_TCP_PORT", default = 5541)]
+    #[env_config(name = "ZO_TCP_PORT", default = 5514)]
     pub tcp_port: u16,
-    #[env_config(name = "ZO_UDP_PORT", default = 5541)]
+    #[env_config(name = "ZO_UDP_PORT", default = 5514)]
     pub udp_port: u16,
 }
 
