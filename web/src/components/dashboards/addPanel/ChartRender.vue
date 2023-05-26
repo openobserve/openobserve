@@ -14,10 +14,10 @@
 -->
 
 <template>
-  <div style="height: 40px; z-index: 10;">
+  <!-- <div style="height: 40px; z-index: 10;">
       <q-spinner-dots v-if="searchQueryData.loading" color="primary" size="40px" style="margin: 0 auto; display: block;" />
-  </div>
-  <div style="margin-top: -40px; height: calc(100% - 40px);">
+  </div> -->
+  <div style="margin-top: 0px; height: calc(100% - 40px);">
       <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">
           <div class="column" style="height: 100%; position: relative;">
               <q-table class="my-sticky-virtscroll-table" virtual-scroll v-model:pagination="pagination"
@@ -29,6 +29,9 @@
       <div v-else style="height: 100%; position: relative;">
           <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
           <div style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
+          <div v-if="searchQueryData.loading" class="row" style="position: absolute; top:0px; width:100%;">
+            <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
+          </div>
       </div>
   </div>
 </template>
@@ -606,10 +609,11 @@ export default defineComponent({
                         orientation: "h"
                     },
                     margin: {
-                        l: props.data.type == 'pie' ? 60 : 32,
-                        r: props.data.type == 'pie' ? 60 : 16,
-                        t: 38,
-                        b: 32,
+                        autoexpand: true,
+                        l:50,
+                        r:50,
+                        t:50,
+                        b:50
                     }
                 };
 
