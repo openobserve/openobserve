@@ -256,6 +256,7 @@ mod tests {
                             show_legends: true,
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                        query_type: "",
                         custom_query: false,
                     },
                 ],
@@ -336,6 +337,7 @@ mod tests {
                   "show_legends": true
                 },
                 "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                "query_type": "",
                 "customQuery": false
               }
             ],
@@ -419,6 +421,7 @@ mod tests {
                             show_legends: true,
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
+                        query_type: "",
                         custom_query: false,
                     },
                 ],
