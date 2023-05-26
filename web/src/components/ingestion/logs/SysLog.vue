@@ -132,7 +132,7 @@
                       size="sm"
                       round
                       flat
-                      :title="t('syslog.delete')"
+                      :title="t('syslog.cancel')"
                       @click="resetEditingRoute"
                     ></q-btn>
                   </template>
@@ -482,6 +482,8 @@ export default defineComponent({
     const deleteRoute = () => {
       if (!routeToDelete.value) return;
 
+      console.log(editingRoute.value);
+
       if (!routeToDelete.value?.isSaved) {
         routeList.value = routeList.value
           .filter((_route) => routeToDelete.value?.id !== _route.id)
@@ -494,7 +496,7 @@ export default defineComponent({
         message: "Please wait while deleting route...",
       });
       syslogService
-        .delete(editingRoute.value.orgId, routeToDelete.value.id || "")
+        .delete(organization.value, routeToDelete.value.id || "")
         .then(() => {
           getSyslogRoutes();
           q.notify({
