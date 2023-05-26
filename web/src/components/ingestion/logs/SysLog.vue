@@ -298,6 +298,7 @@ export default defineComponent({
     onMounted(() => {
       if (store.state.zoConfig.syslog_enabled !== undefined) {
         isLoading.value = false;
+        syslogEnabled.value = store.state.zoConfig.syslog_enabled;
       }
     });
 
