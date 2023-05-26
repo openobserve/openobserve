@@ -203,8 +203,6 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_LUA_FN_ENABLED", default = false)]
     pub lua_fn_enabled: bool,
-    #[env_config(name = "ZO_REQ_ACCEPT_INVALID_CERTS", default = false)]
-    pub req_accept_invalid_certs: bool,
 }
 
 #[derive(EnvConfig)]

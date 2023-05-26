@@ -15,7 +15,6 @@
 use std::error::Error as StdError;
 
 use crate::common::json::{self, Value};
-use crate::infra::config::CONFIG;
 use crate::meta::alert::{self, Alert};
 use crate::service::db;
 
@@ -23,19 +22,10 @@ pub async fn send_notification(
     alert: &Alert,
     trigger: &alert::Trigger,
 ) -> Result<(), Box<dyn StdError>> {
-    let client = if CONFIG.common.req_accept_invalid_certs {
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
-    } else {
-        reqwest::Client::new()
-    };
-
     let alert_type = match &trigger.is_ingest_time {
         true => "Real time",
         false => "Scheduled",
     };
-
     let curr_ts = chrono::Utc::now().timestamp_micros();
     match db::alerts::destinations::get(&trigger.org, &alert.destination).await {
         Ok(dest) => match dest {
@@ -64,6 +54,13 @@ pub async fn send_notification(
                         Err(_) => msg,
                     },
                     _ => msg,
+                };
+                let client = if local_dest.skip_tls_verify {
+                    reqwest::Client::builder()
+                        .danger_accept_invalid_certs(true)
+                        .build()?
+                } else {
+                    reqwest::Client::new()
                 };
                 let url = url::Url::parse(&local_dest.url);
                 let mut req = match local_dest.method {
@@ -120,6 +117,7 @@ mod tests {
         let destination = AlertDestination {
             url: "http://dummy/alert".to_string(),
             method: alert::AlertHTTPType::POST,
+            skip_tls_verify: false,
             headers: None,
             template: "testTemplate".to_string(),
             name: Some("test".to_string()),
