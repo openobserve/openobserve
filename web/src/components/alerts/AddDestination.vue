@@ -51,12 +51,6 @@
             :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
         </div>
         <div class="col-12 q-py-sm">
-          <div class="q-py-sm" style="paddingleft: 10px">
-            <q-toggle class="q-mt-sm" v-model="formData.skip_tls_verify"
-              :label="t('alert_destinations.skip_tls_verify')" />
-          </div>
-        </div>
-        <div class="col-12 q-py-sm">
           <div class="text-bold q-py-xs" style="paddingleft: 10px">Headers</div>
           <div v-for="(header, index) in apiHeaders" :key="header.uuid" class="row q-col-gutter-sm q-pb-sm">
             <div class="col-5 q-ml-none">
@@ -77,6 +71,12 @@
                 class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
                 :title="t('alert_templates.edit')" @click="addApiHeader()" />
             </div>
+          </div>
+        </div> 
+        <div class="col-12 q-py-sm">
+          <div class="q-py-sm">
+            <q-toggle class="q-mt-sm" v-model="formData.skip_tls_verify"
+              :label="t('alert_destinations.skip_tls_verify')" />
           </div>
         </div>
       </div>
