@@ -212,7 +212,6 @@ export default defineComponent({
     },
     getMoreData() {
       if (
-        this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0 &&
         this.searchObj.data.queryResults.total >
           this.searchObj.data.queryResults.from &&

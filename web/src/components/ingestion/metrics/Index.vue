@@ -81,7 +81,13 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onActivated } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onActivated,
+  onBeforeMount,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -97,7 +103,7 @@ export default defineComponent({
   components: {},
   data() {
     return {
-      ingestiontabs: "prometheus",
+      ingestiontabs: "",
     };
   },
   setup() {
@@ -111,7 +117,7 @@ export default defineComponent({
       store.state.selectedOrganization.identifier
     );
 
-    onMounted(() => {
+    onBeforeMount(() => {
       const ingestRoutes = ["prometheus", "otelCollector", "telegraf"];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({

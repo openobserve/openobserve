@@ -24,6 +24,7 @@
         id="traces_scatter_chart"
         v-show="searchObj.meta.showHistogram"
         :chart="searchObj.data.histogram"
+        @updated:chart="onChartUpdate"
       />
 
       <q-virtual-scroll
@@ -305,6 +306,7 @@ export default defineComponent({
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = null;
     };
+
     return {
       t,
       store,

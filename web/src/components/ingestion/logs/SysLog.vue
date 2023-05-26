@@ -132,7 +132,7 @@
                       size="sm"
                       round
                       flat
-                      :title="t('syslog.delete')"
+                      :title="t('syslog.cancel')"
                       @click="resetEditingRoute"
                     ></q-btn>
                   </template>
@@ -332,7 +332,7 @@ export default defineComponent({
       const dismiss = q.notify({
         spinner: true,
         message: `Please wait while turning ${
-          syslogEnabled.value ? "Off" : "On"
+          syslogEnabled.value ? "On" : "Off"
         } syslog...`,
       });
       disableToggle.value = true;
@@ -494,7 +494,7 @@ export default defineComponent({
         message: "Please wait while deleting route...",
       });
       syslogService
-        .delete(editingRoute.value.orgId, routeToDelete.value.id || "")
+        .delete(organization.value, routeToDelete.value.id || "")
         .then(() => {
           getSyslogRoutes();
           q.notify({
