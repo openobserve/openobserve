@@ -99,7 +99,6 @@
         >
           <q-tab-panel name="ingestLogs">
             <router-view
-              title="Logs"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -108,7 +107,6 @@
           </q-tab-panel>
           <q-tab-panel name="ingestMetrics">
             <router-view
-              title="Metrics"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
@@ -118,7 +116,6 @@
 
           <q-tab-panel name="ingestTraces">
             <router-view
-              title="Traces"
               :currOrgIdentifier="currentOrgIdentifier"
               :currUserEmail="currentUserEmail"
               @copy-to-clipboard-fn="copyToClipboardFn"
