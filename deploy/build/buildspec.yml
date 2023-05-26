@@ -30,7 +30,7 @@ phases:
 
       # build zincobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t zincobserve:latest-amd64 -f deploy/build/Dockerfile.amd64 .
+      - docker build -t zincobserve:latest-amd64 -f deploy/build/Dockerfile.mimalloc.amd64 .
       - docker tag zincobserve:latest-amd64 public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker tag zincobserve:latest-amd64 public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
       - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64

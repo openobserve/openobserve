@@ -25,7 +25,6 @@ use crate::infra::{config::CONFIG, errors, metrics};
 use crate::meta;
 use crate::service::promql::search as SearchService;
 
-#[derive(Default)]
 pub struct Querier;
 
 #[tonic::async_trait]

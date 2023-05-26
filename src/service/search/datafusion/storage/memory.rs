@@ -16,8 +16,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
-use object_store::MultipartId;
-use object_store::{path::Path, GetResult, ListResult, ObjectMeta, ObjectStore, Result};
+use object_store::{
+    path::Path, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+};
 use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
