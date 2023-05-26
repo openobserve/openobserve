@@ -22,7 +22,7 @@ mod tests {
     use std::sync::Once;
     use std::{env, fs, str, thread};
     use zincobserve::common::json;
-    use zincobserve::handler::http::router::{get_basic_routes, get_service_routes};
+    use zincobserve::handler::http::router::*;
     use zincobserve::infra::config::CONFIG;
     use zincobserve::infra::db::default;
     use zincobserve::meta::dashboards::{Dashboard, Dashboards};
@@ -1314,6 +1314,7 @@ mod tests {
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
                 .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit))
+                .configure(get_config_routes)
                 .configure(get_service_routes)
                 .configure(get_basic_routes),
         )
