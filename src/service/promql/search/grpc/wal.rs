@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use datafusion::{
+    arrow::datatypes::Schema,
     datasource::file_format::file_type::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
@@ -45,11 +46,11 @@ pub(crate) async fn create_context(
     stream_name: &str,
     _time_range: (i64, i64),
     _filters: &[(&str, &str)],
-) -> Result<SessionContext> {
+) -> Result<(SessionContext, Arc<Schema>)> {
     // get file list
     let files = get_file_list(org_id, stream_name).await?;
     if files.is_empty() {
-        return Ok(SessionContext::new());
+        return Ok((SessionContext::new(), Arc::new(Schema::empty())));
     }
 
     let work_dir = session_id.to_string();
@@ -76,7 +77,7 @@ pub(crate) async fn create_context(
         data_type: SessionType::Tmpfs,
     };
 
-    let (ctx, _) = register_table(
+    register_table(
         &session,
         StreamParams {
             org_id,
@@ -88,8 +89,7 @@ pub(crate) async fn create_context(
         &[],
         FileType::JSON,
     )
-    .await?;
-    Ok(ctx)
+    .await
 }
 
 /// get file list from local cache, no need match_source, each file will be searched

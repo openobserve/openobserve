@@ -154,8 +154,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use std::env;

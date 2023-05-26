@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use datafusion::{error::DataFusionError, prelude::SessionContext};
+use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use promql_parser::parser;
-use std::time::{Duration, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, UNIX_EPOCH},
+};
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{cache::tmpfs, errors::Result};
@@ -40,7 +43,7 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> datafusion::error::Result<Vec<SessionContext>> {
+    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>)>> {
         let mut resp = Vec::new();
         // register storage table
         let ctx =

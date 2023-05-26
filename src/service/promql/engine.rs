@@ -14,7 +14,10 @@
 
 use async_recursion::async_recursion;
 use datafusion::{
-    arrow::array::{Float64Array, Int64Array, StringArray},
+    arrow::{
+        array::{Float64Array, Int64Array, StringArray},
+        datatypes::Schema,
+    },
     error::{DataFusionError, Result},
     prelude::{col, lit, SessionContext},
 };
@@ -350,10 +353,10 @@ impl QueryEngine {
             .await?;
 
         let mut tasks = Vec::new();
-        for ctx in ctxs {
+        for (ctx, schema) in ctxs {
             let selector = selector.clone();
             let task = tokio::task::spawn(async move {
-                selector_load_data_from_datafusion(ctx, selector).await
+                selector_load_data_from_datafusion(ctx, schema, selector).await
             });
             tasks.push(task);
         }
@@ -716,6 +719,7 @@ impl QueryEngine {
 
 async fn selector_load_data_from_datafusion(
     ctx: SessionContext,
+    schema: Arc<Schema>,
     selector: VectorSelector,
 ) -> Result<FxHashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
@@ -728,6 +732,12 @@ async fn selector_load_data_from_datafusion(
 
     let mut df_group = table.clone();
     for mat in selector.matchers.matchers.iter() {
+        if mat.name == CONFIG.common.column_timestamp
+            || mat.name == VALUE_LABEL
+            || schema.field_with_name(&mat.name).is_err()
+        {
+            continue;
+        }
         match &mat.op {
             MatchOp::Equal => {
                 df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?

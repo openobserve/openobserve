@@ -534,8 +534,8 @@ pub(crate) async fn get_series(
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
             if mat.name == CONFIG.common.column_timestamp
-                || mat.name == NAME_LABEL
                 || mat.name == VALUE_LABEL
+                || schema.field_with_name(&mat.name).is_err()
             {
                 continue;
             }
