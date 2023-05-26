@@ -23,6 +23,7 @@ publish = false
 [features]
 default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
+jemalloc = ["dep:tikv-jemallocator"]
 zo_functions = ["dep:mlua"]
 
 [profile.release]
@@ -141,6 +142,7 @@ sys-info = "0.9"
 syslog_loose = "0.18.0"
 thiserror = "1.0"
 time = "0.3"
+tikv-jemallocator = { version = "0.5", optional = true }
 tokio = { version = "1", features = ["full"] }
 tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = "0.1"

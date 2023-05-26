@@ -23,8 +23,7 @@ use crate::infra::{cache, metrics};
 use crate::meta::common::FileMeta;
 use crate::service::db::file_list;
 
-#[derive(Default)]
-pub struct Eventer {}
+pub struct Eventer;
 
 #[tonic::async_trait]
 impl Event for Eventer {

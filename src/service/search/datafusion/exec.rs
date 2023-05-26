@@ -757,26 +757,17 @@ pub async fn merge_parquet_files(
     let session_config = SessionConfig::new()
         .with_information_schema(false)
         .with_batch_size(8192);
-    let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
+    let ctx = SessionContext::with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-
-    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{session_id}/")) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}"
-            )));
-        }
-    };
-
+    let prefix = ListingTableUrl::parse(format!("tmpfs:///{session_id}/"))?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
-        .with_schema(schema.clone());
+        .with_schema(schema);
 
     let table = ListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
@@ -788,9 +779,8 @@ pub async fn merge_parquet_files(
     );
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
-    let json_rows = arrowJson::writer::record_batches_to_json_rows(&batches[..]).unwrap();
-    let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-    let record = result.pop().unwrap();
+    let result = arrowJson::writer::record_batches_to_json_rows(&batches[..]).unwrap();
+    let record = result.first().unwrap();
     let file_meta = FileMeta {
         min_ts: record["min_ts"].as_i64().unwrap(),
         max_ts: record["max_ts"].as_i64().unwrap(),

@@ -134,7 +134,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
             stype: cluster_rpc::SearchType::Cluster as _,
             ..req.clone()
         };
-        let mut req_query = req.query.as_mut().unwrap();
+        let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
         if need_wal && req_query.end == end {

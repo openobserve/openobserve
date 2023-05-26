@@ -53,6 +53,10 @@ use zincobserve::service::users;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     if cli().await? {
@@ -106,13 +110,13 @@ async fn main() -> Result<(), anyhow::Error> {
     rx.await?;
     if !router::is_router() {
         let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-        let event_svc = EventServer::new(Eventer::default())
+        let event_svc = EventServer::new(Eventer)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let search_svc = SearchServer::new(Searcher::default())
+        let search_svc = SearchServer::new(Searcher)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let metrics_svc = MetricsServer::new(Querier::default())
+        let metrics_svc = MetricsServer::new(Querier)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         let tracer = TraceServer::default();
