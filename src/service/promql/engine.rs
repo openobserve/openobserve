@@ -144,8 +144,8 @@ impl Engine {
             self.result_type = Some("vector".to_string());
         }
         let metrics_name = selector.name.as_ref().unwrap();
-        let need_load_data = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
-        if !need_load_data {
+        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        if !cache_exists {
             self.selector_load_data(selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
@@ -195,8 +195,8 @@ impl Engine {
             self.result_type = Some("matrix".to_string());
         }
         let metrics_name = selector.name.as_ref().unwrap();
-        let need_load_data = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
-        if !need_load_data {
+        let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
+        if !cache_exists {
             self.selector_load_data(selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;

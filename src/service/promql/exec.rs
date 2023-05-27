@@ -39,7 +39,6 @@ pub struct Query {
     pub lookback_delta: i64,
     /// key — metric name; value — time series data
     pub data_cache: Arc<RwLock<FxHashMap<String, Value>>>,
-    result_type: Option<String>,
 }
 
 impl Query {
@@ -57,7 +56,6 @@ impl Query {
             interval: five_min,
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(FxHashMap::default())),
-            result_type: None,
         }
     }
 
@@ -74,20 +72,24 @@ impl Query {
 
         let ctx = Arc::new(self.clone());
         let expr = Arc::new(stmt.expr);
+        let mut result_type: Option<String> = None;
 
         // range query always be matrix result type.
         if self.start != self.end {
-            self.result_type = Some("matrix".to_string());
+            result_type = Some("matrix".to_string());
         } else {
             // Instant query
             let mut engine = super::Engine::new(ctx.clone(), self.start);
             let expr = expr.clone();
-            let mut value = engine.exec_expr(&expr).await?;
+            let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
             }
             value.sort();
-            return Ok((value, self.result_type.to_owned()));
+            if result_type_exec.is_some() {
+                result_type = result_type_exec;
+            }
+            return Ok((value, result_type));
         }
 
         // Range query
@@ -99,14 +101,18 @@ impl Query {
             let time = self.start + (self.interval * i);
             let mut engine = super::Engine::new(ctx.clone(), time);
             let expr = expr.clone();
-            // let task = tokio::task::spawn(async move { (time, engine.exec_expr(&expr).await) });
-            let task = (time, engine.exec_expr(&expr).await);
+            // let task = tokio::task::spawn(async move { (time, engine.exec(&expr).await) });
+            let task = (time, engine.exec(&expr).await);
             tasks.push(task);
         }
 
         for task in tasks {
             let (time, result) = task;
-            match result? {
+            let (result, result_type_exec) = result?;
+            if result_type.is_none() && result_type_exec.is_some() {
+                result_type = result_type_exec;
+            }
+            match result {
                 Value::Instant(v) => {
                     instant_vectors.push(RangeValue::new(v.labels.to_owned(), [v.sample]))
                 }
@@ -125,7 +131,7 @@ impl Query {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((Value::None, self.result_type.to_owned()));
+            return Ok((Value::None, result_type));
         }
 
         // merge data
@@ -148,6 +154,6 @@ impl Query {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((value, self.result_type.to_owned()))
+        Ok((value, result_type))
     }
 }
