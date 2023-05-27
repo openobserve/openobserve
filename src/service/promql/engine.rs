@@ -136,7 +136,6 @@ impl Engine {
     /// Instant vector selector --- select a single sample at each evaluation timestamp.
     ///
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
-    #[tracing::instrument(name = "promql:engine:vector_selector", skip_all)]
     async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
@@ -187,7 +186,6 @@ impl Engine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix of samples.
-    #[tracing::instrument(name = "promql:engine:matrix_selector", skip_all)]
     async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
