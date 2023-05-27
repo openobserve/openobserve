@@ -23,7 +23,7 @@ use std::{
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{cache::tmpfs, errors::Result};
 use crate::service::{
-    promql::{value, QueryEngine, TableProvider, DEFAULT_LOOKBACK},
+    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
     search,
 };
 
@@ -87,7 +87,7 @@ pub async fn search(
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
-    let mut engine = QueryEngine::new(
+    let mut engine = Query::new(
         org_id,
         StorageProvider {
             session_id: session_id.to_string(),

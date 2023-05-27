@@ -15,9 +15,9 @@
 use datafusion::error::Result;
 use promql_parser::parser::Expr as PromExpr;
 
-use super::QueryEngine;
+use super::Engine;
 use crate::service::promql::value::Value;
 
-pub async fn bottomk(ctx: &mut QueryEngine, param: Box<PromExpr>, data: &Value) -> Result<Value> {
+pub async fn bottomk(ctx: &mut Engine, param: Box<PromExpr>, data: &Value) -> Result<Value> {
     super::eval_top(ctx, param, data, true).await
 }

@@ -17,7 +17,7 @@ use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
 use rustc_hash::FxHashMap;
 
-use super::QueryEngine;
+use super::Engine;
 use crate::service::promql::value::{signature, Labels, Signature, Value};
 
 mod avg;
@@ -122,7 +122,7 @@ pub(crate) fn eval_arithmetic(
 }
 
 pub async fn eval_top(
-    ctx: &mut QueryEngine,
+    ctx: &mut Engine,
     param: Box<PromExpr>,
     data: &Value,
     is_bottom: bool,
