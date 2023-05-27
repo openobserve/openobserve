@@ -47,7 +47,7 @@ pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
 }
 
 #[inline(always)]
-async fn get_queue_lock() -> Result<etcd::Locker> {
+async fn _get_queue_lock() -> Result<etcd::Locker> {
     let mut lock = etcd::Locker::new("search/cluster_queue_metrics");
     lock.lock(0).await.map_err(server_internal_error)?;
     Ok(lock)
@@ -58,11 +58,13 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     let op_start = std::time::Instant::now();
 
     // get a cluster search queue lock
-    let locker = if CONFIG.common.local_mode {
-        None
-    } else {
-        Some(get_queue_lock().await?)
-    };
+    // let locker = if CONFIG.common.local_mode {
+    //     None
+    // } else {
+    //     Some(get_queue_lock().await?)
+    // };
+    let locker: Option<etcd::Locker> = None;
+
     let took_wait = op_start.elapsed().as_millis() as usize;
 
     // get querier nodes from cluster
