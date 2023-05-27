@@ -611,6 +611,7 @@ export default defineComponent({
                         name: JSON.stringify(metric.metric),
                         x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
                         y: values.map((value: any) => value[1]),
+                        hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"
                     }
                 })
 
