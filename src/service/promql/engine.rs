@@ -51,6 +51,7 @@ impl Engine {
             result_type: None,
         }
     }
+
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
