@@ -113,6 +113,7 @@ export default defineComponent({
               obj["name"] = it.label
               obj["field"] = it.alias
               obj["label"] = it.label
+              obj["align"] = 'left'
               obj["sortable"] = true
               return obj
           })
