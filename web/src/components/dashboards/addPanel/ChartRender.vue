@@ -102,6 +102,18 @@ export default defineComponent({
 
       const tableColumn: any = ref([]);
 
+      // check if the values are numbers or not (used for table column alignment)
+      const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
+            if (!Array.isArray(arr)) {
+                return false;
+            }
+            const sample = arr.slice(0, Math.min(sampleSize, arr.length));
+            return sample.every(obj => {
+                const value = obj[key];
+                return value === undefined || value === null || value === '' || typeof value === 'number';
+            });
+        };
+
       // set column value for type chart if the axis value is undefined
       const updateTableColumns = () => {
           const x = props.data?.fields?.x || []
@@ -113,7 +125,7 @@ export default defineComponent({
               obj["name"] = it.label
               obj["field"] = it.alias
               obj["label"] = it.label
-              obj["align"] = 'left'
+              obj["align"] = !isSampleValuesNumbers(searchQueryData.data, it.alias, 20) ? 'left' : 'right';
               obj["sortable"] = true
               return obj
           })
@@ -316,7 +328,9 @@ export default defineComponent({
           () => [searchQueryData.data, props.data.type],
           () => {
               if (props.data.type != "table") {
-                  renderChart()
+                renderChart()
+              } else {
+                updateTableColumns()
               }
           },
           { deep: true }
