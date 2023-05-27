@@ -61,6 +61,7 @@ pub struct QueryEngine {
     time_window_idx: i64,
     /// key — metric name; value — time series data
     metrics_cache: FxHashMap<String, Value>,
+    result_type: Option<String>,
 }
 
 impl QueryEngine {
@@ -79,11 +80,12 @@ impl QueryEngine {
             lookback_delta: five_min,
             time_window_idx: 0,
             metrics_cache: FxHashMap::default(),
+            result_type: None,
         }
     }
 
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
-    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<Value> {
+    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<(Value, Option<String>)> {
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
         if stmt.interval > Duration::ZERO {
@@ -93,6 +95,11 @@ impl QueryEngine {
             self.lookback_delta = micros(stmt.lookback_delta);
         }
 
+        // range query always be matrix result type.
+        if self.start != self.end {
+            self.result_type = Some("matrix".to_string());
+        }
+
         if self.start == self.end {
             // Instant query
             let mut value = self.exec_expr(&stmt.expr).await?;
@@ -100,7 +107,7 @@ impl QueryEngine {
                 value = Value::Sample(Sample::new(self.end, val));
             }
             value.sort();
-            return Ok(value);
+            return Ok((value, self.result_type.to_owned()));
         }
 
         // Range query
@@ -133,7 +140,7 @@ impl QueryEngine {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok(Value::None);
+            return Ok((Value::None, self.result_type.to_owned()));
         }
 
         // merge data
@@ -156,7 +163,7 @@ impl QueryEngine {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok(value)
+        Ok((value, self.result_type.to_owned()))
     }
 
     #[async_recursion]
@@ -244,6 +251,9 @@ impl QueryEngine {
         &mut self,
         selector: &VectorSelector,
     ) -> Result<Vec<InstantValue>> {
+        if self.result_type.is_none() {
+            self.result_type = Some("vector".to_string());
+        }
         let metrics_name = selector.name.as_ref().unwrap();
         if !self.metrics_cache.contains_key(metrics_name) {
             self.selector_load_data(selector, None).await?;
@@ -291,6 +301,9 @@ impl QueryEngine {
         selector: &VectorSelector,
         range: Duration,
     ) -> Result<Vec<RangeValue>> {
+        if self.result_type.is_none() {
+            self.result_type = Some("matrix".to_string());
+        }
         let metrics_name = selector.name.as_ref().unwrap();
         if !self.metrics_cache.contains_key(metrics_name) {
             self.selector_load_data(selector, Some(range)).await?;

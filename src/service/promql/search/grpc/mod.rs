@@ -94,7 +94,11 @@ pub async fn search(
             need_wal: req.need_wal,
         },
     );
-    let value = engine.exec(eval_stmt).await?;
+    let (value, result_type) = engine.exec(eval_stmt).await?;
+    let result_type = match result_type {
+        Some(v) => v,
+        None => value.get_type().to_string(),
+    };
 
     // clear session
     search::datafusion::storage::file_list::clear(&session_id)
@@ -106,7 +110,7 @@ pub async fn search(
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
-        result_type: value.get_type().to_string(),
+        result_type,
         ..Default::default()
     };
 
