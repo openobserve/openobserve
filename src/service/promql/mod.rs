@@ -24,11 +24,13 @@ use utoipa::ToSchema;
 mod aggregations;
 mod binaries;
 mod engine;
+mod exec;
 mod functions;
 pub mod search;
 pub mod value;
 
-pub use engine::QueryEngine;
+pub use engine::Engine;
+pub use exec::Query;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s

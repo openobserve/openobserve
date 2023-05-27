@@ -28,7 +28,6 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::{
     cluster,
     config::CONFIG,
-    db::etcd,
     errors::{Error, ErrorCodes, Result},
 };
 use crate::service::{
@@ -46,24 +45,9 @@ pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
     search_in_cluster(req).await
 }
 
-#[inline(always)]
-async fn get_queue_lock() -> Result<etcd::Locker> {
-    let mut lock = etcd::Locker::new("search/cluster_queue_metrics");
-    lock.lock(0).await.map_err(server_internal_error)?;
-    Ok(lock)
-}
-
 #[tracing::instrument(name = "promql:search:cluster", skip_all)]
 async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
     let op_start = std::time::Instant::now();
-
-    // get a cluster search queue lock
-    let locker = if CONFIG.common.local_mode {
-        None
-    } else {
-        Some(get_queue_lock().await?)
-    };
-    let took_wait = op_start.elapsed().as_millis() as usize;
 
     // get querier nodes from cluster
     let mut nodes = cluster::get_cached_online_querier_nodes().unwrap();
@@ -221,37 +205,13 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
-            if locker.is_some() {
-                if let Err(e) = locker.unwrap().unlock().await {
-                    log::error!("search in cluster unlock error: {}", e);
-                }
-            }
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
             )));
         }
     };
     for res in task_results {
-        match res {
-            Ok(res) => {
-                results.push(res);
-            }
-            Err(err) => {
-                if locker.is_some() {
-                    if let Err(e) = locker.unwrap().unlock().await {
-                        log::error!("search in cluster unlock error: {}", e);
-                    }
-                }
-                return Err(err);
-            }
-        }
-    }
-
-    // search done, release lock
-    if locker.is_some() {
-        if let Err(e) = locker.unwrap().unlock().await {
-            log::error!("search in cluster unlock error: {}", e);
-        }
+        results.push(res?);
     }
 
     // merge multiple instances data
@@ -281,9 +241,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[TRACE] promql->search->result: took: {},  took_wait: {}, file_count: {}, scan_size: {}",
+        "[TRACE] promql->search->result: took: {}, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
-        took_wait,
         file_count,
         scan_size,
     );

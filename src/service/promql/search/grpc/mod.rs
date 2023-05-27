@@ -23,7 +23,7 @@ use std::{
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{cache::tmpfs, errors::Result};
 use crate::service::{
-    promql::{value, QueryEngine, TableProvider, DEFAULT_LOOKBACK},
+    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
     search,
 };
 
@@ -87,14 +87,18 @@ pub async fn search(
         lookback_delta: DEFAULT_LOOKBACK,
     };
 
-    let mut engine = QueryEngine::new(
+    let mut engine = Query::new(
         org_id,
         StorageProvider {
             session_id: session_id.to_string(),
             need_wal: req.need_wal,
         },
     );
-    let value = engine.exec(eval_stmt).await?;
+    let (value, result_type) = engine.exec(eval_stmt).await?;
+    let result_type = match result_type {
+        Some(v) => v,
+        None => value.get_type().to_string(),
+    };
 
     // clear session
     search::datafusion::storage::file_list::clear(&session_id)
@@ -106,7 +110,7 @@ pub async fn search(
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
-        result_type: value.get_type().to_string(),
+        result_type,
         ..Default::default()
     };
 
