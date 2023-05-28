@@ -22,17 +22,19 @@ You can reduce your log storage costs by ~140x compared to Elasticsearch by usin
 
 Some of the features are:
 
+1. Logs, Metrics, Traces
+1. Alerts, Dashboards
+1. Ingest and Query functions to aid advanced capabilities like enrichment, redaction, log reduction, compliance, etc. e.g. you can use ingest functions to redact sensitive data like email IDs, AWS keys, etc. from logs before the get stored in logs.
 1. Advanced Embedded GUI
-1. It's a drop in replacement for elasticsearch 
+1. SQL for Logs and Traces. SQL and PromQL for metrics. No need to learn yet another query language.
 1. Single binary for installation & running. Binaries available under [releases](https://github.com/zinclabs/zincobserve/releases) for multiple platforms.
-1. SQL for sophisticated queries, no need to learn yet another query language.
-1. Embedded scripting functions for ingestion & query to aid advanced capabilities like enrichment, redaction, log reduction, compliance, etc.
+1. Storage in local Disk, s3, MinIO, GCS
+1. High availability and clustering
+1. Drop in replacement for elasticsearch
 1. Dynamic Schema
 1. Out of the box authentication
-1. Storage in local Disk, s3, MinIO, GCS
 1. Vastly easier to operate
 1. Seamless upgrades
-1. High availability and clustering
 
 For full list of features check [documentation](https://docs.zinc.dev/ZincObserve/#project-status-features-and-roadmap)
 
