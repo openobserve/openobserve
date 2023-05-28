@@ -54,6 +54,12 @@ phases:
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
 
+      # build zincobserve-mimalloc
+      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
+      - docker build -t zincobserve:latest-arm64-mimalloc -f deploy/build/Dockerfile.mimalloc.aarch64 .
+      - docker tag zincobserve:latest-arm64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
+      - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
+
 cache:
   paths:
     - /root/.cache/
