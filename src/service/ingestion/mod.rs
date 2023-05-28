@@ -55,6 +55,13 @@ use crate::{
 
 #[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
+    if func.contains("get_env_var") {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "get_env_var is not supported",
+        ));
+    }
+
     let external = state::ExternalEnv::default();
     let vrl_config = get_vrl_compiler_config(org_id);
     match vrl::compiler::compile_with_external(
