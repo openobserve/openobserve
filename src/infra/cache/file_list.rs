@@ -178,7 +178,11 @@ async fn scan_prefix(
         None => return Ok(items),
     };
 
-    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/{year}/{month}/{day}/{hour}/");
+    let prefix = if hour.is_empty() {
+        format!("files/{org_id}/{stream_type}/{stream_name}/{year}/{month}/{day}/")
+    } else {
+        format!("files/{org_id}/{stream_type}/{stream_name}/{year}/{month}/{day}/{hour}/")
+    };
     items.extend(
         day_cache
             .iter()
@@ -196,7 +200,6 @@ pub async fn get_file_list(
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
-    let mut files = Vec::new();
     let mut keys = Vec::new();
     if time_min > 0 && time_max > 0 {
         let time_min = Utc.timestamp_nanos(time_min * 1000);
@@ -231,6 +234,7 @@ pub async fn get_file_list(
         keys.push("".to_string());
     }
 
+    let mut files = Vec::new();
     for key in keys {
         let resp = scan_prefix(org_id, stream_name, stream_type, &key)
             .await
