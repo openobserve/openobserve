@@ -93,8 +93,9 @@ export default defineComponent({
                 confirmQueryModeChangeDialog.value = true;
             }
         };
-        const changeToggle = () => {
+        const changeToggle = async () => {
             selectedButtonType.value = popupSelectedButtonType.value;
+            await nextTick() // let the watchers execute first
             removeXYFilters()
         };
 
