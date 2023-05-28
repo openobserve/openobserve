@@ -14,7 +14,7 @@ phases:
       - swapon /swapfile || true
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
-      - GIT_HASH="$(git rev-parse --short HEAD)"
+      - GIT_HASH="$(git rev-parse --short=7 HEAD)"
       - echo "Building for commit - $GIT_HASH"
 
       # install buildx
@@ -40,9 +40,7 @@ phases:
       # - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
       # - docker build -t zincobserve:latest-amd64-mimalloc -f deploy/build/Dockerfile.mimalloc.amd64 .
       # - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-      # - docker tag zincobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
       # - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-      # - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64-mimalloc
 
 cache:
   paths:
