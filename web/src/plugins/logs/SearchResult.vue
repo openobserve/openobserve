@@ -93,28 +93,44 @@
               :key="index + '-' + column.name"
               class="field_list"
             >
-              <high-light
-                :content="
-                  column.name == 'source'
-                    ? column.prop(row)
-                    : column.prop(row, column.name).length > 100
-                    ? column.prop(row, column.name).substr(0, 100) + '...'
-                    : column.name != '@timestamp'
-                    ? row[column.name]
-                    : column.prop(row, column.name)
-                "
-                :query-string="
-                  searchObj.meta.sqlMode
-                    ? searchObj.data.query.split('where')[1]
-                    : searchObj.data.query
-                "
-                :title="
-                  column.prop(row, column.name).length > 100 &&
-                  column.name != 'source'
-                    ? column.prop(row, column.name)
-                    : ''
-                "
-              ></high-light>
+              <div class="flex row items-center no-wrap">
+                <q-btn
+                  v-if="column.name === '@timestamp'"
+                  :icon="
+                    expandedLogs[row._timestamp]
+                      ? 'expand_more'
+                      : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  @click.stop="expandLog(row)"
+                ></q-btn>
+                <high-light
+                  :content="
+                    column.name == 'source'
+                      ? column.prop(row)
+                      : searchObj.data.resultGrid.columns.length > 2 &&
+                        column.prop(row, column.name).length > 100
+                      ? column.prop(row, column.name).substr(0, 100) + '...'
+                      : column.name != '@timestamp'
+                      ? row[column.name]
+                      : column.prop(row, column.name)
+                  "
+                  :query-string="
+                    searchObj.meta.sqlMode
+                      ? searchObj.data.query.split('where')[1]
+                      : searchObj.data.query
+                  "
+                  :title="
+                    column.prop(row, column.name).length > 100 &&
+                    column.name != 'source'
+                      ? column.prop(row, column.name)
+                      : ''
+                  "
+                ></high-light>
+              </div>
               <div
                 v-if="column.closable && row[column.name]"
                 class="field_overlay"
@@ -137,8 +153,14 @@
                   "
                 />
               </div>
-            </q-td> </q-tr
-        ></template>
+            </q-td>
+          </q-tr>
+          <q-tr v-if="expandedLogs[row._timestamp]">
+            <td :colspan="searchObj.data.resultGrid.columns.length">
+              <pre class="log_json_content">{{ row }}</pre>
+            </td>
+          </q-tr>
+        </template>
       </q-virtual-scroll>
       <q-dialog
         v-model="searchObj.meta.showDetailTab"
@@ -172,7 +194,7 @@
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -264,6 +286,7 @@ export default defineComponent({
     const searchTableRef: any = ref(null);
 
     const plotChart: any = ref(null);
+    const expandedLogs: any = ref({});
 
     const reDrawChart = () => {
       if (
@@ -315,6 +338,12 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
+    const expandLog = async (row: any) => {
+      if (expandedLogs.value[row._timestamp])
+        delete expandedLogs.value[row._timestamp];
+      else expandedLogs.value[row._timestamp] = true;
+    };
+
     return {
       t,
       store,
@@ -330,7 +359,9 @@ export default defineComponent({
       navigateRowDetail,
       totalHeight,
       reDrawChart,
+      expandLog,
       getImageURL,
+      expandedLogs,
     };
   },
 });
@@ -463,6 +494,10 @@ export default defineComponent({
       font-weight: bold;
     }
   }
+
+  .log_json_content {
+    white-space: pre-wrap;
+  }
 }
 .thead-sticky tr > *,
 .tfoot-sticky tr > * {
@@ -486,6 +521,8 @@ export default defineComponent({
   position: relative;
   overflow: visible;
   cursor: default;
+  font-size: 12px;
+  font-family: monospace;
 
   .field_overlay {
     position: absolute;
