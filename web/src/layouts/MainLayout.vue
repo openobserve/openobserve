@@ -18,22 +18,9 @@
     <q-header>
       <q-toolbar>
         <img
-          v-if="!miniMode"
           class="appLogo"
           :src="getImageURL('images/common/app_logo_zo.png')"
           @click="goToHome"
-        />
-        <img
-          v-else
-          class="appLogo__mini"
-          :src="getImageURL('images/common/mini_logo.svg')"
-        />
-        <q-btn
-          dense
-          flat
-          round
-          :icon="'img:' + getImageURL('images/common/menu_icon.svg')"
-          @click="toggleLeftDrawer"
         />
 
         <q-toolbar-title></q-toolbar-title>
@@ -183,6 +170,10 @@
       :width="210"
       :breakpoint="500"
       bordered
+      show-if-above
+      @mouseover="miniMode = false"
+      @mouseout="miniMode = true"
+      mini-to-overlay
     >
       <q-list class="leftNavList">
         <menu-link
@@ -630,15 +621,6 @@ export default defineComponent({
       orgOptions,
       leftDrawerOpen: true,
       miniMode,
-      toggleLeftDrawer() {
-        miniMode.value = !miniMode.value;
-        const leftDrawer = miniMode.value;
-        const currentUser: any = useLocalCurrentUser();
-        currentUser.miniMode = leftDrawer;
-        store.dispatch("setCurrentUser", currentUser);
-        useLocalCurrentUser(currentUser);
-        window.dispatchEvent(new Event("resize"));
-      },
       user,
       zoBackendUrl,
       getImageURL,
@@ -706,10 +688,8 @@ export default defineComponent({
   }
 }
 
-.miniMode {
-  .q-page-container {
-    padding-left: 5rem !important;
-  }
+.q-page-container {
+  padding-left: 5rem !important;
 }
 
 .q-drawer {
