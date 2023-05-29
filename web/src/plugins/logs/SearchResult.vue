@@ -96,7 +96,11 @@
               <div class="flex row items-center no-wrap">
                 <q-btn
                   v-if="column.name === '@timestamp'"
-                  icon="expand_more"
+                  :icon="
+                    expandedLogs[row._timestamp]
+                      ? 'expand_more'
+                      : 'chevron_right'
+                  "
                   dense
                   size="xs"
                   flat
@@ -153,7 +157,7 @@
           </q-tr>
           <q-tr v-if="expandedLogs[row._timestamp]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
-              <pre>{{ row }}</pre>
+              <pre class="log_json_content">{{ row }}</pre>
             </td>
           </q-tr>
         </template>
@@ -489,6 +493,10 @@ export default defineComponent({
       text-transform: capitalize;
       font-weight: bold;
     }
+  }
+
+  .log_json_content {
+    white-space: pre-wrap;
   }
 }
 .thead-sticky tr > *,
