@@ -178,6 +178,8 @@ pub async fn merge_by_stream(
     for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
         files_with_size.sort_by(|a, b| a.1.cmp(&b.1));
+        // delete duplicated files
+        files_with_size.dedup_by(|a, b| a.0 == b.0);
         loop {
             // yield to other tasks
             tokio::task::yield_now().await;
