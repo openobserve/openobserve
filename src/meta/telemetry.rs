@@ -50,7 +50,7 @@ impl Telemetry {
         if !CONFIG.common.telemetry_enabled {
             return;
         }
-        log::info!("[TRACE] sending event {}", event);
+        log::info!("sending event {}", event);
         let mut props = self.base_info.clone();
         if data.is_some() {
             for item in data.unwrap() {

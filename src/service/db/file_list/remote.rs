@@ -28,10 +28,9 @@ lazy_static! {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    log::info!("[TRACE] Load file_list begin");
-    let storage = &storage::DEFAULT;
-    let prefix = "file_list/";
-    let files = storage.list(prefix).await?;
+    log::info!("Load file_list begin");
+    let prefix = "file_list/".to_string();
+    let files = storage::list(&prefix).await?;
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
@@ -39,7 +38,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Result<usize, anyhow::Error>> =
             tokio::task::spawn(async move {
-                let count = proccess_file(storage.as_ref(), &file).await?;
+                let count = proccess_file(&file).await?;
                 drop(permit);
                 Ok(count)
             });
@@ -54,7 +53,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 count += v;
             }
             Err(e) => {
-                return Err(anyhow::anyhow!("[TRACE] Load file_list err: {:?}", e));
+                return Err(anyhow::anyhow!("Load file_list err: {:?}", e));
             }
         }
     }
@@ -64,7 +63,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         super::progress(item.key(), item.value().to_owned(), true).await?;
     }
 
-    log::info!("[TRACE] Load file_list done[{}:{}]", files.len(), count);
+    log::info!("Load file_list done[{}:{}]", files.len(), count);
 
     // clean deleted files
     DELETED_FILES.clear();
@@ -73,12 +72,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn proccess_file(
-    client: &dyn storage::FileStorage,
-    file: &str,
-) -> Result<usize, anyhow::Error> {
+async fn proccess_file(file: &str) -> Result<usize, anyhow::Error> {
     // download file list from storage
-    let data = client.get(file).await?;
+    let data = storage::get(file).await?;
     // uncompress file
     let uncompress = zstd::decode_all(data.reader())?;
     let uncompress_reader = BufReader::new(uncompress.reader());

@@ -174,7 +174,6 @@ pub async fn merge_by_stream(
         partition.push((file.clone(), file_meta.original_size));
     }
 
-    let storage = &storage::DEFAULT;
     for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
         files_with_size.sort_by(|a, b| a.1.cmp(&b.1));
@@ -225,9 +224,7 @@ pub async fn merge_by_stream(
                 buf.write_all(&write_buf)?;
             }
             let compressed_bytes = buf.finish().unwrap();
-            storage
-                .put(&new_file_list_key, compressed_bytes.into())
-                .await?;
+            storage::put(&new_file_list_key, compressed_bytes.into()).await?;
 
             // set to local cache & send broadcast
             // retry 10 times
@@ -258,9 +255,7 @@ pub async fn merge_by_stream(
             }
 
             // delete small files from storage
-            match storage
-                .del(&new_file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-                .await
+            match storage::del(&new_file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
             {
                 Ok(_) => {}
                 Err(e) => {
@@ -335,10 +330,9 @@ async fn merge_files(
     }
 
     // write parquet files into tmpfs
-    let storage = &storage::DEFAULT;
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
-        let data = storage.get(file).await?;
+        let data = storage::get(file).await?;
         tmp_dir.set(file, data)?;
     }
 
@@ -394,7 +388,7 @@ async fn merge_files(
             }
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
-            let file_data = storage.get(file).await?;
+            let file_data = storage::get(file).await?;
             file_tmp_dir.set(file, file_data)?;
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
@@ -438,7 +432,7 @@ async fn merge_files(
     );
 
     // upload file
-    match storage.put(&new_file_key, buf.into()).await {
+    match storage::put(&new_file_key, buf.into()).await {
         Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
         Err(e) => Err(e),
     }

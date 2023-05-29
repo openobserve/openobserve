@@ -304,7 +304,7 @@ fn parse_key_columns(key: &str) -> Result<KeyColumns, anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns.len() < 9 {
         return Err(anyhow::anyhow!(
-            "[TRACE] [set_file_to_cache] Invalid file path: {}",
+            "[set_file_to_cache] Invalid file path: {}",
             key
         ));
     }

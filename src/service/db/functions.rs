@@ -58,7 +58,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/function/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching function");
+    log::info!("Start watching function");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -126,7 +126,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             QUERY_FUNCTIONS.insert(item_key.to_string(), json_val);
         }
     }
-    log::info!("[TRACE] Functions Cached");
+    log::info!("Functions Cached");
     Ok(())
 }
 

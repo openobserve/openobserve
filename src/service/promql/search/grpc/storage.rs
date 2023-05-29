@@ -26,7 +26,7 @@ use crate::meta::{search::Session as SearchSession, stream::StreamParams, Stream
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::{exec::register_table, storage::file_list::SessionType},
+        datafusion::{exec::register_table, storage::StorageType},
         match_source,
     },
 };
@@ -46,41 +46,40 @@ pub(crate) async fn create_context(
         return Ok((SessionContext::new(), Arc::new(Schema::empty())));
     }
 
-    // load files to local cache
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
-    for file in files.iter() {
-        let file = file.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
-            tokio::task::spawn(async move {
-                if !file_data::exist(&file).unwrap_or_default() {
-                    if let Err(e) = file_data::download(&file).await {
-                        log::error!("storage->search: load file {}, err: {}", &file, e);
-                    }
-                };
-                drop(permit);
-                Ok(())
-            });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        match task.await {
-            Ok(ret) => {
-                if let Err(err) = ret {
-                    return Err(DataFusionError::Execution(err.to_string()));
-                }
-            }
+    // calcuate scan size
+    let (scan_original_size, scan_compressed_size) =
+        match file_list::calculate_files_size(&files.to_vec()).await {
+            Ok(size) => size,
             Err(err) => {
-                return Err(DataFusionError::Execution(err.to_string()));
+                log::error!("calculate files size error: {}", err);
+                return Err(datafusion::error::DataFusionError::Execution(
+                    "calculate files size error".to_string(),
+                ));
             }
         };
-    }
     log::info!(
-        "[TRACE] promql->search->storage: load files {}, done",
-        file_count
+        "promql->search->storage: load files {}, scan_size {}, compressed_size {}",
+        file_count,
+        scan_original_size,
+        scan_compressed_size
     );
+
+    // if scan_compressed_size > 50% of total memory cache, skip memory cache
+    let storage_type =
+        if !CONFIG.memory_cache.enabled || scan_compressed_size * 2 > file_data::stats().0 as u64 {
+            StorageType::FsNoCache
+        } else {
+            StorageType::FsMemory
+        };
+
+    // load files to local cache
+    if storage_type == StorageType::FsMemory {
+        cache_parquet_files(&files).await?;
+        log::info!(
+            "promql->search->storage: load files {}, into memory cache done",
+            file_count
+        );
+    }
 
     // fetch all schema versions, get latest schema
     let stream_type = StreamType::Metrics;
@@ -98,9 +97,10 @@ pub(crate) async fn create_context(
             .to_owned()
             .with_metadata(std::collections::HashMap::new()),
     );
+
     let session = SearchSession {
         id: session_id.to_string(),
-        data_type: SessionType::Storage,
+        storage_type,
     };
 
     register_table(
@@ -164,4 +164,40 @@ async fn get_file_list(
         }
     }
     Ok(files)
+}
+
+#[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
+async fn cache_parquet_files(files: &[String]) -> Result<()> {
+    let mut tasks = Vec::new();
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
+    for file in files.iter() {
+        let file = file.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
+            tokio::task::spawn(async move {
+                if !file_data::exist(&file).unwrap_or_default() {
+                    if let Err(e) = file_data::download(&file).await {
+                        log::error!("promql->search->storage: load file {}, err: {}", &file, e);
+                    }
+                };
+                drop(permit);
+                Ok(())
+            });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        match task.await {
+            Ok(ret) => {
+                if let Err(err) = ret {
+                    return Err(DataFusionError::Execution(err.to_string()));
+                }
+            }
+            Err(err) => {
+                return Err(DataFusionError::Execution(err.to_string()));
+            }
+        };
+    }
+
+    Ok(())
 }

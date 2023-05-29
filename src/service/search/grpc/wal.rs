@@ -24,7 +24,7 @@ use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
 use crate::service::db;
 use crate::service::file_list::calculate_local_files_size;
-use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::search::datafusion::storage::StorageType;
 use crate::service::search::sql::Sql;
 
 /// search in local WAL, which haven't been sync to object storage
@@ -55,7 +55,7 @@ pub async fn search(
         }
     };
     log::info!(
-        "[TRACE] wal->search: load files {}, scan_size {}",
+        "wal->search: load files {}, scan_size {}",
         file_count,
         scan_size
     );
@@ -78,7 +78,7 @@ pub async fn search(
 
     let session = meta::search::Session {
         id: session_id.to_string(),
-        data_type: SessionType::Wal,
+        storage_type: StorageType::Wal,
     };
     let result = match super::datafusion::exec::sql(
         &session,
