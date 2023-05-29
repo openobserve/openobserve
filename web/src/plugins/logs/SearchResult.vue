@@ -153,10 +153,7 @@
           </q-tr>
           <q-tr v-if="expandedLogs[row._timestamp]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
-              <pre>
-              {{ JSON.parse(JSON.stringify(row).replace(/^\s+/g, "")) }}
-            </pre
-              >
+              <pre>{{ row }}</pre>
             </td>
           </q-tr>
         </template>
@@ -337,7 +334,7 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    const expandLog = (row: any) => {
+    const expandLog = async (row: any) => {
       if (expandedLogs.value[row._timestamp])
         delete expandedLogs.value[row._timestamp];
       else expandedLogs.value[row._timestamp] = true;
