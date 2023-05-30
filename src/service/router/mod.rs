@@ -34,11 +34,6 @@ const QUERIER_ROUTES: [&str; 9] = [
 ];
 
 #[inline]
-pub fn is_router() -> bool {
-    cluster::is_router(&cluster::load_local_node_role().to_vec())
-}
-
-#[inline]
 fn check_querier_route(path: &str) -> bool {
     QUERIER_ROUTES.iter().any(|x| path.contains(x))
 }
@@ -151,11 +146,6 @@ async fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_is_router() {
-        assert!(!is_router());
-    }
 
     #[test]
     fn test_check_querier_route() {
