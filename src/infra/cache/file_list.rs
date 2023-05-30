@@ -56,7 +56,7 @@ pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 }
 
 pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
-    FILES.remove(key);
+    DATA.remove(key);
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
     let mut org_filelist = match FILES.get_mut(&org_id) {
         Some(org_filelist) => org_filelist,
