@@ -195,7 +195,7 @@ pub async fn sql(
                 let need_add_columns = schema
                     .fields()
                     .iter()
-                    .filter(|field| !tmp_fields.contains(&field.name().to_string()))
+                    .filter(|field| !tmp_fields.contains(&field.name()))
                     .map(|field| field.name().as_str())
                     .collect::<Vec<&str>>();
                 if !need_add_columns.is_empty() {
