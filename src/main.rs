@@ -14,38 +14,45 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::sdk::{trace as sdktrace, Resource};
-use opentelemetry::KeyValue;
+use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
+    KeyValue,
+};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{prelude::*, Registry};
 
-use openobserve::handler::grpc::auth::check_auth;
-use openobserve::handler::grpc::cluster_rpc::event_server::EventServer;
-use openobserve::handler::grpc::cluster_rpc::metrics_server::MetricsServer;
-use openobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
-use openobserve::handler::grpc::request::{
-    event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
+use openobserve::{
+    handler::{
+        grpc::{
+            auth::check_auth,
+            cluster_rpc::{
+                event_server::EventServer, metrics_server::MetricsServer,
+                search_server::SearchServer,
+            },
+            request::{event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer},
+        },
+        http::router::*,
+    },
+    infra::{
+        cluster,
+        config::{self, CONFIG},
+        file_lock, metrics,
+    },
+    job, meta,
+    service::{db, router, users},
 };
-use openobserve::handler::http::router::*;
-
-use openobserve::infra::cluster;
-use openobserve::infra::config::{self, CONFIG};
-use openobserve::infra::file_lock;
-use openobserve::infra::metrics;
-use openobserve::meta::telemetry::Telemetry;
-use openobserve::service::db;
-use openobserve::service::router;
-use openobserve::service::users;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -75,7 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cluster::register_and_keepalive()
             .await
             .expect("cluster init failed");
-        openobserve::job::init().await.expect("job init failed");
+        job::init().await.expect("job init failed");
         tx.send(true).unwrap();
     });
 
@@ -97,7 +104,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
-    Telemetry::new()
+    meta::telemetry::Telemetry::new()
         .event("OpenObserve - Starting server", None, false)
         .await;
 
@@ -163,7 +170,7 @@ async fn main() -> Result<(), anyhow::Error> {
     .await?;
 
     // stop telemetry
-    Telemetry::new()
+    meta::telemetry::Telemetry::new()
         .event("OpenObserve - Server stopped", None, false)
         .await;
     // leave the cluster
@@ -272,11 +279,11 @@ async fn cli() -> Result<bool, anyhow::Error> {
             match component.as_str() {
                 "root" => {
                     let _ = users::post_user(
-                        openobserve::meta::organization::DEFAULT_ORG,
-                        openobserve::meta::user::UserRequest {
+                        meta::organization::DEFAULT_ORG,
+                        meta::user::UserRequest {
                             email: CONFIG.auth.root_user_email.clone(),
                             password: CONFIG.auth.root_user_password.clone(),
-                            role: openobserve::meta::user::UserRole::Root,
+                            role: meta::user::UserRole::Root,
                             first_name: "root".to_owned(),
                             last_name: "".to_owned(),
                         },
