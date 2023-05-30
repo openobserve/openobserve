@@ -232,7 +232,7 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive, computed } from "vue";
+import { ref, defineComponent, KeepAlive, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -435,6 +435,8 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/language_flags/pt.svg"),
       },
     ];
+
+    onMounted(() => (miniMode.value = true));
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
