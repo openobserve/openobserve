@@ -1,19 +1,26 @@
 <template>
-  <div ref="chart"></div>
+  <div ref="chart" class="traces-service-graph-container text-center"></div>
 </template>
 
 <script lang="ts">
 import { hierarchy, tree } from "d3-hierarchy";
 import { select } from "d3-selection";
+import { cloneDeep } from "lodash-es";
 import { defineComponent } from "vue";
 
 export default defineComponent({
   name: "D3Chart",
+  props: {
+    data: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     return {
       root: null as any,
-      width: 600,
-      height: 400,
+      width: 200,
+      height: 200,
       svg: null as any,
       layout: null as any,
       g: null as any,
@@ -29,59 +36,179 @@ export default defineComponent({
   methods: {
     initChart() {
       // Create the SVG element and append it to the chart div
+      const { height, depth } = this.getTreeHeightAndDepth();
+
       this.svg = select(this.$refs.chart)
         .append("svg")
         .attr("width", this.width)
-        .attr("height", this.height);
+        .attr("height", this.height)
+        .attr("id", "traces-service-graph-svg")
+        .attr("class", "traces-service-graph-svg");
 
       // Create a group element for the chart content
-      this.g = this.svg.append("g").attr("transform", `translate(50, 50)`);
+      this.g = this.svg
+        .append("g")
+        .attr("transform", `translate(150, 0)`)
+        .attr("id", "traces-service-graph-svg-group")
+        .attr("class", "traces-service-graph-svg-group");
 
       // Create the tree layout and set its dimensions
-      this.layout = tree().size([this.width - 100, this.height - 100]);
+      this.layout = tree().size([height > 1 ? height * 80 : 40, depth * 175]);
     },
+
+    getTreeHeightAndDepth() {
+      let data = [
+        {
+          name: "Service A",
+          children: [
+            {
+              name: "Service B",
+              children: [
+                {
+                  name: "Service c",
+                  children: [
+                    {
+                      name: "Service F",
+                      children: [
+                        {
+                          name: "Service G",
+                          children: [
+                            {
+                              name: "Service H",
+                              children: [
+                                {
+                                  name: "Service H",
+                                  children: [
+                                    {
+                                      name: "Service H",
+                                      children: [
+                                        {
+                                          name: "Service H",
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+                {
+                  name: "Service E",
+                },
+              ],
+            },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+            { name: "Service D" },
+          ],
+        },
+      ];
+      let maxDepth = 0;
+      let maxHeight: number[] = [0];
+      const getService = (span: any, depth: number) => {
+        maxHeight[depth] =
+          maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
+        if (span.children && span.children.length) {
+          span.children.forEach((span: any) => getService(span, depth + 1));
+        } else {
+          if (maxDepth < depth) maxDepth = depth;
+        }
+      };
+      this.data.forEach((span: any) => {
+        getService(span, 1);
+      });
+      return {
+        height: Math.max(...maxHeight),
+        depth: maxDepth,
+      };
+    },
+
     loadData() {
       // Load your data here and convert it to a hierarchy
-      const data = {
-        name: "Parent",
-        children: [
-          {
-            name: "Child 1",
-            children: [
-              { name: "Child 1" },
-              { name: "Child 2" },
-              { name: "Child 3" },
-            ],
-          },
-          // { name: "Child 2" },
-          // {
-          //   name: "Child 3",
-          //   children: [
-          //     { name: "Child 1" },
-          //     { name: "Child 2" },
-          //     {
-          //       name: "Child 3",
-          //       children: [
-          //         { name: "Child 1" },
-          //         { name: "Child 2" },
-          //         { name: "Child 3" },
-          //       ],
-          //     },
-          //   ],
-          // },
-        ],
-      };
-
+      let data = cloneDeep(this.data[0]) || [];
+      // data = {
+      //   name: "Service A Service H H H H H H H H H H H H H H H H H H H H H H H",
+      //   children: [
+      //     {
+      //       name: "Service B",
+      //       children: [
+      //         {
+      //           name: "Service c",
+      //           children: [
+      //             {
+      //               name: "Service F",
+      //               children: [
+      //                 {
+      //                   name: "Service G",
+      //                   children: [
+      //                     {
+      //                       name: "Service H",
+      //                       children: [
+      //                         {
+      //                           name: "Service H",
+      //                           children: [
+      //                             {
+      //                               name: "Service H",
+      //                               children: [
+      //                                 {
+      //                                   name: "Service H H H H H H H H H H H H H H H H H",
+      //                                 },
+      //                               ],
+      //                             },
+      //                           ],
+      //                         },
+      //                       ],
+      //                     },
+      //                   ],
+      //                 },
+      //               ],
+      //             },
+      //           ],
+      //         },
+      //         {
+      //           name: "Service E",
+      //         },
+      //       ],
+      //     },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //     { name: "Service D" },
+      //   ],
+      // };
       this.root = hierarchy(data);
-
       // Update the chart with the new data
       this.updateChart();
+      this.$nextTick(() => {
+        this.updateChartHeight();
+      });
+    },
+    updateChartHeight() {
+      let group = document.getElementById("traces-service-graph-svg-group");
+      let svg = document.getElementById("traces-service-graph-svg");
+      const groupDimensions = group?.getBoundingClientRect();
+      // this.height = group?.getBoundingClientRect().height as number;
+      svg.style.height = groupDimensions.height + 150 + "px";
+      svg.style.width = groupDimensions?.width + 150 + "px";
     },
     updateChart() {
       // Call the layout on the root node and get the nodes and links
       const nodes = this.layout(this.root).descendants();
       const links = this.layout(this.root).links();
-
       // Bind the data to the nodes and links
       const node = this.g.selectAll(".node").data(nodes, (d) => d.data.name);
 
@@ -94,20 +221,32 @@ export default defineComponent({
         .enter()
         .append("g")
         .attr("class", "node")
-        .attr("transform", (d) => `translate(${d.y}, ${d.x})`);
+        .attr("transform", (d) => {
+          console.log(d);
+          return `translate(${d.y}, ${d.x})`;
+        });
 
       nodeEnter
         .append("circle")
         .attr("r", 10)
         .style("fill", "#fff")
-        .style("stroke", "#000");
+        .style("stroke-width", "2px")
+        .style("stroke", (d) => {
+          return d.data.color;
+        });
 
-      nodeEnter
+      let text = nodeEnter
         .append("text")
-        .attr("dy", ".35em")
-        .attr("x", (d) => (d.children ? -15 : 15))
-        .attr("text-anchor", (d) => (d.children ? "end" : "start"))
-        .text((d) => d.data.name);
+        .attr("dy", "30px")
+        .attr("dx", "0px")
+        .attr("text-anchor", "middle")
+        .text((d) => {
+          return d.data.name;
+        })
+        .attr("font-size", "12px")
+        .style("cursor", "pointer");
+
+      text.append("title").text((d) => d.data.name);
 
       link
         .enter()
@@ -124,11 +263,9 @@ export default defineComponent({
         .style("stroke", "#ccc");
 
       // Update existing nodes and links
-      node
-        .merge(nodeEnter)
-        .transition()
-        .duration(500)
-        .attr("transform", (d) => `translate(${d.y}, ${d.x})`);
+      node.merge(nodeEnter).attr("transform", (d) => {
+        return `translate(${d.y}, ${d.x} )`;
+      });
 
       link.merge(link.enter());
     },
@@ -139,4 +276,11 @@ export default defineComponent({
 });
 </script>
 
-<style scoped></style>
+<style lang="scss">
+.traces-service-graph-container {
+  height: 200px;
+  width: 100%;
+  overflow-y: scroll;
+  overflow-x: auto;
+}
+</style>

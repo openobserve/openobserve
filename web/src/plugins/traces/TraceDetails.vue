@@ -38,7 +38,7 @@
         :chart="traceChart"
         @updated:chart="updateChart"
       />
-      <d3-chart />
+      <d3-chart :data="traceServiceMap" />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -135,6 +135,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
+    const traceServiceMap: Ref<any[]> = ref([]);
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -249,10 +250,6 @@ export default defineComponent({
           noParentSpans.push(span);
         }
 
-        // if (span.parentId && !traceTreeMock[span.parentId]) {
-        //   traceTreeMock[span.parentId] = [];
-        // }
-
         if (span.parentId && traceTreeMock[span.parentId])
           traceTreeMock[span.parentId].push(span);
 
@@ -284,6 +281,7 @@ export default defineComponent({
 
       calculateTracePosition();
       buildTraceChart();
+      buildServiceTree(serviceColorMapping);
     };
     let index = 0;
     const addSpansPositions = (span: any, depth: number) => {
@@ -316,6 +314,52 @@ export default defineComponent({
       } else {
         return 0;
       }
+    };
+
+    const buildServiceTree = (serviceColors: any) => {
+      const serviceTree: any[] = [];
+      let maxDepth = 0;
+      let maxHeight: number[] = [0];
+      const getService = (
+        span: any,
+        currentColumn: any[],
+        serviceName: string,
+        depth: number,
+        height: number
+      ) => {
+        maxHeight[depth] =
+          maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
+        if (serviceName !== span.serviceName) {
+          const children: any[] = [];
+          currentColumn.push({
+            name: span.serviceName,
+            parent: serviceName,
+            duration: span.durationMs,
+            children: children,
+            color: serviceColors[span.serviceName],
+          });
+          if (span.spans && span.spans.length) {
+            span.spans.forEach((_span: any) =>
+              getService(_span, children, span.serviceName, depth + 1, height)
+            );
+          } else {
+            if (maxDepth < depth) maxDepth = depth;
+          }
+          return;
+        }
+        if (span.spans && span.spans.length) {
+          span.spans.forEach((span: any) =>
+            getService(span, currentColumn, serviceName, depth + 1, height)
+          );
+        } else {
+          if (maxDepth < depth) maxDepth = depth;
+        }
+      };
+      traceTree.value.forEach((span: any) => {
+        getService(span, serviceTree, "", 1, 1);
+      });
+      console.log(maxDepth, maxHeight);
+      traceServiceMap.value = cloneDeep(serviceTree);
     };
 
     // Convert span object to required format
@@ -496,6 +540,7 @@ export default defineComponent({
       plotChart,
       traceChart,
       updateChart,
+      traceServiceMap,
     };
   },
 });
