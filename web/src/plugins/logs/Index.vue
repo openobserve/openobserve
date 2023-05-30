@@ -36,7 +36,7 @@
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll"
+            class="row scroll relative-position thirdlevel"
             style="width: 100%"
             v-if="searchObj.data.stream.streamLists.length > 0"
           >
@@ -46,20 +46,35 @@
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
             >
-              <template #before v-if="searchObj.meta.showFields">
-                <index-list
-                  data-test="logs-search-index-list"
-                  :key="searchObj.data.stream.streamLists"
-                />
-              </template>
-              <template #separator>
-                <q-avatar
-                  color="primary"
-                  text-color="white"
-                  size="20px"
-                  icon="drag_indicator"
-                  style="top: 10px"
-                />
+              <template #before>
+                <div class="relative-position">
+                  <index-list
+                    v-if="searchObj.meta.showFields"
+                    data-test="logs-search-index-list"
+                    :key="searchObj.data.stream.streamLists"
+                  />
+                  <q-btn
+                    :icon="
+                      searchObj.meta.showFields
+                        ? 'chevron_left'
+                        : 'chevron_right'
+                    "
+                    :title="
+                      searchObj.meta.showFields
+                        ? 'Collapse Fields'
+                        : 'Open Fields'
+                    "
+                    dense
+                    size="20px"
+                    round
+                    class="q-mr-xs field-list-collapse-btn"
+                    color="primary"
+                    :style="{
+                      right: searchObj.meta.showFields ? '-20px' : '-24px',
+                    }"
+                    @click="collapseFieldList"
+                  ></q-btn>
+                </div>
               </template>
               <template #after>
                 <div
@@ -1314,6 +1329,11 @@ export default defineComponent({
       }
     };
 
+    const collapseFieldList = () => {
+      if (searchObj.meta.showFields) searchObj.meta.showFields = false;
+      else searchObj.meta.showFields = true;
+    };
+
     return {
       store,
       router,
@@ -1335,6 +1355,7 @@ export default defineComponent({
       searchAroundData,
       verifyOrganizationStatus,
       getStreamList,
+      collapseFieldList,
     };
   },
   computed: {
@@ -1537,6 +1558,15 @@ div.plotly-notifier {
     }
     .q-splitter__before {
       overflow: visible !important;
+    }
+  }
+
+  .thirdlevel {
+    .field-list-collapse-btn {
+      z-index: 9;
+      position: absolute;
+      top: 5px;
+      font-size: 12px !important;
     }
   }
 }

@@ -33,19 +33,11 @@
     :target="target"
     @click="external ? openWebPage(link) : ''"
   >
-    <q-tooltip
-      v-if="mini"
-      anchor="center right"
-      self="center left"
-      :offset="[10, 10]"
-    >
-      {{ title }}
-    </q-tooltip>
     <q-item-section v-if="icon" avatar>
       <q-icon :name="icon" />
     </q-item-section>
 
-    <q-item-section v-if="!mini">
+    <q-item-section>
       {{ title }}
     </q-item-section>
   </q-item>

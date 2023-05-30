@@ -162,6 +162,7 @@
                       </q-item>
                     </q-list>
                   </q-btn-dropdown>
+
                   <pre
                     :data-test="`log-detail-${value}-value`"
                     class="table-pre"
@@ -177,7 +178,6 @@
           </div>
         </q-card-section>
       </q-tab-panel>
-
       <q-tab-panel name="json" class="q-pa-none">
         <q-card-section
           data-test="log-detail-json-content"
