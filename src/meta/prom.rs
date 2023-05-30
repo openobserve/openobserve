@@ -152,7 +152,7 @@ pub struct RequestSeries {
     /// Series selector argument that selects the series to return.
     ///
     /// NOTE: Prometheus API allows passing multiple `match[]` arguments,
-    /// but ZincObserve only supports a single one.
+    /// but we only supports a single one.
     #[serde(rename = "match[]")]
     pub matcher: Option<String>,
     /// Start timestamp.
@@ -168,7 +168,7 @@ pub struct RequestLabels {
     /// the label names.
     ///
     /// NOTE: Prometheus API allows passing any number of `match[]` arguments,
-    /// but ZincObserve requires that exactly one is passed.
+    /// but we requires that exactly one is passed.
     #[serde(rename = "match[]")]
     pub matcher: Option<String>,
     /// Start timestamp.
@@ -184,7 +184,7 @@ pub struct RequestLabelValues {
     /// the label values.
     ///
     /// NOTE: Prometheus API allows passing any number of `match[]` arguments,
-    /// but ZincObserve requires that exactly one is passed.
+    /// but we requires that exactly one is passed.
     #[serde(rename = "match[]")]
     pub matcher: Option<String>,
     /// Start timestamp.

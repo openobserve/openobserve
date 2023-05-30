@@ -247,7 +247,7 @@ import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 
 let mainLayoutMixin: any = null;
-if (config.isZincObserveCloud == "true") {
+if (config.isOpenObserveCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;
 } else {
   mainLayoutMixin = MainLayoutOpenSourceMixin;
@@ -440,7 +440,7 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     //additional links based on environment and conditions
-    if (config.isZincObserveCloud == "true") {
+    if (config.isOpenObserveCloud == "true") {
       linksList.value = mainLayoutMixin
         .setup()
         .leftNavigationLinks(linksList, t);
@@ -471,7 +471,7 @@ export default defineComponent({
       const timeoutinterval = Math.floor(d.getTime() / 1000);
       const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
 
-      if (config.isZincObserveCloud == "true") {
+      if (config.isOpenObserveCloud == "true") {
         setTimeout(() => {
           mainLayoutMixin.setup().getRefreshToken(store);
         }, timeout);
@@ -529,7 +529,7 @@ export default defineComponent({
             };
 
             if (
-              config.isZincObserveCloud == "true" &&
+              config.isOpenObserveCloud == "true" &&
               localOrg.value.identifier == data.identifier &&
               (customOrganization == "" || customOrganization == undefined)
             ) {
@@ -569,7 +569,7 @@ export default defineComponent({
 
       if (
         selectedOrg.value.identifier != "" &&
-        config.isZincObserveCloud == "true"
+        config.isOpenObserveCloud == "true"
       ) {
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
@@ -586,7 +586,7 @@ export default defineComponent({
         .then((res: any) => {
           if (
             res.data.functions_enabled &&
-            config.isZincObserveCloud == "false"
+            config.isOpenObserveCloud == "false"
           ) {
             linksList.value = mainLayoutMixin
               .setup()
@@ -599,7 +599,7 @@ export default defineComponent({
 
     getConfig();
 
-    if (config.isZincObserveCloud == "true") {
+    if (config.isOpenObserveCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
 
       const tracker = new Tracker({

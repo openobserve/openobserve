@@ -99,7 +99,7 @@
         </q-card-actions>
       </q-card>
 
-      <q-card v-if="isZincObserveCloud === 'true'" class="my-card">
+      <q-card v-if="isOpenObserveCloud === 'true'" class="my-card">
         <q-card-section align="center" flat bordered class="my-card bg-grey-3">
           <div class="text-h6">{{ t("home.inestedInSearch") }}</div>
           <div class="text-subtitle1">{{ t("home.searchInDemoOrg") }}</div>
@@ -127,7 +127,7 @@ export default defineComponent({
     const summary: any = ref([]);
     const $q = useQuasar();
     const no_data_ingest = ref(false);
-    const isZincObserveCloud = config.isZincObserveCloud;
+    const isOpenObserveCloud = config.isOpenObserveCloud;
     const getSummary = (org_id: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -215,7 +215,7 @@ export default defineComponent({
       summary,
       no_data_ingest,
       getSummary,
-      isZincObserveCloud,
+      isOpenObserveCloud,
     };
   },
   computed: {

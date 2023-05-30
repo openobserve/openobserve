@@ -24,7 +24,7 @@ import config from "@/aws-exports";
 export default {
   setup() {
     const store = useStore();
-    if (config.isZincObserveCloud == "false" && window.location.origin != "http://localhost:8081") {
+    if (config.isOpenObserveCloud == "false" && window.location.origin != "http://localhost:8081") {
       let endpoint = window.location.origin + window.location.pathname;
       let pos = window.location.pathname.indexOf("/web/");
       if (pos > -1) {

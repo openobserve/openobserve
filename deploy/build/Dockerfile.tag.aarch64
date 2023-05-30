@@ -25,14 +25,14 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
   RUSTFLAGS='-C target-feature=+aes,+crc,+lse,+neon'
 RUN cargo build --release --target aarch64-unknown-linux-gnu
-RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
 FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 # RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 # RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 # RUN update-ca-certificates
-COPY --from=builder /app/target/release/zincobserve /
+COPY --from=builder /app/target/release/openobserve /
 COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/aarch64-linux-gnu/libz.so.1 /lib/aarch64-linux-gnu/libz.so.1
-CMD ["/zincobserve"]
+CMD ["/openobserve"]

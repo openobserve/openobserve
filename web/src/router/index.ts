@@ -25,7 +25,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isZincObserveCloud == "true") {
+  if (config.isOpenObserveCloud == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();

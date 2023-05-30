@@ -24,7 +24,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         Telemetry::new()
-            .heart_beat("ZincObserve - heartbeat", None)
+            .heart_beat("OpenObserve - heartbeat", None)
             .await;
     }
 }
