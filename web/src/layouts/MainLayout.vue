@@ -173,7 +173,6 @@
       show-if-above
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
-      mini-to-overlay
     >
       <q-list class="leftNavList">
         <menu-link
@@ -303,7 +302,7 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const miniMode = ref(false);
+    const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -695,12 +694,12 @@ export default defineComponent({
 .q-drawer {
   @extend .border-right;
   @extend .bg-white;
-  min-width: 5rem;
+  min-width: 50px;
   color: unset;
 
   &--mini {
     .leftNavList {
-      padding: 1.5rem 0.625rem;
+      padding: 8px 8px;
     }
   }
 }

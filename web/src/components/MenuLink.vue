@@ -101,8 +101,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .q-item {
-  padding: 8px 17px;
-  margin: 0 24px;
+  padding: 8px 8px;
+  margin: 0 8px;
   border-radius: 6px;
 
   /* Overriding default height */
@@ -125,7 +125,7 @@ export default defineComponent({
   }
 
   &.ql-item-mini {
-    margin: 0 8px;
+    margin: 0;
 
     &::before {
       display: none;
