@@ -117,9 +117,9 @@ pub async fn search(
         scan_compressed_size
     );
 
-    // if scan_compressed_size > 50% of total memory cache, skip memory cache
+    // if scan_compressed_size > 30% of total memory cache, skip memory cache
     let storage_type =
-        if !CONFIG.memory_cache.enabled || scan_compressed_size * 2 > file_data::stats().0 as u64 {
+        if !CONFIG.memory_cache.enabled || scan_compressed_size * 3 > file_data::stats().0 as u64 {
             StorageType::FsNoCache
         } else {
             StorageType::FsMemory
