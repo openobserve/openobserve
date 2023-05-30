@@ -237,7 +237,7 @@ export default defineComponent({
     ]);
 
     if (config.isZincObserveCloud == "true") {
-      columns.value.splice(5, 1);
+      columns.value?.splice(5, 1);
     }
 
     let deleteStreamName = "";
