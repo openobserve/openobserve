@@ -32,7 +32,6 @@
     "signOut": "Sair",
     "account": "Conta",
     "feedback": "Feedback",
-    "zincSearch": "Pesquisa de zinco",
     "documentation": "Documentos",
     "tickets": "Bilhete",
     "organizations": "Organizações",
@@ -46,7 +45,7 @@
     "docs": "Documentos"
   },
   "about": {
-    "name": "Zinco",
+    "name": "OpenObserve",
     "introduction": "Observabilidade simplificada."
   },
   "login": {
