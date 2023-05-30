@@ -15,6 +15,7 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
+    {{ miniMode }}
     <q-header>
       <q-toolbar>
         <img
@@ -165,10 +166,7 @@
     </q-header>
 
     <q-drawer
-      v-model="leftDrawerOpen"
       :mini="miniMode"
-      :width="210"
-      :breakpoint="500"
       bordered
       show-if-above
       @mouseover="miniMode = false"
@@ -457,13 +455,6 @@ export default defineComponent({
       }
     }
 
-    if (
-      store.state.currentuser.hasOwnProperty("miniMode") &&
-      store.state.currentuser.miniMode != miniMode.value
-    ) {
-      miniMode.value = !miniMode.value;
-    }
-
     //get refresh token for cloud environment
     if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
       const d = new Date();
@@ -618,7 +609,7 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
+      leftDrawerOpen: false,
       miniMode,
       user,
       zoBackendUrl,
@@ -695,6 +686,7 @@ export default defineComponent({
   @extend .border-right;
   @extend .bg-white;
   min-width: 50px;
+  max-width: 210px;
   color: unset;
 
   &--mini {

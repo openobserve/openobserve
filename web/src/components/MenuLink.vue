@@ -72,7 +72,7 @@ export default defineComponent({
 
     mini: {
       type: Boolean,
-      default: false,
+      default: true,
     },
 
     target: {
