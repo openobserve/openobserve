@@ -87,7 +87,7 @@ impl Sql {
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
-        // log::info!("[TRACE] origin_sql: {:?}", origin_sql);
+        // log::info!("origin_sql: {:?}", origin_sql);
         origin_sql = origin_sql.replace('\n', " ");
         origin_sql = origin_sql.trim().to_string();
         if origin_sql.ends_with(';') {
@@ -570,7 +570,7 @@ impl Sql {
         }
 
         log::info!(
-            "[TRACE] sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
+            "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
             sql.stream_name,
             sql.meta.fields,
             sql.meta.quick_text,

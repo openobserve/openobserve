@@ -20,7 +20,7 @@ use crate::{
     meta::user::UserRole,
 };
 
-pub fn get_hash(pass: &str, salt: &str) -> String {
+pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
     let hash = PASSWORD_HASH.get(&key);
     match hash {
@@ -43,7 +43,7 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub fn is_root_user(user_id: &str) -> bool {
+pub(crate) fn is_root_user(user_id: &str) -> bool {
     match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,

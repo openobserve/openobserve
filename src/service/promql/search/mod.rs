@@ -128,7 +128,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         worker_start += worker_dt;
 
         log::info!(
-            "[TRACE] promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
+            "promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
             node.id,
             req_need_wal,
             req_query.start,
@@ -139,9 +139,10 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         let grpc_span = info_span!("promql:search:cluster:grpc_search");
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {
-                    Error::Message(format!("invalid org_id: {}", req.org_id))
-                })?;
+                let org_id: MetadataValue<_> = req
+                    .org_id
+                    .parse()
+                    .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -152,13 +153,21 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                     )
                 });
 
-                let token: MetadataValue<_> = cluster::get_internal_grpc_token().parse().map_err(|_| {
-                    Error::Message("invalid token".to_string())
-                })?;
-                let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(|err| {
-                    log::error!("[TRACE] promql->search->grpc: node: {}, connect err: {:?}", node.id, err);
-                    server_internal_error("connect search node error")
-                })?;
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "promql->search->grpc: node: {}, connect err: {:?}",
+                            node.id,
+                            err
+                        );
+                        server_internal_error("connect search node error")
+                    })?;
                 let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -171,11 +180,12 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
                     .accept_compressed(CompressionEncoding::Gzip);
-                let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await {
+                let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
+                {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[TRACE] promql->search->grpc: node: {}, search err: {:?}",
+                            "promql->search->grpc: node: {}, search err: {:?}",
                             node.id,
                             err
                         );
@@ -188,7 +198,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 };
 
                 log::info!(
-                    "[TRACE] promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}",
+                    "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}",
                     node.id,
                     req_need_wal,
                     response.took,
@@ -241,7 +251,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[TRACE] promql->search->result: took: {}, file_count: {}, scan_size: {}",
+        "promql->search->result: took: {}, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
         file_count,
         scan_size,

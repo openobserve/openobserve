@@ -43,7 +43,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
     let key = "/metrics_leader/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching prometheus cluster leader");
+    log::info!("Start watching prometheus cluster leader");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -76,6 +76,6 @@ pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
         let json_val: ClusterLeader = json::from_slice(&item_value).unwrap();
         METRIC_CLUSTER_LEADER.insert(item_key_str.to_string(), json_val);
     }
-    log::info!("[TRACE] Prometheus cluster leaders Cached");
+    log::info!("Prometheus cluster leaders Cached");
     Ok(())
 }

@@ -105,7 +105,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/compact/delete/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching stream deleting");
+    log::info!("Start watching stream deleting");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,

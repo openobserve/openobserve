@@ -83,7 +83,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/user/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching user");
+    log::info!("Start watching user");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -133,7 +133,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             USERS.insert(format!("{}/{}", user.org, item_key), user);
         }
     }
-    log::info!("[TRACE] Users Cached");
+    log::info!("Users Cached");
     Ok(())
 }
 

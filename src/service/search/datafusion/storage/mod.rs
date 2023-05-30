@@ -12,6 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use thiserror::Error as ThisError;
+
 pub mod file_list;
-pub mod memory;
+pub mod memory; // fsm: File system with memory cache
+pub mod nocache; // fsn: File system without memory cahce
 pub mod tmpfs;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StorageType {
+    FsMemory,  // fsm
+    FsNoCache, // fsn
+    Tmpfs,
+    Wal,
+}
+
+/// A specialized `Error` for in-memory object store-related errors
+#[derive(ThisError, Debug)]
+#[allow(missing_docs)]
+enum Error {
+    #[error("Out of range")]
+    OutOfRange(String),
+    #[error("Bad range")]
+    BadRange(String),
+}
+
+impl From<Error> for object_store::Error {
+    fn from(source: Error) -> Self {
+        Self::Generic {
+            store: "storage",
+            source: Box::new(source),
+        }
+    }
+}

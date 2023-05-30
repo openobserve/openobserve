@@ -38,10 +38,13 @@ async fn run_delete() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        let locker = service::compact::QUEUE_LOCKER.clone();
+        let locker = locker.lock().await;
         let ret = service::compact::run_delete().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data delete error: {}", ret.err().unwrap());
         }
+        drop(locker);
     }
 }
 async fn run_merge() -> Result<(), anyhow::Error> {
@@ -49,9 +52,12 @@ async fn run_merge() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        let locker = service::compact::QUEUE_LOCKER.clone();
+        let locker = locker.lock().await;
         let ret = service::compact::run_merge().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data merge error: {}", ret.err().unwrap());
         }
+        drop(locker);
     }
 }

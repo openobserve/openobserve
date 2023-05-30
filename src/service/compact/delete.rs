@@ -44,11 +44,7 @@ pub async fn delete_all(
         // delete files from s3
         // first fetch file list from local cache
         let files = file_list::get_file_list(org_id, stream_name, Some(stream_type), 0, 0).await?;
-        let storage = &storage::DEFAULT;
-        match storage
-            .del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-            .await
-        {
+        match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("[COMPACT] delete file failed: {}", e);
@@ -58,14 +54,11 @@ pub async fn delete_all(
         // at the end, fetch a file list from s3 to guatantte there is no file
         let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
         loop {
-            let files = storage.list(&prefix).await?;
+            let files = storage::list(&prefix).await?;
             if files.is_empty() {
                 break;
             }
-            match storage
-                .del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-                .await
-            {
+            match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("[COMPACT] delete file failed: {}", e);
@@ -118,11 +111,7 @@ pub async fn delete_by_date(
             time_range.1,
         )
         .await?;
-        let storage = &storage::DEFAULT;
-        match storage
-            .del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-            .await
-        {
+        match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("[COMPACT] delete file failed: {}", e);
@@ -136,14 +125,11 @@ pub async fn delete_by_date(
                 date_start.format("%Y/%m/%d")
             );
             loop {
-                let files = storage.list(&prefix).await?;
+                let files = storage::list(&prefix).await?;
                 if files.is_empty() {
                     break;
                 }
-                match storage
-                    .del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-                    .await
-                {
+                match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("[COMPACT] delete file failed: {}", e);
@@ -210,7 +196,6 @@ async fn delete_from_file_list(
         });
     }
 
-    let storage = &storage::DEFAULT;
     for (key, items) in hours_files {
         // upload the new file_list to storage
         let new_file_list_key = format!("file_list/{key}/{}.json.zst", ider::generate());
@@ -221,9 +206,7 @@ async fn delete_from_file_list(
             buf.write_all(&write_buf)?;
         }
         let compressed_bytes = buf.finish().unwrap();
-        storage
-            .put(&new_file_list_key, compressed_bytes.into())
-            .await?;
+        storage::put(&new_file_list_key, compressed_bytes.into()).await?;
 
         // set to local cache & send broadcast
         // retry 10 times

@@ -136,8 +136,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{offset_prefix}");
-    let storage = &storage::DEFAULT;
-    let file_list = storage.list(&key).await?;
+    let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
         if locker.is_some() {
             // release cluster lock
@@ -151,7 +150,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
     for file in file_list.clone() {
         log::info!("[COMPACT] merge small file list: {}", file);
-        let data = storage.get(&file).await?;
+        let data = storage::get(&file).await?;
         // uncompress file
         let uncompress = zstd::decode_all(data.reader())?;
         let uncompress_reader = BufReader::new(uncompress.reader());
@@ -192,7 +191,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let compressed_bytes = buf.finish().unwrap();
 
     let new_file_ok = if has_content {
-        match storage.put(&file_name, compressed_bytes.into()).await {
+        match storage::put(&file_name, compressed_bytes.into()).await {
             Ok(_) => {
                 log::info!(
                     "[COMPACT] merge file list succeeded, new file: {}",
@@ -210,9 +209,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     };
     if new_file_ok {
         // delete all small file list keys in this hour from storage
-        storage
-            .del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>())
-            .await?;
+        storage::del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await?;
     }
 
     if locker.is_some() {

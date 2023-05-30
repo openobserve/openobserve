@@ -270,11 +270,7 @@ async fn upload_file(
         format!("files/{}{}{}", new_file.0, partition_key, new_file.1)
     };
 
-    let storage = &storage::DEFAULT;
-    match storage
-        .put(&new_file_key, bytes::Bytes::from(buf_parquet))
-        .await
-    {
+    match storage::put(&new_file_key, bytes::Bytes::from(buf_parquet)).await {
         Ok(_output) => {
             log::info!("[JOB] memory file upload succeeded: {}", new_file_key);
             Ok((new_file_key, file_meta, stream_type))
