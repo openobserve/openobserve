@@ -85,7 +85,7 @@ glob = "0.3"
 hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
-ipnetwork = "0.20.0"
+ipnetwork = "0.20"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.8"
@@ -168,4 +168,3 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "22"
 expect-test = "1.4"
 float-cmp = "0.9"
-

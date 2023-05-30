@@ -106,7 +106,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/alerts/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching alerts");
+    log::info!("Start watching alerts");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -162,7 +162,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             .or_insert(AlertList { list: vec![] });
         group.list.push(json_val);
     }
-    log::info!("[TRACE] Alerts Cached");
+    log::info!("Alerts Cached");
     Ok(())
 }
 

@@ -219,7 +219,7 @@ pub async fn register() -> Result<()> {
     // 7. register ok, release lock
     locker.unlock().await?;
 
-    log::info!("[TRACE] Register to cluster ok");
+    log::info!("Register to cluster ok");
     Ok(())
 }
 
@@ -353,7 +353,7 @@ async fn watch_node_list() -> Result<()> {
     let key = "/nodes/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching node_list");
+    log::info!("Start watching node_list");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -366,7 +366,7 @@ async fn watch_node_list() -> Result<()> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
-                log::info!("[TRACE] cluster->node: join {:?}", item_value.clone());
+                log::info!("cluster->node: join {:?}", item_value.clone());
                 NODES.insert(item_key.to_string(), item_value.clone());
                 // need broadcast local file list
                 if item_value.status.eq(&NodeStatus::Online)
@@ -379,7 +379,7 @@ async fn watch_node_list() -> Result<()> {
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value = NODES.get(item_key).unwrap().clone();
-                log::info!("[TRACE] cluster->node: leave {:?}", item_value.clone());
+                log::info!("cluster->node: leave {:?}", item_value.clone());
                 NODES.remove(item_key);
             }
         }

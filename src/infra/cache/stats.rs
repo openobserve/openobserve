@@ -57,7 +57,7 @@ pub fn incr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns.len() < 9 {
         return Err(anyhow::anyhow!(
-            "[TRACE] [incr_stream_stats] Invalid file path: {}",
+            "[incr_stream_stats] Invalid file path: {}",
             key
         ));
     }
@@ -90,7 +90,7 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns.len() < 9 {
         return Err(anyhow::anyhow!(
-            "[TRACE] [decr_stream_stats] Invalid file path: {}",
+            "[decr_stream_stats] Invalid file path: {}",
             key
         ));
     }

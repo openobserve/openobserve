@@ -17,12 +17,12 @@ use std::collections::HashMap;
 use utoipa::ToSchema;
 
 use crate::common::{self, json};
-use crate::service::search::datafusion::storage::file_list;
+use crate::service::search::datafusion::storage::StorageType;
 
 #[derive(Clone, Debug)]
 pub struct Session {
     pub id: String,
-    pub data_type: file_list::SessionType,
+    pub storage_type: StorageType,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -34,7 +34,7 @@ use crate::meta::{search::Session as SearchSession, stream::StreamParams, Stream
 use crate::service::{
     db,
     search::{
-        datafusion::{exec::register_table, storage::file_list::SessionType},
+        datafusion::{exec::register_table, storage::StorageType},
         MetadataMap,
     },
 };
@@ -74,7 +74,7 @@ pub(crate) async fn create_context(
     );
     let session = SearchSession {
         id: session_id.to_string(),
-        data_type: SessionType::Tmpfs,
+        storage_type: StorageType::Tmpfs,
     };
 
     register_table(

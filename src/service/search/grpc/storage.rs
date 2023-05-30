@@ -23,7 +23,7 @@ use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
-use crate::service::search::datafusion::storage::file_list::SessionType;
+use crate::service::search::datafusion::storage::StorageType;
 use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
 
@@ -46,43 +46,6 @@ pub async fn search(
         return Ok((HashMap::new(), 0, 0));
     }
 
-    // load files to local cache
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
-    for file in files.iter() {
-        let file = file.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
-            tokio::task::spawn(async move {
-                if !file_data::exist(&file).unwrap_or_default() {
-                    if let Err(e) = file_data::download(&file).await {
-                        log::error!("storage->search: load file {}, err: {}", &file, e);
-                    }
-                };
-                drop(permit);
-                Ok(())
-            });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        match task.await {
-            Ok(ret) => {
-                if let Err(err) = ret {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
-                }
-            }
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
-    }
-    log::info!("[TRACE] storage->search: load files {}, done", file_count);
-
     // fetch all schema versions, group files by version
     let schema_versions =
         match db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
@@ -103,23 +66,27 @@ pub async fn search(
     let schema_latest_id = schema_versions.len() - 1;
     let mut files_group: HashMap<usize, Vec<String>> =
         HashMap::with_capacity(schema_versions.len());
-    let mut scan_size = 0;
+    let mut scan_original_size = 0;
+    let mut scan_compressed_size = 0;
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
-        scan_size = match file_list::calculate_files_size(&files.to_vec()).await {
-            Ok(size) => size,
-            Err(err) => {
-                log::error!("calculate files size error: {}", err);
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    "calculate files size error".to_string(),
-                )));
-            }
-        };
+        let files = files.to_vec();
+        (scan_original_size, scan_compressed_size) =
+            match file_list::calculate_files_size(&files).await {
+                Ok(size) => size,
+                Err(err) => {
+                    log::error!("calculate files size error: {}", err);
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        "calculate files size error".to_string(),
+                    )));
+                }
+            };
         files_group.insert(schema_latest_id, files);
     } else {
-        for file in files {
-            let file_meta = file_list::get_file_meta(&file).await.unwrap_or_default();
+        for file in &files {
+            let file_meta = file_list::get_file_meta(file).await.unwrap_or_default();
             // calculate scan size
-            scan_size += file_meta.original_size;
+            scan_original_size += file_meta.original_size;
+            scan_compressed_size += file_meta.compressed_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -129,7 +96,7 @@ pub async fn search(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "storage->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file,
                         file_meta.min_ts,
                         file_meta.max_ts
@@ -139,15 +106,33 @@ pub async fn search(
                 }
             };
             let group = files_group.entry(schema_ver_id).or_insert_with(Vec::new);
-            group.push(file);
+            group.push(file.clone());
         }
     }
 
     log::info!(
-        "[TRACE] storage->search: load files {}, scan_size {}",
+        "search->storage: load files {}, scan_size {}, compressed_size {}",
         file_count,
-        scan_size
+        scan_original_size,
+        scan_compressed_size
     );
+
+    // if scan_compressed_size > 30% of total memory cache, skip memory cache
+    let storage_type =
+        if !CONFIG.memory_cache.enabled || scan_compressed_size * 3 > file_data::stats().0 as u64 {
+            StorageType::FsNoCache
+        } else {
+            StorageType::FsMemory
+        };
+
+    // load files to local cache
+    if storage_type == StorageType::FsMemory {
+        cache_parquet_files(&files).await?;
+        log::info!(
+            "search->storage: load files {}, into memory cache done",
+            file_count
+        );
+    }
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
@@ -159,7 +144,7 @@ pub async fn search(
         let sql = sql.clone();
         let session = meta::search::Session {
             id: format!("{session_id}-{ver}"),
-            data_type: SessionType::Storage,
+            storage_type: storage_type.clone(),
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
@@ -215,7 +200,7 @@ pub async fn search(
         };
     }
 
-    Ok((results, file_count, scan_size as usize))
+    Ok((results, file_count, scan_original_size as usize))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]
@@ -246,4 +231,44 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     }
     Ok(files)
+}
+
+#[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
+async fn cache_parquet_files(files: &[String]) -> Result<(), Error> {
+    let mut tasks = Vec::new();
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
+    for file in files.iter() {
+        let file = file.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
+            tokio::task::spawn(async move {
+                if !file_data::exist(&file).unwrap_or_default() {
+                    if let Err(e) = file_data::download(&file).await {
+                        log::error!("search->storage: load file {}, err: {}", &file, e);
+                    }
+                };
+                drop(permit);
+                Ok(())
+            });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        match task.await {
+            Ok(ret) => {
+                if let Err(err) = ret {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
+            }
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
+    }
+
+    Ok(())
 }

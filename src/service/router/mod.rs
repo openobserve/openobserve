@@ -21,10 +21,11 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 9] = [
+const QUERIER_ROUTES: [&str; 10] = [
     "/_search",
     "/_around",
     "/_values",
+    "/api/cache/status",
     "/prometheus/api/v1/series",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query",
@@ -32,11 +33,6 @@ const QUERIER_ROUTES: [&str; 9] = [
     "/prometheus/api/v1/labels",
     "/prometheus/api/v1/label/",
 ];
-
-#[inline]
-pub fn is_router() -> bool {
-    cluster::is_router(&cluster::load_local_node_role().to_vec())
-}
 
 #[inline]
 fn check_querier_route(path: &str) -> bool {
@@ -151,11 +147,6 @@ async fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_is_router() {
-        assert!(!is_router());
-    }
 
     #[test]
     fn test_check_querier_route() {

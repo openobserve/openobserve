@@ -363,6 +363,12 @@ pub async fn set_schema_metadata(
     if !updated {
         return Ok(());
     }
+    if !metadata.contains_key("created_at") {
+        metadata.insert(
+            "created_at".to_string(),
+            chrono::Utc::now().timestamp_micros().to_string(),
+        );
+    }
     db::schema::set(
         org_id,
         stream_name,

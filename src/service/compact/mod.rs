@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::cache;
-use crate::infra::config::CONFIG;
+use once_cell::sync::Lazy;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+use crate::infra::{cache, config::CONFIG};
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -21,6 +24,9 @@ pub(crate) mod delete;
 mod file_list;
 mod lifecycle;
 mod merge;
+
+pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 /// compactor delete run steps:
 pub async fn run_delete() -> Result<(), anyhow::Error> {

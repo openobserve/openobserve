@@ -112,10 +112,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
         file_columns[1], file_columns[2], file_columns[3], file_columns[4], file_columns[5]
     );
 
-    let storage = &storage::DEFAULT;
-    let result = storage
-        .put(&new_file_key, bytes::Bytes::from(compressed_bytes))
-        .await;
+    let result = storage::put(&new_file_key, bytes::Bytes::from(compressed_bytes)).await;
     match result {
         Ok(_output) => {
             log::info!("[JOB] File_list upload succeeded: {}", new_file_key);
