@@ -261,7 +261,7 @@ export const getPath = () => {
       ? window.location.pathname.slice(0, pos + 5)
       : window.location.pathname;
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isZincObserveCloud == "true" ? cloudPath : path;
+  return config.isCloud == "true" ? cloudPath : path;
 };
 
 export const routeGuardPendingSubscriptions = (
@@ -271,10 +271,7 @@ export const routeGuardPendingSubscriptions = (
 ) => {
   const local_organization = ref();
   local_organization.value = useLocalOrganization();
-  if (
-    local_organization.value.value == null ||
-    config.isZincObserveCloud == "false"
-  ) {
+  if (local_organization.value.value == null || config.isCloud == "false") {
     next();
   }
 
@@ -309,7 +306,7 @@ export const verifyOrganizationStatus = (Organizations: any, Router: any) => {
     if (org.status == "pending-subscription") {
       Dialog.create({
         title: "Warning",
-        message: "Please subscribe to a paid plan to continue."
+        message: "Please subscribe to a paid plan to continue.",
       });
       Router.push({ name: "plans" });
     }

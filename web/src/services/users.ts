@@ -58,7 +58,7 @@ const users = {
     name: string,
     org_identifier: string
   ) => {
-    if (config.isZincObserveCloud === "true") {
+    if (config.isCloud === "true") {
       return http().get(
         `/api/${org_identifier}/org_users?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
       );

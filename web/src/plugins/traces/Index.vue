@@ -196,7 +196,7 @@ export default defineComponent({
         this.searchObj.runQuery = true;
       }
 
-      if (config.isZincObserveCloud == "true") {
+      if (config.isCloud == "true") {
         segment.track("Button Click", {
           button: "Search Data",
           user_org: this.store.state.selectedOrganization.identifier,
@@ -224,7 +224,7 @@ export default defineComponent({
         this.searchObj.loading = true;
         this.getQueryData();
 
-        if (config.isZincObserveCloud == "true") {
+        if (config.isCloud == "true") {
           segment.track("Button Click", {
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
@@ -331,7 +331,7 @@ export default defineComponent({
             searchObj.data.streamResults = res.data;
 
             if (res.data.list.length > 0) {
-              if (config.isZincObserveCloud == "true") {
+              if (config.isCloud == "true") {
                 getQueryTransform();
               }
 

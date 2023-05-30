@@ -34,7 +34,7 @@ const config = {
   //zincOxideIngestion: import.meta.env.VITE_ZINC_OXIDE_INGESTION,
   zincQuotaThreshold: import.meta.env.VITE_ZINC_QUOTA_THRESHOLD,
   enableAnalytics: import.meta.env.VITE_ZINC_ANALYTICS_ENABLED,
-  isZincObserveCloud: import.meta.env.VITE_ZINCOBSERVE_CLOUD
+  isCloud: import.meta.env.VITE_ZINCOBSERVE_CLOUD
     ? import.meta.env.VITE_ZINCOBSERVE_CLOUD
     : "false",
   freePlan: "Free-Plan-USD-Monthly",
