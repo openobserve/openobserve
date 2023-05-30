@@ -20,7 +20,7 @@
       <q-toolbar>
         <img
           class="appLogo"
-          :src="getImageURL('images/common/app_logo_zo.png')"
+          :src="getImageURL('images/common/open_observe_logo.svg')"
           @click="goToHome"
         />
 
@@ -664,9 +664,9 @@ export default defineComponent({
   @extend .bg-white;
 
   .appLogo {
-    margin-left: 1.75rem;
+    margin-left: 0.5rem;
     margin-right: 2rem;
-    width: 109px;
+    width: 150px;
     cursor: pointer;
 
     &__mini {

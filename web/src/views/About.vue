@@ -17,7 +17,7 @@
   <q-page class="aboutPage">
     <div class="about_head">
       <img
-        :src="getImageURL('images/common/app_logo_zo.png')"
+        :src="getImageURL('images/common/open_observe_logo.svg')"
         class="logo"
         width="177"
       />
