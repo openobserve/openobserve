@@ -1,10 +1,10 @@
-# Contributing to ZincObserve
+# Contributing to OpenObserve
 
 ## Setting up development environment
 
 ### Prerequisite
 
-ZincObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
+OpenObserve uses Rust & embdeds sled db (For server) & VueJS (For Web UI)
 
 You must have follwing installed:
 
@@ -19,8 +19,8 @@ Alternatively you can use pre-configured devcontainer in VS code to get up and r
 ### Lets clone the repo and get started
 
 ```shell
-git clone https://github.com/zinclabs/zincobserve
-cd zincobserve
+git clone https://github.com/zinclabs/openobserve
+cd openobserve
 ```
 
 ### Now let's build the UI
@@ -32,13 +32,13 @@ npm run build
 cd ..
 ```
 
-Output will be stored in web/dist folder. web/dist will be embedded in zincobserve binary when zincobserve application is built.
+Output will be stored in web/dist folder. web/dist will be embedded in openobserve binary when openobserve application is built.
 
-It is important that you build the web app every time you make any changes to javascript code as the built code is then embedded in zincobserve application.
+It is important that you build the web app every time you make any changes to javascript code as the built code is then embedded in openobserve application.
 
 ### Time to build the rust application now
 
-Make sure you are in zincobserve directory & not in zincobserve/web, and have 
+Make sure you are in openobserve directory & not in openobserve/web, and have
 Rust toolchain installed:
 
 Install `protoc`:
@@ -83,9 +83,9 @@ There are 2 areas of development.
 ZO_ROOT_USER_EMAIL=root@example.com ZO_ROOT_USER_PASSWORD=Complexpass#123 cargo run
 ```
 
-This will start the zincobserve API server on port 5080
+This will start the openobserve API server on port 5080
 
-environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when zincobserve is started.
+environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started.
 
 ### UI
 
@@ -99,7 +99,7 @@ npm run dev
 
 This will start UI server on port 8081, to change port specify it in vite.config.ts
 
-In order for you to effectively use the UI you would want to have the zincobserve API server running in a seperate window that will accept requests from the UI.
+In order for you to effectively use the UI you would want to have the openobserve API server running in a seperate window that will accept requests from the UI.
 
 ## Swagger
 
@@ -112,7 +112,7 @@ Make sure that you have [docker](https://docs.docker.com/get-docker/).
 Simple build:
 
 ```shell
-docker build -t zincobserve:latest-amd64 -f deploy/build/Dockerfile .
+docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile .
 ```
 
 Multi-arch build
@@ -120,7 +120,7 @@ Multi-arch build
 In order to build multi-arch builds you will need [buildx](https://docs.docker.com/buildx/working-with-buildx/) installed. You will need to pass the platform flag for the platform that you want to build.
 
 ```shell
-docker build -t zincobserve:latest-amd64 -f deploy/build/Dockerfile.tag.amd64 .
+docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile.tag.amd64 .
 ```
 
 Please check folder deploy/build for docker files.
@@ -141,14 +141,13 @@ We check for following in CI pipeline for any pull requests.
 
 ## How to contribute code
 
-1. Fork the repository on github (e.g. awesomedev/zincobserve)
-1. Clone the repo from the forked repository ( e.g. awesomedev/zincobserve) to your machine.
+1. Fork the repository on github (e.g. awesomedev/openobserve)
+1. Clone the repo from the forked repository ( e.g. awesomedev/openobserve) to your machine.
 1. create a new branch locally.
 1. Make the changes to code.
 1. Push the code to your repo.
 1. Create a PR
 1. Make sure that the automatic CI checks pass for your PR.
-
 
 ## PR title should meet following criteria:
 
