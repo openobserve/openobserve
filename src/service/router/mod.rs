@@ -21,10 +21,11 @@ use rand::thread_rng;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 9] = [
+const QUERIER_ROUTES: [&str; 10] = [
     "/_search",
     "/_around",
     "/_values",
+    "/api/cache/status",
     "/prometheus/api/v1/series",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query",
