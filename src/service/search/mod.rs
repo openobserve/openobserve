@@ -14,9 +14,9 @@
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
-use std::io::Cursor;
-use std::sync::Arc;
-use std::{cmp::min, time::Duration};
+use once_cell::sync::Lazy;
+use std::{cmp::min, io::Cursor, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -24,18 +24,23 @@ use uuid::Uuid;
 
 use crate::common::{json, str::find};
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::CONFIG;
-use crate::infra::db::etcd;
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::infra::{
+    cluster,
+    config::CONFIG,
+    db::etcd,
+    errors::{Error, ErrorCodes},
+};
 use crate::meta::{search, stream::StreamParams, StreamType};
 use crate::service::{db, file_list};
 
 use super::get_partition_key_query;
 
-pub mod datafusion;
-pub mod grpc;
-pub mod sql;
+pub(crate) mod datafusion;
+pub(crate) mod grpc;
+pub(crate) mod sql;
+
+pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
@@ -212,7 +217,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                     )
                 });
 
-                let token: MetadataValue<_> = get_internal_grpc_token()
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = Channel::from_shared(node_addr)

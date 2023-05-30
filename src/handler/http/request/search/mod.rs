@@ -22,7 +22,7 @@ use crate::common::base64;
 use crate::common::functions;
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, SEARCH_LOCKER};
+use crate::infra::config::CONFIG;
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -126,7 +126,7 @@ pub async fn search(
     }
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
     let took_wait = start.elapsed().as_millis() as usize;
 
@@ -278,7 +278,7 @@ pub async fn around(
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
     let query_context = if uses_fn {
         Some(around_sql.clone())
@@ -511,7 +511,7 @@ pub async fn values(
     }
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
 
     // search

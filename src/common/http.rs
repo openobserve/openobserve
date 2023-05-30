@@ -19,7 +19,7 @@ use std::io::{Error, ErrorKind};
 use crate::meta::StreamType;
 
 #[inline(always)]
-pub fn get_stream_type_from_request(
+pub(crate) fn get_stream_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<StreamType>, Error> {
     let stream_type = match query.get("type") {
