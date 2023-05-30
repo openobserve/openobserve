@@ -38,7 +38,6 @@
             id="thirdLevel"
             class="row scroll relative-position thirdlevel"
             style="width: 100%"
-            v-if="searchObj.data.stream.streamLists.length > 0"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -77,8 +76,24 @@
                 </div>
               </template>
               <template #after>
+                <div v-if="searchObj.loading == true">
+                  <q-spinner-dots
+                    color="primary"
+                    size="40px"
+                    style="margin: 0 auto; display: block"
+                  />
+                </div>
+                <div v-else-if="!areStreamsPresent">
+                  <h5 data-test="logs-search-error-message" class="text-center">
+                    <q-icon
+                      name="warning"
+                      color="warning"
+                      size="10rem"
+                    /><br />{{ searchObj.data.errorMsg }}
+                  </h5>
+                </div>
                 <div
-                  v-if="
+                  v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
                 >
@@ -152,20 +167,6 @@
                 </div>
               </template>
             </q-splitter>
-          </div>
-          <div v-else-if="searchObj.loading == true">
-            <q-spinner-dots
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
-          </div>
-          <div v-else>
-            <h5 data-test="logs-search-error-message" class="text-center">
-              <q-icon name="warning" color="warning" size="10rem" /><br />{{
-                searchObj.data.errorMsg
-              }}
-            </h5>
           </div>
         </template>
       </q-splitter>
@@ -1334,6 +1335,10 @@ export default defineComponent({
       else searchObj.meta.showFields = true;
     };
 
+    const areStreamsPresent = computed(() => {
+      return searchObj.data.stream.streamLists.length > 0;
+    });
+
     return {
       store,
       router,
@@ -1356,6 +1361,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       getStreamList,
       collapseFieldList,
+      areStreamsPresent,
     };
   },
   computed: {
