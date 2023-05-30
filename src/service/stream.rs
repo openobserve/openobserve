@@ -186,16 +186,20 @@ pub async fn save_stream_settings(
     let schema = db::schema::get(org_id, stream_name, Some(stream_type))
         .await
         .unwrap();
-
-    let mut meta = schema.metadata.clone();
-
-    meta.insert("settings".to_string(), json::to_string(&setting).unwrap());
+    let mut metadata = schema.metadata.clone();
+    metadata.insert("settings".to_string(), json::to_string(&setting).unwrap());
+    if !metadata.contains_key("created_at") {
+        metadata.insert(
+            "created_at".to_string(),
+            chrono::Utc::now().timestamp_micros().to_string(),
+        );
+    }
     log::info!("Saving setting for schema {:?}", stream_name);
     db::schema::set(
         org_id,
         stream_name,
         stream_type,
-        &schema.clone().with_metadata(meta),
+        &schema.clone().with_metadata(metadata),
         None,
     )
     .await
