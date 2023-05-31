@@ -15,12 +15,11 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    {{ miniMode }}
     <q-header>
       <q-toolbar>
         <img
           class="appLogo"
-          :src="getImageURL('images/common/app_logo_zo.png')"
+          :src="getImageURL('images/common/open_observe_logo.svg')"
           @click="goToHome"
         />
 
@@ -171,6 +170,7 @@
       show-if-above
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
+      mini-to-overlay
     >
       <q-list class="leftNavList">
         <menu-link
@@ -244,7 +244,7 @@ import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 
 let mainLayoutMixin: any = null;
-if (config.isOpenObserveCloud == "true") {
+if (config.isCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;
 } else {
   mainLayoutMixin = MainLayoutOpenSourceMixin;
@@ -436,8 +436,8 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    //additional links based on environment and conditions
-    if (config.isOpenObserveCloud == "true") {
+    // additional links based on environment and conditions
+    if (config.isCloud == "true") {
       linksList.value = mainLayoutMixin
         .setup()
         .leftNavigationLinks(linksList, t);
@@ -461,7 +461,7 @@ export default defineComponent({
       const timeoutinterval = Math.floor(d.getTime() / 1000);
       const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
 
-      if (config.isOpenObserveCloud == "true") {
+      if (config.isCloud == "true") {
         setTimeout(() => {
           mainLayoutMixin.setup().getRefreshToken(store);
         }, timeout);
@@ -519,7 +519,7 @@ export default defineComponent({
             };
 
             if (
-              config.isOpenObserveCloud == "true" &&
+              config.isCloud == "true" &&
               localOrg.value.identifier == data.identifier &&
               (customOrganization == "" || customOrganization == undefined)
             ) {
@@ -557,10 +557,7 @@ export default defineComponent({
         });
       }
 
-      if (
-        selectedOrg.value.identifier != "" &&
-        config.isOpenObserveCloud == "true"
-      ) {
+      if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
     };
@@ -574,10 +571,7 @@ export default defineComponent({
       await configService
         .get_config()
         .then((res: any) => {
-          if (
-            res.data.functions_enabled &&
-            config.isOpenObserveCloud == "false"
-          ) {
+          if (res.data.functions_enabled && config.isCloud == "false") {
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
@@ -589,7 +583,7 @@ export default defineComponent({
 
     getConfig();
 
-    if (config.isOpenObserveCloud == "true") {
+    if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
 
       const tracker = new Tracker({
@@ -664,9 +658,9 @@ export default defineComponent({
   @extend .bg-white;
 
   .appLogo {
-    margin-left: 1.75rem;
+    margin-left: 0.5rem;
     margin-right: 2rem;
-    width: 109px;
+    width: 150px;
     cursor: pointer;
 
     &__mini {
@@ -679,7 +673,7 @@ export default defineComponent({
 }
 
 .q-page-container {
-  padding-left: 5rem !important;
+  padding-left: 57px;
 }
 
 .q-drawer {

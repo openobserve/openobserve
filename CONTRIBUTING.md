@@ -38,7 +38,7 @@ It is important that you build the web app every time you make any changes to ja
 
 ### Time to build the rust application now
 
-Make sure you are in openobserve directory & not in openobserve/web, and have 
+Make sure you are in openobserve directory & not in openobserve/web, and have
 Rust toolchain installed:
 
 Install `protoc`:
@@ -148,7 +148,6 @@ We check for following in CI pipeline for any pull requests.
 1. Push the code to your repo.
 1. Create a PR
 1. Make sure that the automatic CI checks pass for your PR.
-
 
 ## PR title should meet following criteria:
 

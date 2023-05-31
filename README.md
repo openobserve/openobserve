@@ -1,9 +1,9 @@
 🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).
 
-
-# [Zinc Cloud](https://observe.zinc.dev) | [Docs](https://zinc.dev/docs) | [Slack](https://join.slack.com/t/zinc-nvh4832/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://zinc.dev) 
+# [Zinc Cloud](https://cloud.openobserve.ai) | [Docs](https://openobserve.ai/docs/) | [Slack](https://join.slack.com/t/zinc-nvh4832/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://openobserve.ai)
 
 # OpenObserve
+
 OpenObserve is a cloud native observability platform built specifically for logs, metrics, traces and analytics designed to work at petabyte scale.
 
 It is very simple and easy to operate as opposed to Elasticsearch which requires a couple dozen knobs to understand and tune which you can get up and running in under 2 minutes.
@@ -36,20 +36,21 @@ Some of the features are:
 1. Vastly easier to operate
 1. Seamless upgrades
 
-For full list of features check [documentation](https://zinc.dev/docs/guide/#project-status-features-and-roadmap)
 
+For full list of features check [documentation](https://openobserve.ai/docs/#project-status-features-and-roadmap)
 
 # Installation
 
-You can install OpenObserve in under 2 minutes by following the [quickstart](https://zinc.dev/docs/guide/quickstart/) documentation
+You can install OpenObserve in under 2 minutes by following the [quickstart](https://openobserve.ai/docs/guide/quickstart/) documentation
 
-# OpenObserve Cloud 
+# OpenObserve Cloud
 
-You can also try OpenObserve without installing it in under 2 minutes by trying out OpenObserve Cloud  at [https://observe.zinc.dev](https://observe.zinc.dev)
+You can also try OpenObserve without installing it in under 2 minutes by trying out OpenObserve Cloud at [https://cloud.openobserve.ai](https://cloud.openobserve.ai)
 
 # Screenshots
 
 ## Home
+
 ![Home](./screenshots/zo_home.png)
 
 ## Logs
@@ -59,7 +60,6 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 ## Log details
 
 ![Home](./screenshots/zo_log_details.png)
-
 
 ## Visualization and dashboard
 
@@ -82,7 +82,6 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 ## Ingestion
 
 ![Home](./screenshots/zo_ingestion.png)
-
 
 # Community
 

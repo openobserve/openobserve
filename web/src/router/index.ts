@@ -25,7 +25,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isOpenObserveCloud == "true") {
+  if (config.isCloud == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();
