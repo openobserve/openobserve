@@ -1,6 +1,6 @@
 🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).
 
-# [Zinc Cloud](https://cloud.openobserve.ai) | [Docs](https://openobserve.ai/docs/) | [Slack](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://openobserve.ai)
+# [OpenObserve Cloud](https://cloud.openobserve.ai) | [Docs](https://openobserve.ai/docs/) | [Slack](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://openobserve.ai)
 
 # OpenObserve
 
