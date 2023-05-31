@@ -18,7 +18,7 @@ jobs:
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
             os: ubuntu-2004-8-cores
-            features: ""
+            features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu

@@ -18,14 +18,14 @@ mod tests {
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
     use core::time;
+    use openobserve::{
+        common::json,
+        handler::http::router::*,
+        infra::{config::CONFIG, db::default},
+        meta::dashboards::{Dashboard, Dashboards},
+    };
     use prost::Message;
-    use std::sync::Once;
-    use std::{env, fs, str, thread};
-    use openobserve::common::json;
-    use openobserve::handler::http::router::*;
-    use openobserve::infra::config::CONFIG;
-    use openobserve::infra::db::default;
-    use openobserve::meta::dashboards::{Dashboard, Dashboards};
+    use std::{env, fs, str, sync::Once, thread};
 
     static START: Once = Once::new();
 
