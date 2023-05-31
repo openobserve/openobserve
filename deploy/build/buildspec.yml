@@ -8,7 +8,7 @@ phases:
   build:
     commands:
       # Increase swap file size
-      - fallocate -l 32G /swapfile
+      - fallocate -l 24G /swapfile
       - chmod 600 /swapfile
       - mkswap /swapfile || true
       - swapon /swapfile || true
