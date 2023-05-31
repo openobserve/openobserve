@@ -38,7 +38,7 @@
         :chart="traceChart"
         @updated:chart="updateChart"
       />
-      <d3-chart :data="traceServiceMap" />
+      <d3-chart :data="mockServiceMap" />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -522,6 +522,70 @@ export default defineComponent({
       timeRange.value.end = range2;
       calculateTracePosition();
     };
+    const mockServiceMap = [
+      {
+        name: "Service A Service H H H H H H H H H H H H H H H H H H H H H H H",
+        children: [
+          {
+            name: "Service B",
+            children: [
+              {
+                name: "Service c",
+                children: [
+                  {
+                    name: "Service F",
+                    children: [
+                      {
+                        name: "Service G",
+                        children: [
+                          {
+                            name: "Service H",
+                            children: [
+                              {
+                                name: "Service H",
+                                children: [
+                                  {
+                                    name: "Service H",
+                                    children: [
+                                      {
+                                        name: "Service H H H H H H H H H H H H H H H H H",
+                                      },
+                                    ],
+                                  },
+                                ],
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                name: "Service E",
+              },
+            ],
+          },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+          { name: "Service D" },
+        ],
+      },
+      {
+        name: "Service X",
+        color: "#000000",
+      },
+      {
+        name: "Service Y",
+        color: "#000000",
+      },
+    ];
     return {
       traceTree,
       collapseMapping,
@@ -541,6 +605,7 @@ export default defineComponent({
       traceChart,
       updateChart,
       traceServiceMap,
+      mockServiceMap,
     };
   },
 });
