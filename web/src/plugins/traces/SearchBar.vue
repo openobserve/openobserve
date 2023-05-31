@@ -168,7 +168,7 @@ export default defineComponent({
     const updateDateTime = (value: object) => {
       searchObj.data.datetime = value;
 
-      if (config.isOpenObserveCloud == "true" && value.userChangedValue) {
+      if (config.isCloud == "true" && value.userChangedValue) {
         let dateTimeVal;
         if (value.tab === "relative") {
           dateTimeVal = value.relative;

@@ -33,12 +33,10 @@
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -133,8 +131,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -236,7 +233,7 @@ export default defineComponent({
       },
     ]);
 
-    if (config.isZincObserveCloud == "true") {
+    if (config.isCloud == "true") {
       columns.value?.splice(5, 1);
     }
 

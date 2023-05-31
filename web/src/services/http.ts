@@ -22,7 +22,7 @@ const http = ({ headers } = {} as any) => {
     baseURL: store.state.API_ENDPOINT,
     headers: {
       Authorization:
-        config.isOpenObserveCloud == "true"
+        config.isCloud == "true"
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
       ...headers,

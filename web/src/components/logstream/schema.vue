@@ -55,7 +55,7 @@
                 <tr>
                   <th>{{ t("logStream.docsCount") }}</th>
                   <th>{{ t("logStream.storageSize") }}</th>
-                  <th v-if="isZincObserveCloud !== 'true'">{{ t("logStream.compressedSize") }}</th>
+                  <th v-if="isCloud !== 'true'">{{ t("logStream.compressedSize") }}</th>
                   <th>{{ t("logStream.time") }}</th>
                 </tr>
               </thead>
@@ -74,7 +74,7 @@
                     }}
                     MB
                   </td>
-                  <td v-if="isZincObserveCloud !== 'true'">
+                  <td v-if="isCloud !== 'true'">
                     {{
                       parseInt(indexData.stats.compressed_size).toLocaleString(
                         "en-US"
@@ -224,7 +224,7 @@ export default defineComponent({
     const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
-    const isZincObserveCloud = config.isZincObserveCloud;
+    const isCloud = config.isCloud;
 
     const getSchema = async () => {
       const dismiss = q.notify({
@@ -360,7 +360,7 @@ export default defineComponent({
     return {
       t,
       q,
-      isZincObserveCloud,
+      isCloud,
       indexData,
       getSchema,
       onSubmit,

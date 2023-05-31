@@ -121,7 +121,7 @@ const useIngestionRoutes = () => {
     component: SysLog,
   };
 
-  if (config.isOpenObserveCloud === "false" || !config.isOpenObserveCloud) {
+  if (config.isCloud === "false" || !config.isCloud) {
     ingestionRoutes[0].children
       .find((child: any) => child.name === "ingestLogs")
       .children.push(sysLog);

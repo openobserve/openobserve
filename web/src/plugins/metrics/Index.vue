@@ -171,7 +171,7 @@ export default defineComponent({
         this.runQuery();
       }
 
-      if (config.isOpenObserveCloud == "true") {
+      if (config.isCloud == "true") {
         segment.track("Button Click", {
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
@@ -632,7 +632,7 @@ export default defineComponent({
     const updateDateTime = (value: any) => {
       searchObj.data.datetime = value;
 
-      if (config.isOpenObserveCloud == "true" && value.userChangedValue) {
+      if (config.isCloud == "true" && value.userChangedValue) {
         let dateTimeVal;
         if (value.tab === "relative") {
           dateTimeVal = value.relative;

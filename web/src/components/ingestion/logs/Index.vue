@@ -275,7 +275,7 @@ export default defineComponent({
     };
 
     const showSyslog = computed(() => {
-      return config.isOpenObserveCloud !== "true";
+      return config.isCloud !== "true";
     });
 
     return {

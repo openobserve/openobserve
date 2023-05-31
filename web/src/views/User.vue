@@ -22,7 +22,7 @@ export default defineComponent({
   },
   created() {
     // check condition here and set the componentName accordingly
-    if (config.isOpenObserveCloud == "true") {
+    if (config.isCloud == "true") {
       this.componentName = "UsersCloud";
     } else {
       this.componentName = "UsersOpenSource";
@@ -37,7 +37,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
 
-    return {store, t,};
+    return { store, t };
   },
 });
 </script>
