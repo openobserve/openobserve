@@ -31,7 +31,7 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 /// compactor delete run steps:
 pub async fn run_delete() -> Result<(), anyhow::Error> {
     // check data lifecyle date
-    if CONFIG.compact.data_retention_enabled {
+    if CONFIG.compact.data_retention_days > 0 {
         let now = chrono::Utc::now();
         let date = now - chrono::Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
