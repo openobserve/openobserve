@@ -57,7 +57,7 @@ const getConfig = async () => {
             tracingOrigins: [
               "localhost",
               "alpha1.cloud.zinclabs.dev",
-              "observe.zinc.dev",
+              "cloud.openobserve.ai",
               /^\//,
             ],
           }),

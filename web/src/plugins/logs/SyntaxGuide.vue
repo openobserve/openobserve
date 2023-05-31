@@ -68,7 +68,7 @@
                 <li>
                   For additional examples,
                   <a
-                    href="https://docs.zinc.dev/example-queries/"
+                    href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     >click here</a
                   >.
@@ -130,7 +130,7 @@
                 <li>
                   For additional examples,
                   <a
-                    href="https://docs.zinc.dev/example-queries/"
+                    href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     >click here</a
                   >.
