@@ -32,7 +32,6 @@ use crate::service::db;
 use crate::service::ingestion::write_file;
 use crate::service::schema::stream_schema_exists;
 
-// #[tracing::instrument(name = "json:ingest", skip_all)]
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
