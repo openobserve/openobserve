@@ -14,38 +14,45 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::sdk::{trace as sdktrace, Resource};
-use opentelemetry::KeyValue;
+use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
+    KeyValue,
+};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{prelude::*, Registry};
 
-use zincobserve::handler::grpc::auth::check_auth;
-use zincobserve::handler::grpc::cluster_rpc::event_server::EventServer;
-use zincobserve::handler::grpc::cluster_rpc::metrics_server::MetricsServer;
-use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
-use zincobserve::handler::grpc::request::{
-    event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
+use openobserve::{
+    handler::{
+        grpc::{
+            auth::check_auth,
+            cluster_rpc::{
+                event_server::EventServer, metrics_server::MetricsServer,
+                search_server::SearchServer,
+            },
+            request::{event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer},
+        },
+        http::router::*,
+    },
+    infra::{
+        cluster,
+        config::{self, CONFIG},
+        file_lock, metrics,
+    },
+    job, meta,
+    service::{db, router, users},
 };
-use zincobserve::handler::http::router::*;
-
-use zincobserve::infra::cluster;
-use zincobserve::infra::config::{self, CONFIG};
-use zincobserve::infra::file_lock;
-use zincobserve::infra::metrics;
-use zincobserve::meta::telemetry::Telemetry;
-use zincobserve::service::db;
-use zincobserve::service::router;
-use zincobserve::service::users;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -62,36 +69,11 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     if CONFIG.common.tracing_enabled {
-        let service_name = format!("zo-{}", CONFIG.common.instance_name);
-        opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
-        let mut headers = HashMap::new();
-        headers.insert(
-            CONFIG.common.tracing_header_key.clone(),
-            CONFIG.common.tracing_header_value.clone(),
-        );
-        let tracer = opentelemetry_otlp::new_pipeline()
-            .tracing()
-            .with_exporter(
-                opentelemetry_otlp::new_exporter()
-                    .http()
-                    .with_endpoint(&CONFIG.common.otel_otlp_url)
-                    .with_headers(headers),
-            )
-            .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-                KeyValue::new("service.name", service_name),
-                KeyValue::new("deployment_type", "k8s"),
-            ])))
-            .install_batch(opentelemetry::runtime::Tokio)?;
-
-        Registry::default()
-            .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
-            .with(tracing_subscriber::fmt::layer())
-            .with(tracing_opentelemetry::layer().with_tracer(tracer))
-            .init();
+        enable_tracing()?;
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
-    log::info!("Starting ZincObserve {}", config::VERSION);
+    log::info!("Starting OpenObserve {}", config::VERSION);
 
     // init jobs
     // it must be initialized before the server starts
@@ -100,38 +82,14 @@ async fn main() -> Result<(), anyhow::Error> {
         cluster::register_and_keepalive()
             .await
             .expect("cluster init failed");
-        zincobserve::job::init().await.expect("job init failed");
+        job::init().await.expect("job init failed");
         tx.send(true).unwrap();
     });
 
     // gRPC server
     rx.await?;
-    if !router::is_router() {
-        let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
-        let event_svc = EventServer::new(Eventer)
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
-        let search_svc = SearchServer::new(Searcher)
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
-        let metrics_svc = MetricsServer::new(Querier)
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
-        let tracer = TraceServer::default();
-        let trace_svc = TraceServiceServer::new(tracer);
-
-        tokio::task::spawn(async move {
-            log::info!("starting gRPC server at {}", gaddr);
-            tonic::transport::Server::builder()
-                .layer(tonic::service::interceptor(check_auth))
-                .add_service(event_svc)
-                .add_service(search_svc)
-                .add_service(metrics_svc)
-                .add_service(trace_svc)
-                .serve(gaddr)
-                .await
-                .expect("gRPC server init failed");
-        });
+    if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+        init_grpc_server()?;
     }
 
     // let node online
@@ -146,13 +104,22 @@ async fn main() -> Result<(), anyhow::Error> {
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
-    Telemetry::new()
-        .event("ZincObserve - Starting server", None, false)
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Starting server", None, false)
         .await;
-    if router::is_router() {
-        HttpServer::new(move || {
-            log::info!("starting HTTP server at: {}", haddr);
-            let app = if CONFIG.common.base_uri.is_empty() {
+
+    HttpServer::new(move || {
+        let local_id = thread_id.load(Ordering::SeqCst) as usize;
+        if CONFIG.common.feature_per_thread_lock {
+            thread_id.fetch_add(1, Ordering::SeqCst);
+        }
+        log::info!(
+            "starting HTTP server at: {}, thread_id: {}",
+            haddr,
+            local_id
+        );
+        let app = if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+            if CONFIG.common.base_uri.is_empty() {
                 App::new()
                     .wrap(prometheus.clone())
                     .service(router::config)
@@ -167,66 +134,44 @@ async fn main() -> Result<(), anyhow::Error> {
                         .service(router::aws)
                         .configure(get_basic_routes),
                 )
-            };
-            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-                .app_data(web::Data::new(
-                    awc::Client::builder()
-                        .timeout(Duration::from_secs(CONFIG.route.timeout))
-                        .finish(),
-                ))
-                .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::new(
-                    r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
-                ))
-                .wrap(RequestTracing::new())
-        })
-        .bind(haddr)?
-        .run()
-        .await?;
-    } else {
-        HttpServer::new(move || {
-            let local_id = thread_id.load(Ordering::SeqCst) as usize;
-            if CONFIG.common.feature_per_thread_lock {
-                thread_id.fetch_add(1, Ordering::SeqCst);
             }
-            log::info!(
-                "starting HTTP server at: {}, thread_id: {}",
-                haddr,
-                local_id
-            );
-
-            let app = if CONFIG.common.base_uri.is_empty() {
-                App::new()
-                    .wrap(prometheus.clone())
+        } else if CONFIG.common.base_uri.is_empty() {
+            App::new()
+                .wrap(prometheus.clone())
+                .configure(get_config_routes)
+                .configure(get_service_routes)
+                .configure(get_other_service_routes)
+                .configure(get_basic_routes)
+        } else {
+            App::new().wrap(prometheus.clone()).service(
+                web::scope(&CONFIG.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
-                    .configure(get_basic_routes)
-            } else {
-                App::new().wrap(prometheus.clone()).service(
-                    web::scope(&CONFIG.common.base_uri)
-                        .configure(get_config_routes)
-                        .configure(get_service_routes)
-                        .configure(get_other_service_routes)
-                        .configure(get_basic_routes),
-                )
-            };
-            app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-                .app_data(web::Data::new(local_id))
-                .wrap(middleware::Compress::default())
-                .wrap(middleware::Logger::new(
-                    r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
-                ))
-                .wrap(RequestTracing::new())
-        })
-        .bind(haddr)?
-        .run()
-        .await?;
-    };
-    Telemetry::new()
-        .event("ZincObserve - Server stopped", None, false)
+                    .configure(get_basic_routes),
+            )
+        };
+        app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
+            .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
+            .app_data(web::Data::new(local_id))
+            .app_data(web::Data::new(
+                awc::Client::builder()
+                    .timeout(Duration::from_secs(CONFIG.route.timeout))
+                    .finish(),
+            ))
+            .wrap(middleware::Compress::default())
+            .wrap(middleware::Logger::new(
+                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            ))
+            .wrap(RequestTracing::new())
+    })
+    .bind(haddr)?
+    .run()
+    .await?;
+
+    // stop telemetry
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Server stopped", None, false)
         .await;
     // leave the cluster
     let _ = cluster::leave().await;
@@ -238,13 +183,72 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn init_grpc_server() -> Result<(), anyhow::Error> {
+    let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
+    let event_svc = EventServer::new(Eventer)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let search_svc = SearchServer::new(Searcher)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let metrics_svc = MetricsServer::new(Querier)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+    let tracer = TraceServer::default();
+    let trace_svc = TraceServiceServer::new(tracer);
+
+    tokio::task::spawn(async move {
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(event_svc)
+            .add_service(search_svc)
+            .add_service(metrics_svc)
+            .add_service(trace_svc)
+            .serve(gaddr)
+            .await
+            .expect("gRPC server init failed");
+    });
+    Ok(())
+}
+
+fn enable_tracing() -> Result<(), anyhow::Error> {
+    let service_name = format!("zo-{}", CONFIG.common.instance_name);
+    opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
+    let mut headers = HashMap::new();
+    headers.insert(
+        CONFIG.common.tracing_header_key.clone(),
+        CONFIG.common.tracing_header_value.clone(),
+    );
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(
+            opentelemetry_otlp::new_exporter()
+                .http()
+                .with_endpoint(&CONFIG.common.otel_otlp_url)
+                .with_headers(headers),
+        )
+        .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
+            KeyValue::new("service.name", service_name),
+            KeyValue::new("deployment_type", "k8s"),
+        ])))
+        .install_batch(opentelemetry::runtime::Tokio)?;
+
+    Registry::default()
+        .with(tracing_subscriber::EnvFilter::new(&CONFIG.log.level))
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
+    Ok(())
+}
+
 async fn cli() -> Result<bool, anyhow::Error> {
-    let app = clap::Command::new("zincobserve")
+    let app = clap::Command::new("openobserve")
         .version(env!("GIT_VERSION"))
         .about(clap::crate_description!())
         .subcommands(&[
             clap::Command::new("reset")
-                .about("reset zincobserve data")
+                .about("reset openobserve data")
                 .arg(
                     clap::Arg::new("component")
                         .short('c')
@@ -254,7 +258,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         ),
                 ),
             clap::Command::new("view")
-                .about("view zincobserve data")
+                .about("view openobserve data")
                 .arg(
                     clap::Arg::new("component")
                         .short('c')
@@ -275,11 +279,11 @@ async fn cli() -> Result<bool, anyhow::Error> {
             match component.as_str() {
                 "root" => {
                     let _ = users::post_user(
-                        zincobserve::meta::organization::DEFAULT_ORG,
-                        zincobserve::meta::user::UserRequest {
+                        meta::organization::DEFAULT_ORG,
+                        meta::user::UserRequest {
                             email: CONFIG.auth.root_user_email.clone(),
                             password: CONFIG.auth.root_user_password.clone(),
-                            role: zincobserve::meta::user::UserRole::Root,
+                            role: meta::user::UserRole::Root,
                             first_name: "root".to_owned(),
                             last_name: "".to_owned(),
                         },

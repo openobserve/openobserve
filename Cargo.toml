@@ -1,5 +1,5 @@
 [package]
-description = "ZincObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces."
+description = "OpenObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces."
 edition = "2021"
 homepage = "https://zinc.dev/"
 keywords = [
@@ -14,8 +14,8 @@ keywords = [
   "opensource",
 ]
 license = "Apache-2.0"
-name = "zincobserve"
-repository = "https://github.com/zinclabs/zincobserve/"
+name = "openobserve"
+repository = "https://github.com/zinclabs/openobserve/"
 version = "0.1.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -85,7 +85,7 @@ glob = "0.3"
 hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
-ipnetwork = "0.20.0"
+ipnetwork = "0.20"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.8"
@@ -168,4 +168,3 @@ tonic-build = { version = "0.8", features = ["prost"] }
 datafusion-expr = "22"
 expect-test = "1.4"
 float-cmp = "0.9"
-

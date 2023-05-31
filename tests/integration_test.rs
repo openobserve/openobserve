@@ -21,11 +21,11 @@ mod tests {
     use prost::Message;
     use std::sync::Once;
     use std::{env, fs, str, thread};
-    use zincobserve::common::json;
-    use zincobserve::handler::http::router::*;
-    use zincobserve::infra::config::CONFIG;
-    use zincobserve::infra::db::default;
-    use zincobserve::meta::dashboards::{Dashboard, Dashboards};
+    use openobserve::common::json;
+    use openobserve::handler::http::router::*;
+    use openobserve::infra::config::CONFIG;
+    use openobserve::infra::db::default;
+    use openobserve::meta::dashboards::{Dashboard, Dashboards};
 
     static START: Once = Once::new();
 
@@ -67,7 +67,7 @@ mod tests {
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
         setup();
-        let _ = zincobserve::job::init().await;
+        let _ = openobserve::job::init().await;
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;
@@ -103,7 +103,7 @@ mod tests {
         e2e_delete_function().await;
 
         /* FIXME: Revise and restore the e2e tests for search API calls.
-         * They have been broken by https://github.com/zinclabs/zincobserve/pull/570
+         * They have been broken by https://github.com/zinclabs/openobserve/pull/570
          *
          * // search
          * e2e_search().await;

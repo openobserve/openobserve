@@ -128,7 +128,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("file list remote cache failed");
 
     // Shouldn't serve request until initialization finishes
-    log::info!("[TRACE] Start job");
+    log::info!("Start job");
 
     // compactor run
     tokio::task::spawn(async move { compact::run().await });

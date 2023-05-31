@@ -70,7 +70,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/kv/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching kv");
+    log::info!("Start watching kv");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,

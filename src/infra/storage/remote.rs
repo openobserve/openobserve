@@ -13,16 +13,17 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use futures::{StreamExt, TryStreamExt};
-use object_store::limit::LimitStore;
-use object_store::ObjectStore;
-use std::time::Instant;
+use bytes::Bytes;
+use futures::{stream::BoxStream, StreamExt};
+use object_store::{
+    limit::LimitStore, path::Path, Error, GetResult, ListResult, MultipartId, ObjectMeta,
+    ObjectStore, Result,
+};
+use std::{ops::Range, time::Instant};
+use tokio::io::AsyncWrite;
 
-use super::FileStorage;
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-
-const CONCURRENT_REQUESTS: usize = 1000;
+use super::{format_key, CONCURRENT_REQUESTS};
+use crate::infra::{config::CONFIG, metrics};
 
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
@@ -36,73 +37,26 @@ impl Default for Remote {
     }
 }
 
+impl std::fmt::Debug for Remote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("storage for remote")
+    }
+}
+
+impl std::fmt::Display for Remote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("storage for remote")
+    }
+}
+
 #[async_trait]
-impl FileStorage for Remote {
-    async fn list(&self, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
-        let prefix = if !CONFIG.s3.bucket_prefix.is_empty()
-            && !prefix.starts_with(&CONFIG.s3.bucket_prefix)
-        {
-            format!("{}{}", CONFIG.s3.bucket_prefix, prefix)
-        } else {
-            prefix.to_string()
-        };
-        let list_stream = self
-            .client
-            .list(Some(&(prefix.into())))
-            .await
-            .expect("Error listing files");
-        let files = list_stream
-            .map_ok(|meta| meta.location.to_string())
-            .try_collect::<Vec<String>>()
-            .await
-            .expect("Error listing files");
-        Ok(files)
-    }
-
-    async fn get(&self, file: &str) -> Result<bytes::Bytes, anyhow::Error> {
+impl ObjectStore for Remote {
+    async fn put(&self, location: &Path, bytes: Bytes) -> Result<()> {
         let start = Instant::now();
-        let key =
-            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
-                format!("{}{}", CONFIG.s3.bucket_prefix, file)
-            } else {
-                file.to_string()
-            };
-        let object = match self.client.get(&(key.into())).await {
-            Ok(ret) => ret,
-            Err(e) => {
-                log::error!("s3 get object {} error: {:?}", file, e);
-                return Err(anyhow::anyhow!("s3 get object error"));
-            }
-        };
-        let data = object.bytes().await?;
-
-        // metrics
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[3], columns[2]])
-                .inc_by(data.len() as u64);
-
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
-                .inc_by(time);
-        }
-
-        Ok(data)
-    }
-
-    async fn put(&self, file: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
-        let start = Instant::now();
-        let key =
-            if !CONFIG.s3.bucket_prefix.is_empty() && !file.starts_with(&CONFIG.s3.bucket_prefix) {
-                format!("{}{}", CONFIG.s3.bucket_prefix, file)
-            } else {
-                file.to_string()
-            };
-        let data_size = data.len();
-        match self.client.put(&(key.into()), data).await {
-            Ok(_output) => {
+        let file = location.to_string();
+        let data_size = bytes.len();
+        match self.client.put(&(format_key(&file).into()), bytes).await {
+            Ok(_) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
@@ -120,48 +74,98 @@ impl FileStorage for Remote {
             }
             Err(err) => {
                 log::error!("s3 File upload error: {:?}", err);
-                Err(anyhow::anyhow!("s3 put object error"))
+                Err(err)
             }
         }
     }
 
-    async fn del(&self, files: &[&str]) -> Result<(), anyhow::Error> {
-        if files.is_empty() {
-            return Ok(());
-        }
+    async fn put_multipart(
+        &self,
+        _location: &Path,
+    ) -> Result<(MultipartId, Box<dyn AsyncWrite + Unpin + Send>)> {
+        Err(Error::NotImplemented)
+    }
 
-        let start_time = Instant::now();
-        let columns = files[0].split('/').collect::<Vec<&str>>();
+    async fn abort_multipart(&self, _location: &Path, _multipart_id: &MultipartId) -> Result<()> {
+        Err(Error::NotImplemented)
+    }
 
-        let files = files
-            .iter()
-            .map(|file| {
-                if !CONFIG.s3.bucket_prefix.is_empty()
-                    && !file.starts_with(&CONFIG.s3.bucket_prefix)
-                {
-                    format!("{}{}", CONFIG.s3.bucket_prefix, file)
-                } else {
-                    file.to_string()
-                }
-            })
-            .collect::<Vec<_>>();
-        let files_stream = futures::stream::iter(files);
-        files_stream
-            .for_each_concurrent(None, |file| async {
-                if let Err(e) = self.client.delete(&(file.into())).await {
-                    log::error!("s3 Failed to delete object: {:?}", e);
-                }
-            })
-            .await;
+    async fn get(&self, location: &Path) -> Result<GetResult> {
+        let start = Instant::now();
+        let file = location.to_string();
+        let result = self.client.get(&(format_key(&file).into())).await?;
 
+        // metrics
+        let data = result.bytes().await?;
+        let data_len = data.len();
+        let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
-            let time = start_time.elapsed().as_secs_f64();
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data_len as u64);
+
+            let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[3], columns[2], "del"])
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
                 .inc_by(time);
         }
 
-        Ok(())
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
+    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+        let start = Instant::now();
+        let file = location.to_string();
+        let data = self
+            .client
+            .get_range(&(format_key(&file).into()), range)
+            .await?;
+
+        // metrics
+        let data_len = data.len();
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data_len as u64);
+
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
+                .inc_by(time);
+        }
+
+        Ok(data)
+    }
+
+    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn delete(&self, location: &Path) -> Result<()> {
+        self.client
+            .delete(&(format_key(location.as_ref()).into()))
+            .await
+    }
+
+    async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
+        self.client
+            .list(Some(&format_key(prefix.unwrap().as_ref()).into()))
+            .await
+    }
+
+    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
     }
 }
 

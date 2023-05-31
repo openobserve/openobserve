@@ -14,9 +14,9 @@
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
-use std::io::Cursor;
-use std::sync::Arc;
-use std::{cmp::min, time::Duration};
+use once_cell::sync::Lazy;
+use std::{cmp::min, io::Cursor, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -24,18 +24,23 @@ use uuid::Uuid;
 
 use crate::common::{json, str::find};
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::CONFIG;
-use crate::infra::db::etcd;
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::infra::{
+    cluster,
+    config::CONFIG,
+    db::etcd,
+    errors::{Error, ErrorCodes},
+};
 use crate::meta::{search, stream::StreamParams, StreamType};
 use crate::service::{db, file_list};
 
 use super::get_partition_key_query;
 
-pub mod datafusion;
-pub mod grpc;
-pub mod sql;
+pub(crate) mod datafusion;
+pub(crate) mod grpc;
+pub(crate) mod sql;
+
+pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
+    Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
@@ -162,7 +167,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     } else {
         (file_num / querier_num) + 1
     };
-    log::info!("[TRACE] search->file_list: num: {file_num}, offset: {offset}");
+    log::info!("search->file_list: num: {file_num}, offset: {offset}");
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     let mut session_id = Uuid::new_v4().to_string();
@@ -198,9 +203,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         let grpc_span = info_span!("service:search:cluster:grpc_search");
         let task = tokio::task::spawn(
             async move {
-                let org_id: MetadataValue<_> = req.org_id.parse().map_err(|_| {
-                    Error::Message("invalid org_id".to_string())
-                })?;
+                let org_id: MetadataValue<_> = req
+                    .org_id
+                    .parse()
+                    .map_err(|_| Error::Message("invalid org_id".to_string()))?;
                 let mut request = tonic::Request::new(req);
                 request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
@@ -211,19 +217,17 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                     )
                 });
 
-                let token: MetadataValue<_> = get_internal_grpc_token().parse().map_err(|_| {
-                    Error::Message("invalid token".to_string())
-                })?;
-                let channel = Channel::from_shared(node_addr).unwrap().connect().await.map_err(
-                    |err| {
-                        log::error!(
-                            "[TRACE] search->grpc: node: {}, connect err: {:?}",
-                            node.id,
-                            err
-                        );
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!("search->grpc: node: {}, connect err: {:?}", node.id, err);
                         server_internal_error("connect search node error")
-                    },
-                )?;
+                    })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -239,11 +243,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 let response: cluster_rpc::SearchResponse = match client.search(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
-                        log::error!(
-                            "[TRACE] search->grpc: node: {}, search err: {:?}",
-                            node.id,
-                            err
-                        );
+                        log::error!("search->grpc: node: {}, search err: {:?}", node.id, err);
                         if err.code() == tonic::Code::Internal {
                             let err = ErrorCodes::from_json(err.message())?;
                             return Err(Error::ErrorCode(err));
@@ -253,7 +253,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 };
 
                 log::info!(
-                    "[TRACE] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                    "search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
                     node.id,
                     is_querier,
                     response.total,
@@ -435,7 +435,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     }
 
     log::info!(
-        "[TRACE] search->result: total: {}, took: {}, scan_size: {}",
+        "search->result: total: {}, took: {}, scan_size: {}",
         result.total,
         result.took,
         result.scan_size,

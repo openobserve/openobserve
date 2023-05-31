@@ -156,7 +156,7 @@ use crate::meta;
     ),
     modifiers(&SecurityAddon),
     tags(
-        (name = "Meta", description = "Meta details about the ZincObserve state itself. e.g. healthz"),
+        (name = "Meta", description = "Meta details about the OpenObserve state itself. e.g. healthz"),
         (name = "Auth", description = "User login authentication"),
         (name = "Logs", description = "Logs data ingestion operations"),
         (name = "Dashboards", description = "Dashboard operations"),
@@ -172,8 +172,8 @@ use crate::meta;
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
     ),
     info(
-        description = "ZincObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
-        contact(name = "ZincObserve", email = "hello@zinclabs.io", url = "https://zinc.dev/"),
+        description = "OpenObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
+        contact(name = "OpenObserve", email = "hello@zinclabs.io", url = "https://zinc.dev/"),
     ),
 )]
 pub struct ApiDoc;

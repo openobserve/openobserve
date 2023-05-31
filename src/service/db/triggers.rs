@@ -51,7 +51,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let json_val: Trigger = json::from_slice(&item_value).unwrap();
         TRIGGERS.insert(item_key.to_owned(), json_val);
     }
-    log::info!("[TRACE] Triggers Cached");
+    log::info!("Triggers Cached");
     Ok(())
 }
 
@@ -60,7 +60,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/trigger/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching Triggers");
+    log::info!("Start watching Triggers");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,

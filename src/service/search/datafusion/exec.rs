@@ -37,12 +37,11 @@ use datafusion::{
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
-use object_store::limit::LimitStore;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 use std::{sync::Arc, time::Instant};
 
-use super::storage::file_list;
+use super::storage::{file_list, StorageType};
 #[cfg(feature = "zo_functions")]
 use super::transform_udf::get_all_transform;
 use crate::common::json;
@@ -817,13 +816,15 @@ pub async fn merge_parquet_files(
 pub fn create_runtime_env() -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
-    let mem = super::storage::memory::InMemory::new();
-    let mem = LimitStore::new(mem, CONFIG.limit.query_thread_num);
-    let mem_url = url::Url::parse("mem:///").unwrap();
-    object_store_registry.register_store(&mem_url, Arc::new(mem));
+    let fsm = super::storage::memory::FS::new();
+    let fsm_url = url::Url::parse("fsm:///").unwrap();
+    object_store_registry.register_store(&fsm_url, Arc::new(fsm));
+
+    let fsn = super::storage::nocache::FS::new();
+    let fsn_url = url::Url::parse("fsn:///").unwrap();
+    object_store_registry.register_store(&fsn_url, Arc::new(fsn));
 
     let tmpfs = super::storage::tmpfs::Tmpfs::new();
-    let tmpfs = LimitStore::new(tmpfs, CONFIG.limit.query_thread_num);
     let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
@@ -888,16 +889,23 @@ pub async fn register_table(
         }
     };
 
-    let prefix = if session.data_type.eq(&file_list::SessionType::Wal) {
+    let prefix = if session.storage_type.eq(&StorageType::Wal) {
         format!(
             "{}files/{}/{stream_type}/{}/",
             &CONFIG.common.data_wal_dir, org_id, stream_name
         )
-    } else if session.data_type.eq(&file_list::SessionType::Tmpfs) {
+    } else if session.storage_type.eq(&StorageType::FsMemory) {
+        file_list::set(&session.id, files).await.unwrap();
+        format!("fsm:///{}/", session.id)
+    } else if session.storage_type.eq(&StorageType::FsNoCache) {
+        file_list::set(&session.id, files).await.unwrap();
+        format!("fsn:///{}/", session.id)
+    } else if session.storage_type.eq(&StorageType::Tmpfs) {
         format!("tmpfs:///{}/", session.id)
     } else {
-        file_list::set(&session.id, files).await.unwrap();
-        format!("mem:///{}/", session.id)
+        return Err(DataFusionError::Execution(format!(
+            "Unsupported file type scheme {file_type:?}",
+        )));
     };
     let prefix = match ListingTableUrl::parse(prefix) {
         Ok(url) => url,
@@ -909,7 +917,7 @@ pub async fn register_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let schema = if schema.is_none() || session.data_type.eq(&file_list::SessionType::Wal) {
+    let schema = if schema.is_none() || session.storage_type.eq(&StorageType::Wal) {
         config = config.infer_schema(&ctx.state()).await.unwrap();
         let table = ListingTable::try_new(config.clone())?;
         let infered_schema = table.schema();

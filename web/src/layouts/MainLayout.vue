@@ -19,7 +19,7 @@
       <q-toolbar>
         <img
           class="appLogo"
-          :src="getImageURL('images/common/app_logo_zo.png')"
+          :src="getImageURL('images/common/open_observe_logo.svg')"
           @click="goToHome"
         />
 
@@ -165,10 +165,7 @@
     </q-header>
 
     <q-drawer
-      v-model="leftDrawerOpen"
       :mini="miniMode"
-      :width="210"
-      :breakpoint="500"
       bordered
       show-if-above
       @mouseover="miniMode = false"
@@ -247,7 +244,7 @@ import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 
 let mainLayoutMixin: any = null;
-if (config.isZincObserveCloud == "true") {
+if (config.isCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;
 } else {
   mainLayoutMixin = MainLayoutOpenSourceMixin;
@@ -303,7 +300,7 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const miniMode = ref(false);
+    const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -367,7 +364,7 @@ export default defineComponent({
       {
         title: t("menu.slack"),
         icon: "img:" + getImageURL("images/common/slack.svg"),
-        link: "https://join.slack.com/t/zincsearch/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
+        link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
       },
@@ -441,8 +438,8 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    //additional links based on environment and conditions
-    if (config.isZincObserveCloud == "true") {
+    // additional links based on environment and conditions
+    if (config.isCloud == "true") {
       linksList.value = mainLayoutMixin
         .setup()
         .leftNavigationLinks(linksList, t);
@@ -460,20 +457,13 @@ export default defineComponent({
       }
     }
 
-    if (
-      store.state.currentuser.hasOwnProperty("miniMode") &&
-      store.state.currentuser.miniMode != miniMode.value
-    ) {
-      miniMode.value = !miniMode.value;
-    }
-
     //get refresh token for cloud environment
     if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
       const d = new Date();
       const timeoutinterval = Math.floor(d.getTime() / 1000);
       const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
 
-      if (config.isZincObserveCloud == "true") {
+      if (config.isCloud == "true") {
         setTimeout(() => {
           mainLayoutMixin.setup().getRefreshToken(store);
         }, timeout);
@@ -531,7 +521,7 @@ export default defineComponent({
             };
 
             if (
-              config.isZincObserveCloud == "true" &&
+              config.isCloud == "true" &&
               localOrg.value.identifier == data.identifier &&
               (customOrganization == "" || customOrganization == undefined)
             ) {
@@ -569,10 +559,7 @@ export default defineComponent({
         });
       }
 
-      if (
-        selectedOrg.value.identifier != "" &&
-        config.isZincObserveCloud == "true"
-      ) {
+      if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
     };
@@ -586,10 +573,7 @@ export default defineComponent({
       await configService
         .get_config()
         .then((res: any) => {
-          if (
-            res.data.functions_enabled &&
-            config.isZincObserveCloud == "false"
-          ) {
+          if (res.data.functions_enabled && config.isCloud == "false") {
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
@@ -601,7 +585,7 @@ export default defineComponent({
 
     getConfig();
 
-    if (config.isZincObserveCloud == "true") {
+    if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
 
       const tracker = new Tracker({
@@ -621,7 +605,7 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
+      leftDrawerOpen: false,
       miniMode,
       user,
       zoBackendUrl,
@@ -676,9 +660,9 @@ export default defineComponent({
   @extend .bg-white;
 
   .appLogo {
-    margin-left: 1.75rem;
+    margin-left: 0.5rem;
     margin-right: 2rem;
-    width: 109px;
+    width: 150px;
     cursor: pointer;
 
     &__mini {
@@ -691,18 +675,19 @@ export default defineComponent({
 }
 
 .q-page-container {
-  padding-left: 5rem !important;
+  padding-left: 57px;
 }
 
 .q-drawer {
   @extend .border-right;
   @extend .bg-white;
-  min-width: 5rem;
+  min-width: 50px;
+  max-width: 210px;
   color: unset;
 
   &--mini {
     .leftNavList {
-      padding: 1.5rem 0.625rem;
+      padding: 8px 8px;
     }
   }
 }

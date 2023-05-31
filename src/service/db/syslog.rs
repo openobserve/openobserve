@@ -70,7 +70,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/syslog/route/";
     let mut events = db::DEFAULT.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching syslog routes");
+    log::info!("Start watching syslog routes");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -100,7 +100,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let json_val: SyslogRoute = json::from_slice(&item_value).unwrap();
         SYSLOG_ROUTES.insert(json_val.id.to_owned(), json_val);
     }
-    log::info!("[TRACE] SyslogRoutes Cached");
+    log::info!("SyslogRoutes Cached");
     Ok(())
 }
 
@@ -108,7 +108,7 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
     let key = "/syslog/enabled";
     let mut events = db::DEFAULT.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching SyslogServer settings");
+    log::info!("Start watching SyslogServer settings");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -139,6 +139,6 @@ pub async fn cache_syslog_settings() -> Result<(), anyhow::Error> {
         let mut syslog_enabled = SYSLOG_ENABLED.write();
         *syslog_enabled = item_value;
     }
-    log::info!("[TRACE] SyslogServer settings Cached");
+    log::info!("SyslogServer settings Cached");
     Ok(())
 }

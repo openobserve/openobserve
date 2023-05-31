@@ -22,7 +22,7 @@ use crate::common::base64;
 use crate::common::functions;
 use crate::common::http::get_stream_type_from_request;
 use crate::common::json;
-use crate::infra::config::{CONFIG, SEARCH_LOCKER};
+use crate::infra::config::CONFIG;
 use crate::infra::{errors, metrics};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::{self, StreamType};
@@ -59,14 +59,14 @@ use crate::service::search as SearchService;
                     "_p": "F",
                     "_timestamp": 1674213225158000i64,
                     "kubernetes": {
-                        "container_hash": "dkr.ecr.us-west-2.amazonaws.com/zincobserve@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
-                        "container_image": "dkr.ecr.us-west-2.amazonaws.com/zincobserve:v0.0.3",
-                        "container_name": "zincobserve",
+                        "container_hash": "dkr.ecr.us-west-2.amazonaws.com/openobserve@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
+                        "container_image": "dkr.ecr.us-west-2.amazonaws.com/openobserve:v0.0.3",
+                        "container_name": "openobserve",
                         "docker_id": "eb0983bdb9ff9360d227e6a0b268fe3b24a0868c2c2d725a1516c11e88bf5789",
                         "host": "ip.us-east-2.compute.internal",
-                        "namespace_name": "zincobserve",
+                        "namespace_name": "openobserve",
                         "pod_id": "35a0421f-9203-4d73-9663-9ff0ce26d409",
-                        "pod_name": "zincobserve-ingester-0"
+                        "pod_name": "openobserve-ingester-0"
                     },
                     "log": "[2023-01-20T11:13:45Z INFO  actix_web::middleware::logger] 10.2.80.192 \"POST /api/demo/_bulk HTTP/1.1\" 200 68",
                     "stream": "stderr"
@@ -126,7 +126,7 @@ pub async fn search(
     }
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
     let took_wait = start.elapsed().as_millis() as usize;
 
@@ -210,14 +210,14 @@ pub async fn search(
                     "_p": "F",
                     "_timestamp": 1674213225158000i64,
                     "kubernetes": {
-                        "container_hash": "dkr.ecr.us-west-2.amazonaws.com/zincobserve@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
-                        "container_image": "dkr.ecr.us-west-2.amazonaws.com/zincobserve:v0.0.3",
-                        "container_name": "zincobserve",
+                        "container_hash": "dkr.ecr.us-west-2.amazonaws.com/openobserve@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
+                        "container_image": "dkr.ecr.us-west-2.amazonaws.com/openobserve:v0.0.3",
+                        "container_name": "openobserve",
                         "docker_id": "eb0983bdb9ff9360d227e6a0b268fe3b24a0868c2c2d725a1516c11e88bf5789",
                         "host": "ip.us-east-2.compute.internal",
-                        "namespace_name": "zincobserve",
+                        "namespace_name": "openobserve",
                         "pod_id": "35a0421f-9203-4d73-9663-9ff0ce26d409",
-                        "pod_name": "zincobserve-ingester-0"
+                        "pod_name": "openobserve-ingester-0"
                     },
                     "log": "[2023-01-20T11:13:45Z INFO  actix_web::middleware::logger] 10.2.80.192 \"POST /api/demo/_bulk HTTP/1.1\" 200 68",
                     "stream": "stderr"
@@ -278,7 +278,7 @@ pub async fn around(
         .map_or(10, |v| v.parse::<usize>().unwrap_or(0));
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
     let query_context = if uses_fn {
         Some(around_sql.clone())
@@ -511,7 +511,7 @@ pub async fn values(
     }
 
     // get a local search queue lock
-    let locker = SEARCH_LOCKER.clone();
+    let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
 
     // search

@@ -55,7 +55,7 @@
                 <tr>
                   <th>{{ t("logStream.docsCount") }}</th>
                   <th>{{ t("logStream.storageSize") }}</th>
-                  <th>{{ t("logStream.compressedSize") }}</th>
+                  <th v-if="isCloud !== 'true'">{{ t("logStream.compressedSize") }}</th>
                   <th>{{ t("logStream.time") }}</th>
                 </tr>
               </thead>
@@ -74,7 +74,7 @@
                     }}
                     MB
                   </td>
-                  <td>
+                  <td v-if="isCloud !== 'true'">
                     {{
                       parseInt(indexData.stats.compressed_size).toLocaleString(
                         "en-US"
@@ -198,6 +198,7 @@ import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 const defaultValue: any = () => {
   return {
@@ -223,6 +224,7 @@ export default defineComponent({
     const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
+    const isCloud = config.isCloud;
 
     const getSchema = async () => {
       const dismiss = q.notify({
@@ -358,6 +360,7 @@ export default defineComponent({
     return {
       t,
       q,
+      isCloud,
       indexData,
       getSchema,
       onSubmit,

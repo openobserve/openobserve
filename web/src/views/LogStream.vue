@@ -33,12 +33,10 @@
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -133,8 +131,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -166,6 +163,7 @@ import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -234,6 +232,11 @@ export default defineComponent({
         align: "center",
       },
     ]);
+
+    if (config.isCloud == "true") {
+      columns.value?.splice(5, 1);
+    }
+
     let deleteStreamName = "";
     let deleteStreamType = "";
 

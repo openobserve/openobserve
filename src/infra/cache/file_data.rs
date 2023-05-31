@@ -65,7 +65,7 @@ impl FileData {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[TRACE] File cache is full {}/{}, can't cache {} bytes",
+                "File cache is full {}/{}, can't cache {} bytes",
                 self.cur_size,
                 self.max_size,
                 data_size
@@ -152,8 +152,7 @@ pub fn stats() -> (usize, usize) {
 
 #[inline]
 pub async fn download(file: &str) -> Result<Bytes, anyhow::Error> {
-    let store = &storage::DEFAULT;
-    let data = store.get(file).await?;
+    let data = storage::get(file).await?;
     if let Err(e) = set(file, data.clone()) {
         return Err(anyhow::anyhow!(
             "set file {} to memory cache failed: {}",

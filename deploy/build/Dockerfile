@@ -26,5 +26,5 @@ FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/zincobserve /
-CMD ["/zincobserve"]
+COPY --from=builder /app/target/release/openobserve /
+CMD ["/openobserve"]

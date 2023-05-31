@@ -67,7 +67,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/destinations/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("[TRACE] Start watching alert destinations");
+    log::info!("Start watching alert destinations");
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -100,6 +100,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let json_val: AlertDestination = json::from_slice(&item_value).unwrap();
         ALERTS_DESTINATIONS.insert(item_key.to_owned(), json_val);
     }
-    log::info!("[TRACE] Alert destinations Cached");
+    log::info!("Alert destinations Cached");
     Ok(())
 }

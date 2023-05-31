@@ -84,7 +84,7 @@ pub struct TimeWindow {
     pub eval_ts: i64,
     pub range: Duration,
     /// The offset used during the query execution.
-    /// We don't use it in ZincObserve (yet), so its value is always zero.
+    /// We don't use it (yet), so its value is always zero.
     //
     // See https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/parser/ast.go#L192-L198
     pub offset: Duration,
