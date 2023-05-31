@@ -16,17 +16,17 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "pkg:cargo/zincobserve@0.1.0",
-      "name": "zincobserve",
+      "bom-ref": "pkg:cargo/openobserve@0.1.0",
+      "name": "openobserve",
       "version": "0.1.0",
-      "description": "ZincObserve is an observability platfom that allows you to capture, search, and analyze your logs, metrics, and traces.",
+      "description": "OpenObserve is an observability platfom that allows you to capture, search, and analyze your logs, metrics, and traces.",
       "scope": "required",
       "licenses": [
         {
           "expression": "Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/zincobserve@0.1.0",
+      "purl": "pkg:cargo/openobserve@0.1.0",
       "externalReferences": [
         {
           "url": "https://zinc.dev/",
@@ -34,7 +34,7 @@
           "hashes": []
         },
         {
-          "url": "https://github.com/zinclabs/zincobserve/",
+          "url": "https://github.com/zinclabs/openobserve/",
           "type": "vcs",
           "hashes": []
         }

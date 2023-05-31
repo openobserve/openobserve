@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/sccache du -sh /root/.cache/sccache
 RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --target aarch64-unknown-linux-gnu \
   && sccache --show-stats \
   && du -sh /root/.cache/sccache
-RUN mv /app/target/aarch64-unknown-linux-gnu/release/zincobserve /app/target/release/zincobserve
+RUN mv /app/target/aarch64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
@@ -35,5 +35,5 @@ FROM public.ecr.aws/debian/debian:bullseye-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/zincobserve /
-CMD ["/zincobserve"]
+COPY --from=builder /app/target/release/openobserve /
+CMD ["/openobserve"]

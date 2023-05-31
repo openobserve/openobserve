@@ -36,6 +36,7 @@ Some of the features are:
 1. Vastly easier to operate
 1. Seamless upgrades
 
+
 For full list of features check [documentation](https://openobserve.ai/docs/#project-status-features-and-roadmap)
 
 # Installation

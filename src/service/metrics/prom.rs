@@ -483,7 +483,7 @@ pub(crate) async fn get_metadata(
     }
 }
 
-// HACK: ZincObserve implementation returns at most one metadata object per metric.
+// HACK: the implementation returns at most one metadata object per metric.
 // This differs from Prometheus, which [supports] multiple metadata objects per metric.
 //
 // [supports]: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata

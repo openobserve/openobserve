@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'zincobserve'",
+            "name": "Debug unit tests in library 'openobserve'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=zincobserve"
+                    "--package=openobserve"
                 ],
                 "filter": {
-                    "name": "zincobserve",
+                    "name": "openobserve",
                     "kind": "lib"
                 }
             },
@@ -26,15 +26,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'zincobserve'",
+            "name": "Debug executable 'openobserve'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=zincobserve",
-                    "--package=zincobserve"
+                    "--bin=openobserve",
+                    "--package=openobserve"
                 ],
                 "filter": {
-                    "name": "zincobserve",
+                    "name": "openobserve",
                     "kind": "bin"
                 }
             },
@@ -44,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'zincobserve'",
+            "name": "Debug unit tests in executable 'openobserve'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=zincobserve",
-                    "--package=zincobserve"
+                    "--bin=openobserve",
+                    "--package=openobserve"
                 ],
                 "filter": {
-                    "name": "zincobserve",
+                    "name": "openobserve",
                     "kind": "bin"
                 }
             },

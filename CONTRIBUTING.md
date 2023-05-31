@@ -89,7 +89,7 @@ environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used f
 
 ### UI
 
-If not alredy present create .env file in web directory & set VITE_ZINC_ENL_ENDPOINT=http://localhost:5080
+If not alredy present create .env file in web directory & set VITE_OPENOBSERVE_ENDPOINT=http://localhost:5080
 
 ```shell
 cd web

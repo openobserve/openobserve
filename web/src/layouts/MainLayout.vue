@@ -364,7 +364,7 @@ export default defineComponent({
       {
         title: t("menu.slack"),
         icon: "img:" + getImageURL("images/common/slack.svg"),
-        link: "https://join.slack.com/t/zincsearch/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
+        link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
       },
@@ -436,7 +436,7 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    //additional links based on environment and conditions
+    // additional links based on environment and conditions
     if (config.isCloud == "true") {
       linksList.value = mainLayoutMixin
         .setup()

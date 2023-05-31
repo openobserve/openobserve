@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: zincobserve
-  namespace: zincobserve
+  name: openobserve
+  namespace: openobserve
 spec:
   clusterIP: None
   selector:
-    app: zincobserve
+    app: openobserve
   ports:
   - name: http
     port: 5080
@@ -18,22 +18,22 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: zincobserve
-  namespace: zincobserve
+  name: openobserve
+  namespace: openobserve
   labels:
-    name: zincobserve
+    name: openobserve
 spec:
-  serviceName: zincobserve
+  serviceName: openobserve
   replicas: 1
   selector:
     matchLabels:
-      name: zincobserve
-      app: zincobserve
+      name: openobserve
+      app: openobserve
   template:
     metadata:
       labels:
-        name: zincobserve
-        app: zincobserve
+        name: openobserve
+        app: openobserve
     spec:
       securityContext:
         fsGroup: 2000
@@ -42,8 +42,8 @@ spec:
         runAsNonRoot: true
       # terminationGracePeriodSeconds: 0
       containers:
-        - name: zincobserve
-          image: public.ecr.aws/zinclabs/zincobserve:latest
+        - name: openobserve
+          image: public.ecr.aws/zinclabs/openobserve:latest
           env:
             - name: ZO_ROOT_USER_EMAIL
               value: root@example.com

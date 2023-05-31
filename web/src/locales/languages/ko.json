@@ -32,7 +32,6 @@
     "signOut": "로그아웃",
     "account": "어카운트",
     "feedback": "피드백",
-    "zincSearch": "아연 검색",
     "documentation": "문서",
     "tickets": "입장권",
     "organizations": "조직",
@@ -46,7 +45,7 @@
     "docs": "문서"
   },
   "about": {
-    "name": "아연",
+    "name": "OpenObserve",
     "introduction": "옵저버빌리티가 간소화되었습니다."
   },
   "login": {
