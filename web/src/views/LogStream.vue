@@ -166,6 +166,7 @@ import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -234,6 +235,11 @@ export default defineComponent({
         align: "center",
       },
     ]);
+
+    if (config.isZincObserveCloud == "true") {
+      columns.value?.splice(5, 1);
+    }
+
     let deleteStreamName = "";
     let deleteStreamType = "";
 
