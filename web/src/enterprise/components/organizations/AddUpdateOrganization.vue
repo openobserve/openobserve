@@ -105,7 +105,6 @@
           />
         </div>
       </q-form>
-      asd{{ proPlanRequired }}
     </q-card-section>
   </q-card>
 </template>

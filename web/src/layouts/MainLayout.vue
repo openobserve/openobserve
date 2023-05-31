@@ -276,7 +276,7 @@ export default defineComponent({
   },
   methods: {
     navigateToDocs() {
-      window.open("https://docs.zinc.dev", "_blank");
+      window.open("https://openobserve.ai/docs", "_blank");
     },
     navigateToOpenAPI(zoBackendUrl: string) {
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
