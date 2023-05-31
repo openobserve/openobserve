@@ -28,8 +28,7 @@
           <search-bar
             data-test="logs-search-bar"
             ref="searchBarRef"
-            v-show="searchObj.data.stream.streamLists.length > 0"
-            :key="searchObj.data.stream.streamLists.length"
+            :key="searchObj.data.stream.streamLists.length || 1"
             @searchdata="searchData"
           />
         </template>
@@ -38,7 +37,6 @@
             id="thirdLevel"
             class="row scroll relative-position thirdlevel"
             style="width: 100%"
-            v-if="searchObj.data.stream.streamLists.length > 0"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -77,95 +75,100 @@
                 </div>
               </template>
               <template #after>
-                <div
-                  v-if="
-                    searchObj.data.errorMsg !== '' && searchObj.loading == false
-                  "
-                >
-                  <h5 class="text-center">
-                    <div
-                      data-test="logs-search-result-not-found-text"
-                      v-if="searchObj.data.errorCode == 0"
-                    >
-                      Result not found.
-                    </div>
-                    <div
-                      data-test="logs-search-error-message"
-                      v-html="searchObj.data.errorMsg"
-                    ></div>
-                    <div
-                      data-test="logs-search-error-20003"
-                      v-if="parseInt(searchObj.data.errorCode) == 20003"
-                    >
-                      <q-btn
-                        no-caps
-                        unelevated
-                        size="sm"
-                        bg-secondary
-                        class="no-border bg-secondary text-white"
-                        :to="
-                          '/logstreams?dialog=' +
-                          searchObj.data.stream.selectedStream.label
-                        "
-                        >Click here</q-btn
-                      >
-                      to configure a full text search field to the stream.
-                    </div>
-                    <br />
-                    <q-item-label>{{
-                      searchObj.data.additionalErrorMsg
-                    }}</q-item-label>
-                  </h5>
-                </div>
-                <div
-                  v-else-if="searchObj.data.stream.selectedStream.label == ''"
-                >
-                  <h5
-                    data-test="logs-search-no-stream-selected-text"
-                    class="text-center"
-                  >
-                    No stream selected.
-                  </h5>
-                </div>
-                <div
-                  v-else-if="
-                    searchObj.data.queryResults.hasOwnProperty('total') &&
-                    searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false
-                  "
-                >
-                  <h5 class="text-center">No result found.</h5>
-                </div>
-                <div
-                  data-test="logs-search-search-result"
-                  v-show="
-                    searchObj.data.queryResults.hasOwnProperty('total') &&
-                    searchObj.data.queryResults.hits.length !== 0
-                  "
-                >
-                  <search-result
-                    ref="searchResultRef"
-                    @update:datetime="searchData"
-                    @update:scroll="getMoreData"
-                    @search:timeboxed="searchAroundData"
+                <div v-if="!areStreamsPresent && searchObj.loading == true">
+                  <q-spinner-dots
+                    color="primary"
+                    size="40px"
+                    style="margin: 0 auto; display: block"
                   />
                 </div>
+                <div v-else-if="!areStreamsPresent">
+                  <h5 data-test="logs-search-error-message" class="text-center">
+                    <q-icon
+                      name="warning"
+                      color="warning"
+                      size="10rem"
+                    /><br />{{ searchObj.data.errorMsg }}
+                  </h5>
+                </div>
+                <template v-else>
+                  <div
+                    v-if="
+                      searchObj.data.errorMsg !== '' &&
+                      searchObj.loading == false
+                    "
+                  >
+                    <h5 class="text-center">
+                      <div
+                        data-test="logs-search-result-not-found-text"
+                        v-if="searchObj.data.errorCode == 0"
+                      >
+                        Result not found.
+                      </div>
+                      <div
+                        data-test="logs-search-error-message"
+                        v-html="searchObj.data.errorMsg"
+                      ></div>
+                      <div
+                        data-test="logs-search-error-20003"
+                        v-if="parseInt(searchObj.data.errorCode) == 20003"
+                      >
+                        <q-btn
+                          no-caps
+                          unelevated
+                          size="sm"
+                          bg-secondary
+                          class="no-border bg-secondary text-white"
+                          :to="
+                            '/logstreams?dialog=' +
+                            searchObj.data.stream.selectedStream.label
+                          "
+                          >Click here</q-btn
+                        >
+                        to configure a full text search field to the stream.
+                      </div>
+                      <br />
+                      <q-item-label>{{
+                        searchObj.data.additionalErrorMsg
+                      }}</q-item-label>
+                    </h5>
+                  </div>
+                  <div
+                    v-else-if="searchObj.data.stream.selectedStream.label == ''"
+                  >
+                    <h5
+                      data-test="logs-search-no-stream-selected-text"
+                      class="text-center"
+                    >
+                      No stream selected.
+                    </h5>
+                  </div>
+                  <div
+                    v-else-if="
+                      searchObj.data.queryResults.hasOwnProperty('total') &&
+                      searchObj.data.queryResults.hits.length == 0 &&
+                      searchObj.loading == false
+                    "
+                  >
+                    <h5 class="text-center">No result found.</h5>
+                  </div>
+                  <div
+                    data-test="logs-search-search-result"
+                    v-show="
+                      searchObj.data.queryResults.hasOwnProperty('total') &&
+                      searchObj.data.queryResults.hits.length !== 0
+                    "
+                  >
+                    <search-result
+                      ref="searchResultRef"
+                      @update:datetime="searchData"
+                      @update:scroll="getMoreData"
+                      @search:timeboxed="searchAroundData"
+                    />
+                  </div>
+                </template>
               </template>
             </q-splitter>
-          </div>
-          <div v-else-if="searchObj.loading == true">
-            <q-spinner-dots
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
-          </div>
-          <div v-else>
-            <h5 data-test="logs-search-error-message" class="text-center">
-              <q-icon name="warning" color="warning" size="10rem" /><br />{{
-                searchObj.data.errorMsg
-              }}
-            </h5>
           </div>
         </template>
       </q-splitter>
@@ -1334,6 +1337,10 @@ export default defineComponent({
       else searchObj.meta.showFields = true;
     };
 
+    const areStreamsPresent = computed(() => {
+      return !!searchObj.data.stream.streamLists.length;
+    });
+
     return {
       store,
       router,
@@ -1356,6 +1363,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       getStreamList,
       collapseFieldList,
+      areStreamsPresent,
     };
   },
   computed: {
@@ -1495,6 +1503,13 @@ export default defineComponent({
       this.setQuery(newVal);
     },
     getStreamType() {
+      this.searchObj.loading = true;
+      this.searchObj.data.errorMsg = "";
+      this.searchObj.data.stream.streamLists = [];
+      this.searchObj.data.stream.selectedStream = { label: "", value: "" };
+      this.searchObj.data.stream.selectedStreamFields = [];
+      this.searchObj.data.queryResults = {};
+      this.searchObj.data.sortedQueryResults = [];
       this.getStreamList();
     },
   },
