@@ -72,7 +72,7 @@ export default defineComponent({
           0
         );
       } else {
-        totalHeight = height;
+        totalHeight = height + 25;
       }
       // Create a group element for the chart content
       this.services[dataIndex]["g"] = this.svg
@@ -83,7 +83,7 @@ export default defineComponent({
 
       // Create the tree layout and set its dimensions
       this.services[dataIndex]["layout"] = tree().size([
-        height > 1 ? height * 80 : 40,
+        height > 1 ? height * 100 : 40,
         depth * 175,
       ]);
     },
@@ -124,6 +124,7 @@ export default defineComponent({
       this.updateChart(dataIndex);
       this.updateChartHeight(dataIndex);
     },
+
     updateChartHeight(dataIndex: number) {
       let group = document.getElementById(
         `traces-service-graph-svg-group${dataIndex}`
@@ -172,9 +173,20 @@ export default defineComponent({
           return d.data.color;
         });
 
+      nodeEnter
+        .append("text")
+        .attr("dy", "-15px")
+        .attr("dx", "0px")
+        .attr("text-anchor", "middle")
+        .text((d) => {
+          return d.data.duration + "ms";
+        })
+        .attr("font-size", "12px")
+        .style("cursor", "pointer");
+
       let text = nodeEnter
         .append("text")
-        .attr("dy", "30px")
+        .attr("dy", "22px")
         .attr("dx", "0px")
         .attr("text-anchor", "middle")
         .text((d) => {

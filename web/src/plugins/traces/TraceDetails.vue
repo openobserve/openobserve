@@ -31,14 +31,32 @@
         </div>
         <div>Spans: {{ spanList.length - 1 }}</div>
       </div>
-      <trace-chart
-        class="trace-details-chart"
-        id="trace_details_gantt_chart"
-        ref="plotChart"
-        :chart="traceChart"
-        @updated:chart="updateChart"
-      />
-      <d3-chart :data="mockServiceMap" />
+      <div class="col-12 flex justify-end">
+        <q-select
+          data-test="log-search-index-list-field-search-input"
+          v-model="activeVisual"
+          :options="traceVisuals"
+          data-cy="logs-index-list-select-stream-type"
+          filled
+          borderless
+          dense
+          size="xs"
+          debounce="1"
+          class="q-pb-xs"
+        />
+      </div>
+      <div class="col-12" v-if="activeVisual === 'Histogram'">
+        <trace-chart
+          class="trace-details-chart"
+          id="trace_details_gantt_chart"
+          ref="plotChart"
+          :chart="traceChart"
+          @updated:chart="updateChart"
+        />
+      </div>
+      <div class="col-12" v-else>
+        <d3-chart :data="traceServiceMap" />
+      </div>
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -150,6 +168,10 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+
+    const traceVisuals = ["Service Map", "Histogram"];
+
+    const activeVisual = ref("Histogram");
 
     const traceChart = ref({
       data: [{}],
@@ -524,31 +546,56 @@ export default defineComponent({
     };
     const mockServiceMap = [
       {
-        name: "Service A Service H H H H H H H H H H H H H H H H H H H H H H H",
+        name: "Service A",
+        color: "#000000",
+        duration: "10",
         children: [
           {
             name: "Service B",
+            color: "#000000",
+            duration: "10",
+
             children: [
               {
                 name: "Service c",
+                color: "#000000",
+                duration: "10",
+
                 children: [
                   {
                     name: "Service F",
+                    color: "#000000",
+                    duration: "10",
+
                     children: [
                       {
                         name: "Service G",
+                        color: "#000000",
+                        duration: "10",
+
                         children: [
                           {
                             name: "Service H",
+                            color: "#000000",
+                            duration: "10",
+
                             children: [
                               {
                                 name: "Service H",
+                                color: "#000000",
+                                duration: "10",
+
                                 children: [
                                   {
                                     name: "Service H",
+                                    color: "#000000",
+                                    duration: "10",
+
                                     children: [
                                       {
                                         name: "Service H H H H H H H H H H H H H H H H H",
+                                        color: "#000000",
+                                        duration: "10",
                                       },
                                     ],
                                   },
@@ -564,26 +611,31 @@ export default defineComponent({
               },
               {
                 name: "Service E",
+                color: "#000000",
+                duration: "10",
               },
             ],
           },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
-          { name: "Service D" },
+          { name: "Service D", color: "#000000", duration: "10" },
+          { name: "Service D", color: "#000000", duration: "10" },
         ],
       },
       {
         name: "Service X",
         color: "#000000",
+        duration: "10",
       },
       {
         name: "Service Y",
         color: "#000000",
+        duration: "10",
+        children: [
+          {
+            name: "Service YA",
+            color: "#000000",
+            duration: "10",
+          },
+        ],
       },
     ];
     return {
@@ -606,6 +658,8 @@ export default defineComponent({
       updateChart,
       traceServiceMap,
       mockServiceMap,
+      activeVisual,
+      traceVisuals,
     };
   },
 });
@@ -633,13 +687,15 @@ $traceChartHeight: 200px;
 
 .histogram-sidebar {
   width: $sidebarWidth;
-  height: calc(100vh - $toolbarHeight - $traceChartHeight);
+  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
   overflow-y: scroll;
   overflow-x: hidden;
 }
 
 .histogram-spans-container {
-  height: calc(100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight);
+  height: calc(
+    100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight - 44px
+  );
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
