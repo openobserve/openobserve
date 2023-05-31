@@ -15,7 +15,6 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    {{ miniMode }}
     <q-header>
       <q-toolbar>
         <img
@@ -171,6 +170,7 @@
       show-if-above
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
+      mini-to-overlay
     >
       <q-list class="leftNavList">
         <menu-link
@@ -673,7 +673,7 @@ export default defineComponent({
 }
 
 .q-page-container {
-  padding-left: 5rem !important;
+  padding-left: 57px;
 }
 
 .q-drawer {
