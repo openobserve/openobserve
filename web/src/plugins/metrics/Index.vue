@@ -171,7 +171,7 @@ export default defineComponent({
         this.runQuery();
       }
 
-      if (config.isZincObserveCloud == "true") {
+      if (config.isOpenObserveCloud == "true") {
         segment.track("Button Click", {
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
@@ -632,7 +632,7 @@ export default defineComponent({
     const updateDateTime = (value: any) => {
       searchObj.data.datetime = value;
 
-      if (config.isZincObserveCloud == "true" && value.userChangedValue) {
+      if (config.isOpenObserveCloud == "true" && value.userChangedValue) {
         let dateTimeVal;
         if (value.tab === "relative") {
           dateTimeVal = value.relative;

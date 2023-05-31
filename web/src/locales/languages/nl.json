@@ -32,7 +32,6 @@
     "signOut": "Uitloggen",
     "account": "Rekening",
     "feedback": "Feedback",
-    "zincSearch": "Zink Search",
     "documentation": "Dokters",
     "tickets": "Ticket",
     "organizations": "Organisaties",
@@ -46,7 +45,7 @@
     "docs": "Dokters"
   },
   "about": {
-    "name": "Zink",
+    "name": "OpenObserve",
     "introduction": "Waarneembaarheid vereenvoudigd."
   },
   "login": {

@@ -79,7 +79,7 @@ describe("Users", async () => {
 
   // describe("When current user is admin and is on cloud", () => {
   //   beforeEach(() => {
-  //     import.meta.env.VITE_ZINCOBSERVE_CLOUD = true;
+  //     import.meta.env.VITE_OPENOBSERVE_CLOUD = true;
   //   });
   //   it("Should display invite user email input", async () => {
   //     expect(

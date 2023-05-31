@@ -16,10 +16,10 @@ import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
 const pos = window.location.pathname.indexOf("/web/");
-const API_ENDPOINT = import.meta.env.VITE_ZINCOBSERVE_ENDPOINT
-  ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.endsWith("/")
-    ? import.meta.env.VITE_ZINCOBSERVE_ENDPOINT.slice(0, -1)
-    : import.meta.env.VITE_ZINCOBSERVE_ENDPOINT
+const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
+  ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.endsWith("/")
+    ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
+    : import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   : window.location.origin == "http://localhost:8081"
   ? "/"
   : pos > -1
