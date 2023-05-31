@@ -13,7 +13,7 @@ jobs:
         include:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            features: ""
+            features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
