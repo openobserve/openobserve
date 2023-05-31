@@ -46,6 +46,7 @@ struct ConfigResponse<'a> {
     sql_base64_enabled: bool,
     timestamp_column: String,
     syslog_enabled: bool,
+    data_retention_days: i64,
 }
 
 /** Healthz */
@@ -81,6 +82,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
         timestamp_column: CONFIG.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
+        data_retention_days: CONFIG.compact.data_retention_days,
     }))
 }
 
