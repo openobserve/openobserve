@@ -49,7 +49,7 @@ const enterpriseResolverPlugin = {
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
       if (
-        process.env.VITE_ZINCOBSERVE_CLOUD == "true" &&
+        process.env.VITE_OPENOBSERVE_CLOUD == "true" &&
         (await fs.pathExists(enterprisePath))
       ) {
         return enterprisePath;
@@ -76,7 +76,7 @@ function monacoEditorTestResolver() {
 }
 
 // let filePath = path.resolve(process.cwd(), "src");
-// if (process.env.VITE_ZINCOBSERVE_CLOUD === "true") {
+// if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
 // const filePath = path.resolve(process.cwd(), "src/enterprise");
 // }
 

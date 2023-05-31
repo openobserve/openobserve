@@ -12,7 +12,7 @@ import store from "./store";
 import "../../__mocks__/index";
 import home from "../mockData/home";
 
-import.meta.env.VITE_ZINCOBSERVE_ENDPOINT = "http://localhost:8080";
+import.meta.env.VITE_OPENOBSERVE_ENDPOINT = "http://localhost:8080";
 
 // TODO OK: Move below rest handlers to separate file
 export const restHandlers = [

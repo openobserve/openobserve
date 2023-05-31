@@ -3,20 +3,20 @@
 
 # [Zinc Cloud](https://observe.zinc.dev) | [Docs](https://zinc.dev/docs) | [Slack](https://join.slack.com/t/zinc-nvh4832/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg) | [Website](https://zinc.dev) 
 
-# ZincObserve
-ZincObserve is a cloud native observability platform built specifically for logs, metrics, traces and analytics designed to work at petabyte scale.
+# OpenObserve
+OpenObserve is a cloud native observability platform built specifically for logs, metrics, traces and analytics designed to work at petabyte scale.
 
 It is very simple and easy to operate as opposed to Elasticsearch which requires a couple dozen knobs to understand and tune which you can get up and running in under 2 minutes.
 
-It is a drop-in replacement for Elasticsearch if you are just ingesting data using APIs and searching using kibana (Kibana is not supported nor required with ZincObserve. ZincObserve provides its own UI which does not require separate installation unlike kibana).
+It is a drop-in replacement for Elasticsearch if you are just ingesting data using APIs and searching using kibana (Kibana is not supported nor required with OpenObserve. OpenObserve provides its own UI which does not require separate installation unlike kibana).
 
-You can reduce your log storage costs by ~140x compared to Elasticsearch by using ZincObserve. Below are the results when we pushed logs from our production kubernetes cluster to Elasticsearch and ZincObserve using fluentbit. ZincObserve stored data in Amazon s3 and Elasticsearch stored data on Amazon EBS volumes.
+You can reduce your log storage costs by ~140x compared to Elasticsearch by using OpenObserve. Below are the results when we pushed logs from our production kubernetes cluster to Elasticsearch and OpenObserve using fluentbit. OpenObserve stored data in Amazon s3 and Elasticsearch stored data on Amazon EBS volumes.
 
-![ZincObserve Vs ElasticSearch](./screenshots/zo_vs_es.png)
+![OpenObserve Vs ElasticSearch](./screenshots/zo_vs_es.png)
 
 ## Introduction video
 
-[![ZincObserve Introduction](./screenshots/zo_intro_youtube.png)](https://www.youtube.com/watch?v=cPMH1Am2_zM)
+[![OpenObserve Introduction](./screenshots/zo_intro_youtube.png)](https://www.youtube.com/watch?v=cPMH1Am2_zM)
 
 ## Features:
 
@@ -27,7 +27,7 @@ Some of the features are:
 1. Ingest and Query functions to aid advanced capabilities like enrichment, redaction, log reduction, compliance, etc. e.g. you can use ingest functions to redact sensitive data like email IDs, AWS keys, etc. from logs before the get stored in logs.
 1. Advanced Embedded GUI
 1. SQL for Logs and Traces. SQL and PromQL for metrics. No need to learn yet another query language.
-1. Single binary for installation & running. Binaries available under [releases](https://github.com/zinclabs/zincobserve/releases) for multiple platforms.
+1. Single binary for installation & running. Binaries available under [releases](https://github.com/zinclabs/openobserve/releases) for multiple platforms.
 1. Storage in local Disk, s3, MinIO, GCS
 1. High availability and clustering
 1. Drop in replacement for elasticsearch
@@ -36,16 +36,16 @@ Some of the features are:
 1. Vastly easier to operate
 1. Seamless upgrades
 
-For full list of features check [documentation](https://docs.zinc.dev/ZincObserve/#project-status-features-and-roadmap)
+For full list of features check [documentation](https://zinc.dev/docs/guide/#project-status-features-and-roadmap)
 
 
 # Installation
 
-You can install ZincObserve in under 2 minutes by following the [quickstart](https://docs.zinc.dev/ZincObserve/quickstart/) documentation
+You can install OpenObserve in under 2 minutes by following the [quickstart](https://zinc.dev/docs/guide/quickstart/) documentation
 
-# ZincObserve Cloud 
+# OpenObserve Cloud 
 
-You can also try ZincObserve without installing it in under 2 minutes by trying out ZincObserve Cloud  at [https://observe.zinc.dev](https://observe.zinc.dev)
+You can also try OpenObserve without installing it in under 2 minutes by trying out OpenObserve Cloud  at [https://observe.zinc.dev](https://observe.zinc.dev)
 
 # Screenshots
 
@@ -86,7 +86,7 @@ You can also try ZincObserve without installing it in under 2 minutes by trying 
 
 # Community
 
-- #### How to develop and contribute to ZincObserve
+- #### How to develop and contribute to OpenObserve
 
   Check the [contributing guide](./CONTRIBUTING.md) . Also check the [roadmap items](https://github.com/orgs/zinclabs/projects/7)
 

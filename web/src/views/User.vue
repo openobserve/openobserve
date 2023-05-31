@@ -22,7 +22,7 @@ export default defineComponent({
   },
   created() {
     // check condition here and set the componentName accordingly
-    if (config.isZincObserveCloud == "true") {
+    if (config.isOpenObserveCloud == "true") {
       this.componentName = "UsersCloud";
     } else {
       this.componentName = "UsersOpenSource";

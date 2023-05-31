@@ -14,38 +14,45 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::sdk::{trace as sdktrace, Resource};
-use opentelemetry::KeyValue;
+use opentelemetry::{
+    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
+    KeyValue,
+};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{prelude::*, Registry};
 
-use zincobserve::handler::grpc::auth::check_auth;
-use zincobserve::handler::grpc::cluster_rpc::event_server::EventServer;
-use zincobserve::handler::grpc::cluster_rpc::metrics_server::MetricsServer;
-use zincobserve::handler::grpc::cluster_rpc::search_server::SearchServer;
-use zincobserve::handler::grpc::request::{
-    event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer,
+use openobserve::{
+    handler::{
+        grpc::{
+            auth::check_auth,
+            cluster_rpc::{
+                event_server::EventServer, metrics_server::MetricsServer,
+                search_server::SearchServer,
+            },
+            request::{event::Eventer, metrics::Querier, search::Searcher, traces::TraceServer},
+        },
+        http::router::*,
+    },
+    infra::{
+        cluster,
+        config::{self, CONFIG},
+        file_lock, metrics,
+    },
+    job, meta,
+    service::{db, router, users},
 };
-use zincobserve::handler::http::router::*;
-
-use zincobserve::infra::cluster;
-use zincobserve::infra::config::{self, CONFIG};
-use zincobserve::infra::file_lock;
-use zincobserve::infra::metrics;
-use zincobserve::meta::telemetry::Telemetry;
-use zincobserve::service::db;
-use zincobserve::service::router;
-use zincobserve::service::users;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -66,7 +73,7 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
-    log::info!("Starting ZincObserve {}", config::VERSION);
+    log::info!("Starting OpenObserve {}", config::VERSION);
 
     // init jobs
     // it must be initialized before the server starts
@@ -75,7 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
         cluster::register_and_keepalive()
             .await
             .expect("cluster init failed");
-        zincobserve::job::init().await.expect("job init failed");
+        job::init().await.expect("job init failed");
         tx.send(true).unwrap();
     });
 
@@ -97,8 +104,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
     let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
-    Telemetry::new()
-        .event("ZincObserve - Starting server", None, false)
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Starting server", None, false)
         .await;
 
     HttpServer::new(move || {
@@ -163,8 +170,8 @@ async fn main() -> Result<(), anyhow::Error> {
     .await?;
 
     // stop telemetry
-    Telemetry::new()
-        .event("ZincObserve - Server stopped", None, false)
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Server stopped", None, false)
         .await;
     // leave the cluster
     let _ = cluster::leave().await;
@@ -236,12 +243,12 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
 }
 
 async fn cli() -> Result<bool, anyhow::Error> {
-    let app = clap::Command::new("zincobserve")
+    let app = clap::Command::new("openobserve")
         .version(env!("GIT_VERSION"))
         .about(clap::crate_description!())
         .subcommands(&[
             clap::Command::new("reset")
-                .about("reset zincobserve data")
+                .about("reset openobserve data")
                 .arg(
                     clap::Arg::new("component")
                         .short('c')
@@ -251,7 +258,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         ),
                 ),
             clap::Command::new("view")
-                .about("view zincobserve data")
+                .about("view openobserve data")
                 .arg(
                     clap::Arg::new("component")
                         .short('c')
@@ -272,11 +279,11 @@ async fn cli() -> Result<bool, anyhow::Error> {
             match component.as_str() {
                 "root" => {
                     let _ = users::post_user(
-                        zincobserve::meta::organization::DEFAULT_ORG,
-                        zincobserve::meta::user::UserRequest {
+                        meta::organization::DEFAULT_ORG,
+                        meta::user::UserRequest {
                             email: CONFIG.auth.root_user_email.clone(),
                             password: CONFIG.auth.root_user_password.clone(),
-                            role: zincobserve::meta::user::UserRole::Root,
+                            role: meta::user::UserRole::Root,
                             first_name: "root".to_owned(),
                             last_name: "".to_owned(),
                         },

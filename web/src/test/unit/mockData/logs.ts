@@ -20,7 +20,7 @@ export default {
         kubernetes_namespace_name: "ziox",
         kubernetes_pod_id: "810e7dbc-fb09-4a8f-9108-6b8785754af9",
         kubernetes_pod_name: "ziox-querier-595748494c-7xqlg",
-        log: '[2022-12-27T14:12:29Z INFO  zinc_enl::service::search::datafusion] search file: Bhargav_organization_29/logs/default/2022/12/23/12/7012038228660338688.parquet, need add columns: ["from"]',
+        log: '[2022-12-27T14:12:29Z INFO  openobserve::service::search::datafusion] search file: Bhargav_organization_29/logs/default/2022/12/23/12/7012038228660338688.parquet, need add columns: ["from"]',
         stream: "stderr",
       },
       {

@@ -34,31 +34,31 @@ phases:
       # - echo 'Push manifests'
       # - docker manifest push public.ecr.aws/zinclabs/rust:bullseye-sccache
 
-      # build zincobserve
+      # build openobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t zincobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
-      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
-      - docker tag zincobserve:latest-arm64 public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
+      - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
 
       - echo 'Pull amd64 image'
-      - docker pull public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64
-      - docker pull public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64
+      - docker pull public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
+      - docker pull public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
 
       - echo 'Create manifests'
-      - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64
-      - docker manifest create public.ecr.aws/zinclabs/zincobserve-dev:latest --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/zincobserve-dev:latest-arm64
+      - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker manifest create public.ecr.aws/zinclabs/openobserve-dev:latest --amend public.ecr.aws/zinclabs/openobserve-dev:latest-amd64 --amend public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
 
       - echo 'Push manifests'
-      - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH
-      - docker manifest push public.ecr.aws/zinclabs/zincobserve-dev:latest
+      - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
+      - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
 
-      # build zincobserve-mimalloc
+      # build openobserve-mimalloc
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t zincobserve:latest-arm64-mimalloc -f deploy/build/Dockerfile.mimalloc.aarch64 .
-      - docker tag zincobserve:latest-arm64-mimalloc public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
-      - docker push public.ecr.aws/zinclabs/zincobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
+      - docker build -t openobserve:latest-arm64-mimalloc -f deploy/build/Dockerfile.mimalloc.aarch64 .
+      - docker tag openobserve:latest-arm64-mimalloc public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
 
 cache:
   paths:

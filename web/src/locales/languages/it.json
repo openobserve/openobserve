@@ -32,7 +32,6 @@
     "signOut": "Esci",
     "account": "Conto",
     "feedback": "Feedback",
-    "zincSearch": "Ricerca in zinco",
     "documentation": "Documenti",
     "tickets": "Biglietto",
     "organizations": "Organizzazioni",
@@ -46,7 +45,7 @@
     "docs": "Documenti"
   },
   "about": {
-    "name": "Zinco",
+    "name": "OpenObserve",
     "introduction": "Osservabilità semplificata."
   },
   "login": {

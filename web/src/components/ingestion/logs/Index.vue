@@ -275,7 +275,7 @@ export default defineComponent({
     };
 
     const showSyslog = computed(() => {
-      return config.isZincObserveCloud !== "true";
+      return config.isOpenObserveCloud !== "true";
     });
 
     return {

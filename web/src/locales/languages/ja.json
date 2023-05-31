@@ -32,7 +32,6 @@
     "signOut": "サインアウト",
     "account": "アカウント",
     "feedback": "フィードバック",
-    "zincSearch": "亜鉛サーチ",
     "documentation": "ドキュメント",
     "tickets": "チケット",
     "organizations": "組織",
@@ -46,7 +45,7 @@
     "docs": "ドキュメント"
   },
   "about": {
-    "name": "亜鉛",
+    "name": "OpenObserve",
     "introduction": "オブザーバビリティがシンプルになりました。"
   },
   "login": {

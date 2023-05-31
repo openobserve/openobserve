@@ -39,7 +39,7 @@ pub fn get_stream_file_num_v1(file_name: &str) -> u32 {
 
 #[inline(always)]
 pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String {
-    // creates file name like "./data/zincobserve/olympics/olympics#2022#09#13#13_1.json"
+    // creates file name like "./data/openobserve/olympics/olympics#2022#09#13#13_1.json"
     format!(
         "{}{}/{}/{}/{}_{}{}",
         &CONFIG.common.data_wal_dir,
@@ -111,7 +111,7 @@ mod tests {
 
         for i in 0..suffix_nums.len() {
             let suffix = increment_stream_file_num_v1(&format!(
-                "./data/zincobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
+                "./data/openobserve/WAL/nexus/logs/olympics/1663064862606912_{}.json",
                 suffix_nums[i]
             ));
             assert_eq!(suffix, suffix_nums[i] + 1);
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_get_stream_file_num_v1() {
         let file_key =
-            get_stream_file_num_v1("./data/zincobserve/WAL/logs/nexus/Olympics/Olympics_2.json");
+            get_stream_file_num_v1("./data/openobserve/WAL/logs/nexus/Olympics/Olympics_2.json");
         assert_eq!(file_key, 2);
     }
 

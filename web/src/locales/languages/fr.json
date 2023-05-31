@@ -32,7 +32,6 @@
     "signOut": "Déconnectez-vous",
     "account": "Compte",
     "feedback": "Feedback",
-    "zincSearch": "Recherche de zinc",
     "documentation": "Documents",
     "tickets": "Billet",
     "organizations": "Organisations",
@@ -46,7 +45,7 @@
     "docs": "Documents"
   },
   "about": {
-    "name": "Zinc",
+    "name": "OpenObserve",
     "introduction": "Observabilité simplifiée."
   },
   "login": {

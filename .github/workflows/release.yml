@@ -14,32 +14,32 @@ jobs:
           - arch: x86_64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
             features: ""
-            file_name: zincobserve-${{ github.ref_name }}-linux-amd64
+            file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
             os: ubuntu-2004-8-cores
             features: ""
-            file_name: zincobserve-${{ github.ref_name }}-linux-amd64-musl
+            file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
             features: ""
-            file_name: zincobserve-${{ github.ref_name }}-linux-arm64
+            file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
             os: macos-latest
             features: ""
-            file_name: zincobserve-${{ github.ref_name }}-darwin-amd64
+            file_name: openobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
             features: "--no-default-features"
-            file_name: zincobserve-${{ github.ref_name }}-darwin-arm64
+            file_name: openobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
             os: windows-2022-16-cores
             features: ""
-            file_name: zincobserve-${{ github.ref_name }}-windows-amd64
+            file_name: openobserve-${{ github.ref_name }}-windows-amd64
             file_ext: .zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -129,8 +129,8 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.arch }}/release
-          chmod +x zincobserve
-          tar -zcvf ${{ matrix.file_name }}.tar.gz zincobserve
+          chmod +x openobserve
+          tar -zcvf ${{ matrix.file_name }}.tar.gz openobserve
           echo $(shasum -a 256 ${{ matrix.file_name }}.tar.gz | cut -f1 -d' ') > ${{ matrix.file_name }}.tar.gz.sha256sum
 
       - name: Calculate checksum and rename binary for windows
@@ -138,7 +138,7 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.arch }}/release
-          7z a -tzip ${{ matrix.file_name }}.zip zincobserve.exe
+          7z a -tzip ${{ matrix.file_name }}.zip openobserve.exe
           certutil.exe -hashfile ${{ matrix.file_name }}.zip sha256|head -n 2|tail -n 1 > ${{ matrix.file_name }}.zip.sha256sum
 
       - name: Upload artifacts
@@ -169,4 +169,4 @@ jobs:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
-            **/zincobserve-*
+            **/openobserve-*

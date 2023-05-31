@@ -261,7 +261,7 @@ export const getPath = () => {
       ? window.location.pathname.slice(0, pos + 5)
       : window.location.pathname;
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isZincObserveCloud == "true" ? cloudPath : path;
+  return config.isOpenObserveCloud == "true" ? cloudPath : path;
 };
 
 export const routeGuardPendingSubscriptions = (
@@ -273,7 +273,7 @@ export const routeGuardPendingSubscriptions = (
   local_organization.value = useLocalOrganization();
   if (
     local_organization.value.value == null ||
-    config.isZincObserveCloud == "false"
+    config.isOpenObserveCloud == "false"
   ) {
     next();
   }

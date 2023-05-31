@@ -145,11 +145,11 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
-    #[env_config(name = "ZO_DATA_DIR", default = "./data/zincobserve/")]
+    #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
     pub data_dir: String,
-    #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/zincobserve/wal/
+    #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/
     pub data_wal_dir: String,
-    #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/zincobserve/stream/
+    #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
@@ -300,7 +300,7 @@ pub struct Etcd {
 
 #[derive(EnvConfig)]
 pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/zincobserve/db/
+    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
     pub data_dir: String,
     #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
     pub prefix: String,
@@ -427,7 +427,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.data_dir.is_empty() {
-        cfg.common.data_dir = "./data/zincobserve/".to_string();
+        cfg.common.data_dir = "./data/openobserve/".to_string();
     }
     if !cfg.common.data_dir.ends_with('/') {
         cfg.common.data_dir = format!("{}/", cfg.common.data_dir);
