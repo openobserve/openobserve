@@ -70,7 +70,7 @@ pub async fn send_logs() {
         logs.push(val);
 
         if logs.len() >= CONFIG.log.events_batch_size {
-            let old_logs = std::mem::replace(&mut *logs, Vec::new());
+            let old_logs = std::mem::take(&mut *logs);
             let url = url::Url::parse(&CONFIG.log.events_url).unwrap();
             let auth = format!("Basic {}", &CONFIG.log.events_auth);
             let cl = Arc::clone(&cl);
