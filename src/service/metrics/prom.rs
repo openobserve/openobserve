@@ -220,16 +220,15 @@ pub async fn remote_write(
             // End get stream alert
 
             #[cfg(feature = "zo_functions")]
-            let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
+            let mut runtime = crate::service::ingestion::init_functions_runtime();
 
             // Start Register Transforms for stream
             #[cfg(feature = "zo_functions")]
-            let (local_tans, stream_lua_map, stream_vrl_map) =
+            let (local_tans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
                     StreamType::Metrics,
                     &metric_name,
-                    Some(&lua),
                 );
             // End Register Transforms for stream
 
@@ -244,8 +243,6 @@ pub async fn remote_write(
             let mut value = crate::service::ingestion::apply_stream_transform(
                 &local_tans,
                 &value,
-                Some(&lua),
-                Some(&stream_lua_map),
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,

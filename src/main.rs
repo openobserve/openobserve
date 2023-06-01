@@ -14,6 +14,7 @@
 
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
+use log::LevelFilter;
 use opentelemetry::{
     sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
     KeyValue,
@@ -23,6 +24,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::Trac
 use std::{
     collections::HashMap,
     net::SocketAddr,
+    str::FromStr,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
@@ -34,6 +36,7 @@ use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 
 use openobserve::{
+    common::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
             auth::check_auth,
@@ -68,7 +71,16 @@ async fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if CONFIG.common.tracing_enabled {
+    if CONFIG.log.events_enabled {
+        let logger = ZoLogger {
+            sender: EVENT_SENDER.clone(),
+        };
+        log::set_boxed_logger(Box::new(logger)).map(|()| {
+            log::set_max_level(
+                LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
+            )
+        })?;
+    } else if CONFIG.common.tracing_enabled {
         enable_tracing()?;
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
@@ -95,7 +107,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online().await;
 
-    //This is specifically for lookup tables caching happening using search service
+    //This is specifically for lookup tables,as caching is happening using search service
     db::schema::cache().await.expect("schema cache failed");
 
     // metrics
@@ -108,7 +120,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .event("OpenObserve - Starting server", None, false)
         .await;
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
         if CONFIG.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
@@ -165,9 +177,11 @@ async fn main() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .bind(haddr)?
-    .run()
-    .await?;
+    .bind(haddr)?;
+
+    tokio::task::spawn(async move { zo_logger::send_logs().await });
+
+    server.run().await?;
 
     // stop telemetry
     meta::telemetry::Telemetry::new()
