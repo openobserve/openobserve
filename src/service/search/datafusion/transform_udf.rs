@@ -197,14 +197,14 @@ fn get_udf_vrl(
 
 pub fn _compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
     let mut fields = vec![];
-    let result = vrl::compiler::compile(func, &vrl_stdlib::all());
+    let result = vrl::compiler::compile(func, &vrl::stdlib::all());
     match result {
         Ok(CompilationResult {
             program,
             warnings: _,
             config: _,
         }) => {
-            let state = program.final_type_state();
+            let state = program.initial_type_state();
             if let Some(ext) = state.external.target_kind().as_object() {
                 for k in ext.known().keys() {
                     fields.push(k.to_string());
@@ -222,11 +222,11 @@ pub fn _compile_vrl_function(func: &str) -> Option<(Program, Vec<String>)> {
 pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> json::Value {
     let obj_str = String::from("");
 
-    let mut metadata = vrl_value::Value::from(BTreeMap::new());
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut vrl_value::Value::from(obj_str),
+        value: &mut vrl::value::Value::from(obj_str),
         metadata: &mut metadata,
-        secrets: &mut vrl_value::Secrets::new(),
+        secrets: &mut vrl::value::Secrets::new(),
     };
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match VrlRuntime::default() {

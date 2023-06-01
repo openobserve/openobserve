@@ -86,11 +86,11 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
 
 #[cfg(feature = "zo_functions")]
 pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: &Value) -> Value {
-    let mut metadata = vrl_value::Value::from(BTreeMap::new());
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
-        value: &mut vrl_value::Value::from(row),
+        value: &mut vrl::value::Value::from(row),
         metadata: &mut metadata,
-        secrets: &mut vrl_value::Secrets::new(),
+        secrets: &mut vrl::value::Secrets::new(),
     };
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match vrl::compiler::VrlRuntime::default() {
