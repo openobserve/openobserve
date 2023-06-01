@@ -69,6 +69,7 @@ clap = { version = "4.1", default-features = false, features = [
   "suggestions",
   "cargo",
 ] }
+cloudevents-sdk = { version = "0.7.0",features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "22", features = ["simd"] }

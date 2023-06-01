@@ -87,7 +87,7 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 
 - #### How to develop and contribute to OpenObserve
 
-  Check the [contributing guide](./CONTRIBUTING.md) . Also check the [roadmap items](https://github.com/orgs/zinclabs/projects/7)
+  Check the [contributing guide](./CONTRIBUTING.md) . Also check the [roadmap items](https://github.com/orgs/openobserve/projects/7)
 
 - #### Join our Slack Channel
 
