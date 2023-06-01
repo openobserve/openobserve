@@ -97,17 +97,23 @@
           </div>
           <template v-if="showDataRetention">
             <q-separator class="q-mt-lg q-mb-lg" />
-            <div class="row flex items-center">
+            <div class="row flex items-center q-pb-xs">
               <label class="q-pr-sm text-bold">Data Retention (in days)</label>
               <q-input
-                data-test="add-alert-duration-input"
+                data-test="stream-details-data-retention-input"
                 v-model="dataRetentionDays"
                 type="number"
                 dense
                 filled
                 min="0"
                 round
+                class="q-mr-sm data-retention-input"
+                :rules="[(val: any) => (!!val && val > 0) || 'Retention period must be at least 1 day']"
               ></q-input>
+              <div>
+                <span class="text-bold">Note:</span> Global data retention
+                period is {{ store.state.zoConfig.data_retention_days }} days
+              </div>
             </div>
           </template>
           <q-separator class="q-mt-lg q-mb-lg" />
@@ -215,6 +221,7 @@ import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import store from "@/test/unit/helpers/store";
 
 const defaultValue: any = () => {
   return {
@@ -314,7 +321,10 @@ export default defineComponent({
             }
           }
 
-          dataRetentionDays.value = res.data.settings.data_retention;
+          if (showDataRetention.value)
+            dataRetentionDays.value =
+              res.data.settings.data_retention ||
+              store.state.zoConfig.data_retention_days;
 
           dismiss();
         });
@@ -326,8 +336,18 @@ export default defineComponent({
         full_text_search_keys: [],
       };
 
+      if (showDataRetention.value && dataRetentionDays.value < 1) {
+        q.notify({
+          color: "negative",
+          message:
+            "Invalid Data Retention Period: Retention period must be at least 1 day.",
+          timeout: 4000,
+        });
+        return;
+      }
+
       if (showDataRetention.value) {
-        settings["data_retention"] = dataRetentionDays;
+        settings["data_retention"] = Number(dataRetentionDays.value);
       }
 
       let added_part_keys = [];
@@ -390,6 +410,7 @@ export default defineComponent({
     return {
       t,
       q,
+      store,
       isCloud,
       indexData,
       getSchema,
@@ -493,6 +514,15 @@ export default defineComponent({
           border-radius: 0 0 0.5rem 0.5rem;
         }
       }
+    }
+  }
+
+  .data-retention-input {
+    &.q-field {
+      padding-bottom: 0 !important;
+    }
+    .q-field__bottom {
+      padding: 8px 0;
     }
   }
 }
