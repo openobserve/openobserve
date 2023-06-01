@@ -269,29 +269,30 @@ export const routeGuardPendingSubscriptions = (
   from: any,
   next: any
 ) => {
-  const local_organization = ref();
-  local_organization.value = useLocalOrganization();
-  if (local_organization.value.value == null || config.isCloud == "false") {
-    next();
-  }
+  next();
+  // const local_organization = ref();
+  // local_organization.value = useLocalOrganization();
+  // if (local_organization.value.value == null || config.isCloud == "false") {
+  //   next();
+  // }
 
-  if (local_organization.value.value.status == "pending-subscription") {
-    Dialog.create({
-      title: "Confirmation",
-      message: "Please subscribe to a paid plan to continue.",
-      cancel: true,
-      persistent: true,
-    })
-      .onOk(() => {
-        const nextURL = getPath().replace(".", "") + "billings/plans";
-        next(nextURL);
-      })
-      .onCancel(() => {
-        return false;
-      });
-  } else {
-    next();
-  }
+  // if (local_organization.value.value.status == "pending-subscription") {
+  //   Dialog.create({
+  //     title: "Confirmation",
+  //     message: "Please subscribe to a paid plan to continue.",
+  //     cancel: true,
+  //     persistent: true,
+  //   })
+  //     .onOk(() => {
+  //       const nextURL = getPath().replace(".", "") + "billings/plans";
+  //       next(nextURL);
+  //     })
+  //     .onCancel(() => {
+  //       return false;
+  //     });
+  // } else {
+  //   next();
+  // }
 };
 
 export const convertToTitleCase = (str: string) => {
