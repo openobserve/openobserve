@@ -20,15 +20,16 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crate::common::file::{get_file_meta, scan_files};
+use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::infra::{
+    cache::tmpfs,
     config::{self, CONFIG},
     errors::{Error, ErrorCodes},
+    file_lock, ider,
 };
 use crate::meta;
 use crate::service::{
     db,
-    file_list::calculate_local_files_size,
     search::{datafusion::storage::StorageType, sql::Sql},
 };
 
@@ -43,27 +44,36 @@ pub async fn search(
     let searching = Searching::new();
 
     // get file list
-    let files = get_file_list(&sql, stream_type).await?;
-    let file_count = files.len();
+    let mut files = get_file_list(&sql, stream_type).await?;
+    let mut scan_size = 0;
 
+    // cache files
+    let work_dir = session_id.to_string();
+    for file in &files {
+        if let Ok(file_data) = get_file_contents(file) {
+            scan_size += file_data.len();
+            let file_name = format!("/{work_dir}/{}", file.split('/').last().unwrap_or_default());
+            tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+        }
+    }
+
+    // check wal memory mode
+    if CONFIG.common.wal_memory_mode_enabled {
+        let mem_files = file_lock::get_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
+            .unwrap_or_default();
+        for file_data in mem_files {
+            scan_size += file_data.len();
+            let file_name = format!("/{work_dir}/{}.json", ider::generate());
+            tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+            files.push(file_name);
+        }
+    }
+
+    let file_count = files.len();
     if file_count == 0 {
         return Ok((HashMap::new(), 0, 0));
     }
-
-    let scan_size = match calculate_local_files_size(&files).await {
-        Ok(size) => size,
-        Err(err) => {
-            log::error!("calculate files size error: {}", err);
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                "calculate files size error".to_string(),
-            )));
-        }
-    };
-    log::info!(
-        "wal->search: load files {}, scan_size {}",
-        file_count,
-        scan_size
-    );
+    log::info!("wal->search: load files {file_count}, scan_size {scan_size}");
 
     // fetch all schema versions, get latest schema
     let schema = match db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
@@ -83,7 +93,7 @@ pub async fn search(
 
     let session = meta::search::Session {
         id: session_id.to_string(),
-        storage_type: StorageType::Wal,
+        storage_type: StorageType::Tmpfs,
     };
     let result = match super::datafusion::exec::sql(
         &session,
@@ -106,7 +116,10 @@ pub async fn search(
     // searching done.
     drop(searching);
 
-    Ok((result, file_count, scan_size as usize))
+    // clear tmpfs
+    tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
+
+    Ok((result, file_count, scan_size))
 }
 
 /// get file list from local wal, no need match_source, each file will be searched

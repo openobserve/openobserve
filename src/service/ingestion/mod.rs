@@ -16,10 +16,12 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
+use datafusion::arrow::json::reader::infer_json_schema;
 #[cfg(feature = "zo_functions")]
 use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
 #[cfg(feature = "zo_functions")]
 use std::collections::BTreeMap;
+use std::io::BufReader;
 #[cfg(feature = "zo_functions")]
 use vector_enrichment::TableRegistry;
 #[cfg(feature = "zo_functions")]
@@ -29,7 +31,7 @@ use vrl::compiler::{runtime::Runtime, CompilationResult};
 #[cfg(feature = "zo_functions")]
 use vrl::prelude::state;
 
-use super::triggers;
+use super::{db, triggers};
 #[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
 #[cfg(feature = "zo_functions")]
@@ -141,9 +143,9 @@ pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
 
 #[cfg(feature = "zo_functions")]
 pub async fn get_stream_transforms<'a>(
-    stream_name: String,
-    org_id: String,
+    org_id: &str,
     stream_type: StreamType,
+    stream_name: &str,
     stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut AHashMap<String, VRLRuntimeConfig>,
     stream_lua_map: &mut AHashMap<String, Function<'a>>,
@@ -156,21 +158,21 @@ pub async fn get_stream_transforms<'a>(
     let mut _local_tans: Vec<StreamTransform> = vec![];
     (_local_tans, *stream_lua_map, *stream_vrl_map) =
         crate::service::ingestion::register_stream_transforms(
-            &org_id,
-            &stream_name,
+            org_id,
             stream_type,
+            stream_name,
             Some(lua),
         );
     stream_transform_map.insert(key, _local_tans);
 }
 
 pub async fn get_stream_partition_keys(
-    stream_name: String,
-    stream_schema_map: AHashMap<String, Schema>,
+    stream_name: &str,
+    stream_schema_map: &AHashMap<String, Schema>,
 ) -> Vec<String> {
     let mut keys: Vec<String> = vec![];
-    if stream_schema_map.contains_key(&stream_name) {
-        let schema = stream_schema_map.get(&stream_name).unwrap();
+    if stream_schema_map.contains_key(stream_name) {
+        let schema = stream_schema_map.get(stream_name).unwrap();
         let mut meta = schema.metadata().clone();
         meta.remove("created_at");
 
@@ -260,8 +262,8 @@ pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
 #[cfg(feature = "zo_functions")]
 pub fn register_stream_transforms<'a>(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     lua: Option<&'a Lua>,
 ) -> (
     Vec<StreamTransform>,
@@ -332,13 +334,48 @@ pub fn format_stream_name(stream_name: &str) -> String {
     stream_name.replace('/', "_").replace('=', "-")
 }
 
+pub async fn chk_schema_by_record(
+    stream_schema_map: &mut AHashMap<String, Schema>,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    record_ts: i64,
+    record_val: &str,
+) {
+    let schema = if stream_schema_map.contains_key(stream_name) {
+        stream_schema_map.get(stream_name).unwrap().clone()
+    } else {
+        let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+            .await
+            .unwrap();
+        stream_schema_map.insert(stream_name.to_string(), schema.clone());
+        schema
+    };
+    if !schema.fields().is_empty() {
+        return;
+    }
+
+    let mut schema_reader = BufReader::new(record_val.as_bytes());
+    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+    let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
+    stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type,
+        &inferred_schema,
+        Some(record_ts),
+    )
+    .await
+    .unwrap();
+}
+
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: actix_web::web::Data<usize>,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    stream_file_name: &mut String,
 ) {
     let mut write_buf = BytesMut::new();
     for (key, entry) in buf {
@@ -358,9 +395,6 @@ pub fn write_file(
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
-        if stream_file_name.is_empty() {
-            *stream_file_name = file.full_name();
-        }
         file.write(write_buf.as_ref());
 
         // metrics
@@ -433,7 +467,7 @@ mod tests {
         );
         let schema = Schema::new(vec![]).with_metadata(meta);
         stream_schema_map.insert("olympics".to_string(), schema);
-        let keys = get_stream_partition_keys("olympics".to_string(), stream_schema_map).await;
+        let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
         assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);
     }
 

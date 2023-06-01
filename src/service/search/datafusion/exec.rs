@@ -59,7 +59,7 @@ pub async fn sql(
     schema: Option<Arc<Schema>>,
     rules: HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    files: &Vec<String>,
+    files: &[String],
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
     if files.is_empty() {

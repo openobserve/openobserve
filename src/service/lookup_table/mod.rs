@@ -13,24 +13,30 @@
 // limitations under the License.
 
 use actix_multipart::Multipart;
-use actix_web::http::{self, StatusCode};
-use actix_web::{web, HttpResponse};
+use actix_web::{
+    http::{self, StatusCode},
+    web, HttpResponse,
+};
 use ahash::AHashMap;
 use chrono::{TimeZone, Utc};
+use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
-use std::fs::OpenOptions;
 use std::io::Error;
 
-use super::compact::delete;
-use super::db;
-use super::ingestion::write_file;
-use super::schema::{add_stream_schema, stream_schema_exists};
 use crate::common::json;
-use crate::infra::cache::stats;
-use crate::infra::cluster;
-use crate::infra::config::{CONFIG, STREAM_SCHEMAS};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::{self, StreamType};
+use crate::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, STREAM_SCHEMAS},
+};
+use crate::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+
+use super::{
+    compact::delete,
+    db,
+    ingestion::{chk_schema_by_record, write_file},
+    schema::stream_schema_exists,
+};
 
 pub async fn save_metadata(
     org_id: &str,
@@ -61,11 +67,12 @@ pub async fn save_metadata(
         );
     }
 
+    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
         StreamType::LookUpTable,
-        &mut AHashMap::new(),
+        &mut stream_schema_map,
     )
     .await;
 
@@ -99,12 +106,22 @@ pub async fn save_metadata(
                         CONFIG.common.column_timestamp.clone(),
                         json::Value::Number(timestamp.into()),
                     );
+                    let value_str = json::to_string(&json_record).unwrap();
+                    chk_schema_by_record(
+                        &mut stream_schema_map,
+                        org_id,
+                        StreamType::LookUpTable,
+                        stream_name,
+                        timestamp,
+                        &value_str,
+                    )
+                    .await;
 
                     if records.is_empty() {
                         hour_key =
                             super::ingestion::get_hour_key(timestamp, vec![], json_record.clone());
                     }
-                    records.push(json::to_string(&json_record).unwrap());
+                    records.push(value_str);
                 }
             }
         }
@@ -119,31 +136,8 @@ pub async fn save_metadata(
         );
     }
 
-    let mut stream_file_name = "".to_string();
     buf.insert(hour_key.clone(), records.clone());
-
-    write_file(
-        buf,
-        thread_id,
-        org_id,
-        stream_name,
-        StreamType::LookUpTable,
-        &mut stream_file_name,
-    );
-
-    let file = OpenOptions::new()
-        .read(true)
-        .open(&stream_file_name)
-        .unwrap();
-    add_stream_schema(
-        org_id,
-        stream_name,
-        StreamType::LookUpTable,
-        &file,
-        &mut AHashMap::new(),
-        timestamp,
-    )
-    .await;
+    write_file(buf, thread_id, org_id, stream_name, StreamType::LookUpTable);
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),
