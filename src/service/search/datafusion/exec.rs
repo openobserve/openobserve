@@ -378,12 +378,7 @@ pub async fn merge(
     );
 
     // query data
-    let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(true)
-        .with_batch_size(8192);
-    let mut ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
-
+    let mut ctx = prepare_datafusion_context(true)?;
     // Configure listing options
     let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -664,11 +659,7 @@ pub async fn convert_parquet_file(
 ) -> Result<()> {
     let start = Instant::now();
     // query data
-    let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(false)
-        .with_batch_size(8192);
-    let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
+    let ctx = prepare_datafusion_context(false)?;
 
     // Configure listing options
     let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
@@ -833,6 +824,20 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
     RuntimeEnv::new(rn_config)
 }
 
+pub fn prepare_datafusion_context(
+    information_schema: bool,
+) -> Result<SessionContext, DataFusionError> {
+    let runtime_env = create_runtime_env()?;
+    let session_config = SessionConfig::new()
+        .with_information_schema(information_schema)
+        .with_batch_size(8192)
+        .set_bool("datafusion.execution.parquet.pushdown_filters", true);
+    Ok(SessionContext::with_config_rt(
+        session_config,
+        Arc::new(runtime_env),
+    ))
+}
+
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::match_udf::MATCH_UDF.clone());
     ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
@@ -862,12 +867,8 @@ pub async fn register_table(
         stream_name,
         stream_type,
     } = stream;
-    let runtime_env = create_runtime_env()?;
-    let session_config = SessionConfig::new()
-        .with_information_schema(schema.is_none())
-        .with_batch_size(8192);
-    let ctx = SessionContext::with_config_rt(session_config.clone(), Arc::new(runtime_env));
 
+    let ctx = prepare_datafusion_context(schema.is_none())?;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
