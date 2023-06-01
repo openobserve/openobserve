@@ -271,7 +271,7 @@ pub struct Log {
     pub events_auth: String,
     #[env_config(
         name = "EVENTS_EP",
-        default = "https://api.openobserve.ai/api/debug/acc11/_json"
+        default = "https://api.openobserve.ai/api/debug/events/_json"
     )]
     pub events_url: String,
     #[env_config(name = "EVENTS_BATCH_SIZE", default = 10)]
