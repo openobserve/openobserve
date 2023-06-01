@@ -4151,7 +4151,7 @@ checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
 [[package]]
 name = "path"
 version = "0.1.0"
-source = "https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
 dependencies = [
  "once_cell",
  "regex",
@@ -4162,7 +4162,7 @@ dependencies = [
 [[package]]
 name = "path"
 version = "0.1.0"
-source = "https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
 dependencies = [
  "once_cell",
  "regex",
