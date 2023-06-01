@@ -262,6 +262,20 @@ pub struct MemoryCache {
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
+    #[env_config(name = "EVENTS_ENABLED", default = false)]
+    pub events_enabled: bool,
+    #[env_config(
+        name = "EVENTS_AUTH",
+        default = "cm9vdEBleGFtcGxlLmNvbTpUZ0ZzZFpzTUZQdzg2SzRK"
+    )]
+    pub events_auth: String,
+    #[env_config(
+        name = "EVENTS_EP",
+        default = "https://api.openobserve.ai/api/debug/acc11/_json"
+    )]
+    pub events_url: String,
+    #[env_config(name = "EVENTS_BATCH_SIZE", default = 10)]
+    pub events_batch_size: usize,
 }
 
 #[derive(Debug, EnvConfig)]
