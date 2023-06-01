@@ -12,7 +12,7 @@ pub struct StreamTableConfig {}
 pub struct StreamTable {
     pub org_id: String,
     pub stream_name: String,
-    pub data: Vec<vrl_value::Value>,
+    pub data: Vec<vrl::value::Value>,
 }
 impl StreamTable {}
 
@@ -24,7 +24,8 @@ impl Table for StreamTable {
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_value::Value>, String> {
+    ) -> std::result::Result<BTreeMap<std::string::String, vrl::value::Value>, std::string::String>
+    {
         let resp = get_data(self, conditions, select, case);
         let record = if resp.is_empty() {
             BTreeMap::new()
@@ -41,7 +42,7 @@ impl Table for StreamTable {
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_value::Value>>, String> {
+    ) -> Result<Vec<BTreeMap<String, vrl::value::Value>>, String> {
         let resp = get_data(self, conditions, select, case);
         Ok(resp)
     }
@@ -68,13 +69,13 @@ fn get_data(
     condition: &[vector_enrichment::Condition],
     select: Option<&[String]>,
     case: vector_enrichment::Case,
-) -> Vec<BTreeMap<String, vrl_value::Value>> {
+) -> Vec<BTreeMap<String, vrl::value::Value>> {
     let mut resp = vec![];
-    let filtered: Vec<&vrl_value::Value> = table
+    let filtered: Vec<&vrl::value::Value> = table
         .data
         .iter()
         .filter(|v| {
-            if let vrl_value::Value::Object(map) = v {
+            if let vrl::value::Value::Object(map) = v {
                 for cond in condition {
                     match cond {
                         vector_enrichment::Condition::Equals { field, value } => match case {
@@ -140,7 +141,7 @@ fn get_data(
                     let btree_map: BTreeMap<String, Value> = map
                         .iter()
                         .map(|(k, v)| (k.to_owned(), v.clone()))
-                        .collect::<BTreeMap<String, vrl_value::Value>>();
+                        .collect::<BTreeMap<String, vrl::value::Value>>();
                     resp.push(btree_map);
                 };
             }

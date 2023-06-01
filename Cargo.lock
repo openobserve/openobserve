@@ -157,7 +157,7 @@ dependencies = [
  "futures-util",
  "mio",
  "num_cpus",
- "socket2",
+ "socket2 0.4.9",
  "tokio",
  "tracing",
 ]
@@ -236,7 +236,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "smallvec",
- "socket2",
+ "socket2 0.4.9",
  "time 0.3.21",
  "url",
 ]
@@ -1359,15 +1359,6 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "bstr"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a246e68bb43f6cd9db24bea052a53e40405417c5fb372e3d1a8a7f770a564ef5"
@@ -1415,9 +1406,6 @@ name = "bytes"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bytes-utils"
@@ -1902,52 +1890,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
-name = "datadog-filter"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "datadog-search-syntax",
- "dyn-clone",
- "regex",
-]
-
-[[package]]
-name = "datadog-grok"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "bytes",
- "chrono",
- "chrono-tz",
- "lalrpop",
- "lalrpop-util",
- "nom",
- "once_cell",
- "onig",
- "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "peeking_take_while",
- "regex",
- "serde_json",
- "thiserror",
- "tracing",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-compiler 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
-]
-
-[[package]]
-name = "datadog-search-syntax"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "itertools",
- "once_cell",
- "pest",
- "pest_derive",
- "regex",
-]
-
-[[package]]
 name = "datafusion"
 version = "22.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2212,14 +2154,14 @@ checksum = "210ec60ae7d710bed8683e333e9d2855a8a56a3e9892b38bad3bb0d4d29b0d5e"
 
 [[package]]
 name = "dns-lookup"
-version = "1.0.8"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
+checksum = "8f332aa79f9e9de741ac013237294ef42ce2e9c6394dc7d766725812f1238812"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "socket2",
- "winapi 0.3.9",
+ "socket2 0.5.3",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2279,13 +2221,13 @@ dependencies = [
 [[package]]
 name = "enrichment"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
+source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
 dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
  "vector-common",
- "vrl 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl 0.4.0 (git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8)",
 ]
 
 [[package]]
@@ -2319,15 +2261,6 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
-]
-
-[[package]]
-name = "erased-serde"
-version = "0.3.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f2b0c2380453a92ea8b6c8e5f64ecaafccddde8ceab55ff7a8ac1029f894569"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -2684,7 +2617,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "029d74589adefde59de1a0c4f4732695c32805624aec7b68d91503d4dba79afc"
 dependencies = [
  "aho-corasick 0.7.20",
- "bstr 1.5.0",
+ "bstr",
  "fnv",
  "log",
  "regex",
@@ -2876,7 +2809,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2",
+ "socket2 0.4.9",
  "tokio",
  "tower-service",
  "tracing",
@@ -3105,10 +3038,32 @@ dependencies = [
  "ena",
  "is-terminal",
  "itertools",
- "lalrpop-util",
+ "lalrpop-util 0.19.12",
  "petgraph",
  "regex",
  "regex-syntax 0.6.29",
+ "string_cache",
+ "term",
+ "tiny-keccak",
+ "unicode-xid",
+]
+
+[[package]]
+name = "lalrpop"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da4081d44f4611b66c6dd725e6de3169f9f63905421e8626fcb86b6a898998b8"
+dependencies = [
+ "ascii-canvas",
+ "bit-set",
+ "diff",
+ "ena",
+ "is-terminal",
+ "itertools",
+ "lalrpop-util 0.20.0",
+ "petgraph",
+ "regex",
+ "regex-syntax 0.7.2",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -3120,6 +3075,12 @@ name = "lalrpop-util"
 version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3c48237b9604c5a4702de6b824e02006c3214327564636aef27c1028a8fa0ed"
+
+[[package]]
+name = "lalrpop-util"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f35c735096c0293d313e8f2a641627472b83d01b937177fe76e5e2708d31e0d"
 
 [[package]]
 name = "language-tags"
@@ -3351,24 +3312,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lua-src"
-version = "546.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cb00c1380f1b4b4928dd211c07301ffa34872a239e590bd3219d9e5b213face"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "luajit-src"
-version = "210.4.5+resty2cf5186"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27b7992a40e602786272d84c6f2beca44a588ededcfd57b48ec6f82008a7cb97"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "lz4"
 version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3525,24 +3468,6 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mlua"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07366ed2cd22a3b000aed076e2b68896fb46f06f1f5786c5962da73c0af01577"
-dependencies = [
- "bstr 0.2.17",
- "cc",
- "erased-serde",
- "lua-src",
- "luajit-src",
- "num-traits",
- "once_cell",
- "pkg-config",
- "rustc-hash",
- "serde",
 ]
 
 [[package]]
@@ -3803,7 +3728,6 @@ dependencies = [
  "lru",
  "memchr",
  "mimalloc",
- "mlua",
  "object_store",
  "once_cell",
  "opentelemetry",
@@ -3845,9 +3769,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-stdlib",
+ "vrl 0.4.0 (git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8)",
  "walkdir",
  "zstd 0.12.3+zstd.1.5.2",
 ]
@@ -4136,28 +4058,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
 
 [[package]]
-name = "path"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "once_cell",
- "regex",
- "serde",
- "snafu",
-]
-
-[[package]]
-name = "path"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "once_cell",
- "regex",
- "serde",
- "snafu",
-]
-
-[[package]]
 name = "peeking_take_while"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4310,9 +4210,9 @@ checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
 name = "portable-atomic"
-version = "1.3.2"
+version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc59d1bcc64fc5d021d67521f818db868368028108d37f0e98d74e33f68297b5"
+checksum = "767eb9f07d4a5ebcb39bbf2d452058a93c011373abf6832e24194a1c3f004794"
 
 [[package]]
 name = "ppv-lite86"
@@ -5352,6 +5252,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2538b18701741680e0322a2302176d3253a35388e2e62f172f64f4f16605f877"
+dependencies = [
+ "libc",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "sparsevec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5687,7 +5597,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2",
+ "socket2 0.4.9",
  "tokio-macros",
  "windows-sys 0.48.0",
 ]
@@ -6141,6 +6051,7 @@ dependencies = [
  "getrandom",
  "rand",
  "uuid-macro-internal",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -6159,40 +6070,6 @@ name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
-
-[[package]]
-name = "value"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "bytes",
- "chrono",
- "once_cell",
- "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "regex",
- "serde",
- "serde_json",
- "snafu",
- "tracing",
-]
-
-[[package]]
-name = "value"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "bytes",
- "chrono",
- "once_cell",
- "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "regex",
- "serde",
- "serde_json",
- "snafu",
- "tracing",
-]
 
 [[package]]
 name = "value-trait"
@@ -6215,7 +6092,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 [[package]]
 name = "vector-common"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
+source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
 dependencies = [
  "async-stream",
  "bytes",
@@ -6240,13 +6117,13 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-config-macros",
- "vrl 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "vector-config"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
+source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -6265,13 +6142,13 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
- "vrl 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "vector-config-common"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
+source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
 dependencies = [
  "convert_case 0.6.0",
  "darling 0.13.4",
@@ -6288,7 +6165,7 @@ dependencies = [
 [[package]]
 name = "vector-config-macros"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
+source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
 dependencies = [
  "darling 0.13.4",
  "proc-macro2",
@@ -6332,188 +6209,56 @@ dependencies = [
 
 [[package]]
 name = "vrl"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6236fdfaaa956af732a73630b8a8b43ef75e0a42fed6b94cf3c1c19c99daca5"
 dependencies = [
- "datadog-filter",
- "datadog-grok",
- "datadog-search-syntax",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-compiler 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-core 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-parser 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-stdlib",
+ "anymap",
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "codespan-reporting",
+ "dyn-clone",
+ "getrandom",
+ "indoc",
+ "lalrpop 0.19.12",
+ "lalrpop-util 0.19.12",
+ "nom",
+ "once_cell",
+ "ordered-float 3.7.0",
+ "paste",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "termcolor",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
 name = "vrl"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "vrl-compiler 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
-]
-
-[[package]]
-name = "vrl-compiler"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "anymap",
- "bytes",
- "chrono",
- "chrono-tz",
- "dyn-clone",
- "getrandom",
- "indoc",
- "lalrpop-util",
- "ordered-float 3.7.0",
- "paste",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "regex",
- "serde",
- "snafu",
- "thiserror",
- "tracing",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-parser 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
-]
-
-[[package]]
-name = "vrl-compiler"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "anymap",
- "bytes",
- "chrono",
- "chrono-tz",
- "dyn-clone",
- "getrandom",
- "indoc",
- "lalrpop-util",
- "ordered-float 3.7.0",
- "paste",
- "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "regex",
- "serde",
- "snafu",
- "thiserror",
- "tracing",
- "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "vrl-parser 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
-]
-
-[[package]]
-name = "vrl-core"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "bytes",
- "chrono",
- "chrono-tz",
- "derivative",
- "nom",
- "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "serde",
- "serde_json",
- "snafu",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
-]
-
-[[package]]
-name = "vrl-core"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "bytes",
- "chrono",
- "chrono-tz",
- "derivative",
- "nom",
- "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "serde",
- "serde_json",
- "snafu",
- "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
-]
-
-[[package]]
-name = "vrl-diagnostic"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "codespan-reporting",
- "termcolor",
-]
-
-[[package]]
-name = "vrl-diagnostic"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "codespan-reporting",
- "termcolor",
-]
-
-[[package]]
-name = "vrl-parser"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "lalrpop",
- "lalrpop-util",
- "ordered-float 3.7.0",
- "paste",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "thiserror",
- "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
-]
-
-[[package]]
-name = "vrl-parser"
-version = "0.1.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
-dependencies = [
- "lalrpop",
- "lalrpop-util",
- "ordered-float 3.7.0",
- "paste",
- "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
- "thiserror",
- "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
-]
-
-[[package]]
-name = "vrl-stdlib"
-version = "0.1.0"
-source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+version = "0.4.0"
+source = "git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8#2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8"
 dependencies = [
  "aes",
+ "anymap",
  "base16",
  "base64 0.21.2",
  "bytes",
  "cbc",
  "cfb-mode",
+ "cfg-if 1.0.0",
  "charset",
  "chrono",
+ "chrono-tz",
  "cidr-utils",
+ "codespan-reporting",
  "csv",
  "ctr",
  "data-encoding",
- "datadog-filter",
- "datadog-grok",
- "datadog-search-syntax",
  "dns-lookup",
+ "dyn-clone",
  "flate2",
  "grok",
  "hex",
@@ -6521,13 +6266,20 @@ dependencies = [
  "hostname",
  "indexmap",
  "indoc",
+ "itertools",
+ "lalrpop 0.20.0",
+ "lalrpop-util 0.20.0",
  "md-5",
  "nom",
  "ofb",
  "once_cell",
+ "onig",
  "ordered-float 3.7.0",
- "path 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "paste",
+ "peeking_take_while",
  "percent-encoding",
+ "pest",
+ "pest_derive",
  "quoted_printable",
  "rand",
  "regex",
@@ -6539,17 +6291,16 @@ dependencies = [
  "sha-1",
  "sha2",
  "sha3",
+ "snafu",
  "strip-ansi-escapes",
  "syslog_loose",
+ "termcolor",
+ "thiserror",
  "tracing",
  "uaparser",
  "url",
  "utf8-width",
  "uuid",
- "value 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-compiler 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-core 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
- "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
  "woothee",
  "zstd 0.12.3+zstd.1.5.2",
 ]

@@ -57,7 +57,7 @@ pub async fn process(
     }
 
     #[cfg(feature = "zo_functions")]
-    let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -76,13 +76,11 @@ pub async fn process(
 
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_lua_map, stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            org_id,
-            stream_name,
-            StreamType::Logs,
-            Some(&lua),
-        );
+    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        stream_name,
+        StreamType::Logs,
+    );
     // End Register Transforms for stream
 
     let stream_schema = crate::service::schema::stream_schema_exists(
@@ -191,8 +189,6 @@ pub async fn process(
                 let mut value = crate::service::ingestion::apply_stream_transform(
                     &local_tans,
                     &value,
-                    Some(&lua),
-                    Some(&stream_lua_map),
                     &stream_vrl_map,
                     stream_name,
                     &mut runtime,

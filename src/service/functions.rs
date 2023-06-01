@@ -20,14 +20,11 @@ use std::io::Error;
 
 #[cfg(feature = "zo_functions")]
 use super::ingestion::compile_vrl_function;
-use crate::service::db;
-use crate::{
-    infra::config::CONFIG,
-    meta::{
-        functions::{StreamFunctionsList, StreamOrder, StreamTransform},
-        http::HttpResponse as MetaHttpResponse,
-    },
+use crate::meta::{
+    functions::{StreamFunctionsList, StreamOrder, StreamTransform},
+    http::HttpResponse as MetaHttpResponse,
 };
+use crate::service::db;
 use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
 use crate::{meta::functions::FunctionList, meta::StreamType};
 
@@ -39,17 +36,9 @@ const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is used in streams , please remove it from the streams before deleting :";
-const LUA_FN_DISABLED: &str = "Lua functions are disabled";
 
 #[tracing::instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
-    if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST.into(),
-            LUA_FN_DISABLED.to_string(),
-        )));
-    }
-
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
@@ -91,12 +80,6 @@ pub async fn update_function(
     fn_name: String,
     mut func: Transform,
 ) -> Result<HttpResponse, Error> {
-    if !CONFIG.common.lua_fn_enabled && func.trans_type.unwrap() == 1 {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST.into(),
-            LUA_FN_DISABLED.to_string(),
-        )));
-    }
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
