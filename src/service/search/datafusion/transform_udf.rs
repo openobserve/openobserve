@@ -24,7 +24,6 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
-use mlua::{Function, Lua, LuaSerdeExt, MultiValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use vector_enrichment::TableRegistry;
@@ -78,21 +77,13 @@ pub async fn get_all_transform(org_id: &str) -> Vec<datafusion::logical_expr::Sc
         let key = transform.key();
         //do not register ingest_time transforms
         if key.contains(org_id) {
-            if transform.trans_type.unwrap() == 1 {
-                udf = get_udf_lua(
-                    transform.name.to_owned(),
-                    transform.function.to_owned().as_str(),
-                    transform.num_args,
-                );
-            } else {
-                udf = get_udf_vrl(
-                    transform.name.to_owned(),
-                    transform.function.to_owned().as_str(),
-                    &transform.params,
-                    transform.num_args,
-                    org_id,
-                );
-            }
+            udf = get_udf_vrl(
+                transform.name.to_owned(),
+                transform.function.to_owned().as_str(),
+                &transform.params,
+                transform.num_args,
+                org_id,
+            );
 
             udf_list.push(udf);
         }
@@ -250,69 +241,9 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> j
     }
 }
 
-fn get_udf_lua(fn_name: String, func: &str, num_args: u8) -> datafusion::logical_expr::ScalarUDF {
-    let local_fn_name = fn_name;
-    let local_func = func.to_owned();
-    let pow_calc = move |args: &[ArrayRef]| {
-        //Lua
-        let lua = Lua::new();
-        //Register Lua Function
-        let func = load_transform(&lua, local_func.to_string());
-        let len = args[0].len();
-
-        let mut data_vec = vec![];
-
-        for i in 0..len {
-            data_vec.insert(i, lua_transform(&lua, &func, args, i));
-        }
-        let result = StringArray::from(data_vec);
-
-        // `Ok` because no error occurred during the calculation (we should add one if exponent was [0, 1[ and the base < 0 because that panics!)
-        // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(Arc::new(result) as ArrayRef)
-    };
-    // the function above expects an `ArrayRef`, but DataFusion may pass a scalar to a UDF.
-    // thus, we use `make_scalar_function` to decorare the closure so that it can handle both Arrays and Scalar values.
-    let pow_scalar = make_scalar_function(pow_calc);
-
-    // Next:
-    // * give it a name so that it shows nicely when the plan is printed
-    // * declare what input it expects
-    // * declare its return type
-    let pow_udf = create_user_df(local_fn_name.as_str(), num_args, pow_scalar, vec![]);
-    pow_udf
-}
-
-fn load_transform(lua: &Lua, func: String) -> Function {
-    lua.load(&func).eval().unwrap()
-}
-
-fn lua_transform(lua: &Lua, func: &Function, args: &[ArrayRef], stream: usize) -> String {
-    let mut input_vec = vec![];
-
-    for (_i, arg) in args.iter().enumerate() {
-        let col = arg
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
-
-        input_vec.push(lua.to_value(&col.value(stream)).unwrap());
-    }
-
-    let input = MultiValue::from_vec(input_vec);
-    let _res = func.call::<_, String>(input);
-    match _res {
-        Ok(res) => res,
-        Err(err) => {
-            log::error!("lua_transform execute error: {}", err);
-            "".to_string()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::service::search::datafusion::transform_udf::{get_udf_lua, get_udf_vrl};
+    use crate::service::search::datafusion::transform_udf::get_udf_vrl;
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -345,7 +276,6 @@ mod tests {
         )
         .unwrap();
 
-        let lua_udf = get_udf_lua("luaconcat".to_string(), "function(a, b) return a..b end", 2);
         let vrl_udf = get_udf_vrl(
             "vrltest".to_string(),
             " . = parse_aws_vpc_flow_log!(col1) \n .http_code=200 \n .",
@@ -356,7 +286,6 @@ mod tests {
 
         // declare a new context. In spark API, this corresponds to a new spark SQLsession
         let ctx = SessionContext::new();
-        ctx.register_udf(lua_udf.clone());
         ctx.register_udf(vrl_udf.clone());
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();

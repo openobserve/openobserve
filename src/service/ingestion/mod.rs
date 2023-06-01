@@ -17,8 +17,6 @@ use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 #[cfg(feature = "zo_functions")]
-use mlua::{Function, Lua, LuaSerdeExt, Value as LuaValue};
-#[cfg(feature = "zo_functions")]
 use std::collections::BTreeMap;
 #[cfg(feature = "zo_functions")]
 use vector_enrichment::TableRegistry;
@@ -113,54 +111,20 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: 
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn lua_transform(in_lua: Option<&Lua>, row: &Value, func: &Function) -> Value {
-    match in_lua {
-        Some(lua) => {
-            let input = lua.to_value(&row).unwrap();
-            let _res = func.call::<_, LuaValue>(input);
-            match _res {
-                Ok(res) => lua.from_value(res).unwrap(),
-                Err(err) => {
-                    log::error!("Err from lua {:?}", err.to_string());
-                    row.clone()
-                }
-            }
-        }
-        None => row.clone(),
-    }
-}
-
-#[cfg(feature = "zo_functions")]
-pub fn load_lua_transform(lua: &Lua, js_func: String) -> Option<Function> {
-    if let Ok(val) = lua.load(&js_func).eval() {
-        val
-    } else {
-        None
-    }
-}
-
-#[cfg(feature = "zo_functions")]
 pub async fn get_stream_transforms<'a>(
     stream_name: String,
     org_id: String,
     stream_type: StreamType,
     stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut AHashMap<String, VRLRuntimeConfig>,
-    stream_lua_map: &mut AHashMap<String, Function<'a>>,
-    lua: &'a Lua,
 ) {
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
     if stream_transform_map.contains_key(&key) {
         return;
     }
     let mut _local_tans: Vec<StreamTransform> = vec![];
-    (_local_tans, *stream_lua_map, *stream_vrl_map) =
-        crate::service::ingestion::register_stream_transforms(
-            &org_id,
-            &stream_name,
-            stream_type,
-            Some(lua),
-        );
+    (_local_tans, *stream_vrl_map) =
+        crate::service::ingestion::register_stream_transforms(&org_id, &stream_name, stream_type);
     stream_transform_map.insert(key, _local_tans);
 }
 
@@ -258,19 +222,13 @@ pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn register_stream_transforms<'a>(
+pub fn register_stream_transforms(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    lua: Option<&'a Lua>,
-) -> (
-    Vec<StreamTransform>,
-    AHashMap<String, Function<'a>>,
-    AHashMap<String, VRLRuntimeConfig>,
-) {
+) -> (Vec<StreamTransform>, AHashMap<String, VRLRuntimeConfig>) {
     let mut local_tans = vec![];
     let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
-    let mut stream_lua_map: AHashMap<String, Function> = AHashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
@@ -278,14 +236,7 @@ pub fn register_stream_transforms<'a>(
         local_tans.sort_by(|a, b| a.order.cmp(&b.order));
         for trans in &local_tans {
             let func_key = format!("{}/{}", &stream_name, trans.transform.name);
-            if trans.transform.trans_type.is_some() && trans.transform.trans_type.unwrap() == 1 {
-                if let Some(local_fn) =
-                    load_lua_transform(lua.unwrap(), trans.transform.function.clone())
-                {
-                    stream_lua_map.insert(func_key, local_fn.to_owned());
-                }
-            } else if let Ok(vrl_runtime_config) =
-                compile_vrl_function(&trans.transform.function, org_id)
+            if let Ok(vrl_runtime_config) = compile_vrl_function(&trans.transform.function, org_id)
             {
                 let registry = vrl_runtime_config
                     .config
@@ -297,30 +248,21 @@ pub fn register_stream_transforms<'a>(
         }
     }
 
-    (local_tans, stream_lua_map, stream_vrl_map)
+    (local_tans, stream_vrl_map)
 }
 
 #[cfg(feature = "zo_functions")]
 pub fn apply_stream_transform<'a>(
     local_tans: &Vec<StreamTransform>,
     value: &'a Value,
-    lua: Option<&'a Lua>,
-    stream_lua_map: Option<&'a AHashMap<String, Function>>,
     stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Value {
     let mut value = value.clone();
-    let empty_map = AHashMap::new();
     for trans in local_tans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
-        let local_map = match stream_lua_map {
-            Some(stream_lua_map) => stream_lua_map,
-            None => &empty_map,
-        };
-        if local_map.contains_key(&func_key) && lua.is_some() {
-            value = lua_transform(lua, &value, local_map.get(&func_key).unwrap());
-        } else if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
+        if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
             value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
@@ -374,11 +316,8 @@ pub fn write_file(
 }
 
 #[cfg(feature = "zo_functions")]
-pub fn init_functions_runtime() -> (Lua, Runtime) {
-    let lua = Lua::new();
-    // lua.sandbox(true).unwrap();
-    let runtime = crate::common::functions::init_vrl_runtime();
-    (lua, runtime)
+pub fn init_functions_runtime() -> Runtime {
+    crate::common::functions::init_vrl_runtime()
 }
 
 #[cfg(test)]

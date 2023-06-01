@@ -78,7 +78,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .map(|s| s.to_string())
             .collect(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
-        lua_fn_enabled: CONFIG.common.lua_fn_enabled,
+        lua_fn_enabled: false,
         sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,
         timestamp_column: CONFIG.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
