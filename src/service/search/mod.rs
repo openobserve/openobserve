@@ -97,15 +97,15 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
         Err(_) => vec![],
         Ok(file_list) => {
             let mut files = Vec::with_capacity(file_list.len());
-            if (time_max - time_min) >= 3_600_000_000 {
-                // over than 1 hour, just filter by partition key
+            if (time_max - time_min) > 7_200_000_000 {
+                // over than 2 hour, just filter by partition key
                 files.extend(
                     file_list
                         .into_iter()
                         .filter(|file| sql.filter_source_by_partition_key(file)),
                 );
             } else {
-                // less than 1 hour, use file meta reduce file list
+                // less than 2 hour, use file meta reduce file list
                 for file in file_list {
                     if sql.match_source(&file, false, false, stream_type).await {
                         files.push(file.clone());

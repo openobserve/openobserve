@@ -14,18 +14,23 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::datasource::file_format::file_type::FileType;
-use std::path::Path;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::{
+    path::Path,
+    sync::{atomic::Ordering, Arc},
+    time::UNIX_EPOCH,
+};
 
-use crate::common::file::scan_files;
-use crate::infra::config::{self, CONFIG};
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::common::file::{get_file_meta, scan_files};
+use crate::infra::{
+    config::{self, CONFIG},
+    errors::{Error, ErrorCodes},
+};
 use crate::meta;
-use crate::service::db;
-use crate::service::file_list::calculate_local_files_size;
-use crate::service::search::datafusion::storage::StorageType;
-use crate::service::search::sql::Sql;
+use crate::service::{
+    db,
+    file_list::calculate_local_files_size,
+    search::{datafusion::storage::StorageType, sql::Sql},
+};
 
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:enter", skip_all)]
@@ -120,7 +125,40 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
             return Ok(result);
         }
     };
+    let time_range = sql.meta.time_range.unwrap_or((0, 0));
     for file in files {
+        if time_range != (0, 0) {
+            // check wal file created time, we can skip files which created time > end_time
+            let file_meta = get_file_meta(&file).map_err(Error::from)?;
+            let file_modified = file_meta
+                .modified()
+                .unwrap_or(UNIX_EPOCH)
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros();
+            let file_created = file_meta
+                .created()
+                .unwrap_or(UNIX_EPOCH)
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros();
+            let file_created = (file_created as i64)
+                - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
+                    .num_microseconds()
+                    .unwrap_or_default();
+
+            if (time_range.0 > 0 && (file_modified as i64) < time_range.0)
+                || (time_range.1 > 0 && file_created > time_range.1)
+            {
+                log::info!(
+                    "skip wal file: {} time_range: [{},{}]",
+                    file,
+                    file_created,
+                    file_modified
+                );
+                continue;
+            }
+        }
         let file = Path::new(&file).canonicalize().unwrap();
         let file = file.strip_prefix(&data_dir).unwrap();
         let local_file = file.to_str().unwrap();

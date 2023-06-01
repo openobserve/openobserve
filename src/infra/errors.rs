@@ -20,6 +20,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(ThisError, Debug)]
 pub enum Error {
+    #[error("IoError# {0}")]
+    IoError(#[from] std::io::Error),
     #[error("DbError# {0}")]
     DbError(#[from] DbError),
     #[error("EtcdError# {0}")]
