@@ -18,8 +18,8 @@ use tokio::time;
 use crate::common::file::scan_files;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
-use crate::infra::wal;
 use crate::infra::storage;
+use crate::infra::wal;
 use crate::meta::StreamType;
 
 pub async fn run() -> Result<(), anyhow::Error> {

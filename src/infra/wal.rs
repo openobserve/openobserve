@@ -26,7 +26,7 @@ use crate::infra::{config::CONFIG, ider, metrics};
 use crate::meta::StreamType;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
-pub static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
+static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
 // MEMORY_FILES for in-memory mode WAL files, already not in use, should move to s3
 pub static MEMORY_FILES: Lazy<MemoryFiles> = Lazy::new(MemoryFiles::new);
@@ -35,11 +35,11 @@ struct Manager {
     data: Arc<Vec<HashMap<String, Arc<RwFile>>>>,
 }
 
-struct MemoryFiles {
-    data: HashMap<String, Arc<Bytes>>,
+pub struct MemoryFiles {
+    data: HashMap<String, Bytes>,
 }
 
-struct RwFile {
+pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
     cache: Option<RwLock<BytesMut>>,
@@ -48,8 +48,79 @@ struct RwFile {
     stream_name: String,
     dir: String,
     name: String,
-    created: i64,
     expired: i64,
+}
+
+pub fn get_or_create(
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    key: &str,
+    use_cache: bool,
+) -> Arc<RwFile> {
+    MANAGER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+}
+
+pub fn check_in_use(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    file_name: &str,
+) -> bool {
+    MANAGER.check_in_use(org_id, stream_name, stream_type, file_name)
+}
+
+pub fn get_search_in_memory_files(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<Vec<Vec<u8>>, std::io::Error> {
+    if !CONFIG.common.wal_memory_mode_enabled {
+        return Ok(vec![]);
+    }
+    let mut files = Vec::new();
+    // read usesing files in use
+    for data in MANAGER.data.iter() {
+        for item in data.iter() {
+            let file = item.value();
+            if file.org_id == org_id
+                && file.stream_name == stream_name
+                && file.stream_type == stream_type
+            {
+                if let Ok(data) = file.read() {
+                    files.push(data);
+                }
+            }
+        }
+    }
+    // read memory files waiting to be moved to s3
+    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
+    for (file, data) in MEMORY_FILES.list() {
+        if file.starts_with(&prefix) {
+            files.push(data.to_vec());
+        }
+    }
+    Ok(files)
+}
+
+pub fn flush_all_to_disk() {
+    for data in MANAGER.data.iter() {
+        for file in data.iter() {
+            file.value().sync();
+        }
+    }
+
+    for (file, data) in MEMORY_FILES.list() {
+        let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open(file_path)
+            .unwrap();
+        f.write_all(&data).unwrap();
+    }
 }
 
 impl Default for Manager {
@@ -78,13 +149,8 @@ impl Manager {
         stream_type: StreamType,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
-        let file = match self
-            .data
-            .get(thread_id)
-            .unwrap()
-            .get(&full_key)
-        {
+        let full_key = format!("{org_id}_{stream_type}_{stream_name}_{key}");
+        let file = match self.data.get(thread_id).unwrap().get(&full_key) {
             Some(file) => file.value().clone(),
             None => {
                 return None;
@@ -95,10 +161,7 @@ impl Manager {
         if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= chrono::Utc::now().timestamp()
         {
-            self.data
-                .get(thread_id)
-                .unwrap() 
-                .remove(&full_key);
+            self.data.get(thread_id).unwrap().remove(&full_key);
             file.sync();
             return None;
         }
@@ -124,7 +187,7 @@ impl Manager {
             key,
             use_cache,
         ));
-        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
+        let data = self.data.get(thread_id).unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTable) {
             data.insert(full_key, file.clone());
         };
@@ -166,25 +229,33 @@ impl Manager {
     }
 }
 
+impl Default for MemoryFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryFiles {
     pub fn new() -> MemoryFiles {
         Self {
-            data: RwLock::new(HashMap::with_capacity(16)),
+            data: HashMap::default(),
         }
     }
 
-    pub fn get(&self, file_name: &str) -> Option<Bytes> {
-        self.data.read().unwrap().get(file_name).cloned()
+    pub fn list(&self) -> Vec<(String, Bytes)> {
+        self.data
+            .iter()
+            .map(|f| (f.key().clone(), f.value().clone()))
+            .collect()
     }
 
-    pub fn insert(&mut self, file_name: String, data: Bytes) {
-        self.data.write().unwrap().insert(file_name, data);
+    pub fn insert(&self, file_name: String, data: Bytes) {
+        self.data.insert(file_name, data);
     }
 
-    pub fn remove(&mut self, file_name: &str) {
-        let mut data = self.data.write().unwrap();
-        data.remove(file_name);
-        data.shrink_to_fit();
+    pub fn remove(&self, file_name: &str) {
+        self.data.remove(file_name);
+        self.data.shrink_to_fit();
     }
 }
 
@@ -212,12 +283,7 @@ impl RwFile {
         std::fs::create_dir_all(&dir_path).unwrap();
 
         let (file, cache) = if use_cache {
-            (
-                None,
-                Some(RwLock::new(BytesMut::with_capacity(
-                    CONFIG.limit.max_file_size_on_disk as usize / 16,
-                ))),
-            )
+            (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
         } else {
             let f = OpenOptions::new()
                 .write(true)
@@ -296,7 +362,7 @@ impl RwFile {
         if self.use_cache {
             let file_path = format!("{}{}", self.dir, self.name);
             let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-            FILES.write().unwrap().insert(
+            MEMORY_FILES.insert(
                 file_path.to_string(),
                 self.cache
                     .as_ref()
@@ -322,14 +388,10 @@ impl RwFile {
         if self.use_cache {
             self.cache.as_ref().unwrap().write().unwrap().len() as i64
         } else {
-            self.file
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .metadata()
-                .unwrap()
-                .len() as i64
+            match self.file.as_ref().unwrap().read() {
+                Ok(f) => f.metadata().unwrap().len() as i64,
+                Err(_) => 0,
+            }
         }
     }
 
@@ -349,60 +411,50 @@ impl RwFile {
     }
 }
 
-pub fn get_search_in_memory_files(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<Vec<Vec<u8>>, std::io::Error> {
-    if !CONFIG.common.wal_memory_mode_enabled {
-        return Ok(vec![]);
-    }
-    let mut files = Vec::new();
-    // read usesing files in use
-    for data in MANAGER.data.iter() {
-        let thread_data = data.read().unwrap();
-        for (_, file) in thread_data.iter() {
-            if file.org_id == org_id
-                && file.stream_name == stream_name
-                && file.stream_type == stream_type
-            {
-                if let Ok(data) = file.read() {
-                    files.push(data);
-                }
-            }
-        }
-    }
-    // read memory files waiting to be moved to s3
-    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-    for (file, data) in MEMORY_FILES.read().unwrap().iter() {
-        if file.starts_with(&prefix) {
-            files.push(data.to_vec());
-        }
-    }
-    Ok(files)
-}
-
-pub fn flush_all_to_disk() {
-    for data in MANAGER.data.iter() {
-        let thread_data = data.read().unwrap();
-        for (_, file) in thread_data.iter() {
-            file.sync();
-        }
-    }
-
-    for (file, data) in MEMORY_FILES.read().unwrap().iter() {
-        let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
-        let mut f = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(true)
-            .open(file_path)
-            .unwrap();
-        f.write_all(data).unwrap();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_wal_manager() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let key = "test_key";
+        let use_cache = false;
+        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data);
+        assert_eq!(file.read().unwrap(), data);
+        assert_eq!(file.size(), data.len() as i64);
+        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
+    }
+
+    #[test]
+    fn test_memory_files() {
+        let memory_files = MemoryFiles::new();
+        let file_name = "test_file".to_string();
+        let data = Bytes::from("test_data".to_string().into_bytes());
+        memory_files.insert(file_name.clone(), data.clone());
+        assert_eq!(memory_files.list(), vec![(file_name.clone(), data)]);
+        memory_files.remove(&file_name);
+        assert_eq!(memory_files.list(), vec![]);
+    }
+
+    #[test]
+    fn test_rw_file() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let key = "test_key";
+        let use_cache = false;
+        let file = RwFile::new(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data);
+        assert_eq!(file.read().unwrap(), data);
+        assert_eq!(file.size(), data.len() as i64);
+        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
+    }
 }

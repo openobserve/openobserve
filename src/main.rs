@@ -50,7 +50,7 @@ use openobserve::{
     infra::{
         cluster,
         config::{self, CONFIG},
-        wal, metrics,
+        metrics, wal,
     },
     job, meta,
     service::{db, router, users},

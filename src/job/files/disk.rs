@@ -25,7 +25,7 @@ use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::infra::{
     cluster,
     config::{CONFIG, SEARCHING_IN_WAL},
-    wal, metrics, storage,
+    metrics, storage, wal,
 };
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};

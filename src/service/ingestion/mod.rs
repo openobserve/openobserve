@@ -327,11 +327,6 @@ pub fn write_file(
         if entry.is_empty() {
             continue;
         }
-        write_buf.clear();
-        for row in &entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
         let file = crate::infra::wal::get_or_create(
             *thread_id.as_ref(),
             org_id,
@@ -340,7 +335,15 @@ pub fn write_file(
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
-        file.write(write_buf.as_ref());
+
+        let mut write_size = 0;
+        for row in &entry {
+            write_buf.clear();
+            write_buf.put(row.as_bytes());
+            write_buf.put("\n".as_bytes());
+            file.write(write_buf.as_ref());
+            write_size += write_buf.len() as u64
+        }
 
         // metrics
         metrics::INGEST_RECORDS
@@ -348,7 +351,7 @@ pub fn write_file(
             .inc_by(entry.len() as u64);
         metrics::INGEST_BYTES
             .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-            .inc_by(write_buf.len() as u64);
+            .inc_by(write_size);
     }
 }
 

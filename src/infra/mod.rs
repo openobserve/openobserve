@@ -17,7 +17,7 @@ pub mod cluster;
 pub mod config;
 pub mod db;
 pub mod errors;
-pub mod wal;
 pub mod ider;
 pub mod metrics;
 pub mod storage;
+pub mod wal;

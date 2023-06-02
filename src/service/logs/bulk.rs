@@ -105,17 +105,6 @@ pub async fn ingest(
             (action, stream_name, doc_id) = ret.unwrap();
             next_line_is_data = true;
 
-            // check if we are allowed to ingest
-            if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
-            {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("stream [{stream_name}] is being deleted"),
-                    )),
-                );
-            }
-
             // Start Register Transfoms for stream
             #[cfg(feature = "zo_functions")]
             crate::service::ingestion::get_stream_transforms(
@@ -299,6 +288,15 @@ pub async fn ingest(
     }
 
     for (stream_name, stream_data) in stream_data_map {
+        // check if we are allowed to ingest
+        if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None) {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!("stream [{stream_name}] is being deleted"),
+                )),
+            );
+        }
         // write to file
         write_file(
             stream_data.data,
