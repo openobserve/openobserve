@@ -18,7 +18,7 @@ use actix_web::{
     web, HttpResponse,
 };
 use ahash::AHashMap;
-use chrono::{TimeZone, Utc};
+use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
