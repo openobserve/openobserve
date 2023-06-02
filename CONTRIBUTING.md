@@ -19,7 +19,7 @@ Alternatively you can use pre-configured devcontainer in VS code to get up and r
 ### Lets clone the repo and get started
 
 ```shell
-git clone https://github.com/zinclabs/openobserve
+git clone https://github.com/openobserve/openobserve
 cd openobserve
 ```
 

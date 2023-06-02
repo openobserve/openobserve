@@ -1921,6 +1921,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 
 [[package]]
+name = "datadog-filter"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "datadog-search-syntax",
+ "dyn-clone",
+ "regex",
+]
+
+[[package]]
+name = "datadog-grok"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "lalrpop",
+ "lalrpop-util",
+ "nom",
+ "once_cell",
+ "onig",
+ "ordered-float 3.7.0",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "peeking_take_while",
+ "regex",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-compiler 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+]
+
+[[package]]
+name = "datadog-search-syntax"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "itertools",
+ "once_cell",
+ "pest",
+ "pest_derive",
+ "regex",
+]
+
+[[package]]
 name = "datafusion"
 version = "22.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2263,7 +2309,7 @@ dependencies = [
 [[package]]
 name = "enrichment"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
+source = "git+https://github.com/openobserve/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
 dependencies = [
  "arc-swap",
  "chrono",
@@ -3812,7 +3858,9 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
- "vrl 0.4.0 (git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8)",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-stdlib",
  "walkdir",
  "zstd 0.12.3+zstd.1.5.2",
 ]
@@ -4099,6 +4147,28 @@ name = "paste"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
+
+[[package]]
+name = "path"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+ "snafu",
+]
+
+[[package]]
+name = "path"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+ "snafu",
+]
 
 [[package]]
 name = "peeking_take_while"
@@ -6136,6 +6206,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
+name = "value"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "bytes",
+ "chrono",
+ "once_cell",
+ "ordered-float 3.7.0",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing",
+]
+
+[[package]]
+name = "value"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "bytes",
+ "chrono",
+ "once_cell",
+ "ordered-float 3.7.0",
+ "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing",
+]
+
+[[package]]
 name = "value-trait"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6156,7 +6260,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 [[package]]
 name = "vector-common"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
+source = "git+https://github.com/openobserve/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
 dependencies = [
  "async-stream",
  "bytes",
@@ -6187,7 +6291,7 @@ dependencies = [
 [[package]]
 name = "vector-config"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
+source = "git+https://github.com/openobserve/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -6212,7 +6316,7 @@ dependencies = [
 [[package]]
 name = "vector-config-common"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
+source = "git+https://github.com/openobserve/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
 dependencies = [
  "convert_case 0.6.0",
  "darling 0.13.4",
@@ -6229,7 +6333,7 @@ dependencies = [
 [[package]]
 name = "vector-config-macros"
 version = "0.1.0"
-source = "git+https://github.com/zinclabs/vector?rev=c110977d421bb7826738faee7d435de783cef561#c110977d421bb7826738faee7d435de783cef561"
+source = "git+https://github.com/openobserve/vector?rev=ce014974f814d05779b92e42027e5952d19848af#ce014974f814d05779b92e42027e5952d19848af"
 dependencies = [
  "darling 0.13.4",
  "proc-macro2",
@@ -6273,37 +6377,188 @@ dependencies = [
 
 [[package]]
 name = "vrl"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6236fdfaaa956af732a73630b8a8b43ef75e0a42fed6b94cf3c1c19c99daca5"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "datadog-filter",
+ "datadog-grok",
+ "datadog-search-syntax",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-compiler 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-core 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-parser 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-stdlib",
+]
+
+[[package]]
+name = "vrl"
+version = "0.1.0"
+source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "vrl-diagnostic 0.1.0 (git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+]
+
+[[package]]
+name = "vrl"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl-compiler 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl-core 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+]
+
+[[package]]
+name = "vrl-compiler"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
 dependencies = [
  "anymap",
  "bytes",
  "chrono",
  "chrono-tz",
- "codespan-reporting",
  "dyn-clone",
  "getrandom",
  "indoc",
- "lalrpop 0.19.12",
- "lalrpop-util 0.19.12",
- "nom",
- "once_cell",
+ "lalrpop-util",
  "ordered-float 3.7.0",
  "paste",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
  "regex",
  "serde",
- "serde_json",
- "snafu 0.7.4",
- "termcolor",
+ "snafu",
  "thiserror",
  "tracing",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-parser 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
 ]
 
 [[package]]
-name = "vrl"
-version = "0.4.0"
-source = "git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8#2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8"
+name = "vrl-compiler"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "anymap",
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "dyn-clone",
+ "getrandom",
+ "indoc",
+ "lalrpop-util",
+ "ordered-float 3.7.0",
+ "paste",
+ "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "regex",
+ "serde",
+ "snafu",
+ "thiserror",
+ "tracing",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl-parser 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+]
+
+[[package]]
+name = "vrl-core"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "derivative",
+ "nom",
+ "ordered-float 3.7.0",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "serde",
+ "serde_json",
+ "snafu",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+]
+
+[[package]]
+name = "vrl-core"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "derivative",
+ "nom",
+ "ordered-float 3.7.0",
+ "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "serde",
+ "serde_json",
+ "snafu",
+ "value 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+]
+
+[[package]]
+name = "vrl-diagnostic"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "codespan-reporting",
+ "termcolor",
+]
+
+[[package]]
+name = "vrl-diagnostic"
+version = "0.1.0"
+source = "git+https://github.com/zinclabs/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "codespan-reporting",
+ "termcolor",
+]
+
+[[package]]
+name = "vrl-diagnostic"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "codespan-reporting",
+ "termcolor",
+]
+
+[[package]]
+name = "vrl-parser"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "lalrpop",
+ "lalrpop-util",
+ "ordered-float 3.7.0",
+ "paste",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "thiserror",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+]
+
+[[package]]
+name = "vrl-parser"
+version = "0.1.0"
+source = "git+https://github.com/vectordotdev/vrl?rev=v0.3.0#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
+dependencies = [
+ "lalrpop",
+ "lalrpop-util",
+ "ordered-float 3.7.0",
+ "paste",
+ "path 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+ "thiserror",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/vectordotdev/vrl?rev=v0.3.0)",
+]
+
+[[package]]
+name = "vrl-stdlib"
+version = "0.1.0"
+source = "git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125#113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125"
 dependencies = [
  "aes",
  "anymap",
@@ -6339,8 +6594,7 @@ dependencies = [
  "once_cell",
  "onig",
  "ordered-float 3.7.0",
- "paste",
- "peeking_take_while",
+ "path 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
  "percent-encoding",
  "pest",
  "pest_derive",
@@ -6365,6 +6619,10 @@ dependencies = [
  "url",
  "utf8-width",
  "uuid",
+ "value 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-compiler 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-core 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
+ "vrl-diagnostic 0.1.0 (git+https://github.com/openobserve/vrl?rev=113005bcee6cd7b5ea0a53a7db2fc45ba4bc4125)",
  "woothee",
  "zstd 0.12.3+zstd.1.5.2",
 ]
