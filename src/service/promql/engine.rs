@@ -260,7 +260,7 @@ impl Engine {
         for (ctx, schema) in ctxs {
             let selector = selector.clone();
             let task = tokio::task::spawn(async move {
-                selector_load_data_from_datafusion(ctx, schema, selector).await
+                selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
             });
             tasks.push(task);
         }
@@ -632,6 +632,8 @@ async fn selector_load_data_from_datafusion(
     ctx: SessionContext,
     schema: Arc<Schema>,
     selector: VectorSelector,
+    start: i64,
+    end: i64,
 ) -> Result<FxHashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let table = match ctx.table(table_name).await {
@@ -641,7 +643,11 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
-    let mut df_group = table.clone();
+    let mut df_group = table.clone().filter(
+        col(&CONFIG.common.column_timestamp)
+            .gt(lit(start))
+            .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
+    )?;
     for mat in selector.matchers.matchers.iter() {
         if mat.name == CONFIG.common.column_timestamp
             || mat.name == VALUE_LABEL

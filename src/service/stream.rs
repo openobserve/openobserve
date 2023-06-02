@@ -22,7 +22,7 @@ use crate::common::utils::is_local_disk_storage;
 use crate::infra::cache::stats;
 use crate::infra::config::STREAM_SCHEMAS;
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::stream::{ListStream, Stream, StreamProperty, StreamSettings, StreamStats};
+use crate::meta::stream::{Stream, StreamProperty, StreamSettings, StreamStats};
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -50,16 +50,6 @@ pub async fn get_stream(
             "stream not found".to_string(),
         )))
     }
-}
-
-#[tracing::instrument]
-pub async fn list_streams(
-    org_id: &str,
-    stream_type: Option<StreamType>,
-    fetch_schema: bool,
-) -> Result<HttpResponse, Error> {
-    let indices_res = get_streams(org_id, stream_type, fetch_schema).await;
-    Ok(HttpResponse::Ok().json(ListStream { list: indices_res }))
 }
 
 pub async fn get_streams(

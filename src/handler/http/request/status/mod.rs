@@ -25,7 +25,7 @@ use crate::infra::{
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
 };
 use crate::meta::functions::ZoFunction;
-use crate::service::search::datafusion::DEFAULT_FUNCTIONS;
+use crate::service::{db, search::datafusion::DEFAULT_FUNCTIONS};
 
 #[derive(Serialize, ToSchema)]
 pub struct HealthzResponse {
@@ -126,6 +126,12 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
     stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
+
+    let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
+    stats.insert(
+        "COMPACT",
+        json::json!({"file_list_offset": last_file_list_offset}),
+    );
 
     Ok(HttpResponse::Ok().json(stats))
 }

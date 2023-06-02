@@ -13,15 +13,16 @@
 // limitations under the License.
 
 use opentelemetry::global;
+use std::time::UNIX_EPOCH;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::file::{get_file_contents, scan_files};
+use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,
 };
-use crate::infra::{config::CONFIG, errors, metrics};
+use crate::infra::{config::CONFIG, errors, file_lock, ider, metrics};
 use crate::meta;
 use crate::service::promql::search as SearchService;
 
@@ -77,6 +78,8 @@ impl Metrics for Querier {
     ) -> Result<Response<MetricsWalFileResponse>, Status> {
         let start = std::time::Instant::now();
         let org_id = req.get_ref().org_id.clone();
+        let start_time = req.get_ref().start_time;
+        let end_time = req.get_ref().end_time;
         let stream_name = req.get_ref().stream_name.clone();
         let pattern = format!(
             "{}/files/{org_id}/metrics/{stream_name}/*.json",
@@ -86,10 +89,61 @@ impl Metrics for Querier {
         let mut resp = MetricsWalFileResponse::default();
         let files = scan_files(&pattern);
         for file in files {
+            if start_time > 0 || end_time > 0 {
+                // check wal file created time, we can skip files which created time > end_time
+                let file_meta = match get_file_meta(&file) {
+                    Ok(meta) => meta,
+                    Err(err) => {
+                        log::error!("failed to get file meta: {}, {}", file, err);
+                        continue;
+                    }
+                };
+                let file_modified = file_meta
+                    .modified()
+                    .unwrap_or(UNIX_EPOCH)
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros();
+                let file_created = file_meta
+                    .created()
+                    .unwrap_or(UNIX_EPOCH)
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros();
+                let file_created = (file_created as i64)
+                    - chrono::Duration::hours(CONFIG.limit.ingest_allowed_upto)
+                        .num_microseconds()
+                        .unwrap_or_default();
+
+                if (start_time > 0 && (file_modified as i64) < start_time)
+                    || (end_time > 0 && file_created > end_time)
+                {
+                    log::info!(
+                        "skip wal file: {} time_range: [{},{}]",
+                        file,
+                        file_created,
+                        file_modified
+                    );
+                    continue;
+                }
+            }
             if let Ok(body) = get_file_contents(&file) {
-                let name = file.split('/').last().unwrap_or("");
+                let name = file.split('/').last().unwrap_or_default();
                 resp.files.push(MetricsWalFile {
                     name: name.to_string(),
+                    body,
+                });
+            }
+        }
+
+        // check wal memory mode
+        if CONFIG.common.wal_memory_mode_enabled {
+            let mem_files =
+                file_lock::get_in_memory_files(&org_id, &stream_name, meta::StreamType::Metrics)
+                    .unwrap_or_default();
+            for body in mem_files {
+                resp.files.push(MetricsWalFile {
+                    name: format!("{}.json", ider::generate()),
                     body,
                 });
             }

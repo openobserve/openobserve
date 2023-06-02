@@ -78,8 +78,8 @@ pub async fn process(
     #[cfg(feature = "zo_functions")]
     let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
-        stream_name,
         StreamType::Logs,
+        stream_name,
     );
     // End Register Transforms for stream
 
@@ -92,11 +92,9 @@ pub async fn process(
     .await;
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys = crate::service::ingestion::get_stream_partition_keys(
-            stream_name.to_string(),
-            stream_schema_map.clone(),
-        )
-        .await;
+        partition_keys =
+            crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
+                .await;
     }
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
@@ -251,28 +249,7 @@ pub async fn process(
     }
 
     // write to file
-    let mut stream_file_name = "".to_string();
-    write_file(
-        buf,
-        thread_id,
-        org_id,
-        stream_name,
-        StreamType::Logs,
-        &mut stream_file_name,
-    );
-
-    if stream_file_name.is_empty() {
-        return Ok(
-            HttpResponse::InternalServerError().json(KinesisFHIngestionResponse {
-                request_id: request.request_id,
-                error_message: Some(
-                    json::to_string(&stream_status)
-                        .unwrap_or("error processing request".to_string()),
-                ),
-                timestamp: request.timestamp.unwrap_or(Utc::now().timestamp_micros()),
-            }),
-        );
-    }
+    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

@@ -190,7 +190,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // leave the cluster
     let _ = cluster::leave().await;
     // flush WAL cache to disk
-    file_lock::flush_all();
+    file_lock::flush_all_to_disk();
 
     log::info!("server stopped");
 

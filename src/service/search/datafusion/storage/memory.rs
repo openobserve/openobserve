@@ -38,9 +38,9 @@ impl FS {
         let path = location.to_string();
         match file_data::get(&path) {
             Ok(data) => Ok(data),
-            Err(_) => Err(object_store::Error::NotFound {
+            Err(err) => Err(object_store::Error::NotFound {
                 path,
-                source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found").into(),
+                source: err.into(),
             }),
         }
     }

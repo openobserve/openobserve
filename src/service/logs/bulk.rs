@@ -119,9 +119,9 @@ pub async fn ingest(
             // Start Register Transfoms for stream
             #[cfg(feature = "zo_functions")]
             crate::service::ingestion::get_stream_transforms(
-                stream_name.clone(),
-                org_id.to_owned(),
+                org_id,
                 StreamType::Logs,
+                &stream_name,
                 &mut stream_tansform_map,
                 &mut stream_vrl_map,
             )
@@ -144,8 +144,8 @@ pub async fn ingest(
                 let mut partition_keys: Vec<String> = vec![];
                 if stream_schema.has_partition_keys {
                     partition_keys = crate::service::ingestion::get_stream_partition_keys(
-                        stream_name.clone(),
-                        stream_schema_map.clone(),
+                        &stream_name,
+                        &stream_schema_map,
                     )
                     .await;
                 }
@@ -300,14 +300,12 @@ pub async fn ingest(
 
     for (stream_name, stream_data) in stream_data_map {
         // write to file
-        let mut stream_file_name = "".to_string();
         write_file(
             stream_data.data,
             thread_id.clone(),
             org_id,
             &stream_name,
             StreamType::Logs,
-            &mut stream_file_name,
         );
     }
 

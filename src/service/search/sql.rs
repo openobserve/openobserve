@@ -17,19 +17,19 @@ use chrono::Duration;
 use datafusion::arrow::datatypes::{DataType, Schema};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+};
 
 use crate::common::str::find;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::config::CONFIG;
-use crate::infra::errors::{Error, ErrorCodes};
-use crate::meta::sql::Sql as MetaSql;
-use crate::meta::stream::StreamParams;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::search::{filter_source_by_partition_key, match_source};
-use crate::service::stream::get_stream_setting_fts_fields;
+use crate::infra::{
+    config::CONFIG,
+    errors::{Error, ErrorCodes},
+};
+use crate::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
+use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
@@ -611,18 +611,6 @@ impl Sql {
             match_min_ts_only,
         )
         .await
-    }
-
-    pub(crate) fn filter_source_by_partition_key(&self, source: &str) -> bool {
-        filter_source_by_partition_key(
-            source,
-            &self
-                .meta
-                .quick_text
-                .iter()
-                .map(|(k, v, _)| (k.as_str(), v.as_str()))
-                .collect::<Vec<(_, _)>>(),
-        )
     }
 }
 

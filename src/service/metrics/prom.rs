@@ -21,13 +21,12 @@ use promql_parser::label::MatchOp;
 use promql_parser::parser;
 use prost::Message;
 use rustc_hash::FxHashSet;
-use std::{collections::HashMap, fs::OpenOptions, io, time::Instant};
+use std::{collections::HashMap, io, time::Instant};
 
-use crate::infra::cache::stats;
-use crate::service::search as search_service;
 use crate::{
     common::{json, time::parse_i64_to_timestamp_micros},
     infra::{
+        cache::stats,
         cluster,
         config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         errors::{Error, Result},
@@ -41,7 +40,9 @@ use crate::{
     },
     service::{
         db,
-        schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
+        ingestion::chk_schema_by_record,
+        schema::{set_schema_metadata, stream_schema_exists},
+        search as search_service,
     },
 };
 
@@ -202,8 +203,8 @@ pub async fn remote_write(
             let mut partition_keys: Vec<String> = vec![];
             if stream_schema.has_partition_keys {
                 partition_keys = crate::service::ingestion::get_stream_partition_keys(
-                    metric_name.clone(),
-                    metric_schema_map.clone(),
+                    &metric_name,
+                    &metric_schema_map,
                 )
                 .await;
             }
@@ -226,8 +227,8 @@ pub async fn remote_write(
             let (local_tans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
-                    &metric_name,
                     StreamType::Metrics,
+                    &metric_name,
                 );
             // End Register Transforms for stream
 
@@ -257,6 +258,15 @@ pub async fn remote_write(
                 json::Value::Number(timestamp.into()),
             );
             let value_str = crate::common::json::to_string(&val_map).unwrap();
+            chk_schema_by_record(
+                &mut metric_schema_map,
+                org_id,
+                StreamType::Metrics,
+                &metric_name,
+                timestamp,
+                &value_str,
+            )
+            .await;
 
             // get hour key
             let hour_key = crate::service::ingestion::get_hour_key(
@@ -309,7 +319,6 @@ pub async fn remote_write(
 
     for (metric_name, metric_data) in metric_data_map {
         // write to file
-        let mut metric_file_name = "".to_string();
         let mut write_buf = BytesMut::new();
         for (key, entry) in metric_data {
             if entry.is_empty() {
@@ -342,11 +351,8 @@ pub async fn remote_write(
                 &metric_name,
                 StreamType::Metrics,
                 &key,
-                false,
+                CONFIG.common.wal_memory_mode_enabled,
             );
-            if metric_file_name.is_empty() {
-                metric_file_name = file.full_name();
-            }
             file.write(write_buf.as_ref());
 
             // metrics
@@ -366,28 +372,13 @@ pub async fn remote_write(
                 .inc_by(write_buf.len() as u64);
         }
 
-        let schema_exists = stream_schema_exists(
+        let _schema_exists = stream_schema_exists(
             org_id,
             &metric_name,
             StreamType::Metrics,
             &mut metric_schema_map,
         )
         .await;
-        if !schema_exists.has_fields && !metric_file_name.is_empty() {
-            let file = OpenOptions::new()
-                .read(true)
-                .open(&metric_file_name)
-                .unwrap();
-            add_stream_schema(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &file,
-                &mut metric_schema_map,
-                min_ts,
-            )
-            .await;
-        }
     }
 
     // only one trigger per request, as it updates etcd

@@ -21,16 +21,28 @@ use object_store::{
 use std::ops::Range;
 use tokio::io::AsyncWrite;
 
-use crate::infra::storage;
+use crate::common::time::BASE_TIME;
+use crate::infra::{cache::file_data, storage};
 
-/// fsn: File system without memory cahce
+/// fsn: File system without memory cache
 #[derive(Debug, Default)]
 pub struct FS {}
 
 impl FS {
-    /// Create new in-memory storage.
+    /// Create new no-cache storage.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    async fn get_cache(&self, location: &Path) -> Result<Bytes> {
+        let path = location.to_string();
+        match file_data::get(&path) {
+            Ok(data) => Ok(data),
+            Err(err) => Err(object_store::Error::NotFound {
+                path,
+                source: err.into(),
+            }),
+        }
     }
 }
 
@@ -43,19 +55,58 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        storage::DEFAULT.get(location).await
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.get(location).await,
+        };
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        storage::DEFAULT.get_range(location, range).await
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.get_range(location, range).await,
+        };
+        if range.end > data.len() {
+            return Err(super::Error::OutOfRange(location.to_string()).into());
+        }
+        if range.start > range.end {
+            return Err(super::Error::BadRange(location.to_string()).into());
+        }
+        Ok(data.slice(range))
     }
 
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
-        storage::DEFAULT.get_ranges(location, ranges).await
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.get_ranges(location, ranges).await,
+        };
+        ranges
+            .iter()
+            .map(|range| {
+                if range.end > data.len() {
+                    return Err(super::Error::OutOfRange(location.to_string()).into());
+                }
+                if range.start > range.end {
+                    return Err(super::Error::BadRange(location.to_string()).into());
+                }
+                Ok(data.slice(range.clone()))
+            })
+            .collect()
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        storage::DEFAULT.head(location).await
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.head(location).await,
+        };
+        Ok(ObjectMeta {
+            location: location.clone(),
+            last_modified: *BASE_TIME,
+            size: data.len(),
+        })
     }
 
     #[tracing::instrument(name = "datafusion::storage::nocache::list", skip_all)]

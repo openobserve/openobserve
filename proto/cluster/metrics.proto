@@ -57,6 +57,8 @@ message Sample {
 message MetricsWalFileRequest {
     string      org_id = 1;
     string stream_name = 2;
+    int64   start_time = 3;
+    int64     end_time = 4;
 }
 
 message MetricsWalFileResponse {

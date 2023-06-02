@@ -68,14 +68,6 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         step,
     } = req.query.as_ref().unwrap();
 
-    // if end is older than max_file_retention_time * 2, we don't need search wal
-    let need_wal = end
-        + chrono::Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
-            .num_microseconds()
-            .unwrap()
-            * 2
-        > chrono::Utc::now().timestamp_micros();
-
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
     let step = max(micros(DEFAULT_LOOKBACK), step);
@@ -121,7 +113,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        if need_wal && req_query.end == end {
+        if req_query.end == end {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;

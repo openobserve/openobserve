@@ -59,7 +59,7 @@ pub async fn sql(
     schema: Option<Arc<Schema>>,
     rules: HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    files: &Vec<String>,
+    files: &[String],
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
     if files.is_empty() {
@@ -378,7 +378,7 @@ pub async fn merge(
     );
 
     // query data
-    let mut ctx = prepare_datafusion_context(true)?;
+    let mut ctx = prepare_datafusion_context()?;
     // Configure listing options
     let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -659,7 +659,7 @@ pub async fn convert_parquet_file(
 ) -> Result<()> {
     let start = Instant::now();
     // query data
-    let ctx = prepare_datafusion_context(false)?;
+    let ctx = prepare_datafusion_context()?;
 
     // Configure listing options
     let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
@@ -824,12 +824,9 @@ pub fn create_runtime_env() -> Result<RuntimeEnv> {
     RuntimeEnv::new(rn_config)
 }
 
-pub fn prepare_datafusion_context(
-    information_schema: bool,
-) -> Result<SessionContext, DataFusionError> {
+pub fn prepare_datafusion_context() -> Result<SessionContext, DataFusionError> {
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()
-        .with_information_schema(information_schema)
         .with_batch_size(8192)
         .set_bool("datafusion.execution.parquet.pushdown_filters", true);
     Ok(SessionContext::with_config_rt(
@@ -868,7 +865,7 @@ pub async fn register_table(
         stream_type,
     } = stream;
 
-    let ctx = prepare_datafusion_context(schema.is_none())?;
+    let ctx = prepare_datafusion_context()?;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
