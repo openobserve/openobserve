@@ -128,7 +128,7 @@ import organizationsService from "../services/organizations";
 import config from "../aws-exports";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import segment from "../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import { getImageURL } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -257,7 +257,6 @@ export default defineComponent({
       showUpdateDialogFn,
       confirmUpdate,
       getImageURL,
-      verifyOrganizationStatus,
       ingestTabType,
     };
   },
