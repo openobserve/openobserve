@@ -209,7 +209,11 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     };
     if new_file_ok {
         // delete all small file list keys in this hour from storage
-        storage::del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await?;
+        if let Err(e) =
+            storage::del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
+        {
+            log::error!("[COMPACT] delete small file list failed: {}", e);
+        }
     }
 
     if locker.is_some() {
