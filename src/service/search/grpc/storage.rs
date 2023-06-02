@@ -235,7 +235,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[String]) -> Result<(), Error> {
+async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
@@ -255,21 +255,11 @@ async fn cache_parquet_files(files: &[String]) -> Result<(), Error> {
     }
 
     for task in tasks {
-        match task.await {
-            Ok(ret) => {
-                if let Err(err) = ret {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
-                }
-            }
-            Err(err) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    err.to_string(),
-                )));
-            }
-        };
+        if let Ok(Err(e)) = task.await {
+            // delete from file list
+            log::error!("search->storage: load file err: {}", e);
+        }
     }
 
-    Ok(())
+    Ok(vec![])
 }

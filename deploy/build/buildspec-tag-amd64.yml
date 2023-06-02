@@ -4,6 +4,7 @@ phases:
   pre_build:
     commands:
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
+      - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
 
   build:
     commands:
@@ -56,3 +57,35 @@ phases:
       - echo 'Push manifests'
       - docker manifest push public.ecr.aws/zinclabs/openobserve:$GIT_TAG
       - docker manifest push public.ecr.aws/zinclabs/openobserve:latest
+
+      # push to docker hub
+      - echo 'Pull amd64 image'
+      - docker tag openobserve:latest-amd64 openobserve/openobserve:$GIT_TAG-amd64
+      - docker tag openobserve:latest-amd64 openobserve/openobserve:latest-amd64
+      - docker push openobserve/openobserve:$GIT_TAG-amd64
+      - docker push openobserve/openobserve:latest-amd64
+      - echo 'Pull amd64-simd image'
+      - docker tag openobserve:latest-amd64-simd openobserve/openobserve:$GIT_TAG-amd64-simd
+      - docker tag openobserve:latest-amd64-simd openobserve/openobserve:latest-amd64-simd
+      - docker pull openobserve/openobserve:$GIT_TAG-arm64-simd
+      - docker pull openobserve/openobserve:latest-arm64-simd
+      # create manifests for common version
+      - echo 'Pull arm64 image'
+      - docker pull openobserve/openobserve:$GIT_TAG-arm64
+      - docker pull openobserve/openobserve:latest-arm64 
+      - echo 'Create manifests'
+      - docker manifest create openobserve/openobserve:$GIT_TAG --amend openobserve/openobserve:$GIT_TAG-amd64 --amend openobserve/openobserve:$GIT_TAG-arm64
+      - docker manifest create openobserve/openobserve:latest --amend openobserve/openobserve:latest-amd64 --amend openobserve/openobserve:latest-arm64
+      - echo 'Push manifests'
+      - docker manifest push openobserve/openobserve:$GIT_TAG
+      - docker manifest push openobserve/openobserve:latest
+      # create manifests for simd version
+      - echo 'Pull arm64 image'
+      - docker pull openobserve/openobserve:$GIT_TAG-arm64-simd
+      - docker pull openobserve/openobserve:latest-arm64-simd
+      - echo 'Create manifests'
+      - docker manifest create openobserve/openobserve:$GIT_TAG-simd --amend openobserve/openobserve:$GIT_TAG-amd64-simd --amend openobserve/openobserve:$GIT_TAG-arm64-simd
+      - docker manifest create openobserve/openobserve:latest-simd --amend openobserve/openobserve:latest-amd64-simd --amend openobserve/openobserve:latest-arm64-simd
+      - echo 'Push manifests'
+      - docker manifest push openobserve/openobserve:$GIT_TAG-simd
+      - docker manifest push openobserve/openobserve:latest-simd 
