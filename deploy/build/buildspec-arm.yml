@@ -54,6 +54,24 @@ phases:
       - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
 
+      # push to docker hub
+      - docker tag openobserve:latest-arm64 openobserve/openobserve-dev:latest-arm64
+      - docker tag openobserve:latest-arm64 openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker push openobserve/openobserve-dev:latest-arm64
+      - docker push openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+
+      - echo 'Pull amd64 image'
+      - docker pull openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
+      - docker pull openobserve/openobserve-dev:latest-amd64
+
+      - echo 'Create manifests'
+      - docker manifest create openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH --amend openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64 --amend openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
+      - docker manifest create openobserve/openobserve-dev:latest --amend openobserve/openobserve-dev:latest-amd64 --amend openobserve/openobserve-dev:latest-arm64
+
+      - echo 'Push manifests'
+      - docker manifest push openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH
+      - docker manifest push openobserve/openobserve-dev:latest
+
       # build openobserve-mimalloc
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
       - docker build -t openobserve:latest-arm64-mimalloc -f deploy/build/Dockerfile.mimalloc.aarch64 .
