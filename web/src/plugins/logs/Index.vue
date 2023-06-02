@@ -450,7 +450,7 @@ export default defineComponent({
 
     function getConsumableDateTime() {
       try {
-        if (searchObj.data.stream.streamType === "lookuptable") {
+        if (searchObj.data.stream.streamType === "enrichment_tables") {
           const stream = searchObj.data.streamResults.list.find(
             (stream) =>
               stream.name === searchObj.data.stream.selectedStream.value
@@ -826,7 +826,7 @@ export default defineComponent({
             } else {
               searchObj.data.errorMsg = err.message;
             }
-
+            console.log(err.response);
             const customMessage = logsErrorMessage(err.response.data.code);
             searchObj.data.errorCode = err.response.data.code;
             if (customMessage != "") {

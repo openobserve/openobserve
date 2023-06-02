@@ -16,7 +16,7 @@ use actix_multipart::Multipart;
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::{meta, service::lookup_table::save_metadata};
+use crate::{meta, service::enrichment_table::save_enrichment_data};
 
 /** CreateEnrichmentTable */
 #[utoipa::path(
@@ -35,7 +35,7 @@ use crate::{meta, service::lookup_table::save_metadata};
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),
     ),
 )]
-#[post("/{org_id}/metadata/{table_name}")]
+#[post("/{org_id}/enrichment_tables/{table_name}")]
 pub async fn save_enrichment_table(
     path: web::Path<(String, String)>,
     payload: Multipart,
@@ -51,7 +51,7 @@ pub async fn save_enrichment_table(
                 .unwrap_or("")
                 .starts_with("multipart/form-data")
             {
-                save_metadata(&org_id, &table_name, payload, thread_id).await
+                save_enrichment_data(&org_id, &table_name, payload, thread_id).await
             } else {
                 Ok(bad_request())
             }

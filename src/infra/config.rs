@@ -70,8 +70,8 @@ pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::
 pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
-pub static LOOKUP_TABLES: Lazy<DashMap<String, StreamTable>> = Lazy::new(DashMap::new);
-pub static LOOKUP_REGISTRY: Lazy<Arc<TableRegistry>> =
+pub static ENRICHMENT_TABLES: Lazy<DashMap<String, StreamTable>> = Lazy::new(DashMap::new);
+pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 
 #[derive(EnvConfig)]

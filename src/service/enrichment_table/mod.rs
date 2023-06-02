@@ -18,7 +18,7 @@ use actix_web::{
     web, HttpResponse,
 };
 use ahash::AHashMap;
-use chrono::{TimeZone, Utc};
+use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
@@ -38,7 +38,7 @@ use super::{
     schema::stream_schema_exists,
 };
 
-pub async fn save_metadata(
+pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
     mut payload: Multipart,
@@ -58,7 +58,12 @@ pub async fn save_metadata(
     }
 
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::LookUpTable, None) {
+    if db::compact::delete::is_deleting_stream(
+        org_id,
+        stream_name,
+        StreamType::EnrichmentTable,
+        None,
+    ) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -71,17 +76,17 @@ pub async fn save_metadata(
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
-        StreamType::LookUpTable,
+        StreamType::EnrichmentTable,
         &mut stream_schema_map,
     )
     .await;
 
     if stream_schema.has_fields {
-        delete_lookup_table(org_id, stream_name, StreamType::LookUpTable).await;
+        delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTable).await;
     }
 
     let mut records = vec![];
-    let timestamp = Utc.timestamp_opt(0, 0).unwrap().timestamp_micros();
+    let timestamp = Utc::now().timestamp_micros();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();
@@ -110,7 +115,7 @@ pub async fn save_metadata(
                     chk_schema_by_record(
                         &mut stream_schema_map,
                         org_id,
-                        StreamType::LookUpTable,
+                        StreamType::EnrichmentTable,
                         stream_name,
                         timestamp,
                         &value_str,
@@ -137,7 +142,13 @@ pub async fn save_metadata(
     }
 
     buf.insert(hour_key.clone(), records.clone());
-    write_file(buf, thread_id, org_id, stream_name, StreamType::LookUpTable);
+    write_file(
+        buf,
+        thread_id,
+        org_id,
+        stream_name,
+        StreamType::EnrichmentTable,
+    );
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),
@@ -145,8 +156,8 @@ pub async fn save_metadata(
     )))
 }
 
-async fn delete_lookup_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
-    log::info!("deleting lookup table  {stream_name}");
+async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
+    log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
         log::error!("Error deleting stream schema: {}", e);
@@ -162,5 +173,5 @@ async fn delete_lookup_table(org_id: &str, stream_name: &str, stream_type: Strea
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
-    log::info!("deleted lookup table  {stream_name}");
+    log::info!("deleted enrichment table  {stream_name}");
 }

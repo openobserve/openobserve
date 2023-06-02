@@ -1,4 +1,4 @@
-use crate::{infra::config::LOOKUP_TABLES, meta::organization::DEFAULT_ORG};
+use crate::{infra::config::ENRICHMENT_TABLES, meta::organization::DEFAULT_ORG};
 use std::collections::HashMap;
 use vector_enrichment::{Table, TableRegistry};
 
@@ -22,13 +22,13 @@ pub fn init_vrl_runtime() -> vrl::compiler::runtime::Runtime {
 }
 
 pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
-    let lookup_tables = LOOKUP_TABLES.clone();
+    let en_tables = ENRICHMENT_TABLES.clone();
     let mut functions = vrl::stdlib::all();
     functions.append(&mut vector_enrichment::vrl_functions());
     let registry = TableRegistry::default();
     let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
-    for table in lookup_tables.iter() {
+    for table in en_tables.iter() {
         if table.org_id == org_id || table.org_id == DEFAULT_ORG {
             tables.insert(
                 table.clone().stream_name.to_owned(),
