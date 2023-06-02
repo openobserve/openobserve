@@ -120,7 +120,7 @@
     <template v-slot:after>
       <router-view
         :title="ingestiontabs"
-        :currOrgIdentifier="currentOrgIdentifier"
+        :currOrgIdentifier="currOrgIdentifier"
         :currUserEmail="currentUserEmail"
         @copy-to-clipboard-fn="copyToClipboardFn"
       >
@@ -131,13 +131,11 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
-import organizationsService from "@/services/organizations";
-// import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
@@ -145,6 +143,12 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestLogs",
   components: {},
+  props: {
+    currOrgIdentifier: {
+      type: String,
+      default: "",
+    },
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -158,6 +162,7 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
+      console.log("before mount");
       const ingestRoutes = [
         "curl",
         "fluentbit",
@@ -184,26 +189,7 @@ export default defineComponent({
         });
         return;
       }
-      getOrganizationPasscode();
     });
-
-    const getOrganizationPasscode = () => {
-      organizationsService
-        .get_organization_passcode(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          if (res.data.data.token == "") {
-            q.notify({
-              type: "negative",
-              message: "API Key not found.",
-              timeout: 5000,
-            });
-          } else {
-            store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-            currentOrgIdentifier.value =
-              store.state.selectedOrganization.identifier;
-          }
-        });
-    };
 
     const copyToClipboardFn = (content: any) => {
       copyToClipboard(content.innerText)
@@ -231,45 +217,6 @@ export default defineComponent({
       });
     };
 
-    const updatePasscode = () => {
-      organizationsService
-        .update_organization_passcode(
-          store.state.selectedOrganization.identifier
-        )
-        .then((res) => {
-          if (res.data.data.token == "") {
-            q.notify({
-              type: "negative",
-              message: "API Key not found.",
-              timeout: 5000,
-            });
-          } else {
-            q.notify({
-              type: "positive",
-              message: "Token reset successfully.",
-              timeout: 5000,
-            });
-            store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-            currentOrgIdentifier.value =
-              store.state.selectedOrganization.identifier;
-          }
-        })
-        .catch((e) => {
-          q.notify({
-            type: "negative",
-            message: "Error while updating Token." + e.error,
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Update Passcode",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
-    };
-
     const showUpdateDialogFn = () => {
       confirmUpdate.value = true;
     };
@@ -285,11 +232,9 @@ export default defineComponent({
       config,
       rowData,
       splitterModel: ref(200),
-      getOrganizationPasscode,
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       copyToClipboardFn,
-      updatePasscode,
       showUpdateDialogFn,
       confirmUpdate,
       getImageURL,
@@ -297,31 +242,6 @@ export default defineComponent({
       ingestiontabs,
       showSyslog,
     };
-  },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (
-        newVal != oldVal &&
-        (this.router.currentRoute.value.name === "ingestLogs" ||
-          this.router.currentRoute.value.name === "fluentbit" ||
-          this.router.currentRoute.value.name === "fluentd" ||
-          this.router.currentRoute.value.name === "vector" ||
-          this.router.currentRoute.value.name === "curl" ||
-          this.router.currentRoute.value.name === "kinesisfirehose" ||
-          this.router.currentRoute.value.name === "filebeat")
-      ) {
-        this.getOrganizationPasscode();
-      }
-    },
   },
 });
 </script>

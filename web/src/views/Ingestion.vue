@@ -98,28 +98,16 @@
           transition-next="jump-up"
         >
           <q-tab-panel name="ingestLogs">
-            <router-view
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
+            <router-view :currOrgIdentifier="currentOrgIdentifier">
             </router-view>
           </q-tab-panel>
           <q-tab-panel name="ingestMetrics">
-            <router-view
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
+            <router-view :currOrgIdentifier="currentOrgIdentifier">
             </router-view>
           </q-tab-panel>
 
           <q-tab-panel name="ingestTraces">
-            <router-view
-              :currOrgIdentifier="currentOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-              @copy-to-clipboard-fn="copyToClipboardFn"
-            >
+            <router-view :currOrgIdentifier="currentOrgIdentifier">
             </router-view>
           </q-tab-panel>
         </q-tab-panels>
@@ -130,11 +118,11 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { useQuasar } from "quasar";
 import organizationsService from "../services/organizations";
 // import { config } from "../constants/config";
 import config from "../aws-exports";
@@ -159,6 +147,7 @@ export default defineComponent({
     const ingestTabType = ref("");
 
     onBeforeMount(() => {
+      console.log("on before mount");
       const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics"];
       const logRoutes = [
         "curl",
@@ -188,17 +177,16 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-      } else {
-        if (store.state.selectedOrganization.status == "active") {
-          getOrganizationPasscode();
-        }
       }
+
+      if (!store.state.organizationPasscode) getOrganizationPasscode();
     });
 
     const getOrganizationPasscode = () => {
       organizationsService
         .get_organization_passcode(store.state.selectedOrganization.identifier)
         .then((res) => {
+          console.log(res.data);
           if (res.data.data.token == "") {
             q.notify({
               type: "negative",
@@ -211,32 +199,6 @@ export default defineComponent({
               store.state.selectedOrganization.identifier;
           }
         });
-    };
-
-    const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
-      });
     };
 
     const updatePasscode = () => {
@@ -290,9 +252,7 @@ export default defineComponent({
       rowData,
       splitterModel: ref(200),
       getOrganizationPasscode,
-      currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
-      copyToClipboardFn,
       updatePasscode,
       showUpdateDialogFn,
       confirmUpdate,
@@ -308,20 +268,7 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (
-        newVal != oldVal &&
-        (this.router.currentRoute.value.name == "ingestion" ||
-          this.router.currentRoute.value.name == "fluentbit" ||
-          this.router.currentRoute.value.name == "fluentd" ||
-          this.router.currentRoute.value.name == "vector" ||
-          this.router.currentRoute.value.name == "curl" ||
-          this.router.currentRoute.value.name == "kinesisfirehose" ||
-          this.router.currentRoute.value.name == "tracesOTLP")
-      ) {
+      if (newVal != oldVal) {
         this.getOrganizationPasscode();
       }
     },
