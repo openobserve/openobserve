@@ -14,9 +14,8 @@
 
 use actix_web::http::Error;
 use actix_web::{route, web, HttpRequest, HttpResponse};
-use awc::Client;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::{seq::SliceRandom, thread_rng};
+use std::time::Duration;
 
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
@@ -49,9 +48,8 @@ fn check_querier_route(path: &str) -> bool {
 pub async fn config(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload, client).await
+    dispatch(req, payload).await
 }
 
 #[route(
@@ -64,9 +62,8 @@ pub async fn config(
 pub async fn api(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload, client).await
+    dispatch(req, payload).await
 }
 
 #[route(
@@ -79,15 +76,13 @@ pub async fn api(
 pub async fn aws(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload, client).await
+    dispatch(req, payload).await
 }
 
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
@@ -110,6 +105,15 @@ async fn dispatch(
     // random nodes
     let mut rng = thread_rng();
     nodes.shuffle(&mut rng);
+
+    let client = awc::Client::builder()
+        .connector(
+            awc::Connector::new()
+                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .limit(0),
+        )
+        .timeout(Duration::from_secs(CONFIG.route.timeout))
+        .finish();
 
     // send query
     let node = nodes.first().unwrap();
