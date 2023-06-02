@@ -36,7 +36,9 @@ impl FS {
 
     async fn get_cache(&self, location: &Path) -> Result<Bytes> {
         let path = location.to_string();
-        match file_data::get(&path) {
+        let data = file_data::get(&path);
+        tokio::task::yield_now().await;
+        match data {
             Ok(data) => Ok(data),
             Err(err) => Err(object_store::Error::NotFound {
                 path,
