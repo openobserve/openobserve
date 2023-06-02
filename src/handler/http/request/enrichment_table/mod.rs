@@ -35,7 +35,7 @@ use crate::{meta, service::enrichment_table::save_enrichment_data};
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = HttpResponse),
     ),
 )]
-#[post("/{org_id}/enrichment_table/{table_name}")]
+#[post("/{org_id}/enrichment_tables/{table_name}")]
 pub async fn save_enrichment_table(
     path: web::Path<(String, String)>,
     payload: Multipart,
