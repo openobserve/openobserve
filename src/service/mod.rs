@@ -23,7 +23,7 @@ pub mod functions;
 pub mod ingestion;
 pub mod kv;
 pub mod logs;
-pub mod lookup_table;
+pub mod enrichment_table;
 pub mod metrics;
 pub mod organization;
 pub mod promql;

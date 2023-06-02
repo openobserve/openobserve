@@ -26,6 +26,8 @@
         dense
         debounce="1"
         class="q-pb-xs"
+        emit-value
+        map-options
         :placeholder="t('search.searchField')"
       />
       <q-select
@@ -310,14 +312,9 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import {
-  b64EncodeUnicode,
-  getImageURL,
-  validateEmail,
-} from "../../utils/zincutils";
+import { b64EncodeUnicode, getImageURL } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
-import type { DomEvent } from "@vue/test-utils/dist/constants/dom-events";
 import { Parser } from "node-sql-parser";
 
 interface Filter {
@@ -342,7 +339,10 @@ export default defineComponent({
     }> = ref({});
     const parser = new Parser();
 
-    const streamTypes = ["logs", "lookuptable"];
+    const streamTypes = [
+      { label: "Logs", value: "logs" },
+      { label: "Enrichment Tables", value: "enrichment_tables" },
+    ];
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -394,7 +394,7 @@ export default defineComponent({
 
       let timestamps = getConsumableDateTime(searchObj.data.datetime);
 
-      if (searchObj.data.stream.streamType === "lookuptable") {
+      if (searchObj.data.stream.streamType === "enrichment_tables") {
         const stream = searchObj.data.streamResults.list.find(
           (stream: any) =>
             stream.name === searchObj.data.stream.selectedStream.value

@@ -19,7 +19,7 @@ use std::sync::Arc;
 use crate::common::json;
 use crate::common::utils::is_local_disk_storage;
 use crate::infra::cache;
-use crate::infra::config::{CONFIG, LOOKUP_TABLES, STREAM_SCHEMAS};
+use crate::infra::config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS};
 use crate::infra::db::Event;
 use crate::meta::stream::StreamSchema;
 use crate::meta::StreamType;
@@ -263,13 +263,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_type = StreamType::from(keys[1]);
                 let stream_name = keys[2];
 
-                if stream_type.eq(&StreamType::LookUpTable) {
-                    LOOKUP_TABLES.insert(
+                if stream_type.eq(&StreamType::EnrichmentTable) {
+                    ENRICHMENT_TABLES.insert(
                         item_key.to_owned(),
                         StreamTable {
                             org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
-                            data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
+                            data: super::enrichment_table::get(org_id, stream_name)
+                                .await
+                                .unwrap(),
                         },
                     );
                 }
@@ -288,7 +290,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("del_offset: {}", e);
                 }
 
-                if stream_type.eq(&StreamType::LookUpTable) && is_local_disk_storage() {
+                if stream_type.eq(&StreamType::EnrichmentTable) && is_local_disk_storage() {
                     let data_dir = format!(
                         "{}/files/{org_id}/{stream_type}/{stream_name}",
                         CONFIG.common.data_wal_dir
@@ -342,13 +344,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let org_id = keys[0];
         let stream_type = StreamType::from(keys[1]);
         let stream_name = keys[2];
-        if stream_type.eq(&StreamType::LookUpTable) {
-            LOOKUP_TABLES.insert(
+        if stream_type.eq(&StreamType::EnrichmentTable) {
+            ENRICHMENT_TABLES.insert(
                 item_key.to_owned(),
                 StreamTable {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.to_string(),
-                    data: super::lookup_table::get(org_id, stream_name).await.unwrap(),
+                    data: super::enrichment_table::get(org_id, stream_name)
+                        .await
+                        .unwrap(),
                 },
             );
         }

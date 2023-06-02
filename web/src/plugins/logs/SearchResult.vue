@@ -24,7 +24,7 @@
         v-show="
           searchObj.meta.showHistogram &&
           !searchObj.meta.sqlMode &&
-          searchObj.data.stream.streamType !== 'lookuptable'
+          searchObj.data.stream.streamType !== 'enrichment_tables'
         "
         @updated:chart="onChartUpdate"
       ></BarChart>
