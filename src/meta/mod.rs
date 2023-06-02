@@ -50,7 +50,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
-            "enrichment_table" => StreamType::EnrichmentTable,
+            "enrichment_tables" => StreamType::EnrichmentTable,
             "file_list" => StreamType::Filelist,
             _ => StreamType::Logs,
         }
@@ -63,7 +63,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
-            StreamType::EnrichmentTable => write!(f, "enrichment_table"),
+            StreamType::EnrichmentTable => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
         }
     }
