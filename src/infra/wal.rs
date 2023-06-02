@@ -46,8 +46,8 @@ pub struct RwFile {
     file: Option<RwLock<File>>,
     cache: Option<RwLock<BytesMut>>,
     org_id: String,
-    stream_type: StreamType,
     stream_name: String,
+    stream_type: StreamType,
     dir: String,
     name: String,
     expired: i64,
@@ -150,7 +150,7 @@ impl Manager {
         stream_type: StreamType,
         key: &str,
     ) -> Option<Arc<RwFile>> {
-        let full_key = format!("{org_id}_{stream_type}_{stream_name}_{key}");
+        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
         let file = match self
             .data
             .get(thread_id)
