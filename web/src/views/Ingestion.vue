@@ -128,7 +128,7 @@ import organizationsService from "../services/organizations";
 import config from "../aws-exports";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import segment from "../services/segment_analytics";
-import { getImageURL } from "../utils/zincutils";
+import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -267,6 +267,7 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
+      verifyOrganizationStatus(this.store.state.organizations, this.router);
       if (newVal != oldVal) {
         this.getOrganizationPasscode();
       }
