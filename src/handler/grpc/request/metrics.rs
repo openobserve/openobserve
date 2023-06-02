@@ -139,7 +139,7 @@ impl Metrics for Querier {
         // check wal memory mode
         if CONFIG.common.wal_memory_mode_enabled {
             let mem_files =
-                wal::get_search_in_memory_files(&org_id, &stream_name, meta::StreamType::Metrics)
+                wal::get_search_in_memory_files(org_id, stream_name, meta::StreamType::Metrics)
                     .unwrap_or_default();
             for body in mem_files {
                 resp.files.push(MetricsWalFile {

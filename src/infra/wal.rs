@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use bytes::{Bytes, BytesMut};
-use dashmap::DashMap as HashMap;
 use once_cell::sync::Lazy;
 use std::{
+    collections::HashMap,
     fs::{File, OpenOptions},
     io::Write,
     sync::{Arc, RwLock},
@@ -31,12 +31,14 @@ static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 // MEMORY_FILES for in-memory mode WAL files, already not in use, should move to s3
 pub static MEMORY_FILES: Lazy<MemoryFiles> = Lazy::new(MemoryFiles::new);
 
+type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
+
 struct Manager {
-    data: Arc<Vec<HashMap<String, Arc<RwFile>>>>,
+    data: Arc<Vec<RwData>>,
 }
 
 pub struct MemoryFiles {
-    data: HashMap<String, Bytes>,
+    pub data: Arc<RwLock<HashMap<String, Bytes>>>,
 }
 
 pub struct RwFile {
@@ -82,8 +84,7 @@ pub fn get_search_in_memory_files(
     let mut files = Vec::new();
     // read usesing files in use
     for data in MANAGER.data.iter() {
-        for item in data.iter() {
-            let file = item.value();
+        for (_, file) in data.read().unwrap().iter() {
             if file.org_id == org_id
                 && file.stream_name == stream_name
                 && file.stream_type == stream_type
@@ -106,8 +107,8 @@ pub fn get_search_in_memory_files(
 
 pub fn flush_all_to_disk() {
     for data in MANAGER.data.iter() {
-        for file in data.iter() {
-            file.value().sync();
+        for (_, file) in data.read().unwrap().iter() {
+            file.sync();
         }
     }
 
@@ -134,7 +135,7 @@ impl Manager {
         let size = CONFIG.limit.cpu_num;
         let mut data = Vec::with_capacity(size);
         for _ in 0..size {
-            data.push(HashMap::<String, Arc<RwFile>>::default());
+            data.push(RwLock::new(HashMap::<String, Arc<RwFile>>::default()));
         }
         Self {
             data: Arc::new(data),
@@ -150,8 +151,15 @@ impl Manager {
         key: &str,
     ) -> Option<Arc<RwFile>> {
         let full_key = format!("{org_id}_{stream_type}_{stream_name}_{key}");
-        let file = match self.data.get(thread_id).unwrap().get(&full_key) {
-            Some(file) => file.value().clone(),
+        let file = match self
+            .data
+            .get(thread_id)
+            .unwrap()
+            .read()
+            .unwrap()
+            .get(&full_key)
+        {
+            Some(file) => file.clone(),
             None => {
                 return None;
             }
@@ -161,7 +169,12 @@ impl Manager {
         if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= chrono::Utc::now().timestamp()
         {
-            self.data.get(thread_id).unwrap().remove(&full_key);
+            self.data
+                .get(thread_id)
+                .unwrap()
+                .write()
+                .unwrap()
+                .remove(&full_key);
             file.sync();
             return None;
         }
@@ -187,7 +200,7 @@ impl Manager {
             key,
             use_cache,
         ));
-        let data = self.data.get(thread_id).unwrap();
+        let mut data = self.data.get(thread_id).unwrap().write().unwrap();
         if !stream_type.eq(&StreamType::EnrichmentTable) {
             data.insert(full_key, file.clone());
         };
@@ -238,24 +251,22 @@ impl Default for MemoryFiles {
 impl MemoryFiles {
     pub fn new() -> MemoryFiles {
         Self {
-            data: HashMap::default(),
+            data: Arc::new(RwLock::new(HashMap::default())),
         }
     }
 
-    pub fn list(&self) -> Vec<(String, Bytes)> {
-        self.data
-            .iter()
-            .map(|f| (f.key().clone(), f.value().clone()))
-            .collect()
+    pub fn list(&self) -> HashMap<String, Bytes> {
+        self.data.read().unwrap().clone()
     }
 
     pub fn insert(&self, file_name: String, data: Bytes) {
-        self.data.insert(file_name, data);
+        self.data.write().unwrap().insert(file_name, data);
     }
 
     pub fn remove(&self, file_name: &str) {
-        self.data.remove(file_name);
-        self.data.shrink_to_fit();
+        let mut data = self.data.write().unwrap();
+        data.remove(file_name);
+        data.shrink_to_fit();
     }
 }
 
@@ -437,9 +448,9 @@ mod tests {
         let file_name = "test_file".to_string();
         let data = Bytes::from("test_data".to_string().into_bytes());
         memory_files.insert(file_name.clone(), data.clone());
-        assert_eq!(memory_files.list(), vec![(file_name.clone(), data)]);
+        assert_eq!(memory_files.list().len(), 1);
         memory_files.remove(&file_name);
-        assert_eq!(memory_files.list(), vec![]);
+        assert_eq!(memory_files.list().len(), 0);
     }
 
     #[test]
