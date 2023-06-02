@@ -55,7 +55,9 @@
                 <tr>
                   <th>{{ t("logStream.docsCount") }}</th>
                   <th>{{ t("logStream.storageSize") }}</th>
-                  <th v-if="isCloud !== 'true'">{{ t("logStream.compressedSize") }}</th>
+                  <th v-if="isCloud !== 'true'">
+                    {{ t("logStream.compressedSize") }}
+                  </th>
                   <th>{{ t("logStream.time") }}</th>
                 </tr>
               </thead>
@@ -93,7 +95,27 @@
               </tbody>
             </table>
           </div>
-
+          <template v-if="showDataRetention">
+            <q-separator class="q-mt-lg q-mb-lg" />
+            <div class="row flex items-center q-pb-xs">
+              <label class="q-pr-sm text-bold">Data Retention (in days)</label>
+              <q-input
+                data-test="stream-details-data-retention-input"
+                v-model="dataRetentionDays"
+                type="number"
+                dense
+                filled
+                min="0"
+                round
+                class="q-mr-sm data-retention-input"
+                :rules="[(val: any) => (!!val && val > 0) || 'Retention period must be at least 1 day']"
+              ></q-input>
+              <div>
+                <span class="text-bold">Note:</span> Global data retention
+                period is {{ store.state.zoConfig.data_retention_days }} days
+              </div>
+            </div>
+          </template>
           <q-separator class="q-mt-lg q-mb-lg" />
 
           <div class="title" data-test="schema-log-stream-mapping-title-text">
@@ -191,7 +213,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
@@ -199,6 +221,7 @@ import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import store from "@/test/unit/helpers/store";
 
 const defaultValue: any = () => {
   return {
@@ -225,6 +248,11 @@ export default defineComponent({
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
+    const dataRetentionDays = ref(0);
+
+    onBeforeMount(() => {
+      dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
+    });
 
     const getSchema = async () => {
       const dismiss = q.notify({
@@ -293,17 +321,35 @@ export default defineComponent({
             }
           }
 
+          if (showDataRetention.value)
+            dataRetentionDays.value =
+              res.data.settings.data_retention ||
+              store.state.zoConfig.data_retention_days;
+
           dismiss();
         });
     };
 
     const onSubmit = async () => {
-      /*  this.updateSettingsForm.validate().then((valid: any) => {
-      if (!valid) {
-          return false;
-        } */
+      let settings = {
+        partition_keys: [],
+        full_text_search_keys: [],
+      };
 
-      let settings = { partition_keys: [], full_text_search_keys: [] };
+      if (showDataRetention.value && dataRetentionDays.value < 1) {
+        q.notify({
+          color: "negative",
+          message:
+            "Invalid Data Retention Period: Retention period must be at least 1 day.",
+          timeout: 4000,
+        });
+        return;
+      }
+
+      if (showDataRetention.value) {
+        settings["data_retention"] = Number(dataRetentionDays.value);
+      }
+
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
         if (property.ftsKey) {
@@ -357,9 +403,14 @@ export default defineComponent({
       () => showFullTextSearchColumn.value && showPartitionColumn.value
     );
 
+    const showDataRetention = computed(
+      () => !!(store.state.zoConfig.data_retention_days | false)
+    );
+
     return {
       t,
       q,
+      store,
       isCloud,
       indexData,
       getSchema,
@@ -370,6 +421,8 @@ export default defineComponent({
       showFullTextSearchColumn,
       getImageURL,
       showSchemaActions,
+      dataRetentionDays,
+      showDataRetention,
     };
   },
   created() {
@@ -461,6 +514,15 @@ export default defineComponent({
           border-radius: 0 0 0.5rem 0.5rem;
         }
       }
+    }
+  }
+
+  .data-retention-input {
+    &.q-field {
+      padding-bottom: 0 !important;
+    }
+    .q-field__bottom {
+      padding: 8px 0;
     }
   }
 }
