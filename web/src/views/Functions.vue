@@ -50,15 +50,15 @@
               content-class="tab_content"
             />
             <q-route-tab
-              data-test="function-lookup-table-tab"
-              name="lookupTables"
+              data-test="function-enrichment-table-tab"
+              name="enrichmentTables"
               :to="{
-                name: 'lookupTables',
+                name: 'enrichmentTables',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :label="t('function.lookupTables')"
+              :label="t('function.enrichmentTables')"
               content-class="tab_content"
             />
           </q-tabs>

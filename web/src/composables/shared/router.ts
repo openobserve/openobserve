@@ -26,7 +26,7 @@ import LogStream from "@/views/LogStream.vue";
 import {
   FunctionList,
   AssociatedStreamFunction,
-  LookupTables,
+  EnrichmentTableList,
 } from "../../components/functions/index";
 import Alerts from "@/views/AppAlerts.vue";
 import Error404 from "@/views/Error404.vue";
@@ -204,9 +204,9 @@ const useRoutes = () => {
           component: AssociatedStreamFunction,
         },
         {
-          path: "lookup-tables",
-          name: "lookupTables",
-          component: LookupTables,
+          path: "enrichment-tables",
+          name: "enrichmentTables",
+          component: EnrichmentTableList,
         },
       ],
     },

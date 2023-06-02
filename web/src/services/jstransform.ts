@@ -78,13 +78,13 @@ const jstransform = {
       `/api/${org_identifier}/${stream_name}/functions/${function_name}`
     );
   },
-  create_lookup_table: (
+  create_enrichment_table: (
     org_identifier: string,
     table_name: string,
     data: any
   ) => {
     return http({ headers: { "Content-Type": "multipart/form-data" } }).post(
-      `/api/${org_identifier}/metadata/${table_name}`,
+      `/api/${org_identifier}/enrichment_tables/${table_name}`,
       data
     );
   },

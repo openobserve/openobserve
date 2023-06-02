@@ -107,7 +107,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // let node online
     let _ = cluster::set_online().await;
 
-    //This is specifically for lookup tables,as caching is happening using search service
+    //This is specifically for enrichment tables,as caching is happening using search service
     db::schema::cache().await.expect("schema cache failed");
 
     // metrics
