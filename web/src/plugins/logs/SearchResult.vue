@@ -81,6 +81,7 @@
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
+            class="pointer"
             :style="
               row[store.state.zoConfig.timestamp_column] ==
               searchObj.data.searchAround.indexTimestamp
@@ -92,6 +93,7 @@
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
               class="field_list"
+              style="cursor: pointer"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
@@ -217,7 +219,14 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "expandlog",
   ],
+  props: {
+    expandedLogs: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
   methods: {
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
@@ -339,9 +348,7 @@ export default defineComponent({
     };
 
     const expandLog = async (row: any, index: number) => {
-      if (expandedLogs.value[index.toString()])
-        delete expandedLogs.value[index.toString()];
-      else expandedLogs.value[index.toString()] = true;
+      emit("expandlog", index);
     };
 
     return {
@@ -361,7 +368,6 @@ export default defineComponent({
       reDrawChart,
       expandLog,
       getImageURL,
-      expandedLogs,
     };
   },
 });
