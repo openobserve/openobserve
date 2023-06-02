@@ -60,19 +60,19 @@
       <!-- <div class="q-mt-md text-body1 text-weight-redular">
         {{ planData.description }}
       </div> -->
-      <!-- <div class="row q-mt-md items-center" :v-show="1 == 0">
+      <div class="q-mt-md text-body text-weight-redular text-h6">
         <span
-          class="text-weight-bold free"
+          class="text-weight-bold free text-body" style="font-size:30px;"
           :class="{
             secondaryColor: planData.price == 'Free',
             primaryColor: planData.price != 'Free',
           }"
           >{{ planData.price }}</span
         >
-        <span class="text-weight-regular text-h6">
-          &nbsp;&nbsp;/&nbsp;{{ planData.duration }}
+        <span class="text-weight-regular text-body">
+          /&nbsp;{{ planData.duration }}
         </span>
-      </div> -->
+      </div>
       <div class="text-body1 text-weight-bold q-mt-md">
         {{ t("billing.whatIsIncluded") }}
       </div>
