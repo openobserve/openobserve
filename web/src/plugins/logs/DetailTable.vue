@@ -120,18 +120,15 @@
                             @click="
                               toggleIncludeSearchTerm(`${value}='${key}'`)
                             "
-                            ><q-icon
+                            ><q-btn
                               title="Add to search query"
-                              :name="
-                                'img:' +
-                                getImageURL('images/common/add_icon.svg')
+                              :icon="
+                                'img:' + getImageURL('images/common/equals.svg')
                               "
-                              size="1rem"
-                              outlined
-                              filled
-                              dense
+                              size="6px"
+                              round
                               class="q-mr-sm pointer"
-                            ></q-icon
+                            ></q-btn
                             >Inlcude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -144,18 +141,16 @@
                             @click="
                               toggleExcludeSearchTerm(`${value}!='${key}'`)
                             "
-                            ><q-icon
+                            ><q-btn
                               title="Add to search query"
-                              :name="
+                              :icon="
                                 'img:' +
-                                getImageURL('images/common/add_icon.svg')
+                                getImageURL('images/common/not_equals.svg')
                               "
-                              size="1rem"
-                              outlined
-                              filled
-                              dense
+                              size="6px"
+                              round
                               class="q-mr-sm pointer"
-                            ></q-icon
+                            ></q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
