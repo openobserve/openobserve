@@ -392,7 +392,9 @@ export default defineComponent({
             let compressed_size = "";
             resultTotal.value = res.data.list.length;
             logStream.value = res.data.list
-              .filter((stream: any) => stream.stream_type !== "lookuptable")
+              .filter(
+                (stream: any) => stream.stream_type !== "enrichment_tables"
+              )
               .map((data: any) => {
                 doc_num = "--";
                 storage_size = "--";

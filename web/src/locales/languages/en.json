@@ -223,10 +223,10 @@
     "associatedWithStream": "Stream Association",
     "paramsHint": "param1, param2,...",
     "associatedFunctionHeader": "Associated Functions",
-    "lookupTables": "Lookup Tables",
-    "addLookupTable": "Add Lookup Table",
-    "updateLookupTable": "Update Lookup Table",
-    "searchLookupTable": "Search Lookup Table"
+    "enrichmentTables": "Enrichment Tables",
+    "addEnrichmentTable": "Add Enrichment Table",
+    "updateEnrichmentTable": "Update Enrichment Table",
+    "searchEnrichmentTable": "Search Enrichment Table"
   },
   "confirmDialog": {
     "cancel": "Cancel",

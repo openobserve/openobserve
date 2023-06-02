@@ -206,7 +206,7 @@
           />
         </div>
         <div
-          v-show="streamType !== 'lookuptable'"
+          v-show="streamType !== 'enrichment_tables'"
           class="col-8 row justify-center align-center q-gutter-sm"
         >
           <div style="line-height: 40px; font-weight: bold">No of Records:</div>
