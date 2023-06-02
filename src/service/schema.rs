@@ -195,10 +195,8 @@ pub async fn check_for_schema(
         schema
     };
 
-    let meta = schema.metadata().clone();
-
-    if !meta.is_empty() {
-        let stream_settings = meta.get("settings");
+    if !schema.metadata().is_empty() {
+        let stream_settings = schema.metadata().get("settings");
         if let Some(value) = stream_settings {
             let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
             if let Some(keys) = settings.get("skip_schema_validation") {
@@ -235,8 +233,8 @@ pub async fn check_for_schema(
 
     let inferred_fields: HashSet<_> = inferred_schema.fields().iter().collect();
     let field_datatype_delta: Vec<_> = schema
-        .clone()
         .fields
+        .clone()
         .into_iter()
         .filter(|item| !inferred_fields.contains(item))
         .collect();
@@ -253,7 +251,6 @@ pub async fn check_for_schema(
                 .unwrap();
             let item_set: HashSet<_> = schema.fields.iter().collect();
             let field_datatype_delta: Vec<_> = inferred_schema
-                .clone()
                 .fields
                 .into_iter()
                 .filter(|item| !item_set.contains(item))

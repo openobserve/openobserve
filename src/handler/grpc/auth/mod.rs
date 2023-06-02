@@ -23,7 +23,7 @@ use http_auth_basic::Credentials;
 use tonic::{Request, Status};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
-    let metadata = req.metadata().clone();
+    let metadata = req.metadata();
     if !metadata.contains_key(&CONFIG.grpc.org_header_key)
         && !metadata.contains_key("authorization")
     {

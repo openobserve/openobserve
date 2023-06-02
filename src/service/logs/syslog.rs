@@ -216,7 +216,7 @@ async fn get_org_for_ip(ip: std::net::IpAddr) -> Option<SyslogRoute> {
     for (_, route) in SYSLOG_ROUTES.clone() {
         for subnet in &route.subnets {
             if subnet.contains(ip) {
-                matching_route = Some(route.clone());
+                matching_route = Some(route);
                 break;
             }
         }

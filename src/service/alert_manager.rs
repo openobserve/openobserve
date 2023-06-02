@@ -115,26 +115,23 @@ async fn handle_trigger(alert_name: &str, frequency: i64) {
                         Ok(res) => {
                             if !res.hits.is_empty() {
                                 let record = res.hits.first().unwrap().as_object().unwrap();
-                                if alert.condition.clone().evaluate(record.clone()) {
+                                if alert.condition.evaluate(record.clone()) {
                                     let curr_ts = Utc::now().timestamp_micros();
                                     let mut local_trigger = trigger.clone();
 
-                                    if trigger.clone().last_sent_at == 0
-                                        || (trigger.clone().last_sent_at > 0
-                                            && curr_ts - trigger.clone().last_sent_at
+                                    if trigger.last_sent_at == 0
+                                        || (trigger.last_sent_at > 0
+                                            && curr_ts - trigger.last_sent_at
                                                 > get_micros_from_min(alert.time_between_alerts))
                                     {
-                                        let _ = send_notification(&alert, &trigger.clone()).await;
+                                        let _ = send_notification(&alert, &trigger).await;
                                         local_trigger.last_sent_at = curr_ts;
                                     }
                                     //Update trigger for last sent
 
                                     local_trigger.count += 1;
-                                    let _ = triggers::save_trigger(
-                                        alert.name.clone(),
-                                        local_trigger.clone(),
-                                    )
-                                    .await;
+                                    let _ =
+                                        triggers::save_trigger(&alert.name, &local_trigger).await;
                                 }
                             }
                         }

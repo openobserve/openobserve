@@ -31,7 +31,7 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
     for table in en_tables.iter() {
         if table.org_id == org_id || table.org_id == DEFAULT_ORG {
             tables.insert(
-                table.clone().stream_name.to_owned(),
+                table.stream_name.to_owned(),
                 Box::new(table.value().clone()),
             );
         }

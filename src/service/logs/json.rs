@@ -109,12 +109,10 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let body_vec = body.to_vec();
-    let reader: Vec<json::Value> = json::from_slice(&body_vec)?;
+    let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.iter() {
-        let mut value = item.to_owned();
         //JSON Flattening
-        value = json::flatten_json_and_format_field(&value);
+        let value = json::flatten_json_and_format_field(item);
 
         #[cfg(feature = "zo_functions")]
         let mut value = crate::service::ingestion::apply_stream_transform(
