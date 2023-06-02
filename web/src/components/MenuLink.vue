@@ -109,7 +109,7 @@ export default defineComponent({
   min-height: 40px;
 
   &.q-router-link--active {
-    background-color: #5960b2;
+    background-color: $primary;
     color: white;
 
     &::before {
