@@ -27,7 +27,7 @@ pub(crate) fn get_stream_type_from_request(
             "logs" => Some(StreamType::Logs),
             "metrics" => Some(StreamType::Metrics),
             "traces" => Some(StreamType::Traces),
-            "enrichment_table" => Some(StreamType::EnrichmentTable),
+            "enrichment_tables" => Some(StreamType::EnrichmentTable),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,
