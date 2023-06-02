@@ -168,6 +168,9 @@ async fn main() -> Result<(), anyhow::Error> {
             .app_data(web::Data::new(local_id))
             .app_data(web::Data::new(
                 awc::Client::builder()
+                    .connector(
+                        awc::Connector::new().timeout(Duration::from_secs(CONFIG.route.timeout)),
+                    )
                     .timeout(Duration::from_secs(CONFIG.route.timeout))
                     .finish(),
             ))
