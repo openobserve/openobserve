@@ -337,10 +337,20 @@ pub fn write_file(
         );
 
         let mut write_size = 0;
-        for row in &entry {
+        if CONFIG.common.wal_line_mode_enabled {
+            for row in &entry {
+                write_buf.clear();
+                write_buf.put(row.as_bytes());
+                write_buf.put("\n".as_bytes());
+                file.write(write_buf.as_ref());
+                write_size += write_buf.len() as u64
+            }
+        } else {
             write_buf.clear();
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
+            for row in &entry {
+                write_buf.put(row.as_bytes());
+                write_buf.put("\n".as_bytes());
+            }
             file.write(write_buf.as_ref());
             write_size += write_buf.len() as u64
         }

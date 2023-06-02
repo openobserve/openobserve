@@ -155,6 +155,8 @@ pub struct Common {
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
+    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
+    pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_FILE_EXT_JSON", default = ".json")]
     pub file_ext_json: String,
     #[env_config(name = "ZO_FILE_EXT_PARQUET", default = ".parquet")]
