@@ -130,10 +130,7 @@
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div
-            class="q-table__container q-table--cell-separator"
-            style="height: calc(100vh - 460px); overflow: auto"
-          >
+          <div class="q-table__container q-table--cell-separator">
             <table
               class="q-table"
               data-test="schema-log-stream-field-mapping-table"
