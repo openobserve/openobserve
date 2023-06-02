@@ -97,7 +97,7 @@
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedLogs[row._timestamp]
+                    expandedLogs[index.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -105,7 +105,7 @@
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandLog(row)"
+                  @click.stop="expandLog(row, index)"
                 ></q-btn>
                 <high-light
                   :content="
@@ -155,7 +155,7 @@
               </div>
             </q-td>
           </q-tr>
-          <q-tr v-if="expandedLogs[row._timestamp]">
+          <q-tr v-if="expandedLogs[index.toString()]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
               <pre class="log_json_content">{{ row }}</pre>
             </td>
@@ -338,10 +338,10 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    const expandLog = async (row: any) => {
-      if (expandedLogs.value[row._timestamp])
-        delete expandedLogs.value[row._timestamp];
-      else expandedLogs.value[row._timestamp] = true;
+    const expandLog = async (row: any, index: number) => {
+      if (expandedLogs.value[index.toString()])
+        delete expandedLogs.value[index.toString()];
+      else expandedLogs.value[index.toString()] = true;
     };
 
     return {

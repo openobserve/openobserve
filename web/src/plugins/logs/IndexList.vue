@@ -229,7 +229,7 @@
                           <q-item tag="label" class="q-pr-none">
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 36px)"
+                              style="width: calc(100% - 42px)"
                             >
                               <div
                                 :title="value.key"
@@ -247,30 +247,34 @@
                               </div>
                             </div>
                             <div class="flex row">
-                              <q-icon
-                                :name="
+                              <q-btn
+                                :icon="
                                   'img:' +
-                                  getImageURL('images/common/add_icon.svg')
+                                  getImageURL('images/common/equals.svg')
                                 "
                                 class="q-mr-xs"
-                                size="1rem"
+                                size="6px"
                                 @click="
                                   addSearchTerm(
                                     `${props.row.name}='${value.key}'`
                                   )
                                 "
+                                title="Include Term"
+                                round
                               />
-                              <q-icon
-                                :name="
+                              <q-btn
+                                :icon="
                                   'img:' +
-                                  getImageURL('images/common/remove_icon.svg')
+                                  getImageURL('images/common/not_equals.svg')
                                 "
-                                size="1rem"
+                                size="6px"
                                 @click="
                                   addSearchTerm(
                                     `${props.row.name}!='${value.key}'`
                                   )
                                 "
+                                title="Exclude Term"
+                                round
                               />
                             </div>
                           </q-item>
