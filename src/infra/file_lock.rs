@@ -14,14 +14,15 @@
 
 use bytes::{Bytes, BytesMut};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::{
+    collections::HashMap,
+    fs::{File, OpenOptions},
+    io::Write,
+    sync::{Arc, RwLock},
+};
 
-use crate::infra::config::CONFIG;
-use crate::infra::ider;
-use crate::infra::metrics;
+use crate::common::file::get_file_contents;
+use crate::infra::{config::CONFIG, ider, metrics};
 use crate::meta::StreamType;
 
 static LOCKER: Lazy<Locker> = Lazy::new(Locker::new);
@@ -68,8 +69,40 @@ pub fn check_in_use(
     LOCKER.check_in_use(org_id, stream_name, stream_type, file_name)
 }
 
-#[inline]
-pub fn flush_all() {
+pub fn get_in_memory_files(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<Vec<Vec<u8>>, std::io::Error> {
+    if !CONFIG.common.wal_memory_mode_enabled {
+        return Ok(vec![]);
+    }
+    let mut files = Vec::new();
+    // read files in use
+    for data in LOCKER.data.iter() {
+        let thread_data = data.read().unwrap();
+        for (_, file) in thread_data.iter() {
+            if file.org_id == org_id
+                && file.stream_name == stream_name
+                && file.stream_type == stream_type
+            {
+                if let Ok(data) = file.read() {
+                    files.push(data);
+                }
+            }
+        }
+    }
+    // read files waiting to be moved to s3
+    let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
+    for (file, data) in FILES.read().unwrap().iter() {
+        if file.starts_with(&prefix) {
+            files.push(data.to_vec());
+        }
+    }
+    Ok(files)
+}
+
+pub fn flush_all_to_disk() {
     for data in LOCKER.data.iter() {
         let thread_data = data.read().unwrap();
         for (_, file) in thread_data.iter() {
@@ -295,6 +328,22 @@ impl RwFile {
     }
 
     #[inline]
+    pub fn read(&self) -> Result<Vec<u8>, std::io::Error> {
+        if self.use_cache {
+            Ok(self
+                .cache
+                .as_ref()
+                .unwrap()
+                .read()
+                .unwrap()
+                .to_owned()
+                .into())
+        } else {
+            get_file_contents(&self.full_name())
+        }
+    }
+
+    #[inline]
     pub fn sync(&self) {
         if self.use_cache {
             let file_path = format!("{}{}", self.dir, self.name);
@@ -384,7 +433,7 @@ mod tests {
             stream_type,
             "1_2022_10_17_10_7040693836556926977.json",
         ));
-        flush_all();
+        flush_all_to_disk();
     }
 
     #[test]

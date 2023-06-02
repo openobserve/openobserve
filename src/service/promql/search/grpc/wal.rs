@@ -44,11 +44,11 @@ pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
     stream_name: &str,
-    _time_range: (i64, i64),
+    time_range: (i64, i64),
     _filters: &[(&str, &str)],
 ) -> Result<(SessionContext, Arc<Schema>)> {
     // get file list
-    let files = get_file_list(org_id, stream_name).await?;
+    let files = get_file_list(org_id, stream_name, time_range).await?;
     if files.is_empty() {
         return Ok((SessionContext::new(), Arc::new(Schema::empty())));
     }
@@ -97,6 +97,7 @@ pub(crate) async fn create_context(
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,
+    time_range: (i64, i64),
 ) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
     let nodes = get_cached_online_ingester_nodes();
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
@@ -111,6 +112,8 @@ async fn get_file_list(
         let req = cluster_rpc::MetricsWalFileRequest {
             org_id: org_id.clone(),
             stream_name: stream_name.to_string(),
+            start_time: time_range.0,
+            end_time: time_range.1,
         };
         let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file");
         let task: tokio::task::JoinHandle<

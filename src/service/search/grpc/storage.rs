@@ -117,13 +117,14 @@ pub async fn search(
         scan_compressed_size
     );
 
-    // if scan_compressed_size > 30% of total memory cache, skip memory cache
-    let storage_type =
-        if !CONFIG.memory_cache.enabled || scan_compressed_size * 3 > file_data::stats().0 as u64 {
-            StorageType::FsNoCache
-        } else {
-            StorageType::FsMemory
-        };
+    // if scan_compressed_size > 80% of total memory cache, skip memory cache
+    let storage_type = if !CONFIG.memory_cache.enabled
+        || scan_compressed_size > CONFIG.memory_cache.skip_size as u64
+    {
+        StorageType::FsNoCache
+    } else {
+        StorageType::FsMemory
+    };
 
     // load files to local cache
     if storage_type == StorageType::FsMemory {

@@ -13,12 +13,17 @@
 // limitations under the License.
 
 use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
-use std::collections::HashMap;
-use std::io::Error;
-use std::io::ErrorKind;
+use std::{
+    collections::HashMap,
+    io::{Error, ErrorKind},
+};
 
 use crate::common::http::get_stream_type_from_request;
-use crate::meta::{self, stream::StreamSettings, StreamType};
+use crate::meta::{
+    self,
+    stream::{ListStream, StreamSettings},
+    StreamType,
+};
 use crate::service::stream;
 
 /** GetSchema */
@@ -199,5 +204,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         None => false,
     };
 
-    stream::list_streams(org_id.as_str(), stream_type, fetch_schema).await
+    let mut indices = stream::get_streams(org_id.as_str(), stream_type, fetch_schema).await;
+    indices.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(HttpResponse::Ok().json(ListStream { list: indices }))
 }

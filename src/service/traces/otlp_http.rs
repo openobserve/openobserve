@@ -87,8 +87,8 @@ pub async fn traces_json(
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
         partition_keys = crate::service::ingestion::get_stream_partition_keys(
-            traces_stream_name.to_string(),
-            traces_schema_map.clone(),
+            traces_stream_name,
+            &traces_schema_map,
         )
         .await;
     }
