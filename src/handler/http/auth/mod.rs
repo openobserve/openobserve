@@ -44,7 +44,7 @@ pub async fn validator(
     };
     match validate_credentials(
         credentials.user_id(),
-        credentials.password().unwrap().trim(),
+        credentials.password().unwrap_or_default().trim(),
         path,
     )
     .await

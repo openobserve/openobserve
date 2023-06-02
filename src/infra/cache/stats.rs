@@ -103,10 +103,17 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
         return Ok(());
     }
     let mut stats = STATS.entry(key).or_default();
-    stats.doc_num -= val.records;
-    stats.file_num -= 1;
-    stats.storage_size -= val.original_size as f64;
-    stats.compressed_size -= val.compressed_size as f64;
+    if stats.doc_num > val.records {
+        stats.doc_num -= val.records;
+        stats.file_num -= 1;
+        stats.storage_size -= val.original_size as f64;
+        stats.compressed_size -= val.compressed_size as f64;
+    } else {
+        stats.doc_num = 0;
+        stats.file_num = 0;
+        stats.storage_size = 0.0;
+        stats.compressed_size = 0.0;
+    }
 
     Ok(())
 }

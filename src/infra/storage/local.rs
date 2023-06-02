@@ -145,9 +145,18 @@ impl ObjectStore for Local {
     }
 
     async fn delete(&self, location: &Path) -> Result<()> {
-        self.client
-            .delete(&(format_key(location.as_ref()).into()))
-            .await
+        let mut result: Result<()> = Ok(());
+        for _ in 0..3 {
+            result = self
+                .client
+                .delete(&(format_key(location.as_ref()).into()))
+                .await;
+            if result.is_ok() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        result
     }
 
     async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
