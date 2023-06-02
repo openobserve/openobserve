@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let stats = stats::get_stream_stats(org_id, name, meta::StreamType::LookUpTable);
+    let stats = stats::get_stream_stats(org_id, name, meta::StreamType::EnrichmentTable);
 
     let rec_num = if stats.doc_num == 0 {
         100000
@@ -29,7 +29,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         encoding: meta::search::RequestEncoding::Empty,
     };
     // do search
-    match SearchService::search(org_id, meta::StreamType::LookUpTable, &req).await {
+    match SearchService::search(org_id, meta::StreamType::EnrichmentTable, &req).await {
         Ok(res) => {
             if !res.hits.is_empty() {
                 Ok(res.hits.iter().map(convert_to_vrl).collect())
@@ -38,7 +38,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
             }
         }
         Err(err) => {
-            log::error!("get lookup table data error: {:?}", err);
+            log::error!("get enrichment table data error: {:?}", err);
             Ok(vec![])
         }
     }
