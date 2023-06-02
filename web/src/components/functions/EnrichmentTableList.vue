@@ -41,7 +41,7 @@
               size="sm"
               round
               flat
-              :title="t('function.lookupTables')"
+              :title="t('function.enrichmentTables')"
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
@@ -70,15 +70,15 @@
         </template>
         <template #top="scope">
           <div class="q-table__title">
-            {{ t("function.lookupTables") }}
+            {{ t("function.enrichmentTables") }}
           </div>
           <q-input
             v-model="filterQuery"
             borderless
             filled
             dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('function.searchLookupTable')"
+            class="q-ml-auto q-mb-xs no-border search-en-table-input"
+            :placeholder="t('function.searchEnrichmentTable')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -89,13 +89,13 @@
             padding="sm lg"
             color="secondary"
             no-caps
-            :label="t(`function.addLookupTable`)"
+            :label="t(`function.addEnrichmentTable`)"
             @click="showAddUpdateFn({})"
           />
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('function.lookupTables')"
+            :pageTitle="t('function.enrichmentTables')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -115,7 +115,7 @@
       </q-table>
     </div>
     <div v-else>
-      <add-lookup-table
+      <add-enrichment-table
         v-model="formData"
         :isUpdating="isUpdated"
         @update:list="refreshList"
@@ -123,8 +123,8 @@
       />
     </div>
     <ConfirmDialog
-      title="Delete Lookup Table"
-      message="Are you sure you want to delete lookup table?"
+      title="Delete Enrichment Table"
+      message="Are you sure you want to delete enrichment table?"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -140,8 +140,7 @@ import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../shared/grid/Pagination.vue";
-import jsTransformService from "../../services/jstransform";
-import AddLookupTable from "./AddLookupTable.vue";
+import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -149,8 +148,8 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 
 export default defineComponent({
-  name: "LookupTables",
-  components: { QTablePagination, AddLookupTable, NoData, ConfirmDialog },
+  name: "EnrichmentTableList",
+  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -204,7 +203,7 @@ export default defineComponent({
       streamService
         .nameList(
           store.state.selectedOrganization.identifier,
-          "lookuptable",
+          "enrichment_tables",
           false
         )
         .then((res) => {
@@ -263,9 +262,9 @@ export default defineComponent({
       let action;
       if (!props.row) {
         isUpdated.value = false;
-        action = "Add Lookup Table";
+        action = "Add Enrichment Table";
         router.push({
-          name: "lookupTables",
+          name: "enrichmentTables",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
@@ -273,9 +272,9 @@ export default defineComponent({
         });
       } else {
         isUpdated.value = true;
-        action = "Update Lookup Table";
+        action = "Update Enrichment Table";
         router.push({
-          name: "lookupTables",
+          name: "enrichmentTables",
           query: {
             action: "update",
             name: props.row.name,
@@ -295,7 +294,7 @@ export default defineComponent({
 
     const refreshList = () => {
       router.push({
-        name: "lookupTables",
+        name: "enrichmentTables",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -307,7 +306,7 @@ export default defineComponent({
     const hideForm = () => {
       showAddJSTransformDialog.value = false;
       router.replace({
-        name: "lookupTables",
+        name: "enrichmentTables",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -319,7 +318,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           selectedDelete.value.name,
-          "lookuptable"
+          "enrichment_tables"
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -338,7 +337,7 @@ export default defineComponent({
         });
 
       segment.track("Button Click", {
-        button: "Delete Lookup Table",
+        button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         function_name: selectedDelete.value.name,
@@ -421,6 +420,12 @@ export default defineComponent({
   &__top {
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
+  }
+}
+
+.search-en-table-input {
+  .q-field__inner {
+    width: 250px;
   }
 }
 </style>

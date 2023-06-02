@@ -18,9 +18,9 @@
     <div class="row items-center no-wrap">
       <div class="col">
         <div v-if="isUpdating" class="text-h6">
-          {{ t("function.updateLookupTable") }}
+          {{ t("function.updateEnrichmentTable") }}
         </div>
-        <div v-else class="text-h6">{{ t("function.addLookupTable") }}</div>
+        <div v-else class="text-h6">{{ t("function.addEnrichmentTable") }}</div>
       </div>
     </div>
 
@@ -105,7 +105,7 @@ const defaultValue: any = () => {
 };
 
 export default defineComponent({
-  name: "AddLookupTable",
+  name: "AddEnrichmentTable",
   props: {
     modelValue: {
       type: Object,
@@ -145,7 +145,7 @@ export default defineComponent({
       reqformData.append("file", formData.value.file);
 
       jsTransformService
-        .create_lookup_table(
+        .create_enrichment_table(
           store.state.selectedOrganization.identifier,
           formData.value.name,
           reqformData
@@ -166,17 +166,17 @@ export default defineComponent({
             type: "negative",
             message:
               JSON.stringify(err.response.data["error"]) ||
-              "Lookup Table creation failed",
+              "Enrichment Table creation failed",
           });
           dismiss();
         });
 
       segment.track("Button Click", {
-        button: "Save Lookup Table",
+        button: "Save Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
         function_name: formData.value.name,
-        page: "Add/Update Lookup Table",
+        page: "Add/Update Enrichment Table",
       });
     };
 
