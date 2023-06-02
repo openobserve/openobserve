@@ -42,15 +42,15 @@ impl Metrics for Querier {
         tracing::Span::current().set_parent(parent_cx);
 
         let req = req.get_ref();
-        let org_id = req.org_id.clone();
+        let org_id = &req.org_id;
         let stream_type = meta::StreamType::Metrics.to_string();
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/metrics/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/metrics/query", "500", org_id, "", &stream_type])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/metrics/query", "500", &org_id, "", &stream_type])
+                .with_label_values(&["/metrics/query", "500", org_id, "", &stream_type])
                 .inc();
             let message = if let errors::Error::ErrorCode(code) = err {
                 code.to_json()
@@ -62,10 +62,10 @@ impl Metrics for Querier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/metrics/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, "", &stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/metrics/query", "200", &org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, "", &stream_type])
             .inc();
 
         Ok(Response::new(result))
@@ -77,10 +77,10 @@ impl Metrics for Querier {
         req: Request<MetricsWalFileRequest>,
     ) -> Result<Response<MetricsWalFileResponse>, Status> {
         let start = std::time::Instant::now();
-        let org_id = req.get_ref().org_id.clone();
         let start_time = req.get_ref().start_time;
         let end_time = req.get_ref().end_time;
-        let stream_name = req.get_ref().stream_name.clone();
+        let org_id = &req.get_ref().org_id;
+        let stream_name = &req.get_ref().stream_name;
         let pattern = format!(
             "{}/files/{org_id}/metrics/{stream_name}/*.json",
             &CONFIG.common.data_wal_dir
@@ -139,7 +139,7 @@ impl Metrics for Querier {
         // check wal memory mode
         if CONFIG.common.wal_memory_mode_enabled {
             let mem_files =
-                file_lock::get_in_memory_files(&org_id, &stream_name, meta::StreamType::Metrics)
+                file_lock::get_in_memory_files(org_id, stream_name, meta::StreamType::Metrics)
                     .unwrap_or_default();
             for body in mem_files {
                 resp.files.push(MetricsWalFile {
@@ -151,10 +151,10 @@ impl Metrics for Querier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/metrics/wal_file", "200", &org_id, &stream_name, "metrics"])
+            .with_label_values(&["/metrics/wal_file", "200", org_id, stream_name, "metrics"])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/metrics/wal_file", "200", &org_id, &stream_name, "metrics"])
+            .with_label_values(&["/metrics/wal_file", "200", org_id, stream_name, "metrics"])
             .inc();
 
         Ok(Response::new(resp))

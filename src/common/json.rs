@@ -89,24 +89,30 @@ where
 
 #[inline(always)]
 pub fn flatten_json_and_format_field(obj: &Value) -> Value {
-    let mut obj = flatten_json(obj);
+    let obj = flatten_json(obj);
     if !obj.is_object() {
-        return obj.to_owned();
+        return obj;
     }
-    let mut map = serde_json::Map::new();
-    for (key, value) in obj.as_object_mut().unwrap().iter_mut() {
-        let key = key
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() {
-                    c.to_lowercase().next().unwrap()
-                } else {
-                    '_'
-                }
-            })
-            .collect::<String>();
-        map.insert(key, value.to_owned());
-    }
+
+    let map = obj
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(key, value)| {
+            let key = key
+                .chars()
+                .map(|c| {
+                    if c.is_alphanumeric() {
+                        c.to_lowercase().next().unwrap()
+                    } else {
+                        '_'
+                    }
+                })
+                .collect::<String>();
+            (key, value.to_owned())
+        })
+        .collect();
+
     Value::Object(map)
 }
 

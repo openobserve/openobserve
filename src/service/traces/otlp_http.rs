@@ -427,7 +427,7 @@ pub async fn traces_json(
         alerts.retain(|alert| alert.name.eq(&val.alert_name));
         if !alerts.is_empty() {
             crate::service::ingestion::send_ingest_notification(
-                val.clone(),
+                val,
                 alerts.first().unwrap().clone(),
             )
             .await;
