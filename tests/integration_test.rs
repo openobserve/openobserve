@@ -103,7 +103,7 @@ mod tests {
         e2e_delete_function().await;
 
         /* FIXME: Revise and restore the e2e tests for search API calls.
-         * They have been broken by https://github.com/zinclabs/openobserve/pull/570
+         * They have been broken by https://github.com/openobserve/openobserve/pull/570
          *
          * // search
          * e2e_search().await;

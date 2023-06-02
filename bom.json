@@ -34,7 +34,7 @@
           "hashes": []
         },
         {
-          "url": "https://github.com/zinclabs/openobserve/",
+          "url": "https://github.com/openobserve/openobserve/",
           "type": "vcs",
           "hashes": []
         }
@@ -608,12 +608,12 @@
           "hashes": []
         },
         {
-          "url": "https://github.com/zinclabs/dotenv-config/",
+          "url": "https://github.com/openobserve/dotenv-config/",
           "type": "website",
           "hashes": []
         },
         {
-          "url": "https://github.com/zinclabs/dotenv-config/",
+          "url": "https://github.com/openobserve/dotenv-config/",
           "type": "vcs",
           "hashes": []
         }
