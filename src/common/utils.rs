@@ -66,7 +66,7 @@ pub async fn populate_file_meta(
         return Ok(());
     }
     let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), batch)?;
+    let provider = MemTable::try_new(schema, batch)?;
     ctx.register_table("temp", Arc::new(provider))?;
 
     let sql = format!(

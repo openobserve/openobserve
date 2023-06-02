@@ -211,16 +211,19 @@ pub fn get_partition_key_record(s: &str) -> String {
     }
 }
 
-pub async fn send_ingest_notification(mut trigger: Trigger, alert: Alert) {
+pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
     log::info!(
         "Sending notification for alert {} {}",
         alert.name,
         alert.stream
     );
-    let _ = send_notification(&alert, &trigger.clone()).await;
-    trigger.last_sent_at = Utc::now().timestamp_micros();
-    trigger.count += 1;
-    let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
+    let _ = send_notification(&alert, &trigger).await;
+    let trigger_to_save = Trigger {
+        last_sent_at: Utc::now().timestamp_micros(),
+        count: trigger.count + 1,
+        ..trigger
+    };
+    let _ = triggers::save_trigger(&trigger_to_save.alert_name, &trigger_to_save).await;
 }
 
 #[cfg(feature = "zo_functions")]

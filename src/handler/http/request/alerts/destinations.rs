@@ -45,7 +45,7 @@ pub async fn save_destination(
 
     let dest = dest.into_inner();
 
-    match db::alerts::templates::get(org_id.as_str(), &dest.clone().template).await {
+    match db::alerts::templates::get(org_id.as_str(), &dest.template).await {
         Ok(temp) => match temp {
             Some(_) => destinations::save_destination(org_id, name, dest).await,
             None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(

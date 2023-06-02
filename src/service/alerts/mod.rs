@@ -130,7 +130,7 @@ pub async fn save_alert(
         let trigger = Trigger {
             timestamp: Utc::now().timestamp_micros(),
             is_valid: true,
-            alert_name: alert.name.clone(),
+            alert_name: alert.name,
             stream: stream_name,
             stream_type,
             org: org_id,
@@ -138,7 +138,7 @@ pub async fn save_alert(
             count: 0,
             is_ingest_time: false,
         };
-        let _ = triggers::save_trigger(trigger.alert_name.clone(), trigger.clone()).await;
+        let _ = triggers::save_trigger(&trigger.alert_name, &trigger).await;
     }
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

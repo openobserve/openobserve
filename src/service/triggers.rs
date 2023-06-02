@@ -24,10 +24,10 @@ use crate::meta::http::HttpResponse as MetaHttpResponse;
 
 #[tracing::instrument(skip_all)]
 pub async fn save_trigger(
-    alert_name: String,
-    trigger: Trigger,
+    alert_name: &str,
+    trigger: &Trigger,
 ) -> Result<HttpResponse, anyhow::Error> {
-    db::triggers::set(&alert_name, trigger).await.unwrap();
+    db::triggers::set(alert_name, trigger).await.unwrap();
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         "Trigger saved".to_string(),
@@ -56,8 +56,8 @@ mod tests {
     #[actix_web::test]
     async fn test_triggers() {
         let resp = save_trigger(
-            "dummy_trigger".to_string(),
-            Trigger {
+            "dummy_trigger",
+            &Trigger {
                 timestamp: 0,
                 is_valid: true,
                 alert_name: "TestAlert".to_string(),
