@@ -94,11 +94,11 @@ async fn settings(
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => {
             if let Some(s_type) = v {
-                if s_type == StreamType::LookUpTable {
+                if s_type == StreamType::EnrichmentTable {
                     return Ok(
                         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                             http::StatusCode::BAD_REQUEST.into(),
-                            "Stream type 'LookUpTable' not allowed".to_string(),
+                            "Stream type 'EnrichmentTable' not allowed".to_string(),
                         )),
                     );
                 }

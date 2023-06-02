@@ -20,7 +20,7 @@ pub mod dashboard;
 pub mod file_list;
 pub mod functions;
 pub mod kv;
-pub mod lookup_table;
+pub mod enrichment_table;
 pub mod metrics;
 pub mod schema;
 pub mod syslog;
