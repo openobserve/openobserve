@@ -33,3 +33,15 @@ phases:
       
       - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64
       - docker push public.ecr.aws/zinclabs/openobserve:latest-arm64
+
+      # push to docker hub
+      - echo 'Pull arm64 image'
+      - docker tag openobserve:latest-arm64 openobserve/openobserve:$GIT_TAG-arm64
+      - docker tag openobserve:latest-arm64 openobserve/openobserve:latest-arm64
+      - docker push openobserve/openobserve:$GIT_TAG-arm64
+      - docker push openobserve/openobserve:latest-arm64
+      - echo 'Pull arm64-simd image'
+      - docker tag openobserve:latest-arm64 openobserve/openobserve:$GIT_TAG-arm64-simd
+      - docker tag openobserve:latest-arm64 openobserve/openobserve:latest-arm64-simd
+      - docker push openobserve/openobserve:$GIT_TAG-arm64-simd
+      - docker push openobserve/openobserve:latest-arm64-simd

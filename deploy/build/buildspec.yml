@@ -37,18 +37,6 @@ phases:
       - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
 
-      # push to docker hub
-      - docker tag openobserve:latest-amd64 openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
-      - docker tag openobserve:latest-amd64 openobserve/openobserve-dev:latest-amd64
-      - docker push openobserve/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
-      - docker push openobserve/openobserve-dev:latest-amd64
-
-      # build openobserve-mimalloc
-      # - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      # - docker build -t openobserve:latest-amd64-mimalloc -f deploy/build/Dockerfile.mimalloc.amd64 .
-      # - docker tag openobserve:latest-amd64-mimalloc public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-      # - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64-mimalloc
-
 cache:
   paths:
     - /root/.cache/
