@@ -29,7 +29,6 @@ use std::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
-    time::Duration,
 };
 use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
@@ -166,14 +165,6 @@ async fn main() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .app_data(web::Data::new(
-                awc::Client::builder()
-                    .connector(
-                        awc::Connector::new().timeout(Duration::from_secs(CONFIG.route.timeout)),
-                    )
-                    .timeout(Duration::from_secs(CONFIG.route.timeout))
-                    .finish(),
-            ))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
