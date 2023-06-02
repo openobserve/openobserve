@@ -30,7 +30,7 @@ use crate::{
         cluster,
         config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         errors::{Error, Result},
-        file_lock, metrics,
+        wal, metrics,
     },
     meta::{
         self,
@@ -345,7 +345,7 @@ pub async fn remote_write(
                 write_buf.put(row.as_bytes());
                 write_buf.put("\n".as_bytes());
             }
-            let file = file_lock::get_or_create(
+            let file = wal::get_or_create(
                 *thread_id.as_ref(),
                 org_id,
                 &metric_name,

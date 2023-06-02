@@ -332,7 +332,7 @@ pub fn write_file(
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
         }
-        let file = crate::infra::file_lock::get_or_create(
+        let file = crate::infra::wal::get_or_create(
             *thread_id.as_ref(),
             org_id,
             stream_name,

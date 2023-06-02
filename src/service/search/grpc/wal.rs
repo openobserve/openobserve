@@ -25,7 +25,7 @@ use crate::infra::{
     cache::tmpfs,
     config::{self, CONFIG},
     errors::{Error, ErrorCodes},
-    file_lock, ider,
+    wal, ider,
 };
 use crate::meta;
 use crate::service::{
@@ -59,7 +59,7 @@ pub async fn search(
 
     // check wal memory mode
     if CONFIG.common.wal_memory_mode_enabled {
-        let mem_files = file_lock::get_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
+        let mem_files = wal::get_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
             .unwrap_or_default();
         for file_data in mem_files {
             scan_size += file_data.len();

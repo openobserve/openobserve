@@ -18,7 +18,7 @@ use tokio::time;
 use crate::common::file::scan_files;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
+use crate::infra::wal;
 use crate::infra::storage;
 use crate::meta::StreamType;
 
@@ -68,7 +68,7 @@ async fn move_file_list_to_storage() -> Result<(), anyhow::Error> {
         let file_name = columns[1].to_string();
 
         // check the file is using for write
-        if file_lock::check_in_use("", "", StreamType::Filelist, &file_name) {
+        if wal::check_in_use("", "", StreamType::Filelist, &file_name) {
             continue;
         }
         log::info!("[JOB] convert file_list: {}", file);

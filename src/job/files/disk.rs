@@ -25,7 +25,7 @@ use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::infra::{
     cluster,
     config::{CONFIG, SEARCHING_IN_WAL},
-    file_lock, metrics, storage,
+    wal, metrics, storage,
 };
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
@@ -86,7 +86,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let file_name = columns[4].to_string();
 
         // check the file is using for write
-        if file_lock::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
+        if wal::check_in_use(&org_id, &stream_name, stream_type, &file_name) {
             // println!("file is using for write, skip, {}", file_name);
             continue;
         }
