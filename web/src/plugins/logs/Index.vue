@@ -161,9 +161,11 @@
                   >
                     <search-result
                       ref="searchResultRef"
+                      :expandedLogs="expandedLogs"
                       @update:datetime="searchData"
                       @update:scroll="getMoreData"
                       @search:timeboxed="searchAroundData"
+                      @expandlog="toggleExpandLog"
                     />
                   </div>
                 </template>
@@ -277,6 +279,7 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
+    const expandedLogs = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -1146,6 +1149,7 @@ export default defineComponent({
     const runQueryFn = () => {
       searchObj.data.resultGrid.currentPage = 0;
       searchObj.runQuery = false;
+      expandedLogs.value = {};
       getQueryData();
     };
 
@@ -1341,6 +1345,12 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
+    const toggleExpandLog = async (index: number) => {
+      if (expandedLogs.value[index.toString()])
+        delete expandedLogs.value[index.toString()];
+      else expandedLogs.value[index.toString()] = true;
+    };
+
     return {
       store,
       router,
@@ -1364,6 +1374,8 @@ export default defineComponent({
       getStreamList,
       collapseFieldList,
       areStreamsPresent,
+      toggleExpandLog,
+      expandedLogs,
     };
   },
   computed: {

@@ -81,6 +81,7 @@
             :key="'expand_' + index"
             @click="expandRowDetail(row, index)"
             style="cursor: pointer"
+            class="pointer"
             :style="
               row[store.state.zoConfig.timestamp_column] ==
               searchObj.data.searchAround.indexTimestamp
@@ -92,12 +93,13 @@
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
               class="field_list"
+              style="cursor: pointer"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
                   v-if="column.name === '@timestamp'"
                   :icon="
-                    expandedLogs[row._timestamp]
+                    expandedLogs[index.toString()]
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -105,7 +107,7 @@
                   size="xs"
                   flat
                   class="q-mr-xs"
-                  @click.stop="expandLog(row)"
+                  @click.stop="expandLog(row, index)"
                 ></q-btn>
                 <high-light
                   :content="
@@ -155,7 +157,7 @@
               </div>
             </q-td>
           </q-tr>
-          <q-tr v-if="expandedLogs[row._timestamp]">
+          <q-tr v-if="expandedLogs[index.toString()]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
               <pre class="log_json_content">{{ row }}</pre>
             </td>
@@ -217,7 +219,14 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "expandlog",
   ],
+  props: {
+    expandedLogs: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
   methods: {
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
@@ -338,10 +347,8 @@ export default defineComponent({
       emit("remove:searchTerm", term);
     };
 
-    const expandLog = async (row: any) => {
-      if (expandedLogs.value[row._timestamp])
-        delete expandedLogs.value[row._timestamp];
-      else expandedLogs.value[row._timestamp] = true;
+    const expandLog = async (row: any, index: number) => {
+      emit("expandlog", index);
     };
 
     return {
@@ -361,7 +368,6 @@ export default defineComponent({
       reDrawChart,
       expandLog,
       getImageURL,
-      expandedLogs,
     };
   },
 });
