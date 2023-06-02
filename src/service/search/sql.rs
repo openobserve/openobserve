@@ -15,6 +15,7 @@
 use ahash::AHashMap;
 use chrono::Duration;
 use datafusion::arrow::datatypes::{DataType, Schema};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,6 +36,23 @@ const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
+
+static RE1: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
+static RE2: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select \*").unwrap());
+static RE3: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
+static RE4: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
+static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+static RE_TIMESTAMP_EMPTY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+
+static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
+static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
+
+static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -125,10 +143,6 @@ impl Sql {
         // 1. must from query
         // 2. disallow select *
         // 3. must select group by field
-        let re1 = Regex::new(r"(?i) from[ ]+query").unwrap();
-        let re2 = Regex::new(r"(?i)select \*").unwrap();
-        let re3 = Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap();
-        let re4 = Regex::new(r"(?i)select (.*) from[ ]+query").unwrap();
         let mut req_aggs = HashMap::new();
         for agg in req.aggs.iter() {
             req_aggs.insert(agg.name.to_string(), agg.sql.to_string());
@@ -141,25 +155,25 @@ impl Sql {
 
         // check aggs
         for sql in req_aggs.values() {
-            if !re1.is_match(sql.as_str()) {
+            if !RE1.is_match(sql) {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Aggregation SQL only support 'from query' as context".to_string(),
                 )));
             }
-            if re2.is_match(sql.as_str()) {
+            if RE2.is_match(sql) {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Aggregation SQL is not supported 'select *' please specify the fields"
                         .to_string(),
                 )));
             }
-            if re3.is_match(sql.as_str()) {
-                let caps = re3.captures(sql.as_str()).unwrap();
+            if RE3.is_match(sql) {
+                let caps = RE3.captures(sql).unwrap();
                 let group_by = caps
                     .get(1)
                     .unwrap()
                     .as_str()
                     .trim_matches(|v| v == '\'' || v == '"');
-                let select_caps = match re4.captures(sql.as_str()) {
+                let select_caps = match RE4.captures(sql) {
                     Some(caps) => caps,
                     None => {
                         return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
@@ -189,8 +203,7 @@ impl Sql {
 
         // Hack _timestamp
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
-            let re = Regex::new(r"(?i)SELECT (.*) FROM").unwrap();
-            let caps = re.captures(origin_sql.as_str()).unwrap();
+            let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(&CONFIG.common.column_timestamp) {
                 origin_sql = origin_sql.replace(
@@ -247,8 +260,7 @@ impl Sql {
                 "".to_string()
             };
             if !time_range_sql.is_empty() && meta_time_range_is_empty {
-                let re = Regex::new(r"(?i) where (.*)").unwrap();
-                match re.captures(origin_sql.as_str()) {
+                match RE_TIMESTAMP_EMPTY.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
                         if !meta.order_by.is_empty() {
@@ -315,19 +327,17 @@ impl Sql {
 
         // HACK full text search
         let mut fulltext = Vec::new();
-        let re1 = Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap();
-        let re2 = Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap();
         for token in &where_tokens {
             let tokens = split_sql_token_unwrap_brace(token);
             for token in &tokens {
                 if !token.to_lowercase().starts_with("match_all") {
                     continue;
                 }
-                for cap in re1.captures_iter(token) {
+                for cap in RE_MATCH_ALL.captures_iter(token) {
                     // println!("match_all: {}, {}", &cap[0], &cap[1]);
                     fulltext.push((cap[0].to_string(), cap[1].to_string()));
                 }
-                for cap in re2.captures_iter(token) {
+                for cap in RE_MATCH_ALL_IGNORE_CASE.captures_iter(token) {
                     // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
@@ -405,10 +415,9 @@ impl Sql {
         }
 
         // Hack for histogram
-        let re_histogram = Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap();
         let from_pos = origin_sql.to_lowercase().find(" from ").unwrap();
         let select_str = origin_sql[0..from_pos].to_string();
-        for cap in re_histogram.captures_iter(select_str.as_str()) {
+        for cap in RE_HISTOGRAM.captures_iter(select_str.as_str()) {
             let attrs = cap
                 .get(1)
                 .unwrap()
@@ -433,8 +442,7 @@ impl Sql {
         }
 
         // pickup where
-        let re_where = Regex::new(r"(?i) where (.*)").unwrap();
-        let mut where_str = match re_where.captures(&origin_sql) {
+        let mut where_str = match RE_WHERE.captures(&origin_sql) {
             Some(caps) => caps[1].to_string(),
             None => "".to_string(),
         };
@@ -467,15 +475,13 @@ impl Sql {
             );
         }
         let mut aggs = AHashMap::new();
-        let re_where = Regex::new(r"(?i) where ").unwrap();
-        let re_from = Regex::new(r"(?i) from[ ]+query").unwrap();
         for (key, sql) in &req_aggs {
             let mut sql = sql.to_string();
-            if let Some(caps) = re_from.captures(&sql) {
+            if let Some(caps) = RE_ONLY_FROM.captures(&sql) {
                 sql = sql.replace(&caps[0].to_string(), " FROM tbl ");
             }
             if !where_str.is_empty() {
-                match re_where.captures(&sql) {
+                match RE_ONLY_WHERE.captures(&sql) {
                     Some(caps) => {
                         sql = sql
                             .replace(&caps[0].to_string(), &format!(" WHERE ({where_str}) AND "));
@@ -493,7 +499,7 @@ impl Sql {
                 log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
-            for cap in re_histogram.captures_iter(sql.clone().as_str()) {
+            for cap in RE_HISTOGRAM.captures_iter(sql.clone().as_str()) {
                 let attrs = cap
                     .get(1)
                     .unwrap()
