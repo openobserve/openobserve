@@ -55,7 +55,6 @@ export default defineComponent({
       const svgWidth = Math.max(
         ...this.services.map((service) => service.width)
       );
-      console.log(svg, "width height", svgWidth, svgHeight);
       svg.style.width = svgWidth + "px";
       svg.style.height = svgHeight + "px";
     });
@@ -65,7 +64,6 @@ export default defineComponent({
       // Create the SVG element and append it to the chart div
       const { height, depth } = this.getTreeHeightAndDepth(dataIndex);
       let totalHeight;
-      console.log(cloneDeep(this.services[dataIndex - 1]?.height));
       if (dataIndex) {
         totalHeight = this.services.reduce(
           (acc, service) => acc + (service.height || 0) + 40,
@@ -131,7 +129,6 @@ export default defineComponent({
       );
 
       const groupDimensions = group?.getBoundingClientRect();
-      console.log("height", dataIndex, groupDimensions);
       this.services[dataIndex]["height"] = groupDimensions.height + 40;
       this.services[dataIndex]["width"] = groupDimensions.width + 150;
     },
@@ -160,7 +157,6 @@ export default defineComponent({
         .append("g")
         .attr("class", "node")
         .attr("transform", (d) => {
-          console.log(d);
           return `translate(${d.y}, ${d.x})`;
         });
 

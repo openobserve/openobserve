@@ -25,27 +25,50 @@
       class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
-      <div class="q-py-sm flex items-center justify-start col-12 toolbar">
-        <div class="text-h6 q-mr-lg">
-          {{ traceTree[0]["operationName"] }}
+      <div
+        class="q-py-sm q-px-sm flex items-end justify-between col-12 toolbar"
+      >
+        <div class="flex items-end justify-start">
+          <div class="text-h6 q-mr-lg">
+            {{ traceTree[0]["operationName"] }}
+          </div>
+          <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <div>Spans: {{ spanList.length - 1 }}</div>
-      </div>
-      <div class="col-12 flex justify-end">
-        <q-select
-          data-test="log-search-index-list-field-search-input"
-          v-model="activeVisual"
-          :options="traceVisuals"
-          data-cy="logs-index-list-select-stream-type"
-          filled
-          borderless
-          dense
-          size="xs"
-          debounce="1"
-          class="q-pb-xs"
+        <q-btn
+          v-close-popup
+          round
+          flat
+          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          size="md"
         />
       </div>
-      <div class="col-12" v-if="activeVisual === 'Histogram'">
+      <q-separator style="width: 100%" />
+      <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
+        <div class="text-subtitle2 text-bold">
+          {{
+            activeVisual === "timeline" ? "Trace Timeline" : "Trace Service Map"
+          }}
+        </div>
+        <div
+          class="rounded-borders"
+          style="border: 1px solid #cacaca; padding: 2px"
+        >
+          <template v-for="visual in traceVisuals" :key="visual.value">
+            <q-btn
+              :icon="'img:' + getImageURL(`images/common/${visual.icon}.svg`)"
+              :color="visual.value === activeVisual ? 'primary' : ''"
+              :flat="visual.value === activeVisual ? false : true"
+              dense
+              no-caps
+              size="11px"
+              class="q-px-sm visual-selection-btn"
+              @click="activeVisual = visual.value"
+              >{{ visual.label }}</q-btn
+            >
+          </template>
+        </div>
+      </div>
+      <div class="col-12" v-if="activeVisual === 'timeline'">
         <trace-chart
           class="trace-details-chart"
           id="trace_details_gantt_chart"
@@ -57,6 +80,7 @@
       <div class="col-12" v-else>
         <d3-chart :data="traceServiceMap" />
       </div>
+      <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -124,6 +148,7 @@ import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -169,9 +194,12 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
 
-    const traceVisuals = ["Service Map", "Histogram"];
+    const traceVisuals = [
+      { label: "Timeline", value: "timeline", icon: "trace_timeline" },
+      { label: "Service Map", value: "service_map", icon: "service_map" },
+    ];
 
-    const activeVisual = ref("Histogram");
+    const activeVisual = ref("timeline");
 
     const traceChart = ref({
       data: [{}],
@@ -380,7 +408,6 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
-      console.log(maxDepth, maxHeight);
       traceServiceMap.value = cloneDeep(serviceTree);
     };
 
@@ -660,6 +687,7 @@ export default defineComponent({
       mockServiceMap,
       activeVisual,
       traceVisuals,
+      getImageURL,
     };
   },
 });
@@ -668,9 +696,9 @@ export default defineComponent({
 <style scoped lang="scss">
 $sidebarWidth: 300px;
 $seperatorWidth: 2px;
-$toolbarHeight: 60px;
+$toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
-$traceChartHeight: 200px;
+$traceChartHeight: 210px;
 .toolbar {
   height: $toolbarHeight;
 }
@@ -724,6 +752,13 @@ $traceChartHeight: 200px;
     .rangeslider-mask-min {
       fill: #d2d2d2 !important;
       fill-opacity: 1 !important;
+    }
+  }
+
+  .visual-selection-btn {
+    .q-icon {
+      padding-right: 5px;
+      font-size: 15px;
     }
   }
 }
