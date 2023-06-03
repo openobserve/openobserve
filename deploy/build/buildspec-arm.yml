@@ -55,12 +55,6 @@ phases:
       - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
       - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
 
-      # build openobserve-mimalloc
-      - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t openobserve:latest-arm64-mimalloc -f deploy/build/Dockerfile.mimalloc.aarch64 .
-      - docker tag openobserve:latest-arm64-mimalloc public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
-      - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64-mimalloc
-
 cache:
   paths:
     - /root/.cache/
