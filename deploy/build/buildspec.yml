@@ -31,7 +31,7 @@ phases:
 
       # build openobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile.mimalloc.amd64 .
+      - docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile.amd64 .
       - docker tag openobserve:latest-amd64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker tag openobserve:latest-amd64 public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64

@@ -23,7 +23,7 @@ jobs:
             file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubuntu-2004-8-cores
-            features: ""
+            features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
@@ -33,7 +33,7 @@ jobs:
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
             os: macos-latest
-            features: "--no-default-features"
+            features: ""
             file_name: openobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
           - arch: x86_64-pc-windows-msvc
