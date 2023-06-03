@@ -87,9 +87,9 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-$toolbarHeight: 60px;
+$toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
-$traceChartHeight: 200px;
+$traceChartHeight: 250px;
 
 .spans-container {
   position: relative;
