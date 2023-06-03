@@ -305,7 +305,7 @@
     "noData": "No se han ingerido datos",
     "findIngestion": "Descubra cómo ingerir registros >>",
     "ingestionMsg": "Parece que no has ingerido ningún dato para la organización seleccionada. Hay varias formas de ingerir datos, como Fluentbit.",
-    "inestedInSearch": "Prueba Logs Search",
+    "inestedInSearch": "Prueba Log Search",
     "searchInDemoOrg": "Puede explorar las capacidades de búsqueda cambiando a la organización de demostración. Para cambiar a la organización de demostración, seleccione «Organización de demostración» en el menú desplegable de organizaciones de la parte superior. Seguimos ingresando datos ficticios para la organización de demostración."
   },
   "billing": {

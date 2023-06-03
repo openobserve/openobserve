@@ -305,7 +305,7 @@
     "noData": "Nessun dato importato",
     "findIngestion": "Scopri come inserire i log >>",
     "ingestionMsg": "Sembra che tu non abbia inserito alcun dato nell'organizzazione selezionata, ci sono vari modi in cui i dati possono essere ingeriti come fluentbit.",
-    "inestedInSearch": "Prova Logs Search",
+    "inestedInSearch": "Prova Log Search",
     "searchInDemoOrg": "Puoi esplorare le funzionalità di ricerca passando all'organizzazione demo, per passare all'organizzazione demo, seleziona «Organizzazione demo» utilizzando il menu a discesa dell'organizzazione in alto. Continuiamo a inserire dati fittizi in Demo Organization."
   },
   "billing": {
