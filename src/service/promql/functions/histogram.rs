@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
-use rustc_hash::FxHashMap;
 
 use crate::{
     meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
@@ -50,7 +50,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         }
     };
 
-    let mut metrics_with_buckets: FxHashMap<Signature, MetricWithBuckets> = FxHashMap::default();
+    let mut metrics_with_buckets: HashMap<Signature, MetricWithBuckets> = HashMap::default();
     for InstantValue { mut labels, sample } in in_vec {
         // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
         //

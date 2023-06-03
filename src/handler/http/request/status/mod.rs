@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use actix_web::{get, HttpResponse};
-use ahash::AHashMap;
+use ahash::AHashMap as HashMap;
 use datafusion::arrow::datatypes::{Field, Schema};
 use serde::Serialize;
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 use utoipa::ToSchema;
 
 use crate::common::json;
@@ -88,7 +88,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
 
 #[get("/cache/status")]
 pub async fn cache_status() -> Result<HttpResponse, Error> {
-    let mut stats: AHashMap<&str, json::Value> = AHashMap::new();
+    let mut stats: HashMap<&str, json::Value> = HashMap::default();
     stats.insert(
         "LOCAL_NODE_UUID",
         json::json!(cluster::LOCAL_NODE_UUID.clone()),

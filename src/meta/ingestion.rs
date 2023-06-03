@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap;
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use utoipa::ToSchema;
 
 use crate::common::json;
@@ -29,7 +28,7 @@ pub struct RecordStatus {
 }
 
 pub struct BulkStreamData {
-    pub data: AHashMap<String, Vec<String>>,
+    pub data: HashMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -28,8 +27,7 @@ pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
-pub type FxIndexMap<K, V> =
-    indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
+pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric {

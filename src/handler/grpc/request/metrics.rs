@@ -22,7 +22,7 @@ use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,
 };
-use crate::infra::{config::CONFIG, errors, file_lock, ider, metrics};
+use crate::infra::{config::CONFIG, errors, ider, metrics, wal};
 use crate::meta;
 use crate::service::promql::search as SearchService;
 
@@ -139,7 +139,7 @@ impl Metrics for Querier {
         // check wal memory mode
         if CONFIG.common.wal_memory_mode_enabled {
             let mem_files =
-                file_lock::get_in_memory_files(org_id, stream_name, meta::StreamType::Metrics)
+                wal::get_search_in_memory_files(org_id, stream_name, meta::StreamType::Metrics)
                     .unwrap_or_default();
             for body in mem_files {
                 resp.files.push(MetricsWalFile {

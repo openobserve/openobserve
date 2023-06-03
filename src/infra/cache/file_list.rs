@@ -12,43 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
-use dashmap::DashMap as HashMap;
+use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use rustc_hash::FxHashMap;
 
+use crate::infra::config::RwHashMap;
 use crate::meta::{common::FileMeta, StreamType};
 
-static FILES: Lazy<HashMap<String, OrgFilelist>> = Lazy::new(HashMap::new);
-static DATA: Lazy<HashMap<String, FileMeta>> = Lazy::new(HashMap::new);
+static FILES: Lazy<RwHashMap<String, OrgFilelist>> = Lazy::new(DashMap::default);
+static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
 
-const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<FxHashMap<String, Vec<String>>>();
+const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<String>>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
-type OrgFilelist = FxHashMap<String, TypeFilelist>;
-type TypeFilelist = FxHashMap<String, StreamFilelist>;
-type StreamFilelist = FxHashMap<String, YearFilelist>;
-type YearFilelist = FxHashMap<String, MonthFilelist>;
-type MonthFilelist = FxHashMap<String, DayFilelist>;
+type OrgFilelist = AHashMap<String, TypeFilelist>;
+type TypeFilelist = AHashMap<String, StreamFilelist>;
+type StreamFilelist = AHashMap<String, YearFilelist>;
+type YearFilelist = AHashMap<String, MonthFilelist>;
+type MonthFilelist = AHashMap<String, DayFilelist>;
 type DayFilelist = Vec<String>;
 
 type KeyColumns = (String, String, String, String, String, String, String);
 
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let mut org_filelist = FILES.entry(org_id).or_insert_with(FxHashMap::default);
+    let mut org_filelist = FILES.entry(org_id).or_insert_with(AHashMap::default);
     let type_filelist = org_filelist
         .entry(stream_type)
-        .or_insert_with(FxHashMap::default);
+        .or_insert_with(AHashMap::default);
     let stream_filelist = type_filelist
         .entry(stream_name)
-        .or_insert_with(FxHashMap::default);
+        .or_insert_with(AHashMap::default);
     let year_filelist = stream_filelist
         .entry(year)
-        .or_insert_with(FxHashMap::default);
-    let month_filelist = year_filelist
-        .entry(month)
-        .or_insert_with(FxHashMap::default);
+        .or_insert_with(AHashMap::default);
+    let month_filelist = year_filelist.entry(month).or_insert_with(AHashMap::default);
     let day_filelist = month_filelist.entry(day).or_insert_with(Vec::new);
     day_filelist.push(key.to_string());
     DATA.insert(key.to_string(), val);

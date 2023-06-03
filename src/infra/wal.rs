@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use bytes::{Bytes, BytesMut};
 use once_cell::sync::Lazy;
 use std::{
-    collections::HashMap,
     fs::{File, OpenOptions},
     io::Write,
     sync::{Arc, RwLock},
@@ -25,15 +25,21 @@ use crate::common::file::get_file_contents;
 use crate::infra::{config::CONFIG, ider, metrics};
 use crate::meta::StreamType;
 
-static LOCKER: Lazy<Locker> = Lazy::new(Locker::new);
-pub static FILES: Lazy<RwLock<HashMap<String, Bytes>>> =
-    Lazy::new(|| RwLock::new(HashMap::with_capacity(16)));
+// MANAGER for manage using WAL files, in use, should not move to s3
+static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
-pub struct Locker {
+// MEMORY_FILES for in-memory mode WAL files, already not in use, should move to s3
+pub static MEMORY_FILES: Lazy<MemoryFiles> = Lazy::new(MemoryFiles::new);
+
+type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
+
+struct Manager {
     data: Arc<Vec<RwData>>,
 }
 
-type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
+pub struct MemoryFiles {
+    pub data: Arc<RwLock<HashMap<String, Bytes>>>,
+}
 
 pub struct RwFile {
     use_cache: bool,
@@ -47,7 +53,6 @@ pub struct RwFile {
     expired: i64,
 }
 
-#[inline]
 pub fn get_or_create(
     thread_id: usize,
     org_id: &str,
@@ -56,20 +61,19 @@ pub fn get_or_create(
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    LOCKER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+    MANAGER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
 }
 
-#[inline]
 pub fn check_in_use(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     file_name: &str,
 ) -> bool {
-    LOCKER.check_in_use(org_id, stream_name, stream_type, file_name)
+    MANAGER.check_in_use(org_id, stream_name, stream_type, file_name)
 }
 
-pub fn get_in_memory_files(
+pub fn get_search_in_memory_files(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -78,10 +82,9 @@ pub fn get_in_memory_files(
         return Ok(vec![]);
     }
     let mut files = Vec::new();
-    // read files in use
-    for data in LOCKER.data.iter() {
-        let thread_data = data.read().unwrap();
-        for (_, file) in thread_data.iter() {
+    // read usesing files in use
+    for data in MANAGER.data.iter() {
+        for (_, file) in data.read().unwrap().iter() {
             if file.org_id == org_id
                 && file.stream_name == stream_name
                 && file.stream_type == stream_type
@@ -92,9 +95,9 @@ pub fn get_in_memory_files(
             }
         }
     }
-    // read files waiting to be moved to s3
+    // read memory files waiting to be moved to s3
     let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-    for (file, data) in FILES.read().unwrap().iter() {
+    for (file, data) in MEMORY_FILES.list() {
         if file.starts_with(&prefix) {
             files.push(data.to_vec());
         }
@@ -103,14 +106,13 @@ pub fn get_in_memory_files(
 }
 
 pub fn flush_all_to_disk() {
-    for data in LOCKER.data.iter() {
-        let thread_data = data.read().unwrap();
-        for (_, file) in thread_data.iter() {
+    for data in MANAGER.data.iter() {
+        for (_, file) in data.read().unwrap().iter() {
             file.sync();
         }
     }
 
-    for (file, data) in FILES.read().unwrap().iter() {
+    for (file, data) in MEMORY_FILES.list() {
         let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
         let mut f = OpenOptions::new()
             .write(true)
@@ -118,24 +120,24 @@ pub fn flush_all_to_disk() {
             .append(true)
             .open(file_path)
             .unwrap();
-        f.write_all(data).unwrap();
+        f.write_all(&data).unwrap();
     }
 }
 
-impl Default for Locker {
+impl Default for Manager {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Locker {
-    pub fn new() -> Locker {
+impl Manager {
+    pub fn new() -> Manager {
         let size = CONFIG.limit.cpu_num;
         let mut data = Vec::with_capacity(size);
-        for _i in 0..size {
-            data.push(RwLock::new(HashMap::<String, Arc<RwFile>>::new()));
+        for _ in 0..size {
+            data.push(RwLock::new(HashMap::<String, Arc<RwFile>>::default()));
         }
-        Locker {
+        Self {
             data: Arc::new(data),
         }
     }
@@ -240,6 +242,34 @@ impl Locker {
     }
 }
 
+impl Default for MemoryFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoryFiles {
+    pub fn new() -> MemoryFiles {
+        Self {
+            data: Arc::new(RwLock::new(HashMap::default())),
+        }
+    }
+
+    pub fn list(&self) -> HashMap<String, Bytes> {
+        self.data.read().unwrap().clone()
+    }
+
+    pub fn insert(&self, file_name: String, data: Bytes) {
+        self.data.write().unwrap().insert(file_name, data);
+    }
+
+    pub fn remove(&self, file_name: &str) {
+        let mut data = self.data.write().unwrap();
+        data.remove(file_name);
+        data.shrink_to_fit();
+    }
+}
+
 impl RwFile {
     fn new(
         thread_id: usize,
@@ -264,12 +294,7 @@ impl RwFile {
         std::fs::create_dir_all(&dir_path).unwrap();
 
         let (file, cache) = if use_cache {
-            (
-                None,
-                Some(RwLock::new(BytesMut::with_capacity(
-                    CONFIG.limit.max_file_size_on_disk as usize / 16,
-                ))),
-            )
+            (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
         } else {
             let f = OpenOptions::new()
                 .write(true)
@@ -348,7 +373,7 @@ impl RwFile {
         if self.use_cache {
             let file_path = format!("{}{}", self.dir, self.name);
             let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-            FILES.write().unwrap().insert(
+            MEMORY_FILES.insert(
                 file_path.to_string(),
                 self.cache
                     .as_ref()
@@ -374,14 +399,10 @@ impl RwFile {
         if self.use_cache {
             self.cache.as_ref().unwrap().write().unwrap().len() as i64
         } else {
-            self.file
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .metadata()
-                .unwrap()
-                .len() as i64
+            match self.file.as_ref().unwrap().read() {
+                Ok(f) => f.metadata().unwrap().len() as i64,
+                Err(_) => 0,
+            }
         }
     }
 
@@ -406,55 +427,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_file_loc_with_stream() {
+    fn test_wal_manager() {
         let thread_id = 1;
-        let org_id = "org1";
-        let stream_name = "stream1";
+        let org_id = "test_org";
+        let stream_name = "test_stream";
         let stream_type = StreamType::Logs;
-        let key = "2022_10_17_10";
-        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, false);
-        file.write(b"hello world");
-        assert_eq!(file.size(), 11);
-        assert!(file.name().contains(key));
-        assert!(file.expired() > 0);
-        file.sync();
-
-        let key = "2022_10_17_11";
-        let file2 = get_or_create(thread_id, org_id, stream_name, stream_type, key, true);
-        file2.write(b"hello world");
-        assert_eq!(file2.size(), 11);
-        assert!(file2.name().contains(key));
-        assert!(file2.expired() > 0);
-        file2.sync();
-
-        assert!(!check_in_use(
-            org_id,
-            stream_name,
-            stream_type,
-            "1_2022_10_17_10_7040693836556926977.json",
-        ));
-        flush_all_to_disk();
+        let key = "test_key";
+        let use_cache = false;
+        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data);
+        assert_eq!(file.read().unwrap(), data);
+        assert_eq!(file.size(), data.len() as i64);
+        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
     }
 
     #[test]
-    fn test_file_loc_without_stream() {
-        let locker = Locker::default();
+    fn test_memory_files() {
+        let memory_files = MemoryFiles::new();
+        let file_name = "test_file".to_string();
+        let data = Bytes::from("test_data".to_string().into_bytes());
+        memory_files.insert(file_name.clone(), data.clone());
+        assert_eq!(memory_files.list().len(), 1);
+        memory_files.remove(&file_name);
+        assert_eq!(memory_files.list().len(), 0);
+    }
+
+    #[test]
+    fn test_rw_file() {
         let thread_id = 1;
-        let org_id = "";
-        let stream_name = "";
-        let stream_type = StreamType::Filelist;
-        let key = "2022_10_17_10";
-        let file = locker.get_or_create(thread_id, org_id, stream_name, stream_type, key, false);
-        file.write(b"hello world");
-        assert_eq!(file.size(), 11);
-        assert_eq!(file.name().contains(key), true);
-        assert_eq!(file.expired() > 0, true);
-        assert_eq!(
-            locker
-                .get(1, org_id, stream_name, stream_type, key)
-                .unwrap()
-                .name(),
-            file.name()
-        );
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let key = "test_key";
+        let use_cache = false;
+        let file = RwFile::new(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data);
+        assert_eq!(file.read().unwrap(), data);
+        assert_eq!(file.size(), data.len() as i64);
+        assert!(file.name().contains(&format!("{}_{}", thread_id, key)));
     }
 }

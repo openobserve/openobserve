@@ -19,11 +19,11 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::CONFIG;
+use crate::infra::config::{RwHashMap, CONFIG};
 use crate::meta::common::FileKey;
 
 lazy_static! {
-    pub static ref EVENTS: DashMap<String, Arc<mpsc::Sender<Vec<FileKey>>>> = DashMap::new();
+    pub static ref EVENTS: RwHashMap<String, Arc<mpsc::Sender<Vec<FileKey>>>> = DashMap::default();
 }
 
 /// send an event to broadcast, will create a new channel for each nodes

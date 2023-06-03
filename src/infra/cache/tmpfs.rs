@@ -18,10 +18,11 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
+use crate::infra::config::RwHashMap;
 use crate::infra::errors::*;
 
-static FILES: Lazy<DashMap<String, File>> = Lazy::new(DashMap::new);
-static DATA: Lazy<DashMap<String, Bytes>> = Lazy::new(DashMap::new);
+static FILES: Lazy<RwHashMap<String, File>> = Lazy::new(DashMap::default);
+static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(DashMap::default);
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();

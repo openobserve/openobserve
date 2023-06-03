@@ -19,7 +19,7 @@ use std::io::{BufRead, BufReader};
 use crate::common::file::scan_files;
 use crate::common::json;
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
+use crate::infra::wal;
 use crate::meta::common::{FileKey, FileMeta};
 use crate::meta::StreamType;
 
@@ -35,7 +35,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
         .timestamp_nanos(meta.min_ts * 1000)
         .format("%Y_%m_%d_%H")
         .to_string();
-    let file = file_lock::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
+    let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
     file.write(write_buf.as_ref());
 
     super::progress(key, meta, deleted).await?;

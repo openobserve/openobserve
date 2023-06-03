@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use datafusion::error::Result;
 use promql_parser::parser::EvalStmt;
-use rustc_hash::FxHashMap;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime},
@@ -38,7 +38,7 @@ pub struct Query {
     /// Default look back from sample search.
     pub lookback_delta: i64,
     /// key — metric name; value — time series data
-    pub data_cache: Arc<RwLock<FxHashMap<String, Value>>>,
+    pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
 }
 
 impl Query {
@@ -55,7 +55,7 @@ impl Query {
             end: now,
             interval: five_min,
             lookback_delta: five_min,
-            data_cache: Arc::new(RwLock::new(FxHashMap::default())),
+            data_cache: Arc::new(RwLock::new(HashMap::default())),
         }
     }
 
@@ -135,8 +135,8 @@ impl Query {
         }
 
         // merge data
-        let mut merged_data = FxHashMap::default();
-        let mut merged_metrics = FxHashMap::default();
+        let mut merged_data = HashMap::default();
+        let mut merged_metrics = HashMap::default();
         for value in instant_vectors {
             merged_data
                 .entry(signature(&value.labels))

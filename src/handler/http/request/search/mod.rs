@@ -14,6 +14,7 @@
 
 use actix_web::http::StatusCode;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use ahash::AHashMap;
 use chrono::Duration;
 use std::collections::HashMap;
 use std::io::Error;
@@ -101,7 +102,7 @@ pub async fn search(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(bad_request(e)),
@@ -239,7 +240,7 @@ pub async fn around(
     let start = std::time::Instant::now();
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(bad_request(e)),
@@ -467,7 +468,7 @@ pub async fn values(
     let start = std::time::Instant::now();
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(bad_request(e)),
