@@ -16,7 +16,6 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Error};
 use std::time::Instant;
 
@@ -345,7 +344,7 @@ fn add_record_status(
     failure_type: Option<String>,
     failure_reason: Option<String>,
 ) {
-    let mut item = HashMap::new();
+    let mut item = AHashMap::new();
 
     match failure_type {
         Some(failure_type) => {

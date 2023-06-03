@@ -18,7 +18,7 @@ use std::sync::Arc;
 use crate::{infra::db::Event, meta::StreamType};
 
 lazy_static! {
-    static ref CACHE: DashSet<String> = DashSet::new();
+    static ref CACHE: DashSet<String, ahash::RandomState> = DashSet::default();
 }
 
 #[inline]

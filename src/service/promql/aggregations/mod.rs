@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
-use rustc_hash::FxHashMap;
 
 use super::Engine;
 use crate::service::promql::value::{signature, Labels, Signature, Value};
@@ -53,7 +53,7 @@ pub(crate) fn eval_arithmetic(
     data: &Value,
     f_name: &str,
     f_handler: fn(total: f64, val: f64) -> f64,
-) -> Result<Option<FxHashMap<Signature, ArithmeticItem>>> {
+) -> Result<Option<HashMap<Signature, ArithmeticItem>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -64,7 +64,7 @@ pub(crate) fn eval_arithmetic(
         }
     };
 
-    let mut score_values = FxHashMap::default();
+    let mut score_values = HashMap::default();
     match param {
         Some(v) => match v {
             LabelModifier::Include(labels) => {

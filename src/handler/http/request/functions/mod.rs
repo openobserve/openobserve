@@ -16,7 +16,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse};
 #[cfg(feature = "zo_functions")]
 use actix_web::{http, HttpRequest};
 #[cfg(feature = "zo_functions")]
-use std::collections::HashMap;
+use ahash::AHashMap as HashMap;
 use std::io::Error;
 
 #[cfg(feature = "zo_functions")]

@@ -19,12 +19,13 @@ use std::io::{BufRead, BufReader};
 use tokio::sync::Semaphore;
 
 use crate::common::json;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{RwHashMap, CONFIG};
 use crate::infra::storage;
 use crate::meta::common::{FileKey, FileMeta};
 
 lazy_static! {
-    static ref DELETED_FILES: DashMap<String, FileMeta> = DashMap::with_capacity(64);
+    static ref DELETED_FILES: RwHashMap<String, FileMeta> =
+        DashMap::with_capacity_and_hasher(64, Default::default());
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {

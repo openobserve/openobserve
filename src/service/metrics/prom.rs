@@ -19,7 +19,6 @@ use datafusion::arrow::datatypes::Schema;
 use promql_parser::label::MatchOp;
 use promql_parser::parser;
 use prost::Message;
-use rustc_hash::FxHashSet;
 use std::{collections::HashMap, io, time::Instant};
 
 use crate::{
@@ -387,7 +386,7 @@ pub(crate) async fn get_metadata(
     req: prom::RequestMetadata,
 ) -> Result<prom::ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(HashMap::new());
+        return Ok(AHashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -398,9 +397,9 @@ pub(crate) async fn get_metadata(
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
         let resp = if schema == Schema::empty() {
-            HashMap::new()
+            AHashMap::new()
         } else {
-            HashMap::from([(
+            AHashMap::from([(
                 metric_name,
                 get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
             )])
@@ -547,7 +546,7 @@ pub(crate) async fn get_labels(
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
-    let mut label_names = FxHashSet::default();
+    let mut label_names = ahash::HashSet::default();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {

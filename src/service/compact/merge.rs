@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
-use ahash::AHashMap as HashMap;
+use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::{io::Write, sync::Arc, time::Instant};
+use std::{collections::HashMap, io::Write, sync::Arc, time::Instant};
 use tokio::time;
 
 use crate::common::json;
@@ -57,7 +57,7 @@ pub async fn merge_by_stream(
     // get schema
     let schema = db::schema::get(org_id, stream_name, Some(stream_type)).await?;
     let schema_metadata = schema.metadata.clone();
-    let schema = Arc::new(schema.with_metadata(std::collections::HashMap::new()));
+    let schema = Arc::new(schema.with_metadata(HashMap::new()));
 
     // get last compacted offset
     let mut offset = db::compact::files::get_offset(org_id, stream_name, stream_type).await?;
@@ -163,7 +163,7 @@ pub async fn merge_by_stream(
     }
 
     // do partition by partition key
-    let mut partition_files_with_size: HashMap<String, Vec<(String, u64)>> = HashMap::new();
+    let mut partition_files_with_size: HashMap<String, Vec<(String, u64)>> = HashMap::default();
     for file in files {
         let prefix = {
             let pos = file.rfind('/').unwrap();
@@ -367,8 +367,8 @@ async fn merge_files(
             // cacluate the diff between latest schema and current schema
             let schema = schema_versions[schema_ver_id]
                 .clone()
-                .with_metadata(std::collections::HashMap::new());
-            let mut diff_fields = HashMap::new();
+                .with_metadata(HashMap::new());
+            let mut diff_fields = AHashMap::default();
             let cur_fields = schema.fields();
             for field in cur_fields {
                 if let Ok(v) = schema_latest.field_with_name(field.name()) {

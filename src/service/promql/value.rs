@@ -19,8 +19,7 @@ use serde::{
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
-type FxIndexMap<K, V> =
-    indexmap::IndexMap<K, V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 pub type Labels = Vec<Arc<Label>>;
 

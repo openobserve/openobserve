@@ -21,7 +21,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::config::{CONFIG, INSTANCE_ID};
+use super::config::{RwHashMap, CONFIG, INSTANCE_ID};
 use super::db::ETCD_CLIENT;
 use super::errors::{Error, Result};
 use crate::common::json;
@@ -35,7 +35,7 @@ static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
 pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
-static NODES: Lazy<DashMap<String, Node>> = Lazy::new(DashMap::new);
+static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(DashMap::default);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
