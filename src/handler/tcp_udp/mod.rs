@@ -48,18 +48,27 @@ pub async fn tcp_server(listener: TcpListener) {
     let mut tcp_receiver_rx = sender.subscribe();
     let mut buf_tcp = vec![0u8; 1024];
     loop {
-        let (mut stream, addr) = listener.accept().await.unwrap();
-        let len = stream.read(&mut buf_tcp).await.unwrap();
-        let message = BytesMut::from(&buf_tcp[..len]);
-        let input_str = String::from_utf8(message.to_vec()).unwrap();
-        if input_str != STOP_SRV {
-            let _ = syslog::ingest(&input_str, addr).await;
-        }
-        if let Ok(val) = tcp_receiver_rx.try_recv() {
-            if !val {
-                log::warn!("TCP server - received the stop signal, exiting.");
-                drop(listener);
-                break;
+        let (mut stream, _) = listener.accept().await.unwrap();
+
+        match stream.peer_addr() {
+            Ok(addr) => {
+                let len = stream.read(&mut buf_tcp).await.unwrap();
+                let message = BytesMut::from(&buf_tcp[..len]);
+                let input_str = String::from_utf8(message.to_vec()).unwrap();
+                if input_str != STOP_SRV {
+                    let _ = syslog::ingest(&input_str, addr).await;
+                }
+                if let Ok(val) = tcp_receiver_rx.try_recv() {
+                    if !val {
+                        log::warn!("TCP server - received the stop signal, exiting.");
+                        drop(listener);
+                        break;
+                    }
+                };
+            }
+            Err(e) => {
+                log::error!("Error while writing to TCP stream: {}", e);
+                continue;
             }
         };
     }
