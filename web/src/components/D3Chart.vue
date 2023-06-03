@@ -28,7 +28,7 @@ export default defineComponent({
     };
   },
   mounted() {
-    this.svg = select(this.$refs.chart)
+    this.svg = select(this.$refs.chart as HTMLElement)
       .append("svg")
       .attr("width", this.width)
       .attr("height", this.height)
@@ -55,8 +55,10 @@ export default defineComponent({
       const svgWidth = Math.max(
         ...this.services.map((service) => service.width)
       );
-      svg.style.width = svgWidth + "px";
-      svg.style.height = svgHeight + "px";
+      if (svg) {
+        svg.style.width = svgWidth + "px";
+        svg.style.height = svgHeight + "px";
+      }
     });
   },
   methods: {
@@ -129,8 +131,10 @@ export default defineComponent({
       );
 
       const groupDimensions = group?.getBoundingClientRect();
-      this.services[dataIndex]["height"] = groupDimensions.height + 40;
-      this.services[dataIndex]["width"] = groupDimensions.width + 150;
+      if (groupDimensions) {
+        this.services[dataIndex]["height"] = groupDimensions.height + 40;
+        this.services[dataIndex]["width"] = groupDimensions.width + 150;
+      }
     },
 
     updateChart(dataIndex: number) {
@@ -145,18 +149,18 @@ export default defineComponent({
       // Bind the data to the nodes and links
       const node = this.services[dataIndex]["g"]
         .selectAll(".node")
-        .data(nodes, (d) => d.data.name);
+        .data(nodes, (d: any) => d.data.name);
 
       const link = this.services[dataIndex]["g"]
         .selectAll(".link")
-        .data(links, (d) => `${d.source.data.name}-${d.target.data.name}`);
+        .data(links, (d: any) => `${d.source.data.name}-${d.target.data.name}`);
 
       // Enter new nodes and links
       const nodeEnter = node
         .enter()
         .append("g")
         .attr("class", "node")
-        .attr("transform", (d) => {
+        .attr("transform", (d: any) => {
           return `translate(${d.y}, ${d.x})`;
         });
 
@@ -165,7 +169,7 @@ export default defineComponent({
         .attr("r", 10)
         .style("fill", "#fff")
         .style("stroke-width", "2px")
-        .style("stroke", (d) => {
+        .style("stroke", (d: any) => {
           return d.data.color;
         });
 
@@ -174,7 +178,7 @@ export default defineComponent({
         .attr("dy", "-15px")
         .attr("dx", "0px")
         .attr("text-anchor", "middle")
-        .text((d) => {
+        .text((d: any) => {
           return d.data.duration + "ms";
         })
         .attr("font-size", "12px")
@@ -185,19 +189,19 @@ export default defineComponent({
         .attr("dy", "22px")
         .attr("dx", "0px")
         .attr("text-anchor", "middle")
-        .text((d) => {
+        .text((d: any) => {
           return d.data.name;
         })
         .attr("font-size", "12px")
         .style("cursor", "pointer");
 
-      text.append("title").text((d) => d.data.name);
+      text.append("title").text((d: any) => d.data.name);
 
       link
         .enter()
         .insert("path", ".node")
         .attr("class", "link")
-        .attr("d", (d) => {
+        .attr("d", (d: any) => {
           const source = { x: d.source.x, y: d.source.y };
           const target = { x: d.target.x, y: d.target.y };
           return `M${source.y},${source.x}C${(source.y + target.y) / 2},${
@@ -208,7 +212,7 @@ export default defineComponent({
         .style("stroke", "#ccc");
 
       // Update existing nodes and links
-      node.merge(nodeEnter).attr("transform", (d) => {
+      node.merge(nodeEnter).attr("transform", (d: any) => {
         return `translate(${d.y}, ${d.x} )`;
       });
 
