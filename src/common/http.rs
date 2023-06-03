@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use actix_web::web::Query;
-use std::collections::HashMap;
+use ahash::AHashMap as HashMap;
 use std::io::{Error, ErrorKind};
 
 use crate::meta::StreamType;
@@ -49,7 +49,7 @@ mod tests {
     fn test_get_file_from_cache() {
         let key = "type".to_string();
 
-        let mut map: HashMap<String, String> = HashMap::new();
+        let mut map: HashMap<String, String> = HashMap::default();
         map.insert(key.clone(), key.clone());
 
         let resp = get_stream_type_from_request(&Query { 0: map.clone() });

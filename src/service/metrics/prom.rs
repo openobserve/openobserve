@@ -14,13 +14,11 @@
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::label::MatchOp;
 use promql_parser::parser;
 use prost::Message;
-use rustc_hash::FxHashSet;
 use std::{collections::HashMap, io, time::Instant};
 
 use crate::{
@@ -30,7 +28,7 @@ use crate::{
         cluster,
         config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         errors::{Error, Result},
-        file_lock, metrics,
+        metrics,
     },
     meta::{
         self,
@@ -40,7 +38,7 @@ use crate::{
     },
     service::{
         db,
-        ingestion::chk_schema_by_record,
+        ingestion::{chk_schema_by_record, write_file},
         schema::{set_schema_metadata, stream_schema_exists},
         search as search_service,
     },
@@ -73,7 +71,7 @@ pub async fn remote_write(
     let mut has_entry = false;
     let mut accept_record = false;
     let mut cluster_name: String = String::new();
-    let mut metric_data_map: AHashMap<String, HashMap<String, Vec<String>>> = AHashMap::new();
+    let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
@@ -317,68 +315,25 @@ pub async fn remote_write(
         }
     }
 
-    for (metric_name, metric_data) in metric_data_map {
-        // write to file
-        let mut write_buf = BytesMut::new();
-        for (key, entry) in metric_data {
-            if entry.is_empty() {
-                continue;
-            }
-
-            // check if we are allowed to ingest
-            if db::compact::delete::is_deleting_stream(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                None,
-            ) {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("stream [{metric_name}] is being deleted"),
-                    ),
-                ));
-            }
-
-            write_buf.clear();
-            for row in &entry {
-                write_buf.put(row.as_bytes());
-                write_buf.put("\n".as_bytes());
-            }
-            let file = file_lock::get_or_create(
-                *thread_id.as_ref(),
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &key,
-                CONFIG.common.wal_memory_mode_enabled,
+    for (stream_name, stream_data) in metric_data_map {
+        // check if we are allowed to ingest
+        if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
+        {
+            return Ok(
+                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!("stream [{stream_name}] is being deleted"),
+                )),
             );
-            file.write(write_buf.as_ref());
-
-            // metrics
-            metrics::INGEST_RECORDS
-                .with_label_values(&[
-                    org_id,
-                    &metric_name,
-                    StreamType::Metrics.to_string().as_str(),
-                ])
-                .inc_by(entry.len() as u64);
-            metrics::INGEST_BYTES
-                .with_label_values(&[
-                    org_id,
-                    &metric_name,
-                    StreamType::Metrics.to_string().as_str(),
-                ])
-                .inc_by(write_buf.len() as u64);
         }
-
-        let _schema_exists = stream_schema_exists(
+        // write to file
+        write_file(
+            stream_data,
+            thread_id.clone(),
             org_id,
-            &metric_name,
+            &stream_name,
             StreamType::Metrics,
-            &mut metric_schema_map,
-        )
-        .await;
+        );
     }
 
     // only one trigger per request, as it updates etcd
@@ -431,7 +386,7 @@ pub(crate) async fn get_metadata(
     req: prom::RequestMetadata,
 ) -> Result<prom::ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(HashMap::new());
+        return Ok(AHashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -442,9 +397,9 @@ pub(crate) async fn get_metadata(
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
         let resp = if schema == Schema::empty() {
-            HashMap::new()
+            AHashMap::new()
         } else {
-            HashMap::from([(
+            AHashMap::from([(
                 metric_name,
                 get_metadata_object(&schema).map_or_else(Vec::new, |obj| vec![obj]),
             )])
@@ -591,7 +546,7 @@ pub(crate) async fn get_labels(
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
-    let mut label_names = FxHashSet::default();
+    let mut label_names = ahash::HashSet::default();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {

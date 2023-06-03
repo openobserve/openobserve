@@ -31,6 +31,8 @@ use crate::meta::syslog::SyslogRoute;
 use crate::meta::user::User;
 use crate::service::enrichment::StreamTable;
 
+pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
+
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
@@ -41,7 +43,7 @@ pub static HAS_FUNCTIONS: bool = false;
 pub static SEARCHING_IN_WAL: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
-pub static INSTANCE_ID: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
+pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
@@ -54,23 +56,27 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
 });
 
 // global cache variables
-pub static KVS: Lazy<DashMap<String, bytes::Bytes>> = Lazy::new(DashMap::new);
-pub static STREAM_SCHEMAS: Lazy<DashMap<String, Vec<Schema>>> = Lazy::new(DashMap::new);
-pub static STREAM_FUNCTIONS: Lazy<DashMap<String, StreamFunctionsList>> = Lazy::new(DashMap::new);
-pub static QUERY_FUNCTIONS: Lazy<DashMap<String, Transform>> = Lazy::new(DashMap::new);
-pub static USERS: Lazy<DashMap<String, User>> = Lazy::new(DashMap::new);
-pub static ROOT_USER: Lazy<DashMap<String, User>> = Lazy::new(DashMap::new);
-pub static PASSWORD_HASH: Lazy<DashMap<String, String>> = Lazy::new(DashMap::new);
-pub static METRIC_CLUSTER_MAP: Lazy<DashMap<String, Vec<String>>> = Lazy::new(DashMap::new);
-pub static METRIC_CLUSTER_LEADER: Lazy<DashMap<String, ClusterLeader>> = Lazy::new(DashMap::new);
-pub static STREAM_ALERTS: Lazy<DashMap<String, AlertList>> = Lazy::new(DashMap::new);
-pub static TRIGGERS: Lazy<DashMap<String, Trigger>> = Lazy::new(DashMap::new);
-pub static TRIGGERS_IN_PROCESS: Lazy<DashMap<String, TriggerTimer>> = Lazy::new(DashMap::new);
-pub static ALERTS_TEMPLATES: Lazy<DashMap<String, DestinationTemplate>> = Lazy::new(DashMap::new);
-pub static ALERTS_DESTINATIONS: Lazy<DashMap<String, AlertDestination>> = Lazy::new(DashMap::new);
-pub static SYSLOG_ROUTES: Lazy<DashMap<String, SyslogRoute>> = Lazy::new(DashMap::new);
+pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(DashMap::default);
+pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<Schema>>> = Lazy::new(DashMap::default);
+pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
+    Lazy::new(DashMap::default);
+pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
+pub static USERS: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
+pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(DashMap::default);
+pub static METRIC_CLUSTER_LEADER: Lazy<RwHashMap<String, ClusterLeader>> =
+    Lazy::new(DashMap::default);
+pub static STREAM_ALERTS: Lazy<RwHashMap<String, AlertList>> = Lazy::new(DashMap::default);
+pub static TRIGGERS: Lazy<RwHashMap<String, Trigger>> = Lazy::new(DashMap::default);
+pub static TRIGGERS_IN_PROCESS: Lazy<RwHashMap<String, TriggerTimer>> = Lazy::new(DashMap::default);
+pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, DestinationTemplate>> =
+    Lazy::new(DashMap::default);
+pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, AlertDestination>> =
+    Lazy::new(DashMap::default);
+pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(DashMap::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
-pub static ENRICHMENT_TABLES: Lazy<DashMap<String, StreamTable>> = Lazy::new(DashMap::new);
+pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(DashMap::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 
@@ -155,6 +161,8 @@ pub struct Common {
     pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
+    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
+    pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_FILE_EXT_JSON", default = ".json")]
     pub file_ext_json: String,
     #[env_config(name = "ZO_FILE_EXT_PARQUET", default = ".parquet")]

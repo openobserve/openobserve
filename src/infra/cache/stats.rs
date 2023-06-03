@@ -15,16 +15,17 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
+use crate::infra::config::RwHashMap;
 use crate::meta::common::FileMeta;
 use crate::meta::stream::StreamStats;
 use crate::meta::StreamType;
 
-static STATS: Lazy<DashMap<String, StreamStats>> = Lazy::new(DashMap::new);
+static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(DashMap::default);
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 
 #[inline]
-pub fn get_stats() -> DashMap<String, StreamStats> {
+pub fn get_stats() -> RwHashMap<String, StreamStats> {
     STATS.clone()
 }
 

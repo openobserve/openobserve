@@ -16,7 +16,8 @@ pub mod destinations;
 pub mod templates;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use std::{collections::HashMap, io::Error};
+use ahash::AHashMap as HashMap;
+use std::io::Error;
 
 use crate::{
     meta::{self, alert::Alert, StreamType},

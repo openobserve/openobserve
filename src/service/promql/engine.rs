@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
 use datafusion::{
     arrow::{
@@ -29,7 +30,6 @@ use promql_parser::{
         MatrixSelector, NumberLiteral, ParenExpr, TokenType, UnaryExpr, VectorSelector,
     },
 };
-use rustc_hash::FxHashMap;
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use crate::infra::config::CONFIG;
@@ -268,7 +268,7 @@ impl Engine {
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
 
-        let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
+        let mut metrics: HashMap<String, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
         for task_result in task_results {
             if task_results_len == 1 {
@@ -634,12 +634,12 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
-) -> Result<FxHashMap<String, RangeValue>> {
+) -> Result<HashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let table = match ctx.table(table_name).await {
         Ok(v) => v,
         Err(_) => {
-            return Ok(FxHashMap::default());
+            return Ok(HashMap::default());
         }
     };
 
@@ -683,7 +683,7 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let mut metrics: FxHashMap<String, RangeValue> = FxHashMap::default();
+    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
     for batch in &batches {
         let hash_values = batch
             .column_by_name(HASH_LABEL)

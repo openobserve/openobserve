@@ -50,7 +50,7 @@ use openobserve::{
     infra::{
         cluster,
         config::{self, CONFIG},
-        file_lock, metrics,
+        metrics, wal,
     },
     job, meta,
     service::{db, router, users},
@@ -184,7 +184,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // leave the cluster
     let _ = cluster::leave().await;
     // flush WAL cache to disk
-    file_lock::flush_all_to_disk();
+    wal::flush_all_to_disk();
 
     log::info!("server stopped");
 

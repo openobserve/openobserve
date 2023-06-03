@@ -17,9 +17,10 @@ use dashmap::DashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 
+use crate::infra::config::RwHashMap;
 use crate::service::file_list;
 
-pub static FILES: Lazy<DashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::new);
+pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
 
 pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.get(session_id) {

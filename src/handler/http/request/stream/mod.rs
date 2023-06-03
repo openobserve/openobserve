@@ -13,10 +13,8 @@
 // limitations under the License.
 
 use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-};
+use ahash::AHashMap as HashMap;
+use std::io::{Error, ErrorKind};
 
 use crate::common::http::get_stream_type_from_request;
 use crate::meta::{

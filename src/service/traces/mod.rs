@@ -29,7 +29,7 @@ use std::io::Error;
 
 use crate::common::json::{json, Map, Value};
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
+use crate::infra::wal;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
 use crate::meta::traces::Event;
 use crate::service::schema::stream_schema_exists;
@@ -277,7 +277,7 @@ pub async fn handle_trace_request(
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
         }
-        let file = file_lock::get_or_create(
+        let file = wal::get_or_create(
             *thread_id.as_ref(),
             org_id,
             traces_stream_name,

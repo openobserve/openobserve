@@ -24,7 +24,7 @@ use std::io::{BufRead, BufReader, Error};
 
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
-use crate::infra::file_lock;
+use crate::infra::wal;
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::traces::Event;
 use crate::service::ingestion::{format_stream_name, get_partition_key_record};
@@ -375,7 +375,7 @@ pub async fn traces_json(
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
         }
-        let file = file_lock::get_or_create(
+        let file = wal::get_or_create(
             *thread_id.as_ref(),
             org_id,
             traces_stream_name,

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap as HashMap;
 use futures::future::try_join_all;
-use rustc_hash::FxHashMap;
 use std::{
     cmp::{max, min},
     sync::Arc,
@@ -252,8 +252,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 }
 
 fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = FxHashMap::default();
-    let mut merged_metrics = FxHashMap::default();
+    let mut merged_data = HashMap::default();
+    let mut merged_metrics = HashMap::default();
     for ser in series {
         let labels: Labels = ser
             .metric
@@ -262,7 +262,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
             .collect();
         let entry = merged_data
             .entry(signature(&labels))
-            .or_insert_with(FxHashMap::default);
+            .or_insert_with(HashMap::default);
         ser.samples.iter().for_each(|v| {
             entry.insert(v.time, v.value);
         });
@@ -289,12 +289,8 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 }
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = FxHashMap::default();
-    let mut merged_metrics: std::collections::HashMap<
-        Signature,
-        Vec<Arc<Label>>,
-        std::hash::BuildHasherDefault<rustc_hash::FxHasher>,
-    > = FxHashMap::default();
+    let mut merged_data = HashMap::default();
+    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::default();
     for ser in series {
         let labels: Labels = ser
             .metric

@@ -18,7 +18,7 @@ use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{json, utils::populate_file_meta};
-use crate::infra::{cluster, config::CONFIG, file_lock, metrics, storage};
+use crate::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
@@ -44,7 +44,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
  * upload compressed files to storage & delete moved files from local
  */
 async fn move_files_to_storage() -> Result<(), anyhow::Error> {
-    let files = file_lock::FILES.read().unwrap().clone();
+    let files = wal::MEMORY_FILES.list();
 
     // use multiple threads to upload files
     let mut tasks: Vec<task::JoinHandle<Result<TaskResult, anyhow::Error>>> = Vec::new();
@@ -73,9 +73,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 &stream_name,
                 file
             );
-            if file_lock::FILES.write().unwrap().remove(&file).is_none() {
-                log::error!("[JOB] Failed to remove memory file: {}", file)
-            }
+            wal::MEMORY_FILES.remove(&file);
             continue;
         }
 
@@ -116,17 +114,14 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 Ok((path, key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
-                            if file_lock::FILES.write().unwrap().remove(&path).is_none() {
-                                log::error!("[JOB] Failed to remove memory file: {}", path)
-                            } else {
-                                // println!("removed file: {}", key);
-                                // metrics
-                                let columns = key.split('/').collect::<Vec<&str>>();
-                                if columns[0] == "files" {
-                                    metrics::INGEST_WAL_USED_BYTES
-                                        .with_label_values(&[columns[1], columns[3], columns[2]])
-                                        .sub(meta.original_size as i64);
-                                }
+                            wal::MEMORY_FILES.remove(&path);
+                            // println!("removed file: {}", key);
+                            // metrics
+                            let columns = key.split('/').collect::<Vec<&str>>();
+                            if columns[0] == "files" {
+                                metrics::INGEST_WAL_USED_BYTES
+                                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                                    .sub(meta.original_size as i64);
                             }
                         }
                         Err(e) => log::error!(
@@ -156,9 +151,7 @@ async fn upload_file(
     let file_size = buf.len() as u64;
     log::info!("[JOB] File upload begin: memory: {}", path_str);
     if file_size == 0 {
-        if file_lock::FILES.write().unwrap().remove(path_str).is_none() {
-            log::error!("[JOB] Failed to remove memory file: {}", path_str)
-        }
+        wal::MEMORY_FILES.remove(path_str);
         return Err(anyhow::anyhow!("file is empty: {}", path_str));
     }
 
