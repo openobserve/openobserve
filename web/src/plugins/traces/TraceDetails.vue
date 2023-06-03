@@ -25,19 +25,62 @@
       class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
-      <div class="q-py-sm flex items-center justify-start col-12 toolbar">
-        <div class="text-h6 q-mr-lg">
-          {{ traceTree[0]["operationName"] }}
+      <div
+        class="q-py-sm q-px-sm flex items-end justify-between col-12 toolbar"
+      >
+        <div class="flex items-end justify-start">
+          <div class="text-h6 q-mr-lg">
+            {{ traceTree[0]["operationName"] }}
+          </div>
+          <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <div>Spans: {{ spanList.length - 1 }}</div>
+        <q-btn
+          v-close-popup
+          round
+          flat
+          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          size="md"
+        />
       </div>
-      <trace-chart
-        class="trace-details-chart"
-        id="trace_details_gantt_chart"
-        ref="plotChart"
-        :chart="traceChart"
-        @updated:chart="updateChart"
-      />
+      <q-separator style="width: 100%" />
+      <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
+        <div class="text-subtitle2 text-bold">
+          {{
+            activeVisual === "timeline" ? "Trace Timeline" : "Trace Service Map"
+          }}
+        </div>
+        <div
+          class="rounded-borders"
+          style="border: 1px solid #cacaca; padding: 2px"
+        >
+          <template v-for="visual in traceVisuals" :key="visual.value">
+            <q-btn
+              :icon="'img:' + getImageURL(`images/common/${visual.icon}.svg`)"
+              :color="visual.value === activeVisual ? 'primary' : ''"
+              :flat="visual.value === activeVisual ? false : true"
+              dense
+              no-caps
+              size="11px"
+              class="q-px-sm visual-selection-btn"
+              @click="activeVisual = visual.value"
+              >{{ visual.label }}</q-btn
+            >
+          </template>
+        </div>
+      </div>
+      <div class="col-12" v-if="activeVisual === 'timeline'">
+        <trace-chart
+          class="trace-details-chart"
+          id="trace_details_gantt_chart"
+          ref="plotChart"
+          :chart="traceChart"
+          @updated:chart="updateChart"
+        />
+      </div>
+      <div class="col-12" v-else>
+        <d3-chart :data="traceServiceMap" />
+      </div>
+      <q-separator style="width: 100%" class="q-mb-sm" />
       <div
         :class="
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full'
@@ -104,6 +147,8 @@ import TraceHeader from "./TraceHeader.vue";
 import TraceChart from "./TraceChart.vue";
 import { useStore } from "vuex";
 import { duration } from "moment";
+import D3Chart from "@/components/D3Chart.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -119,6 +164,7 @@ export default defineComponent({
     TraceTree,
     TraceHeader,
     TraceChart,
+    D3Chart,
   },
 
   setup() {
@@ -132,6 +178,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
+    const traceServiceMap: Ref<any[]> = ref([]);
     const spanDimensions = {
       height: 25,
       barHeight: 8,
@@ -146,6 +193,13 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+
+    const traceVisuals = [
+      { label: "Timeline", value: "timeline", icon: "trace_timeline" },
+      { label: "Service Map", value: "service_map", icon: "service_map" },
+    ];
+
+    const activeVisual = ref("timeline");
 
     const traceChart = ref({
       data: [{}],
@@ -246,10 +300,6 @@ export default defineComponent({
           noParentSpans.push(span);
         }
 
-        // if (span.parentId && !traceTreeMock[span.parentId]) {
-        //   traceTreeMock[span.parentId] = [];
-        // }
-
         if (span.parentId && traceTreeMock[span.parentId])
           traceTreeMock[span.parentId].push(span);
 
@@ -281,6 +331,7 @@ export default defineComponent({
 
       calculateTracePosition();
       buildTraceChart();
+      buildServiceTree(serviceColorMapping);
     };
     let index = 0;
     const addSpansPositions = (span: any, depth: number) => {
@@ -313,6 +364,51 @@ export default defineComponent({
       } else {
         return 0;
       }
+    };
+
+    const buildServiceTree = (serviceColors: any) => {
+      const serviceTree: any[] = [];
+      let maxDepth = 0;
+      let maxHeight: number[] = [0];
+      const getService = (
+        span: any,
+        currentColumn: any[],
+        serviceName: string,
+        depth: number,
+        height: number
+      ) => {
+        maxHeight[depth] =
+          maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
+        if (serviceName !== span.serviceName) {
+          const children: any[] = [];
+          currentColumn.push({
+            name: span.serviceName,
+            parent: serviceName,
+            duration: span.durationMs,
+            children: children,
+            color: serviceColors[span.serviceName],
+          });
+          if (span.spans && span.spans.length) {
+            span.spans.forEach((_span: any) =>
+              getService(_span, children, span.serviceName, depth + 1, height)
+            );
+          } else {
+            if (maxDepth < depth) maxDepth = depth;
+          }
+          return;
+        }
+        if (span.spans && span.spans.length) {
+          span.spans.forEach((span: any) =>
+            getService(span, currentColumn, serviceName, depth + 1, height)
+          );
+        } else {
+          if (maxDepth < depth) maxDepth = depth;
+        }
+      };
+      traceTree.value.forEach((span: any) => {
+        getService(span, serviceTree, "", 1, 1);
+      });
+      traceServiceMap.value = cloneDeep(serviceTree);
     };
 
     // Convert span object to required format
@@ -475,6 +571,100 @@ export default defineComponent({
       timeRange.value.end = range2;
       calculateTracePosition();
     };
+    const mockServiceMap = [
+      {
+        name: "Service A",
+        color: "#000000",
+        duration: "10",
+        children: [
+          {
+            name: "Service B",
+            color: "#000000",
+            duration: "10",
+
+            children: [
+              {
+                name: "Service c",
+                color: "#000000",
+                duration: "10",
+
+                children: [
+                  {
+                    name: "Service F",
+                    color: "#000000",
+                    duration: "10",
+
+                    children: [
+                      {
+                        name: "Service G",
+                        color: "#000000",
+                        duration: "10",
+
+                        children: [
+                          {
+                            name: "Service H",
+                            color: "#000000",
+                            duration: "10",
+
+                            children: [
+                              {
+                                name: "Service H",
+                                color: "#000000",
+                                duration: "10",
+
+                                children: [
+                                  {
+                                    name: "Service H",
+                                    color: "#000000",
+                                    duration: "10",
+
+                                    children: [
+                                      {
+                                        name: "Service H H H H H H H H H H H H H H H H H",
+                                        color: "#000000",
+                                        duration: "10",
+                                      },
+                                    ],
+                                  },
+                                ],
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                name: "Service E",
+                color: "#000000",
+                duration: "10",
+              },
+            ],
+          },
+          { name: "Service D", color: "#000000", duration: "10" },
+          { name: "Service D", color: "#000000", duration: "10" },
+        ],
+      },
+      {
+        name: "Service X",
+        color: "#000000",
+        duration: "10",
+      },
+      {
+        name: "Service Y",
+        color: "#000000",
+        duration: "10",
+        children: [
+          {
+            name: "Service YA",
+            color: "#000000",
+            duration: "10",
+          },
+        ],
+      },
+    ];
     return {
       traceTree,
       collapseMapping,
@@ -493,6 +683,11 @@ export default defineComponent({
       plotChart,
       traceChart,
       updateChart,
+      traceServiceMap,
+      mockServiceMap,
+      activeVisual,
+      traceVisuals,
+      getImageURL,
     };
   },
 });
@@ -501,9 +696,9 @@ export default defineComponent({
 <style scoped lang="scss">
 $sidebarWidth: 300px;
 $seperatorWidth: 2px;
-$toolbarHeight: 60px;
+$toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
-$traceChartHeight: 200px;
+$traceChartHeight: 210px;
 .toolbar {
   height: $toolbarHeight;
 }
@@ -520,13 +715,15 @@ $traceChartHeight: 200px;
 
 .histogram-sidebar {
   width: $sidebarWidth;
-  height: calc(100vh - $toolbarHeight - $traceChartHeight);
+  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
   overflow-y: scroll;
   overflow-x: hidden;
 }
 
 .histogram-spans-container {
-  height: calc(100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight);
+  height: calc(
+    100vh - $toolbarHeight - $traceHeaderHeight - $traceChartHeight - 44px
+  );
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
@@ -555,6 +752,13 @@ $traceChartHeight: 200px;
     .rangeslider-mask-min {
       fill: #d2d2d2 !important;
       fill-opacity: 1 !important;
+    }
+  }
+
+  .visual-selection-btn {
+    .q-icon {
+      padding-right: 5px;
+      font-size: 15px;
     }
   }
 }

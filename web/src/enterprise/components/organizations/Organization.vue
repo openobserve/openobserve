@@ -28,22 +28,6 @@
       :loading="loading"
     >
       <template #no-data><NoData /></template>
-      <template #body-cell-actions="props">
-        <q-td :props="props">
-          <q-btn
-            v-if="props.row.actions == 'true' && props.row.role == 'admin'"
-            icon="group"
-            :title="t('organization.invite')"
-            class="iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="redirectToInviteMember(props)"
-          ></q-btn>
-        </q-td>
-      </template>
 
       <template #top="scope">
         <div class="q-table__title">{{ t("organization.header") }}</div>
@@ -96,6 +80,7 @@
       position="right"
       full-height
       maximized
+      @before-hide="hideAddOrgDialog"
     >
       <add-update-organization @updated="updateOrganizationList" />
     </q-dialog>
@@ -239,12 +224,6 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("organization.actions"),
-        align: "center",
-      },
     ]);
     const perPageOptions = [
       { label: "5", value: 5 },
@@ -318,6 +297,9 @@ export default defineComponent({
         message: "Please wait while loading organizations...",
       });
       organizationsService.list(0, 1000, "name", false, "").then((res) => {
+        // Updating store so that organizations in navbar also gets updated
+        store.dispatch("setOrganizations", res.data.data);
+
         resultTotal.value = res.data.data.length;
         let counter = 1;
         organizations.value = res.data.data.map((data: any) => {
@@ -356,7 +338,6 @@ export default defineComponent({
                 : data.UserObj.email,
             created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
             role: convertToTitleCase(role),
-            actions: "true",
             status: convertToTitleCase(data.status),
             plan_type:
               data.CustomerBillingObj.subscription_type ==
@@ -406,6 +387,14 @@ export default defineComponent({
       });
     };
 
+    const hideAddOrgDialog = () => {
+      router.push({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       store,
@@ -442,6 +431,7 @@ export default defineComponent({
         return filtered;
       },
       redirectToInviteMember,
+      hideAddOrgDialog,
     };
   },
   methods: {

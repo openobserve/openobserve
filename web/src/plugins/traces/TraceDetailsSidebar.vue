@@ -32,7 +32,7 @@
   <div class="q-pb-sm">
     <div
       :title="span.operation_name"
-      class="q-px-sm q-pb-none text-h6 ellipsis non-selectable"
+      class="q-px-sm q-pb-none text-subtitle1 ellipsis non-selectable"
     >
       {{ span.operation_name }}
     </div>
