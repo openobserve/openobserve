@@ -694,7 +694,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-$sidebarWidth: 300px;
+$sidebarWidth: 45%;
 $seperatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
