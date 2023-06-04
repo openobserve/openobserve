@@ -56,11 +56,11 @@
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
     <q-tab-panel name="tags">
       <div v-for="key in Object.keys(spanDetails.attrs)" :key="key">
-        <div class="row q-py-sm q-px-sm border-bottom">
-          <span class="text-subtitle2 text-grey-9 q-pr-sm text-bold"
+        <div class="row q-py-xs q-px-sm border-bottom">
+          <span class="attr-text text-grey-9 q-pr-sm text-bold"
             >{{ key }}:</span
           >
-          <span class="text-subtitle2">{{ spanDetails.attrs[key] }}</span>
+          <span class="attr-text">{{ spanDetails.attrs[key] }}</span>
         </div>
       </div>
     </q-tab-panel>
@@ -252,6 +252,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.attr-text {
+  font-size: 12px;
+  font-family: monospace;
+}
 .table-header {
   // text-transform: capitalize;
 

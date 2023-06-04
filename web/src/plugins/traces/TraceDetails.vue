@@ -32,6 +32,9 @@
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
+          <div class="q-pb-xs q-mr-lg">
+            Trace ID: {{ spanList[0]["trace_id"] }}
+          </div>
           <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
         <q-btn
@@ -205,6 +208,7 @@ export default defineComponent({
       data: [{}],
       layout: {},
     });
+
     const plotChart: any = ref(null);
 
     const spanList: any = computed(() => {
@@ -694,7 +698,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-$sidebarWidth: 45%;
+$sidebarWidth: 60%;
 $seperatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
