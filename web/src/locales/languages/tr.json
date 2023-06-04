@@ -287,7 +287,7 @@
     "noData": "Alınan Veri Yok",
     "findIngestion": "Günlükleri nasıl alacağınızı öğrenin >>",
     "ingestionMsg": "Görünüşe göre seçilen kuruluşa herhangi bir veri almadınız, verilerin fluentbit gibi alınabileceği varoius yolları vardır.",
-    "inestedInSearch": "Logs Search'i deneyin",
+    "inestedInSearch": "Logs Searc'i deneyin",
     "searchInDemoOrg": "Demo organizasyonuna geçerek, demo organizasyonuna geçmek için arama kapaklarını keşfedebilir, üstteki organizasyon açılır menüsünü kullanarak 'Demo Organizasyon'u seçebilirsiniz.Demo Organizasyon'a kukla verileri yutmaya devam ediyoruz."
   },
   "billing": {

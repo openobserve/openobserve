@@ -305,7 +305,7 @@
     "noData": "Geen gegevens opgenomen",
     "findIngestion": "Ontdek hoe u logboeken kunt opnemen >>",
     "ingestionMsg": "Het lijkt erop dat u geen gegevens hebt ingevoerd voor een geselecteerde organisatie. Er zijn verschillende manieren waarop gegevens kunnen worden opgenomen, zoals fluentbit.",
-    "inestedInSearch": "Probeer Logs Search",
+    "inestedInSearch": "Probeer Log Search",
     "searchInDemoOrg": "U kunt de zoekmogelijkheden verkennen door over te schakelen naar een demo-organisatie. Om over te schakelen naar een demo-organisatie, selecteert u 'Demo-organisatie' met de vervolgkeuzelijst 'Organisatie' bovenaan. We blijven dummygegevens invoeren in Demo Organization."
   },
   "billing": {

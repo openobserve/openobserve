@@ -305,7 +305,7 @@
     "noData": "Keine Daten aufgenommen",
     "findIngestion": "Finden Sie heraus, wie Sie Logs aufnehmen können >>",
     "ingestionMsg": "Sieht so aus, als ob Sie keine Daten in die ausgewählte Organisation aufgenommen haben. Es gibt verschiedene Möglichkeiten, wie Daten wie Fluentbit aufgenommen werden können.",
-    "inestedInSearch": "Testen Sie Logs Search",
+    "inestedInSearch": "Testen Sie Log Search",
     "searchInDemoOrg": "Sie können die Suchmöglichkeiten erkunden, indem Sie zur Demo-Organisation wechseln. Um zur Demo-Organisation zu wechseln, wählen Sie „Demo-Organisation“ über das Drop-down-Menü für die Organisation aus. Wir erfassen ständig Dummy-Daten in die Demo-Organisation."
   },
   "billing": {
