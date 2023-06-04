@@ -190,6 +190,9 @@ export default defineComponent({
         .attr("dx", "0px")
         .attr("text-anchor", "middle")
         .text((d: any) => {
+          if (d.data?.name?.length > 40) {
+            return d.data.name.slice(0, 37) + "...";
+          }
           return d.data.name;
         })
         .attr("font-size", "12px")
