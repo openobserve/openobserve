@@ -92,7 +92,7 @@
           <q-btn
             no-caps
             color="primary"
-            @click="() => $router.push('/ingestion/fluentbit')"
+            @click="() => $router.push('/ingestion/logs/fluentbit')"
             flat
             >{{ t("home.findIngestion") }}
           </q-btn>
