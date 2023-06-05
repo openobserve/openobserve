@@ -110,10 +110,7 @@ export default defineComponent({
     });
 
     const redirectRoute = () => {
-      if (
-        router.currentRoute.value.name === "alerts" &&
-        store.state.selectedOrganization.status == "active"
-      ) {
+      if (router.currentRoute.value.name === "alerts") {
         router.push({
           name: "alertList",
           query: {
@@ -123,22 +120,22 @@ export default defineComponent({
       }
     };
     const getTemplates = () => {
-      if (store.state.selectedOrganization.status == "active") {
-        templateService
-          .list({
-            org_identifier: store.state.selectedOrganization.identifier,
-          })
-          .then((res) => (templates.value = res.data));
-      }
+      // if (store.state.selectedOrganization.status == "active") {
+      templateService
+        .list({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res) => (templates.value = res.data));
+      // }
     };
     const getDestinations = () => {
-      if (store.state.selectedOrganization.status == "active") {
-        destinationService
-          .list({
-            org_identifier: store.state.selectedOrganization.identifier,
-          })
-          .then((res) => (destinations.value = res.data));
-      }
+      // if (store.state.selectedOrganization.status == "active") {
+      destinationService
+        .list({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res) => (destinations.value = res.data));
+      // }
     };
 
     return {
