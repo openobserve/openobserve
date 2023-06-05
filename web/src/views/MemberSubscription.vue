@@ -34,13 +34,13 @@
     ></div>
     <div v-else>Thank you for your subscription.</div>
 
-    <div
+    <!-- <div
       v-if="status == 'error' && error !== ''"
       class="subscription_message q-btn-primary"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
       <q-btn @click="ProcessSubscription(queryString, 'confirm')" class="q-mt-md">Confirm Member Subscription</q-btn>
-    </div>
+    </div> -->
   </q-page>
 </template>
 
@@ -65,12 +65,11 @@ export default defineComponent({
   },
   created() {
     const propArr = this.$route.hash.split("=");
-    this.ProcessSubscription(propArr[1], "normal");
+    this.ProcessSubscription(propArr[1], "confirm");
   },
   methods: {
     async ProcessSubscription(s: any, action: string) {
       const baseURL = getPath();
-      alert(baseURL)
       await organizationsService
         .process_subscription(s, action)
         .then((res) => {
