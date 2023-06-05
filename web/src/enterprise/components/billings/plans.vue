@@ -70,8 +70,9 @@
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense
-v-close-popup />
+          <q-btn icon="close"
+flat round
+dense v-close-popup />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -96,8 +97,9 @@ v-close-popup />
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense
-v-close-popup />
+          <q-btn icon="close"
+flat round
+dense v-close-popup />
         </q-card-section>
 
         <q-card-section>
@@ -135,8 +137,8 @@ v-close-popup />
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel" color="secondary"
-v-close-popup />
+          <q-btn label="Cancel"
+color="secondary" v-close-popup />
           <q-btn
             label="Confirm"
             color="primary"
@@ -190,14 +192,18 @@ export default defineComponent({
           });
       } else {
         BillingService.get_hosted_url(
-          this.store.state.selectedOrganization.identifier
+          this.store.state.selectedOrganization.identifier,
+          "Pro"
         )
           .then((res) => {
-            this.isActiveSubscription = false;
-            this.subScribePlan = true;
-            this.hostedResponse = res.data.data.hosted_page;
-            setInterval(this.retriveHostedPage, 5000);
-            this.loadSubscription(true);
+            console.log(res);
+            // alert(res.data.data.url)
+            window.location.href = res.data.data.url;
+            // this.isActiveSubscription = false;
+            // this.subScribePlan = true;
+            // this.hostedResponse = res.data.data.url;
+            // setInterval(this.retriveHostedPage, 5000);
+            // this.loadSubscription(true);
           })
           .catch((e) => {
             this.$q.notify({
@@ -248,41 +254,61 @@ export default defineComponent({
         this.store.state.selectedOrganization.identifier
       )
         .then((res) => {
-          this.listSubscriptionResponse = res.data.data;
-          this.listSubscriptionResponse.subscription.current_term_end =
-            date.formatDate(
-              Math.floor(
-                this.listSubscriptionResponse.subscription.current_term_end *
-                  1000
-              ),
-              "MMM DD, YYYY"
-            );
-          this.listSubscriptionResponse.subscription.current_term_start =
-            date.formatDate(
-              Math.floor(
-                this.listSubscriptionResponse.subscription.current_term_start *
-                  1000
-              ),
-              "MMM DD, YYYY"
-            );
-          res.data.data.subscription.subscription_items.forEach(
-            (element: any) => {
-              if (element.item_price_id == "professional-USD-Monthly") {
-                this.isProPlan = true;
-                const localOrg: any = useLocalOrganization();
-                localOrg.value.subscription_type = "professional-USD-Monthly";
-                useLocalOrganization(localOrg.value);
-                this.store.dispatch("setSelectedOrganization", localOrg.value);
-                this.store.dispatch("setQuotaThresholdMsg", "");
-              } else if (element.item_price_id == "Free-Plan-USD-Monthly") {
-                this.isProPlan = false;
-                const localOrg: any = useLocalOrganization();
-                localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
-                useLocalOrganization(localOrg.value);
-                this.store.dispatch("setSelectedOrganization", localOrg.value);
-              }
-            }
-          );
+          if (
+            res.data.data.CustomerBillingObj.subscription_type ==
+            "professional-USD-Monthly"
+          ) {
+            this.isProPlan = true;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = "professional-USD-Monthly";
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
+          } else if (
+            res.data.data.CustomerBillingObj.subscription_type ==
+            "Free-Plan-USD-Monthly"
+          ) {
+            this.isProPlan = false;
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+          }
+          // this.listSubscriptionResponse = res.data.data;
+          // this.listSubscriptionResponse.subscription.current_term_end =
+          //   date.formatDate(
+          //     Math.floor(
+          //       this.listSubscriptionResponse.subscription.current_term_end *
+          //         1000
+          //     ),
+          //     "MMM DD, YYYY"
+          //   );
+          // this.listSubscriptionResponse.subscription.current_term_start =
+          //   date.formatDate(
+          //     Math.floor(
+          //       this.listSubscriptionResponse.subscription.current_term_start *
+          //         1000
+          //     ),
+          //     "MMM DD, YYYY"
+          //   );
+          // res.data.data.subscription.subscription_items.forEach(
+          //   (element: any) => {
+          //     if (element.item_price_id == "professional-USD-Monthly") {
+          //       this.isProPlan = true;
+          //       const localOrg: any = useLocalOrganization();
+          //       localOrg.value.subscription_type = "professional-USD-Monthly";
+          //       useLocalOrganization(localOrg.value);
+          //       this.store.dispatch("setSelectedOrganization", localOrg.value);
+          //       this.store.dispatch("setQuotaThresholdMsg", "");
+          //     } else if (element.item_price_id == "Free-Plan-USD-Monthly") {
+          //       this.isProPlan = false;
+          //       const localOrg: any = useLocalOrganization();
+          //       localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
+          //       useLocalOrganization(localOrg.value);
+          //       this.store.dispatch("setSelectedOrganization", localOrg.value);
+          //     }
+          //   }
+          // );
           // if (
           //   res.data.data.card &&
           //   res.data.data.card.payment_source_id != ""
