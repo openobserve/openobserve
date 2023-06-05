@@ -34,8 +34,8 @@ const billings = {
   resume_subscription: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/resume_subscription`);
   },
-  get_hosted_url: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/billings/hosted_subscription_url`);
+  get_hosted_url: (org_identifier: string, plan_name: string) => {
+    return http().get(`/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`);
   },
   retrive_hosted_page: (org_identifier: string, hosted_page_id: string) => {
     return http().get(`/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`);
