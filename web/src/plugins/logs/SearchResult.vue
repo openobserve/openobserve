@@ -138,21 +138,24 @@
                 class="field_overlay"
                 :title="row.name"
               >
-                <q-icon
-                  :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  size="1rem"
-                  title="Add to search query"
+                <q-btn
+                  :icon="'img:' + getImageURL('images/common/equals.svg')"
+                  class="q-mr-xs"
+                  size="6px"
                   @click.prevent.stop="
                     addSearchTerm(`${column.name}='${row[column.name]}'`)
                   "
+                  title="Include Term"
+                  round
                 />
-                <q-icon
-                  :name="'img:' + getImageURL('images/common/remove_icon.svg')"
-                  size="1rem"
-                  title="Add to search query"
+                <q-btn
+                  :icon="'img:' + getImageURL('images/common/not_equals.svg')"
+                  size="6px"
                   @click.prevent.stop="
                     addSearchTerm(`${column.name}!='${row[column.name]}'`)
                   "
+                  title="Exclude Term"
+                  round
                 />
               </div>
             </q-td>
