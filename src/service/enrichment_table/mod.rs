@@ -61,7 +61,7 @@ pub async fn save_enrichment_data(
     if db::compact::delete::is_deleting_stream(
         org_id,
         stream_name,
-        StreamType::EnrichmentTable,
+        StreamType::EnrichmentTables,
         None,
     ) {
         return Ok(
@@ -76,13 +76,13 @@ pub async fn save_enrichment_data(
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
-        StreamType::EnrichmentTable,
+        StreamType::EnrichmentTables,
         &mut stream_schema_map,
     )
     .await;
 
     if stream_schema.has_fields {
-        delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTable).await;
+        delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTables).await;
     }
 
     let mut records = vec![];
@@ -115,7 +115,7 @@ pub async fn save_enrichment_data(
                     chk_schema_by_record(
                         &mut stream_schema_map,
                         org_id,
-                        StreamType::EnrichmentTable,
+                        StreamType::EnrichmentTables,
                         stream_name,
                         timestamp,
                         &value_str,
@@ -147,7 +147,7 @@ pub async fn save_enrichment_data(
         thread_id,
         org_id,
         stream_name,
-        StreamType::EnrichmentTable,
+        StreamType::EnrichmentTables,
     );
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
