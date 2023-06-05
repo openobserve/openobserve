@@ -270,7 +270,7 @@ pub async fn remote_write(
             let hour_key = crate::service::ingestion::get_hour_key(
                 timestamp,
                 partition_keys.clone(),
-                value.as_object().unwrap().clone(),
+                value.as_object().unwrap(),
             );
             let hour_buf = buf.entry(hour_key.clone()).or_default();
             hour_buf.push(value_str);

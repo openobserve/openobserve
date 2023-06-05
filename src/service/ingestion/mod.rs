@@ -177,7 +177,7 @@ pub async fn get_stream_alerts<'a>(
 pub fn get_hour_key(
     timestamp: i64,
     partition_keys: Vec<String>,
-    local_val: Map<String, Value>,
+    local_val: &Map<String, Value>,
 ) -> String {
     // get hour file name
     let mut hour_key = Utc
@@ -392,7 +392,7 @@ mod tests {
             get_hour_key(
                 1620000000,
                 vec!["country".to_string(), "sport".to_string()],
-                local_val
+                &local_val
             ),
             "1970_01_01_00_country=USA_sport=basketball"
         );
@@ -403,12 +403,12 @@ mod tests {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
-        assert_eq!(get_hour_key(1620000000, vec![], local_val), "1970_01_01_00");
+        assert_eq!(get_hour_key(1620000000, vec![], &local_val), "1970_01_01_00");
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_hour_key(1620000000, vec![], Map::new()),
+            get_hour_key(1620000000, vec![], &Map::new()),
             "1970_01_01_00"
         );
     }
