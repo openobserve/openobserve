@@ -212,7 +212,11 @@ import {
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
-import { verifyOrganizationStatus } from "@/utils/zincutils";
+import {
+  verifyOrganizationStatus,
+  convertTimeFromMicroToMilli,
+} from "@/utils/zincutils";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "PageSearch",
@@ -460,8 +464,16 @@ export default defineComponent({
           );
           if (stream.stats) {
             return {
-              start_time: new Date(stream.stats.doc_time_min),
-              end_time: new Date(stream.stats.doc_time_max),
+              start_time: new Date(
+                convertTimeFromMicroToMilli(
+                  stream.stats.doc_time_min - 300000000
+                )
+              ),
+              end_time: new Date(
+                convertTimeFromMicroToMilli(
+                  stream.stats.doc_time_max + 300000000
+                )
+              ),
             };
           }
         }
@@ -559,7 +571,6 @@ export default defineComponent({
         };
 
         var timestamps: any = getConsumableDateTime();
-
         if (
           timestamps.start_time != "Invalid Date" &&
           timestamps.end_time != "Invalid Date"
@@ -829,7 +840,6 @@ export default defineComponent({
             } else {
               searchObj.data.errorMsg = err.message;
             }
-            console.log(err.response);
             const customMessage = logsErrorMessage(err.response.data.code);
             searchObj.data.errorCode = err.response.data.code;
             if (customMessage != "") {
@@ -1518,7 +1528,6 @@ export default defineComponent({
       this.searchObj.loading = true;
       this.searchObj.data.errorMsg = "";
       this.searchObj.data.stream.streamLists = [];
-      this.searchObj.data.stream.selectedStream = { label: "", value: "" };
       this.searchObj.data.stream.selectedStreamFields = [];
       this.searchObj.data.queryResults = {};
       this.searchObj.data.sortedQueryResults = [];

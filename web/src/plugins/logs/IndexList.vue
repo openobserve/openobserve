@@ -316,7 +316,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
-import { b64EncodeUnicode, getImageURL } from "../../utils/zincutils";
+import {
+  b64EncodeUnicode,
+  getImageURL,
+  convertTimeFromMicroToMilli,
+} from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import { Parser } from "node-sql-parser";
@@ -405,11 +409,16 @@ export default defineComponent({
         );
         if (stream.stats) {
           timestamps = {
-            start_time: new Date(stream.stats.doc_time_min),
-            end_time: new Date(stream.stats.doc_time_max),
+            start_time: new Date(
+              convertTimeFromMicroToMilli(stream.stats.doc_time_min - 300000000)
+            ),
+            end_time: new Date(
+              convertTimeFromMicroToMilli(stream.stats.doc_time_max + 300000000)
+            ),
           };
         }
       }
+
       const startISOTimestamp: any =
         new Date(timestamps.start_time.toISOString()).getTime() * 1000;
       const endISOTimestamp: any =
