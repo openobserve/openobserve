@@ -92,7 +92,7 @@ async fn settings(
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => {
             if let Some(s_type) = v {
-                if s_type == StreamType::EnrichmentTable {
+                if s_type == StreamType::EnrichmentTables {
                     return Ok(
                         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                             http::StatusCode::BAD_REQUEST.into(),
