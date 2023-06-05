@@ -259,7 +259,7 @@ export const getPath = () => {
       ? "/"
       : pos > -1
       ? window.location.pathname.slice(0, pos + 5)
-        : window.location.pathname;
+      : window.location.pathname;
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
@@ -312,4 +312,10 @@ export const verifyOrganizationStatus = (Organizations: any, Router: any) => {
   //     Router.push({ name: "plans" });
   //   }
   // }
+};
+
+export const convertTimeFromMicroToMilli = (time: number) => {
+  const milliseconds = Math.floor(time / 1000);
+  const date = new Date(milliseconds);
+  return date.getTime();
 };
