@@ -291,7 +291,7 @@ pub async fn traces_json(
                             let mut hour_key = crate::service::ingestion::get_hour_key(
                                 timestamp.try_into().unwrap(),
                                 partition_keys.clone(),
-                                value.as_object().unwrap().clone(),
+                                value.as_object().unwrap(),
                             );
 
                             if !stream_alerts_map.is_empty() {

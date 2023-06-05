@@ -124,7 +124,7 @@ pub async fn save_enrichment_data(
 
                     if records.is_empty() {
                         hour_key =
-                            super::ingestion::get_hour_key(timestamp, vec![], json_record.clone());
+                            super::ingestion::get_hour_key(timestamp, vec![], &json_record);
                     }
                     records.push(value_str);
                 }
