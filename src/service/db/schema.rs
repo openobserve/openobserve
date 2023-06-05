@@ -263,7 +263,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_type = StreamType::from(keys[1]);
                 let stream_name = keys[2];
 
-                if stream_type.eq(&StreamType::EnrichmentTable) {
+                if stream_type.eq(&StreamType::EnrichmentTables) {
                     ENRICHMENT_TABLES.insert(
                         item_key.to_owned(),
                         StreamTable {
@@ -290,7 +290,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("del_offset: {}", e);
                 }
 
-                if stream_type.eq(&StreamType::EnrichmentTable) && is_local_disk_storage() {
+                if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
                     let data_dir = format!(
                         "{}/files/{org_id}/{stream_type}/{stream_name}",
                         CONFIG.common.data_wal_dir
@@ -344,7 +344,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let org_id = keys[0];
         let stream_type = StreamType::from(keys[1]);
         let stream_name = keys[2];
-        if stream_type.eq(&StreamType::EnrichmentTable) {
+        if stream_type.eq(&StreamType::EnrichmentTables) {
             ENRICHMENT_TABLES.insert(
                 item_key.to_owned(),
                 StreamTable {
