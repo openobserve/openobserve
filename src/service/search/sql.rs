@@ -37,11 +37,11 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-static RE1: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
-static RE2: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select \*").unwrap());
-static RE3: Lazy<Regex> =
+static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select \*").unwrap());
+static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
-static RE4: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
+static RE_SELECT_FIELD: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 static RE_TIMESTAMP_EMPTY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
@@ -155,25 +155,25 @@ impl Sql {
 
         // check aggs
         for sql in req_aggs.values() {
-            if !RE1.is_match(sql) {
+            if !RE_ONLY_FROM.is_match(sql) {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Aggregation SQL only support 'from query' as context".to_string(),
                 )));
             }
-            if RE2.is_match(sql) {
+            if RE_ONLY_SELECT.is_match(sql) {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Aggregation SQL is not supported 'select *' please specify the fields"
                         .to_string(),
                 )));
             }
-            if RE3.is_match(sql) {
-                let caps = RE3.captures(sql).unwrap();
+            if RE_ONLY_GROUPBY.is_match(sql) {
+                let caps = RE_ONLY_GROUPBY.captures(sql).unwrap();
                 let group_by = caps
                     .get(1)
                     .unwrap()
                     .as_str()
                     .trim_matches(|v| v == '\'' || v == '"');
-                let select_caps = match RE4.captures(sql) {
+                let select_caps = match RE_SELECT_FIELD.captures(sql) {
                     Some(caps) => caps,
                     None => {
                         return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
