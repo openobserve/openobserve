@@ -127,12 +127,8 @@ dense v-close-popup />
               color="primary"
               text-color="white"
               class="q-mr-sm"
-            />Since you are downgrading the subscription plan, please note that
-            if you are currently part of an organization that is subscribed to
-            the free/developer plan, the current organization members, their
-            tokens and the organization status will be changed to 'Pending
-            Subscription' state. Are you sure you want to proceed with this
-            action?</span
+            />You are downgrading the subscription plan. Are you sure you want
+            to proceed with this action?</span
           >
         </q-card-section>
 
