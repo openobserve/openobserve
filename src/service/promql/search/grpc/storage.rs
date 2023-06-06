@@ -195,7 +195,10 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
                         if let Err(e) =
                             db::file_list::local::set(&file, FileMeta::default(), true).await
                         {
-                            log::error!("promql->search->storage: delete from file_list err: {}", e);
+                            log::error!(
+                                "promql->search->storage: delete from file_list err: {}",
+                                e
+                            );
                         }
                         return Some(file);
                     }

@@ -114,12 +114,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
-    let meta = match sql::Sql::new(&req).await {
-        Ok(meta) => meta,
-        Err(err) => {
-            return Err(err);
-        }
-    };
+    let meta = sql::Sql::new(&req).await?;
 
     // get a cluster search queue lock
     let locker = if CONFIG.common.local_mode {
