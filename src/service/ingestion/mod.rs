@@ -403,7 +403,10 @@ mod tests {
         let mut local_val = Map::new();
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
-        assert_eq!(get_hour_key(1620000000, vec![], &local_val), "1970_01_01_00");
+        assert_eq!(
+            get_hour_key(1620000000, vec![], &local_val),
+            "1970_01_01_00"
+        );
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
