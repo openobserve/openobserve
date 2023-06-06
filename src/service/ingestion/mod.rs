@@ -310,6 +310,7 @@ pub async fn chk_schema_by_record(
         stream_type,
         &inferred_schema,
         Some(record_ts),
+        true,
     )
     .await
     .unwrap();

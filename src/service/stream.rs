@@ -191,6 +191,7 @@ pub async fn save_stream_settings(
         stream_type,
         &schema.clone().with_metadata(metadata),
         None,
+        false,
     )
     .await
     .unwrap();

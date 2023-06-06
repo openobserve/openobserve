@@ -97,6 +97,7 @@ pub async fn set(
     stream_type: StreamType,
     schema: &Schema,
     min_ts: Option<i64>,
+    new_version: bool,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::infra::db::DEFAULT;
     let mut versions: Vec<Schema>;
@@ -104,7 +105,7 @@ pub async fn set(
     let map_key = key.strip_prefix("/schema/").unwrap();
     if STREAM_SCHEMAS.contains_key(map_key) {
         versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
-        if min_ts.is_some() {
+        if min_ts.is_some() && new_version {
             //update last schema to add end date
             let last_schema = versions.pop().unwrap();
             if !last_schema.fields.eq(&schema.fields) {
