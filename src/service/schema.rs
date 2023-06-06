@@ -297,8 +297,8 @@ pub async fn check_for_schema(
     match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
         Err(ref _e) => (false, Some(field_datatype_delta)), //return (false, None),
         Ok(merged) => {
-            log::info!("Schema widening for stream {:?}", stream_name);
             if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+                log::info!("creating new schema version for stream {:?}", stream_name);
                 let is_field_delta = !field_datatype_delta.is_empty();
                 db::schema::set(
                     org_id,
