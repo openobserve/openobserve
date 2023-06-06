@@ -89,7 +89,7 @@ pub(crate) async fn create_context(
             files.retain(|f| !deleted_files.contains(f));
         }
         log::info!(
-            "search->storage: load files {}, into memory cache done",
+            "promql->search->storage: load files {}, into memory cache done",
             file_count
         );
     }
@@ -189,13 +189,13 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             if !file_data::exist(&file).unwrap_or_default() {
                 if let Err(e) = file_data::download(&file).await {
-                    log::error!("romql->search->storage: download file err: {}", e);
+                    log::error!("promql->search->storage: download file err: {}", e);
                     if e.to_string().contains("not found") {
                         // delete file from file list
                         if let Err(e) =
                             db::file_list::local::set(&file, FileMeta::default(), true).await
                         {
-                            log::error!("romql->search->storage: delete from file_list err: {}", e);
+                            log::error!("promql->search->storage: delete from file_list err: {}", e);
                         }
                         return Some(file);
                     }
