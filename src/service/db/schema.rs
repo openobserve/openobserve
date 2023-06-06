@@ -362,20 +362,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn filter_schema_version_id(schemas: &[Schema], start_dt: i64, end_dt: i64) -> Option<usize> {
+pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64) -> Option<usize> {
     for (i, schema) in schemas.iter().enumerate() {
         let metadata = schema.metadata();
-        let start_dt_loc: i64 = metadata.get("start_dt").unwrap().parse().unwrap();
-        if start_dt < start_dt_loc {
-            continue;
-        }
-        let end_dt_loc: i64 = match metadata.get("end_dt") {
-            Some(v) => v.parse().unwrap(),
-            None => {
-                return Some(i);
-            }
-        };
-        if end_dt <= end_dt_loc {
+        let schema_end_dt: i64 = metadata
+            .get("end_dt")
+            .unwrap_or(&"0".to_string())
+            .parse()
+            .unwrap();
+        if schema_end_dt == 0 || end_dt < schema_end_dt {
             return Some(i);
         }
     }
