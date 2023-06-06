@@ -74,19 +74,13 @@
           <q-tr :props="props">
             <q-td
               class="field_list"
-              :class="
-                dashboardPanelData.data.fields.x.find((it: any)=>it.column === props.row.name) ||
-                dashboardPanelData.data.fields.y.find((it: any)=>it.column === props.row.name) ||
-                dashboardPanelData.data.fields.filter.find((it: any)=>it.column === props.row.name)
-                ? 'selected'
-                : ''
-              "
               :props="props"
               v-mutation="mutationHandler"
               @dragenter="onDragEnter"
               @dragleave="onDragLeave"
               @dragover="onDragOver"
               @drop="onDrop"
+              :style="props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''"
             >
               <div class="field_overlay" :title="props.row.name">
                 <div
@@ -205,7 +199,7 @@ export default defineComponent({
     watch(
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
-        // console.log("stream:", dashboardPanelData.data.fields.stream);
+        console.log("stream:", dashboardPanelData.data.fields.stream);
         
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
@@ -243,7 +237,7 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
       ],
       () => {
-        // console.log("updated custom query fields or selected stream fields");
+        console.log("updated custom query fields or selected stream fields");
 
         data.currentFieldsList = [];
         data.currentFieldsList = [
