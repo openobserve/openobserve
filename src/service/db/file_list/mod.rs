@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::cache;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
+
+use crate::infra::{
+    cache, cluster,
+    config::{RwHashMap, CONFIG},
+};
 use crate::meta::common::FileMeta;
 
 pub mod broadcast;
 pub mod local;
 pub mod remote;
+
+pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
+    Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
 #[inline]
 pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), anyhow::Error> {

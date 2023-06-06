@@ -158,7 +158,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                             }
                             match fs::remove_file(&path) {
                                 Ok(_) => {
-                                    // println!("removed file: {}", key);
                                     // metrics
                                     let columns = key.split('/').collect::<Vec<&str>>();
                                     if columns[0] == "files" {

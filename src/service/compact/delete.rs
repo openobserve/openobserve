@@ -30,7 +30,6 @@ pub async fn delete_all(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
-    // println!("delete_all: {}/{}/{}", org_id, stream_type, stream_name);
     if is_local_disk_storage() {
         let data_dir = format!(
             "{}/files/{org_id}/{stream_type}/{stream_name}",
@@ -40,6 +39,7 @@ pub async fn delete_all(
         if path.exists() {
             std::fs::remove_dir_all(path)?;
         }
+        log::info!("deleted all files: {:?}", path);
     } else {
         // delete files from s3
         // first fetch file list from local cache
@@ -70,9 +70,23 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
+    log::info!(
+        "deleted file list for: {}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name
+    );
 
     // mark delete done
-    db::compact::delete::delete_stream_done(org_id, stream_name, stream_type, None).await
+    db::compact::delete::delete_stream_done(org_id, stream_name, stream_type, None).await?;
+    log::info!(
+        "deleted stream all: {}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name
+    );
+
+    Ok(())
 }
 
 pub async fn delete_by_date(

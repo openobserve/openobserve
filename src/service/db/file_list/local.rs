@@ -16,12 +16,12 @@ use chrono::{TimeZone, Utc};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::common::file::scan_files;
-use crate::common::json;
-use crate::infra::config::CONFIG;
-use crate::infra::wal;
-use crate::meta::common::{FileKey, FileMeta};
-use crate::meta::StreamType;
+use crate::common::{file::scan_files, json};
+use crate::infra::{config::CONFIG, wal};
+use crate::meta::{
+    common::{FileKey, FileMeta},
+    StreamType,
+};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
     let file_data = FileKey {
@@ -31,10 +31,20 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     };
     let mut write_buf = json::to_vec(&file_data)?;
     write_buf.push(b'\n');
-    let hour_key = Utc
-        .timestamp_nanos(meta.min_ts * 1000)
-        .format("%Y_%m_%d_%H")
-        .to_string();
+    let hour_key = if meta.min_ts > 0 {
+        Utc.timestamp_nanos(meta.min_ts * 1000)
+            .format("%Y_%m_%d_%H")
+            .to_string()
+    } else {
+        let columns = key.split('/').collect::<Vec<&str>>();
+        if columns[0] != "files" || columns.len() < 9 {
+            return Ok(());
+        }
+        format!(
+            "{}_{}_{}_{}",
+            columns[4], columns[5], columns[6], columns[7]
+        )
+    };
     let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
     file.write(write_buf.as_ref());
 
@@ -74,9 +84,14 @@ pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
 
 #[inline]
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let files = get_all().await?;
-    for file in files {
-        super::progress(&file.key, file.meta, false).await?;
+    let items = get_all().await?;
+    for item in items {
+        // check deleted files
+        if item.deleted {
+            super::DELETED_FILES.insert(item.key, item.meta.to_owned());
+            continue;
+        }
+        super::progress(&item.key, item.meta, item.deleted).await?;
     }
     Ok(())
 }

@@ -22,7 +22,9 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::infra::{cache::file_data, config::CONFIG};
-use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
+use crate::meta::{
+    common::FileMeta, search::Session as SearchSession, stream::StreamParams, StreamType,
+};
 use crate::service::{
     db, file_list,
     search::{
@@ -39,8 +41,14 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     filters: &[(&str, &str)],
 ) -> Result<(SessionContext, Arc<Schema>)> {
+    // check if we are allowed to search
+    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
+        log::error!("stream [{}] is being deleted", stream_name);
+        return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+    }
+
     // get file list
-    let files = get_file_list(org_id, stream_name, time_range, filters).await?;
+    let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
     let file_count = files.len();
     if files.is_empty() {
         return Ok((SessionContext::new(), Arc::new(Schema::empty())));
@@ -75,9 +83,13 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     if storage_type == StorageType::FsMemory {
-        cache_parquet_files(&files).await?;
+        let deleted_files = cache_parquet_files(&files).await?;
+        if !deleted_files.is_empty() {
+            // remove deleted files
+            files.retain(|f| !deleted_files.contains(f));
+        }
         log::info!(
-            "promql->search->storage: load files {}, into memory cache done",
+            "search->storage: load files {}, into memory cache done",
             file_count
         );
     }
@@ -168,37 +180,46 @@ async fn get_file_list(
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[String]) -> Result<()> {
+async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
-            tokio::task::spawn(async move {
-                if !file_data::exist(&file).unwrap_or_default() {
-                    if let Err(e) = file_data::download(&file).await {
-                        log::error!("promql->search->storage: load file {}, err: {}", &file, e);
+        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
+            if !file_data::exist(&file).unwrap_or_default() {
+                if let Err(e) = file_data::download(&file).await {
+                    log::error!("romql->search->storage: download file err: {}", e);
+                    if e.to_string().contains("not found") {
+                        // delete file from file list
+                        if let Err(e) =
+                            db::file_list::local::set(&file, FileMeta::default(), true).await
+                        {
+                            log::error!("romql->search->storage: delete from file_list err: {}", e);
+                        }
+                        return Some(file);
                     }
-                };
-                drop(permit);
-                Ok(())
-            });
+                }
+            };
+            drop(permit);
+            None
+        });
         tasks.push(task);
     }
 
+    let mut delete_files = Vec::new();
     for task in tasks {
         match task.await {
             Ok(ret) => {
-                if let Err(err) = ret {
-                    return Err(DataFusionError::Execution(err.to_string()));
+                if let Some(file) = ret {
+                    delete_files.push(file);
                 }
             }
-            Err(err) => {
-                return Err(DataFusionError::Execution(err.to_string()));
+            Err(e) => {
+                log::error!("promql->search->storage: load file task err: {}", e);
             }
-        };
+        }
     }
 
-    Ok(())
+    Ok(delete_files)
 }

@@ -112,6 +112,15 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
 
+    // handle request time range
+    let stream_type = StreamType::from(req.stream_type.as_str());
+    let meta = match sql::Sql::new(&req).await {
+        Ok(meta) => meta,
+        Err(err) => {
+            return Err(err);
+        }
+    };
+
     // get a cluster search queue lock
     let locker = if CONFIG.common.local_mode {
         None
@@ -133,21 +142,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     {
         0 => 1,
         n => n,
-    };
-
-    // handle request time range
-    let stream_type = StreamType::from(req.stream_type.as_str());
-    let meta = match sql::Sql::new(&req).await {
-        Ok(meta) => meta,
-        Err(err) => {
-            // search done, release lock
-            if locker.is_some() {
-                if let Err(e) = locker.unwrap().unlock().await {
-                    log::error!("search in cluster unlock error: {}", e);
-                }
-            }
-            return Err(err);
-        }
     };
 
     let file_list = get_file_list(&meta, stream_type).await;

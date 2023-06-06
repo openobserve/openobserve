@@ -3748,7 +3748,6 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
- "datafusion-common",
  "datafusion-expr",
  "dotenv_config",
  "dotenvy",

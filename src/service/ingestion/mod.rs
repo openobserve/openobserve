@@ -106,7 +106,7 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: 
             Err(_) => row.clone(),
         },
         Err(err) => {
-            println!("Error from vrl {:?}", err);
+            log::error!("Error from vrl {:?}", err);
             row.clone()
         }
     }

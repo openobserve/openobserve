@@ -336,11 +336,6 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     })?;
 
     for item in ret.kvs() {
-        // let item_key = item.key_str().unwrap().to_string();
-        // let short_key = item_key.strip_prefix(&format!("{}nodes/", &CONFIG.etcd.prefix)).unwrap();
-        // println!("key: {:?}", item_key);
-        // println!("key: {:?}", short_key);
-        // println!("val: {:?}", item.value_str());
         let node: Node = json::from_slice(item.value())?;
         nodes.push(node.to_owned());
     }

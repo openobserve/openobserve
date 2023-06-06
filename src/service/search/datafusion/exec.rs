@@ -517,7 +517,6 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         start_pos = i;
         in_word = true;
     }
-    // println!("fields: {:?}", fields);
 
     let mut new_fields = Vec::new();
     let mut sel_fields_name = Vec::new();
@@ -628,7 +627,6 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
             sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
         }
-        // println!("merge_rewrite_sql C: {}", sql);
     }
 
     // delete where from sql
