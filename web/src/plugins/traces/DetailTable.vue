@@ -252,6 +252,7 @@ import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../utils/zincutils";
+import { useStore } from "vuex";
 
 const defaultValue: any = () => {
   return {
@@ -297,14 +298,8 @@ export default defineComponent({
       //   this.$emit("remove:searchterm", term);
       // }
     },
-    searchTimeBoxed(rowData: any, size: number) {
-      this.$emit("search:timeboxed", {
-        key: rowData._timestamp,
-        size: size,
-      });
-    },
   },
-  setup() {
+  setup(props, { emit }) {
     const { t } = useI18n();
     const rowData: any = ref({});
     const router = useRouter();
@@ -312,6 +307,7 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(false);
+    const store = useStore();
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -345,6 +341,13 @@ export default defineComponent({
       return newObj;
     };
 
+    function searchTimeBoxed(rowData: any, size: number) {
+      emit("search:timeboxed", {
+        key: rowData[store.state.zoConfig.timestamp_column],
+        size: size,
+      });
+    }
+
     return {
       t,
       router,
@@ -356,6 +359,7 @@ export default defineComponent({
       getImageURL,
       shouldWrapValues,
       toggleWrapLogDetails,
+      searchTimeBoxed,
     };
   },
   async created() {

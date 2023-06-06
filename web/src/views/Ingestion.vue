@@ -147,7 +147,6 @@ export default defineComponent({
     const ingestTabType = ref("");
 
     onBeforeMount(() => {
-      console.log("on before mount");
       const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics"];
       const logRoutes = [
         "curl",
@@ -186,7 +185,6 @@ export default defineComponent({
       organizationsService
         .get_organization_passcode(store.state.selectedOrganization.identifier)
         .then((res) => {
-          console.log(res.data);
           if (res.data.data.token == "") {
             q.notify({
               type: "negative",

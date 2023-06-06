@@ -211,13 +211,13 @@ async fn add_valid_record(
 ) -> Option<Trigger> {
     let mut trigger: Option<Trigger> = None;
     let timestamp: i64 = local_val
-        .get(&CONFIG.common.column_timestamp.clone())
+        .get(&CONFIG.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
     // get hour key
     let hour_key =
-        super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val.clone());
+        super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val);
     let hour_buf = buf.entry(hour_key.clone()).or_default();
 
     let mut value_str = common::json::to_string(&local_val).unwrap();

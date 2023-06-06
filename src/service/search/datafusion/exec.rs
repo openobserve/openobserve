@@ -50,8 +50,13 @@ use crate::meta::{
     common::FileMeta, search::Session as SearchSession, sql, stream::StreamParams, StreamType,
 };
 use crate::service::search::sql::Sql;
+use once_cell::sync::Lazy;
 
 const AGGREGATE_UDF_LIST: [&str; 6] = ["min", "max", "count", "avg", "sum", "array_agg"];
+
+static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+static RE_FIELD_FN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"#).unwrap());
 
 pub async fn sql(
     session: &SearchSession,
@@ -86,9 +91,7 @@ pub async fn sql(
 
     // get used UDF
     let mut field_fns = vec![];
-
     let mut sql_parts = vec![];
-    let where_regex = Regex::new(r"(?i) where (.*)").unwrap();
 
     for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
@@ -97,7 +100,7 @@ pub async fn sql(
     }
 
     if !field_fns.is_empty() || sql.query_fn.is_some() {
-        if let Some(caps) = where_regex.captures(&sql.origin_sql) {
+        if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
             sql_parts.insert(
                 0,
                 sql.origin_sql
@@ -595,7 +598,6 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     let mut need_rewrite = false;
-    let re_field_fn = Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"a-zA-Z0-9_*]+)"#).unwrap();
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
         if !field.contains('(') {
@@ -606,7 +608,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
             continue;
         }
         need_rewrite = true;
-        let cap = re_field_fn.captures(field).unwrap();
+        let cap = RE_FIELD_FN.captures(field).unwrap();
         let mut fn_name = cap.get(1).unwrap().as_str().to_lowercase();
         if !AGGREGATE_UDF_LIST.contains(&fn_name.as_str()) {
             fields[i] = format!("\"{}\"", schema.field(i).name());
@@ -630,8 +632,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     // delete where from sql
-    let re_where = Regex::new(r"(?i) where (.*)").unwrap();
-    let mut where_str = match re_where.captures(&sql) {
+    let mut where_str = match RE_WHERE.captures(&sql) {
         Some(caps) => caps[0].to_string(),
         None => "".to_string(),
     };

@@ -211,7 +211,7 @@ pub async fn handle_trace_request(
                 let mut hour_key = super::ingestion::get_hour_key(
                     timestamp.try_into().unwrap(),
                     partition_keys.clone(),
-                    value.as_object().unwrap().clone(),
+                    value.as_object().unwrap(),
                 );
 
                 if !stream_alerts_map.is_empty() {
