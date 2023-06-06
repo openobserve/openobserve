@@ -23,6 +23,7 @@ use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
+use crate::meta::common::FileMeta;
 use crate::service::search::datafusion::storage::StorageType;
 use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
@@ -128,7 +129,13 @@ pub async fn search(
 
     // load files to local cache
     if storage_type == StorageType::FsMemory {
-        cache_parquet_files(&files).await?;
+        let deleted_files = cache_parquet_files(&files).await?;
+        if !deleted_files.is_empty() {
+            // remove deleted files from files_group
+            for (_, g_files) in files_group.iter_mut() {
+                g_files.retain(|f| !deleted_files.contains(f));
+            }
+        }
         log::info!(
             "search->storage: load files {}, into memory cache done",
             file_count
@@ -241,25 +248,40 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
     for file in files.iter() {
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
-            tokio::task::spawn(async move {
-                if !file_data::exist(&file).unwrap_or_default() {
-                    if let Err(e) = file_data::download(&file).await {
-                        log::error!("search->storage: load file {}, err: {}", &file, e);
+        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
+            if !file_data::exist(&file).unwrap_or_default() {
+                if let Err(e) = file_data::download(&file).await {
+                    log::error!("search->storage: download file err: {}", e);
+                    if e.to_string().contains("not found") {
+                        // delete file from file list
+                        if let Err(e) =
+                            db::file_list::local::set(&file, FileMeta::default(), true).await
+                        {
+                            log::error!("search->storage: delete from file_list err: {}", e);
+                        }
+                        return Some(file);
                     }
-                };
-                drop(permit);
-                Ok(())
-            });
+                }
+            };
+            drop(permit);
+            None
+        });
         tasks.push(task);
     }
 
+    let mut delete_files = Vec::new();
     for task in tasks {
-        if let Ok(Err(e)) = task.await {
-            // delete from file list
-            log::error!("search->storage: load file err: {}", e);
+        match task.await {
+            Ok(ret) => {
+                if let Some(file) = ret {
+                    delete_files.push(file);
+                }
+            }
+            Err(e) => {
+                log::error!("search->storage: load file task err: {}", e);
+            }
         }
     }
 
-    Ok(vec![])
+    Ok(delete_files)
 }

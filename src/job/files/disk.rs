@@ -17,16 +17,12 @@ use std::{
     fs,
     io::{BufReader, Seek, SeekFrom},
     path::Path,
-    sync::{atomic::Ordering, Arc},
+    sync::Arc,
 };
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{file::scan_files, json, utils::populate_file_meta};
-use crate::infra::{
-    cluster,
-    config::{CONFIG, SEARCHING_IN_WAL},
-    metrics, storage, wal,
-};
+use crate::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
@@ -147,18 +143,8 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 Ok((path, key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
-                            loop {
-                                let searching = SEARCHING_IN_WAL.load(Ordering::Relaxed);
-                                if searching == 0 {
-                                    break;
-                                } else {
-                                    task::yield_now().await;
-                                    time::sleep(time::Duration::from_millis(100)).await;
-                                }
-                            }
                             match fs::remove_file(&path) {
                                 Ok(_) => {
-                                    // println!("removed file: {}", key);
                                     // metrics
                                     let columns = key.split('/').collect::<Vec<&str>>();
                                     if columns[0] == "files" {

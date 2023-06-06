@@ -14,16 +14,12 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::datasource::file_format::file_type::FileType;
-use std::{
-    path::Path,
-    sync::{atomic::Ordering, Arc},
-    time::UNIX_EPOCH,
-};
+use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::infra::{
     cache::tmpfs,
-    config::{self, CONFIG},
+    config::CONFIG,
     errors::{Error, ErrorCodes},
     ider, wal,
 };
@@ -40,20 +36,23 @@ pub async fn search(
     sql: Arc<Sql>,
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
-    // mark searching in WAL
-    let searching = Searching::new();
-
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
     let mut scan_size = 0;
 
     // cache files
     let work_dir = session_id.to_string();
-    for file in &files {
-        if let Ok(file_data) = get_file_contents(file) {
-            scan_size += file_data.len();
-            let file_name = format!("/{work_dir}/{}", file.split('/').last().unwrap_or_default());
-            tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+    for file in files.clone().iter() {
+        match get_file_contents(file) {
+            Err(_) => {
+                files.retain(|x| x != file);
+            }
+            Ok(file_data) => {
+                scan_size += file_data.len();
+                let file_name =
+                    format!("/{work_dir}/{}", file.split('/').last().unwrap_or_default());
+                tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+            }
         }
     }
 
@@ -112,9 +111,6 @@ pub async fn search(
             return Err(super::handle_datafusion_error(err));
         }
     };
-
-    // searching done.
-    drop(searching);
 
     // clear tmpfs
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
@@ -187,20 +183,4 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     }
     Ok(result)
-}
-
-/// Searching for marking searching in wal
-struct Searching;
-
-impl Searching {
-    pub fn new() -> Self {
-        config::SEARCHING_IN_WAL.store(1, Ordering::Relaxed);
-        Searching
-    }
-}
-
-impl Drop for Searching {
-    fn drop(&mut self) {
-        config::SEARCHING_IN_WAL.store(0, Ordering::Relaxed);
-    }
 }

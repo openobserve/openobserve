@@ -75,9 +75,14 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         .collect::<Vec<_>>();
     let files_stream = futures::stream::iter(files);
     files_stream
-        .for_each_concurrent(CONFIG.limit.query_thread_num, |file| async {
-            if let Err(e) = DEFAULT.delete(&(file.into())).await {
-                log::error!("Failed to delete object: {:?}", e);
+        .for_each_concurrent(CONFIG.limit.query_thread_num, |file| async move {
+            match DEFAULT.delete(&(file.as_str().into())).await {
+                Ok(_) => {
+                    log::info!("Deleted object: {}", file);
+                }
+                Err(e) => {
+                    log::error!("Failed to delete object: {:?}", e);
+                }
             }
         })
         .await;

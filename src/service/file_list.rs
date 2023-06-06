@@ -72,7 +72,6 @@ mod test {
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
         )
         .await;
-        // println!("{:?}", res);
         assert!(res.is_ok());
     }
 

@@ -334,11 +334,9 @@ impl Sql {
                     continue;
                 }
                 for cap in RE_MATCH_ALL.captures_iter(token) {
-                    // println!("match_all: {}, {}", &cap[0], &cap[1]);
                     fulltext.push((cap[0].to_string(), cap[1].to_string()));
                 }
                 for cap in RE_MATCH_ALL_IGNORE_CASE.captures_iter(token) {
-                    // println!("match_all_ignore_case: {}, {}", &cap[0], &cap[1]);
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
             }

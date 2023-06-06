@@ -115,7 +115,6 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             wal::MEMORY_FILES.remove(&path);
-                            // println!("removed file: {}", key);
                             // metrics
                             let columns = key.split('/').collect::<Vec<&str>>();
                             if columns[0] == "files" {
