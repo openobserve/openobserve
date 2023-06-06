@@ -345,14 +345,18 @@ export default defineComponent({
                     })
                     .then((res) => {
                         searchQueryData.data = res.data.data;
-                        searchQueryData.loading = false
                     })
                     .catch((error) => {
                         $q.notify({
                             type: "negative",
-                            message: "Something went wrong!",
+                            message: error?.response?.data?.error ? 
+                                        error?.response?.data?.error : 
+                                        "Something went wrong!",
                             timeout: 5000,
                         });
+                    })
+                    .finally(() => {
+                        searchQueryData.loading = false
                     });
             }
             else{
@@ -363,16 +367,19 @@ export default defineComponent({
                         page_type: props.data.fields.stream_type,
                     })
                     .then((res) => {
-
                         searchQueryData.data = res.data.hits;
-                        searchQueryData.loading = false
                     })
                     .catch((error) => {
                         $q.notify({
                             type: "negative",
-                            message: "Something went wrong!",
+                            message: error?.response?.data?.error ? 
+                                        error?.response?.data?.error : 
+                                        "Something went wrong!",
                             timeout: 5000,
                         });
+                    })
+                    .finally(() => {
+                        searchQueryData.loading = false
                     });
             }
       };
