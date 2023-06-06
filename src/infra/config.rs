@@ -170,7 +170,7 @@ pub struct Common {
     pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
+    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
     pub widening_schema_evolution: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
