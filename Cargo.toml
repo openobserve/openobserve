@@ -67,7 +67,6 @@ cloudevents-sdk = { version = "0.7.0",features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "22", features = ["simd"] }
-datafusion-common = "22"
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"

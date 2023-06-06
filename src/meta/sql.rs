@@ -401,7 +401,6 @@ fn parse_timestamp(s: &SqlValue) -> Result<Option<i64>, anyhow::Error> {
         SqlValue::String(s) => {
             let s = s.to_lowercase();
             let mut s = s.as_str();
-            // println!("timestamp: s: {}", s);
             if s.starts_with("to_timestamp") {
                 if s.starts_with("to_timestamp_seconds(") {
                     s = s.strip_prefix("to_timestamp_seconds(").unwrap();

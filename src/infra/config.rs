@@ -19,7 +19,7 @@ use dotenvy::dotenv;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use reqwest::Client;
-use std::{sync::atomic::AtomicU8, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use sys_info::hostname;
 use vector_enrichment::TableRegistry;
 
@@ -40,7 +40,6 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
-pub static SEARCHING_IN_WAL: AtomicU8 = AtomicU8::new(0);
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);

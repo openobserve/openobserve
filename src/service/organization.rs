@@ -97,7 +97,6 @@ mod tests {
             },
         )
         .await;
-        println!("{:?}", resp);
         assert!(resp.is_ok());
 
         let resp = get_passcode(Some(org_id), user_id).await;

@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
+use ::datafusion::{
+    arrow::{ipc, record_batch::RecordBatch},
+    error::DataFusionError,
+};
 use ahash::AHashMap as HashMap;
-use datafusion_common::DataFusionError;
 use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster;
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::infra::{
+    cluster,
+    errors::{Error, ErrorCodes},
+};
 use crate::meta::StreamType;
+use crate::service::db;
 
 mod storage;
 mod wal;
@@ -37,6 +42,14 @@ pub async fn search(
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
+
+    // check if we are allowed to search
+    if db::compact::delete::is_deleting_stream(&sql.org_id, &sql.stream_name, stream_type, None) {
+        return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
+            "stream [{}] is being deleted",
+            &sql.stream_name
+        ))));
+    }
 
     let mut results = HashMap::new();
     let mut file_count = 0;

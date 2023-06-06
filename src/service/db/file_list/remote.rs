@@ -13,20 +13,13 @@
 // limitations under the License.
 
 use bytes::Buf;
-use dashmap::DashMap;
 use futures::future::try_join_all;
 use std::io::{BufRead, BufReader};
 use tokio::sync::Semaphore;
 
 use crate::common::json;
-use crate::infra::config::{RwHashMap, CONFIG};
-use crate::infra::storage;
-use crate::meta::common::{FileKey, FileMeta};
-
-lazy_static! {
-    static ref DELETED_FILES: RwHashMap<String, FileMeta> =
-        DashMap::with_capacity_and_hasher(64, Default::default());
-}
+use crate::infra::{config::CONFIG, storage};
+use crate::meta::common::FileKey;
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("Load file_list begin");
@@ -60,15 +53,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
 
     // delete files
-    for item in DELETED_FILES.iter() {
+    for item in super::DELETED_FILES.iter() {
         super::progress(item.key(), item.value().to_owned(), true).await?;
     }
 
     log::info!("Load file_list done[{}:{}]", files.len(), count);
 
     // clean deleted files
-    DELETED_FILES.clear();
-    DELETED_FILES.shrink_to_fit();
+    super::DELETED_FILES.clear();
+    super::DELETED_FILES.shrink_to_fit();
 
     Ok(())
 }
@@ -90,7 +83,7 @@ async fn proccess_file(file: &str) -> Result<usize, anyhow::Error> {
         let item: FileKey = json::from_slice(line.as_bytes())?;
         // check deleted files
         if item.deleted {
-            DELETED_FILES.insert(item.key, item.meta.to_owned());
+            super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
         super::progress(&item.key, item.meta, item.deleted).await?;
