@@ -82,7 +82,7 @@ pub async fn ingest(
 
     // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
         stream_name,
@@ -112,16 +112,18 @@ pub async fn ingest(
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.iter() {
         //JSON Flattening
-        let value = json::flatten_json_and_format_field(item);
+        let mut value = json::flatten_json_and_format_field(item);
 
         #[cfg(feature = "zo_functions")]
-        let mut value = crate::service::ingestion::apply_stream_transform(
-            &local_tans,
-            &value,
-            &stream_vrl_map,
-            stream_name,
-            &mut runtime,
-        );
+        if !local_trans.is_empty() {
+            value = crate::service::ingestion::apply_stream_transform(
+                &local_trans,
+                &value,
+                &stream_vrl_map,
+                stream_name,
+                &mut runtime,
+            );
+        }
         #[cfg(feature = "zo_functions")]
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped

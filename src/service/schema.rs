@@ -49,24 +49,38 @@ pub async fn schema_evolution(
             stream_type,
             &inferred_schema.as_ref().clone().with_metadata(metadata),
             Some(min_ts),
+            false,
         )
         .await
         .unwrap();
     } else if !inferred_schema.fields().eq(schema.fields()) {
         let schema_fields: HashSet<_> = schema.fields().iter().collect();
-        let field_datatype_delta: Vec<_> = inferred_schema
-            .fields
-            .iter()
-            .filter(|item| !schema_fields.contains(item))
-            .map(|v| format!("{}:[{}]", v.name(), v.data_type()))
-            .collect();
-        if field_datatype_delta.is_empty() {
+        let mut field_datatype_delta: Vec<_> = vec![];
+        let mut new_field_delta: Vec<_> = vec![];
+
+        for item in inferred_schema.fields.iter() {
+            let item_name = item.name();
+            let item_data_type = item.data_type();
+
+            match schema_fields.iter().find(|f| f.name() == item_name) {
+                Some(existing_field) => {
+                    if existing_field.data_type() != item_data_type {
+                        field_datatype_delta.push(format!("{}:[{}]", item_name, item_data_type));
+                    }
+                }
+                None => {
+                    new_field_delta.push(format!("{}:[{}]", item_name, item_data_type));
+                }
+            }
+        }
+        if field_datatype_delta.is_empty() && new_field_delta.is_empty() {
             return;
         }
         log::info!(
-            "schema_evolution: updating schema for {:?} delta is {:?}",
+            "schema_evolution: updating schema for {:?} field data type delta is {:?} ,newly added fields are {:?}",
             stream_name,
-            field_datatype_delta
+            field_datatype_delta,
+            new_field_delta
         );
         match try_merge(vec![schema.clone(), inferred_schema.as_ref().clone()]) {
             Err(e) => {
@@ -77,9 +91,19 @@ pub async fn schema_evolution(
                 );
             }
             Ok(merged) => {
-                db::schema::set(org_id, stream_name, stream_type, &merged, Some(min_ts))
+                if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+                    let is_field_delta = !field_datatype_delta.is_empty();
+                    db::schema::set(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &merged,
+                        Some(min_ts),
+                        is_field_delta,
+                    )
                     .await
                     .unwrap();
+                }
             }
         };
     }
@@ -89,7 +113,7 @@ pub async fn schema_evolution(
 fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowError> {
     let mut merged_metadata: HashMap<String, String> = HashMap::new();
     let mut merged_fields: Vec<Field> = Vec::new();
-    // TODO : this dummy initilization is to avoid compilar complaining for unintilized value
+    // TODO : this dummy initialization is to avoid compiler complaining for uninitialized value
     let mut temp_field = Field::new("dummy", DataType::Utf8, false);
 
     for schema in schemas {
@@ -156,10 +180,25 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
             DataType::Int16,
             DataType::Int32,
             DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
         ],
-        DataType::Int16 => vec![DataType::Utf8, DataType::Int32, DataType::Int64],
-        DataType::Int32 => vec![DataType::Utf8, DataType::Int64],
-        DataType::Int64 => vec![DataType::Utf8],
+        DataType::Int16 => vec![
+            DataType::Utf8,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Int32 => vec![
+            DataType::Utf8,
+            DataType::Int64,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Int64 => vec![DataType::Utf8, DataType::Float64],
         DataType::UInt8 => vec![
             DataType::Utf8,
             DataType::UInt16,
@@ -218,46 +257,83 @@ pub async fn check_for_schema(
     }
 
     if schema == Schema::empty() {
-        stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
+        let mut metadata = inferred_schema.metadata.clone();
+        if !metadata.contains_key("created_at") {
+            metadata.insert(
+                "created_at".to_string(),
+                chrono::Utc::now().timestamp_micros().to_string(),
+            );
+        }
+        let final_schema = inferred_schema.with_metadata(metadata.clone());
+        stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+
         db::schema::set(
             org_id,
             stream_name,
             stream_type,
-            &inferred_schema,
+            &final_schema,
             Some(record_ts),
+            false,
         )
         .await
         .unwrap();
+
         return (true, None);
     }
 
     let inferred_fields: HashSet<_> = inferred_schema.fields().iter().collect();
-    let field_datatype_delta: Vec<_> = schema
-        .fields
-        .clone()
-        .into_iter()
-        .filter(|item| !inferred_fields.contains(item))
-        .collect();
+    let mut field_datatype_delta: Vec<_> = vec![];
+    let mut new_field_delta: Vec<_> = vec![];
+
+    for item in inferred_fields.iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match schema.fields.iter().find(|f| f.name() == item_name) {
+            Some(existing_field) => {
+                if existing_field.data_type() != item_data_type {
+                    field_datatype_delta.push(existing_field.to_owned().clone());
+                }
+            }
+            None => {
+                new_field_delta.push(item);
+            }
+        }
+    }
     if !CONFIG.common.widening_schema_evolution {
         return (true, Some(field_datatype_delta));
     }
-
-    match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
-        Err(ref _e) => (true, Some(field_datatype_delta)), //return (false, None),
-        Ok(merged) => {
-            log::info!("Schema widening for stream {:?}", stream_name);
-            db::schema::set(org_id, stream_name, stream_type, &merged, Some(record_ts))
-                .await
-                .unwrap();
-            let item_set: HashSet<_> = schema.fields.iter().collect();
-            let field_datatype_delta: Vec<_> = inferred_schema
-                .fields
-                .into_iter()
-                .filter(|item| !item_set.contains(item))
-                .collect();
-            stream_schema_map.insert(stream_name.to_string(), merged);
-            (true, Some(field_datatype_delta))
+    if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+        match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
+            Err(ref _e) => (false, Some(field_datatype_delta)), //return (false, None),
+            Ok(merged) => {
+                log::info!("Schema widening for stream {:?} ", stream_name);
+                if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+                    let is_field_delta = !field_datatype_delta.is_empty();
+                    let mut metadata = merged.metadata.clone();
+                    if !metadata.contains_key("created_at") {
+                        metadata.insert(
+                            "created_at".to_string(),
+                            chrono::Utc::now().timestamp_micros().to_string(),
+                        );
+                    }
+                    db::schema::set(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &Schema::new(merged.fields().to_vec()).with_metadata(metadata),
+                        Some(record_ts),
+                        is_field_delta,
+                    )
+                    .await
+                    .unwrap();
+                }
+                stream_schema_map.insert(stream_name.to_string(), merged);
+                (true, Some(field_datatype_delta))
+            }
         }
+    } else {
+        (true, None)
     }
 }
 
@@ -335,6 +411,7 @@ pub async fn add_stream_schema(
         stream_type,
         &inferred_schema.clone().with_metadata(metadata),
         Some(min_ts),
+        false,
     )
     .await
     .unwrap();
@@ -372,6 +449,7 @@ pub async fn set_schema_metadata(
         stream_type,
         &schema.with_metadata(metadata),
         None,
+        false,
     )
     .await
 }

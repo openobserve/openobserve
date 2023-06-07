@@ -221,7 +221,7 @@ async fn add_valid_record(
 
     let mut value_str = common::json::to_string(&local_val).unwrap();
     // check schema
-    let (schema_conformance, delta_fields) = check_for_schema(
+    let (schema_conformance, delta_data_type_fields) = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -232,10 +232,14 @@ async fn add_valid_record(
     .await;
 
     if schema_conformance {
-        let valid_record = if delta_fields.is_some() {
-            let delta = delta_fields.unwrap();
+        let valid_record = if delta_data_type_fields.is_some() {
+            let delta = delta_data_type_fields.unwrap();
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
-            let (ret_val, error) = cast_to_type(loc_value, delta);
+            let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
+                cast_to_type(loc_value, delta)
+            } else {
+                (Some(value_str.clone()), None)
+            };
             if ret_val.is_some() {
                 value_str = ret_val.unwrap();
                 true
