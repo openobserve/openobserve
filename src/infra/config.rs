@@ -234,6 +234,8 @@ pub struct Limit {
     pub cpu_num: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT")]
     pub req_cols_per_record_limit: usize,
+    #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
+    pub http_worker_num: usize,
 }
 
 #[derive(EnvConfig)]
@@ -362,6 +364,9 @@ pub fn init() -> Config {
     // set cpu num
     let cpu_num = sys_info::cpu_num().unwrap() as usize;
     cfg.limit.cpu_num = cpu_num;
+    if cfg.limit.http_worker_num == 0 {
+        cfg.limit.http_worker_num = cpu_num;
+    }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
         cfg.limit.query_thread_num = cpu_num * 4;
