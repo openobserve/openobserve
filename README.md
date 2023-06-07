@@ -16,7 +16,7 @@ You can reduce your log storage costs by ~140x compared to Elasticsearch by usin
 
 ## Introduction video
 
-[![OpenObserve Introduction](./screenshots/zo_intro_youtube.png)](https://www.youtube.com/watch?v=cPMH1Am2_zM)
+[![OpenObserve Introduction](./screenshots/zo_intro_youtube.png)](https://www.youtube.com/watch?v=fZ-ErfMdF-o)
 
 ## Features:
 
@@ -54,11 +54,8 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 
 ## Logs
 
-![Home](./screenshots/zo_logs.png)
+![Home](./screenshots/logs.webp)
 
-## Log details
-
-![Home](./screenshots/zo_log_details.png)
 
 ## Visualization and dashboard
 
@@ -80,7 +77,7 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 
 ## Ingestion
 
-![Home](./screenshots/zo_ingestion.png)
+![Home](./screenshots/ingestion.webp)
 
 # Community
 
