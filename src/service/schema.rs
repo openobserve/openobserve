@@ -257,17 +257,27 @@ pub async fn check_for_schema(
     }
 
     if schema == Schema::empty() {
-        stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
+        let mut metadata = inferred_schema.metadata.clone();
+        if !metadata.contains_key("created_at") {
+            metadata.insert(
+                "created_at".to_string(),
+                chrono::Utc::now().timestamp_micros().to_string(),
+            );
+        }
+        let final_schema = inferred_schema.with_metadata(metadata.clone());
+        stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+
         db::schema::set(
             org_id,
             stream_name,
             stream_type,
-            &inferred_schema,
+            &final_schema,
             Some(record_ts),
             false,
         )
         .await
         .unwrap();
+
         return (true, None);
     }
 
@@ -293,27 +303,37 @@ pub async fn check_for_schema(
     if !CONFIG.common.widening_schema_evolution {
         return (true, Some(field_datatype_delta));
     }
-
-    match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
-        Err(ref _e) => (false, Some(field_datatype_delta)), //return (false, None),
-        Ok(merged) => {
-            if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
-                log::info!("creating new schema version for stream {:?}", stream_name);
-                let is_field_delta = !field_datatype_delta.is_empty();
-                db::schema::set(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &merged,
-                    Some(record_ts),
-                    is_field_delta,
-                )
-                .await
-                .unwrap();
+    if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+        match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
+            Err(ref _e) => (false, Some(field_datatype_delta)), //return (false, None),
+            Ok(merged) => {
+                log::info!("Schema widening for stream {:?} ", stream_name);
+                if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
+                    let is_field_delta = !field_datatype_delta.is_empty();
+                    let mut metadata = merged.metadata.clone();
+                    if !metadata.contains_key("created_at") {
+                        metadata.insert(
+                            "created_at".to_string(),
+                            chrono::Utc::now().timestamp_micros().to_string(),
+                        );
+                    }
+                    db::schema::set(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &Schema::new(merged.fields().to_vec()).with_metadata(metadata),
+                        Some(record_ts),
+                        is_field_delta,
+                    )
+                    .await
+                    .unwrap();
+                }
+                stream_schema_map.insert(stream_name.to_string(), merged);
+                (true, Some(field_datatype_delta))
             }
-            stream_schema_map.insert(stream_name.to_string(), merged);
-            (true, Some(field_datatype_delta))
         }
+    } else {
+        (true, None)
     }
 }
 
