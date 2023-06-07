@@ -292,7 +292,7 @@ pub async fn check_for_schema(
         match schema.fields.iter().find(|f| f.name() == item_name) {
             Some(existing_field) => {
                 if existing_field.data_type() != item_data_type {
-                    field_datatype_delta.push(item.to_owned().clone());
+                    field_datatype_delta.push(existing_field.to_owned().clone());
                 }
             }
             None => {
