@@ -174,95 +174,57 @@ export default defineComponent({
                   }
               );
 
-              plotRef.value.on('plotly_legendclick', function(clickData: any) {
-                    var xlen = clickData.data.length;
-                    console.log(clickData);
-                    console.log("index", clickData.expandedIndex);
+              // Set custom legend click behavior
+              // 1. If are visible currently, and clicking on anyone legend, 
+              //    all others become hidden and only the clicked one should be visible.
+              // 2. If clicked on any hidden legend, that should become selected and all others should be hidden. 
+              // 3. If clicked on the currently visible item, and all other are currently hidden, all should be visible again
+              plotRef.value.on('plotly_legendclick', function(eventData: any) {
 
-                    var traces = clickData.data;
-                    var clickedIndex = clickData.curveNumber;
-                    
-                    // set a few things first
-                    for (var i = 0; i < xlen; i++) {
-                        if(!clickData.data[i].hasOwnProperty('visible')) {
-                            clickData.data[i].visible = true;
+                console.log(eventData.data);
+                if(['table', 'pie', 'donut'].includes(props.data.type)) {
+                    return
+                } else {
+                    // get the clicked legend
+                    const clickedTraceIndex = eventData.curveNumber;
+
+                    const data = eventData.data
+
+                    // set the traces to visible if they are not currently
+                    for (let i = 0; i < data.length; i++) {
+                        if (!data[i].hasOwnProperty('visible')) {
+                            data[i].visible = true;
                         }
                     }
 
-                    console.log(JSON.stringify(clickData.data.map((it: any)=> ({name: it.name, visible: it.visible})), null, 2));
-
-                    // if(clickData.data[clickData.expandedIndex].visible == true) {
-                    //     console.log('legend update mode: toggle');
-                        
-                    //     for (var i = 0; i < xlen; i++) {
-                    //         console.log("checking for index", i);
-                            
-                    //         if (i != clickData.expandedIndex) {
-                    //             console.log('updating value to "True" for index type: ', i);
-                    //             clickData.data[i].visible = true;
-                    //         } else {
-                    //             console.log('skipped index update for ', i);
-                    //         }
-                    //     }    
-                    // } else {
-                    //     console.log('legend update mode: hide');
-
-                    //     for (var i = 0; i < xlen; i++) {
-                    //         console.log("checking for index", i);
-                    //         if (i != clickData.expandedIndex) {
-                    //             console.log('updating value to "True" for index type: ', i);
-                    //             clickData.data[i].visible = 'legendonly';
-                    //         } else {
-                    //             console.log('skipped index update for ', i);
-                    //         }
-                    //     }
-                    // }
-
-                    if (clickedIndex === -1) {
-                        // When all are visible and you click on any one, hide all except the clicked one
-                        for (var i = 0; i < traces.length; i++) {
-                        traces[i].visible = i === 0 ? true : 'legendonly';
-                        }
-                    } else if (traces[clickedIndex].visible === true) {
-                        // When you click on the one which is shown, and others are disabled, show all legends
-                        for (var i = 0; i < traces.length; i++) {
-                        traces[i].visible = true;
-                        }
+                    // Case 1: check if all are currently visible
+                    const allVisible = data.every((it: any) => it.visible == true);
+                    if (allVisible) {
+                        // set all hidden
+                        data.forEach((it: any) => it.visible = 'legendonly');
+                        // set the clicked one visible
+                        data[clickedTraceIndex].visible = true;
+                        Plotly.redraw(plotRef.value);
+                    }
+                    // Case 2: if the current trace is not visible then set the clicked one visible
+                    else if (data[clickedTraceIndex].visible == 'legendonly') {
+                        // set all hidden
+                        data.forEach((it: any) => it.visible = 'legendonly');
+                        // set the clicked one visible
+                        data[clickedTraceIndex].visible = true;
+                        Plotly.redraw(plotRef.value);
+                    }
+                    // Case 3: if the current trace is visible and others are not visible then show all
+                    else if (!allVisible && data[clickedTraceIndex].visible == true) {
+                        // set all visible
+                        data.forEach((it: any) => it.visible = true);
+                        Plotly.redraw(plotRef.value);
                     } else {
-                        // Otherwise, make the clicked legend visible and hide all others
-                        for (var i = 0; i < traces.length; i++) {
-                        traces[i].visible = i === clickedIndex ? true : 'legendonly';
-                        }
+                        return
                     }
-                    console.log(JSON.stringify(clickData.data.map((it: any)=> ({name: it.name, visible: it.visible})), null, 2));
-                    // return false
-                });
+                }
 
-                // plotRef.value.on('plotly_restyle', function(eventData:any) {
-                //     var clickedItem = eventData[0].entry;
-                //     var traces = plotRef.value.data;
-
-                //     // Check if the clicked legend item is already visible
-                //     var isVisible = clickedItem.visible === true || clickedItem.visible === 'legendonly';
-
-                //     // Toggle the visibility of the clicked legend item
-                //     Plotly.toggle(plotRef.value, clickedItem.curveNumber);
-
-                //     // If the clicked legend item was already visible, show all legends
-                //     if (isVisible) {
-                //         for (var i = 0; i < traces.length; i++) {
-                //         Plotly.restyle(plotRef.value, { visible: true }, i);
-                //         }
-                //     } else {
-                //         // Otherwise, hide all legends except the clicked one
-                //         for (var i = 0; i < traces.length; i++) {
-                //         if (i !== clickedItem.curveNumber) {
-                //             Plotly.restyle(plotRef.value, { visible: 'legendonly' }, i);
-                //         }
-                //         }
-                //     }
-                //     });
-
+              });
 
               // plotRef.value.on('plotly_afterplot', function () {
               //     !searchQueryData.data.length ? noData.value = "No Data" : noData.value = ""
@@ -675,6 +637,7 @@ export default defineComponent({
               autosize: true,
               legend: {
                   bgcolor: "#f7f7f7",
+                  itemclick: ['pie', 'donut'].includes(props.data.type) ? 'toggle' : false,
               },
               margin: {
                   l: props.data.type == 'pie' ? 60 : 32,
@@ -716,8 +679,7 @@ export default defineComponent({
                     legend: {
                         bgcolor: "#f7f7f7",
                         orientation: "h",
-                        // itemclick: false,
-                        // groupclick: "toggleothers"
+                        itemclick: false,
                     },
                     margin: {
                         autoexpand: true,
@@ -755,7 +717,8 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
-                        orientation: "h"
+                        orientation: "h",
+                        itemclick: false
                     },
                     margin: {
                         l: props.data.type == 'pie' ? 60 : 32,
