@@ -174,6 +174,57 @@ export default defineComponent({
                   }
               );
 
+              // Set custom legend click behavior
+              // 1. If are visible currently, and clicking on anyone legend, 
+              //    all others become hidden and only the clicked one should be visible.
+              // 2. If clicked on any hidden legend, that should become selected and all others should be hidden. 
+              // 3. If clicked on the currently visible item, and all other are currently hidden, all should be visible again
+              plotRef.value.on('plotly_legendclick', function(eventData: any) {
+
+                if(['table', 'pie', 'donut'].includes(props.data.type)) {
+                    return
+                } else {
+                    // get the clicked legend
+                    const clickedTraceIndex = eventData.curveNumber;
+
+                    const data = eventData.data
+
+                    // set the traces to visible if they are not currently
+                    for (let i = 0; i < data.length; i++) {
+                        if (!data[i].hasOwnProperty('visible')) {
+                            data[i].visible = true;
+                        }
+                    }
+
+                    // Case 1: check if all are currently visible
+                    const allVisible = data.every((it: any) => it.visible == true);
+                    if (allVisible) {
+                        // set all hidden
+                        data.forEach((it: any) => it.visible = 'legendonly');
+                        // set the clicked one visible
+                        data[clickedTraceIndex].visible = true;
+                        Plotly.redraw(plotRef.value);
+                    }
+                    // Case 2: if the current trace is not visible then set the clicked one visible
+                    else if (data[clickedTraceIndex].visible == 'legendonly') {
+                        // set all hidden
+                        data.forEach((it: any) => it.visible = 'legendonly');
+                        // set the clicked one visible
+                        data[clickedTraceIndex].visible = true;
+                        Plotly.redraw(plotRef.value);
+                    }
+                    // Case 3: if the current trace is visible and others are not visible then show all
+                    else if (!allVisible && data[clickedTraceIndex].visible == true) {
+                        // set all visible
+                        data.forEach((it: any) => it.visible = true);
+                        Plotly.redraw(plotRef.value);
+                    } else {
+                        return
+                    }
+                }
+
+              });
+
               // plotRef.value.on('plotly_afterplot', function () {
               //     !searchQueryData.data.length ? noData.value = "No Data" : noData.value = ""
               // })
@@ -585,6 +636,7 @@ export default defineComponent({
               autosize: true,
               legend: {
                   bgcolor: "#f7f7f7",
+                  itemclick: ['pie', 'donut'].includes(props.data.type) ? 'toggle' : false,
               },
               margin: {
                   l: props.data.type == 'pie' ? 60 : 32,
@@ -625,7 +677,8 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
-                        orientation: "h"
+                        orientation: "h",
+                        itemclick: false,
                     },
                     margin: {
                         autoexpand: true,
@@ -663,7 +716,8 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
-                        orientation: "h"
+                        orientation: "h",
+                        itemclick: false
                     },
                     margin: {
                         l: props.data.type == 'pie' ? 60 : 32,
