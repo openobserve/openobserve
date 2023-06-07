@@ -95,9 +95,23 @@
               </tbody>
             </table>
           </div>
+          <q-separator class="q-mt-lg q-mb-lg" />
+          <div class="row flex items-center q-pb-xs">
+            <label class="q-pr-sm text-bold"
+              >Skip schema check during ingestion</label
+            >
+            <q-checkbox
+              data-test="stream-details-skip-schema-check-checkbox"
+              v-model="skipSchemaCheck"
+              dense
+              filled
+              round
+              class="q-mr-sm"
+            />
+          </div>
+
           <template v-if="showDataRetention">
-            <q-separator class="q-mt-lg q-mb-lg" />
-            <div class="row flex items-center q-pb-xs">
+            <div class="row flex items-center q-pb-xs q-mt-lg">
               <label class="q-pr-sm text-bold">Data Retention (in days)</label>
               <q-input
                 data-test="stream-details-data-retention-input"
@@ -246,6 +260,7 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
+    const skipSchemaCheck = ref(false);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -323,6 +338,8 @@ export default defineComponent({
               res.data.settings.data_retention ||
               store.state.zoConfig.data_retention_days;
 
+          skipSchemaCheck.value = res.data.settings.skip_schema_validation;
+
           dismiss();
         });
     };
@@ -346,6 +363,8 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
+
+      settings["skip_schema_validation"] = skipSchemaCheck.value;
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -420,6 +439,7 @@ export default defineComponent({
       showSchemaActions,
       dataRetentionDays,
       showDataRetention,
+      skipSchemaCheck,
     };
   },
   created() {
