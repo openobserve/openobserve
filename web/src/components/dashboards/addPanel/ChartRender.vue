@@ -181,7 +181,6 @@ export default defineComponent({
               // 3. If clicked on the currently visible item, and all other are currently hidden, all should be visible again
               plotRef.value.on('plotly_legendclick', function(eventData: any) {
 
-                console.log(eventData.data);
                 if(['table', 'pie', 'donut'].includes(props.data.type)) {
                     return
                 } else {
