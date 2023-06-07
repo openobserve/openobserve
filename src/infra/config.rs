@@ -247,7 +247,7 @@ pub struct Compact {
     pub interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
     pub max_file_size: u64,
-    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 0)] // in days
+    #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // in days
     pub data_retention_days: i64,
 }
 
