@@ -47,10 +47,12 @@ const http = ({ headers } = {} as any) => {
                 error.response.data["error"] || "Invalid credentials"
               )
             );
-            store.dispatch("logout");
-            localStorage.clear();
-            sessionStorage.clear();
-            window.location.reload();
+            if (!error.request.responseURL.includes("/auth/login")) {
+              store.dispatch("logout");
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
+            }
             break;
           case 404:
             console.log(

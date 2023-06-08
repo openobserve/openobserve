@@ -97,7 +97,12 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                                 r#"<base href="/" />"#,
                                 &format!(r#"<base href="{prefix}" />"#),
                             );
-                            Ok(ServiceResponse::new(req, HttpResponse::Ok().body(body)))
+                            Ok(ServiceResponse::new(
+                                req,
+                                HttpResponse::Ok()
+                                    .content_type(header::ContentType::html())
+                                    .body(body),
+                            ))
                         }
                     })
                 })
