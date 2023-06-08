@@ -175,12 +175,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
 
-    server
-        .workers(CONFIG.limit.http_worker_num)
-        .worker_max_blocking_threads(1024)
-        .backlog(1024 * CONFIG.limit.http_worker_num as u32)
-        .run()
-        .await?;
+    server.workers(CONFIG.limit.http_worker_num).run().await?;
 
     // stop telemetry
     meta::telemetry::Telemetry::new()
