@@ -187,5 +187,9 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
             resp.message = "Invalid credentials".to_string();
         }
     };
-    Ok(HttpResponse::Ok().json(resp))
+    if resp.status {
+        Ok(HttpResponse::Ok().json(resp))
+    } else {
+        Ok(HttpResponse::Unauthorized().json(resp))
+    }
 }
