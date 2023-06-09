@@ -167,7 +167,7 @@ pub struct Common {
     pub data_stream_dir: String,
     #[env_config(name = "ZO_BASE_URI", default = "")]
     pub base_uri: String,
-    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
+    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = true)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
     pub wal_line_mode_enabled: bool,

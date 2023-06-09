@@ -21,7 +21,11 @@ use crate::service::logs::json::process_json_data;
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut logs_receiver_rx = LOGS_SENDER.subscribe();
     while let Ok(val) = logs_receiver_rx.recv().await {
-        process_json_data(&val.1, &val.0, &val.2, web::Data::new(0), Instant::now()).await?;
+        tokio::task::spawn(async move {
+            process_json_data(&val.1, &val.0, &val.2, web::Data::new(0), Instant::now())
+                .await
+                .unwrap();
+        });
     }
     Ok(())
 }
