@@ -14,9 +14,16 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
+
+use arrow::ipc::writer::StreamWriter;
+use arrow_array::{Int64Array, RecordBatch};
+use arrow_schema::{DataType, Field};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
+use itertools::Itertools;
+use std::fs::OpenOptions;
 use std::io::Error;
+use std::sync::Arc;
 use std::time::Instant;
 
 use super::StreamMeta;
@@ -31,6 +38,7 @@ use crate::meta::StreamType;
 use crate::service::db;
 use crate::service::ingestion::write_file;
 use crate::service::schema::stream_schema_exists;
+use arrow::json::reader::{Decoder, DecoderOptions};
 
 pub async fn ingest(
     org_id: &str,
@@ -59,6 +67,106 @@ pub async fn ingest(
                 format!("stream [{stream_name}] is being deleted"),
             )),
         );
+    }
+
+    if CONFIG.common.simple_path {
+        let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+        let _stream_schema = stream_schema_exists(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &mut stream_schema_map,
+        )
+        .await;
+
+        let req_data: Vec<json::Value> = serde_json::from_slice(&body)?;
+        //if let json::Value::Array(req_data) = json::flatten_json_and_format_field(&data) {
+        let mut schema = match stream_schema_map.get(stream_name) {
+            Some(existing_schema) => existing_schema.clone(),
+            None => {
+                match arrow::json::reader::infer_json_schema_from_iterator(req_data.iter().map(Ok))
+                {
+                    Ok(infer_schema) => infer_schema,
+                    Err(_) => {
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::BAD_REQUEST.into(),
+                                format!("Could not infer schema for [{stream_name}] "),
+                            ),
+                        ))
+                    }
+                }
+            }
+        };
+
+        match schema.field_with_name(&CONFIG.common.column_timestamp) {
+            Ok(_) => {}
+            Err(_) => schema.fields.insert(
+                0,
+                Field::new(&CONFIG.common.column_timestamp, DataType::Int64, true),
+            ),
+        }
+
+        // convert data into record batch
+        let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(req_data.len());
+        let value_iter: &mut (dyn Iterator<Item = json::Value>) = &mut req_data.into_iter();
+
+        let reader = Decoder::new(
+            schema.clone().into(),
+            DecoderOptions::new().with_batch_size(batch_size),
+        );
+        let resp = match reader.next_batch(&mut value_iter.map(Ok)) {
+            Ok(Some(recordbatch)) => Ok(recordbatch),
+            Err(err) => Err(err),
+            Ok(None) => unreachable!("all records are added to one rb"),
+        };
+
+        match resp {
+            Ok(batch) => {
+                let mut final_arrays = batch.columns().iter().map(Arc::clone).collect_vec();
+                final_arrays[0] = Arc::new(Int64Array::from(vec![
+                    Utc::now().timestamp_micros();
+                    batch.num_rows()
+                ]));
+
+                let fb = RecordBatch::try_new(schema.clone().into(), final_arrays).unwrap();
+                let hour_key = Utc::now().format("%Y_%m_%d_%H").to_string();
+
+                let rw_file = crate::infra::wal::get_or_create(
+                    *thread_id.as_ref(),
+                    org_id,
+                    stream_name,
+                    StreamType::Logs,
+                    &hour_key,
+                    CONFIG.common.wal_memory_mode_enabled,
+                );
+
+                let file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(true)
+                    .open(format!("{}.arrow", rw_file.full_name()))
+                    .unwrap();
+
+                let mut writer = StreamWriter::try_new(file, &schema).unwrap();
+
+                // Write the RecordBatch to the file
+                writer.write(&fb).unwrap();
+                writer.finish().unwrap();
+                return Ok(HttpResponse::Ok()
+                    .json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])));
+            }
+            Err(_) => {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Could not process request for [{stream_name}] "),
+                    )),
+                )
+            }
+        }
+
+        //}
     }
 
     let mut min_ts =

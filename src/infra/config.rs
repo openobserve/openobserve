@@ -218,6 +218,8 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
+    #[env_config(name = "ZO_SIMPLE_PATH", default = true)]
+    pub simple_path: bool,
 }
 
 #[derive(EnvConfig)]

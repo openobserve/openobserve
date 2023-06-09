@@ -54,6 +54,7 @@ ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
 argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
 arrow = { version = "36", features = ["simd", "ipc_compression"] }
+arrow-array = { version = "36" }
 arrow-schema = { version = "36", features = ["serde"] }
 async-trait = "0.1"
 async_once = "0.2"
@@ -87,6 +88,7 @@ hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
 ipnetwork = "0.20"
+itertools = "0.10.5"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.8"
