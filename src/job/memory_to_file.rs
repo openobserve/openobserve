@@ -61,20 +61,23 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
 
         for (stream_key, items) in grouped.iter() {
-            let thread_id = web::Data::new(0);
             let stream_name = stream_key.split('/').last().unwrap();
             let org_id = stream_key.split('/').nth(1).unwrap();
             let start = Instant::now();
-            let res =
-                process_json_data(&org_id.to_string(), stream_name, &items, thread_id, start).await;
-            if let Err(e) = res {
-                log::error!("error writing to file: {}", e);
-            } else {
-                log::info!(
-                    "wrote {} items to file in {}ms",
-                    items.len(),
-                    start.elapsed().as_millis()
-                );
+            for chunk in items.chunks(10000) {
+                let thread_id = web::Data::new(0);
+                let res =
+                    process_json_data(&org_id.to_string(), stream_name, &chunk, thread_id, start)
+                        .await;
+                if let Err(e) = res {
+                    log::error!("error writing to file: {}", e);
+                } else {
+                    log::info!(
+                        "wrote {} items to file in {}ms",
+                        items.len(),
+                        start.elapsed().as_millis()
+                    );
+                }
             }
         }
 
