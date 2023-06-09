@@ -211,6 +211,17 @@ export default defineComponent({
       else expandedEvents.value[index.toString()] = true;
     };
 
+    const getSpanKind = (id: number) => {
+      const spanKindMapping: { [key: number]: string } = {
+        1: "Server",
+        2: "Client",
+        3: "Producer",
+        4: "Consumer",
+        5: "Internal",
+      };
+      return spanKindMapping[id] || id;
+    };
+
     const getFormattedSpanDetails = () => {
       const spanDetails: { attrs: any; events: any[] } = {
         attrs: {},
@@ -229,6 +240,7 @@ export default defineComponent({
           ),
           "MMM DD, YYYY HH:mm:ss.SSS Z"
         );
+      spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       spanDetails.events = JSON.parse(props.span.events).map(
         (event: any) => event

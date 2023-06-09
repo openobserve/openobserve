@@ -647,10 +647,11 @@ export default defineComponent({
       }
     }
 
-    const getTraceDetails = (traceId: string) => {
+    const getTraceDetails = (trace: string) => {
+      searchObj.meta.showTraceDetails = true;
       searchObj.data.traceDetails.loading = true;
       searchObj.data.traceDetails.spanList = [];
-      const req = buildTraceSearchQuery(traceId);
+      const req = buildTraceSearchQuery(trace);
       delete req.aggs;
 
       searchService
@@ -667,16 +668,15 @@ export default defineComponent({
         });
     };
 
-    const buildTraceSearchQuery = (traceId: string) => {
+    const buildTraceSearchQuery = (trace: string) => {
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 1000;
-      var timestamps: any = getConsumableDateTime();
-      req.query.start_time = getISOTimestamp(timestamps.start_time);
-      req.query.end_time = getISOTimestamp(timestamps.end_time);
+      req.query.start_time = trace._timestamp - 30000000;
+      req.query.end_time = trace._timestamp + 30000000;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${traceId}' ORDER BY start_time`
+        `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
       );
 
       return req;
@@ -932,9 +932,10 @@ export default defineComponent({
       var trace1 = {
         x: xData,
         y: yData,
-        name: "Gold",
+        name: "Trace",
         type: "scatter",
         mode: "markers",
+        hovertemplate: "%{x} <br> %{y}", // hovertemplate for custom tooltip
       };
 
       var data = [trace1];
