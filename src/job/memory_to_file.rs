@@ -44,10 +44,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let mut to_remove: Vec<String> = vec![];
         for item in STREAMS_DATA.clone().iter() {
             let key = item.key();
-            if key
-                .as_str()
-                .ends_with(Utc::now().timestamp().to_string().as_str())
-            {
+            if key.ends_with(Utc::now().timestamp().to_string().as_str()) {
                 continue;
             }
 
@@ -66,18 +63,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             let start = Instant::now();
             for chunk in items.chunks(10000) {
                 let thread_id = web::Data::new(0);
-                let res =
-                    process_json_data(&org_id.to_string(), stream_name, &chunk, thread_id, start)
+                let _ =
+                    process_json_data(&org_id.to_string(), stream_name, chunk, thread_id, start)
                         .await;
-                if let Err(e) = res {
-                    log::error!("error writing to file: {}", e);
-                } else {
-                    log::info!(
-                        "wrote {} items to file in {}ms",
-                        items.len(),
-                        start.elapsed().as_millis()
-                    );
-                }
             }
         }
 
