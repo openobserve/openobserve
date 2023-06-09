@@ -14,15 +14,17 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
+use arrow::json::reader::infer_json_schema;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::Error;
+use std::collections::HashMap;
+use std::io::{BufReader, Error};
 use std::time::Instant;
 
 use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::{CONFIG, STREAMS_DATA};
+use crate::infra::config::{CONFIG, STREAMS_DATA, STREAM_SCHEMAS};
 use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -60,25 +62,59 @@ pub async fn ingest(
             )),
         );
     }
+    let mut data: Vec<json::Value> = json::from_slice(&body)?;
 
     if CONFIG.common.memory_wal_booster {
-        let mut data: Vec<json::Value> = json::from_slice(&body)?;
         let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+
+        if !STREAM_SCHEMAS.contains_key(&key) {
+            let val_str = data
+                .clone()
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<String>>()
+                .join("\n");
+
+            let mut schema_reader = BufReader::new(val_str.as_bytes());
+            let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+            let mut metadata: HashMap<String, String> = HashMap::new();
+            let ts = Utc::now().timestamp_micros();
+            metadata.insert("created_at".to_string(), ts.to_string());
+            db::schema::set(
+                org_id,
+                stream_name,
+                StreamType::Logs,
+                &inferred_schema.clone().with_metadata(metadata),
+                Some(ts),
+                false,
+            )
+            .await
+            .unwrap();
+        }
+
         if STREAMS_DATA.contains_key(&key) {
             STREAMS_DATA.get_mut(&key).unwrap().append(&mut data);
         } else {
             STREAMS_DATA.insert(key, data);
         }
-        return Ok(
-            HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![]))
-        );
+        Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
+    } else {
+        process_json_data(stream_name, org_id, &data, thread_id, start).await
     }
+}
 
+pub async fn process_json_data(
+    stream_name: &String,
+    org_id: &str,
+    data: &[json::Value],
+    thread_id: web::Data<usize>,
+    start: Instant,
+) -> Result<HttpResponse, Error> {
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    #[cfg(feature = "zo_functions")]
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    /*  #[cfg(feature = "zo_functions")]
+    let mut runtime = crate::service::ingestion::init_functions_runtime(); */
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -93,14 +129,14 @@ pub async fn ingest(
 
     let mut trigger: Option<Trigger> = None;
 
-    // Start Register Transforms for stream
+    /*  // Start Register Transforms for stream
     #[cfg(feature = "zo_functions")]
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
         stream_name,
     );
-    // End Register Transforms for stream
+    // End Register Transforms for stream */
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -122,12 +158,12 @@ pub async fn ingest(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for item in reader.iter() {
+
+    for item in data.iter() {
         //JSON Flattening
         let mut value = json::flatten_json_and_format_field(item);
 
-        #[cfg(feature = "zo_functions")]
+        /* #[cfg(feature = "zo_functions")]
         if !local_trans.is_empty() {
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
@@ -141,7 +177,7 @@ pub async fn ingest(
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped
             continue;
-        }
+        } */
         // End row based transform
 
         // get json object
