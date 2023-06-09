@@ -36,7 +36,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
 
-        for item in STREAMS_DATA.iter() {
+        for item in STREAMS_DATA.iter_mut() {
             let key = item.key();
             let values = key.split('/').collect::<Vec<&str>>();
             let steam_data = item.value();
