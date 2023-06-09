@@ -24,6 +24,7 @@ use sys_info::hostname;
 use vector_enrichment::TableRegistry;
 
 use crate::common::file::get_file_meta;
+use crate::common::json;
 use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
 use crate::meta::functions::{StreamFunctionsList, Transform};
 use crate::meta::prom::ClusterLeader;
@@ -78,6 +79,7 @@ pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLoc
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(DashMap::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
+pub static STREAMS_DATA: Lazy<RwHashMap<String, Vec<json::Value>>> = Lazy::new(DashMap::default);
 
 #[derive(EnvConfig)]
 pub struct Config {
@@ -206,6 +208,8 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
     pub skip_schema_validation: bool,
+    #[env_config(name = "ZO_MEMORY_WAL_BOOSTER", default = true)]
+    pub memory_wal_booster: bool,
 }
 
 #[derive(EnvConfig)]

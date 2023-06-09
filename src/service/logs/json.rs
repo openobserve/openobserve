@@ -22,7 +22,7 @@ use std::time::Instant;
 use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, STREAMS_DATA};
 use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -58,6 +58,19 @@ pub async fn ingest(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 format!("stream [{stream_name}] is being deleted"),
             )),
+        );
+    }
+
+    if CONFIG.common.memory_wal_booster {
+        let mut data: Vec<json::Value> = json::from_slice(&body)?;
+        let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+        if STREAMS_DATA.contains_key(&key) {
+            STREAMS_DATA.get_mut(&key).unwrap().append(&mut data);
+        } else {
+            STREAMS_DATA.insert(key, data);
+        }
+        return Ok(
+            HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![]))
         );
     }
 
