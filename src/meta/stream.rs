@@ -115,10 +115,14 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_skip_schema_validation")]
     pub skip_schema_validation: bool,
     #[serde(default)]
     pub data_retention: i64,
+}
+
+fn default_skip_schema_validation() -> bool {
+    CONFIG.common.skip_schema_validation
 }
 
 impl Serialize for StreamSettings {

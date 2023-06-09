@@ -204,6 +204,8 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
+    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
+    pub skip_schema_validation: bool,
 }
 
 #[derive(EnvConfig)]
