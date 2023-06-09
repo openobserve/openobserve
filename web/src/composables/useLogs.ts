@@ -139,6 +139,7 @@ const useLogs = () => {
     // delete searchObj.data;
     searchObj = reactive(Object.assign({}, defaultObject));
   };
+
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdetifier || "default";
     const selectedFields: any =
