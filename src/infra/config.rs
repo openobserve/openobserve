@@ -210,6 +210,8 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_MEMORY_WAL_BOOSTER", default = true)]
     pub memory_wal_booster: bool,
+    #[env_config(name = "ZO_MEMORY_WAL_SER_INTERVAL", default = 5)]
+    pub memory_wal_ser_interval: u64,
 }
 
 #[derive(EnvConfig)]
