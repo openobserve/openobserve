@@ -234,15 +234,24 @@ pub async fn check_for_schema(
         schema
     };
 
-    if !schema.metadata().is_empty() {
-        let stream_settings = schema.metadata().get("settings");
-        if let Some(value) = stream_settings {
-            let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-            if let Some(keys) = settings.get("skip_schema_validation") {
-                if keys.as_bool().unwrap_or(false) {
+    // Fetch metadata
+    let metadata = schema.metadata();
+
+    // Fetch the "skip_schema_validation" configuration
+    let skip_validation = CONFIG.common.skip_schema_validation;
+
+    if skip_validation || !metadata.is_empty() {
+        if let Some(stream_settings) = metadata.get("settings") {
+            let settings: json::Value = json::from_slice(stream_settings.as_bytes()).unwrap();
+            if let Some(val) = settings.get("skip_schema_validation") {
+                if val.as_bool().unwrap_or(skip_validation) {
                     return (true, None);
                 }
+            } else {
+                return (true, None);
             }
+        } else {
+            return (true, None);
         }
     }
 
