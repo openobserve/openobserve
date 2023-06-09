@@ -35,9 +35,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let data = STREAMS_DATA.clone().to_owned();
 
-        for item in data.iter() {
+        for item in STREAMS_DATA.iter() {
             let key = item.key();
             let values = key.split('/').collect::<Vec<&str>>();
             let steam_data = item.value();
