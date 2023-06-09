@@ -47,13 +47,15 @@
             >Upgrade to PRO Plan</q-btn
           >
         </div>
-        <q-btn
-          class="q-ml-xs no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.openapi`)"
-          @click="navigateToOpenAPI(zoBackendUrl)"
-        />
+        <template v-if="config.isCloud !== 'true'">
+          <q-btn
+            class="q-ml-xs no-border"
+            size="13px"
+            no-caps
+            :label="t(`menu.openapi`)"
+            @click="navigateToOpenAPI(zoBackendUrl)"
+          />
+        </template>
         <q-btn
           class="q-ml-xs no-border"
           size="13px"
