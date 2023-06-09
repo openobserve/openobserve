@@ -16,6 +16,7 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use arrow::json::reader::infer_json_schema;
 use chrono::{Duration, Utc};
+
 use datafusion::arrow::datatypes::Schema;
 use std::collections::HashMap;
 use std::io::{BufReader, Error};
@@ -65,7 +66,8 @@ pub async fn ingest(
     let mut data: Vec<json::Value> = json::from_slice(&body)?;
 
     if CONFIG.common.memory_wal_booster {
-        let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+        let key: String = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
+        let sec_key = format!("{}/{}", &key, Utc::now().timestamp());
 
         if !STREAM_SCHEMAS.contains_key(&key) {
             let val_str = data
@@ -79,6 +81,7 @@ pub async fn ingest(
             let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
             let mut metadata: HashMap<String, String> = HashMap::new();
             let ts = Utc::now().timestamp_micros();
+
             metadata.insert("created_at".to_string(), ts.to_string());
             db::schema::set(
                 org_id,
@@ -92,10 +95,10 @@ pub async fn ingest(
             .unwrap();
         }
 
-        if STREAMS_DATA.contains_key(&key) {
-            STREAMS_DATA.get_mut(&key).unwrap().append(&mut data);
+        if STREAMS_DATA.contains_key(&sec_key) {
+            STREAMS_DATA.get_mut(&sec_key).unwrap().append(&mut data);
         } else {
-            STREAMS_DATA.insert(key, data);
+            STREAMS_DATA.insert(sec_key, data);
         }
         Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
     } else {
