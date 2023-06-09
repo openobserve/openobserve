@@ -23,7 +23,7 @@ mod alert_manager;
 mod compact;
 mod file_list;
 mod files;
-mod memory_to_file;
+pub mod memory_to_file;
 mod metrics;
 mod prom;
 pub(crate) mod syslog_server;
@@ -138,7 +138,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { alert_manager::run().await });
 
     // ingester run
-    tokio::task::spawn(async move { memory_to_file::run().await });
+
     tokio::task::spawn(async move { files::disk::run().await });
     tokio::task::spawn(async move { files::memory::run().await });
     tokio::task::spawn(async move { file_list::run().await });

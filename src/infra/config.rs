@@ -21,6 +21,7 @@ use parking_lot::RwLock;
 use reqwest::Client;
 use std::{sync::Arc, time::Duration};
 use sys_info::hostname;
+use tokio::sync::broadcast;
 use vector_enrichment::TableRegistry;
 
 use crate::common::file::get_file_meta;
@@ -80,6 +81,12 @@ pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(D
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static STREAMS_DATA: Lazy<RwHashMap<String, Vec<json::Value>>> = Lazy::new(DashMap::default);
+
+pub static LOGS_SENDER: Lazy<broadcast::Sender<(String, String, Vec<json::Value>)>> =
+    Lazy::new(|| {
+        let (tx, _) = broadcast::channel(100000);
+        tx
+    });
 
 #[derive(EnvConfig)]
 pub struct Config {

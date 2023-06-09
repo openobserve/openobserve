@@ -14,18 +14,16 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
-use arrow::json::reader::infer_json_schema;
 use chrono::{Duration, Utc};
 
 use datafusion::arrow::datatypes::Schema;
-use std::collections::HashMap;
-use std::io::{BufReader, Error};
+use std::io::Error;
 use std::time::Instant;
 
 use super::StreamMeta;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::{CONFIG, STREAMS_DATA, STREAM_SCHEMAS};
+use crate::infra::config::{CONFIG, LOGS_SENDER};
 use crate::infra::{cluster, metrics};
 use crate::meta::alert::{Alert, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -63,41 +61,14 @@ pub async fn ingest(
             )),
         );
     }
-    let mut data: Vec<json::Value> = json::from_slice(&body)?;
+    let data: Vec<json::Value> = json::from_slice(&body)?;
 
     if CONFIG.common.memory_wal_booster {
-        let key: String = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
-        let sec_key = format!("{}/{}", &key, Utc::now().timestamp());
-
-        if !STREAM_SCHEMAS.contains_key(&key) {
-            let val_str = data
-                .iter()
-                .map(|value| value.to_string())
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            let mut schema_reader = BufReader::new(val_str.as_bytes());
-            let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
-            let mut metadata: HashMap<String, String> = HashMap::new();
-            let ts = Utc::now().timestamp_micros();
-
-            metadata.insert("created_at".to_string(), ts.to_string());
-            db::schema::set(
-                org_id,
-                stream_name,
-                StreamType::Logs,
-                &inferred_schema.with_metadata(metadata),
-                Some(ts),
-                false,
-            )
-            .await
+        LOGS_SENDER
+            .clone()
+            .send((org_id.to_owned(), stream_name.to_string(), data))
             .unwrap();
-        }
-        if STREAMS_DATA.contains_key(&sec_key) {
-            STREAMS_DATA.get_mut(&sec_key).unwrap().append(&mut data);
-        } else {
-            STREAMS_DATA.insert(sec_key, data);
-        }
+
         Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
     } else {
         process_json_data(stream_name, org_id, &data, thread_id, start).await

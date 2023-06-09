@@ -52,7 +52,8 @@ use openobserve::{
         config::{self, CONFIG},
         metrics, wal,
     },
-    job, meta,
+    job::{self, memory_to_file},
+    meta,
     service::{db, router, users},
 };
 
@@ -174,6 +175,7 @@ async fn main() -> Result<(), anyhow::Error> {
     .bind(haddr)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
+    tokio::task::spawn(async move { memory_to_file::run().await });
 
     server.workers(CONFIG.limit.http_worker_num).run().await?;
 
