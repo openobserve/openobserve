@@ -41,17 +41,6 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-            :title="t('logStream.delete')"
-            class="q-ml-xs iconHoverBtn"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-          />
-          <q-btn
             :icon="'img:' + getImageURL('images/common/list_icon.svg')"
             :title="t('logStream.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
@@ -61,6 +50,17 @@
             round
             flat
             @click="listSchema(props)"
+          />
+          <q-btn
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            :title="t('logStream.delete')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
           />
         </q-td>
       </template>

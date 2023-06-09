@@ -17,7 +17,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="col column oveflow-hidden">
-    <div class="search-list" style="width: 100%">
+    <div class="search-list" ref="searchListContainer" style="width: 100%">
       <BarChart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
@@ -72,7 +72,6 @@
             </tr>
           </thead>
         </template>
-
         <template v-slot="{ item: row, index }">
           <q-tr
             :data-test="`logs-search-result-detail-${
@@ -162,7 +161,99 @@
           </q-tr>
           <q-tr v-if="expandedLogs[index.toString()]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
-              <pre class="log_json_content">{{ row }}</pre>
+              <div class="q-py-xs flex justify-start q-px-md copy-log-btn">
+                <q-btn
+                  label="Copy to clipboard"
+                  dense
+                  size="sm"
+                  no-caps
+                  class="q-px-sm"
+                  icon="content_copy"
+                  @click="copyLogToClipboard(row)"
+                />
+              </div>
+              <div class="q-pl-md">
+                {
+                <div
+                  class="log_json_content"
+                  v-for="key in Object.keys(row)"
+                  :key="key"
+                >
+                  <q-btn-dropdown
+                    data-test="log-details-include-exclude-field-btn"
+                    size="0.5rem"
+                    flat
+                    outlined
+                    filled
+                    dense
+                    class="q-ml-sm pointer"
+                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                  >
+                    <q-list>
+                      <q-item clickable v-close-popup>
+                        <q-item-section>
+                          <q-item-label
+                            data-test="log-details-include-field-btn"
+                            @click="addSearchTerm(`${key}='${row[key]}'`)"
+                            ><q-btn
+                              title="Add to search query"
+                              :icon="
+                                'img:' + getImageURL('images/common/equals.svg')
+                              "
+                              size="6px"
+                              round
+                              class="q-mr-sm pointer"
+                            ></q-btn
+                            >Inlcude Search Term</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+
+                      <q-item clickable v-close-popup>
+                        <q-item-section>
+                          <q-item-label
+                            data-test="log-details-exclude-field-btn"
+                            @click="addSearchTerm(`${key}!='${row[key]}'`)"
+                            ><q-btn
+                              title="Add to search query"
+                              :icon="
+                                'img:' +
+                                getImageURL('images/common/not_equals.svg')
+                              "
+                              size="6px"
+                              round
+                              class="q-mr-sm pointer"
+                            ></q-btn
+                            >Exclude Search Term</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item clickable v-close-popup>
+                        <q-item-section>
+                          <q-item-label
+                            data-test="log-details-exclude-field-btn"
+                            @click="addFieldToTable(key)"
+                            ><q-btn
+                              title="Add field to table"
+                              :icon="
+                                'img:' +
+                                getImageURL('images/common/visibility_on.svg')
+                              "
+                              size="6px"
+                              round
+                              class="q-mr-sm pointer"
+                            ></q-btn
+                            >Add field to table</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-btn-dropdown>
+
+                  <span class="q-pl-xs">{{ key }} : {{ row[key] }},</span>
+                </div>
+                }
+              </div>
             </td>
           </q-tr>
         </template>
@@ -198,8 +289,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useQuasar } from "quasar";
+import { computed, defineComponent, ref } from "vue";
+import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -291,6 +382,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+    const searchListContainer = ref(null);
 
     const { searchObj, updatedLocalLogFilterField } = useLogs();
     const totalHeight = ref(0);
@@ -354,6 +446,35 @@ export default defineComponent({
       emit("expandlog", index);
     };
 
+    const getWidth = computed(() => {
+      console.log("get search width", searchListContainer);
+      return "";
+    });
+
+    function addFieldToTable(fieldName: string) {
+      if (searchObj.data.stream.selectedFields.includes(fieldName)) {
+        searchObj.data.stream.selectedFields =
+          searchObj.data.stream.selectedFields.filter(
+            (v: any) => v !== fieldName
+          );
+      } else {
+        searchObj.data.stream.selectedFields.push(fieldName);
+      }
+      searchObj.organizationIdetifier =
+        store.state.selectedOrganization.identifier;
+      updatedLocalLogFilterField();
+    }
+
+    const copyLogToClipboard = (log: any) => {
+      copyToClipboard(JSON.stringify(log)).then(() =>
+        $q.notify({
+          type: "positive",
+          message: "Content Copied Successfully!",
+          timeout: 1000,
+        })
+      );
+    };
+
     return {
       t,
       store,
@@ -371,6 +492,10 @@ export default defineComponent({
       reDrawChart,
       expandLog,
       getImageURL,
+      addFieldToTable,
+      searchListContainer,
+      getWidth,
+      copyLogToClipboard,
     };
   },
 });
@@ -561,6 +686,16 @@ export default defineComponent({
       .q-icon {
         opacity: 1;
       }
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+.search-list {
+  .copy-log-btn {
+    .q-btn .q-icon {
+      font-size: 12px !important;
     }
   }
 }
