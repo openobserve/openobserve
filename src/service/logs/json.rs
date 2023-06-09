@@ -71,8 +71,7 @@ pub async fn ingest(
 
         if !STREAM_SCHEMAS.contains_key(&key) {
             let val_str = data
-                .clone()
-                .into_iter()
+                .iter()
                 .map(|value| value.to_string())
                 .collect::<Vec<String>>()
                 .join("\n");
@@ -87,7 +86,7 @@ pub async fn ingest(
                 org_id,
                 stream_name,
                 StreamType::Logs,
-                &inferred_schema.clone().with_metadata(metadata),
+                &inferred_schema.with_metadata(metadata),
                 Some(ts),
                 false,
             )
