@@ -112,67 +112,12 @@
           />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
-          <q-btn-group spread>
-            <q-btn-dropdown
-              v-model="btnRefreshInterval"
-              data-cy="search-bar-button-dropdown"
-              flat
-              class="search-dropdown"
-              no-caps
-              :label="searchObj.meta.refreshIntervalLabel"
-              data-test="logs-search-refresh-interval-dropdown-btn"
-            >
-              <div class="refresh-rate-dropdown-container">
-                <div class="row">
-                  <div class="col col-12 q-pa-sm" style="text-align: center">
-                    <q-btn
-                      data-test="logs-search-off-refresh-interval"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== '0'"
-                      size="md"
-                      :class="
-                        'no-border full-width ' +
-                        (searchObj.meta.refreshInterval === '0'
-                          ? 'selected'
-                          : '')
-                      "
-                      @click="refreshTimeChange({ label: 'Off', value: 0 })"
-                    >
-                      Off
-                    </q-btn>
-                  </div>
-                </div>
-                <q-separator />
-                <div
-                  v-for="(items, i) in refreshTimes"
-                  :key="'row_' + i"
-                  class="row"
-                >
-                  <div
-                    v-for="(item, j) in items"
-                    :key="'col_' + i + '_' + j"
-                    class="col col-4 q-pa-sm"
-                    style="text-align: center"
-                  >
-                    <q-btn
-                      :data-test="`logs-search-bar-refresh-time-${item.value}`"
-                      no-caps
-                      :flat="searchObj.meta.refreshInterval !== item.label"
-                      size="md"
-                      :class="
-                        'no-border ' +
-                        (searchObj.meta.refreshInterval === item.label
-                          ? 'selected'
-                          : '')
-                      "
-                      @click="refreshTimeChange(item)"
-                    >
-                      {{ item.label }}
-                    </q-btn>
-                  </div>
-                </div>
-              </div>
-            </q-btn-dropdown>
+          <div class="flex">
+            <auto-refresh-interval
+              class="q-mr-sm q-px-none logs-auto-refresh-interval"
+              style="padding-left: 0 !important"
+              v-model="searchObj.meta.refreshInterval"
+            />
             <q-separator vertical inset />
             <q-btn
               data-test="logs-search-bar-refresh-btn"
@@ -187,7 +132,7 @@
               "
               >Run query</q-btn
             >
-          </q-btn-group>
+          </div>
         </div>
       </div>
     </div>
@@ -258,6 +203,7 @@ import config from "@/aws-exports";
 
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import search from "../../services/search";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 
 const defaultValue: any = () => {
   return {
@@ -274,6 +220,7 @@ export default defineComponent({
     DateTime,
     QueryEditor,
     SyntaxGuide,
+    AutoRefreshInterval,
   },
   emits: ["searchdata"],
   methods: {
@@ -309,7 +256,6 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
-    const btnRefreshInterval = ref(null);
 
     const { searchObj } = useLogs();
     const queryEditorRef = ref(null);
@@ -327,8 +273,6 @@ export default defineComponent({
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
-      searchObj.meta.refreshIntervalLabel = item.label;
-      btnRefreshInterval.value = false;
     };
 
     const updateQueryValue = (value: string) => {
@@ -680,7 +624,6 @@ export default defineComponent({
       fnEditorobj,
       searchObj,
       queryEditorRef,
-      btnRefreshInterval,
       confirmDialogVisible,
       confirmCallback,
       refreshTimes: searchObj.config.refreshTimes,
@@ -953,5 +896,13 @@ export default defineComponent({
 
 .query-editor-container {
   height: calc(100% - 40px) !important;
+}
+
+.logs-auto-refresh-interval {
+  .q-btn {
+    min-height: 30px;
+    max-height: 30px;
+    padding: 0 4px;
+  }
 }
 </style>
