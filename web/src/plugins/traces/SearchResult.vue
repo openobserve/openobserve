@@ -25,6 +25,7 @@
         v-show="searchObj.meta.showHistogram"
         :chart="searchObj.data.histogram"
         @updated:chart="onChartUpdate"
+        @click="onChartClick"
       />
 
       <q-virtual-scroll
@@ -78,7 +79,7 @@
               row[store.state.zoConfig.timestamp_column]
             }`"
             :key="'expand_' + index"
-            @click="expandRowDetail(row, index)"
+            @click="expandRowDetail(row)"
             style="cursor: pointer"
             :style="
               row[store.state.zoConfig.timestamp_column] ==
@@ -271,9 +272,9 @@ export default defineComponent({
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
-    const expandRowDetail = (props: any, index: number) => {
+    const expandRowDetail = (props: any) => {
       searchObj.meta.showTraceDetails = true;
-      emit("get:traceDetails", props.trace_id);
+      emit("get:traceDetails", props);
     };
 
     const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
@@ -308,6 +309,12 @@ export default defineComponent({
       searchObj.data.traceDetails.selectedSpanId = null;
     };
 
+    const onChartClick = (data: any) => {
+      expandRowDetail(
+        searchObj.data.queryResults.hits[data.points[0].pointIndex]
+      );
+    };
+
     return {
       t,
       store,
@@ -326,6 +333,7 @@ export default defineComponent({
       getImageURL,
       showTraceDetails,
       closeTraceDetails,
+      onChartClick,
     };
   },
 });

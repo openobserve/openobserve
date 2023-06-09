@@ -25,7 +25,7 @@ import { defineComponent, onMounted, onUpdated, ref } from "vue";
 
 export default defineComponent({
   name: "TraceChart",
-  emits: ["updated:chart"],
+  emits: ["updated:chart", "click"],
   props: {
     height: {
       type: Number,
@@ -138,6 +138,16 @@ export default defineComponent({
       await Plotly.newPlot(props.id, traces, layout, {
         responsive: true,
         displayModeBar: false,
+      });
+
+      plotref.value.on("plotly_click", (data: any) => {
+        // data contains all the info about the clicked marker
+        emit("click", data);
+      });
+
+      plotref.value.on("plotly_hover", (data: any) => {
+        // Apply the cursor pointer style on hover
+        data.event.target.style.cursor = "pointer";
       });
 
       plotref.value.on("plotly_relayout", onPlotZoom);
