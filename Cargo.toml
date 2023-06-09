@@ -25,12 +25,19 @@ default = ["zo_functions"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 zo_functions = []
+profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 
 [profile.release]
 debug = false
 strip = true
 codegen-units = 1
 lto = "thin" 
+
+[profile.release-profiling]
+inherits = "release"
+debug=true
+strip=false
+codegen-units = 4
 
 [dependencies]
 actix-cors = "0.6"
@@ -143,6 +150,8 @@ vector-enrichment = { package = "enrichment", git = "https://github.com/zinclabs
 vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8", features = ["value"] }
 walkdir = "2"
 zstd = "0.12" 
+pyroscope = { version = "0.5.6", optional = true }
+pyroscope_pprofrs = { version = "0.2.5", optional = true }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
