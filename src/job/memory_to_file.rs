@@ -29,7 +29,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // create wal dir
     fs::create_dir_all(&CONFIG.common.data_wal_dir)?;
 
-    let mut interval = time::interval(time::Duration::from_secs(10));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.common.memory_wal_ser_interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
