@@ -94,7 +94,6 @@ pub async fn ingest(
             .await
             .unwrap();
         }
-
         if STREAMS_DATA.contains_key(&sec_key) {
             STREAMS_DATA.get_mut(&sec_key).unwrap().append(&mut data);
         } else {

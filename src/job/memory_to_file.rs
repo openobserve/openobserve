@@ -13,14 +13,18 @@
 // limitations under the License.
 
 use actix_web::web;
+use ahash::HashMap;
+use ahash::HashMapExt;
 use chrono::Utc;
 use std::fs;
 use std::time::Instant;
 use tokio::time;
 
+use crate::common::json;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 use crate::infra::config::STREAMS_DATA;
+use crate::service::logs::json::process_json_data;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -36,8 +40,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-
-        for item in STREAMS_DATA.iter() {
+        let mut grouped: HashMap<String, Vec<json::Value>> = HashMap::new();
+        let mut to_remove: Vec<String> = vec![];
+        for item in STREAMS_DATA.clone().iter() {
             let key = item.key();
             if key
                 .as_str()
@@ -45,24 +50,36 @@ pub async fn run() -> Result<(), anyhow::Error> {
             {
                 continue;
             }
-            let values = key.split('/').collect::<Vec<&str>>();
-            let stream_data = item.value();
-            match crate::service::logs::json::process_json_data(
-                &values[2].to_string(),
-                values[0],
-                stream_data,
-                web::Data::new(0),
-                Instant::now(),
-            )
-            .await
-            {
-                Ok(_) => {
-                    STREAMS_DATA.remove(key);
-                }
-                Err(e) => {
-                    log::error!("Error consuming data from memory: {}", e);
-                }
+
+            let pos = key.rfind('/').unwrap();
+            let stream_key = &key[0..pos];
+            grouped
+                .entry(stream_key.to_string())
+                .or_default()
+                .extend(item.value().to_owned().iter().cloned());
+            to_remove.push(key.clone());
+        }
+
+        for (stream_key, items) in grouped.iter() {
+            let thread_id = web::Data::new(0);
+            let stream_name = stream_key.split('/').last().unwrap();
+            let org_id = stream_key.split('/').nth(1).unwrap();
+            let start = Instant::now();
+            let res =
+                process_json_data(&org_id.to_string(), stream_name, &items, thread_id, start).await;
+            if let Err(e) = res {
+                log::error!("error writing to file: {}", e);
+            } else {
+                log::info!(
+                    "wrote {} items to file in {}ms",
+                    items.len(),
+                    start.elapsed().as_millis()
+                );
             }
+        }
+
+        for key in to_remove {
+            STREAMS_DATA.remove(&key);
         }
     }
 }
