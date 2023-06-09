@@ -63,7 +63,9 @@
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
-        row-key="name"
+        :row-key="
+          (row) => searchObj.data.stream.selectedStream.label + row.name
+        "
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
         :pagination="{ rowsPerPage: 10000 }"
@@ -544,6 +546,7 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       streamTypes,
+      toggleExpandField,
     };
   },
 });
