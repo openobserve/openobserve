@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use actix_web::web;
+use chrono::Utc;
 use std::fs;
 use std::time::Instant;
 use tokio::time;
@@ -36,14 +37,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
 
-        for item in STREAMS_DATA.iter_mut() {
+        for item in STREAMS_DATA.iter() {
             let key = item.key();
+            if key
+                .as_str()
+                .ends_with(Utc::now().timestamp().to_string().as_str())
+            {
+                continue;
+            }
             let values = key.split('/').collect::<Vec<&str>>();
-            let steam_data = item.value();
+            let stream_data = item.value();
             match crate::service::logs::json::process_json_data(
                 &values[2].to_string(),
                 values[0],
-                steam_data,
+                stream_data,
                 web::Data::new(0),
                 Instant::now(),
             )
