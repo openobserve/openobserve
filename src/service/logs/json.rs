@@ -237,7 +237,6 @@ async fn process_as_arrow(
     body: &bytes::Bytes,
     thread_id: &web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
-    //Ok(if CONFIG.common.simple_path {
     let ts: i64 = Utc::now().timestamp_micros();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_schema = stream_schema_exists(
@@ -249,20 +248,19 @@ async fn process_as_arrow(
     .await;
 
     let req_data: Vec<json::Value> = serde_json::from_slice(body)?;
-    //if let json::Value::Array(req_data) = json::flatten_json_and_format_field(&data) {
 
-    let inferred_schema;
-    match arrow::json::reader::infer_json_schema_from_iterator(req_data.iter().map(Ok)) {
-        Ok(infer_schema) => inferred_schema = infer_schema,
-        Err(_) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    format!("Could not infer schema for [{stream_name}] "),
-                )),
-            )
-        }
-    }
+    let inferred_schema =
+        match arrow::json::reader::infer_json_schema_from_iterator(req_data.iter().map(Ok)) {
+            Ok(schema) => schema,
+            Err(_) => {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!("Could not infer schema for [{}]", stream_name),
+                    )),
+                )
+            }
+        };
 
     let mut schema = match stream_schema_map.get(stream_name) {
         Some(existing_schema) => {
@@ -273,12 +271,12 @@ async fn process_as_arrow(
                     existing_schema.clone(),
                     inferred_schema.clone(),
                 ]) {
-                    Ok(_merged) => existing_schema.clone(), // return existing schema as merging was successful
+                    Ok(_) => existing_schema.clone(),
                     Err(e) => {
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(
                                 http::StatusCode::BAD_REQUEST.into(),
-                                format!("Error matching schema for [{stream_name}] : {}", e),
+                                format!("Error matching schema for [{}] : {}", stream_name, e),
                             ),
                         ))
                     }
@@ -296,7 +294,6 @@ async fn process_as_arrow(
         ),
     }
 
-    // convert data into record batch
     let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(req_data.len());
     let value_iter: &mut (dyn Iterator<Item = json::Value>) = &mut req_data.into_iter();
 
@@ -305,59 +302,51 @@ async fn process_as_arrow(
         schema.clone().into(),
         DecoderOptions::new().with_batch_size(batch_size),
     );
-    let resp = match reader.next_batch(&mut value_iter.map(Ok)) {
-        Ok(Some(recordbatch)) => Ok(recordbatch),
-        Err(err) => Err(err),
+
+    let batch = match reader.next_batch(&mut value_iter.map(Ok)) {
+        Ok(Some(batch)) => batch,
+        Err(_) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!("Could not process request for [{}]", stream_name),
+                )),
+            )
+        }
         Ok(None) => unreachable!("all records are added to one rb"),
     };
 
-    match resp {
-        Ok(batch) => {
-            let mut final_arrays = batch.columns().iter().map(Arc::clone).collect_vec();
-            final_arrays[0] = Arc::new(Int64Array::from_value(ts, batch.num_rows()));
+    let mut final_arrays = batch.columns().iter().map(Arc::clone).collect_vec();
+    final_arrays[0] = Arc::new(Int64Array::from_value(ts, batch.num_rows()));
 
-            let fb = RecordBatch::try_new(schema.clone().into(), final_arrays).unwrap();
-            let hour_key = Utc::now().format("%Y_%m_%d_%H").to_string();
+    let fb = RecordBatch::try_new(schema.clone().into(), final_arrays).unwrap();
+    let hour_key = Utc::now().format("%Y_%m_%d_%H").to_string();
 
-            let rw_file = crate::infra::wal::get_or_create_arrow(
-                *thread_id.as_ref(),
-                org_id,
-                stream_name,
-                StreamType::Logs,
-                &hour_key,
-                CONFIG.common.wal_memory_mode_enabled,
-            );
+    let rw_file = crate::infra::wal::get_or_create_arrow(
+        *thread_id.as_ref(),
+        org_id,
+        stream_name,
+        StreamType::Logs,
+        &hour_key,
+        CONFIG.common.wal_memory_mode_enabled,
+    );
 
-            rw_file.write_for_schema(fb, &schema);
+    rw_file.write_for_schema(fb, &schema);
 
-            if !stream_schema.has_fields {
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("created_at".to_string(), ts.to_string());
-                db::schema::set(
-                    org_id,
-                    stream_name,
-                    StreamType::Logs,
-                    &schema.clone().with_metadata(metadata),
-                    Some(ts),
-                    false,
-                )
-                .await
-                .unwrap();
-            }
-
-            Ok(
-                HttpResponse::Ok()
-                    .json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])),
-            )
-        }
-        Err(_) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Could not process request for [{stream_name}] "),
-            )),
-        ),
+    if !stream_schema.has_fields {
+        let mut metadata = schema.metadata().clone();
+        metadata.insert("created_at".to_string(), ts.to_string());
+        db::schema::set(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &schema.with_metadata(metadata),
+            Some(ts),
+            false,
+        )
+        .await
+        .unwrap();
     }
 
-    //}
-    //})
+    Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
 }
