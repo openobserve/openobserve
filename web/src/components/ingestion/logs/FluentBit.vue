@@ -41,9 +41,11 @@
   Json_date_key    {{ store.state.zoConfig.timestamp_column }}
   Json_date_format iso8601
   HTTP_User {{ currUserEmail }}
-  HTTP_Passwd {{ store.state.organizationPasscode }}</pre
+  HTTP_Passwd {{ store.state.organizationPasscode }}
+  compress gzip</pre
     >
   </div>
+  <a href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit" class="q-ml-md text-h6" target="_blank">Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!</a>
 </template>
 
 <script lang="ts">

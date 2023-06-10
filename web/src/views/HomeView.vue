@@ -15,7 +15,7 @@
 
 <template>
   <q-page class="q-pa-lg">
-    <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md">
+    <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card bg-grey-3">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
@@ -79,7 +79,7 @@
       </q-card>
     </div>
 
-    <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md">
+    <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card bg-grey-3">
           <div class="text-h6">{{ t("home.noData") }}</div>
@@ -107,6 +107,9 @@
 
         <q-separator />
       </q-card>
+    </div>
+    <div class="row justify-center items-center">
+      <iframe width="54%" height="600" src="https://www.youtube.com/embed/fZ-ErfMdF-o" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
     </div>
   </q-page>
 </template>
