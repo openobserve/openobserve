@@ -54,11 +54,12 @@
         v-for="plan in Plans"
         :key="plan.id"
         :plan="plan"
-        :hasProPlan="isProPlan"
+        :isPaidPlan="planType"
         :freeLoading="freeLoading"
         :proLoading="proLoading"
         @update:freeSubscription="confirm_downgrade_subscription = true"
-        @update:proSubscription="onLoadSubscription"
+        @update:proSubscription="onLoadSubscription('pro')"
+        @update:businessSubscription="onLoadSubscription('business')"
       ></plan-card>
     </div>
 
@@ -70,9 +71,8 @@
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round
-dense v-close-popup />
+          <q-btn icon="close" flat
+round dense v-close-popup />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -97,9 +97,8 @@ dense v-close-popup />
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close"
-flat round
-dense v-close-popup />
+          <q-btn icon="close" flat
+round dense v-close-popup />
         </q-card-section>
 
         <q-card-section>
@@ -133,8 +132,8 @@ dense v-close-popup />
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel"
-color="secondary" v-close-popup />
+          <q-btn label="Cancel" color="secondary"
+v-close-popup />
           <q-btn
             label="Confirm"
             color="primary"
@@ -156,7 +155,7 @@ import Plan from "@/constants/plans";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import { useLocalOrganization } from "@/utils/zincutils";
+import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "plans",
@@ -169,7 +168,7 @@ export default defineComponent({
     this.loadSubscription();
   },
   methods: {
-    onLoadSubscription() {
+    onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
         BillingService.resume_subscription(
@@ -189,7 +188,7 @@ export default defineComponent({
       } else {
         BillingService.get_hosted_url(
           this.store.state.selectedOrganization.identifier,
-          "Pro"
+          convertToTitleCase(planType)
         )
           .then((res) => {
             console.log(res);
@@ -254,7 +253,7 @@ export default defineComponent({
             res.data.data.CustomerBillingObj.subscription_type ==
             "professional-USD-Monthly"
           ) {
-            this.isProPlan = true;
+            this.planType = "pro";
             const localOrg: any = useLocalOrganization();
             localOrg.value.subscription_type = "professional-USD-Monthly";
             useLocalOrganization(localOrg.value);
@@ -264,11 +263,21 @@ export default defineComponent({
             res.data.data.CustomerBillingObj.subscription_type ==
             "Free-Plan-USD-Monthly"
           ) {
-            this.isProPlan = false;
+            this.planType = "basic";
             const localOrg: any = useLocalOrganization();
             localOrg.value.subscription_type = "Free-Plan-USD-Monthly";
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
+          } else if (
+            res.data.data.CustomerBillingObj.subscription_type ==
+            "business-USD-Monthly"
+          ) {
+            this.planType = "business";
+            const localOrg: any = useLocalOrganization();
+            localOrg.value.subscription_type = "professional-USD-Monthly";
+            useLocalOrganization(localOrg.value);
+            this.store.dispatch("setSelectedOrganization", localOrg.value);
+            this.store.dispatch("setQuotaThresholdMsg", "");
           }
           // this.listSubscriptionResponse = res.data.data;
           // this.listSubscriptionResponse.subscription.current_term_end =
@@ -400,7 +409,7 @@ export default defineComponent({
     const expiry_month = ref("12");
     const expiry_year = ref("2025");
     const frmPayment = ref();
-    const isProPlan = ref(false);
+    const planType = ref("basic");
     const isActiveSubscription = ref(false);
     const loading = ref(false);
     const hostedResponse: any = ref();
@@ -434,7 +443,7 @@ export default defineComponent({
       expiry_month,
       expiry_year,
       frmPayment,
-      isProPlan,
+      planType,
       isActiveSubscription,
       loading,
       hostedResponse,
