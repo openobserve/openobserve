@@ -237,6 +237,7 @@ async fn process_as_arrow(
     body: &bytes::Bytes,
     thread_id: &web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
+    let start = Instant::now();
     let ts: i64 = Utc::now().timestamp_micros();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_schema = stream_schema_exists(
@@ -347,6 +348,25 @@ async fn process_as_arrow(
         .await
         .unwrap();
     }
+
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .observe(start.elapsed().as_secs_f64());
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/_json",
+            "200",
+            org_id,
+            stream_name,
+            StreamType::Logs.to_string().as_str(),
+        ])
+        .inc();
 
     Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
 }
