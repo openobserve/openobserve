@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use datafusion::arrow::json::{reader::infer_json_schema, RawReaderBuilder};
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
@@ -89,15 +89,27 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(String, String, FileMeta, StreamType), anyhow::Error>> =
             task::spawn(async move {
-                let ret = upload_file(
-                    &org_id,
-                    &stream_name,
-                    stream_type,
-                    &local_file,
-                    data,
-                    partition_key,
-                )
-                .await;
+                let ret = if CONFIG.common.simple_path {
+                    upload_file(
+                        &org_id,
+                        &stream_name,
+                        stream_type,
+                        &local_file,
+                        data,
+                        partition_key,
+                    )
+                    .await
+                } else {
+                    upload_arrow_files(
+                        &org_id,
+                        &stream_name,
+                        stream_type,
+                        &local_file,
+                        data,
+                        partition_key,
+                    )
+                    .await
+                };
                 drop(permit);
                 match ret {
                     Ok((key, meta, stream_type)) => Ok((local_file, key, meta, stream_type)),
@@ -269,6 +281,94 @@ async fn upload_file(
         }
         Err(err) => {
             log::error!("[JOB] memory file upload error: {:?}", err);
+            Err(anyhow::anyhow!(err))
+        }
+    }
+}
+
+async fn upload_arrow_files(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    path_str: &str,
+    buf: Bytes,
+    partition_key: String,
+) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
+    let file_size = buf.len() as u64;
+    log::info!("[JOB] File upload begin: memory: {}", path_str);
+    if file_size == 0 {
+        wal::MEMORY_FILES.remove(path_str);
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
+
+    let file = buf.reader();
+
+    // metrics
+    metrics::INGEST_WAL_READ_BYTES
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .inc_by(file_size);
+
+    let mut schema_reader = arrow::ipc::reader::StreamReader::try_new(file, None).unwrap();
+    let arrow_schema = schema_reader.schema();
+
+    let mut meta_batch = vec![];
+    let mut buf_parquet = Vec::new();
+    let mut writer = new_writer(&mut buf_parquet, &arrow_schema);
+
+    match schema_reader.next() {
+        Some(Ok(batch_write)) => {
+            if let Err(err) = writer.write(&batch_write) {
+                return Err(anyhow::anyhow!("Failed to write batch: {}", err));
+            }
+            meta_batch.push(batch_write);
+        }
+        Some(Err(err)) => return Err(anyhow::anyhow!("Failed to read batch: {}", err)),
+        None => (),
+    }
+
+    writer.close().unwrap();
+
+    //let file_name = path.file_name();
+    let mut file_meta = FileMeta {
+        min_ts: 0,
+        max_ts: 0,
+        records: 0,
+        original_size: file_size,
+        compressed_size: buf_parquet.len() as u64,
+    };
+
+    populate_file_meta(arrow_schema.clone(), vec![meta_batch], &mut file_meta).await?;
+
+    schema_evolution(
+        org_id,
+        stream_name,
+        stream_type,
+        arrow_schema,
+        file_meta.min_ts,
+    )
+    .await;
+
+    let new_file = storage::generate_partioned_file_key(
+        org_id,
+        stream_name,
+        stream_type,
+        file_meta.min_ts,
+        &CONFIG.common.file_ext_parquet,
+    );
+
+    let new_file_key = if partition_key.eq("") {
+        format!("files/{}{}", new_file.0, new_file.1)
+    } else {
+        format!("files/{}{}{}", new_file.0, partition_key, new_file.1)
+    };
+
+    match storage::put(&new_file_key, bytes::Bytes::from(buf_parquet)).await {
+        Ok(_output) => {
+            log::info!("[JOB] disk file upload succeeded: {}", new_file_key);
+            Ok((new_file_key, file_meta, stream_type))
+        }
+        Err(err) => {
+            log::error!("[JOB] disk file upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
         }
     }

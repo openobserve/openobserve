@@ -143,7 +143,7 @@ pub async fn save_enrichment_data(
     buf.insert(hour_key.clone(), records.clone());
     write_file(
         buf,
-        thread_id,
+        **thread_id,
         org_id,
         stream_name,
         StreamType::EnrichmentTables,

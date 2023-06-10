@@ -180,7 +180,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         trigger = Some(local_trigger.unwrap());
     }
 
-    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
+    write_file(buf, **thread_id, org_id, stream_name, StreamType::Logs);
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

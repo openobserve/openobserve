@@ -329,7 +329,7 @@ pub async fn remote_write(
         // write to file
         write_file(
             stream_data,
-            thread_id.clone(),
+            **thread_id,
             org_id,
             &stream_name,
             StreamType::Metrics,

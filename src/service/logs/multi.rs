@@ -187,7 +187,7 @@ pub async fn ingest(
     }
 
     // write to file
-    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
+    write_file(buf, **thread_id, org_id, stream_name, StreamType::Logs);
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;

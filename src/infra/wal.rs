@@ -16,7 +16,7 @@ use ahash::AHashMap as HashMap;
 use arrow::ipc::writer::StreamWriter;
 use arrow_array::RecordBatch;
 use arrow_schema::Schema;
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use once_cell::sync::Lazy;
 use std::{
     fs::{File, OpenOptions},
@@ -43,6 +43,7 @@ struct Manager {
 pub struct MemoryFiles {
     pub data: Arc<RwLock<HashMap<String, Bytes>>>,
 }
+
 #[derive(Clone)]
 struct StreamMeta {
     org_id: String,
@@ -53,7 +54,7 @@ struct StreamMeta {
 pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
-    cache: Option<RwLock<BytesMut>>,
+    cache: Option<RwLock<Arc<BytesMut>>>,
     stream_meta: StreamMeta,
     dir: String,
     name: String,
@@ -335,7 +336,10 @@ impl RwFile {
         std::fs::create_dir_all(&dir_path).unwrap();
 
         let (file, cache) = if use_cache {
-            (None, Some(RwLock::new(BytesMut::with_capacity(524288)))) // 512KB
+            (
+                None,
+                Some(RwLock::new(Arc::new(BytesMut::with_capacity(524288)))),
+            ) // 512KB
         } else {
             let f = OpenOptions::new()
                 .write(true)
@@ -374,12 +378,9 @@ impl RwFile {
             ])
             .inc_by(data.len() as u64);
         if self.use_cache {
-            self.cache
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
-                .extend_from_slice(data);
+            let mut cache = self.cache.as_ref().unwrap().write().unwrap();
+            let buf = Arc::get_mut(&mut cache).unwrap();
+            buf.extend_from_slice(data);
         } else {
             self.file
                 .as_ref()
@@ -393,40 +394,25 @@ impl RwFile {
 
     #[inline]
     pub fn write_for_schema(&self, data: RecordBatch, schema: &Schema) {
-        // metrics
-        /*         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
-            ])
-            .add(data.len() as i64);
-        metrics::INGEST_WAL_WRITE_BYTES
-            .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
-            ])
-            .inc_by(data.len() as u64); */
-
-        let mut file = self.file.as_ref().unwrap().write().unwrap();
-
-        let mut writer = StreamWriter::try_new(&mut *file, schema).unwrap();
-        writer.write(&data).unwrap();
-        writer.finish().unwrap();
+        if self.use_cache {
+            let mut cache = self.cache.as_ref().unwrap().write().unwrap();
+            let mut buf = Arc::get_mut(&mut cache).unwrap().writer();
+            let mut writer = StreamWriter::try_new(&mut buf, schema).unwrap();
+            writer.write(&data).unwrap();
+            writer.finish().unwrap();
+        } else {
+            let mut file = self.file.as_ref().unwrap().write().unwrap();
+            let mut writer = StreamWriter::try_new(&mut *file, schema).unwrap();
+            writer.write(&data).unwrap();
+            writer.finish().unwrap();
+        }
     }
 
     #[inline]
     pub fn read(&self) -> Result<Vec<u8>, std::io::Error> {
         if self.use_cache {
-            Ok(self
-                .cache
-                .as_ref()
-                .unwrap()
-                .read()
-                .unwrap()
-                .to_owned()
-                .into())
+            let data = self.cache.as_ref().unwrap().read().unwrap();
+            Ok(data.to_vec())
         } else {
             get_file_contents(&self.full_name())
         }
@@ -437,16 +423,8 @@ impl RwFile {
         if self.use_cache {
             let file_path = format!("{}{}", self.dir, self.name);
             let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-            MEMORY_FILES.insert(
-                file_path.to_string(),
-                self.cache
-                    .as_ref()
-                    .unwrap()
-                    .read()
-                    .unwrap()
-                    .to_owned()
-                    .freeze(),
-            );
+            let data = self.cache.as_ref().unwrap().read().unwrap().clone();
+            MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
         } else {
             self.file
                 .as_ref()

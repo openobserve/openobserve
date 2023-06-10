@@ -318,7 +318,7 @@ pub async fn chk_schema_by_record(
 
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
-    thread_id: actix_web::web::Data<usize>,
+    thread_id: usize,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -329,7 +329,7 @@ pub fn write_file(
             continue;
         }
         let file = crate::infra::wal::get_or_create(
-            *thread_id.as_ref(),
+            thread_id,
             org_id,
             stream_name,
             stream_type,

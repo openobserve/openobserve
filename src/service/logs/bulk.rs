@@ -299,7 +299,7 @@ pub async fn ingest(
         // write to file
         write_file(
             stream_data.data,
-            thread_id.clone(),
+            **thread_id,
             org_id,
             &stream_name,
             StreamType::Logs,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use arrow_array::{Int64Array, RecordBatch};
 use arrow_schema::{DataType, Field};
@@ -41,8 +41,8 @@ use arrow::json::reader::{Decoder, DecoderOptions};
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    body: actix_web::web::Bytes,
-    thread_id: web::Data<usize>,
+    body: &[json::Value],
+    thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
 
@@ -67,7 +67,7 @@ pub async fn ingest(
         );
     }
     if CONFIG.common.simple_path {
-        process_as_arrow(org_id, stream_name, &body, &thread_id).await
+        process_as_arrow(org_id, stream_name, body, thread_id).await
     } else {
         process_as_json(org_id, stream_name, body, thread_id, start).await
     }
@@ -76,8 +76,8 @@ pub async fn ingest(
 async fn process_as_json(
     stream_name: &str,
     org_id: &str,
-    body: bytes::Bytes,
-    thread_id: web::Data<usize>,
+    body: &[json::Value],
+    thread_id: usize,
     start: Instant,
 ) -> Result<HttpResponse, Error> {
     let mut min_ts =
@@ -128,8 +128,7 @@ async fn process_as_json(
     // End get stream alert
 
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
-    let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for item in reader.iter() {
+    for item in body.iter() {
         //JSON Flattening
         let mut value = json::flatten_json_and_format_field(item);
 
@@ -234,8 +233,8 @@ async fn process_as_json(
 async fn process_as_arrow(
     org_id: &str,
     stream_name: &String,
-    body: &bytes::Bytes,
-    thread_id: &web::Data<usize>,
+    body: &[json::Value],
+    thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
     let ts: i64 = Utc::now().timestamp_micros();
@@ -248,10 +247,8 @@ async fn process_as_arrow(
     )
     .await;
 
-    let req_data: Vec<json::Value> = serde_json::from_slice(body)?;
-
     let inferred_schema =
-        match arrow::json::reader::infer_json_schema_from_iterator(req_data.iter().map(Ok)) {
+        match arrow::json::reader::infer_json_schema_from_iterator(body.iter().map(Ok)) {
             Ok(schema) => schema,
             Err(_) => {
                 return Ok(
@@ -295,8 +292,8 @@ async fn process_as_arrow(
         ),
     }
 
-    let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(req_data.len());
-    let value_iter: &mut (dyn Iterator<Item = json::Value>) = &mut req_data.into_iter();
+    let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(body.len());
+    let value_iter = body.iter().cloned();
 
     #[allow(deprecated)]
     let reader = Decoder::new(
@@ -324,7 +321,7 @@ async fn process_as_arrow(
     let hour_key = Utc::now().format("%Y_%m_%d_%H").to_string();
 
     let rw_file = crate::infra::wal::get_or_create_arrow(
-        *thread_id.as_ref(),
+        thread_id,
         org_id,
         stream_name,
         StreamType::Logs,
