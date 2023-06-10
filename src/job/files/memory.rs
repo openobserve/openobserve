@@ -90,7 +90,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let task: task::JoinHandle<Result<(String, String, FileMeta, StreamType), anyhow::Error>> =
             task::spawn(async move {
                 let ret = if CONFIG.common.simple_path {
-                    upload_file(
+                    upload_arrow_files(
                         &org_id,
                         &stream_name,
                         stream_type,
@@ -100,7 +100,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     )
                     .await
                 } else {
-                    upload_arrow_files(
+                    upload_file(
                         &org_id,
                         &stream_name,
                         stream_type,
