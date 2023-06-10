@@ -110,7 +110,7 @@ pub async fn schema_evolution(
 }
 
 // Hack to allow widening conversion, method overrides Schema::try_merge
-fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowError> {
+pub fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowError> {
     let mut merged_metadata: HashMap<String, String> = HashMap::new();
     let mut merged_fields: Vec<Field> = Vec::new();
     // TODO : this dummy initialization is to avoid compiler complaining for uninitialized value

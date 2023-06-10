@@ -13,6 +13,9 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
+use arrow::ipc::writer::StreamWriter;
+use arrow_array::RecordBatch;
+use arrow_schema::Schema;
 use bytes::{Bytes, BytesMut};
 use once_cell::sync::Lazy;
 use std::{
@@ -40,14 +43,18 @@ struct Manager {
 pub struct MemoryFiles {
     pub data: Arc<RwLock<HashMap<String, Bytes>>>,
 }
+#[derive(Clone)]
+struct StreamMeta {
+    org_id: String,
+    stream_name: String,
+    stream_type: StreamType,
+}
 
 pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
     cache: Option<RwLock<BytesMut>>,
-    org_id: String,
-    stream_name: String,
-    stream_type: StreamType,
+    stream_meta: StreamMeta,
     dir: String,
     name: String,
     expired: i64,
@@ -61,7 +68,29 @@ pub fn get_or_create(
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    MANAGER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+    let stream_meta = StreamMeta {
+        org_id: org_id.to_string(),
+        stream_name: stream_name.to_string(),
+        stream_type,
+    };
+
+    MANAGER.get_or_create(thread_id, stream_meta, key, use_cache, false)
+}
+
+pub fn get_or_create_arrow(
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    key: &str,
+    use_cache: bool,
+) -> Arc<RwFile> {
+    let stream_meta = StreamMeta {
+        org_id: org_id.to_string(),
+        stream_name: stream_name.to_string(),
+        stream_type,
+    };
+    MANAGER.get_or_create(thread_id, stream_meta, key, use_cache, true)
 }
 
 pub fn check_in_use(
@@ -85,9 +114,9 @@ pub fn get_search_in_memory_files(
     // read usesing files in use
     for data in MANAGER.data.iter() {
         for (_, file) in data.read().unwrap().iter() {
-            if file.org_id == org_id
-                && file.stream_name == stream_name
-                && file.stream_type == stream_type
+            if file.stream_meta.org_id == org_id
+                && file.stream_meta.stream_name == stream_name
+                && file.stream_meta.stream_type == stream_type
             {
                 if let Ok(data) = file.read() {
                     files.push(data);
@@ -185,23 +214,24 @@ impl Manager {
     pub fn create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream_meta: StreamMeta,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
     ) -> Arc<RwFile> {
-        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let full_key = format!(
+            "{}_{}_{}_{key}",
+            stream_meta.org_id, stream_meta.stream_name, stream_meta.stream_type
+        );
         let file = Arc::new(RwFile::new(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            stream_meta.clone(),
             key,
             use_cache,
+            use_arrow,
         ));
         let mut data = self.data.get(thread_id).unwrap().write().unwrap();
-        if !stream_type.eq(&StreamType::EnrichmentTables) {
+        if !stream_meta.stream_type.eq(&StreamType::EnrichmentTables) {
             data.insert(full_key, file.clone());
         };
         file
@@ -210,16 +240,21 @@ impl Manager {
     pub fn get_or_create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream_meta: StreamMeta,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
     ) -> Arc<RwFile> {
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, key) {
+        if let Some(file) = self.get(
+            thread_id,
+            &stream_meta.org_id,
+            &stream_meta.stream_name,
+            stream_meta.stream_type,
+            key,
+        ) {
             file
         } else {
-            self.create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+            self.create(thread_id, stream_meta, key, use_cache, use_arrow)
         }
     }
 
@@ -273,15 +308,17 @@ impl MemoryFiles {
 impl RwFile {
     fn new(
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream_meta: StreamMeta,
         key: &str,
         use_cache: bool,
+        use_arrow: bool,
     ) -> RwFile {
         let mut dir_path = format!(
-            "{}files/{org_id}/{stream_type}/{stream_name}/",
-            &CONFIG.common.data_wal_dir
+            "{}files/{}/{}/{}/",
+            &CONFIG.common.data_wal_dir,
+            stream_meta.org_id,
+            stream_meta.stream_type,
+            stream_meta.stream_name
         );
         // Hack for file_list
         let file_list_prefix = "/files//file_list//";
@@ -289,7 +326,11 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json);
+        let file_name = if use_arrow {
+            format!("{thread_id}_{key}_{id}{}", ".arrow")
+        } else {
+            format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json)
+        };
         let file_path = format!("{dir_path}{file_name}");
         std::fs::create_dir_all(&dir_path).unwrap();
 
@@ -308,9 +349,7 @@ impl RwFile {
             use_cache,
             file,
             cache,
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            stream_type,
+            stream_meta,
             dir: dir_path,
             name: file_name,
             expired: chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64,
@@ -322,16 +361,16 @@ impl RwFile {
         // metrics
         metrics::INGEST_WAL_USED_BYTES
             .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
+                &self.stream_meta.org_id,
+                &self.stream_meta.stream_name,
+                self.stream_meta.stream_type.to_string().as_str(),
             ])
             .add(data.len() as i64);
         metrics::INGEST_WAL_WRITE_BYTES
             .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
+                &self.stream_meta.org_id,
+                &self.stream_meta.stream_name,
+                self.stream_meta.stream_type.to_string().as_str(),
             ])
             .inc_by(data.len() as u64);
         if self.use_cache {
@@ -350,6 +389,31 @@ impl RwFile {
                 .write_all(data)
                 .unwrap();
         }
+    }
+
+    #[inline]
+    pub fn write_for_schema(&self, data: RecordBatch, schema: &Schema) {
+        // metrics
+        /*         metrics::INGEST_WAL_USED_BYTES
+            .with_label_values(&[
+                &self.org_id,
+                &self.stream_name,
+                self.stream_type.to_string().as_str(),
+            ])
+            .add(data.len() as i64);
+        metrics::INGEST_WAL_WRITE_BYTES
+            .with_label_values(&[
+                &self.org_id,
+                &self.stream_name,
+                self.stream_type.to_string().as_str(),
+            ])
+            .inc_by(data.len() as u64); */
+
+        let mut file = self.file.as_ref().unwrap().write().unwrap();
+
+        let mut writer = StreamWriter::try_new(&mut *file, schema).unwrap();
+        writer.write(&data).unwrap();
+        writer.finish().unwrap();
     }
 
     #[inline]
@@ -461,7 +525,17 @@ mod tests {
         let stream_type = StreamType::Logs;
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let file = RwFile::new(
+            thread_id,
+            StreamMeta {
+                org_id: org_id.to_owned(),
+                stream_name: stream_name.to_owned(),
+                stream_type,
+            },
+            key,
+            use_cache,
+            false,
+        );
         let data = "test_data".to_string().into_bytes();
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);
