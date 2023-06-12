@@ -393,9 +393,6 @@ export default defineComponent({
       } else {
         return true
       }
-
-
-
     }
 
     const savePanelChangesToDashboard = async (dashId: string) => {

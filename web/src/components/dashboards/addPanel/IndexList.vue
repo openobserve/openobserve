@@ -80,7 +80,7 @@
               @dragleave="onDragLeave"
               @dragover="onDragOver"
               @drop="onDrop"
-              :style="props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''"
+              :style="dashboardPanelData.data.customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''"
             >
               <div class="field_overlay" :title="props.row.name">
                 <div
@@ -102,7 +102,7 @@
                   />
                   {{ props.row.name }}
                 </div>
-                <div class="field_icons" v-if="!promqlMode">
+                <div class="field_icons" v-if="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
                   <q-btn
                     color="white"
                     padding="sm"
