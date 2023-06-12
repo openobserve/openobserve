@@ -142,6 +142,9 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         match task.await {
             Ok(ret) => match ret {
                 Ok((path, key, meta, _stream_type)) => {
+                    if path.is_empty() {
+                        continue;
+                    }
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             match fs::remove_file(&path) {
@@ -271,6 +274,9 @@ async fn move_arrow_files_to_storage() -> Result<(), anyhow::Error> {
         match task.await {
             Ok(ret) => match ret {
                 Ok((path, key, meta, _stream_type)) => {
+                    if path.is_empty() {
+                        continue;
+                    }
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             match fs::remove_file(&path) {
@@ -328,7 +334,7 @@ async fn upload_file(
                 e
             );
         }
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+        return Ok(("".to_string(), FileMeta::default(), stream_type));
     }
 
     // metrics
@@ -475,7 +481,7 @@ async fn upload_arrow_files(
                 e
             );
         }
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+        return Ok(("".to_string(), FileMeta::default(), stream_type));
     }
 
     // metrics

@@ -124,6 +124,9 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         match task.await {
             Ok(ret) => match ret {
                 Ok((path, key, meta, _stream_type)) => {
+                    if path.is_empty() {
+                        continue;
+                    }
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
                             wal::MEMORY_FILES.remove(&path);
@@ -163,7 +166,7 @@ async fn upload_file(
     log::info!("[JOB] File upload begin: memory: {}", path_str);
     if file_size == 0 {
         wal::MEMORY_FILES.remove(path_str);
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+        return Ok(("".to_string(), FileMeta::default(), stream_type));
     }
 
     // metrics
@@ -298,7 +301,7 @@ async fn upload_arrow_files(
     log::info!("[JOB] File upload begin: memory: {}", path_str);
     if file_size == 0 {
         wal::MEMORY_FILES.remove(path_str);
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+        return Ok(("".to_string(), FileMeta::default(), stream_type));
     }
 
     let file = buf.reader();
