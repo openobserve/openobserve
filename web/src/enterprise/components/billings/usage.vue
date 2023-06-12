@@ -87,15 +87,8 @@ export default defineComponent({
       )
         .then((res) => {
           const chartRes = res.data.data;
-          // .map((item, index) => {
-          //   if (index < 10) {
-          //     item.event = "multi";
-          //   }
-          //   return item;
-          // });
-
           var chartObj: any = JSON.parse(JSON.stringify(blankChartObj));
-          if (chartRes.length > 0) {
+          if (chartRes?.length > 0) {
             chartRes.forEach(
               (data: {
                 event: string;
