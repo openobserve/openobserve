@@ -46,7 +46,7 @@ output.elasticsearch:
   hosts: ["{{ endpoint.host }}"]
   timeout: 10
   path: "/api/{{ currOrgIdentifier }}"
-  index: {stream}
+  index: default
   username: "{{ currUserEmail }}"
   password: "{{ store.state.organizationPasscode }}"</pre
     >
