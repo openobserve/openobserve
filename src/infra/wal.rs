@@ -59,6 +59,7 @@ pub struct RwFile {
     stream_meta: StreamMeta,
     dir: String,
     name: String,
+    size: RwLock<usize>,
     expired: i64,
 }
 
@@ -313,7 +314,7 @@ impl RwFile {
         stream_meta: StreamMeta,
         key: &str,
         use_cache: bool,
-        use_arrow: bool,
+        _use_arrow: bool,
     ) -> RwFile {
         let mut dir_path = format!(
             "{}files/{}/{}/{}/",
@@ -328,11 +329,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = if use_arrow {
-            format!("{thread_id}_{key}_{id}{}", ".arrow")
-        } else {
-            format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json)
-        };
+        let file_name = format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json);
         let file_path = format!("{dir_path}{file_name}");
         std::fs::create_dir_all(&dir_path).unwrap();
 
@@ -342,14 +339,13 @@ impl RwFile {
                 Some(RwLock::new(Arc::new(BytesMut::with_capacity(524288)))),
             ) // 512KB
         } else {
-            // let f = OpenOptions::new()
-            //     .write(true)
-            //     .create(true)
-            //     .append(true)
-            //     .open(&file_path)
-            //     .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
-            // (Some(RwLock::new(f)), None)
-            (None, None)
+            let f = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(true)
+                .open(&file_path)
+                .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
+            (Some(RwLock::new(f)), None)
         };
         RwFile {
             use_cache,
@@ -359,12 +355,16 @@ impl RwFile {
             stream_meta,
             dir: dir_path,
             name: file_name,
+            size: RwLock::new(0),
             expired: chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64,
         }
     }
 
     #[inline]
     pub fn write(&self, data: &[u8]) {
+        let mut new_size = self.size.write().unwrap();
+        *new_size += data.len();
+
         // metrics
         metrics::INGEST_WAL_USED_BYTES
             .with_label_values(&[
@@ -385,18 +385,21 @@ impl RwFile {
             let buf = Arc::get_mut(&mut cache).unwrap();
             buf.extend_from_slice(data);
         } else {
-            // self.file
-            //     .as_ref()
-            //     .unwrap()
-            //     .write()
-            //     .unwrap()
-            //     .write_all(data)
-            //     .unwrap();
+            self.file
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .write_all(data)
+                .unwrap();
         }
     }
 
     #[inline]
-    pub fn write_for_schema(&self, data: RecordBatch, schema: &Schema) {
+    pub fn write_for_schema(&self, schema: &Schema, data: RecordBatch, original_size: usize) {
+        let mut new_size = self.size.write().unwrap();
+        *new_size += original_size;
+
         if self.use_cache {
             let mut cache = self.cache.as_ref().unwrap().write().unwrap();
             let mut buf = Arc::get_mut(&mut cache).unwrap().writer();
@@ -407,8 +410,7 @@ impl RwFile {
         } else {
             let mut rw_writer = self.arrow_file.write().unwrap();
             if rw_writer.is_none() {
-                println!("create new writer");
-                let file_path = format!("{}{}", self.dir, self.name);
+                let file_path = format!("{}{}", self.dir, self.name.replace(".json", ".arrow"));
                 let file = OpenOptions::new()
                     .write(true)
                     .create(true)
@@ -443,30 +445,24 @@ impl RwFile {
             let data = self.cache.as_ref().unwrap().read().unwrap().clone();
             MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
         } else {
-            // self.file
-            //     .as_ref()
-            //     .unwrap()
-            //     .write()
-            //     .unwrap()
-            //     .sync_all()
-            //     .unwrap()
+            self.file
+                .as_ref()
+                .unwrap()
+                .write()
+                .unwrap()
+                .sync_all()
+                .unwrap();
             let mut writer = self.arrow_file.write().unwrap();
-            let writer = writer.as_mut().unwrap();
-            writer.finish().unwrap();
+            if writer.is_some() {
+                let writer = writer.as_mut().unwrap();
+                writer.finish().unwrap();
+            }
         }
     }
 
     #[inline]
     pub fn size(&self) -> i64 {
-        if self.use_cache {
-            self.cache.as_ref().unwrap().write().unwrap().len() as i64
-        } else {
-            // match self.file.as_ref().unwrap().read() {
-            //     Ok(f) => f.metadata().unwrap().len() as i64,
-            //     Err(_) => 0,
-            // }
-            0
-        }
+        *self.size.read().unwrap() as i64
     }
 
     #[inline]

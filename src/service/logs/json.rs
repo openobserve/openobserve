@@ -41,7 +41,7 @@ use arrow::json::reader::{Decoder, DecoderOptions};
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    body: &[json::Value],
+    body: actix_web::web::Bytes,
     thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
@@ -66,10 +66,14 @@ pub async fn ingest(
             )),
         );
     }
+
+    let body_size = body.len();
+    let body: Vec<json::Value> = json::from_slice(&body)?;
+
     if CONFIG.common.simple_path {
-        process_as_arrow(org_id, stream_name, body, thread_id).await
+        process_as_arrow(org_id, stream_name, &body, body_size, thread_id).await
     } else {
-        process_as_json(org_id, stream_name, body, thread_id, start).await
+        process_as_json(org_id, stream_name, &body, thread_id, start).await
     }
 }
 
@@ -234,6 +238,7 @@ async fn process_as_arrow(
     org_id: &str,
     stream_name: &String,
     body: &[json::Value],
+    body_size: usize,
     thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     let start = Instant::now();
@@ -328,7 +333,7 @@ async fn process_as_arrow(
         &hour_key,
         CONFIG.common.wal_memory_mode_enabled,
     );
-    rw_file.write_for_schema(fb, &schema);
+    rw_file.write_for_schema(&schema, fb, body_size);
 
     if !stream_schema.has_fields {
         let mut metadata = schema.metadata().clone();
