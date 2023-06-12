@@ -129,7 +129,7 @@
                               round
                               class="q-mr-sm pointer"
                             ></q-btn
-                            >Inlcude Search Term</q-item-label
+                            >Include Search Term</q-item-label
                           >
                         </q-item-section>
                       </q-item>

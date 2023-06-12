@@ -132,7 +132,7 @@
                               dense
                               class="q-mr-sm pointer"
                             ></q-icon
-                            >Inlcude Search Term</q-item-label
+                            >Include Search Term</q-item-label
                           >
                         </q-item-section>
                       </q-item>
