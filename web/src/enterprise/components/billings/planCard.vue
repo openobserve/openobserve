@@ -39,6 +39,9 @@
               <span v-if="planData.for == 'startups'">{{
                 t("billing.startups")
               }}</span>
+              <span v-if="planData.for == 'business'"
+                >For {{ t("billing.business") }}</span
+              >
             </span>
             <span class="row text-h5 text-weight-bold">
               <span class="secondaryColor" v-if="planData.type == 'basic'">{{
@@ -47,11 +50,18 @@
               <span class="primaryColor" v-if="planData.type == 'pro'">{{
                 t("billing.pro")
               }}</span>
+              <span class="primaryColor" v-if="planData.type == 'business'">{{
+                t("billing.business")
+              }}</span>
             </span>
           </div>
         </div>
         <q-icon
-          v-if="(isProPlan && planData.pro) || (!isProPlan && planData.basic)"
+          v-if="
+            isPaidPlan == planData.type ||
+            !isPaidPlan == planData.type ||
+            isPaidPlan == planData.business
+          "
           name="check_circle"
           size="md"
           color="primary"
@@ -62,7 +72,8 @@
       </div> -->
       <div class="q-mt-md text-body text-weight-redular text-h6">
         <span
-          class="text-weight-bold free text-body" style="font-size:30px;"
+          class="text-weight-bold free text-body"
+          style="font-size: 30px"
           :class="{
             secondaryColor: planData.price == 'Free',
             primaryColor: planData.price != 'Free',
@@ -76,39 +87,30 @@
       <div class="text-body1 text-weight-bold q-mt-md">
         {{ t("billing.whatIsIncluded") }}
       </div>
-      <div class="text-body1 text-weight-bold q-mt-md" v-if="planData.type == 'pro'">
-          {{ t("billing.everythingDeveloperPlan") }}
+      <div
+        class="text-body1 text-weight-bold q-mt-md"
+        v-if="planData.type == 'pro' || planData.type == 'business'"
+      >
+        {{ t("billing.everythingDeveloperPlan") }}
       </div>
       <div class="q-mt-lg q-mb-xl">
-        <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px"
-:color="cardColor" />
-          <span class="q-ml-sm text-body1 text-weight-redular">{{
-            planData.included.rule1
-          }}</span>
-        </div>
-        <div class="q-mt-sm">
-          <q-icon name="check_circle" size="20px"
-:color="cardColor" />
-          <span class="q-ml-sm text-body1 text-weight-redular">{{
-            planData.included.rule2
-          }}</span>
-        </div>
-        <div class="q-mt-sm" v-if="planData.included.rule3 != ''">
-          <q-icon name="check_circle" size="20px"
-:color="cardColor" />
-          <span class="q-ml-sm text-body1 text-weight-redular">{{
-            planData.included.rule3
-          }}</span>
+        <div class="q-mt-sm" v-for="rule in planData.included">
+          <q-icon name="check_circle"
+size="20px" :color="cardColor" />
+          <span class="q-ml-sm text-body1 text-weight-redular">{{ rule }}</span>
         </div>
       </div>
       <q-btn
-        v-if="(planData.basic && isProPlan) || (planData.pro && !isProPlan)"
+        v-if="
+          isPaidPlan !== planData.type ||
+          isPaidPlan !== planData.type ||
+          isPaidPlan !== planData.type
+        "
         class="full-width card-btn"
         type="button"
         :color="cardColor"
         no-caps
-        @click="onGetStartedSubscription"
+        @click="onGetStartedSubscription(planData.type)"
         :disable="freeLoading || proLoading"
       >
         <div v-if="freeLoading || proLoading">
@@ -124,7 +126,11 @@
       </q-btn>
 
       <div
-        v-if="(isProPlan && planData.pro) || (!isProPlan && planData.basic)"
+        v-if="
+          isPaidPlan == planData.type ||
+          isPaidPlan == planData.type ||
+          isPaidPlan == planData.type
+        "
         class="row justify-center items-center card-btn"
         :class="cardColor"
       >
@@ -143,7 +149,7 @@ import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PlanCard",
-  props: ["plan", "hasProPlan", "freeLoading", "proLoading"],
+  props: ["plan", "isPaidPlan", "freeLoading", "proLoading"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -152,16 +158,20 @@ export default defineComponent({
     const cardColor = ref(props?.plan?.color);
     const loading = ref(false);
 
-    const isProPlan = computed(() => {
-      return props.hasProPlan;
+    const isPaidPlan = computed(() => {
+      return props.isPaidPlan;
     });
 
-    const onGetStartedSubscription = () => {
+    const onGetStartedSubscription = (planType: string) => {
       loading.value = true;
-      if (planData.value.for == "startups") {
+      if (planType == "pro") {
         emit("update:proSubscription");
-      } else if (isProPlan.value && planData.value.for == "individuals") {
+      } else if (
+        planType == "basic"
+      ) {
         emit("update:freeSubscription");
+      } else if (planType == "business") {
+        emit("update:businessSubscription");
       }
     };
 
@@ -169,7 +179,7 @@ export default defineComponent({
       t,
       planData,
       cardColor,
-      isProPlan,
+      isPaidPlan,
       onGetStartedSubscription,
       loading,
       getImageURL,
@@ -181,8 +191,7 @@ export default defineComponent({
 .my-card {
   width: 394px;
   max-width: 394px;
-  height: 530px;
-  max-height: 530px;
+  height: auto;
   border: 1px solid $card-border;
   box-shadow: 0px 2px 12px rgba(20, 20, 43, 0.08);
   border-radius: 24px;
