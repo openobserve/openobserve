@@ -546,7 +546,6 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       streamTypes,
-      toggleExpandField,
     };
   },
 });
