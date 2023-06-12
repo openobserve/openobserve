@@ -360,13 +360,12 @@ export default defineComponent({
     onScroll(info: any) {
       this.searchObj.meta.scrollInfo = info;
       if (
-        info.ref.items.length / info.index <= 2 &&
+        info.ref.items.length / info.index <= 1.3 &&
         this.searchObj.loading == false &&
         this.searchObj.data.resultGrid.currentPage <=
-          this.searchObj.data.queryResults.from /
+          this.searchObj.data.queryResults.hits.length /
             this.searchObj.meta.resultGrid.rowsPerPage
       ) {
-        this.searchObj.data.resultGrid.currentPage += 1;
         this.$emit("update:scroll");
       }
     },

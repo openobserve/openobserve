@@ -10,7 +10,7 @@
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
-//  limitations under the License. 
+//  limitations under the License.
 
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
@@ -18,53 +18,58 @@ import { useLocalOrganization, getPath } from "./zincutils";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
-export const getDefaultOrganization = async (userInfo: any, org_identifier: any) => {
-  await organizationsService.os_list(0, 1000, "id", false, "", org_identifier).then((res: any) => {
-    const localOrg: any = useLocalOrganization();
-    if (
-      localOrg.value != null &&
-      localOrg.value.user_email !== userInfo.email
-    ) {
-      localOrg.value = null;
-      useLocalOrganization("");
-    }
-
-    orgOptions.value = res.data.data.map(
-      (data: {
-        id: any;
-        name: any;
-        org_type: any;
-        identifier: any;
-        user_obj: any;
-        ingest_threshold: number;
-        search_threshold: number;
-      }) => {
-        const optiondata: any = {
-          label: data.name,
-          id: data.id,
-          type: data.org_type,
-          identifier: data.identifier,
-          user_email: userInfo.email,
-          ingest_threshold: data.ingest_threshold,
-          search_threshold: data.search_threshold,
-        };
-
-        if (
-          ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
-            data.org_type == "default" &&
-            userInfo.email == data.user_obj.email) ||
-          res.data.data.length == 1
-        ) {
-          selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-          useLocalOrganization(selectedOrg.value);
-          //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
-        }
-        return optiondata;
+export const getDefaultOrganization = async (
+  userInfo: any,
+  org_identifier: any
+) => {
+  await organizationsService
+    .os_list(0, 1000, "id", false, "", org_identifier)
+    .then((res: any) => {
+      const localOrg: any = useLocalOrganization();
+      if (
+        localOrg.value != null &&
+        localOrg.value.user_email !== userInfo.email
+      ) {
+        localOrg.value = null;
+        useLocalOrganization("");
       }
-    );
 
-    return res.data.data;
-  });
+      orgOptions.value = res.data.data.map(
+        (data: {
+          id: any;
+          name: any;
+          org_type: any;
+          identifier: any;
+          user_obj: any;
+          ingest_threshold: number;
+          search_threshold: number;
+        }) => {
+          const optiondata: any = {
+            label: data.name,
+            id: data.id,
+            type: data.org_type,
+            identifier: data.identifier,
+            user_email: userInfo.email,
+            ingest_threshold: data.ingest_threshold,
+            search_threshold: data.search_threshold,
+          };
+
+          if (
+            ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
+              data.org_type == "default" &&
+              userInfo.email == data.user_obj.email) ||
+            res.data.data.length == 1
+          ) {
+            selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
+            useLocalOrganization(selectedOrg.value);
+            //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
+          }
+          return optiondata;
+        }
+      );
+
+      return res.data.data;
+    });
 };
 
 export const redirectUser = (redirectURI: string | null) => {
@@ -88,6 +93,7 @@ export const logsErrorMessage = (code: number) => {
     20005: "SearchFunctionNotDefined",
     20006: "SearchParquetFileNotFound",
     20007: "SearchFieldHasNoCompatibleDataType",
+    20008: "SearchSQLExecuteError",
   };
 
   if (messages[code] != undefined) {

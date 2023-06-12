@@ -257,6 +257,11 @@ export default defineComponent({
           this.searchObj.data.queryResults.size +
             this.searchObj.data.queryResults.from
       ) {
+        this.searchObj.data.resultGrid.currentPage =
+          ((this.searchObj.data.queryResults?.hits?.length || 0) +
+            ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
+            150 -
+          1;
         this.searchObj.loading = true;
         this.getQueryData();
 
@@ -557,10 +562,11 @@ export default defineComponent({
             sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
             start_time: (new Date().getTime() - 900000) * 1000,
             end_time: new Date().getTime() * 1000,
-            from:
-              searchObj.data.resultGrid.currentPage *
-              searchObj.meta.resultGrid.rowsPerPage,
-            size: parseInt(searchObj.meta.resultGrid.rowsPerPage, 10),
+            from: searchObj.data.queryResults?.hits?.length || 0,
+            size: parseInt(
+              (searchObj.data.queryResults?.hits?.length || 0) + 150,
+              10
+            ),
           },
           aggs: {
             histogram:
@@ -1016,6 +1022,7 @@ export default defineComponent({
           }
         );
       }
+
       const totalRecords =
         (searchObj.data.resultGrid.currentPage + 1) *
           searchObj.meta.resultGrid.rowsPerPage <

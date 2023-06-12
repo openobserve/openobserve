@@ -21,7 +21,7 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 
-import { defineComponent, onMounted, ref, onUpdated } from "vue";
+import { defineComponent, onMounted, ref, onUpdated, onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "DoubleLineChart",
@@ -81,9 +81,14 @@ export default defineComponent({
       });
     });
 
-    onUpdated(async () => {
+    onBeforeMount(async () => {
       if (props.data) {
         chartID.value = "chart_" + props.data.id;
+      }
+    });
+
+    onUpdated(async () => {
+      if (props.data) {
         reDraw(props.data, props.data.chartParams);
       }
     });
