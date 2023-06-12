@@ -274,7 +274,7 @@ async fn process_as_arrow(
                     existing_schema.clone(),
                     inferred_schema.clone(),
                 ]) {
-                    Ok(_) => existing_schema.clone(),
+                    Ok(merged) => merged,
                     Err(e) => {
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(

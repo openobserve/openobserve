@@ -314,7 +314,7 @@ impl RwFile {
         stream_meta: StreamMeta,
         key: &str,
         use_cache: bool,
-        _use_arrow: bool,
+        use_arrow: bool,
     ) -> RwFile {
         let mut dir_path = format!(
             "{}files/{}/{}/{}/",
@@ -338,6 +338,8 @@ impl RwFile {
                 None,
                 Some(RwLock::new(Arc::new(BytesMut::with_capacity(524288)))),
             ) // 512KB
+        } else if use_arrow {
+            (None, None)
         } else {
             let f = OpenOptions::new()
                 .write(true)
@@ -347,6 +349,7 @@ impl RwFile {
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
+
         RwFile {
             use_cache,
             file,
@@ -445,17 +448,19 @@ impl RwFile {
             let data = self.cache.as_ref().unwrap().read().unwrap().clone();
             MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
         } else {
-            self.file
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
-                .sync_all()
-                .unwrap();
-            let mut writer = self.arrow_file.write().unwrap();
-            if writer.is_some() {
-                let writer = writer.as_mut().unwrap();
+            if self.file.is_some() {
+                self.file
+                    .as_ref()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .sync_all()
+                    .unwrap();
+            }
+            let mut arrow_file = self.arrow_file.write().unwrap(); // Acquire write lock
+            if let Some(writer) = arrow_file.as_mut() {
                 writer.finish().unwrap();
+                *arrow_file = None; // Set the writer to None
             }
         }
     }
