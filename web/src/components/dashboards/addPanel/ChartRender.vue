@@ -56,6 +56,8 @@ import { useQuasar, date } from "quasar";
 import queryService from "../../../services/search";
 import Plotly from "plotly.js";
 import moment from "moment";
+import { logsErrorMessage } from "@/utils/common";
+import { useI18n } from "vue-i18n";
 
 
 export default defineComponent({
@@ -81,6 +83,7 @@ export default defineComponent({
 
   setup(props) {
       const $q = useQuasar();
+      const { t } = useI18n();
       const store = useStore();
       const searchQueryData = reactive({
           data: [] as (any | Array<any>),
@@ -347,11 +350,20 @@ export default defineComponent({
                         searchQueryData.data = res.data.data;
                     })
                     .catch((error) => {
+                       let errStr = ""
+                        if (error.response != undefined) {
+                            errStr = error.response.data.error;
+                        } else {
+                            errStr = error.message;
+                        }
+                        const customMessage = logsErrorMessage(error.response.data.code);
+                        searchQueryData.data.errorCode = error.response.data.code;
+                        if (customMessage != "") {
+                            errStr = t(customMessage);
+                        }
                         $q.notify({
                             type: "negative",
-                            message: error?.response?.data?.error ? 
-                                        error?.response?.data?.error : 
-                                        "Something went wrong!",
+                            message: errStr,
                             timeout: 5000,
                         });
                     })
@@ -370,18 +382,27 @@ export default defineComponent({
                         searchQueryData.data = res.data.hits;
                     })
                     .catch((error) => {
+                        let errStr = ""
+                        if (error.response != undefined) {
+                            errStr = error.response.data.error;
+                        } else {
+                            errStr = error.message;
+                        }
+                        const customMessage = logsErrorMessage(error.response.data.code);
+                        searchQueryData.data.errorCode = error.response.data.code;
+                        if (customMessage != "") {
+                            errStr = t(customMessage);
+                        }
                         $q.notify({
                             type: "negative",
-                            message: error?.response?.data?.error ? 
-                                        error?.response?.data?.error : 
-                                        "Something went wrong!",
+                            message: errStr,
                             timeout: 5000,
                         });
                     })
                     .finally(() => {
                         searchQueryData.loading = false
-                    });
-            }
+                    });     
+        }
       };
 
       // If data or chart type is updated, rerender the chart
