@@ -490,15 +490,19 @@ async fn upload_arrow_files(
     let mut buf_parquet = Vec::new();
     let mut writer = new_writer(&mut buf_parquet, &arrow_schema);
 
-    match schema_reader.next() {
-        Some(Ok(batch_write)) => {
-            if let Err(err) = writer.write(&batch_write) {
-                return Err(anyhow::anyhow!("Failed to write batch: {}", err));
+    loop {
+        match schema_reader.next() {
+            Some(Ok(batch_write)) => {
+                if let Err(err) = writer.write(&batch_write) {
+                    return Err(anyhow::anyhow!("Failed to write batch: {}", err));
+                }
+                meta_batch.push(batch_write);
             }
-            meta_batch.push(batch_write);
+            Some(Err(err)) => return Err(anyhow::anyhow!("Failed to read batch: {}", err)),
+            None => {
+                break;
+            }
         }
-        Some(Err(err)) => return Err(anyhow::anyhow!("Failed to read batch: {}", err)),
-        None => (),
     }
 
     writer.close().unwrap();

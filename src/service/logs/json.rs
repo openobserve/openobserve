@@ -328,7 +328,6 @@ async fn process_as_arrow(
         &hour_key,
         CONFIG.common.wal_memory_mode_enabled,
     );
-
     rw_file.write_for_schema(fb, &schema);
 
     if !stream_schema.has_fields {

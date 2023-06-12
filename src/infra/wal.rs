@@ -54,6 +54,7 @@ struct StreamMeta {
 pub struct RwFile {
     use_cache: bool,
     file: Option<RwLock<File>>,
+    arrow_file: RwLock<Option<StreamWriter<File>>>,
     cache: Option<RwLock<Arc<BytesMut>>>,
     stream_meta: StreamMeta,
     dir: String,
@@ -341,17 +342,19 @@ impl RwFile {
                 Some(RwLock::new(Arc::new(BytesMut::with_capacity(524288)))),
             ) // 512KB
         } else {
-            let f = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .append(true)
-                .open(&file_path)
-                .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
-            (Some(RwLock::new(f)), None)
+            // let f = OpenOptions::new()
+            //     .write(true)
+            //     .create(true)
+            //     .append(true)
+            //     .open(&file_path)
+            //     .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
+            // (Some(RwLock::new(f)), None)
+            (None, None)
         };
         RwFile {
             use_cache,
             file,
+            arrow_file: RwLock::new(None),
             cache,
             stream_meta,
             dir: dir_path,
@@ -382,13 +385,13 @@ impl RwFile {
             let buf = Arc::get_mut(&mut cache).unwrap();
             buf.extend_from_slice(data);
         } else {
-            self.file
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
-                .write_all(data)
-                .unwrap();
+            // self.file
+            //     .as_ref()
+            //     .unwrap()
+            //     .write()
+            //     .unwrap()
+            //     .write_all(data)
+            //     .unwrap();
         }
     }
 
@@ -397,14 +400,28 @@ impl RwFile {
         if self.use_cache {
             let mut cache = self.cache.as_ref().unwrap().write().unwrap();
             let mut buf = Arc::get_mut(&mut cache).unwrap().writer();
-            let mut writer = StreamWriter::try_new(&mut buf, schema).unwrap();
+            let mut writer: StreamWriter<&mut bytes::buf::Writer<&mut BytesMut>> =
+                StreamWriter::try_new(&mut buf, schema).unwrap();
             writer.write(&data).unwrap();
             writer.finish().unwrap();
         } else {
-            let mut file = self.file.as_ref().unwrap().write().unwrap();
-            let mut writer = StreamWriter::try_new(&mut *file, schema).unwrap();
+            let mut rw_writer = self.arrow_file.write().unwrap();
+            if rw_writer.is_none() {
+                println!("create new writer");
+                let file_path = format!("{}{}", self.dir, self.name);
+                let file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(true)
+                    .open(file_path)
+                    .unwrap();
+                let writer = StreamWriter::try_new(file, schema).unwrap();
+                *rw_writer = Some(writer);
+            }
+            drop(rw_writer);
+            let mut writer = self.arrow_file.write().unwrap();
+            let writer = writer.as_mut().unwrap();
             writer.write(&data).unwrap();
-            writer.finish().unwrap();
         }
     }
 
@@ -426,13 +443,16 @@ impl RwFile {
             let data = self.cache.as_ref().unwrap().read().unwrap().clone();
             MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
         } else {
-            self.file
-                .as_ref()
-                .unwrap()
-                .write()
-                .unwrap()
-                .sync_all()
-                .unwrap()
+            // self.file
+            //     .as_ref()
+            //     .unwrap()
+            //     .write()
+            //     .unwrap()
+            //     .sync_all()
+            //     .unwrap()
+            let mut writer = self.arrow_file.write().unwrap();
+            let writer = writer.as_mut().unwrap();
+            writer.finish().unwrap();
         }
     }
 
@@ -441,10 +461,11 @@ impl RwFile {
         if self.use_cache {
             self.cache.as_ref().unwrap().write().unwrap().len() as i64
         } else {
-            match self.file.as_ref().unwrap().read() {
-                Ok(f) => f.metadata().unwrap().len() as i64,
-                Err(_) => 0,
-            }
+            // match self.file.as_ref().unwrap().read() {
+            //     Ok(f) => f.metadata().unwrap().len() as i64,
+            //     Err(_) => 0,
+            // }
+            0
         }
     }
 
