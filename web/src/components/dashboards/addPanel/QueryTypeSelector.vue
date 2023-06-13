@@ -44,7 +44,7 @@ export default defineComponent({
         const router = useRouter();
         const { t } = useI18n();
         const $q = useQuasar();
-        const { dashboardPanelData, removeXYFilters } = useDashboardPanelData();
+        const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } = useDashboardPanelData();
         const confirmQueryModeChangeDialog = ref(false);
         const selectedButtonType = ref("auto");
         const popupSelectedButtonType = ref("auto");
@@ -97,6 +97,7 @@ export default defineComponent({
             selectedButtonType.value = popupSelectedButtonType.value;
             await nextTick() // let the watchers execute first
             removeXYFilters()
+            updateXYFieldsForCustomQueryMode()
         };
 
         watch(() => dashboardPanelData.data.fields.stream_type, () => {
