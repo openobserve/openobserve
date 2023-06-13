@@ -15,7 +15,7 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header>
+    <q-header :class="!darkMode ? 'bg-white' : 'background'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
@@ -29,6 +29,10 @@
         </div>
 
         <q-toolbar-title></q-toolbar-title>
+         <q-toggle
+          v-model="darkMode"
+          label="Dark Mode"
+        ></q-toggle>
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
           <div
             type="warning"
@@ -172,6 +176,7 @@
     </q-header>
 
     <q-drawer
+    :class="!darkMode ? 'bg-white' : 'background'"
       :mini="miniMode"
       bordered
       show-if-above
@@ -225,6 +230,7 @@ import {
   QAvatar,
   QIcon,
   QSelect,
+  useQuasar,
 } from "quasar";
 import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
@@ -236,7 +242,7 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive, computed, onMounted } from "vue";
+import { ref, defineComponent, KeepAlive, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -307,8 +313,18 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+      const $q = useQuasar();
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
+
+    const darkMode = ref(false);
+
+    watch(darkMode, () => {
+      $q.dark.set(darkMode.value);
+
+    });
+
+
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
     )
@@ -616,6 +632,7 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       leftDrawerOpen: false,
+      darkMode,
       miniMode,
       user,
       zoBackendUrl,
@@ -667,7 +684,6 @@ export default defineComponent({
 .q-header {
   color: unset;
   @extend .border-bottom;
-  @extend .bg-white;
 
   .beta-text {
     font-size: 11px;
@@ -714,12 +730,6 @@ export default defineComponent({
   .block {
     font-weight: 700;
     color: #404040;
-  }
-}
-
-.languageWrapper {
-  .q-btn__content {
-    color: #646464;
   }
 }
 
@@ -808,7 +818,6 @@ export default defineComponent({
 
   .userName {
     line-height: 1.25rem;
-    color: #404040;
     font-weight: 700;
   }
 
@@ -832,10 +841,6 @@ export default defineComponent({
 .languageWrapper {
   margin-right: 0.75rem;
   margin-left: 1rem;
-
-  .q-btn__content {
-    color: #646464;
-  }
 }
 
 .languageDdl {
@@ -913,7 +918,6 @@ export default defineComponent({
 
   .userName {
     line-height: 1.25rem;
-    color: #404040;
     font-weight: 700;
   }
 
@@ -923,5 +927,10 @@ export default defineComponent({
     color: #565656;
     font-weight: 600;
   }
+
 }
+
+.background{
+    background-color: $dark-page;
+  }
 </style>

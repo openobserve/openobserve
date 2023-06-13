@@ -17,7 +17,7 @@
   <q-page class="q-pa-lg">
     <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-3">
+        <q-card-section align="center" flat bordered class="my-card bg-grey-8">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
