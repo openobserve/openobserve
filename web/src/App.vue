@@ -34,7 +34,7 @@ export default {
         endpoint =
           window.location.origin + window.location.pathname.slice(0, pos);
       }
-      store.dispatch("endpoint", endpoint);
+      // store.dispatch("endpoint", endpoint);
     }
     const router = useRouter();
     const creds = localStorage.getItem("creds");
