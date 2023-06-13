@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use crate::common::{file::scan_files, json};
-use crate::infra::{config::CONFIG, wal};
+use crate::infra::{cluster, config::CONFIG, wal};
 use crate::meta::{
     common::{FileKey, FileMeta},
     StreamType,
@@ -45,8 +45,10 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
             columns[4], columns[5], columns[6], columns[7]
         )
     };
-    let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
-    file.write(write_buf.as_ref());
+    if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
+        file.write(write_buf.as_ref());
+    }
 
     super::progress(key, meta, deleted).await?;
     super::broadcast::send(&[file_data]).await
