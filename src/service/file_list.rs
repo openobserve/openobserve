@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::Write;
+
 use crate::common;
-use crate::infra::cache::file_list;
-use crate::meta::common::FileMeta;
+use crate::infra::{cache::file_list, ider, storage};
+use crate::meta::common::{FileKey, FileMeta};
 use crate::meta::StreamType;
+use crate::service::db;
 
 #[inline]
 pub async fn get_file_list(
@@ -60,6 +63,44 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
         size += file_size;
     }
     Ok(size)
+}
+
+// Delete one parquet file and update the file list
+pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
+    let columns = key.split('/').collect::<Vec<&str>>();
+    if columns[0] != "files" || columns.len() < 9 {
+        return Ok(());
+    }
+    let new_file_list_key = format!(
+        "file_list/{}/{}/{}/{}/{}.json.zst",
+        columns[4],
+        columns[5],
+        columns[6],
+        columns[7],
+        ider::generate()
+    );
+
+    let meta = FileMeta::default();
+    let deleted = true;
+    let file_data = FileKey {
+        key: key.to_string(),
+        meta,
+        deleted,
+    };
+
+    // generate the new file list
+    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+    let mut write_buf = common::json::to_vec(&file_data)?;
+    write_buf.push(b'\n');
+    buf.write_all(&write_buf)?;
+    let compressed_bytes = buf.finish().unwrap();
+    storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+    db::file_list::progress(key, meta, deleted).await?;
+    db::file_list::broadcast::send(&[file_data]).await?;
+
+    // delete the parquet whaterever the file is exists or not
+    _ = storage::del(&[key]).await;
+    Ok(())
 }
 
 #[cfg(test)]

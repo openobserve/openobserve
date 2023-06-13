@@ -22,9 +22,7 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::infra::{cache::file_data, config::CONFIG};
-use crate::meta::{
-    common::FileMeta, search::Session as SearchSession, stream::StreamParams, StreamType,
-};
+use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
 use crate::service::{
     db, file_list,
     search::{
@@ -192,9 +190,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
                     log::error!("promql->search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) =
-                            db::file_list::local::set(&file, FileMeta::default(), true).await
-                        {
+                        if let Err(e) = file_list::delete_parquet_file(&file).await {
                             log::error!(
                                 "promql->search->storage: delete from file_list err: {}",
                                 e

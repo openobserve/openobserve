@@ -23,7 +23,6 @@ use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
-use crate::meta::common::FileMeta;
 use crate::service::search::datafusion::storage::StorageType;
 use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
@@ -253,9 +252,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
                     log::error!("search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) =
-                            db::file_list::local::set(&file, FileMeta::default(), true).await
-                        {
+                        if let Err(e) = file_list::delete_parquet_file(&file).await {
                             log::error!("search->storage: delete from file_list err: {}", e);
                         }
                         return Some(file);
