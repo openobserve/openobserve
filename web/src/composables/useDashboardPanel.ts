@@ -267,10 +267,41 @@ const useDashboardPanelData = () => {
   }
 
   const removeXYFilters = () => {
-    dashboardPanelData.data.fields.x.splice(0,dashboardPanelData.data.fields.x.length)
-    dashboardPanelData.data.fields.y.splice(0,dashboardPanelData.data.fields.y.length)
-    dashboardPanelData.data.fields.filter.splice(0,dashboardPanelData.data.fields.filter.length)
+    console.log("Clearing X, Y, and Filter fields");
+    if (promqlMode.value || dashboardPanelData.data.customQuery == false) {
+      console.log("promqlmode, Clearing X, Y, and Filter fields");
+      dashboardPanelData.data.fields.x.splice(0, dashboardPanelData.data.fields.x.length);
+      dashboardPanelData.data.fields.y.splice(0, dashboardPanelData.data.fields.y.length);
+      dashboardPanelData.data.fields.filter.splice(0, dashboardPanelData.data.fields.filter.length);
+      console.log("Fields cleared");
+    }
   }
+
+  // This function updates the x and y fields of a custom query in the dashboard panel data
+  const updateXYFieldsForCustomQueryMode = () => {
+    // Check if the custom query is enabled and PromQL mode is disabled
+    if (!promqlMode.value && dashboardPanelData.data.customQuery == true) {
+      // Loop through each custom query field in the dashboard panel data's stream meta
+      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
+        // Determine if the current field is an x or y field
+        const currentFieldType = index < dashboardPanelData.data.fields.x.length ? "x" : "y";
+        // Get the current field based on its index and whether it's an x or y field
+        const field = index < dashboardPanelData.data.fields.x.length
+            ? dashboardPanelData.data.fields.x[index]
+            : dashboardPanelData.data.fields.y[index - dashboardPanelData.data.fields.x.length];
+        // Get the name of the current custom query field
+        const { name } = it;
+
+        // Update the properties of the current field
+        field.alias = name; // Set the alias to the name of the custom query field
+        field.column = name; // Set the column to the name of the custom query field
+        field.color = null; // Reset the color to null
+        // If the current field is a y field, set the aggregation function to "count"
+        field.aggregationFunction = currentFieldType == "x" ? null : "count";
+      });
+    }
+  };
+
 
   return { 
     dashboardPanelData, 
@@ -282,6 +313,7 @@ const useDashboardPanelData = () => {
     removeFilterItem,
     addFilteredItem,
     removeXYFilters,
+    updateXYFieldsForCustomQueryMode,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
     promqlMode,
