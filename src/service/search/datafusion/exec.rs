@@ -398,7 +398,14 @@ pub async fn merge(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    config = config.infer_schema(&ctx.state()).await.unwrap();
+    config = match config.infer_schema(&ctx.state()).await {
+        Ok(config) => config,
+        Err(e) => {
+            return Err(datafusion::error::DataFusionError::Execution(format!(
+                "infer_schema error: {e}"
+            )));
+        }
+    };
 
     let table = ListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
