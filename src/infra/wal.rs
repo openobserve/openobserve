@@ -139,9 +139,8 @@ pub fn get_search_in_memory_files(
 
 pub fn flush_all_to_disk() {
     for data in MANAGER.data.iter() {
-        for (_, file) in data.read().unwrap().iter() {
-            file.sync();
-        }
+        let mut files = data.write().unwrap();
+        files.clear();
     }
 
     for (file, data) in MEMORY_FILES.list() {
@@ -207,7 +206,6 @@ impl Manager {
                 .write()
                 .unwrap()
                 .remove(&full_key);
-            file.sync();
             return None;
         }
 
@@ -329,7 +327,11 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json);
+        let file_name = if use_arrow {
+            format!("{thread_id}_{key}_{id}{}", ".arrow")
+        } else {
+            format!("{thread_id}_{key}_{id}{}", ".json")
+        };
         let file_path = format!("{dir_path}{file_name}");
         std::fs::create_dir_all(&dir_path).unwrap();
 
@@ -441,31 +443,6 @@ impl RwFile {
     }
 
     #[inline]
-    pub fn sync(&self) {
-        if self.use_cache {
-            let file_path = format!("{}{}", self.dir, self.name);
-            let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
-            let data = self.cache.as_ref().unwrap().read().unwrap().clone();
-            MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
-        } else {
-            if self.file.is_some() {
-                self.file
-                    .as_ref()
-                    .unwrap()
-                    .write()
-                    .unwrap()
-                    .sync_all()
-                    .unwrap();
-            }
-            let mut arrow_file = self.arrow_file.write().unwrap(); // Acquire write lock
-            if let Some(writer) = arrow_file.as_mut() {
-                writer.finish().unwrap();
-                *arrow_file = None; // Set the writer to None
-            }
-        }
-    }
-
-    #[inline]
     pub fn size(&self) -> i64 {
         *self.size.read().unwrap() as i64
     }
@@ -483,6 +460,31 @@ impl RwFile {
     #[inline]
     pub fn expired(&self) -> i64 {
         self.expired
+    }
+}
+
+impl Drop for RwFile {
+    fn drop(&mut self) {
+        if self.use_cache {
+            let file_path = format!("{}{}", self.dir, self.name);
+            let file_path = file_path.strip_prefix(&CONFIG.common.data_wal_dir).unwrap();
+            let data = self.cache.as_ref().unwrap().read().unwrap().clone();
+            MEMORY_FILES.insert(file_path.to_string(), bytes::Bytes::from(data.to_vec()));
+        } else {
+            if self.file.is_some() {
+                self.file
+                    .as_ref()
+                    .unwrap()
+                    .write()
+                    .unwrap()
+                    .sync_all()
+                    .unwrap();
+            }
+            let mut arrow_file = self.arrow_file.write().unwrap(); // Acquire write lock
+            if let Some(writer) = arrow_file.as_mut() {
+                writer.finish().unwrap(); 
+            }
+        }
     }
 }
 
