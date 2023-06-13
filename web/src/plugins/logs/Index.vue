@@ -188,8 +188,9 @@ import {
   onDeactivated,
   onActivated,
   computed,
+  onBeforeMount,
 } from "vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar, date, is } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -208,6 +209,7 @@ import {
   useLocalLogsObj,
   b64EncodeUnicode,
   useLocalLogFilterField,
+  b64DecodeUnicode,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -216,7 +218,11 @@ import {
   verifyOrganizationStatus,
   convertTimeFromMicroToMilli,
 } from "@/utils/zincutils";
-import { cloneDeep } from "lodash-es";
+import {
+  getQueryParamsForDuration,
+  getDurationObjectFromParams,
+} from "@/utils/date";
+import { first } from "lodash-es";
 
 export default defineComponent({
   name: "PageSearch",
@@ -370,7 +376,7 @@ export default defineComponent({
       }
     }
 
-    function getStreamList() {
+    function getStreamList(isFirstLoad = false) {
       try {
         const streamType = searchObj.data.stream.streamType || "logs";
         streamService
@@ -386,7 +392,7 @@ export default defineComponent({
               getQueryTransform();
 
               //extract stream data from response
-              loadStreamLists();
+              loadStreamLists(isFirstLoad);
             } else {
               searchObj.loading = false;
               searchObj.data.errorMsg =
@@ -418,7 +424,7 @@ export default defineComponent({
       }
     }
 
-    function loadStreamLists() {
+    function loadStreamLists(isFirstLoad = false) {
       try {
         searchObj.data.stream.streamLists = [];
         searchObj.data.stream.selectedStream = { label: "", value: "" };
@@ -432,7 +438,25 @@ export default defineComponent({
             };
             searchObj.data.stream.streamLists.push(itemObj);
 
-            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+            // If isFirstLoad is true, then select the stream from query params
+            if (
+              isFirstLoad &&
+              router.currentRoute.value?.query?.stream == item.name
+            ) {
+              lastUpdatedStreamTime = item.stats.doc_time_max;
+              selectedStreamItemObj = itemObj;
+            }
+
+            // If stream from query params dosent match the selected stream, then select the stream from last updated time
+            if (
+              item.stats.doc_time_max >= lastUpdatedStreamTime &&
+              !(
+                router.currentRoute.value.query?.stream &&
+                selectedStreamItemObj.value &&
+                router.currentRoute.value.query.stream ===
+                  selectedStreamItemObj.value
+              )
+            ) {
               lastUpdatedStreamTime = item.stats.doc_time_max;
               selectedStreamItemObj = itemObj;
             }
@@ -757,10 +781,36 @@ export default defineComponent({
           }
         }
 
+        updateUrlQueryParams();
+
         return req;
       } catch (e) {
         throw new ErrorException(e.message);
       }
+    }
+
+    function updateUrlQueryParams() {
+      const date = getQueryParamsForDuration(searchObj.data.datetime);
+      const query = {
+        stream: searchObj.data.stream.selectedStream.label,
+      };
+      if (date.period) {
+        query["period"] = date.period;
+      }
+      if (date.from && date.to) {
+        query["from"] = date.from;
+        query["to"] = date.to;
+      }
+      query["refresh"] = searchObj.meta.refreshInterval;
+
+      if (searchObj.data.query) {
+        query["sql_mode"] = searchObj.meta.sqlMode;
+        query["query"] = b64EncodeUnicode(searchObj.data.query);
+      }
+
+      query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+      router.push({ query });
     }
 
     function getQueryData() {
@@ -1056,7 +1106,7 @@ export default defineComponent({
       }
     }
 
-    function loadPageData() {
+    function loadPageData(isFirstLoad: boolean = false) {
       searchObj.loading = true;
       searchObj.data.resultGrid.currentPage = 0;
       resetSearchObj();
@@ -1064,7 +1114,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       //get stream list
-      getStreamList();
+      getStreamList(isFirstLoad);
     }
 
     function refreshStreamData() {
@@ -1077,13 +1127,29 @@ export default defineComponent({
       // getStreamList();
     }
 
-    onMounted(() => {
+    onBeforeMount(() => {
       if (searchObj.loading == false) {
-        loadPageData();
-
-        reDrawGrid();
+        loadPageData(true);
+        const queryParams = router.currentRoute.value.query;
+        const date = getDurationObjectFromParams(queryParams);
+        if (date) {
+          searchObj.data.datetime = date;
+        }
+        if (queryParams.query) {
+          searchObj.meta.sqlMode =
+            queryParams.sql_mode == "true" ? true : false;
+          searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+          searchObj.data.query = b64DecodeUnicode(queryParams.query);
+        }
+        if (queryParams.refresh) {
+          searchObj.meta.refreshInterval = queryParams.refresh;
+        }
         refreshData();
       }
+    });
+
+    onMounted(() => {
+      reDrawGrid();
     });
 
     onUpdated(() => {
@@ -1191,6 +1257,11 @@ export default defineComponent({
     };
 
     const setQuery = (sqlMode: boolean) => {
+      if (!searchBarRef.value) {
+        console.error("searchBarRef is null");
+        return;
+      }
+
       if (sqlMode) {
         let selectFields = "";
         let whereClause = "";
@@ -1393,6 +1464,7 @@ export default defineComponent({
       areStreamsPresent,
       toggleExpandLog,
       expandedLogs,
+      updateUrlQueryParams,
     };
   },
   computed: {
@@ -1526,6 +1598,7 @@ export default defineComponent({
       }
     },
     changeRefreshInterval() {
+      this.updateUrlQueryParams();
       this.refreshData();
     },
     fullSQLMode(newVal) {

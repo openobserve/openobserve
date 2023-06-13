@@ -208,8 +208,15 @@
 // @ts-nocheck
 import { ref, defineComponent } from "vue";
 import { getImageURL } from "../utils/zincutils";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
+  props: {
+    defaultDate: {
+      type: Object,
+      default: null,
+    },
+  },
   data() {
     return {
       relativePeriods: [
@@ -268,6 +275,9 @@ export default defineComponent({
     const datetimeBtn = ref();
 
     return { getDate, setDate, datetimeBtn, getImageURL };
+  },
+  beforeMount() {
+    if (this.defaultDate) this.selectedDate = cloneDeep(this.defaultDate);
   },
   computed: {
     displayValue() {

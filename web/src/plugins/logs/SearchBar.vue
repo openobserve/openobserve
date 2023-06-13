@@ -107,6 +107,7 @@
         ></q-btn>
         <div class="float-left">
           <date-time
+            :default-date="searchObj.data.datetime"
             data-test="logs-search-bar-date-time-dropdown"
             @date-change="updateDateTime"
           />
