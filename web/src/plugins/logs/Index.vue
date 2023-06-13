@@ -789,6 +789,22 @@ export default defineComponent({
       }
     }
 
+    function restoreUrlQueryParams() {
+      const queryParams = router.currentRoute.value.query;
+      const date = getDurationObjectFromParams(queryParams);
+      if (date) {
+        searchObj.data.datetime = date;
+      }
+      if (queryParams.query) {
+        searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
+        searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+        searchObj.data.query = b64DecodeUnicode(queryParams.query);
+      }
+      if (queryParams.refresh) {
+        searchObj.meta.refreshInterval = queryParams.refresh;
+      }
+    }
+
     function updateUrlQueryParams() {
       const date = getQueryParamsForDuration(searchObj.data.datetime);
       const query = {
@@ -1130,20 +1146,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (searchObj.loading == false) {
         loadPageData(true);
-        const queryParams = router.currentRoute.value.query;
-        const date = getDurationObjectFromParams(queryParams);
-        if (date) {
-          searchObj.data.datetime = date;
-        }
-        if (queryParams.query) {
-          searchObj.meta.sqlMode =
-            queryParams.sql_mode == "true" ? true : false;
-          searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-          searchObj.data.query = b64DecodeUnicode(queryParams.query);
-        }
-        if (queryParams.refresh) {
-          searchObj.meta.refreshInterval = queryParams.refresh;
-        }
+        restoreUrlQueryParams();
         refreshData();
       }
     });
