@@ -83,7 +83,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData, removeXYFilters } = useDashboardPanelData()
+    const { dashboardPanelData, updateXYFieldsForCustomQueryMode } = useDashboardPanelData()
     const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
@@ -264,6 +264,9 @@ export default defineComponent({
               dashboardPanelData.meta.stream.customQueryFields.push({name: val, type: ''});
             }
           });
+
+          // update the existing x and y axis fields
+          updateXYFieldsForCustomQueryMode()
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns")
         }
