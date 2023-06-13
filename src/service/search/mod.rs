@@ -494,7 +494,7 @@ pub async fn match_source(
     }
 
     // check time range
-    let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
+    let file_meta = file_list::get_file_meta(source).unwrap_or_default();
     if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
         return true;
     }
