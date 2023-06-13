@@ -190,7 +190,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
             if !file_data::exist(&file).unwrap_or_default() {
                 if let Err(e) = file_data::download(&file).await {
                     log::error!("promql->search->storage: download file err: {}", e);
-                    if e.to_string().contains("not found") {
+                    if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
                         if let Err(e) =
                             db::file_list::local::set(&file, FileMeta::default(), true).await
