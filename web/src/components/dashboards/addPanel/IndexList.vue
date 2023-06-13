@@ -85,13 +85,13 @@
               <div class="field_overlay" :title="props.row.name">
                 <div
                   class="field_label"
-                  draggable="true"
+                  :draggable="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
                   @dragstart="onDragStart($event, props.row)"
                 >
                   <q-icon
                     name="drag_indicator"
                     color="grey-13"
-                    class="drag_indicator q-mr-xs"
+                    :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
                     v-if="!promqlMode"
                   />
 
@@ -448,6 +448,10 @@ export default defineComponent({
         .drag_indicator {
           cursor: -webkit-grab;
           cursor: grab;
+        }
+
+        .drag_disabled {
+          cursor: not-allowed;
         }
       }
     }
