@@ -30,7 +30,7 @@ pub async fn get_file_list(
 }
 
 #[inline]
-pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     match file_list::get_file_from_cache(file) {
         Ok(v) => Ok(v),
         Err(_) => Ok(FileMeta::default()),
@@ -38,11 +38,11 @@ pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
 }
 
 #[inline]
-pub async fn calculate_files_size(files: &[String]) -> Result<(u64, u64), anyhow::Error> {
+pub fn calculate_files_size(files: &[String]) -> Result<(u64, u64), anyhow::Error> {
     let mut original_size = 0;
     let mut compressed_size = 0;
     for file in files {
-        let resp = get_file_meta(file).await.unwrap_or_default();
+        let resp = get_file_meta(file).unwrap_or_default();
         original_size += resp.original_size;
         compressed_size += resp.compressed_size;
     }
@@ -50,7 +50,7 @@ pub async fn calculate_files_size(files: &[String]) -> Result<(u64, u64), anyhow
 }
 
 #[inline]
-pub async fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error> {
+pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error> {
     let mut size = 0;
     for file in files {
         let file_size = match common::file::get_file_meta(file) {
@@ -70,8 +70,7 @@ mod test {
     async fn test_get_file_meta() {
         let res = get_file_meta(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-        )
-        .await;
+        );
         assert!(res.is_ok());
     }
 

@@ -56,7 +56,7 @@ pub(crate) async fn create_context(
 
     // calcuate scan size
     let (scan_original_size, scan_compressed_size) =
-        match file_list::calculate_files_size(&files.to_vec()).await {
+        match file_list::calculate_files_size(&files.to_vec()) {
             Ok(size) => size,
             Err(err) => {
                 log::error!("calculate files size error: {}", err);

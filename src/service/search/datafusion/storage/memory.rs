@@ -72,6 +72,15 @@ impl ObjectStore for FS {
             Err(_) => return storage::DEFAULT.get_range(location, range).await,
         };
         if range.end > data.len() {
+            let file = location.to_string();
+            let file_meta = crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+            log::error!(
+                "get_range: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
+                file,
+                file_meta,
+                range.end,
+                data.len()
+            );
             return Err(super::Error::OutOfRange(location.to_string()).into());
         }
         if range.start > range.end {
@@ -89,6 +98,16 @@ impl ObjectStore for FS {
             .iter()
             .map(|range| {
                 if range.end > data.len() {
+                    let file = location.to_string();
+                    let file_meta =
+                        crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+                    log::error!(
+                        "get_ranges: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
+                        file,
+                        file_meta,
+                        range.end,
+                        data.len()
+                    );
                     return Err(super::Error::OutOfRange(location.to_string()).into());
                 }
                 if range.start > range.end {

@@ -71,20 +71,19 @@ pub async fn search(
     let mut scan_compressed_size = 0;
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
-        (scan_original_size, scan_compressed_size) =
-            match file_list::calculate_files_size(&files).await {
-                Ok(size) => size,
-                Err(err) => {
-                    log::error!("calculate files size error: {}", err);
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "calculate files size error".to_string(),
-                    )));
-                }
-            };
+        (scan_original_size, scan_compressed_size) = match file_list::calculate_files_size(&files) {
+            Ok(size) => size,
+            Err(err) => {
+                log::error!("calculate files size error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    "calculate files size error".to_string(),
+                )));
+            }
+        };
         files_group.insert(schema_latest_id, files);
     } else {
         for file in &files {
-            let file_meta = file_list::get_file_meta(file).await.unwrap_or_default();
+            let file_meta = file_list::get_file_meta(file).unwrap_or_default();
             // calculate scan size
             scan_original_size += file_meta.original_size;
             scan_compressed_size += file_meta.compressed_size;

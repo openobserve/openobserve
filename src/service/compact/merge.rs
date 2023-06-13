@@ -170,7 +170,7 @@ pub async fn merge_by_stream(
             file[..pos].to_string()
         };
         let partition = partition_files_with_size.entry(prefix).or_default();
-        let file_meta = file_list::get_file_meta(&file).await?;
+        let file_meta = file_list::get_file_meta(&file)?;
         partition.push((file.clone(), file_meta.original_size));
     }
 
@@ -343,7 +343,7 @@ async fn merge_files(
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
-            let mut file_meta = file_list::get_file_meta(file).await.unwrap_or_default();
+            let mut file_meta = file_list::get_file_meta(file).unwrap_or_default();
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
                 file_meta.min_ts,
