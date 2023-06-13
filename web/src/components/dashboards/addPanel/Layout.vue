@@ -171,7 +171,8 @@
     </div>
     <q-separator />
     <div style="display:flex; flex-direction: row;" class="q-pl-md">
-      <div class="layout-name"> {{ t('panel.filters') }}:</div>
+      <div class="layout-name"> {{ t('panel.filters') }}</div>
+      <span class="layout-separator">:</span>
       <div class="axis-container droppable scroll q-py-xs" :class="{
         'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
         'drop-entered': dashboardPanelData.meta.dragAndDrop.dragging && currentDragArea == 'f'
