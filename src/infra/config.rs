@@ -95,6 +95,18 @@ pub struct Config {
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
+    pub profiling: Pyroscope,
+}
+
+#[derive(EnvConfig)]
+pub struct Pyroscope {
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_SERVER_URL",
+        default = "http://localhost:4040"
+    )]
+    pub pyroscope_server_url: String,
+    #[env_config(name = "ZO_PROF_PYROSCOPE_PROJECT_NAME", default = "openobserve")]
+    pub pyroscope_project_name: String,
 }
 
 #[derive(EnvConfig)]
