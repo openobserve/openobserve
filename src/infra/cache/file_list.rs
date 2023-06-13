@@ -92,7 +92,7 @@ pub fn get_file_from_cache(key: &str) -> Result<FileMeta, anyhow::Error> {
     }
 }
 
-async fn scan_prefix(
+fn scan_prefix(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -235,9 +235,7 @@ pub async fn get_file_list(
 
     let mut files = Vec::new();
     for key in keys {
-        let resp = scan_prefix(org_id, stream_name, stream_type, &key)
-            .await
-            .unwrap();
+        let resp = scan_prefix(org_id, stream_name, stream_type, &key).unwrap();
         files.extend(resp);
     }
 
@@ -419,16 +417,16 @@ mod tests {
         let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
         assert!(ret.is_ok());
 
-        let ret = scan_prefix("default", "olympics", StreamType::Logs, "").await;
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "");
         assert!(ret.is_ok());
 
-        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/").await;
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/");
         assert!(ret.is_ok());
 
-        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/").await;
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/");
         assert!(ret.is_ok());
 
-        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/10/").await;
+        let ret = scan_prefix("default", "olympics", StreamType::Logs, "2022/10/10/");
         assert!(ret.is_ok());
     }
 

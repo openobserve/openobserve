@@ -23,7 +23,6 @@ use crate::infra::cache::file_data;
 use crate::infra::config::CONFIG;
 use crate::infra::errors::{Error, ErrorCodes};
 use crate::meta;
-use crate::meta::common::FileMeta;
 use crate::service::search::datafusion::storage::StorageType;
 use crate::service::search::sql::Sql;
 use crate::service::{db, file_list};
@@ -71,20 +70,19 @@ pub async fn search(
     let mut scan_compressed_size = 0;
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
-        (scan_original_size, scan_compressed_size) =
-            match file_list::calculate_files_size(&files).await {
-                Ok(size) => size,
-                Err(err) => {
-                    log::error!("calculate files size error: {}", err);
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "calculate files size error".to_string(),
-                    )));
-                }
-            };
+        (scan_original_size, scan_compressed_size) = match file_list::calculate_files_size(&files) {
+            Ok(size) => size,
+            Err(err) => {
+                log::error!("calculate files size error: {}", err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    "calculate files size error".to_string(),
+                )));
+            }
+        };
         files_group.insert(schema_latest_id, files);
     } else {
         for file in &files {
-            let file_meta = file_list::get_file_meta(file).await.unwrap_or_default();
+            let file_meta = file_list::get_file_meta(file).unwrap_or_default();
             // calculate scan size
             scan_original_size += file_meta.original_size;
             scan_compressed_size += file_meta.compressed_size;
@@ -252,11 +250,9 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
             if !file_data::exist(&file).unwrap_or_default() {
                 if let Err(e) = file_data::download(&file).await {
                     log::error!("search->storage: download file err: {}", e);
-                    if e.to_string().contains("not found") {
+                    if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) =
-                            db::file_list::local::set(&file, FileMeta::default(), true).await
-                        {
+                        if let Err(e) = file_list::delete_parquet_file(&file).await {
                             log::error!("search->storage: delete from file_list err: {}", e);
                         }
                         return Some(file);
