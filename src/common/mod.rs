@@ -16,6 +16,7 @@ pub mod auth;
 pub mod base64;
 pub mod file;
 pub mod functions;
+pub mod hasher;
 pub mod http;
 pub mod json;
 pub mod notification;

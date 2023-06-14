@@ -15,7 +15,6 @@
 use ahash::AHashMap as HashMap;
 use arrow::ipc::writer::StreamWriter;
 use arrow_array::RecordBatch;
-use arrow_schema::Schema;
 use bytes::{BufMut, Bytes, BytesMut};
 use once_cell::sync::Lazy;
 use std::{
@@ -401,7 +400,7 @@ impl RwFile {
     }
 
     #[inline]
-    pub fn write_for_schema(&self, schema: &Schema, data: RecordBatch, original_size: usize) {
+    pub fn write_for_schema(&self, data: RecordBatch, original_size: usize) {
         let mut new_size = self.size.write().unwrap();
         *new_size += original_size;
 
@@ -409,7 +408,7 @@ impl RwFile {
             let mut cache = self.cache.as_ref().unwrap().write().unwrap();
             let mut buf = Arc::get_mut(&mut cache).unwrap().writer();
             let mut writer: StreamWriter<&mut bytes::buf::Writer<&mut BytesMut>> =
-                StreamWriter::try_new(&mut buf, schema).unwrap();
+                StreamWriter::try_new(&mut buf, &data.schema()).unwrap();
             writer.write(&data).unwrap();
             writer.finish().unwrap();
         } else {
@@ -422,7 +421,7 @@ impl RwFile {
                     .append(true)
                     .open(file_path)
                     .unwrap();
-                let writer = StreamWriter::try_new(file, schema).unwrap();
+                let writer = StreamWriter::try_new(file, &data.schema()).unwrap();
                 *rw_writer = Some(writer);
             }
             drop(rw_writer);
@@ -482,7 +481,7 @@ impl Drop for RwFile {
             }
             let mut arrow_file = self.arrow_file.write().unwrap(); // Acquire write lock
             if let Some(writer) = arrow_file.as_mut() {
-                writer.finish().unwrap(); 
+                writer.finish().unwrap();
             }
         }
     }

@@ -4015,6 +4015,7 @@ dependencies = [
  "uuid",
  "vrl 0.4.0 (git+https://github.com/zinclabs/vrl?rev=2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8)",
  "walkdir",
+ "xxhash-rust",
  "zstd 0.12.3+zstd.1.5.2",
 ]
 
@@ -7077,6 +7078,12 @@ name = "xmlparser"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d25c75bf9ea12c4040a97f829154768bbbce366287e2dc044af160cd79a13fd"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "735a71d46c4d68d71d4b24d03fdc2b98e38cea81730595801db779c04fe80d70"
 
 [[package]]
 name = "xz2"

@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use super::StreamMeta;
+use crate::common::hasher::get_schema_key_xxh3;
 use crate::common::json;
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::config::CONFIG;
@@ -323,7 +324,11 @@ async fn process_as_arrow(
     final_arrays[0] = Arc::new(Int64Array::from_value(ts, batch.num_rows()));
 
     let fb = RecordBatch::try_new(schema.clone().into(), final_arrays).unwrap();
-    let hour_key = Utc::now().format("%Y_%m_%d_%H").to_string();
+    let schema_hash: String = get_schema_key_xxh3(&schema);
+    let hour_key = format!(
+        "{}_{schema_hash}",
+        Utc::now().format("%Y_%m_%d_%H").to_string()
+    );
 
     let rw_file = crate::infra::wal::get_or_create_arrow(
         thread_id,
@@ -333,7 +338,7 @@ async fn process_as_arrow(
         &hour_key,
         CONFIG.common.wal_memory_mode_enabled,
     );
-    rw_file.write_for_schema(&schema, fb, body_size);
+    rw_file.write_for_schema(fb, body_size);
 
     if !stream_schema.has_fields {
         let mut metadata = schema.metadata().clone();

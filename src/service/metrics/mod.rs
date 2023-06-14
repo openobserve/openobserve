@@ -15,6 +15,7 @@
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
+use crate::common::hasher::Signature;
 use crate::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod prom;
@@ -23,15 +24,6 @@ pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
     let metadata: Metadata = common::json::from_str(metadata).unwrap();
     Some(metadata)
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Signature([u8; 32]);
-
-impl From<Signature> for String {
-    fn from(sig: Signature) -> Self {
-        hex::encode(sig.0)
-    }
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not matching `names`.
