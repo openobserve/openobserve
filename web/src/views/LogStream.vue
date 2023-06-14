@@ -41,6 +41,17 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
+            :icon="'img:' + getImageURL('images/common/search_icon.svg')"
+            :title="t('logStream.explore')"
+            class="q-ml-xs iconHoverBtn"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="exploreStream(props)"
+          />
+          <q-btn
             :icon="'img:' + getImageURL('images/common/list_icon.svg')"
             :title="t('logStream.schemaHeader')"
             class="q-ml-xs iconHoverBtn"
@@ -151,7 +162,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -239,6 +250,20 @@ export default defineComponent({
 
     let deleteStreamName = "";
     let deleteStreamType = "";
+
+    onBeforeMount(() => {
+      console.log(router.currentRoute.value.name);
+      if (router.currentRoute.value.name === "streamExplorer") {
+        console.log("route to stream explorer");
+        router.push({
+          name: "streamExplorer",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        return;
+      }
+    });
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
@@ -390,6 +415,18 @@ export default defineComponent({
       }
     });
 
+    const exploreStream = (props: any) => {
+      console.log(props);
+      router.push({
+        name: "streamExplorer",
+        query: {
+          stream_name: props.row.name,
+          stream_type: props.row.stream_type,
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       qTable,
@@ -429,6 +466,7 @@ export default defineComponent({
       },
       getImageURL,
       verifyOrganizationStatus,
+      exploreStream,
     };
   },
   computed: {
