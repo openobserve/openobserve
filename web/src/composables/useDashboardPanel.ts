@@ -292,21 +292,145 @@ const useDashboardPanelData = () => {
         // Get the name of the current custom query field
         const { name } = it;
 
-        // Update the properties of the current field
-        field.alias = name; // Set the alias to the name of the custom query field
-        field.column = name; // Set the column to the name of the custom query field
-        field.color = null; // Reset the color to null
-        // If the current field is a y field, set the aggregation function to "count"
-        field.aggregationFunction = currentFieldType == "x" ? null : "count";
-      });
+          // Update the properties of the current field
+          field.alias = name; // Set the alias to the name of the custom query field
+          field.column = name; // Set the column to the name of the custom query field
+          field.color = null; // Reset the color to null
+          // If the current field is a y field, set the aggregation function to "count"
+          field.aggregationFunction = currentFieldType == "x" ? null : "count";
+        }
+      );
     }
   };
 
+  const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
+    console.log(
+      "old: updateXYFieldsOnCustomQueryChange",
+      JSON.stringify(oldCustomQueryFields)
+    );
+    console.log(
+      "new: updateXYFieldsOnCustomQueryChange",
+      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
+    );
 
-  return { 
-    dashboardPanelData, 
-    resetDashboardPanelData, 
-    addXAxisItem, 
+    const oldArray = oldCustomQueryFields;
+
+    const newArray = JSON.parse(
+      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
+    );
+
+    const oldMap = new Map();
+    oldArray.forEach((obj, index) => {
+      oldMap.set(obj.name, { index, obj });
+    });
+
+    const changes = [];
+
+    newArray.forEach((newObj, newIndex) => {
+      const { name } = newObj;
+
+      if (oldMap.has(name)) {
+        const { index, obj: oldObj } = oldMap.get(name);
+
+        if (JSON.stringify(oldObj) !== JSON.stringify(newObj)) {
+          changes.push({
+            name,
+            oldIndex: index,
+            newIndex,
+            oldObject: oldObj,
+            newObject: newObj,
+            isUpdate: true,
+          });
+        }
+      } else {
+        let similarName = null;
+        Array.from(oldMap.keys()).forEach((key) => {
+          const distance = levenshteinDistance(name, key);
+          if (distance <= 2) {
+            // Adjust the threshold as per your requirements
+            similarName = key;
+          }
+        });
+
+        if (similarName) {
+          const { index, obj: oldObj } = oldMap.get(similarName);
+          changes.push({
+            name,
+            oldIndex: index,
+            newIndex,
+            oldObject: oldObj,
+            newObject: newObj,
+            isUpdate: true,
+          });
+        } else {
+          changes.push({
+            name,
+            oldIndex: -1,
+            newIndex,
+            oldObject: null,
+            newObject: newObj,
+            isUpdate: false,
+          });
+        }
+      }
+    });
+
+    changes.forEach(
+      ({ name, oldIndex, newIndex, oldObject, newObject, isUpdate }) => {
+        if (isUpdate) {
+          console.log(
+            `Object '${name}' updated from old object at index ${oldIndex} to new object at index ${newIndex}:`,
+            newObject
+          );
+        } else {
+          console.log(
+            `New object '${name}' found at index ${newIndex}:`,
+            newObject
+          );
+        }
+      }
+    );
+
+    function levenshteinDistance(a, b) {
+      const m = a.length;
+      const n = b.length;
+
+      if (m === 0) return n;
+      if (n === 0) return m;
+
+      const d = [];
+      for (let i = 0; i <= m; i++) {
+        d[i] = [i];
+      }
+      for (let j = 0; j <= n; j++) {
+        d[0][j] = j;
+      }
+
+      for (let j = 1; j <= n; j++) {
+        for (let i = 1; i <= m; i++) {
+          if (a[i - 1] === b[j - 1]) {
+            d[i][j] = d[i - 1][j - 1];
+          } else {
+            d[i][j] = Math.min(
+              d[i - 1][j] + 1, // deletion
+              d[i][j - 1] + 1, // insertion
+              d[i - 1][j - 1] + 1 // substitution
+            );
+          }
+        }
+      }
+
+      return d[m][n];
+    }
+
+    if (!promqlMode.value && dashboardPanelData.data.customQuery == true) {
+    }
+  };
+
+  return {
+    dashboardPanelData,
+    resetDashboardPanelData,
+    addXAxisItem,
     addYAxisItem,
     removeXAxisItem,
     removeYAxisItem,
@@ -314,6 +438,7 @@ const useDashboardPanelData = () => {
     addFilteredItem,
     removeXYFilters,
     updateXYFieldsForCustomQueryMode,
+    updateXYFieldsOnCustomQueryChange,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
     promqlMode,

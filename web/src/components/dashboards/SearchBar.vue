@@ -83,7 +83,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData, updateXYFieldsForCustomQueryMode } = useDashboardPanelData()
+    const { dashboardPanelData, updateXYFieldsOnCustomQueryChange } = useDashboardPanelData()
     const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
@@ -251,6 +251,7 @@ export default defineComponent({
         // get the columns first
         if(Array.isArray(dashboardPanelData.meta.parsedQuery?.columns) 
             && dashboardPanelData.meta.parsedQuery?.columns?.length > 0) {
+              const oldCustomQueryFields = JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.customQueryFields))
           dashboardPanelData.meta.stream.customQueryFields = []
           dashboardPanelData.meta.parsedQuery.columns.forEach((item: any, index: any) => {
             let val;
@@ -266,7 +267,7 @@ export default defineComponent({
           });
 
           // update the existing x and y axis fields
-          updateXYFieldsForCustomQueryMode()
+          updateXYFieldsOnCustomQueryChange(oldCustomQueryFields)
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns")
         }
