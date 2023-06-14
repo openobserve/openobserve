@@ -28,6 +28,11 @@
               <q-item-label class="q-pa-sm">Edit Panel</q-item-label>
             </q-item-section>
           </q-item>
+          <q-item clickable v-close-popup @click="onPanelModifyClick('DuplicatePanel')">
+            <q-item-section>
+              <q-item-label class="q-pa-sm">Duplicate</q-item-label>
+            </q-item-section>
+          </q-item>
           <q-item clickable v-close-popup @click="onPanelModifyClick('DeletePanel')">
             <q-item-section>
               <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
@@ -86,6 +91,9 @@ export default defineComponent({
       if(evt == 'EditPanel'){this.addNewPanel()}
       else if(evt == 'DeletePanel') {
         this.$emit('clicked', this.panelDataElementObject)
+      }
+      else if (evt == 'DuplicatePanel') {
+        this.$emit('duplicatePanel', this.panelDataElementObject)
       }
       else {
         // console.log(evt)
