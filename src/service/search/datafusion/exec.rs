@@ -947,10 +947,10 @@ pub async fn register_table(
     };
 
     let prefix = if session.storage_type.eq(&StorageType::FsMemory) {
-        file_list::set(&session.id, files).await;
+        file_list::set(&session.id, files);
         format!("fsm:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::FsNoCache) {
-        file_list::set(&session.id, files).await;
+        file_list::set(&session.id, files);
         format!("fsn:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::Tmpfs) {
         format!("tmpfs:///{}/", session.id)
