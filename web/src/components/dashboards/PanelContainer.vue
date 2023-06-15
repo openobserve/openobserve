@@ -20,6 +20,7 @@
         :panelDataElement="props.data"
         :dashboardId="$route.query.dashboard"
         @clicked="onClickChild"
+        @duplicatePanel="duplicatePanel"
         :draggable="props.draggable"
       />
     </div>
@@ -39,7 +40,7 @@ import PanelHeader from "./PanelHeader.vue";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["updated:chart"],
+  emits: ["updated:chart", "duplicatePanel"],
   props: ["data", "selectedTimeDate", "draggable","width", "height"],
   components: {
     ChartRender,
@@ -62,6 +63,10 @@ export default defineComponent({
     onClickChild(panelDataElementValue: any) {
       this.$emit("updated:chart", panelDataElementValue);
     },
+     duplicatePanel(panelDataElementValue: any) {
+      // Emits a "duplicatePanel" event with the panelDataElementValue parameter as the payload.
+      this.$emit("duplicatePanel", panelDataElementValue);
+    }
   },
 });
 </script>

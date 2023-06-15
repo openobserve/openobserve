@@ -195,7 +195,8 @@
     "propertyType": "Property Type",
     "type": "Type",
     "refreshStats": "Refresh Stats",
-    "updateSettings": "Update Settings"
+    "updateSettings": "Update Settings",
+    "explore": "Explore"
   },
   "function": {
     "header": "Functions",
@@ -257,6 +258,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
+    "duplicate": "Duplicate Dashboard",
     "search": "Search Dashboard",
     "name": "Name",
     "typeDesc": "Description",

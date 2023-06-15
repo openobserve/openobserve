@@ -74,14 +74,20 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<bool, Error> {
     let user;
-    let ep_suffix = &path[path.rfind('/').unwrap_or(0)..];
-    //this is only applicable for super admin user
+    let mut path_columns = path.split('/').collect::<Vec<&str>>();
+    if let Some(v) = path_columns.last() {
+        if v.is_empty() {
+            path_columns.pop();
+        }
+    }
+
+    // this is only applicable for super admin user
     if is_root_user(user_id) {
         user = users::get_user(None, user_id).await;
         if user.is_none() {
             return Ok(false);
         }
-    } else if ep_suffix.eq("/organizations") {
+    } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
         user = match db_user {
             Ok(user) => {
@@ -109,7 +115,7 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
-    if (INGESTION_EP.contains(&ep_suffix) || path.matches('/').count() == 1)
+    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {
         return Ok(true);
