@@ -63,7 +63,7 @@ export const getDefaultOrganization = async (userInfo: any, org_identifier: any)
         }
         return optiondata;
       }
-      );
+    );
 
       return res.data.data;
     });
