@@ -28,7 +28,10 @@
           title="Export logs"
           @click="downloadLogs"
         ></q-btn>
-        <div class="float-left">
+        <div
+          class="float-left"
+          v-show="queryData.streamType !== 'enrichment_tables'"
+        >
           <date-time
             data-test="logs-search-bar-date-time-dropdown"
             @date-change="updateDateTime"
