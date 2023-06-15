@@ -38,10 +38,11 @@
       </div>
     </div>
     <div
-      class="row justify-start text-h6 text-weight-bold q-pl-xl q-pb-lg subtitle"
+      class="row justify-start text-h6 text-weight-bold q-pl-xl q-pb-xs subtitle"
     >
       {{ t("billing.subtitle") }}
     </div>
+    <div class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"><q-icon name="warning" class="q-pt-sm"></q-icon>{{ store.state.selectedOrganization.note }}</div>
     <div v-if="loading">
       <q-spinner-dots
         color="primary"

@@ -506,7 +506,7 @@ export default defineComponent({
             UserObj: any;
             ingest_threshold: number;
             search_threshold: number;
-            CustomerBillingObj: { subscription_type: string };
+            CustomerBillingObj: { subscription_type: string, note: string };
             status: string;
           }) => {
             const optiondata: any = {
@@ -520,6 +520,9 @@ export default defineComponent({
                 ? data.CustomerBillingObj.subscription_type
                 : "",
               status: data.status,
+              note: data.hasOwnProperty("CustomerBillingObj")
+                ? data.CustomerBillingObj.note
+                : "",
             };
 
             if (
