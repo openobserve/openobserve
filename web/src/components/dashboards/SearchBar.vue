@@ -205,17 +205,19 @@ export default defineComponent({
       }
     }, {deep: true})
 
-    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], ()=>{
-      // console.log("query changes in search bar",dashboardPanelData.data.customQuery);
 
-      // only continue if current mode is show custom query
-      if(dashboardPanelData.data.customQuery){
+    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
+      // console.log("query changes in search bar", dashboardPanelData.data.customQuery);
+
+      // Only continue if the current mode is "show custom query"
+      if (dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType == "sql") {
+        // Call the updateQueryValue function
         updateQueryValue()
       } else {
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = []
-       }
+      }
     }, {deep: true})
 
      // This function parses the custom query and generates the errors and custom fields
