@@ -346,29 +346,18 @@ async fn get_fast_mode_ctx(
         let b_meta = files_meta.get(b).unwrap();
         a_meta.min_ts.cmp(&b_meta.min_ts)
     });
-    files.iter().for_each(|key| {
-        println!("file: {}, meta: {:?}", key, files_meta.get(key).unwrap());
-    });
 
     let mut loaded_records = 0;
     let mut new_files = Vec::new();
+    let needs = sql.meta.limit + sql.meta.offset;
     for i in (0..files.len()).rev() {
         loaded_records += files_meta.get(&files[i]).unwrap().records as usize;
         new_files.push(files[i].clone());
-        if loaded_records >= sql.meta.limit + sql.meta.offset {
+        if loaded_records >= needs {
             break;
         }
     }
-    let files = new_files;
-    files.iter().for_each(|key| {
-        println!(
-            "new file: {}, meta: {:?}",
-            key,
-            files_meta.get(key).unwrap()
-        );
-    });
-
-    let (mut ctx, schema) = register_table(session, schema, "tbl", &files, file_type).await?;
+    let (mut ctx, schema) = register_table(session, schema, "tbl", &new_files, file_type).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
