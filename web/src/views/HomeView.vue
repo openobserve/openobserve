@@ -109,7 +109,10 @@
       </q-card>
     </div>
     <div class="row justify-center items-center">
-      <iframe width="26%" height="300" src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      <video width="400" height="225" controls>
+        <source src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
     </div>
   </q-page>
 </template>
