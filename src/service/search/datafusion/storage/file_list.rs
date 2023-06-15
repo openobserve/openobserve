@@ -30,7 +30,7 @@ pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data.value().clone())
 }
 
-pub async fn set(session_id: &str, files: &[String]) -> Result<(), anyhow::Error> {
+pub async fn set(session_id: &str, files: &[String]) {
     let mut values = Vec::with_capacity(files.len());
     for file in files {
         let meta = file_list::get_file_meta(file).unwrap();
@@ -42,12 +42,10 @@ pub async fn set(session_id: &str, files: &[String]) -> Result<(), anyhow::Error
         });
     }
     FILES.insert(session_id.to_string(), values);
-    Ok(())
 }
 
-pub async fn clear(session_id: &str) -> Result<(), anyhow::Error> {
+pub async fn clear(session_id: &str) {
     FILES.remove(session_id);
-    Ok(())
 }
 
 #[cfg(test)]
@@ -67,13 +65,11 @@ mod tests {
         crate::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
 
-        let res = set(session_id, &[file_name.to_string()]).await;
-        assert!(res.is_ok());
+        set(session_id, &[file_name.to_string()]).await;
 
         let get_resp = get(session_id).await;
         assert!(get_resp.unwrap().len() > 0);
 
-        let resp = clear(session_id).await;
-        assert!(resp.is_ok());
+        clear(session_id).await;
     }
 }
