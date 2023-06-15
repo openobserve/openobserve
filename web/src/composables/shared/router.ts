@@ -23,6 +23,7 @@ import Search from "@/views/Search.vue";
 import AppMetrics from "@/views/AppMetrics.vue";
 import AppTraces from "@/views/AppTraces.vue";
 import LogStream from "@/views/LogStream.vue";
+import StreamExplorer from "@/views/StreamExplorer.vue";
 import {
   FunctionList,
   AssociatedStreamFunction,
@@ -87,12 +88,15 @@ const useRoutes = () => {
       },
     },
     {
+      name: "streamExplorer",
+      path: "logstreams/stream-explore",
+      component: StreamExplorer,
+      props: true,
+    },
+    {
       path: "logstreams",
       name: "logstreams",
       component: LogStream,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
