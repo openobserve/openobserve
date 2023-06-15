@@ -64,6 +64,7 @@ pub struct Sql {
     pub aggs: AHashMap<String, (String, MetaSql)>,
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
+    pub fast_mode: bool, // there is no where, no group by, no aggregatioin, we can just get data from the latest file
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
@@ -118,6 +119,20 @@ impl Sql {
                 log::error!("parse sql error: {}, sql: {}", err, origin_sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
+        };
+
+        // need check some things:
+        // 1. no where
+        // 2. no aggregation
+        // 3. no group by
+        let fast_mode = if meta.selection.is_none()
+            && meta.group_by.is_empty()
+            && !meta.fields.iter().any(|f| f.contains("("))
+            && !meta.field_alias.iter().any(|f| f.0.contains("("))
+        {
+            true
+        } else {
+            false
         };
 
         // check sql_mode
@@ -560,6 +575,7 @@ impl Sql {
             aggs,
             fields: vec![],
             sql_mode,
+            fast_mode,
             schema,
             query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,

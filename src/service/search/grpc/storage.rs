@@ -171,7 +171,7 @@ pub async fn search(
                     &session,
                     stream_type,
                     Some(schema),
-                    diff_fields,
+                    &diff_fields,
                     &sql,
                     &files,
                     FileType::PARQUET,

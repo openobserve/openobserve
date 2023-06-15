@@ -98,7 +98,7 @@ pub async fn search(
         &session,
         stream_type,
         Some(schema),
-        HashMap::new(),
+        &HashMap::new(),
         &sql,
         &files,
         FileType::JSON,
