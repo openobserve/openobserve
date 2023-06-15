@@ -170,7 +170,7 @@
       </div>
     </div>
     <q-separator />
-    <div style="display:flex; flex-direction: row;" class="q-pl-md">
+    <div v-if="!(dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType == 'sql')" style="display:flex; flex-direction: row;" class="q-pl-md">
       <div class="layout-name"> {{ t('panel.filters') }}</div>
       <span class="layout-separator">:</span>
       <div class="axis-container droppable scroll q-py-xs" :class="{
