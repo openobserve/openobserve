@@ -42,6 +42,10 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    showAutoComplete: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ["update-query", "run-query"],
   setup(props, { emit }) {
@@ -210,57 +214,58 @@ export default defineComponent({
         },
       });
 
-      monaco.languages.registerCompletionItemProvider("sql", {
-        provideCompletionItems: function (model, position) {
-          // find out if we are completing a property in the 'dependencies' object.
-          var textUntilPosition = model.getValueInRange({
-            startLineNumber: 1,
-            startColumn: 1,
-            endLineNumber: position.lineNumber,
-            endColumn: position.column,
-          });
+      props.showAutoComplete &&
+        monaco.languages.registerCompletionItemProvider("sql", {
+          provideCompletionItems: function (model, position) {
+            // find out if we are completing a property in the 'dependencies' object.
+            var textUntilPosition = model.getValueInRange({
+              startLineNumber: 1,
+              startColumn: 1,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            });
 
-          var word = model.getWordUntilPosition(position);
-          var range = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: word.startColumn,
-            endColumn: word.endColumn,
-          };
+            var word = model.getWordUntilPosition(position);
+            var range = {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endColumn: word.endColumn,
+            };
 
-          let arr = textUntilPosition.trim().split(" ");
-          let filteredSuggestions = [];
-          filteredSuggestions = createDependencyProposals(range);
-          filteredSuggestions = filteredSuggestions.filter((item) => {
-            return item.label.toLowerCase().includes(word.word.toLowerCase());
-          });
+            let arr = textUntilPosition.trim().split(" ");
+            let filteredSuggestions = [];
+            filteredSuggestions = createDependencyProposals(range);
+            filteredSuggestions = filteredSuggestions.filter((item) => {
+              return item.label.toLowerCase().includes(word.word.toLowerCase());
+            });
 
-          // if (filteredSuggestions.length == 0) {
-          const lastElement = arr.pop();
+            // if (filteredSuggestions.length == 0) {
+            const lastElement = arr.pop();
 
-          filteredSuggestions.push({
-            label: `match_all('${lastElement}')`,
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: `match_all('${lastElement}')`,
-            range: range,
-          });
-          filteredSuggestions.push({
-            label: `match_all_ignore_case('${lastElement}')`,
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: `match_all_ignore_case('${lastElement}')`,
-            range: range,
-          });
+            filteredSuggestions.push({
+              label: `match_all('${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `match_all('${lastElement}')`,
+              range: range,
+            });
+            filteredSuggestions.push({
+              label: `match_all_ignore_case('${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `match_all_ignore_case('${lastElement}')`,
+              range: range,
+            });
 
-          return {
-            suggestions: filteredSuggestions,
-          };
-          // } else {
-          //   return {
-          //     suggestions: filteredSuggestions,
-          //   };
-          // }
-        },
-      });
+            return {
+              suggestions: filteredSuggestions,
+            };
+            // } else {
+            //   return {
+            //     suggestions: filteredSuggestions,
+            //   };
+            // }
+          },
+        });
 
       editorObj = monaco.editor.create(editorRef.value, {
         value: props.query,
