@@ -59,7 +59,7 @@
           @move="moveEvent" @resized="resizedEvent" @container-resized="containerResizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
-            <PanelContainer @updated:chart="onUpdatePanel" :draggable="draggable" :data="item"
+            <PanelContainer @updated:chart="onUpdatePanel" @duplicatePanel="onDuplicatePanel" :draggable="draggable" :data="item"
               :selectedTimeDate="currentTimeObj" 
               :width="getPanelLayout(list[0].layouts, item.id, 'w')" :height="getPanelLayout(list[0].layouts, item.id, 'h')">
             </PanelContainer>
@@ -95,6 +95,7 @@ import { useRouter } from "vue-router";
 import {
   getConsumableDateTime,
   getDashboard,
+  addPanel
 } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getDurationObjectFromParams, getQueryParamsForDuration } from "../../utils/date"
 import { toRaw, unref, reactive } from "vue";
@@ -163,6 +164,52 @@ export default defineComponent({
 
     const deleteDashboardOnClick = async () => {
       await deleteDashboard(route.query.dashboard);
+    };
+
+    const onDuplicatePanel = async (data: any): Promise<void> => {
+
+      // Show a loading spinner notification.
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+
+      // Generate a unique panel ID.
+      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+
+      // Duplicate the panel data with the new ID.
+      const panelData = JSON.parse(JSON.stringify(data));
+      panelData.id = panelId;
+
+      try {
+        // Add the duplicated panel to the dashboard.
+        await addPanel(store, route.query.dashboard, panelData);
+
+        // Show a success notification.
+        $q.notify({
+          type: "positive",
+          message: `Panel Duplicated Successfully`,
+        });
+
+        // Navigate to the new panel.
+        return router.push({
+          path: "/dashboards/add_panel",
+          query: { dashboard: String(route.query.dashboard), panelId: panelId }
+        });
+      } catch (err) {
+        // Show an error notification.
+        $q.notify({
+          type: "negative",
+          message: err?.response?.data["error"]
+            ? JSON.stringify(err?.response?.data["error"])
+            : 'Panel duplication failed',
+        });
+      }
+
+      // Hide the loading spinner notification.
+      dismiss();
+
     };
 
     // save the dashboard value
@@ -244,6 +291,7 @@ export default defineComponent({
       goBackToDashboardList,
       deleteDashboardOnClick,
       addPanelData,
+      onDuplicatePanel,
       t,
       list,
       goBack,

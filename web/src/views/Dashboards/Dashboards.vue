@@ -36,6 +36,18 @@
       <!-- add delete icon in actions column -->
       <template #body-cell-actions="props">
         <q-td :props="props">
+           <q-btn
+              v-if="props.row.actions == 'true'"
+              :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+              :title="t('dashboard.duplicate')"
+              class="q-ml-xs iconHoverBtn"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="duplicateDashboard(props.row.id)"
+            ></q-btn>
           <q-btn
             v-if="props.row.actions == 'true'"
             :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
@@ -138,6 +150,7 @@ import { useRouter } from "vue-router";
 import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
+import { getDashboard } from "../../utils/commons.ts";
 
 export default defineComponent({
   name: "Dashboards",
@@ -244,6 +257,46 @@ export default defineComponent({
         path: "/dashboards/import",
       });
     };
+
+    const duplicateDashboard = async (dashboardId: any) => {
+
+    const dismiss = $q.notify({
+      spinner: true,
+      message: "Please wait...",
+      timeout: 2000,
+    });
+
+    try {
+      // Get the dashboard
+      const dashboard = await getDashboard(store, dashboardId);
+
+      // Duplicate the dashboard
+      const data = JSON.parse(JSON.stringify(dashboard));
+      data.title=`${data.title} - Copy`;
+
+      await dashboardService.create(
+        store.state.selectedOrganization.identifier,
+        data
+      );
+
+      await getDashboards();
+
+      $q.notify({
+        type: "positive",
+        message: `Dashboard Duplicated Successfully`,
+      });
+    } catch (err) {
+      $q.notify({
+        type: "negative",
+        message: err?.response?.data["error"]
+          ? JSON.stringify(err?.response?.data["error"])
+          : 'Dashboard duplication failed',
+      });
+    }
+
+      dismiss();
+    };
+
     const routeToViewD = (row) => {
       return router.push({
         path: "/dashboards/view",
@@ -352,6 +405,7 @@ export default defineComponent({
         return filtered;
       },
       deleteDashboard,
+      duplicateDashboard,
       getDashboards,
       getImageURL,
       verifyOrganizationStatus,
