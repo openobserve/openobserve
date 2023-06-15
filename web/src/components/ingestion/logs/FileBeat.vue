@@ -45,7 +45,7 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["{{ endpoint.protocol }}://{{ endpoint.host }}:{{ endpoint.port }}"]
   timeout: 10
-  path: "/api/{{ currOrgIdentifier }}"
+  path: "/api/{{ currOrgIdentifier }}/"
   index: default
   username: "{{ currUserEmail }}"
   password: "{{ store.state.organizationPasscode }}"</pre
