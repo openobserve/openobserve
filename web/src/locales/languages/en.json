@@ -195,7 +195,8 @@
     "propertyType": "Property Type",
     "type": "Type",
     "refreshStats": "Refresh Stats",
-    "updateSettings": "Update Settings"
+    "updateSettings": "Update Settings",
+    "explore": "Explore"
   },
   "function": {
     "header": "Functions",
