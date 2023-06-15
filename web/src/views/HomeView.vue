@@ -109,7 +109,7 @@
       </q-card>
     </div>
     <div class="row justify-center items-center">
-      <iframe width="54%" height="600" src="https://www.youtube.com/embed/fZ-ErfMdF-o" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      <iframe width="26%" height="300" src="https://videos.openobserve.ai/OpenObserve_Introduction.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
     </div>
   </q-page>
 </template>
