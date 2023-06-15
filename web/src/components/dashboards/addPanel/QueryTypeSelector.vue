@@ -46,7 +46,11 @@ export default defineComponent({
         const $q = useQuasar();
         const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } = useDashboardPanelData();
         const confirmQueryModeChangeDialog = ref(false);
+
+        // this is the value of the current button
         const selectedButtonType = ref("auto");
+
+        // this holds the temporary value of the button while user confirms the choice on popup
         const popupSelectedButtonType = ref("auto");
 
         const ignoreSelectedButtonTypeUpdate = ref(false);
@@ -89,8 +93,18 @@ export default defineComponent({
 
         const onUpdateButton = (selectedQueryType: any) => {
             if (selectedQueryType != selectedButtonType.value) {
-                popupSelectedButtonType.value = selectedQueryType;
-                confirmQueryModeChangeDialog.value = true;
+
+                // some exceptions
+                // If user is switching from auto to custom, no need for the popup,
+                // else show the popup
+                if(selectedButtonType.value == "auto" && selectedQueryType == "custom-sql") {
+                    // act like you confirmed without opening the popup
+                    popupSelectedButtonType.value = selectedQueryType;
+                    changeToggle()
+                } else {
+                    popupSelectedButtonType.value = selectedQueryType;
+                    confirmQueryModeChangeDialog.value = true;
+                }
             }
         };
         const changeToggle = async () => {
