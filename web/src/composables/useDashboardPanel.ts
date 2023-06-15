@@ -54,7 +54,8 @@ const getDefaultDashboardPanelData = () => (
       customQuery: false
     },
     layout: {
-      splitter: 20
+      splitter: 20,
+      showQueryBar: false
     },
     meta: {
       parsedQuery: "",
