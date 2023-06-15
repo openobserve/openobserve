@@ -58,6 +58,7 @@
           id="logsQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
+          :show-auto-complete="false"
           v-model:query="searchObj.data.query"
           v-model:fields="searchObj.data.stream.selectedStreamFields"
           v-model:functions="searchObj.data.stream.functions"
