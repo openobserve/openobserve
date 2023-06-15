@@ -114,19 +114,7 @@ pub(crate) async fn create_context(
         storage_type,
     };
 
-    register_table(
-        &session,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type,
-        },
-        Some(schema),
-        stream_name,
-        &files,
-        FileType::PARQUET,
-    )
-    .await
+    register_table(&session, schema, stream_name, &files, FileType::PARQUET).await
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all)]

@@ -46,9 +46,7 @@ use super::storage::{file_list, StorageType};
 use super::transform_udf::get_all_transform;
 use crate::common::json;
 use crate::infra::{cache::tmpfs, config::CONFIG};
-use crate::meta::{
-    common::FileMeta, search::Session as SearchSession, sql, stream::StreamParams, StreamType,
-};
+use crate::meta::{common::FileMeta, search::Session as SearchSession, sql};
 use crate::service::search::sql::Sql;
 use once_cell::sync::Lazy;
 
@@ -60,9 +58,8 @@ static RE_FIELD_FN: Lazy<Regex> =
 
 pub async fn sql(
     session: &SearchSession,
-    stream_type: StreamType,
-    schema: Option<Arc<Schema>>,
-    rules: HashMap<String, DataType>,
+    schema: Arc<Schema>,
+    rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
     files: &[String],
     file_type: FileType,
@@ -72,176 +69,28 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
-    let (mut ctx, schema) = register_table(
-        session,
-        StreamParams {
-            org_id: &sql.org_id,
-            stream_name: &sql.stream_name,
-            stream_type,
-        },
-        schema,
-        "tbl",
-        files,
-        file_type,
-    )
-    .await?;
+    let (mut ctx, schema) =
+        register_table(session, schema, "tbl", files, file_type.clone()).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
 
-    // get used UDF
-    let mut field_fns = vec![];
-    let mut sql_parts = vec![];
-
-    for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
-        if sql.origin_sql.contains(&fn_name) {
-            field_fns.push(fn_name.clone());
-        }
-    }
-
-    if !field_fns.is_empty() || sql.query_fn.is_some() {
-        if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
-            sql_parts.insert(
-                0,
-                sql.origin_sql
-                    .strip_suffix(caps.get(0).unwrap().as_str())
-                    .unwrap(),
-            );
-            sql_parts.insert(1, caps.get(1).unwrap().as_str());
-        };
-    }
-
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
 
-    // query
-    let query = if !&sql.query_context.is_empty() {
-        sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
-        match sql.meta.time_range {
-            Some(ts_range) => format!(
-                "{} where {} >= {} AND {} < {}",
-                sql_parts[0],
-                CONFIG.common.column_timestamp,
-                ts_range.0,
-                CONFIG.common.column_timestamp,
-                ts_range.1
-            ),
-            None => sql_parts[0].to_owned(),
-        }
-    } else {
-        sql.origin_sql.clone()
-    };
-
-    // Debug SQL
-    log::info!("Query sql: {}", query);
-
-    let mut df = match ctx.sql(&query).await {
-        Ok(df) => df,
-        Err(e) => {
-            log::error!(
-                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                session,
-                sql.origin_sql,
-                e
-            );
-            return Err(e);
-        }
-    };
-    if !rules.is_empty() {
-        let fields = df.schema().fields();
-        let mut exprs = Vec::with_capacity(fields.len());
-        for field in fields {
-            if field.qualifier().is_none() {
-                exprs.push(col(field.name()));
-                continue;
-            }
-            exprs.push(match rules.get(field.name()) {
-                Some(rule) => Expr::Alias(
-                    Box::new(cast(col(field.name()), rule.clone())),
-                    field.name().to_string(),
-                ),
-                None => col(field.name()),
-            });
-        }
-        df = df.select(exprs)?;
-    }
-
-    let mut resp = None;
-    if field_fns.is_empty() || sql.query_fn.is_some() {
-        let batches = df.clone().collect().await?;
-        if sql.query_fn.is_some() {
-            resp = handle_query_fn(sql.query_fn.clone().unwrap(), batches, &sql.org_id);
-        } else {
-            result.insert("query".to_string(), batches);
-            log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
-        }
-    }
-
-    if !&sql.query_context.is_empty() || !field_fns.is_empty() {
-        ctx.register_table("tbl_temp", df.into_view())?;
-    } else if sql.query_fn.is_some() {
-        match resp {
-            Some(resp) => {
-                let mem_table = datafusion::datasource::MemTable::try_new(
-                    resp.first().unwrap().schema(),
-                    vec![resp],
-                )?;
-                ctx.register_table("tbl_temp", Arc::new(mem_table))?;
-                // -- fix mem table, add missing columns
-                let mut tmp_df = ctx.table("tbl_temp").await?;
-                let tmp_fields = tmp_df
-                    .schema()
-                    .field_names()
-                    .iter()
-                    .map(|f| f.strip_prefix("tbl_temp.").unwrap().to_string())
-                    .collect::<Vec<String>>();
-                let need_add_columns = schema
-                    .fields()
-                    .iter()
-                    .filter(|field| !tmp_fields.contains(field.name()))
-                    .map(|field| field.name().as_str())
-                    .collect::<Vec<&str>>();
-                if !need_add_columns.is_empty() {
-                    for column in need_add_columns {
-                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
-                    }
-                    ctx.deregister_table("tbl_temp")?;
-                    ctx.register_table("tbl_temp", tmp_df.into_view())?;
-                }
-                // -- fix done
-            }
-            None => {
-                return Err(datafusion::error::DataFusionError::Execution(
-                    "Error applying query function".to_string(),
-                ));
-            }
-        }
-    }
-
-    if (!field_fns.is_empty() && !sql_parts[1].is_empty()) || sql.query_fn.is_some() {
-        let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
-
-        for alias in &sql.meta.field_alias {
-            replace_in_query(&alias.1, &mut where_query, true);
-        }
-        let additional_clause = where_query.clone();
-
-        let df = match ctx.sql(&additional_clause).await {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!(
-                    "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
-                    session,
-                    sql.origin_sql,
-                    e
-                );
-                return Err(e);
-            }
-        };
-        let batches = df.clone().collect().await?;
-        result.insert("query".to_string(), batches);
-        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
-    }
+    // query sql
+    result.insert(
+        "query".to_string(),
+        exec_query(
+            &ctx,
+            session,
+            schema.clone(),
+            rules,
+            sql,
+            files,
+            file_type.clone(),
+        )
+        .await?,
+    );
 
     //get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
@@ -309,6 +158,222 @@ pub async fn sql(
     );
 
     Ok(result)
+}
+
+async fn exec_query(
+    ctx: &SessionContext,
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    rules: &HashMap<String, DataType>,
+    sql: &Arc<Sql>,
+    files: &[String],
+    file_type: FileType,
+) -> Result<Vec<RecordBatch>> {
+    let start = std::time::Instant::now();
+
+    let (ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
+        get_fast_mode_ctx(session, schema, sql, files, file_type).await?
+    } else {
+        (ctx.clone(), schema.clone())
+    };
+
+    // get used UDF
+    let mut field_fns = vec![];
+    let mut sql_parts = vec![];
+
+    for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
+        if sql.origin_sql.contains(&fn_name) {
+            field_fns.push(fn_name.clone());
+        }
+    }
+
+    if !field_fns.is_empty() || sql.query_fn.is_some() {
+        if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
+            sql_parts.insert(
+                0,
+                sql.origin_sql
+                    .strip_suffix(caps.get(0).unwrap().as_str())
+                    .unwrap(),
+            );
+            sql_parts.insert(1, caps.get(1).unwrap().as_str());
+        };
+    }
+
+    // query
+    let query = if !&sql.query_context.is_empty() {
+        sql.query_context.replace(&sql.stream_name, "tbl").clone()
+    } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
+        match sql.meta.time_range {
+            Some(ts_range) => format!(
+                "{} where {} >= {} AND {} < {}",
+                sql_parts[0],
+                CONFIG.common.column_timestamp,
+                ts_range.0,
+                CONFIG.common.column_timestamp,
+                ts_range.1
+            ),
+            None => sql_parts[0].to_owned(),
+        }
+    } else {
+        sql.origin_sql.clone()
+    };
+
+    // Debug SQL
+    log::info!("Query sql: {}", query);
+
+    let mut df = match ctx.sql(&query).await {
+        Ok(df) => df,
+        Err(e) => {
+            log::error!(
+                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                session,
+                sql.origin_sql,
+                e
+            );
+            return Err(e);
+        }
+    };
+    if !rules.is_empty() {
+        let fields = df.schema().fields();
+        let mut exprs = Vec::with_capacity(fields.len());
+        for field in fields {
+            if field.qualifier().is_none() {
+                exprs.push(col(field.name()));
+                continue;
+            }
+            exprs.push(match rules.get(field.name()) {
+                Some(rule) => Expr::Alias(
+                    Box::new(cast(col(field.name()), rule.clone())),
+                    field.name().to_string(),
+                ),
+                None => col(field.name()),
+            });
+        }
+        df = df.select(exprs)?;
+    }
+
+    if field_fns.is_empty() {
+        let batches = df.clone().collect().await?;
+        log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+        return Ok(batches);
+    }
+
+    if !sql.query_context.is_empty() {
+        ctx.register_table("tbl_temp", df.into_view())?;
+    } else if sql.query_fn.is_some() {
+        let batches = df.clone().collect().await?;
+        match handle_query_fn(sql.query_fn.clone().unwrap(), batches, &sql.org_id) {
+            None => {
+                return Err(datafusion::error::DataFusionError::Execution(
+                    "Error applying query function".to_string(),
+                ));
+            }
+            Some(resp) => {
+                let mem_table = datafusion::datasource::MemTable::try_new(
+                    resp.first().unwrap().schema(),
+                    vec![resp],
+                )?;
+                ctx.register_table("tbl_temp", Arc::new(mem_table))?;
+                // -- fix mem table, add missing columns
+                let mut tmp_df = ctx.table("tbl_temp").await?;
+                let tmp_fields = tmp_df
+                    .schema()
+                    .field_names()
+                    .iter()
+                    .map(|f| f.strip_prefix("tbl_temp.").unwrap().to_string())
+                    .collect::<Vec<String>>();
+                let need_add_columns = schema
+                    .fields()
+                    .iter()
+                    .filter(|field| !tmp_fields.contains(field.name()))
+                    .map(|field| field.name().as_str())
+                    .collect::<Vec<&str>>();
+                if !need_add_columns.is_empty() {
+                    for column in need_add_columns {
+                        tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
+                    }
+                    ctx.deregister_table("tbl_temp")?;
+                    ctx.register_table("tbl_temp", tmp_df.into_view())?;
+                }
+                // -- fix done
+            }
+        }
+    } else {
+        return Err(datafusion::error::DataFusionError::Execution(
+            "BUG -> this shouldn't be happen".to_string(),
+        ));
+    }
+
+    let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
+    for alias in &sql.meta.field_alias {
+        replace_in_query(&alias.1, &mut where_query, true);
+    }
+    let additional_clause = where_query.clone();
+
+    let df = match ctx.sql(&additional_clause).await {
+        Ok(df) => df,
+        Err(e) => {
+            log::error!(
+                "query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                session,
+                sql.origin_sql,
+                e
+            );
+            return Err(e);
+        }
+    };
+    let batches = df.clone().collect().await?;
+    log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
+    Ok(batches)
+}
+
+async fn get_fast_mode_ctx(
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    sql: &Arc<Sql>,
+    files: &[String],
+    file_type: FileType,
+) -> Result<(SessionContext, Arc<Schema>)> {
+    // sort files by time range
+    let mut files_meta = HashMap::default();
+    files.iter().for_each(|key| {
+        let meta = crate::service::file_list::get_file_meta(key).unwrap_or_default();
+        files_meta.insert(key, meta);
+    });
+    let mut files = files.to_vec();
+    files.sort_by(|a, b| {
+        let a_meta = files_meta.get(a).unwrap();
+        let b_meta = files_meta.get(b).unwrap();
+        a_meta.min_ts.cmp(&b_meta.min_ts)
+    });
+    files.iter().for_each(|key| {
+        println!("file: {}, meta: {:?}", key, files_meta.get(key).unwrap());
+    });
+
+    let mut loaded_records = 0;
+    let mut new_files = Vec::new();
+    for i in (0..files.len()).rev() {
+        loaded_records += files_meta.get(&files[i]).unwrap().records as usize;
+        new_files.push(files[i].clone());
+        if loaded_records >= sql.meta.limit + sql.meta.offset {
+            break;
+        }
+    }
+    let files = new_files;
+    files.iter().for_each(|key| {
+        println!(
+            "new file: {}, meta: {:?}",
+            key,
+            files_meta.get(key).unwrap()
+        );
+    });
+
+    let (mut ctx, schema) = register_table(session, schema, "tbl", &files, file_type).await?;
+
+    // register UDF
+    register_udf(&mut ctx, &sql.org_id).await;
+
+    Ok((ctx, schema))
 }
 
 fn replace_in_query(replace_pat: &String, where_query: &mut String, is_alias: bool) {
@@ -859,18 +924,11 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
 
 pub async fn register_table(
     session: &SearchSession,
-    stream: StreamParams<'_>,
-    schema: Option<Arc<Schema>>,
+    schema: Arc<Schema>,
     table_name: &str,
     files: &[String],
     file_type: FileType,
 ) -> Result<(SessionContext, Arc<Schema>)> {
-    let StreamParams {
-        org_id,
-        stream_name,
-        stream_type,
-    } = stream;
-
     let ctx = prepare_datafusion_context()?;
     // Configure listing options
     let listing_options = match file_type {
@@ -893,12 +951,7 @@ pub async fn register_table(
         }
     };
 
-    let prefix = if session.storage_type.eq(&StorageType::Wal) {
-        format!(
-            "{}files/{}/{stream_type}/{}/",
-            &CONFIG.common.data_wal_dir, org_id, stream_name
-        )
-    } else if session.storage_type.eq(&StorageType::FsMemory) {
+    let prefix = if session.storage_type.eq(&StorageType::FsMemory) {
         file_list::set(&session.id, files).await.unwrap();
         format!("fsm:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::FsNoCache) {
@@ -921,27 +974,23 @@ pub async fn register_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let schema = if schema.is_none() || session.storage_type.eq(&StorageType::Wal) {
+    let schema = if session.storage_type.eq(&StorageType::Tmpfs) {
         config = config.infer_schema(&ctx.state()).await.unwrap();
         let table = ListingTable::try_new(config.clone())?;
         let infered_schema = table.schema();
-        if schema.is_none() {
-            infered_schema
-        } else {
-            match Schema::try_merge(vec![
-                schema.unwrap().as_ref().to_owned(),
-                infered_schema.as_ref().to_owned(),
-            ]) {
-                Ok(schema) => Arc::new(schema),
-                Err(e) => {
-                    return Err(datafusion::error::DataFusionError::Execution(format!(
-                        "ListingTable Merge schema error: {e}"
-                    )));
-                }
+        match Schema::try_merge(vec![
+            schema.as_ref().to_owned(),
+            infered_schema.as_ref().to_owned(),
+        ]) {
+            Ok(schema) => Arc::new(schema),
+            Err(e) => {
+                return Err(datafusion::error::DataFusionError::Execution(format!(
+                    "ListingTable Merge schema error: {e}"
+                )));
             }
         }
     } else {
-        schema.as_ref().unwrap().clone()
+        schema.clone()
     };
     config = config.with_schema(schema.clone());
 

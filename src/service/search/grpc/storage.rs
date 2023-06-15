@@ -169,8 +169,7 @@ pub async fn search(
             async move {
                 super::datafusion::exec::sql(
                     &session,
-                    stream_type,
-                    Some(schema),
+                    schema,
                     &diff_fields,
                     &sql,
                     &files,

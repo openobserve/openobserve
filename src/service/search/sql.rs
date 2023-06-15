@@ -125,15 +125,10 @@ impl Sql {
         // 1. no where
         // 2. no aggregation
         // 3. no group by
-        let fast_mode = if meta.selection.is_none()
+        let fast_mode = meta.selection.is_none()
             && meta.group_by.is_empty()
-            && !meta.fields.iter().any(|f| f.contains("("))
-            && !meta.field_alias.iter().any(|f| f.0.contains("("))
-        {
-            true
-        } else {
-            false
-        };
+            && !meta.fields.iter().any(|f| f.contains('('))
+            && !meta.field_alias.iter().any(|f| f.0.contains('('));
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();

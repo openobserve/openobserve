@@ -96,8 +96,7 @@ pub async fn search(
     };
     let result = match super::datafusion::exec::sql(
         &session,
-        stream_type,
-        Some(schema),
+        schema,
         &HashMap::new(),
         &sql,
         &files,
