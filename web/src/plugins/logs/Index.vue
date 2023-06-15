@@ -609,19 +609,7 @@ export default defineComponent({
           req.query.start_time = startISOTimestamp;
           req.query.end_time = endISOTimestamp;
 
-          searchObj.meta.resultGrid.chartInterval = "1 second";
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-            searchObj.meta.resultGrid.chartInterval = "3 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-            searchObj.meta.resultGrid.chartInterval = "5 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-            searchObj.meta.resultGrid.chartInterval = "10 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
+          searchObj.meta.resultGrid.chartInterval = "10 second";
           if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
             searchObj.meta.resultGrid.chartInterval = "15 second";
             searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";

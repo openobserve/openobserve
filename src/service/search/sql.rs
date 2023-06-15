@@ -677,21 +677,16 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
             "15 second",
         ),
         (
-            Duration::minutes(20).num_microseconds().unwrap(),
+            Duration::minutes(15).num_microseconds().unwrap(),
             "10 second",
         ),
-        (
-            Duration::minutes(10).num_microseconds().unwrap(),
-            "5 second",
-        ),
-        (Duration::minutes(5).num_microseconds().unwrap(), "2 second"),
     ];
     for interval in intervals.iter() {
         if (time_range.1 - time_range.0) >= interval.0 {
             return interval.1.to_string();
         }
     }
-    "1 second".to_string()
+    "10 second".to_string()
 }
 
 fn split_sql_token_unwrap_brace(s: &str) -> Vec<String> {

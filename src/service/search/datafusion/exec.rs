@@ -357,7 +357,13 @@ async fn get_fast_mode_ctx(
             break;
         }
     }
-    let (mut ctx, schema) = register_table(session, schema, "tbl", &new_files, file_type).await?;
+
+    let fast_sesison = SearchSession {
+        id: format!("{}-fast", session.id),
+        storage_type: session.storage_type.clone(),
+    };
+    let (mut ctx, schema) =
+        register_table(&fast_sesison, schema, "tbl", &new_files, file_type).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
