@@ -257,7 +257,7 @@ const useDashboardPanelData = () => {
         });
 
       })
-      .catch((error) => {
+      .catch((error: any) => {
         $q.notify({
           type: "negative",
           message: "Something went wrong!",
@@ -303,127 +303,50 @@ const useDashboardPanelData = () => {
     }
   };
 
+
   const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
-    console.log(
-      "old: updateXYFieldsOnCustomQueryChange",
-      JSON.stringify(oldCustomQueryFields)
-    );
-    console.log(
-      "new: updateXYFieldsOnCustomQueryChange",
-      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
-    );
-
+    // Create a copy of the old custom query fields array
     const oldArray = oldCustomQueryFields;
+    // Create a deep copy of the new custom query fields array
+    const newArray = JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.customQueryFields));
 
-    const newArray = JSON.parse(
-      JSON.stringify(dashboardPanelData.meta.stream.customQueryFields)
-    );
-
-    const oldMap = new Map();
-    oldArray.forEach((obj, index) => {
-      oldMap.set(obj.name, { index, obj });
-    });
-
-    const changes = [];
-
-    newArray.forEach((newObj, newIndex) => {
-      const { name } = newObj;
-
-      if (oldMap.has(name)) {
-        const { index, obj: oldObj } = oldMap.get(name);
-
-        if (JSON.stringify(oldObj) !== JSON.stringify(newObj)) {
-          changes.push({
-            name,
-            oldIndex: index,
-            newIndex,
-            oldObject: oldObj,
-            newObject: newObj,
-            isUpdate: true,
-          });
+    // Check if the length of the old and new arrays are the same
+    if (oldArray.length == newArray.length) {
+      // Create an array to store the indexes of changed fields
+      const changedIndex: any = [];
+      // Iterate through the new array
+      newArray.forEach((obj: any, index: any) => {
+        const { name } = obj;
+        // Check if the name of the field at the same index in the old array is different
+        if (oldArray[index].name != name) {
+          changedIndex.push(index);
         }
-      } else {
-        let similarName = null;
-        Array.from(oldMap.keys()).forEach((key) => {
-          const distance = levenshteinDistance(name, key);
-          if (distance <= 2) {
-            // Adjust the threshold as per your requirements
-            similarName = key;
-          }
-        });
+      });
+      // Check if there is only one changed field
+      if (changedIndex.length == 1) {
+        const oldName = oldArray[changedIndex[0]]?.name;
+        let fieldIndex = dashboardPanelData.data.fields.x.findIndex((it: any) => it.alias == oldName);
+        // Check if the field is in the x fields array
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field = dashboardPanelData.data.fields.x[fieldIndex];
 
-        if (similarName) {
-          const { index, obj: oldObj } = oldMap.get(similarName);
-          changes.push({
-            name,
-            oldIndex: index,
-            newIndex,
-            oldObject: oldObj,
-            newObject: newObj,
-            isUpdate: true,
-          });
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
         } else {
-          changes.push({
-            name,
-            oldIndex: -1,
-            newIndex,
-            oldObject: null,
-            newObject: newObj,
-            isUpdate: false,
-          });
-        }
-      }
-    });
+          // Check if the field is in the y fields array
+          fieldIndex = dashboardPanelData.data.fields.y.findIndex((it: any) => it.alias == oldName);
+          if (fieldIndex >= 0) {
+            const newName = newArray[changedIndex[0]]?.name;
+            const field = dashboardPanelData.data.fields.y[fieldIndex];
 
-    changes.forEach(
-      ({ name, oldIndex, newIndex, oldObject, newObject, isUpdate }) => {
-        if (isUpdate) {
-          console.log(
-            `Object '${name}' updated from old object at index ${oldIndex} to new object at index ${newIndex}:`,
-            newObject
-          );
-        } else {
-          console.log(
-            `New object '${name}' found at index ${newIndex}:`,
-            newObject
-          );
-        }
-      }
-    );
-
-    function levenshteinDistance(a, b) {
-      const m = a.length;
-      const n = b.length;
-
-      if (m === 0) return n;
-      if (n === 0) return m;
-
-      const d = [];
-      for (let i = 0; i <= m; i++) {
-        d[i] = [i];
-      }
-      for (let j = 0; j <= n; j++) {
-        d[0][j] = j;
-      }
-
-      for (let j = 1; j <= n; j++) {
-        for (let i = 1; i <= m; i++) {
-          if (a[i - 1] === b[j - 1]) {
-            d[i][j] = d[i - 1][j - 1];
-          } else {
-            d[i][j] = Math.min(
-              d[i - 1][j] + 1, // deletion
-              d[i][j - 1] + 1, // insertion
-              d[i - 1][j - 1] + 1 // substitution
-            );
+            // Update the field alias and column to the new name
+            field.alias = newName;
+            field.column = newName;
           }
         }
       }
-
-      return d[m][n];
-    }
-
-    if (!promqlMode.value && dashboardPanelData.data.customQuery == true) {
     }
   };
 
@@ -444,5 +367,4 @@ const useDashboardPanelData = () => {
     promqlMode,
   };
 };
-
 export default useDashboardPanelData;
