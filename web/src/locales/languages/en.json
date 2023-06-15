@@ -257,6 +257,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
+    "duplicate": "Duplicate Dashboard",
     "search": "Search Dashboard",
     "name": "Name",
     "typeDesc": "Description",
