@@ -175,7 +175,7 @@
               <div class="q-pl-md">
                 {
                 <div
-                  class="log_json_content"
+                  class="log_json_content text-grey-8"
                   v-for="key in Object.keys(row)"
                   :key="key"
                 >
@@ -630,6 +630,7 @@ export default defineComponent({
 
   .log_json_content {
     white-space: pre-wrap;
+    font-family: monospace;
   }
 }
 .thead-sticky tr > *,
