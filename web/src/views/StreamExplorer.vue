@@ -19,14 +19,7 @@
 <script lang="ts">
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
 import stream from "@/services/stream";
-import {
-  defineComponent,
-  onBeforeMount,
-  onBeforeUpdate,
-  onMounted,
-  ref,
-  type Ref,
-} from "vue";
+import { defineComponent, onBeforeMount, onMounted, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import StreamDataTable from "@/components/logstream/explore/StreamDataTable.vue";
@@ -37,18 +30,19 @@ import { useI18n } from "vue-i18n";
 import { getConsumableDateTime } from "@/utils/commons";
 import { convertTimeFromMicroToMilli } from "@/utils/zincutils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { cloneDeep } from "lodash-es";
+
+type SearchBarInstance = InstanceType<typeof SearchBar>;
 
 export default defineComponent({
   name: "StreamExplorer",
   components: { SearchBar, StreamDataTable },
-  setup(props) {
+  setup() {
     const store = useStore();
     const router = useRouter();
     const streamData: any = ref(null);
     const isLoading: Ref<boolean[]> = ref([]);
     const { t } = useI18n();
-    const searchBarRef = ref(null);
+    const searchBarRef = ref<SearchBarInstance | null>(null);
     const queryData = ref({
       query: "",
       errorMsg: "",
@@ -76,6 +70,7 @@ export default defineComponent({
         rowsPerPage: 150,
       },
       queryResults: {} as any,
+      streamType: "",
     });
     const q = useQuasar();
 
@@ -96,6 +91,7 @@ export default defineComponent({
           params.stream_type as string
         )
         .then((res) => {
+          queryData.value.streamType = res.data?.stream_type;
           streamData.value = res.data;
           tableData.value["columns"] = res.data.schema.map((field: any) => ({
             name: field.name,
@@ -112,7 +108,7 @@ export default defineComponent({
 
     onMounted(() => {
       if (searchBarRef.value != null) {
-        searchBarRef.value.udpateQuery(queryData.value.query);
+        searchBarRef.value.udpateQuery();
       }
     });
 
