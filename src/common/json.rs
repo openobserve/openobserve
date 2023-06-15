@@ -103,7 +103,7 @@ pub fn flatten_json_and_format_field(obj: &Value) -> Value {
                 .chars()
                 .map(|c| {
                     if c.is_alphanumeric() {
-                        c.to_lowercase().next().unwrap()
+                        c.to_ascii_lowercase()
                     } else {
                         '_'
                     }
@@ -114,6 +114,18 @@ pub fn flatten_json_and_format_field(obj: &Value) -> Value {
         .collect();
 
     Value::Object(map)
+}
+
+#[inline(always)]
+pub fn flatten(nested_value: Value) -> Vec<Value> {
+    if let Value::Array(mut arr) = nested_value {
+        for value in &mut arr {
+            let _ = std::mem::replace(value, flatten_json_and_format_field(value));
+        }
+        arr
+    } else {
+        vec![flatten_json_and_format_field(&nested_value)]
+    }
 }
 
 #[inline(always)]

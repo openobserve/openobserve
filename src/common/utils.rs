@@ -70,7 +70,7 @@ pub async fn populate_file_meta(
     ctx.register_table("temp", Arc::new(provider))?;
 
     let sql = format!(
-        "SELECT min({0}) as min, max({0}) as max, count({0}) as num_records FROM temp;",
+        "SELECT min({0}) as min_ts, max({0}) as max_ts, count({0}) as num_records FROM temp;",
         CONFIG.common.column_timestamp
     );
     let df = ctx.sql(sql.as_str()).await?;
@@ -80,15 +80,15 @@ pub async fn populate_file_meta(
 
     let record = result.pop().expect("No record found");
     file_meta.min_ts = record
-        .get("min")
-        .expect("No field found: min")
+        .get("min_ts")
+        .expect("No field found: min_ts")
         .as_i64()
-        .expect("No value found: min");
+        .expect("No value found: min_ts");
     file_meta.max_ts = record
-        .get("max")
-        .expect("No field found: max")
+        .get("max_ts")
+        .expect("No field found: max_ts")
         .as_i64()
-        .expect("No value found: max");
+        .expect("No value found: max_ts");
     file_meta.records = record
         .get("num_records")
         .expect("No field found: num_records")

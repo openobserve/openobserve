@@ -14,12 +14,12 @@
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
-use arrow_array::{Int64Array, RecordBatch};
-use arrow_schema::{DataType, Field};
+use arrow_array::RecordBatch;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use itertools::Itertools;
 use std::io::Error;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -85,9 +85,6 @@ async fn process_as_json(
     thread_id: usize,
     start: Instant,
 ) -> Result<HttpResponse, Error> {
-    let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
-
     #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
@@ -111,6 +108,7 @@ async fn process_as_json(
         StreamType::Logs,
         stream_name,
     );
+    let is_local_trans_empty = local_trans.is_empty();
     // End Register Transforms for stream
 
     let stream_schema = stream_schema_exists(
@@ -138,7 +136,7 @@ async fn process_as_json(
         let mut value = json::flatten_json_and_format_field(item);
 
         #[cfg(feature = "zo_functions")]
-        if !local_trans.is_empty() {
+        if !is_local_trans_empty {
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
                 &value,
@@ -157,32 +155,9 @@ async fn process_as_json(
         // get json object
         let local_val = value.as_object_mut().unwrap();
 
-        // handle timestamp
-        let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
-            Some(v) => match parse_timestamp_micro_from_value(v) {
-                Ok(t) => t,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    continue;
-                }
-            },
-            None => Utc::now().timestamp_micros(),
-        };
-        // check ingestion time
-        let earlest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earlest_time.timestamp_micros() {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = super::get_upto_discard_error();
+        if let ControlFlow::Break(_) = handle_ts(local_val, &mut stream_status) {
             continue;
         }
-        if timestamp < min_ts {
-            min_ts = timestamp;
-        }
-        local_val.insert(
-            CONFIG.common.column_timestamp.clone(),
-            json::Value::Number(timestamp.into()),
-        );
 
         let local_trigger = super::add_valid_record(
             StreamMeta {
@@ -235,6 +210,37 @@ async fn process_as_json(
     )))
 }
 
+pub fn handle_ts(
+    local_val: &mut json::Map<String, json::Value>,
+    stream_status: &mut StreamStatus,
+) -> ControlFlow<()> {
+    let current_time = Utc::now();
+    let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
+        Some(v) => match parse_timestamp_micro_from_value(v) {
+            Ok(t) => t,
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                return ControlFlow::Break(());
+            }
+        },
+        None => current_time.timestamp_micros(),
+    };
+    // check ingestion time
+    let earlest_time = current_time + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
+    if timestamp < earlest_time.timestamp_micros() {
+        stream_status.status.failed += 1; // too old data, just discard
+        stream_status.status.error = super::get_upto_discard_error();
+        return ControlFlow::Break(());
+    }
+    // add timestamp
+    local_val.insert(
+        CONFIG.common.column_timestamp.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
+    ControlFlow::Continue(())
+}
+
 async fn process_as_arrow(
     org_id: &str,
     stream_name: &String,
@@ -253,8 +259,42 @@ async fn process_as_arrow(
     )
     .await;
 
+    /*     let mut partition_keys: Vec<String> = vec![];
+       if stream_schema.has_partition_keys {
+           partition_keys =
+               crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
+                   .await;
+       }
+    */
+    let mut stream_status = StreamStatus {
+        name: stream_name.to_owned(),
+        status: RecordStatus {
+            successful: 0,
+            failed: 0,
+            error: "".to_string(),
+        },
+    };
+
+    // Start Register Transforms for stream
+    #[cfg(feature = "zo_functions")]
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Logs,
+        stream_name,
+    );
+    // End Register Transforms for stream
+
+    let req_data = crate::common::flatten::flatten_req(
+        body.into(),
+        &mut stream_status,
+        &local_trans,
+        &stream_vrl_map,
+        stream_name,
+    )
+    .unwrap();
+
     let inferred_schema =
-        match arrow::json::reader::infer_json_schema_from_iterator(body.iter().map(Ok)) {
+        match arrow::json::reader::infer_json_schema_from_iterator(req_data.iter().map(Ok)) {
             Ok(schema) => schema,
             Err(_) => {
                 return Ok(
@@ -266,7 +306,7 @@ async fn process_as_arrow(
             }
         };
 
-    let mut schema = match stream_schema_map.get(stream_name) {
+    let schema = match stream_schema_map.get(stream_name) {
         Some(existing_schema) => {
             if existing_schema.fields().is_empty() {
                 inferred_schema
@@ -290,16 +330,8 @@ async fn process_as_arrow(
         None => inferred_schema,
     };
 
-    match schema.field_with_name(&CONFIG.common.column_timestamp) {
-        Ok(_) => {}
-        Err(_) => schema.fields.insert(
-            0,
-            Field::new(&CONFIG.common.column_timestamp, DataType::Int64, true),
-        ),
-    }
-
-    let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(body.len());
-    let value_iter = body.iter().cloned();
+    let batch_size = arrow::util::bit_util::round_upto_multiple_of_64(req_data.len());
+    let value_iter = req_data.iter().cloned();
 
     #[allow(deprecated)]
     let reader = Decoder::new(
@@ -317,11 +349,10 @@ async fn process_as_arrow(
                 )),
             )
         }
-        Ok(None) => unreachable!("all records are added to one rb"),
+        Ok(None) => unreachable!("all records are added to single record batch"),
     };
 
-    let mut final_arrays = batch.columns().iter().map(Arc::clone).collect_vec();
-    final_arrays[0] = Arc::new(Int64Array::from_value(ts, batch.num_rows()));
+    let final_arrays = batch.columns().iter().map(Arc::clone).collect_vec();
 
     let fb = RecordBatch::try_new(schema.clone().into(), final_arrays).unwrap();
     let schema_hash: String = get_schema_key_xxh3(&schema);
@@ -374,5 +405,8 @@ async fn process_as_arrow(
         ])
         .inc();
 
-    Ok(HttpResponse::Ok().json(IngestionResponse::new(http::StatusCode::OK.into(), vec![])))
+    Ok(HttpResponse::Ok().json(IngestionResponse::new(
+        http::StatusCode::OK.into(),
+        vec![stream_status],
+    )))
 }
