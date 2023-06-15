@@ -188,7 +188,7 @@
 // @ts-nocheck
 import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 
@@ -363,6 +363,10 @@ export default defineComponent({
 
       return csv;
     };
+
+    onBeforeRouteUpdate(() => {
+      console.log("on search bar update");
+    });
 
     const downloadLogs = () => {
       const filename = "logs-data.csv";
