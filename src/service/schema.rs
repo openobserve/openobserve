@@ -240,7 +240,7 @@ pub async fn check_for_schema(
     // Fetch the "skip_schema_validation" configuration
     let skip_validation = CONFIG.common.skip_schema_validation;
 
-    if skip_validation || !metadata.is_empty() {
+    if !schema.fields().is_empty() && (skip_validation || !metadata.is_empty()) {
         if let Some(stream_settings) = metadata.get("settings") {
             let settings: json::Value = json::from_slice(stream_settings.as_bytes()).unwrap();
             if let Some(val) = settings.get("skip_schema_validation") {
