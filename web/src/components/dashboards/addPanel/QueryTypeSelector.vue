@@ -87,7 +87,7 @@ export default defineComponent({
         })
 
         // when the data is loaded, initialize the selectedButtonType
-        watch(dashboardPanelData.data, () => {
+        watch(() => [dashboardPanelData.data.queryType, dashboardPanelData.data.customQuery], () => {
             initializeSelectedButtonType()
         })
 
