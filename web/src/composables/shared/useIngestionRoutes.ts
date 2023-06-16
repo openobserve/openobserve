@@ -21,6 +21,7 @@ import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
+import GcpPubSub from "@/components/ingestion/logs/GcpPubSub.vue";
 import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
@@ -74,6 +75,11 @@ const useIngestionRoutes = () => {
               path: "filebeat",
               name: "filebeat",
               component: FileBeat,
+            },
+            {
+              path: "gcp",
+              name: "gcpLogs",
+              component: GcpPubSub,
             },
           ],
         },
