@@ -22,7 +22,7 @@ use crate::service::file_list;
 
 pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
 
-pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
+pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.get(session_id) {
         Some(data) => data,
         None => return Err(anyhow::anyhow!("session_id not found")),
@@ -30,7 +30,7 @@ pub async fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data.value().clone())
 }
 
-pub async fn set(session_id: &str, files: &[String]) -> Result<(), anyhow::Error> {
+pub fn set(session_id: &str, files: &[String]) {
     let mut values = Vec::with_capacity(files.len());
     for file in files {
         let meta = file_list::get_file_meta(file).unwrap();
@@ -42,12 +42,10 @@ pub async fn set(session_id: &str, files: &[String]) -> Result<(), anyhow::Error
         });
     }
     FILES.insert(session_id.to_string(), values);
-    Ok(())
 }
 
-pub async fn clear(session_id: &str) -> Result<(), anyhow::Error> {
+pub fn clear(session_id: &str) {
     FILES.remove(session_id);
-    Ok(())
 }
 
 #[cfg(test)]
@@ -66,14 +64,11 @@ mod tests {
         let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
         crate::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
+        set(session_id, &[file_name.to_string()]);
 
-        let res = set(session_id, &[file_name.to_string()]).await;
-        assert!(res.is_ok());
-
-        let get_resp = get(session_id).await;
+        let get_resp = get(session_id);
         assert!(get_resp.unwrap().len() > 0);
 
-        let resp = clear(session_id).await;
-        assert!(resp.is_ok());
+        clear(session_id);
     }
 }

@@ -101,9 +101,7 @@ pub async fn search(
     };
 
     // clear session
-    search::datafusion::storage::file_list::clear(&session_id)
-        .await
-        .unwrap();
+    search::datafusion::storage::file_list::clear(&session_id);
     // clear tmpfs
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
 
