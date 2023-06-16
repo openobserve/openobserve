@@ -61,6 +61,32 @@ pub async fn get(
     })
 }
 
+pub async fn get_from_db(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: Option<StreamType>,
+) -> Result<Schema, anyhow::Error> {
+    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
+
+    let db = &crate::infra::db::DEFAULT;
+    Ok(match db.get(&key).await {
+        Err(_) => {
+            // REVIEW: shouldn't we report the error?
+            Schema::empty()
+        }
+        Ok(v) => {
+            let local_val: json::Value = json::from_slice(&v).unwrap();
+            // for backward compatibility check if value in etcd is vec or schema based on it return value
+            if local_val.is_array() {
+                let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
+                local_vec.last().unwrap().clone()
+            } else {
+                json::from_slice(&v).unwrap()
+            }
+        }
+    })
+}
+
 pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
