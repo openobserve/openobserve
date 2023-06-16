@@ -268,13 +268,10 @@ const useDashboardPanelData = () => {
   }
 
   const removeXYFilters = () => {
-    console.log("Clearing X, Y, and Filter fields");
     if (promqlMode.value || dashboardPanelData.data.customQuery == false) {
-      console.log("promqlmode, Clearing X, Y, and Filter fields");
       dashboardPanelData.data.fields.x.splice(0, dashboardPanelData.data.fields.x.length);
       dashboardPanelData.data.fields.y.splice(0, dashboardPanelData.data.fields.y.length);
       dashboardPanelData.data.fields.filter.splice(0, dashboardPanelData.data.fields.filter.length);
-      console.log("Fields cleared");
     }
   }
 
