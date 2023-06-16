@@ -118,6 +118,7 @@ const useDashboardPanelData = () => {
         return dashboardPanelData.data.fields.y.length >= 1
       case 'metric':
         return dashboardPanelData.data.fields.y.length >= 1
+      case 'a-stacked':
       case 'stacked':
       case 'h-stacked':
         return dashboardPanelData.data.fields.y.length >= 1
@@ -248,6 +249,7 @@ const useDashboardPanelData = () => {
         end_time:  new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime() * 1000,
         fields: [name],
         size: 10,
+        type: dashboardPanelData.data.fields.stream_type
       })
       .then((res:any) => {
         dashboardPanelData.meta.filterValue.push({

@@ -621,6 +621,35 @@ export default defineComponent({
                 //   console.log("multiple:- traces", traces);
                   break;
               }
+              case "a-stacked": {
+                  // stacked with xAxis's second value
+                  // allow 2 xAxis and 1 yAxis value for stack chart
+                  // get second x axis key
+                  const key1 = xAxisKeys[1]
+                  // get the unique value of the second xAxis's key
+                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
+                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                  
+                  // create a trace based on second xAxis's unique values
+                  traces = stackedXAxisUniqueValue?.map((key: any) => {
+                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                      
+                      const trace = {
+                          name: key,
+                          ...getPropsByChartTypeForTraces(),
+                          showlegend: props.data.config?.show_legends,
+                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                          customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                          hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+                          stackgroup: 'one'
+
+                      };
+                      return trace
+                  })
+                //   console.log("multiple:- traces", traces);
+                  break;
+              }
               case "stacked": {
                   // stacked with xAxis's second value
                   // allow 2 xAxis and 1 yAxis value for stack chart
@@ -642,7 +671,6 @@ export default defineComponent({
                           y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
                           customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
-
                       };
                       return trace
                   })
@@ -715,7 +743,9 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
           };
 
-        //   console.log('layout', layout);
+          console.log('layout', layout);
+          console.log('traces', traces);
+
 
           Plotly.react(plotRef.value, traces, layout, {
               responsive: true,
@@ -928,6 +958,11 @@ export default defineComponent({
                   return {
                       type: 'bar',
                   };
+              case "a-stacked":
+                  return {
+                        mode: 'lines',  
+                        // fill: 'none'
+                  };
               case "metric":
                   return {
                       type: "indicator",
@@ -950,6 +985,9 @@ export default defineComponent({
           const xAxisKey = getXAxisKeys().length ? getXAxisKeys()[0] : '';
           const xAxisData = getAxisDataFromKey(xAxisKey)
           const xAxisDataWithTicks = getTickLimits(xAxisData)
+
+          console.log("data with tick",xAxisDataWithTicks);
+          
 
           switch (props.data.type) {
               case "bar": {
@@ -1114,6 +1152,25 @@ export default defineComponent({
 
                   return trace
               }
+              case "a-stacked":
+                console.log("a-stacked", textformat(xAxisDataWithTicks));
+                
+                  return {
+                      barmode: "stack",
+                      xaxis: {
+                          tickmode: "array",
+                          tickvals: xAxisDataWithTicks,
+                          ticktext: textformat(xAxisDataWithTicks),
+                          title: props.data.fields?.x[0].label,
+                          tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                          automargin: true,
+                      },
+                      yaxis: {
+                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                          automargin: true,
+                          fixedrange: true
+                      },
+                    };
               case "stacked":
                   return {
                       barmode: "stack",

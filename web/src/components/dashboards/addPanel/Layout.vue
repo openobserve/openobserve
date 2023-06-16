@@ -447,6 +447,7 @@ export default defineComponent({
           return "X-Axis field is not allowed"
         case 'table':
           return "Add one or more fields here"
+        case 'a-stacked':
         case 'stacked':
         case 'h-stacked':
           return "Add 2 fields here"

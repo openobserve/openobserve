@@ -59,9 +59,14 @@ export default defineComponent({
     // array of charts
     const chartsArray = ref([
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area.png"),
         title: "Area",
         id: "area",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        title: "A-Stacked",
+        id: "a-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
