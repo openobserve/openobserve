@@ -18,7 +18,7 @@
     data-test="query-editor"
     class="logs-query-editor"
     ref="editorRef"
-    id="editor"
+    :id="id"
   ></div>
 </template>
 
@@ -30,6 +30,10 @@ import { useStore } from "vuex";
 export default defineComponent({
   props: {
     autocompleteKeywords: [],
+    id: {
+      type: String,
+      default: "editor",
+    },
     query: {
       type: String,
       default: "",
@@ -45,6 +49,14 @@ export default defineComponent({
     showAutoComplete: {
       type: Boolean,
       default: true,
+    },
+    keywords: {
+      type: Array,
+      default: () => [],
+    },
+    suggestions: {
+      type: Array,
+      default: () => [],
     },
   },
   emits: ["update-query", "run-query"],
@@ -196,6 +208,26 @@ export default defineComponent({
         keywords.push(itemObj);
       });
 
+      const textRules = ["None", "InsertAsSnippet", "KeepWhitespace"];
+      props.keywords.forEach((keyword: any) => {
+        let itemObj: any = {
+          label: keyword,
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          insertText: keyword,
+          range: range,
+        };
+        if (
+          keyword.insertTextRule &&
+          textRules.includes(keyword.insertTextRule)
+        ) {
+          itemObj.insertTextRules =
+            monaco.languages.CompletionItemInsertTextRule[
+              keyword.insertTextRule
+            ];
+        }
+        keywords.push(itemObj);
+      });
+
       return keywords;
     };
 
@@ -242,6 +274,16 @@ export default defineComponent({
 
             // if (filteredSuggestions.length == 0) {
             const lastElement = arr.pop();
+            props.suggestions.forEach((suggestion: any) => {
+              filteredSuggestions.push({
+                label: suggestion.getLabel(lastElement),
+                kind: monaco.languages.CompletionItemKind[
+                  suggestion.kind || "Text"
+                ],
+                insertText: suggestion.getInsertText(lastElement),
+                range: range,
+              });
+            });
 
             filteredSuggestions.push({
               label: `match_all('${lastElement}')`,

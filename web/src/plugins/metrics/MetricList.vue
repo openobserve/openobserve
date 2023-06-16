@@ -15,37 +15,62 @@
 
 <template>
   <div class="column index-menu">
+    <q-select
+      data-test="log-search-index-list-select-stream"
+      v-model="searchMetricValue"
+      :label="searchMetricValue ? '' : t('search.selectIndex')"
+      :options="streamOptions"
+      data-cy="index-dropdown"
+      input-debounce="0"
+      behavior="menu"
+      filled
+      borderless
+      emit-value
+      dense
+      use-input
+      hide-selected
+      fill-input
+      @filter="filterMetrics"
+    >
+      <template #no-option>
+        <q-item>
+          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+        </q-item>
+      </template>
+    </q-select>
     <q-input
       data-test="log-search-index-list-field-search-input"
-      v-model="searchMetricValue"
+      v-model="searchMetricLabel"
       data-cy="index-field-search-input"
       filled
       borderless
       dense
       clearable
       debounce="1"
-      :placeholder="t('metrics.searchMetric')"
-      @update:model-value="filterMetrics"
+      :placeholder="t('metrics.searchLabel')"
+      @update:model-value="filterMetricLabels"
     >
       <template #prepend>
         <q-icon name="search" />
       </template>
     </q-input>
     <div class="metric-list">
+      <div v-if="!filteredMetricLabels.length" class="q-pt-lg text-center">
+        No labels found
+      </div>
       <div
-        v-for="metric in streamOptions"
-        :key="metric.label"
+        v-for="metricLabel in filteredMetricLabels"
+        :key="metricLabel.name"
         class="metric-container flex content-center ellipsis q-py-sm q-px-sm cursor-pointer q-my-xs"
         :class="
-          searchObj.data.metrics.selectedMetrics.includes(metric.label)
+          searchObj.data.metrics.selectedMetrics.includes(metricLabel.name)
             ? 'selected'
             : ''
         "
-        :title="metric.label"
-        @click="updateSelectedMetrics(metric.label)"
+        :title="metricLabel.name"
       >
         <div class="field_label ellipsis pointer-cursor">
-          {{ metric.label }}
+          {{ metricLabel.name }}
         </div>
       </div>
     </div>
@@ -70,12 +95,9 @@ export default defineComponent({
     const $q = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(searchObj.data.metrics.metricList);
-    const fieldValues: Ref<{
-      [key: string | number]: {
-        isLoading: boolean;
-        values: { key: string; count: string }[];
-      };
-    }> = ref({});
+    const selectedMetricLabels = ref([]);
+    const searchMetricLabel = ref("");
+    const filteredMetricLabels = ref([]);
 
     watch(
       () => searchObj.data.metrics.metricList.length,
@@ -84,16 +106,43 @@ export default defineComponent({
       }
     );
 
-    const searchMetricValue: Ref<string> = ref("");
+    const searchMetricValue: Ref<string> = ref(
+      searchObj.data.metrics.selectedMetrics[0]
+    );
 
-    const filterMetrics = () => {
-      if (!searchMetricValue.value) {
-        streamOptions.value = [...searchObj.data.metrics.metricList];
+    const filterMetrics = (val, update) => {
+      update(() => {
+        streamOptions.value = searchObj.data.metrics.metricList;
+        const needle = val.toLowerCase();
+        streamOptions.value = streamOptions.value.filter(
+          (v: any) => v.label.toLowerCase().indexOf(needle) > -1
+        );
+      });
+    };
+
+    watch(
+      () => searchMetricValue.value,
+      () => {
+        updateMetricLabels();
+      }
+    );
+
+    const updateMetricLabels = () => {
+      selectedMetricLabels.value = searchObj.data.streamResults.list.find(
+        (stream: any) => stream.name === searchMetricValue.value
+      ).schema;
+      filteredMetricLabels.value = [...selectedMetricLabels.value];
+    };
+
+    const filterMetricLabels = () => {
+      console.log("filter metrics label");
+      if (!searchMetricLabel.value) {
+        filteredMetricLabels.value = [...selectedMetricLabels.value];
         return;
       }
-      const value = searchMetricValue.value.toLowerCase();
-      streamOptions.value = searchObj.data.metrics.metricList.filter(
-        (column: any) => column.label.toLowerCase().indexOf(value) > -1
+      const value = searchMetricLabel.value.toLowerCase();
+      filteredMetricLabels.value = selectedMetricLabels.value.filter(
+        (column: any) => column.name.toLowerCase().indexOf(value) > -1
       );
     };
 
@@ -110,9 +159,11 @@ export default defineComponent({
       streamOptions,
       getImageURL,
       filterMetrics,
-      fieldValues,
       updateSelectedMetrics,
       searchMetricValue,
+      filteredMetricLabels,
+      searchMetricLabel,
+      filterMetricLabels,
     };
   },
 });

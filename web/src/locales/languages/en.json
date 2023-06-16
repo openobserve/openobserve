@@ -431,6 +431,7 @@
     "skip_tls_verify": "Skip TLS Verify"
   },
   "metrics": {
-    "searchMetric": "Search for a Metric"
+    "searchMetric": "Search for a Metric",
+    "searchLabel": "Search metric label"
   }
 }

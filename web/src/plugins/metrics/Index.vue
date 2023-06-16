@@ -41,7 +41,7 @@
         </template>
         <template #after>
           <div
-            class="text-right q-px-lg q-pt-sm flex align-center justify-end metrics-date-time"
+            class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
             <date-time
               data-test="logs-search-bar-date-time-dropdown"
@@ -52,17 +52,38 @@
               v-model="searchObj.meta.refreshInterval"
             />
             <q-btn
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
+              data-test="metrics-explorer-run-query-button"
+              data-cy="metrics-explorer-run-query-button"
               dense
-              icon="refresh"
-              title="Refresh"
-              class="q-pa-none no-border refresh-button text-capitalize q-px-sm"
-              rounded
-              size="md"
-              color="primary"
-              @click="runQuery"
-            />
+              flat
+              title="Run query"
+              class="q-pa-none search-button"
+              @click="searchData"
+              :disable="
+                searchObj.loading || searchObj.data.streamResults.length == 0
+              "
+            >
+              Run query
+            </q-btn>
+          </div>
+          <div>
+            <div class="row query-editor-container">
+              <div
+                class="col q-pa-sm"
+                style="border-top: 1px solid #dbdbdb; height: 150px"
+              >
+                <div class="q-pb-xs text-bold">PromQL:</div>
+                <query-editor
+                  id="metrics-query-editor"
+                  ref="metricsQueryEditorRef"
+                  class="monaco-editor"
+                  :show-auto-complete="false"
+                  v-model:query="searchObj.data.query"
+                  @update-query="updateQueryValue"
+                  @run-query="searchData"
+                />
+              </div>
+            </div>
           </div>
           <div v-if="searchObj.loading">
             <q-spinner-dots
@@ -110,16 +131,12 @@
           >
             <h5 class="text-center">No result found.</h5>
           </div>
-          <div
-            data-test="logs-search-search-result"
-            v-if="
-              searchObj.data.queryResults.hasOwnProperty('total') &&
-              !!searchObj.data.queryResults.hits.length
-            "
-          >
-            <metrics-viewer
-              ref="searchResultRef"
-              @update:datetime="searchData"
+          <div style="height: 500px">
+            <chart-render
+              v-if="chartData"
+              :height="6"
+              :data="chartData"
+              :selected-time-date="dashboardPanelData.meta.dateTime"
             />
           </div>
         </template>
@@ -136,6 +153,7 @@ import {
   ref,
   onDeactivated,
   onActivated,
+  onBeforeMount,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -156,14 +174,19 @@ import { logsErrorMessage } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
+import QueryEditor from "@/components/dashboards/QueryEditor.vue";
+import ChartRender from "@/components/dashboards/addPanel/ChartRender.vue";
+import useDashboardPanelData from "@/composables/useDashboardPanel";
+import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "AppMetrics",
   components: {
     MetricList,
-    MetricsViewer,
     DateTime,
     AutoRefreshInterval,
+    QueryEditor,
+    ChartRender,
   },
   methods: {
     searchData() {
@@ -193,6 +216,11 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
+    const metricsQueryEditorRef = ref(null);
+    const { dashboardPanelData, resetDashboardPanelData } =
+      useDashboardPanelData();
+
+    const chartData = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -221,6 +249,11 @@ export default defineComponent({
         loadPageData();
       }
     };
+    onBeforeMount(() => {
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.fields.stream_type = "metrics";
+      dashboardPanelData.data.customQuery = true;
+    });
 
     function ErrorException(message) {
       searchObj.loading = false;
@@ -412,15 +445,9 @@ export default defineComponent({
     function buildSearch() {
       try {
         var req: any = {
-          query: {
-            sql: `select histogram(${store.state.zoConfig.timestamp_column}, 1000) as zo_timestamp, max(value) as max, avg(value) as avg, min(value) as min from "[INDEX_NAME]" group by zo_timestamp ORDER BY zo_timestamp`,
-            start_time: (new Date().getTime() - 900000) * 1000,
-            end_time: new Date().getTime() * 1000,
-            from: 0,
-            size: 1000,
-            sql_mode: "full",
-          },
-          encoding: "base64",
+          sql: searchObj.data.query,
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
         };
 
         var timestamps: any = getConsumableDateTime();
@@ -432,18 +459,12 @@ export default defineComponent({
             new Date(timestamps.start_time.toISOString()).getTime() * 1000;
           const endISOTimestamp: any =
             new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          req.query.start_time = startISOTimestamp;
-          req.query.end_time = endISOTimestamp;
+          req.start_time = startISOTimestamp;
+          req.end_time = endISOTimestamp;
         } else {
           return false;
         }
 
-        req.query.sql = req.query.sql.replace(
-          "[INDEX_NAME]",
-          searchObj.data.metrics.selectedMetrics[0]
-        );
-
-        req.query.sql = b64EncodeUnicode(req.query.sql);
         return req;
       } catch (e) {
         throw new ErrorException(e.message);
@@ -452,55 +473,16 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        if (!searchObj.data.metrics.selectedMetrics.length) {
+        if (
+          !searchObj.data.metrics.selectedMetrics.length ||
+          !searchObj.data.query
+        ) {
           return false;
         }
 
-        dismiss = Notify();
-        const queryReq = buildSearch();
-        if (queryReq == null) {
-          dismiss();
-          return false;
-        }
+        // dismiss = Notify();
 
-        searchObj.data.errorMsg = "";
-        searchObj.data.errorCode = 0;
-
-        searchService
-          .search({
-            org_identifier: searchObj.organizationIdetifier,
-            query: queryReq,
-            page_type: "metrics",
-          })
-          .then((res) => {
-            searchObj.data.queryResults = { ...res.data };
-            generateHistogramData();
-            //update grid columns
-            dismiss();
-          })
-          .catch((err) => {
-            searchObj.data.queryResults = {};
-            searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
-            };
-            dismiss();
-            if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error;
-            } else {
-              searchObj.data.errorMsg = err.message;
-            }
-
-            const customMessage = logsErrorMessage(err.response.data.code);
-            searchObj.data.errorCode = err.response.data.code;
-            if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
-          })
-          .finally(() => {
-            searchObj.loading = false;
-          });
+        chartData.value = cloneDeep(dashboardPanelData.data);
       } catch (e) {
         throw new ErrorException("Request failed.", e.message);
       }
@@ -594,7 +576,7 @@ export default defineComponent({
     }
 
     function loadPageData() {
-      searchObj.loading = true;
+      // searchObj.loading = true;
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
@@ -658,6 +640,10 @@ export default defineComponent({
     const updateDateTime = (value: any) => {
       searchObj.data.datetime = value;
 
+      const timestamp = getConsumableDateTime(searchObj.data.datetime);
+      console.log(timestamp);
+      dashboardPanelData.meta.dateTime = timestamp;
+
       if (config.isCloud == "true" && value.userChangedValue) {
         let dateTimeVal;
         if (value.tab === "relative") {
@@ -676,6 +662,10 @@ export default defineComponent({
       }
     };
 
+    const updateQueryValue = (value) => {
+      dashboardPanelData.data.query = value;
+    };
+
     return {
       store,
       router,
@@ -690,6 +680,10 @@ export default defineComponent({
       setQuery,
       updateDateTime,
       verifyOrganizationStatus,
+      metricsQueryEditorRef,
+      updateQueryValue,
+      dashboardPanelData,
+      chartData,
     };
   },
   computed: {
@@ -744,6 +738,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.query-editor-container {
+  .monaco-editor {
+    height: calc(100% - 40px) !important;
+  }
+}
 div.plotly-notifier {
   visibility: hidden;
 }
@@ -805,6 +804,25 @@ div.plotly-notifier {
       height: 100%;
       padding: 0 8px;
       background-color: #ffffff !important;
+    }
+  }
+
+  .search-button {
+    width: 96px;
+    line-height: 29px;
+    font-weight: bold;
+    text-transform: initial;
+    font-size: 11px;
+    color: white;
+
+    .q-btn__content {
+      background: $primary;
+      border-radius: 0px 3px 3px 0px;
+
+      .q-icon {
+        font-size: 15px;
+        color: #ffffff;
+      }
     }
   }
 }
