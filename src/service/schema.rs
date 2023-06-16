@@ -227,7 +227,7 @@ pub async fn check_for_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
     record_ts: i64,
 ) -> (bool, Option<Vec<Field>>) {
-    let schema = if stream_schema_map.contains_key(stream_name) {
+    let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
         let schema = db::schema::get(org_id, stream_name, Some(stream_type))
@@ -250,11 +250,7 @@ pub async fn check_for_schema(
                 if val.as_bool().unwrap_or(skip_validation) {
                     return (true, None);
                 }
-            } else {
-                return (true, None);
             }
-        } else {
-            return (true, None);
         }
     }
 
@@ -276,7 +272,7 @@ pub async fn check_for_schema(
                 chrono::Utc::now().timestamp_micros().to_string(),
             );
         }
-        let final_schema = inferred_schema.with_metadata(metadata.clone());
+        let final_schema = inferred_schema.clone().with_metadata(metadata.clone());
         stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
 
         if !CONFIG.common.local_mode {
@@ -286,12 +282,13 @@ pub async fn check_for_schema(
             lock.lock(0).await.map_err(server_internal_error).unwrap();
             log::info!("Aquired lock for stream {} as schema is empty", stream_name);
 
-            if db::schema::get_from_db(org_id, stream_name, Some(stream_type))
+            // try getting schema
+
+            let chk_schema = db::schema::get_from_db(org_id, stream_name, Some(stream_type))
                 .await
-                .unwrap()
-                .fields()
-                .is_empty()
-            {
+                .unwrap();
+
+            if chk_schema.fields().is_empty() {
                 log::info!(
                     "Setting schema for stream {} as schema is empty",
                     stream_name
@@ -306,15 +303,21 @@ pub async fn check_for_schema(
                 )
                 .await
                 .unwrap();
+                lock.unlock().await.map_err(server_internal_error).unwrap();
+                log::info!(
+                    "Releasing lock for stream {} after schema is set",
+                    stream_name
+                );
+
+                return (true, None);
+            } else {
+                schema = chk_schema;
+                lock.unlock().await.map_err(server_internal_error).unwrap();
+                log::info!(
+                    "Releasing lock for stream {} after schema is set",
+                    stream_name
+                );
             }
-
-            lock.unlock().await.map_err(server_internal_error).unwrap();
-            log::info!(
-                "Releasing lock for stream {} after schema is set",
-                stream_name
-            );
-
-            return (true, None);
         } else {
             db::schema::set(
                 org_id,
