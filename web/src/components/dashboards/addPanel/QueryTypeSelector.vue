@@ -95,9 +95,11 @@ export default defineComponent({
             if (selectedQueryType != selectedButtonType.value) {
 
                 // some exceptions
-                // If user is switching from auto to custom, no need for the popup,
+                // If user is switching from auto to custom, promql to auto, or propmql to custom-sql no need for the popup,
                 // else show the popup
-                if(selectedButtonType.value == "auto" && selectedQueryType == "custom-sql") {
+                if((selectedButtonType.value == "auto" && selectedQueryType == "custom-sql") 
+                    || (selectedButtonType.value == "promql" && selectedQueryType == "auto") 
+                    || (selectedButtonType.value == "promql" && selectedQueryType == "custom-sql")) {
                     // act like you confirmed without opening the popup
                     popupSelectedButtonType.value = selectedQueryType;
                     changeToggle()
