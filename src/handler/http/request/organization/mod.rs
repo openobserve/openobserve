@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
-use crate::infra::config::USERS;
+use crate::infra::config::STREAM_SCHEMAS;
 use crate::meta::organization::{
     OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
 };
@@ -71,7 +71,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
         });
     }
 
-    for user in USERS.iter() {
+    for user in STREAM_SCHEMAS.iter() {
         if !user.key().contains('/') {
             continue;
         }
