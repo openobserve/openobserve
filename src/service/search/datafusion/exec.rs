@@ -81,7 +81,7 @@ pub async fn sql(
     result.insert(
         "query".to_string(),
         exec_query(
-            &ctx,
+            &mut ctx,
             session,
             schema.clone(),
             rules,
@@ -99,12 +99,7 @@ pub async fn sql(
         // Debug SQL
         log::info!("Query agg sql: {}", orig_agg_sql.0);
 
-        let mut agg_sql = if !&sql.query_context.is_empty() || sql.query_fn.is_some() {
-            orig_agg_sql.0.replace("tbl", "tbl_temp")
-        } else {
-            orig_agg_sql.0.clone()
-        };
-
+        let mut agg_sql = orig_agg_sql.0.to_owned();
         if meta_sql.is_ok() {
             for alias in &meta_sql.as_ref().unwrap().field_alias {
                 replace_in_query(&alias.1, &mut agg_sql, true);
@@ -123,6 +118,7 @@ pub async fn sql(
                 return Err(e);
             }
         };
+
         if !rules.is_empty() {
             let fields = df.schema().fields();
             let mut exprs = Vec::with_capacity(fields.len());
@@ -151,7 +147,6 @@ pub async fn sql(
 
     // drop table
     ctx.deregister_table("tbl")?;
-    ctx.deregister_table("tbl_temp")?;
     log::info!(
         "Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
@@ -161,7 +156,7 @@ pub async fn sql(
 }
 
 async fn exec_query(
-    ctx: &SessionContext,
+    ctx: &mut SessionContext,
     session: &SearchSession,
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,
@@ -171,7 +166,9 @@ async fn exec_query(
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
 
-    let (ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
+    let mut fast_mode = false;
+    let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
+        fast_mode = true;
         get_fast_mode_ctx(session, schema, sql, files, file_type).await?
     } else {
         (ctx.clone(), schema.clone())
@@ -180,14 +177,13 @@ async fn exec_query(
     // get used UDF
     let mut field_fns = vec![];
     let mut sql_parts = vec![];
-
     for fn_name in crate::common::functions::get_all_transform_keys(&sql.org_id).await {
         if sql.origin_sql.contains(&fn_name) {
             field_fns.push(fn_name.clone());
         }
     }
 
-    if !field_fns.is_empty() || sql.query_fn.is_some() {
+    if !fast_mode && (!field_fns.is_empty() || sql.query_fn.is_some()) {
         if let Some(caps) = RE_WHERE.captures(&sql.origin_sql) {
             sql_parts.insert(
                 0,
@@ -202,7 +198,9 @@ async fn exec_query(
     // query
     let query = if !&sql.query_context.is_empty() {
         sql.query_context.replace(&sql.stream_name, "tbl").clone()
-    } else if (!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some() {
+    } else if !fast_mode
+        && ((!field_fns.is_empty() && !sql_parts.is_empty()) || sql.query_fn.is_some())
+    {
         match sql.meta.time_range {
             Some(ts_range) => format!(
                 "{} where {} >= {} AND {} < {}",
@@ -221,7 +219,7 @@ async fn exec_query(
     // Debug SQL
     log::info!("Query sql: {}", query);
 
-    let mut df = match ctx.sql(&query).await {
+    let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
@@ -252,14 +250,20 @@ async fn exec_query(
         df = df.select(exprs)?;
     }
 
-    if field_fns.is_empty() {
+    if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
         log::info!("Query took {:.3} seconds.", start.elapsed().as_secs_f64());
         return Ok(batches);
     }
 
     if !sql.query_context.is_empty() {
-        ctx.register_table("tbl_temp", df.into_view())?;
+        q_ctx.deregister_table("tbl")?;
+        q_ctx.register_table("tbl", df.clone().into_view())?;
+        // re-register to ctx
+        if !fast_mode {
+            ctx.deregister_table("tbl")?;
+            ctx.register_table("tbl", df.into_view())?;
+        }
     } else if sql.query_fn.is_some() {
         let batches = df.clone().collect().await?;
         match handle_query_fn(sql.query_fn.clone().unwrap(), batches, &sql.org_id) {
@@ -273,14 +277,15 @@ async fn exec_query(
                     resp.first().unwrap().schema(),
                     vec![resp],
                 )?;
-                ctx.register_table("tbl_temp", Arc::new(mem_table))?;
+                q_ctx.deregister_table("tbl")?;
+                q_ctx.register_table("tbl", Arc::new(mem_table))?;
                 // -- fix mem table, add missing columns
-                let mut tmp_df = ctx.table("tbl_temp").await?;
+                let mut tmp_df = q_ctx.table("tbl").await?;
                 let tmp_fields = tmp_df
                     .schema()
                     .field_names()
                     .iter()
-                    .map(|f| f.strip_prefix("tbl_temp.").unwrap().to_string())
+                    .map(|f| f.strip_prefix("tbl.").unwrap().to_string())
                     .collect::<Vec<String>>();
                 let need_add_columns = schema
                     .fields()
@@ -292,8 +297,13 @@ async fn exec_query(
                     for column in need_add_columns {
                         tmp_df = tmp_df.with_column(column, lit(ScalarValue::Null))?;
                     }
-                    ctx.deregister_table("tbl_temp")?;
-                    ctx.register_table("tbl_temp", tmp_df.into_view())?;
+                    q_ctx.deregister_table("tbl")?;
+                    q_ctx.register_table("tbl", tmp_df.clone().into_view())?;
+                    // re-register to ctx
+                    if !fast_mode {
+                        ctx.deregister_table("tbl")?;
+                        ctx.register_table("tbl", tmp_df.into_view())?;
+                    }
                 }
                 // -- fix done
             }
@@ -304,13 +314,17 @@ async fn exec_query(
         ));
     }
 
-    let mut where_query = format!("select * from tbl_temp where {}", &sql_parts[1]);
+    let mut where_query = if !sql_parts.is_empty() {
+        format!("select * from tbl where {}", &sql_parts[1])
+    } else {
+        sql.origin_sql.clone()
+    };
     for alias in &sql.meta.field_alias {
         replace_in_query(&alias.1, &mut where_query, true);
     }
     let additional_clause = where_query.clone();
 
-    let df = match ctx.sql(&additional_clause).await {
+    let df = match q_ctx.sql(&additional_clause).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
@@ -371,7 +385,7 @@ async fn get_fast_mode_ctx(
     Ok((ctx, schema))
 }
 
-fn replace_in_query(replace_pat: &String, where_query: &mut String, is_alias: bool) {
+fn replace_in_query(replace_pat: &str, where_query: &mut String, is_alias: bool) {
     let re1 = Regex::new(&format!("(?i){}_([a-zA-Z0-9_-]*)", replace_pat)).unwrap();
     if let Some(caps) = re1.captures(&*where_query) {
         let cap_str = caps.get(0).unwrap().as_str();
