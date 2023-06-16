@@ -125,7 +125,7 @@ impl Sql {
         // 1. no where
         // 2. no aggregation
         // 3. no group by
-        let fast_mode = meta.selection.is_none()
+        let mut fast_mode = meta.selection.is_none()
             && meta.group_by.is_empty()
             && !meta.fields.iter().any(|f| f.contains('('))
             && !meta.field_alias.iter().any(|f| f.0.contains('('));
@@ -507,6 +507,7 @@ impl Sql {
                 log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
+            let sql_meta = sql_meta.unwrap();
             for cap in RE_HISTOGRAM.captures_iter(sql.clone().as_str()) {
                 let attrs = cap
                     .get(1)
@@ -525,7 +526,14 @@ impl Sql {
                 );
             }
 
-            aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
+            if !(sql_meta.group_by.is_empty()
+                || (sql_meta.field_alias.len() == 2
+                    && sql_meta.field_alias[0].1 == "zo_sql_key"
+                    && sql_meta.field_alias[1].1 == "zo_sql_num"))
+            {
+                fast_mode = false;
+            }
+            aggs.insert(key.clone(), (sql, sql_meta));
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());

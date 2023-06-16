@@ -535,19 +535,12 @@ pub async fn values(
     };
 
     for field in &fields {
-        /*  let fn_field = if uses_fn {
-            let mut temp_field = field.replacen('_', "['", 1);
-            temp_field.push_str("']");
-            temp_field
-        } else {
-            field.clone()
-        }; */
         req.aggs.insert(
-            field.clone(),
-            format!(
-                "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
-            ),
-        );
+                field.clone(),
+                format!(
+                    "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
+                ),
+            );
     }
     let resp_search = match SearchService::search(&org_id, stream_type, &req).await {
         Ok(res) => res,
