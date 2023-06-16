@@ -54,7 +54,8 @@ const getDefaultDashboardPanelData = () => (
       customQuery: false
     },
     layout: {
-      splitter: 20
+      splitter: 20,
+      showQueryBar: false
     },
     meta: {
       parsedQuery: "",
@@ -257,7 +258,7 @@ const useDashboardPanelData = () => {
         });
 
       })
-      .catch((error) => {
+      .catch((error: any) => {
         $q.notify({
           type: "negative",
           message: "Something went wrong!",
@@ -267,25 +268,101 @@ const useDashboardPanelData = () => {
   }
 
   const removeXYFilters = () => {
-    dashboardPanelData.data.fields.x.splice(0,dashboardPanelData.data.fields.x.length)
-    dashboardPanelData.data.fields.y.splice(0,dashboardPanelData.data.fields.y.length)
-    dashboardPanelData.data.fields.filter.splice(0,dashboardPanelData.data.fields.filter.length)
+    if (promqlMode.value || dashboardPanelData.data.customQuery == false) {
+      dashboardPanelData.data.fields.x.splice(0, dashboardPanelData.data.fields.x.length);
+      dashboardPanelData.data.fields.y.splice(0, dashboardPanelData.data.fields.y.length);
+      dashboardPanelData.data.fields.filter.splice(0, dashboardPanelData.data.fields.filter.length);
+    }
   }
 
-  return { 
-    dashboardPanelData, 
-    resetDashboardPanelData, 
-    addXAxisItem, 
+  // This function updates the x and y fields of a custom query in the dashboard panel data
+  const updateXYFieldsForCustomQueryMode = () => {
+    // Check if the custom query is enabled and PromQL mode is disabled
+    if (!promqlMode.value && dashboardPanelData.data.customQuery == true) {
+      // Loop through each custom query field in the dashboard panel data's stream meta
+      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any, index: number) => {
+        // Determine if the current field is an x or y field
+        const currentFieldType = index < dashboardPanelData.data.fields.x.length ? "x" : "y";
+        // Get the current field based on its index and whether it's an x or y field
+        const field = index < dashboardPanelData.data.fields.x.length
+            ? dashboardPanelData.data.fields.x[index]
+            : dashboardPanelData.data.fields.y[index - dashboardPanelData.data.fields.x.length];
+        // Get the name of the current custom query field
+        const { name } = it;
+
+          // Update the properties of the current field
+          field.alias = name; // Set the alias to the name of the custom query field
+          field.column = name; // Set the column to the name of the custom query field
+          field.color = null; // Reset the color to null
+          // If the current field is a y field, set the aggregation function to "count"
+          field.aggregationFunction = currentFieldType == "x" ? null : "count";
+        }
+      );
+    }
+  };
+
+
+  const updateXYFieldsOnCustomQueryChange = (oldCustomQueryFields: any) => {
+    // Create a copy of the old custom query fields array
+    const oldArray = oldCustomQueryFields;
+    // Create a deep copy of the new custom query fields array
+    const newArray = JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.customQueryFields));
+
+    // Check if the length of the old and new arrays are the same
+    if (oldArray.length == newArray.length) {
+      // Create an array to store the indexes of changed fields
+      const changedIndex: any = [];
+      // Iterate through the new array
+      newArray.forEach((obj: any, index: any) => {
+        const { name } = obj;
+        // Check if the name of the field at the same index in the old array is different
+        if (oldArray[index].name != name) {
+          changedIndex.push(index);
+        }
+      });
+      // Check if there is only one changed field
+      if (changedIndex.length == 1) {
+        const oldName = oldArray[changedIndex[0]]?.name;
+        let fieldIndex = dashboardPanelData.data.fields.x.findIndex((it: any) => it.alias == oldName);
+        // Check if the field is in the x fields array
+        if (fieldIndex >= 0) {
+          const newName = newArray[changedIndex[0]]?.name;
+          const field = dashboardPanelData.data.fields.x[fieldIndex];
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        } else {
+          // Check if the field is in the y fields array
+          fieldIndex = dashboardPanelData.data.fields.y.findIndex((it: any) => it.alias == oldName);
+          if (fieldIndex >= 0) {
+            const newName = newArray[changedIndex[0]]?.name;
+            const field = dashboardPanelData.data.fields.y[fieldIndex];
+
+            // Update the field alias and column to the new name
+            field.alias = newName;
+            field.column = newName;
+          }
+        }
+      }
+    }
+  };
+
+  return {
+    dashboardPanelData,
+    resetDashboardPanelData,
+    addXAxisItem,
     addYAxisItem,
     removeXAxisItem,
     removeYAxisItem,
     removeFilterItem,
     addFilteredItem,
     removeXYFilters,
+    updateXYFieldsForCustomQueryMode,
+    updateXYFieldsOnCustomQueryChange,
     isAddXAxisNotAllowed,
     isAddYAxisNotAllowed,
     promqlMode,
   };
 };
-
 export default useDashboardPanelData;

@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
-use crate::infra::config::USERS;
+use crate::infra::config::{STREAM_SCHEMAS, USERS};
 use crate::meta::organization::{
     OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
 };
@@ -69,33 +69,54 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
             org_type: DEFAULT_ORG.to_string(),
             user_obj: user_detail.clone(),
         });
+
+        for schema in STREAM_SCHEMAS.iter() {
+            if !schema.key().contains('/') {
+                continue;
+            }
+
+            id += 1;
+            let org = OrgDetails {
+                id,
+                identifier: schema.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                name: schema.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                user_email: user_id.to_string(),
+                ingest_threshold: THRESHOLD,
+                search_threshold: THRESHOLD,
+                org_type: CUSTOM.to_string(),
+                user_obj: user_detail.clone(),
+            };
+            if !org_names.contains(&org.identifier) {
+                org_names.insert(org.identifier.clone());
+                orgs.push(org)
+            }
+        }
+    } else {
+        for user in USERS.iter() {
+            if !user.key().contains('/') {
+                continue;
+            }
+            if !user.key().ends_with(&format!("/{user_id}")) {
+                continue;
+            }
+
+            id += 1;
+            let org = OrgDetails {
+                id,
+                identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                user_email: user_id.to_string(),
+                ingest_threshold: THRESHOLD,
+                search_threshold: THRESHOLD,
+                org_type: CUSTOM.to_string(),
+                user_obj: user_detail.clone(),
+            };
+            if !org_names.contains(&org.identifier) {
+                org_names.insert(org.identifier.clone());
+                orgs.push(org)
+            }
+        }
     }
-
-    for user in USERS.iter() {
-        if !user.key().contains('/') {
-            continue;
-        }
-        if !is_root_user && !user.key().ends_with(&format!("/{user_id}")) {
-            continue;
-        }
-
-        id += 1;
-        let org = OrgDetails {
-            id,
-            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            user_email: user_id.to_string(),
-            ingest_threshold: THRESHOLD,
-            search_threshold: THRESHOLD,
-            org_type: CUSTOM.to_string(),
-            user_obj: user_detail.clone(),
-        };
-        if !org_names.contains(&org.identifier) {
-            org_names.insert(org.identifier.clone());
-            orgs.push(org)
-        }
-    }
-
     let org_response = OrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))

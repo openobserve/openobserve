@@ -85,7 +85,8 @@ import {
   onActivated,
   nextTick,
   watch,
-  reactive
+  reactive,
+  onDeactivated,
 } from "vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
@@ -136,6 +137,11 @@ export default defineComponent({
       errors: []
     })
 
+    onDeactivated(async () => {
+      // clear a few things
+      resetDashboardPanelData();
+    });
+
     onActivated(async () => {
       errorData.errors = []
 
@@ -151,6 +157,7 @@ export default defineComponent({
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         // console.log("dashboard panel data",JSON.stringify(dashboardPanelData.data, null, 2));
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data))
+        updateDateTime(selectedDate.value)
       } else {
         editMode.value = false;
         resetDashboardPanelData();
@@ -393,9 +400,6 @@ export default defineComponent({
       } else {
         return true
       }
-
-
-
     }
 
     const savePanelChangesToDashboard = async (dashId: string) => {
