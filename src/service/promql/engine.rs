@@ -82,11 +82,8 @@ impl Engine {
                         let value = binaries::scalar_binary_operations(token, left, right)?;
                         Value::Float(value)
                     }
-                    (Value::Vector(_left), Value::Vector(_right)) => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported binary operation between two vectors. {:?} {:?}",
-                            &lhs, &rhs
-                        )))
+                    (Value::Vector(left), Value::Vector(right)) => {
+                        binaries::vector_bin_op(expr, &left, &right)?
                     }
                     (Value::Vector(left), Value::Float(right)) => {
                         binaries::vector_scalar_bin_op(expr, &left, right).await?

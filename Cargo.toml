@@ -60,7 +60,7 @@ async_once = "0.2"
 async-recursion = "1.0"
 awc = "3.1"
 base64 = "0.21"
-blake3 = "1.3"
+blake3 = "1.4"
 bytes = "1.4"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.1", default-features = false, features = [
@@ -119,6 +119,7 @@ prost = "0.11"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
 rand = "0.8"
+rayon = "1.7.0"
 regex = "1.7"
 regex-syntax = "0.6"
 reqwest = { version = "0.11", default-features = false, features = [
@@ -155,7 +156,6 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee86
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
-
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
