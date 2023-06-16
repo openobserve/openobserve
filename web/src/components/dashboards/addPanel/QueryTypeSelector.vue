@@ -44,9 +44,13 @@ export default defineComponent({
         const router = useRouter();
         const { t } = useI18n();
         const $q = useQuasar();
-        const { dashboardPanelData, removeXYFilters } = useDashboardPanelData();
+        const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } = useDashboardPanelData();
         const confirmQueryModeChangeDialog = ref(false);
+
+        // this is the value of the current button
         const selectedButtonType = ref("auto");
+
+        // this holds the temporary value of the button while user confirms the choice on popup
         const popupSelectedButtonType = ref("auto");
 
         const ignoreSelectedButtonTypeUpdate = ref(false);
@@ -83,20 +87,33 @@ export default defineComponent({
         })
 
         // when the data is loaded, initialize the selectedButtonType
-        watch(dashboardPanelData.data, () => {
+        watch(() => [dashboardPanelData.data.queryType, dashboardPanelData.data.customQuery], () => {
             initializeSelectedButtonType()
         })
 
         const onUpdateButton = (selectedQueryType: any) => {
             if (selectedQueryType != selectedButtonType.value) {
-                popupSelectedButtonType.value = selectedQueryType;
-                confirmQueryModeChangeDialog.value = true;
+
+                // some exceptions
+                // If user is switching from auto to custom, promql to auto, or propmql to custom-sql no need for the popup,
+                // else show the popup
+                if((selectedButtonType.value == "auto" && selectedQueryType == "custom-sql") 
+                    || (selectedButtonType.value == "promql" && selectedQueryType == "auto") 
+                    || (selectedButtonType.value == "promql" && selectedQueryType == "custom-sql")) {
+                    // act like you confirmed without opening the popup
+                    popupSelectedButtonType.value = selectedQueryType;
+                    changeToggle()
+                } else {
+                    popupSelectedButtonType.value = selectedQueryType;
+                    confirmQueryModeChangeDialog.value = true;
+                }
             }
         };
         const changeToggle = async () => {
             selectedButtonType.value = popupSelectedButtonType.value;
             await nextTick() // let the watchers execute first
             removeXYFilters()
+            updateXYFieldsForCustomQueryMode()
         };
 
         watch(() => dashboardPanelData.data.fields.stream_type, () => {

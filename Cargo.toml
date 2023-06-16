@@ -89,7 +89,7 @@ indexmap = { version = "1.9", features = ["serde"] }
 ipnetwork = "0.20"
 lazy_static = "1.4"
 log = "0.4"
-lru = "0.8"
+lru = "0.10"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 object_store = { version = "0.5", features = [

@@ -507,22 +507,10 @@ export default defineComponent({
         timestamps.end_time != "Invalid Date"
       ) {
         const chartSettings = {
-          chartInterval: "1 second",
+          chartInterval: "10 second",
           chartKeyFormat: "HH:mm:ss",
         };
 
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-          chartSettings.chartInterval = "3 second";
-          chartSettings.chartKeyFormat = "HH:mm:ss";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-          chartSettings.chartInterval = "5 second";
-          chartSettings.chartKeyFormat = "HH:mm:ss";
-        }
-        if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-          chartSettings.chartInterval = "10 second";
-          chartSettings.chartKeyFormat = "HH:mm:ss";
-        }
         if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
           chartSettings.chartInterval = "15 second";
           chartSettings.chartKeyFormat = "HH:mm:ss";

@@ -24,7 +24,6 @@ pub enum StorageType {
     FsMemory,  // fsm
     FsNoCache, // fsn
     Tmpfs,
-    Wal,
 }
 
 /// A specialized `Error` for in-memory object store-related errors

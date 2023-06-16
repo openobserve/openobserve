@@ -64,6 +64,7 @@ pub struct Sql {
     pub aggs: AHashMap<String, (String, MetaSql)>,
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
+    pub fast_mode: bool, // there is no where, no group by, no aggregatioin, we can just get data from the latest file
     pub schema: Schema,
     pub query_context: String,
     pub uses_zo_fn: bool,
@@ -119,6 +120,15 @@ impl Sql {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
             }
         };
+
+        // need check some things:
+        // 1. no where
+        // 2. no aggregation
+        // 3. no group by
+        let mut fast_mode = meta.selection.is_none()
+            && meta.group_by.is_empty()
+            && !meta.fields.iter().any(|f| f.contains('('))
+            && !meta.field_alias.iter().any(|f| f.0.contains('('));
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
@@ -497,6 +507,7 @@ impl Sql {
                 log::error!("parse sql error: {}, sql: {}", sql_meta.err().unwrap(), sql);
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(sql)));
             }
+            let sql_meta = sql_meta.unwrap();
             for cap in RE_HISTOGRAM.captures_iter(sql.clone().as_str()) {
                 let attrs = cap
                     .get(1)
@@ -515,7 +526,14 @@ impl Sql {
                 );
             }
 
-            aggs.insert(key.clone(), (sql, sql_meta.unwrap()));
+            if !(sql_meta.group_by.is_empty()
+                || (sql_meta.field_alias.len() == 2
+                    && sql_meta.field_alias[0].1 == "zo_sql_key"
+                    && sql_meta.field_alias[1].1 == "zo_sql_num"))
+            {
+                fast_mode = false;
+            }
+            aggs.insert(key.clone(), (sql, sql_meta));
         }
 
         let sql_meta = MetaSql::new(origin_sql.clone().as_str());
@@ -560,6 +578,7 @@ impl Sql {
             aggs,
             fields: vec![],
             sql_mode,
+            fast_mode,
             schema,
             query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
@@ -666,21 +685,16 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
             "15 second",
         ),
         (
-            Duration::minutes(20).num_microseconds().unwrap(),
+            Duration::minutes(15).num_microseconds().unwrap(),
             "10 second",
         ),
-        (
-            Duration::minutes(10).num_microseconds().unwrap(),
-            "5 second",
-        ),
-        (Duration::minutes(5).num_microseconds().unwrap(), "2 second"),
     ];
     for interval in intervals.iter() {
         if (time_range.1 - time_range.0) >= interval.0 {
             return interval.1.to_string();
         }
     }
-    "1 second".to_string()
+    "10 second".to_string()
 }
 
 fn split_sql_token_unwrap_brace(s: &str) -> Vec<String> {

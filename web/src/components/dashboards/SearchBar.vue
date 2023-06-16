@@ -19,7 +19,7 @@
       <div style="flex: 1;" @click="onDropDownClick">
         <q-icon
           flat
-          :name="!showQuery ? 'arrow_right' : 'arrow_drop_down'"
+          :name="!dashboardPanelData.layout.showQueryBar ? 'arrow_right' : 'arrow_drop_down'"
           text-color="black"
           class="q-mr-sm"
         />
@@ -32,7 +32,7 @@
     </q-bar>
   </div>
   <div class="row" 
-    :style="!showQuery ? 'height: 0px;' : 'height: auto;'"
+    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
     style="overflow: hidden;">
     <div class="col">
       <query-editor
@@ -78,22 +78,20 @@ export default defineComponent({
     },
   },
   setup() {
-    // show the query box
-    const showQuery = ref(false)
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData, removeXYFilters } = useDashboardPanelData()
+    const { dashboardPanelData, updateXYFieldsOnCustomQueryChange } = useDashboardPanelData()
     const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
 
     // toggle show query view
     const onDropDownClick= () =>{
-        showQuery.value = !showQuery.value
+      dashboardPanelData.layout.showQueryBar = !dashboardPanelData.layout.showQueryBar
     }
 
-    watch(showQuery, () => {
+    watch(() => dashboardPanelData.layout.showQueryBar, () => {
       window.dispatchEvent(new Event("resize"))
     })
 
@@ -207,17 +205,19 @@ export default defineComponent({
       }
     }, {deep: true})
 
-    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], ()=>{
-      // console.log("query changes in search bar",dashboardPanelData.data.customQuery);
 
-      // only continue if current mode is show custom query
-      if(dashboardPanelData.data.customQuery){
+    watch(() => [dashboardPanelData.data.query, dashboardPanelData.data.customQuery, dashboardPanelData.meta.stream.selectedStreamFields], () => {
+      // console.log("query changes in search bar", dashboardPanelData.data.customQuery);
+
+      // Only continue if the current mode is "show custom query"
+      if (dashboardPanelData.data.customQuery && dashboardPanelData.data.queryType == "sql") {
+        // Call the updateQueryValue function
         updateQueryValue()
       } else {
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = []
-       }
+      }
     }, {deep: true})
 
      // This function parses the custom query and generates the errors and custom fields
@@ -251,6 +251,7 @@ export default defineComponent({
         // get the columns first
         if(Array.isArray(dashboardPanelData.meta.parsedQuery?.columns) 
             && dashboardPanelData.meta.parsedQuery?.columns?.length > 0) {
+              const oldCustomQueryFields = JSON.parse(JSON.stringify(dashboardPanelData.meta.stream.customQueryFields))
           dashboardPanelData.meta.stream.customQueryFields = []
           dashboardPanelData.meta.parsedQuery.columns.forEach((item: any, index: any) => {
             let val;
@@ -264,6 +265,9 @@ export default defineComponent({
               dashboardPanelData.meta.stream.customQueryFields.push({name: val, type: ''});
             }
           });
+
+          // update the existing x and y axis fields
+          updateXYFieldsOnCustomQueryChange(oldCustomQueryFields)
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns")
         }
@@ -298,7 +302,6 @@ export default defineComponent({
       updateQueryValue,
       onDropDownClick,
       dashboardPanelData,
-      showQuery,
       confirmQueryModeChangeDialog,
       onUpdateToggle
     };
