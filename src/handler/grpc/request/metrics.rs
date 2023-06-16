@@ -128,7 +128,8 @@ impl Metrics for Querier {
                 }
             }
             if let Ok(body) = get_file_contents(&file) {
-                let name = file.split('/').last().unwrap_or_default();
+                let name = file.replace('\\', "/");
+                let name = name.split('/').last().unwrap_or_default();
                 resp.files.push(MetricsWalFile {
                     name: name.to_string(),
                     body,

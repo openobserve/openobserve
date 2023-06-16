@@ -30,7 +30,7 @@ use crate::infra::{
     cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     config::CONFIG,
 };
-use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
+use crate::meta::{search::Session as SearchSession, StreamType};
 use crate::service::{
     db,
     search::{
@@ -77,19 +77,7 @@ pub(crate) async fn create_context(
         storage_type: StorageType::Tmpfs,
     };
 
-    register_table(
-        &session,
-        StreamParams {
-            org_id,
-            stream_name,
-            stream_type,
-        },
-        Some(schema),
-        stream_name,
-        &[],
-        FileType::JSON,
-    )
-    .await
+    register_table(&session, schema, stream_name, &[], FileType::JSON).await
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
