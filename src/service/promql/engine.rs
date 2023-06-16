@@ -75,13 +75,35 @@ impl Engine {
             PromExpr::Binary(expr) => {
                 let lhs = self.exec_expr(&expr.lhs).await?;
                 let rhs = self.exec_expr(&expr.rhs).await?;
-                match expr.op.id() {
-                    token::T_ADD => binaries::add(&lhs, &rhs)?,
-                    token::T_SUB => binaries::sub(&lhs, &rhs)?,
+                let token = expr.op.id();
+
+                match (lhs.clone(), rhs.clone()) {
+                    (Value::Float(left), Value::Float(right)) => {
+                        let value = binaries::scalar_binary_operations(token, left, right)?;
+                        Value::Float(value)
+                    }
+                    (Value::Vector(_left), Value::Vector(_right)) => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported binary operation between two vectors. {:?} {:?}",
+                            &lhs, &rhs
+                        )))
+                    }
+                    (Value::Vector(left), Value::Float(right)) => {
+                        binaries::vector_scalar_bin_op(expr, &left, right).await?
+                    }
+                    (Value::Float(left), Value::Vector(right)) => {
+                        binaries::vector_scalar_bin_op(expr, &right, left).await?
+                    }
+                    (Value::None, _) | (_, Value::None) => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "No data found for the operation lhs: {:?} rhs: {:?}",
+                            &lhs, &rhs
+                        )))
+                    }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported Binary: {:?}",
-                            expr
+                            "Unsupported binary operation between two operands. {:?} {:?}",
+                            &lhs, &rhs
                         )))
                     }
                 }
@@ -228,6 +250,7 @@ impl Engine {
                 time_window: Some(TimeWindow::new(eval_ts, range)),
             });
         }
+
         Ok(values)
     }
 
