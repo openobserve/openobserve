@@ -345,17 +345,17 @@ export default defineComponent({
       },
       {
         title: t("menu.search"),
-        icon: "img:" + getImageURL("images/left_nav/search_icon.svg"),
+        icon: "search",
         link: "/logs",
       },
       {
         title: t("menu.metrics"),
-        icon: "img:" + getImageURL("images/left_nav/metrics.svg"),
+        icon: "bar_chart",
         link: "/metrics",
       },
       {
         title: t("menu.traces"),
-        icon: "img:" + getImageURL("images/left_nav/traces.svg"),
+        icon: "account_tree",
         link: "/traces",
       },
       {
@@ -365,12 +365,12 @@ export default defineComponent({
       },
       {
         title: t("menu.index"),
-        icon: "img:" + getImageURL("images/left_nav/index_icon.svg"),
+        icon: "grid_on",
         link: "/logstreams",
       },
       {
         title: t("menu.alerts"),
-        icon: "img:" + getImageURL("images/left_nav/warning_icon.svg"),
+        icon: "warning",
         link: "/alerts",
       },
       {
@@ -380,7 +380,7 @@ export default defineComponent({
       },
       {
         title: t("menu.user"),
-        icon: "img:" + getImageURL("images/left_nav/user_icon.svg"),
+        icon: "person",
         link: "/users",
         display: store.state.currentuser.role == "admin" ? true : false,
       },
@@ -393,7 +393,7 @@ export default defineComponent({
       },
       {
         title: t("menu.about"),
-        icon: "img:" + getImageURL("images/left_nav/about_icon.svg"),
+        icon: "format_list_bulleted",
         link: "/about",
       },
     ]);
