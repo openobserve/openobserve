@@ -63,39 +63,6 @@ export const getDefaultOrganization = async (userInfo: any, org_identifier: any)
         }
         return optiondata;
       }
-
-      orgOptions.value = res.data.data.map(
-        (data: {
-          id: any;
-          name: any;
-          org_type: any;
-          identifier: any;
-          user_obj: any;
-          ingest_threshold: number;
-          search_threshold: number;
-        }) => {
-          const optiondata: any = {
-            label: data.name,
-            id: data.id,
-            type: data.org_type,
-            identifier: data.identifier,
-            user_email: userInfo.email,
-            ingest_threshold: data.ingest_threshold,
-            search_threshold: data.search_threshold,
-          };
-
-          if (
-            ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
-              data.org_type == "default" &&
-              userInfo.email == data.user_obj.email) ||
-            res.data.data.length == 1
-          ) {
-            selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-            useLocalOrganization(selectedOrg.value);
-            //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
-          }
-          return optiondata;
-        }
       );
 
       return res.data.data;

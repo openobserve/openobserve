@@ -42,7 +42,7 @@
     >
       {{ t("billing.subtitle") }}
     </div>
-    <div class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"><q-icon name="warning" class="q-pt-sm"></q-icon>{{ store.state.selectedOrganization.note }}</div>
+    <div v-if="store.state.selectedOrganization.hasOwnProperty('note') && store.state.selectedOrganization.note != ''" class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"><q-icon name="warning" class="q-pt-sm"></q-icon>{{ store.state.selectedOrganization.note }}</div>
     <div v-if="loading">
       <q-spinner-dots
         color="primary"
