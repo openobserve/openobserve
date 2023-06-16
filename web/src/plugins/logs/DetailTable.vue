@@ -19,7 +19,7 @@
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold "
             data-test="log-detail-title-text"
           >
             {{ t("search.rowDetail") }}

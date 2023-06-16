@@ -488,7 +488,6 @@ export default defineComponent({
       &__section {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
-        color: $dark-page;
 
         &:not(:first-child) {
           border-left: 1px solid $input-field-border-color;
