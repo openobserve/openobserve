@@ -20,10 +20,23 @@
     }
 }
 
+
 body{
     font-family: 'Nunito Sans', sans-serif;
     @include scrollbars;
 }
+
+.body--dark {
+    --q-primary: #5960B2;
+        --q-secondary: #5ca380;
+        --q-accent: #F5F5F5;
+        --q-positive: #5ca380;
+        --q-negative: #ec1414;
+        --q-info: #31CCEC;
+        --q-warning: #F2C037;
+        --q-dark: #202224;
+        --q-dark-page: #36383A;
+    }
 
 .q-list, .q-splitter__panel, .scroll {
     @include scrollbars;
