@@ -35,7 +35,7 @@
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(itemX,index) in dashboardPanelData.data.fields.x" :key="index">
           <q-btn  
-            icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
+            icon-right="arrow_drop_down" no-caps dense rounded size="sm"
             :label="itemX.column" class="q-pl-sm">
               <q-menu class="q-pa-md">
                 <div>

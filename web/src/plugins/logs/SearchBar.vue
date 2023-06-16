@@ -801,7 +801,6 @@ export default defineComponent({
 
     .q-field__input {
       cursor: pointer;
-      color: #36383a;
       font-weight: 600;
       font-size: 12px;
     }

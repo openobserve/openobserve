@@ -57,7 +57,7 @@
     <q-tab-panel name="tags">
       <div v-for="key in Object.keys(spanDetails.attrs)" :key="key">
         <div class="row q-py-xs q-px-sm border-bottom">
-          <span class="attr-text text-grey-9 q-pr-sm text-bold"
+          <span class="attr-text  q-pr-sm text-bold"
             >{{ key }}:</span
           >
           <span class="attr-text">{{ spanDetails.attrs[key] }}</span>

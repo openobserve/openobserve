@@ -203,7 +203,6 @@ export default defineComponent({
   margin-right: 1rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: $dark;
 }
 .q-table__bottom-item {
   @extend .footer-text;
