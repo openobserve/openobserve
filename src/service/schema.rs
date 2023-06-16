@@ -23,9 +23,12 @@ use std::sync::Arc;
 
 use crate::common::json;
 use crate::infra::config::CONFIG;
+use crate::infra::db::etcd;
 use crate::meta::prom::METADATA_LABEL;
 use crate::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
+
+use super::search::server_internal_error;
 
 #[tracing::instrument(name = "service:schema:schema_evolution", skip(inferred_schema))]
 pub async fn schema_evolution(
@@ -224,7 +227,7 @@ pub async fn check_for_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
     record_ts: i64,
 ) -> (bool, Option<Vec<Field>>) {
-    let schema = if stream_schema_map.contains_key(stream_name) {
+    let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
         let schema = db::schema::get(org_id, stream_name, Some(stream_type))
@@ -247,11 +250,7 @@ pub async fn check_for_schema(
                 if val.as_bool().unwrap_or(skip_validation) {
                     return (true, None);
                 }
-            } else {
-                return (true, None);
             }
-        } else {
-            return (true, None);
         }
     }
 
@@ -273,21 +272,65 @@ pub async fn check_for_schema(
                 chrono::Utc::now().timestamp_micros().to_string(),
             );
         }
-        let final_schema = inferred_schema.with_metadata(metadata.clone());
+        let final_schema = inferred_schema.clone().with_metadata(metadata.clone());
         stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
 
-        db::schema::set(
-            org_id,
-            stream_name,
-            stream_type,
-            &final_schema,
-            Some(record_ts),
-            false,
-        )
-        .await
-        .unwrap();
+        if !CONFIG.common.local_mode {
+            let mut lock = etcd::Locker::new(&format!(
+                "/schema/lock/{org_id}/{stream_type}/{stream_name}"
+            ));
+            lock.lock(0).await.map_err(server_internal_error).unwrap();
+            log::info!("Aquired lock for stream {} as schema is empty", stream_name);
 
-        return (true, None);
+            // try getting schema
+
+            let chk_schema = db::schema::get_from_db(org_id, stream_name, Some(stream_type))
+                .await
+                .unwrap();
+
+            if chk_schema.fields().is_empty() {
+                log::info!(
+                    "Setting schema for stream {} as schema is empty",
+                    stream_name
+                );
+                db::schema::set(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    &final_schema,
+                    Some(record_ts),
+                    false,
+                )
+                .await
+                .unwrap();
+                lock.unlock().await.map_err(server_internal_error).unwrap();
+                log::info!(
+                    "Releasing lock for stream {} after schema is set",
+                    stream_name
+                );
+
+                return (true, None);
+            } else {
+                schema = chk_schema;
+                lock.unlock().await.map_err(server_internal_error).unwrap();
+                log::info!(
+                    "Releasing lock for stream {} after schema is set",
+                    stream_name
+                );
+            }
+        } else {
+            db::schema::set(
+                org_id,
+                stream_name,
+                stream_type,
+                &final_schema,
+                Some(record_ts),
+                false,
+            )
+            .await
+            .unwrap();
+            return (true, None);
+        }
     }
 
     let inferred_fields: HashSet<_> = inferred_schema.fields().iter().collect();
