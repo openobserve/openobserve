@@ -156,6 +156,7 @@ export default defineComponent({
         "vector",
         "filebeat",
         "syslog",
+        "gcpLogs",
       ];
       const metricRoutes = ["prometheus", "otelCollector", "telegraf"];
       const traceRoutes = ["tracesOTLP"];
