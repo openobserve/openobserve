@@ -199,7 +199,7 @@ export default defineComponent({
     watch(
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
-        console.log("stream:", dashboardPanelData.data.fields.stream);
+        // console.log("stream:", dashboardPanelData.data.fields.stream);
         
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
@@ -237,7 +237,7 @@ export default defineComponent({
         dashboardPanelData.meta.stream.customQueryFields,
       ],
       () => {
-        console.log("updated custom query fields or selected stream fields");
+        // console.log("updated custom query fields or selected stream fields");
 
         data.currentFieldsList = [];
         data.currentFieldsList = [
