@@ -17,7 +17,7 @@
   <q-page class="q-pa-lg">
     <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-8">
+        <q-card-section align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="text-subtitle1">{{ t("home.totalDataIngested") }}</div>
@@ -39,13 +39,13 @@
       </q-card>
 
       <q-card align="center" class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-3">
+        <q-card-section align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
           <div class="text-h6">{{ summary.ingest_fns }}</div>
         </q-card-section>
-
+        <q-separator />
         <q-card-actions align="center">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
@@ -59,13 +59,13 @@
       </q-card>
 
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-3">
+        <q-card-section align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
           <div class="text-h6">{{ summary.rt_alerts }}</div>
         </q-card-section>
-
+        <q-separator />
         <q-card-actions align="center">
           <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
@@ -81,7 +81,7 @@
 
     <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md" style="margin: 0 auto; justify-content: center;">
       <q-card class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-3">
+        <q-card-section align="center" flat bordered class="my-card">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
         </q-card-section>
@@ -97,10 +97,11 @@
             >{{ t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
+        
       </q-card>
 
       <q-card v-if="isCloud === 'true'" class="my-card">
-        <q-card-section align="center" flat bordered class="my-card bg-grey-3">
+        <q-card-section align="center" flat bordered class="my-card">
           <div class="text-h6">{{ t("home.inestedInSearch") }}</div>
           <div class="text-subtitle1">{{ t("home.searchInDemoOrg") }}</div>
         </q-card-section>
@@ -249,5 +250,9 @@ export default defineComponent({
 .pointer-description {
   display: flex;
   align-items: center;
+}
+
+.my-card{
+  background-color: rgba(0, 0, 0, 0.045);
 }
 </style>

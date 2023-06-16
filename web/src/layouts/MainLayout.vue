@@ -15,7 +15,7 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="!darkMode ? 'bg-white' : 'background'">
+    <q-header :class="!darkMode ? 'bg-white' : 'dark-mode'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
@@ -73,16 +73,7 @@
           @click="navigateToDocs()"
         />
         <div class="languageWrapper">
-          <q-btn-dropdown
-            unelevated
-            no-caps
-            flat
-            class="languageDdl"
-            :icon="selectedLanguage.icon"
-            :dropdown-icon="
-              'img:' + getImageURL('images/common/language_menu_arrow.svg')
-            "
-          >
+          <q-btn-dropdown unelevated no-caps flat class="languageDdl" :icon="selectedLanguage.icon">
             <template #label>
               <div class="row no-wrap">
                 {{ selectedLanguage.label }}
@@ -122,15 +113,7 @@
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown
-            flat
-            unelevated
-            no-caps
-            padding="xs sm"
-            :dropdown-icon="
-              'img:' + getImageURL('images/common/user_menu_arrow.svg')
-            "
-          >
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md" color="grey" text-color="white">
@@ -175,15 +158,8 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-    :class="!darkMode ? 'bg-white' : 'background'"
-      :mini="miniMode"
-      bordered
-      show-if-above
-      @mouseover="miniMode = false"
-      @mouseout="miniMode = true"
-      mini-to-overlay
-    >
+    <q-drawer :mini="miniMode" bordered show-if-above @mouseover="miniMode = false" @mouseout="miniMode = true"
+      mini-to-overlay>
       <q-list class="leftNavList">
         <menu-link
           v-for="nav in linksList"
@@ -712,7 +688,6 @@ export default defineComponent({
 
 .q-drawer {
   @extend .border-right;
-  @extend .bg-white;
   min-width: 50px;
   max-width: 210px;
   color: unset;
@@ -730,26 +705,6 @@ export default defineComponent({
   .block {
     font-weight: 700;
     color: #404040;
-  }
-}
-
-.languageDdl {
-  padding-right: 0.75rem;
-  padding-left: 0.75rem;
-
-  &.q-btn {
-    .q-icon {
-      &.q-btn-dropdown__arrow {
-        margin-left: 0.5rem;
-        height: 0.875rem;
-        width: 0.875rem;
-      }
-
-      & + .row {
-        margin-left: 0.875rem;
-        margin-right: 0.5rem;
-      }
-    }
   }
 }
 
@@ -796,7 +751,6 @@ export default defineComponent({
     }
 
     &__label {
-      color: $dark-page;
       font-weight: 400;
     }
 
@@ -849,13 +803,7 @@ export default defineComponent({
 
   &.q-btn {
     .q-icon {
-      &.q-btn-dropdown__arrow {
-        margin-left: 0.5rem;
-        height: 0.875rem;
-        width: 0.875rem;
-      }
-
-      & + .row {
+      &+.row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }
@@ -896,7 +844,6 @@ export default defineComponent({
     }
 
     &__label {
-      color: $dark-page;
       font-weight: 400;
     }
 
@@ -930,7 +877,7 @@ export default defineComponent({
 
 }
 
-.background{
-    background-color: $dark-page;
-  }
+.dark-mode {
+  background-color: $dark-page;
+}
 </style>
