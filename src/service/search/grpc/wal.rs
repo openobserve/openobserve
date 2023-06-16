@@ -178,7 +178,7 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
             .match_source(&source_file, false, true, stream_type)
             .await
         {
-            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir));
+            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir).replace('\\', "/"));
         }
     }
     Ok(result)
