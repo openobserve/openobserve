@@ -114,7 +114,7 @@ impl ObjectStore for FS {
     #[tracing::instrument(name = "datafusion::storage::nocache::list", skip_all)]
     async fn list(&self, prefix: Option<&Path>) -> Result<BoxStream<'_, Result<ObjectMeta>>> {
         let key = prefix.unwrap().to_string();
-        let objects = super::file_list::get(&key).await.unwrap();
+        let objects = super::file_list::get(&key).unwrap();
         let values = objects
             .iter()
             .map(|file| Ok(file.to_owned()))

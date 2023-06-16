@@ -102,6 +102,18 @@
           content-class="tab_content"
         />
         <q-route-tab
+          name="gcpLogs"
+          :to="{
+            name: 'gcpLogs',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
+          label="GCP Logs via (Pub/Sub)"
+          content-class="tab_content"
+        />
+        <q-route-tab
           v-if="showSyslog"
           name="syslog"
           :to="{
@@ -170,6 +182,7 @@ export default defineComponent({
         "kinesisfirehose",
         "vector",
         "syslog",
+        "gcpLogs",
       ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -283,6 +296,13 @@ export default defineComponent({
 .ingestionPage {
   .q-tab-panel {
     padding: 0 !important;
+    .tab_content {
+      .q-tab__label {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+    }
   }
 
   .q-icon > img {
