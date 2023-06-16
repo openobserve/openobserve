@@ -31,12 +31,12 @@ profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 debug = false
 strip = true
 codegen-units = 1
-lto = "thin" 
+lto = "thin"
 
 [profile.release-profiling]
 inherits = "release"
-debug=true
-strip=false
+debug = true
+strip = false
 codegen-units = 4
 
 [dependencies]
@@ -70,7 +70,7 @@ clap = { version = "4.1", default-features = false, features = [
   "suggestions",
   "cargo",
 ] }
-cloudevents-sdk = { version = "0.7.0",features = ["actix"] }
+cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "22", features = ["simd"] }
@@ -127,7 +127,7 @@ rust-embed-for-web = "11.1"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-simd-json = "0.7"
+simd-json = "0.10.3"
 sled = "0.34"
 snap = "1"
 sqlparser = { version = "0.32", features = ["serde"] }
@@ -146,10 +146,12 @@ url = "2.2"
 utoipa = { version = "3", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-vector-enrichment = { package = "enrichment", git = "https://github.com/zinclabs/vector", rev ="c110977d421bb7826738faee7d435de783cef561"}
-vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8", features = ["value"] }
+vector-enrichment = { package = "enrichment", git = "https://github.com/zinclabs/vector", rev = "c110977d421bb7826738faee7d435de783cef561" }
+vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee8634346bdbf28f78d8", features = [
+  "value",
+] }
 walkdir = "2"
-zstd = "0.12" 
+zstd = "0.12"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
 

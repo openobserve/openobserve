@@ -94,6 +94,7 @@ pub async fn search(
             need_wal: req.need_wal,
         },
     );
+
     let (value, result_type) = engine.exec(eval_stmt).await?;
     let result_type = match result_type {
         Some(v) => v,

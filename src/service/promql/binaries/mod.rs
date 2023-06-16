@@ -1,5 +1,4 @@
-mod add;
-mod sub;
-
-pub(crate) use add::add;
-pub(crate) use sub::sub;
+mod scalar_operations;
+mod vector_operations;
+pub(crate) use scalar_operations::scalar_binary_operations;
+pub(crate) use vector_operations::vector_scalar_bin_op;
