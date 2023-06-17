@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use once_cell::sync::Lazy;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use snowflake::SnowflakeIdGenerator;
+use std::iter;
 
 use super::cluster;
 
@@ -22,7 +24,16 @@ static mut IDER: Lazy<SnowflakeIdGenerator> =
 
 pub fn generate() -> String {
     let id = unsafe { IDER.real_time_generate() };
-    id.to_string()
+    format!("{}{}", id, generate_random_string(6))
+}
+
+fn generate_random_string(len: usize) -> String {
+    let mut rng = thread_rng();
+    iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(len)
+        .collect()
 }
 
 #[cfg(test)]
@@ -33,5 +44,11 @@ mod tests {
     fn test_generate_id() {
         let id = generate();
         assert_ne!(id, "");
+    }
+
+    #[test]
+    fn test_generate_random_string() {
+        let random_string = generate_random_string(10);
+        assert_eq!(random_string.len(), 10);
     }
 }
