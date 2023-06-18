@@ -110,7 +110,9 @@ pub async fn search(
     }
 
     log::info!(
-        "search->storage: load files {}, scan_size {}, compressed_size {}",
+        "search->storage: org {}, stream {}, load files {}, scan_size {}, compressed_size {}",
+        &sql.org_id,
+        &sql.stream_name,
         file_count,
         scan_original_size,
         scan_compressed_size
@@ -135,7 +137,9 @@ pub async fn search(
             }
         }
         log::info!(
-            "search->storage: load files {}, into memory cache done",
+            "search->storage: org {}, stream {}, load files {}, into memory cache done",
+            &sql.org_id,
+            &sql.stream_name,
             file_count
         );
     }
