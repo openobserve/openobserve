@@ -233,7 +233,7 @@ pub enum AWSRecordType {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GCSIngestionRequest {
+pub struct GCPIngestionRequest {
     pub message: GCSMessage,
     pub subscription: String,
 }
@@ -260,7 +260,7 @@ pub struct GCSAttributes {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct GCSngestionResponse {
+pub struct GCPIngestionResponse {
     pub request_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
