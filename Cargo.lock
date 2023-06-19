@@ -2511,16 +2511,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flatten-json-object"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9539d6d8c87acbf7c3189fb4d1c8ce926de16369212e97ba1629b62febb3d512"
-dependencies = [
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3955,7 +3945,6 @@ dependencies = [
  "etcd-client",
  "expect-test",
  "flate2",
- "flatten-json-object",
  "float-cmp",
  "futures",
  "get_if_addrs",

@@ -19,24 +19,22 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
-use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Error};
+use std::{
+    fs::OpenOptions,
+    io::{BufRead, BufReader, Error},
+};
 
-use crate::common::json::{Map, Value};
-use crate::infra::config::CONFIG;
-use crate::infra::wal;
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::traces::Event;
-use crate::service::ingestion::{format_stream_name, get_partition_key_record};
-use crate::service::schema::{add_stream_schema, stream_schema_exists};
-use crate::{
-    common::json,
-    infra::cluster,
-    meta::{
-        self,
-        traces::{Span, SpanRefType},
-        StreamType,
-    },
+use crate::common::{flatten, json};
+use crate::infra::{cluster, config::CONFIG, wal};
+use crate::meta::{
+    alert::{Alert, Evaluate, Trigger},
+    http::HttpResponse as MetaHttpResponse,
+    traces::{Event, Span, SpanRefType},
+    StreamType,
+};
+use crate::service::{
+    ingestion::{format_stream_name, get_partition_key_record},
+    schema::{add_stream_schema, stream_schema_exists},
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -61,7 +59,7 @@ pub async fn traces_json(
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
-            HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 "not an ingester".to_string(),
             )),
@@ -69,7 +67,8 @@ pub async fn traces_json(
     }
     let traces_stream_name = "default";
 
-    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, Value>>> = AHashMap::new();
+    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
+        AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
 
@@ -120,11 +119,11 @@ pub async fn traces_json(
             continue;
         }
 
-        let traces: Value = json::from_slice(line.as_bytes()).unwrap();
+        let traces: json::Value = json::from_slice(line.as_bytes()).unwrap();
         if traces.get("resourceSpans").is_some() {
             let res_spans = traces.get("resourceSpans").unwrap().as_array().unwrap();
             for res_span in res_spans {
-                let mut service_att_map: AHashMap<String, Value> = AHashMap::new();
+                let mut service_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 if res_span.get("resource").is_some() {
                     let resource = res_span.get("resource").unwrap().as_object().unwrap();
                     if resource.get("attributes").is_some() {
@@ -198,7 +197,7 @@ pub async fn traces_json(
                                 span.get("startTimeUnixNano").unwrap().as_u64().unwrap();
                             let end_time: u64 =
                                 span.get("endTimeUnixNano").unwrap().as_u64().unwrap();
-                            let mut span_att_map: AHashMap<String, Value> = AHashMap::new();
+                            let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                             let attributes = span.get("attributes").unwrap().as_array().unwrap();
                             for span_att in attributes {
                                 span_att_map.insert(
@@ -208,7 +207,7 @@ pub async fn traces_json(
                             }
 
                             let mut events = vec![];
-                            let mut event_att_map: AHashMap<String, Value> = AHashMap::new();
+                            let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
 
                             let span_events = span.get("events").unwrap().as_array().unwrap();
                             for event in span_events {
@@ -259,7 +258,7 @@ pub async fn traces_json(
                             let mut value: json::Value = json::to_value(local_val).unwrap();
 
                             //JSON Flattening
-                            value = json::flatten_json_and_format_field(&value);
+                            value = flatten::flatten(&value).unwrap();
 
                             /*     // Start row based transform
                             #[cfg(feature = "zo_functions")]
@@ -305,7 +304,7 @@ pub async fn traces_json(
                                 if let Some(alerts) = stream_alerts_map.get(&key) {
                                     for alert in alerts {
                                         if alert.is_real_time {
-                                            let set_trigger = meta::alert::Evaluate::evaluate(
+                                            let set_trigger = Evaluate::evaluate(
                                                 &alert.condition,
                                                 value.as_object().unwrap().clone(),
                                             );
@@ -341,7 +340,7 @@ pub async fn traces_json(
 
                             hour_buf.push(value_str);
                             //Trace Metadata
-                            let mut trace_meta = Map::new();
+                            let mut trace_meta = json::Map::new();
                             trace_meta.insert(
                                 "trace_id".to_owned(),
                                 json::Value::String(trace_id.clone()),
@@ -356,12 +355,10 @@ pub async fn traces_json(
                 }
             }
         } else {
-            return Ok(
-                HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Bad Request".to_string(),
-                )),
-            );
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Bad Request".to_string(),
+            )));
         }
     }
     let mut write_buf = BytesMut::new();
@@ -434,7 +431,7 @@ pub async fn traces_json(
         }
     }
 
-    Ok(HttpResponse::Ok().json(meta::http::HttpResponse::message(
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
         "request processed".to_string(),
     )))
@@ -442,7 +439,7 @@ pub async fn traces_json(
     //Ok(HttpResponse::Ok().into())
 }
 
-fn get_val_for_attr(attr_val: Value) -> Value {
+fn get_val_for_attr(attr_val: json::Value) -> json::Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((_key, value)) = local_val.into_iter().next() {
         return value.clone();
