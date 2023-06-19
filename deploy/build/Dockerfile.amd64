@@ -3,8 +3,11 @@ FROM public.ecr.aws/docker/library/node:18.12.1-bullseye as webBuilder
 WORKDIR /web
 COPY ./web /web/
 
-RUN npm install
-RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
+RUN mkdir -p dist 
+RUN touch dist/index.html
+
+# RUN npm install
+# RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
