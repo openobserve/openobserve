@@ -336,7 +336,6 @@ export default defineComponent({
 
       &.text-primary {
         .q-btn__content {
-          color: $dark-page !important;
         }
       }
     }
@@ -450,7 +449,6 @@ export default defineComponent({
 
     &-weekdays>div {
       font-size: 0.875rem;
-      color: $dark-page;
       font-weight: 700;
       opacity: 1;
     }

@@ -366,7 +366,6 @@ export default defineComponent({
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
-    color: $light-text2;
   }
   &.isOpen .q-icon.on-right {
     transform: rotate(180deg);
@@ -376,7 +375,6 @@ export default defineComponent({
     justify-content: flex-start;
 
     .block {
-      color: $dark-page;
       font-weight: 600;
 
       &::before {
@@ -398,7 +396,6 @@ export default defineComponent({
 
       &.text-primary {
         .q-btn__content {
-          color: $dark-page !important;
         }
       }
     }
@@ -422,12 +419,10 @@ export default defineComponent({
         height: 40px;
       }
       &__native {
-        color: $light-text2;
         font-size: 0.875rem;
         font-weight: 600;
       }
       .q-select__dropdown-icon {
-        color: $light-text2;
       }
     }
 
@@ -474,7 +469,6 @@ export default defineComponent({
   padding-right: 1.5rem;
   padding-left: 1.5rem;
   font-size: 0.625rem;
-  color: $light-text;
 }
 .q-date {
   &__navigation {
@@ -492,18 +486,15 @@ export default defineComponent({
 
     .q-btn .block {
       font-size: 0.75rem;
-      color: $dark-page;
       font-weight: 700;
     }
   }
   &__calendar {
     &-item .block {
-      color: $light-text;
       font-weight: 700;
     }
     &-weekdays > div {
       font-size: 0.875rem;
-      color: $dark-page;
       font-weight: 700;
       opacity: 1;
     }
