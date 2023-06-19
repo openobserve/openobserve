@@ -15,7 +15,7 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="!darkMode ? 'bg-white' : 'dark-mode'">
+    <q-header :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
@@ -29,10 +29,7 @@
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-         <q-toggle
-          v-model="darkMode"
-          label="Dark Mode"
-        ></q-toggle>
+          <ThemeSwitcher></ThemeSwitcher>
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
           <div
             type="warning"
@@ -231,6 +228,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
+import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -262,7 +260,8 @@ export default defineComponent({
     "q-avatar": QAvatar,
     "q-icon": QIcon,
     "q-select": QSelect,
-  },
+    ThemeSwitcher,
+},
   methods: {
     navigateToDocs() {
       window.open("https://openobserve.ai/docs", "_blank");
@@ -292,13 +291,6 @@ export default defineComponent({
       const $q = useQuasar();
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
-
-    const darkMode = ref(false);
-
-    watch(darkMode, () => {
-      $q.dark.set(darkMode.value);
-
-    });
 
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
@@ -608,7 +600,6 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       leftDrawerOpen: false,
-      darkMode,
       miniMode,
       user,
       zoBackendUrl,

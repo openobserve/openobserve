@@ -40,6 +40,7 @@ export default createStore({
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     organizationPasscode: "",
+    theme: "",
     // allCurrentDashboards: {},
     // currentSelectedDashboard: {},
     // currentPanelsData: [],
@@ -121,6 +122,9 @@ export default createStore({
     setConfig(state, payload) {
       state.zoConfig = payload;
     },
+    appTheme(state, payload) {
+      state.theme = payload;
+    }
   },
   actions: {
     login(context, payload) {
@@ -174,6 +178,9 @@ export default createStore({
     setConfig(context, payload) {
       context.commit("setConfig", payload);
     },
+    appTheme(context, payload) {
+      context.commit("appTheme", payload);
+    }
   },
   modules: {},
 });
