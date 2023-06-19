@@ -22,6 +22,7 @@ use tokio::sync::Semaphore;
 use crate::common::json;
 use crate::infra::{
     config::{RwHashSet, CONFIG},
+    db::etcd,
     storage,
 };
 use crate::meta::common::FileKey;
@@ -31,7 +32,17 @@ pub static LOADED_FILES: Lazy<RwHashSet<String>> =
 
 pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
+
+    // get a cluster lock for compactor stream
+    let lock_key = format!("file_list/remote/cache/{prefix}");
+    let mut lock = etcd::Locker::new(&lock_key);
+    if lock.lock(0).await.is_err() {
+        return Ok(()); // lock failed, just skip
+    }
+
     if LOADED_FILES.contains(&prefix) {
+        // release cluster lock
+        lock.unlock().await?;
         return Ok(());
     }
 
@@ -61,6 +72,8 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
                 count += v;
             }
             Err(e) => {
+                // release cluster lock
+                lock.unlock().await?;
                 return Err(anyhow::anyhow!("Load file_list err: {:?}", e));
             }
         }
@@ -77,6 +90,9 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
+
+    // release cluster lock
+    lock.unlock().await?;
 
     Ok(())
 }
