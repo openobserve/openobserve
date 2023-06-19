@@ -15,9 +15,10 @@
 use actix_web::{http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::KinesisFHRequest;
-use crate::service::logs;
+use crate::{
+    meta::ingestion::{GCSIngestionRequest, KinesisFHRequest},
+    service::logs,
+};
 
 /** _bulk ES compatible ingestion API */
 #[utoipa::path(
@@ -171,4 +172,14 @@ pub async fn handle_kinesis_request(
             )),
         },
     )
+}
+
+#[post("/{org_id}/{stream_name}/_sub")]
+pub async fn handle_gcp_request(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<GCSIngestionRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), thread_id).await
 }
