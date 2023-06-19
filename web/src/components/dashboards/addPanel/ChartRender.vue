@@ -748,7 +748,7 @@ export default defineComponent({
               font: { size: 12 },
               autosize: true,
               legend: {
-                  bgcolor: "#f7f7f7",
+                  bgcolor: "#0000000b",
                   orientation: getLegendPosition('sql'),
                   itemclick: ['pie', 'donut'].includes(props.data.type) ? 'toggle' : false,
               },
@@ -759,6 +759,7 @@ export default defineComponent({
                   b: 32,
               },
               ...getPropsByChartTypeForLayout(),
+              ...getThemeLayoutOptions()
           };
 
         //   console.log('layout', layout);
@@ -1264,6 +1265,15 @@ export default defineComponent({
                   };
           }
       };
+
+    const getThemeLayoutOptions = () => ({
+        paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+        plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+    })
+
+    watch(() => store.state.theme, () => {
+        Plotly.update(plotRef.value, {}, getThemeLayoutOptions())
+    })
 
       return {
           chartPanelRef,
