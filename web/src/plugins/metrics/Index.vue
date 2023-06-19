@@ -197,6 +197,31 @@ export default defineComponent({
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
 
+    const updateStreams = () => {
+      if (searchObj.data.streamResults?.list?.length) {
+        const streamType = "metrics";
+        streamService
+          .nameList(
+            store.state.selectedOrganization.identifier,
+            streamType,
+            true
+          )
+          .then((response: any) => {
+            searchObj.data.streamResults = response.data;
+            searchObj.data.metrics.metricList = [];
+            response.data.list.map((item: any) => {
+              let itemObj = {
+                label: item.name,
+                value: item.name,
+              };
+              searchObj.data.metrics.metricList.push(itemObj);
+            });
+          });
+      } else {
+        loadPageData();
+      }
+    };
+
     function ErrorException(message) {
       searchObj.loading = false;
       $q.notify({
@@ -591,6 +616,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
+      if (!searchObj.loading) updateStreams();
       refreshData();
 
       if (

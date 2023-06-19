@@ -53,7 +53,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref, type Ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -76,6 +76,13 @@ export default defineComponent({
         values: { key: string; count: string }[];
       };
     }> = ref({});
+
+    watch(
+      () => searchObj.data.metrics.metricList.length,
+      () => {
+        streamOptions.value = searchObj.data.metrics.metricList;
+      }
+    );
 
     const searchMetricValue: Ref<string> = ref("");
 

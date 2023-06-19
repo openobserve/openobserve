@@ -312,7 +312,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, onActivated, ref, type Ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -363,6 +363,13 @@ export default defineComponent({
         );
       });
     };
+
+    watch(
+      () => searchObj.data.stream.streamLists.length,
+      () => {
+        streamOptions.value = searchObj.data.stream.streamLists;
+      }
+    );
 
     const filterFieldFn = (rows: any, terms: any) => {
       var filtered = [];

@@ -1077,20 +1077,10 @@ export default defineComponent({
         );
       }
 
-      const totalRecords =
-        (searchObj.data.resultGrid.currentPage + 1) *
-          searchObj.meta.resultGrid.rowsPerPage <
-        searchObj.data.queryResults.hits.length
-          ? (searchObj.data.resultGrid.currentPage + 1) *
-            searchObj.meta.resultGrid.rowsPerPage
-          : searchObj.data.queryResults.hits.length;
-
       const chartParams = {
         title:
           "Showing " +
-          (searchObj.data.queryResults.from == 0
-            ? searchObj.data.queryResults.size
-            : totalRecords) +
+          searchObj.data.queryResults.hits.length +
           " out of " +
           searchObj.data.queryResults.total.toLocaleString() +
           " hits in " +
@@ -1153,6 +1143,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
+      if (!searchObj.loading) updateStreams();
       refreshData();
 
       if (
@@ -1173,6 +1164,31 @@ export default defineComponent({
         }, 1500);
       }
     });
+
+    const updateStreams = () => {
+      if (searchObj.data.streamResults?.list?.length) {
+        const streamType = searchObj.data.stream.streamType || "logs";
+        streamService
+          .nameList(
+            store.state.selectedOrganization.identifier,
+            streamType,
+            true
+          )
+          .then((response: any) => {
+            searchObj.data.streamResults = response.data;
+            searchObj.data.stream.streamLists = [];
+            response.data.list.map((item: any) => {
+              let itemObj = {
+                label: item.name,
+                value: item.name,
+              };
+              searchObj.data.stream.streamLists.push(itemObj);
+            });
+          });
+      } else {
+        loadPageData(true);
+      }
+    };
 
     const reDrawGrid = () => {
       setTimeout(() => {
