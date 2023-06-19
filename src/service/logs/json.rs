@@ -19,17 +19,14 @@ use datafusion::arrow::datatypes::Schema;
 use std::time::Instant;
 
 use super::StreamMeta;
-use crate::common::flatten;
-use crate::common::json;
-use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::CONFIG;
-use crate::infra::{cluster, metrics};
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
-use crate::service::schema::stream_schema_exists;
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    ingestion::{IngestionResponse, RecordStatus, StreamStatus},
+    StreamType,
+};
+use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 
 pub async fn ingest(
     org_id: &str,

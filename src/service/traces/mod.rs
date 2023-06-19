@@ -19,32 +19,24 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
-    collector::trace::v1::ExportTraceServiceRequest,
-    collector::trace::v1::ExportTraceServiceResponse, common::v1::AnyValue,
+    collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
+    common::v1::AnyValue,
 };
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::{
-    flatten,
-    json::{json, Map, Value},
+use crate::common::{flatten, json};
+use crate::infra::{cluster, config::CONFIG, wal};
+use crate::meta::{
+    alert::{Alert, Evaluate, Trigger},
+    http::HttpResponse as MetaHttpResponse,
+    traces::{Event, Span, SpanRefType},
+    StreamType,
 };
-use crate::infra::{config::CONFIG, wal};
-use crate::meta::alert::{Alert, Evaluate, Trigger};
-use crate::meta::traces::Event;
-use crate::service::schema::stream_schema_exists;
-use crate::{
-    common::json,
-    infra::cluster,
-    meta::{
-        self,
-        traces::{Span, SpanRefType},
-        StreamType,
-    },
+use crate::service::{
+    ingestion::{format_stream_name, get_partition_key_record},
+    schema::{add_stream_schema, stream_schema_exists},
 };
-
-use super::ingestion::{format_stream_name, get_partition_key_record};
-use super::schema::add_stream_schema;
 
 pub mod otlp_http;
 
@@ -61,7 +53,7 @@ pub async fn handle_trace_request(
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
-            HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 "not an ingester".to_string(),
             )),
@@ -69,7 +61,8 @@ pub async fn handle_trace_request(
     }
     let traces_stream_name = "default";
 
-    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, Value>>> = AHashMap::new();
+    let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
+        AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
 
@@ -103,13 +96,13 @@ pub async fn handle_trace_request(
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     for res_span in res_spans {
-        let mut service_att_map: AHashMap<String, Value> = AHashMap::new();
+        let mut service_att_map: AHashMap<String, json::Value> = AHashMap::new();
         let resource = res_span.resource.unwrap();
 
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
                 let loc_service_name = get_val(res_attr.value);
-                if !loc_service_name.eq(&Value::Null) {
+                if !loc_service_name.eq(&json::Value::Null) {
                     service_name = loc_service_name.as_str().unwrap().to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
                 }
@@ -155,13 +148,13 @@ pub async fn handle_trace_request(
                 }
                 let start_time: u64 = span.start_time_unix_nano;
                 let end_time: u64 = span.end_time_unix_nano;
-                let mut span_att_map: AHashMap<String, Value> = AHashMap::new();
+                let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for span_att in span.attributes {
                     span_att_map.insert(span_att.key, get_val(span_att.value));
                 }
 
                 let mut events = vec![];
-                let mut event_att_map: AHashMap<String, Value> = AHashMap::new();
+                let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
                 for event in span.events {
                     for event_att in event.attributes {
                         event_att_map.insert(event_att.key, get_val(event_att.value));
@@ -256,7 +249,7 @@ pub async fn handle_trace_request(
                 }
 
                 //Trace Metadata
-                let mut trace_meta = Map::new();
+                let mut trace_meta = json::Map::new();
                 trace_meta.insert("trace_id".to_owned(), json::Value::String(trace_id.clone()));
                 trace_meta.insert("_timestamp".to_owned(), start_time.into());
 
@@ -334,45 +327,45 @@ pub async fn handle_trace_request(
         .body(out));
 }
 
-fn get_val(attr_val: Option<AnyValue>) -> Value {
+fn get_val(attr_val: Option<AnyValue>) -> json::Value {
     match attr_val {
         Some(local_val) => match local_val.value {
             Some(val) => match val {
                 opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
                     inner_val,
-                ) => json!(inner_val.as_str()),
+                ) => json::json!(inner_val.as_str()),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(inner_val) => {
-                    json!(inner_val)
+                    json::json!(inner_val)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(inner_val) => {
-                    json!(inner_val)
+                    json::json!(inner_val)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
                     inner_val,
-                ) => json!(inner_val),
+                ) => json::json!(inner_val),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(inner_val) => {
                     let mut vals = vec![];
                     for item in inner_val.values.iter().cloned() {
                         vals.push(get_val(Some(item)))
                     }
-                    json!(vals)
+                    json::json!(vals)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(
                     inner_val,
                 ) => {
-                    let mut vals = Map::new();
+                    let mut vals = json::Map::new();
                     for item in inner_val.values.iter().cloned() {
                         vals.insert(item.key, get_val(item.value));
                     }
-                    json!(vals)
+                    json::json!(vals)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::BytesValue(inner_val) => {
-                    json!(inner_val)
+                    json::json!(inner_val)
                 }
             },
-            None => Value::Null,
+            None => json::Value::Null,
         },
-        None => Value::Null,
+        None => json::Value::Null,
     }
 }
 
