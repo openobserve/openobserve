@@ -17,7 +17,7 @@
   <!-- <div style="height: 40px; z-index: 10;">
       <q-spinner-dots v-if="searchQueryData.loading" color="primary" size="40px" style="margin: 0 auto; display: block;" />
   </div> -->
-  <div style="margin-top: 0px; height: calc(100% - 40px);">
+  <div ref="chartPanelRef" style="margin-top: 0px; height: calc(100% - 40px);">
       <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">
           <div class="column" style="height: 100%; position: relative;">
             <q-table class="my-sticky-virtscroll-table" virtual-scroll v-model:pagination="pagination"
@@ -50,6 +50,7 @@ import {
   watch,
   computed,
   onActivated,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
@@ -89,7 +90,6 @@ export default defineComponent({
           data: [] as (any | Array<any>),
           loading: false
       });
-      // const noData = ref('')
 
       //render the plotly chart if the chart type is not table
       onUpdated(() => {
@@ -138,13 +138,48 @@ export default defineComponent({
           tableColumn.value = column
       }
 
+      const chartPanelRef = ref(null)
+      let observer: any = null;
+      const isDirty: any = ref(true);
+      const isVisible: any = ref(false);
+
+      const handleIntersection = (entries:any) => {
+        console.log(props.data.config.title, "-visible state-", entries[0].isIntersecting);
+        isVisible.value = entries[0].isIntersecting;
+      }
+
+      watch(()=> isVisible.value, async()=> {
+          if(isDirty.value){
+            console.log('isDirty', isDirty.value, props.data.config.title)
+              fetchQueryData()
+          }
+      })
+
+      // remove intersection observer
+      onUnmounted(() => {
+        if (observer) {
+            observer.disconnect();
+        }
+      });
+
       // If query changes, we need to get the data again and rerender the chart
       watch(
           () => [props.data, props.selectedTimeDate],
           async () => {
+              isDirty.value = true
+              console.log('props updated for: ' , props.data.config.title);
+              
               if (props.data.query) {
-                  fetchQueryData();
-                  updateTableColumns();
+                console.log("inside props.data.query");
+                
+                  // load the data if visible
+                  if(isVisible.value){
+                    console.log("inside is visible");
+                    
+                    console.log('props updated and visible: ' , props.data.config.title);
+                    fetchQueryData();
+                    updateTableColumns();
+                  }
               } else {
                   await nextTick();
                   Plotly.react(
@@ -164,6 +199,8 @@ export default defineComponent({
 
       // just wait till the component is mounted and then create a plotly instance
       onMounted(async () => {
+        console.log("mounted-");
+        
           await nextTick();
           if (props.data.type != "table") {
               await Plotly.newPlot(
@@ -235,9 +272,17 @@ export default defineComponent({
               updateTableColumns()
           }
 
-          if (props.data.query) {
-              fetchQueryData();
-          }
+        //   if (props.data.query) {
+        //       fetchQueryData();
+        //   }
+
+        observer = new IntersectionObserver(handleIntersection, {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1 // Adjust as needed
+        });
+
+        observer.observe(chartPanelRef.value);
       });
 
       // this is used to clear the data after next tick 
@@ -306,6 +351,10 @@ export default defineComponent({
 
       // Chart Related Functions
       const fetchQueryData = async () => {
+        isDirty.value = false
+        console.log("fetching query data for panel: ", props.data.config.title);
+
+        
           const queryData = props.data.query;
           const chartParams = {
               title: "Found " + "2" + " hits in " + "10" + " ms",
@@ -1130,6 +1179,7 @@ export default defineComponent({
       };
 
       return {
+          chartPanelRef,
           plotRef,
           props,
           searchQueryData,
