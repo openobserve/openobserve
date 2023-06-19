@@ -1154,13 +1154,14 @@ export default defineComponent({
               }
               case "a-stacked":
                 console.log("a-stacked", textformat(xAxisDataWithTicks));
+                console.log("tickvals", xAxisDataWithTicks);
                 
                   return {
                       barmode: "stack",
                       xaxis: {
                           tickmode: "array",
-                          tickvals: xAxisDataWithTicks,
-                          ticktext: textformat(xAxisDataWithTicks),
+                          tickvals: xAxisKey,
+                          ticktext: xAxisKey,
                           title: props.data.fields?.x[0].label,
                           tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                           automargin: true,
@@ -1176,8 +1177,8 @@ export default defineComponent({
                       barmode: "stack",
                       xaxis: {
                           tickmode: "array",
-                          tickvals: xAxisDataWithTicks,
-                          ticktext: textformat(xAxisDataWithTicks),
+                          tickvals: xAxisKey,
+                          ticktext: xAxisKey,
                           title: props.data.fields?.x[0].label,
                           tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                           automargin: true,
