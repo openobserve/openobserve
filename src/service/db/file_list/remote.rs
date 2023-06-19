@@ -17,7 +17,6 @@ use dashmap::DashSet;
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader};
-use tokio::sync::Semaphore;
 
 use crate::common::json;
 use crate::infra::{
@@ -46,19 +45,28 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    log::info!("Load file_list begin");
+    log::info!("Load file_list [{prefix}] begin");
     let files = storage::list(&prefix).await?;
-    log::info!("Load file_list [{prefix}] got {} files", files.len());
+    log::info!("Load file_list [{prefix}] gets {} files", files.len());
+    if files.is_empty() {
+        // release cluster lock
+        lock.unlock().await?;
+        return Ok(());
+    }
 
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
-    for file in files.iter() {
-        let file = file.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
+    let chunk_size = std::cmp::max(1, files.len() / CONFIG.limit.query_thread_num);
+    let files_chunks = files
+        .chunks(chunk_size)
+        .map(|chunk| chunk.to_vec())
+        .collect::<Vec<Vec<String>>>();
+    for chunk in files_chunks {
         let task: tokio::task::JoinHandle<Result<usize, anyhow::Error>> =
             tokio::task::spawn(async move {
-                let count = proccess_file(&file).await?;
-                drop(permit);
+                let mut count = 0;
+                for file in chunk {
+                    count += proccess_file(&file).await?;
+                }
                 Ok(count)
             });
         tasks.push(task);
@@ -84,7 +92,11 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         super::progress(item.key(), item.value().to_owned(), true).await?;
     }
 
-    log::info!("Load file_list done[{}:{}]", files.len(), count);
+    log::info!(
+        "Load file_list [{prefix}] load {}:{} done",
+        files.len(),
+        count
+    );
     LOADED_FILES.insert(prefix);
 
     // clean deleted files
