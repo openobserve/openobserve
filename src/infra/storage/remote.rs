@@ -183,6 +183,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
+                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
                 .with_allow_http(true),
         )
         .with_profile("default")
@@ -207,7 +208,8 @@ fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzu
     let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout)),
+                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
+                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout)),
         )
         .with_container_name(&CONFIG.s3.bucket_name);
     if !CONFIG.s3.access_key.is_empty() {
@@ -223,7 +225,8 @@ fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStora
     let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout)),
+                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
+                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout)),
         )
         .with_bucket_name(&CONFIG.s3.bucket_name);
     if !CONFIG.s3.access_key.is_empty() {

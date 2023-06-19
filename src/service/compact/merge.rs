@@ -136,8 +136,19 @@ pub async fn merge_by_stream(
         return Ok(()); // the time is future, just wait
     }
 
+    // first check file list, if not exist, just get from s3
+    let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
+    if let Err(e) = db::file_list::remote::cache(&file_list_prefix).await {
+        if locker.is_some() {
+            // release cluster lock
+            let mut lock = locker.unwrap();
+            lock.unlock().await?;
+        }
+        return Err(e); // no data
+    }
+
     // get current hour all files
-    let files = file_list::get_file_list(
+    let files = match file_list::get_file_list(
         org_id,
         stream_name,
         Some(stream_type),
@@ -145,7 +156,18 @@ pub async fn merge_by_stream(
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
     )
-    .await?;
+    .await
+    {
+        Ok(files) => files,
+        Err(e) => {
+            if locker.is_some() {
+                // release cluster lock
+                let mut lock = locker.unwrap();
+                lock.unlock().await?;
+            }
+            return Err(e); // no data
+        }
+    };
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new offset

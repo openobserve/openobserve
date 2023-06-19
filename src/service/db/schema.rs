@@ -14,6 +14,7 @@
 
 use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::common::json;
@@ -401,4 +402,39 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
         }
     }
     None
+}
+
+pub fn list_organizations_from_cache() -> Vec<String> {
+    let mut names = HashSet::new();
+    for schema in STREAM_SCHEMAS.iter() {
+        if !schema.key().contains('/') {
+            continue;
+        }
+        let name = schema.key().split('/').collect::<Vec<&str>>()[0].to_string();
+        if !names.contains(&name) {
+            names.insert(name);
+        }
+    }
+    names.into_iter().collect::<Vec<String>>()
+}
+
+pub fn list_streams_from_cache(org_id: &str, stream_type: Option<StreamType>) -> Vec<String> {
+    let mut names = HashSet::new();
+    for schema in STREAM_SCHEMAS.iter() {
+        if !schema.key().contains('/') {
+            continue;
+        }
+        let columns = schema.key().split('/').collect::<Vec<&str>>();
+        let cur_org_id = columns[0];
+        if !org_id.eq(cur_org_id) {
+            continue;
+        }
+        let cur_stream_type = StreamType::from(columns[1]);
+        if stream_type.is_some() && stream_type.unwrap().eq(&cur_stream_type) {
+            continue;
+        }
+        let cur_stream_name = columns[2].to_string();
+        names.insert(cur_stream_name);
+    }
+    names.into_iter().collect::<Vec<String>>()
 }

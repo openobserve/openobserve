@@ -98,8 +98,8 @@ impl std::fmt::Display for Role {
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
     if CONFIG.common.local_mode {
-        let nodes = load_local_node_role();
-        if !is_single_node(nodes) {
+        let roles = load_local_node_role();
+        if !is_single_node(&roles) {
             panic!("For local mode only single node deployment is allowed !");
         }
         // cache local node
@@ -439,7 +439,7 @@ pub fn is_alert_manager(role: &[Role]) -> bool {
 }
 
 #[inline(always)]
-pub fn is_single_node(role: Vec<Role>) -> bool {
+pub fn is_single_node(role: &[Role]) -> bool {
     role.contains(&Role::All)
 }
 

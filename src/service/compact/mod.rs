@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::infra::{cache, config::CONFIG};
+use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -36,7 +36,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         let date = now - chrono::Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-        let orgs = cache::file_list::get_all_organization()?;
+        let orgs = db::schema::list_organizations_from_cache();
         let stream_types = [
             StreamType::Logs,
             StreamType::Metrics,
@@ -45,7 +45,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         ];
         for org_id in orgs {
             for stream_type in stream_types {
-                let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+                let streams = db::schema::list_streams_from_cache(&org_id, Some(stream_type));
                 for stream_name in streams {
                     let schema = db::schema::get(&org_id, &stream_name, Some(stream_type)).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
@@ -130,7 +130,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     // get last file_list compact offset
     let last_file_list_offset = db::compact::file_list::get_offset().await?;
 
-    let orgs = cache::file_list::get_all_organization()?;
+    let orgs = db::schema::list_organizations_from_cache();
     let stream_types = [
         StreamType::Logs,
         StreamType::Metrics,
@@ -139,7 +139,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     ];
     for org_id in orgs {
         for stream_type in stream_types {
-            let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+            let streams = db::schema::list_streams_from_cache(&org_id, Some(stream_type));
             for stream_name in streams {
                 // check if we are allowed to merge or just skip
                 if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None)
@@ -181,25 +181,3 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_files() {
-        let meta = crate::meta::common::FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 10000,
-            original_size: 1024,
-            compressed_size: 1,
-        };
-        let _ret = cache::file_list::set_file_to_cache(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-            meta,
-        )
-        .unwrap();
-        let resp = run_merge().await;
-        assert!(resp.is_ok());
-    }
-}

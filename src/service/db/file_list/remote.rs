@@ -13,18 +13,32 @@
 // limitations under the License.
 
 use bytes::Buf;
+use dashmap::DashSet;
 use futures::future::try_join_all;
+use once_cell::sync::Lazy;
 use std::io::{BufRead, BufReader};
 use tokio::sync::Semaphore;
 
 use crate::common::json;
-use crate::infra::{config::CONFIG, storage};
+use crate::infra::{
+    config::{RwHashSet, CONFIG},
+    storage,
+};
 use crate::meta::common::FileKey;
 
-pub async fn cache() -> Result<(), anyhow::Error> {
+pub static LOADED_FILES: Lazy<RwHashSet<String>> =
+    Lazy::new(|| DashSet::with_capacity_and_hasher(64, Default::default()));
+
+pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     log::info!("Load file_list begin");
-    let prefix = "file_list/".to_string();
+    let prefix = format!("file_list/{prefix}");
+    if LOADED_FILES.contains(&prefix) {
+        return Ok(());
+    }
+
     let files = storage::list(&prefix).await?;
+    log::info!("Load file_list [{prefix}] got {} files", files.len());
+
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
@@ -58,6 +72,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
 
     log::info!("Load file_list done[{}:{}]", files.len(), count);
+    LOADED_FILES.insert(prefix);
 
     // clean deleted files
     super::DELETED_FILES.clear();
