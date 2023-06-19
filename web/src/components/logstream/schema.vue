@@ -95,8 +95,11 @@
               </tbody>
             </table>
           </div>
-          <q-separator class="q-mt-lg q-mb-lg" />
-          <div class="row flex items-center q-pb-xs">
+          <q-separator
+            v-if="showSchemaActions || showDataRetention"
+            class="q-mt-lg q-mb-lg"
+          />
+          <div class="row flex items-center q-pb-xs" v-if="showSchemaActions">
             <label class="q-pr-sm text-bold"
               >Skip schema check during ingestion</label
             >
@@ -407,20 +410,24 @@ export default defineComponent({
         });
     };
 
-    const showPartitionColumn = computed(
-      () => modelValue.stream_type !== "lookuptable"
-    );
+    const showPartitionColumn = computed(() => {
+      return (
+        isCloud != "true" && modelValue.stream_type !== "enrichment_tables"
+      );
+    });
 
     const showFullTextSearchColumn = computed(
-      () => modelValue.stream_type !== "lookuptable"
+      () => modelValue.stream_type !== "enrichment_tables"
     );
 
     const showSchemaActions = computed(
-      () => showFullTextSearchColumn.value && showPartitionColumn.value
+      () => showFullTextSearchColumn.value || showPartitionColumn.value
     );
 
     const showDataRetention = computed(
-      () => !!(store.state.zoConfig.data_retention_days | false)
+      () =>
+        !!(store.state.zoConfig.data_retention_days || false) &&
+        modelValue.stream_type !== "enrichment_tables"
     );
 
     return {
