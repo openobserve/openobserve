@@ -17,11 +17,16 @@
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
     <q-header>
       <q-toolbar>
-        <img
-          class="appLogo"
-          :src="getImageURL('images/common/open_observe_logo.svg')"
-          @click="goToHome"
-        />
+        <div class="flex relative-position q-mr-sm">
+          <img
+            class="appLogo"
+            :src="getImageURL('images/common/open_observe_logo.svg')"
+            @click="goToHome"
+          />
+          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
+            >Beta</span
+          >
+        </div>
 
         <q-toolbar-title></q-toolbar-title>
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
@@ -664,9 +669,15 @@ export default defineComponent({
   @extend .border-bottom;
   @extend .bg-white;
 
+  .beta-text {
+    font-size: 11px;
+    right: 1px;
+    bottom: -9px;
+  }
+
   .appLogo {
     margin-left: 0.5rem;
-    margin-right: 2rem;
+    margin-right: 0;
     width: 150px;
     cursor: pointer;
 
