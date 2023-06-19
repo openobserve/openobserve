@@ -1,29 +1,24 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
-use std::io::prelude::*;
-use std::io::Error;
-use std::time::Instant;
+use std::{io::Read, time::Instant};
 
-use crate::common::json;
-use crate::common::time::parse_i64_to_timestamp_micros;
-use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::AWSRecordType;
-use crate::meta::ingestion::KinesisFHData;
-use crate::meta::ingestion::KinesisFHIngestionResponse;
-use crate::meta::ingestion::KinesisFHRequest;
-use crate::meta::ingestion::RecordStatus;
-use crate::meta::ingestion::StreamStatus;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
+use crate::common::{
+    flatten, json,
+    time::{parse_i64_to_timestamp_micros, parse_timestamp_micro_from_value},
+};
+use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    ingestion::{
+        AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, RecordStatus,
+        StreamStatus,
+    },
+    StreamType,
+};
+use crate::service::{db, ingestion::write_file};
 
 use super::StreamMeta;
 
@@ -32,28 +27,19 @@ pub async fn process(
     in_stream_name: &str,
     request: KinesisFHRequest,
     thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
+) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
     let start = Instant::now();
-
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(anyhow::anyhow!("not an ingester"));
     }
 
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
+        return Err(anyhow::anyhow!(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
     }
 
     #[cfg(feature = "zo_functions")]
@@ -104,6 +90,13 @@ pub async fn process(
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     for record in request.records {
         match decode_and_decompress(&record.data) {
+            Err(err) => {
+                return Ok(KinesisFHIngestionResponse {
+                    request_id: request.request_id,
+                    error_message: Some(err.to_string()),
+                    timestamp: request.timestamp.unwrap_or(Utc::now().timestamp_micros()),
+                });
+            }
             Ok((decompressed_data, record_type)) => {
                 let mut value = json::Value::Null;
                 let mut timestamp = 0;
@@ -180,7 +173,7 @@ pub async fn process(
                 }
 
                 // JSON Flattening
-                value = json::flatten_json_and_format_field(&value);
+                value = flatten::flatten(&value)?;
 
                 // Start row based transform
                 #[cfg(feature = "zo_functions")]
@@ -190,7 +183,7 @@ pub async fn process(
                     &stream_vrl_map,
                     stream_name,
                     &mut runtime,
-                );
+                )?;
                 #[cfg(feature = "zo_functions")]
                 if value.is_null() || !value.is_object() {
                     stream_status.status.failed += 1; // transform failed or dropped
@@ -236,15 +229,6 @@ pub async fn process(
                     trigger = Some(local_trigger.unwrap());
                 }
             }
-            Err(err) => {
-                return Ok(
-                    HttpResponse::InternalServerError().json(KinesisFHIngestionResponse {
-                        request_id: request.request_id,
-                        error_message: Some(err.to_string()),
-                        timestamp: request.timestamp.unwrap_or(Utc::now().timestamp_micros()),
-                    }),
-                );
-            }
         }
     }
 
@@ -273,11 +257,11 @@ pub async fn process(
         ])
         .inc();
 
-    Ok(HttpResponse::Ok().json(KinesisFHIngestionResponse {
+    Ok(KinesisFHIngestionResponse {
         request_id: request.request_id,
         timestamp: request.timestamp.unwrap_or(Utc::now().timestamp_micros()),
         error_message: None,
-    }))
+    })
 }
 
 fn decode_and_decompress(
