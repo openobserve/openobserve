@@ -19,24 +19,25 @@ use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
-use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Error};
+use std::{
+    fs::OpenOptions,
+    io::{BufRead, BufReader, Error},
+};
 
-use crate::common::json::{Map, Value};
-use crate::infra::config::CONFIG;
-use crate::infra::wal;
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::traces::Event;
-use crate::service::ingestion::{format_stream_name, get_partition_key_record};
-use crate::service::schema::{add_stream_schema, stream_schema_exists};
-use crate::{
-    common::json,
-    infra::cluster,
-    meta::{
-        self,
-        traces::{Span, SpanRefType},
-        StreamType,
-    },
+use crate::common::{
+    flatten,
+    json::{self, Map, Value},
+};
+use crate::infra::{cluster, config::CONFIG, wal};
+use crate::meta::{
+    self,
+    alert::{Alert, Trigger},
+    traces::{Event, Span, SpanRefType},
+    StreamType,
+};
+use crate::service::{
+    ingestion::{format_stream_name, get_partition_key_record},
+    schema::{add_stream_schema, stream_schema_exists},
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -259,7 +260,7 @@ pub async fn traces_json(
                             let mut value: json::Value = json::to_value(local_val).unwrap();
 
                             //JSON Flattening
-                            value = json::flatten_json_and_format_field(&value);
+                            value = flatten::flatten(&value).unwrap();
 
                             /*     // Start row based transform
                             #[cfg(feature = "zo_functions")]

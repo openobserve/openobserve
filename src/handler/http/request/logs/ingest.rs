@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{post, web, HttpResponse};
+use actix_web::{http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::{meta::ingestion::KinesisFHRequest, service::logs};
+use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::meta::ingestion::KinesisFHRequest;
+use crate::service::logs;
 
 /** _bulk ES compatible ingestion API */
 #[utoipa::path(
@@ -41,7 +43,13 @@ pub async fn bulk(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    logs::bulk::ingest(&org_id, body, thread_id).await
+    Ok(match logs::bulk::ingest(&org_id, body, thread_id).await {
+        Ok(v) => HttpResponse::Ok().json(v),
+        Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            e.to_string(),
+        )),
+    })
 }
 
 /** _multi ingestion API */
@@ -69,7 +77,15 @@ pub async fn multi(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::multi::ingest(&org_id, &stream_name, body, thread_id).await
+    Ok(
+        match logs::multi::ingest(&org_id, &stream_name, body, thread_id).await {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
+        },
+    )
 }
 
 /** _json ingestion API */
@@ -97,7 +113,15 @@ pub async fn json(
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::json::ingest(&org_id, &stream_name, body, thread_id).await
+    Ok(
+        match logs::json::ingest(&org_id, &stream_name, body, thread_id).await {
+            Ok(v) => HttpResponse::Ok().json(v),
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
+        },
+    )
 }
 
 /** _kinesis_firehose ingestion API*/
@@ -125,5 +149,26 @@ pub async fn handle_kinesis_request(
     post_data: web::Json<KinesisFHRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::kinesis_firehose::process(&org_id, &stream_name, post_data.into_inner(), thread_id).await
+    Ok(
+        match logs::kinesis_firehose::process(
+            &org_id,
+            &stream_name,
+            post_data.into_inner(),
+            thread_id,
+        )
+        .await
+        {
+            Ok(v) => {
+                if v.error_message.is_some() {
+                    HttpResponse::BadRequest().json(v)
+                } else {
+                    HttpResponse::Ok().json(v)
+                }
+            }
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
+        },
+    )
 }

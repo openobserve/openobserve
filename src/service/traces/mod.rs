@@ -18,18 +18,18 @@ use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
-use opentelemetry_proto::tonic::common::v1::AnyValue;
 use opentelemetry_proto::tonic::{
     collector::trace::v1::ExportTraceServiceRequest,
-    collector::trace::v1::ExportTraceServiceResponse,
+    collector::trace::v1::ExportTraceServiceResponse, common::v1::AnyValue,
 };
 use prost::Message;
-use std::fs::OpenOptions;
-use std::io::Error;
+use std::{fs::OpenOptions, io::Error};
 
-use crate::common::json::{json, Map, Value};
-use crate::infra::config::CONFIG;
-use crate::infra::wal;
+use crate::common::{
+    flatten,
+    json::{json, Map, Value},
+};
+use crate::infra::{config::CONFIG, wal};
 use crate::meta::alert::{Alert, Evaluate, Trigger};
 use crate::meta::traces::Event;
 use crate::service::schema::stream_schema_exists;
@@ -195,7 +195,7 @@ pub async fn handle_trace_request(
                 let value: json::Value = json::to_value(local_val).unwrap();
 
                 //JSON Flattening
-                let mut value = json::flatten_json_and_format_field(&value);
+                let mut value = flatten::flatten(&value).unwrap();
 
                 // get json object
                 let val_map = value.as_object_mut().unwrap();

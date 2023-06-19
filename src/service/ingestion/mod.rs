@@ -23,34 +23,25 @@ use std::io::BufReader;
 #[cfg(feature = "zo_functions")]
 use vector_enrichment::TableRegistry;
 #[cfg(feature = "zo_functions")]
-use vrl::compiler::TargetValueRef;
-#[cfg(feature = "zo_functions")]
-use vrl::compiler::{runtime::Runtime, CompilationResult};
+use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
 #[cfg(feature = "zo_functions")]
 use vrl::prelude::state;
 
 use super::{db, triggers};
+use crate::common::flatten;
 #[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
-#[cfg(feature = "zo_functions")]
-use crate::common::json;
+use crate::common::json::{Map, Value};
+use crate::common::notification::send_notification;
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
+use crate::infra::config::{CONFIG, STREAM_ALERTS};
 use crate::infra::metrics;
 #[cfg(feature = "zo_functions")]
-use crate::meta::functions::StreamTransform;
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::VRLRuntimeConfig;
-
-use crate::meta::StreamType;
-use crate::{
-    common::json::{Map, Value},
-    infra::config::CONFIG,
-};
-use crate::{
-    common::notification::send_notification,
-    infra::config::STREAM_ALERTS,
-    meta::alert::{Alert, Trigger},
+use crate::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    StreamType,
 };
 
 #[cfg(feature = "zo_functions")]
@@ -263,7 +254,7 @@ pub fn apply_stream_transform<'a>(
     stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
     stream_name: &str,
     runtime: &mut Runtime,
-) -> Value {
+) -> Result<Value, anyhow::Error> {
     let mut value = value.clone();
     for trans in local_tans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
@@ -272,7 +263,7 @@ pub fn apply_stream_transform<'a>(
             value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
     }
-    json::flatten_json_and_format_field(&value)
+    flatten::flatten(&value)
 }
 
 pub fn format_stream_name(stream_name: &str) -> String {

@@ -12,54 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader, Error};
-use std::time::Instant;
+use std::{
+    io::{BufRead, BufReader},
+    time::Instant,
+};
 
-use crate::common::json;
-use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamStatus};
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
-use crate::service::logs::StreamMeta;
-use crate::service::schema::stream_schema_exists;
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    ingestion::{IngestionResponse, RecordStatus, StreamStatus},
+    StreamType,
+};
+use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists};
 
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
+) -> Result<IngestionResponse, anyhow::Error> {
     let start = Instant::now();
-
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(anyhow::anyhow!("not an ingester"));
     }
 
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
+        return Err(anyhow::anyhow!(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
     }
     #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -117,7 +105,7 @@ pub async fn ingest(
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
 
         // JSON Flattening
-        value = json::flatten_json_and_format_field(&value);
+        value = flatten::flatten(&value)?;
         // Start row based transform
         #[cfg(feature = "zo_functions")]
         if !local_trans.is_empty() {
@@ -127,7 +115,7 @@ pub async fn ingest(
                 &stream_vrl_map,
                 stream_name,
                 &mut runtime,
-            );
+            )?;
         }
         #[cfg(feature = "zo_functions")]
         if value.is_null() || !value.is_object() {
@@ -211,8 +199,8 @@ pub async fn ingest(
         ])
         .inc();
 
-    Ok(HttpResponse::Ok().json(IngestionResponse::new(
+    Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
         vec![stream_status],
-    )))
+    ))
 }
