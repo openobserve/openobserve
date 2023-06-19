@@ -27,7 +27,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-   //  tokio::task::spawn(async move { run_delete().await });
+    //  tokio::task::spawn(async move { run_delete().await });
     tokio::task::spawn(async move { run_merge().await });
 
     Ok(())

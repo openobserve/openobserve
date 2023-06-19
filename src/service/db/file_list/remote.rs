@@ -30,12 +30,12 @@ pub static LOADED_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(64, Default::default()));
 
 pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
-    log::info!("Load file_list begin");
     let prefix = format!("file_list/{prefix}");
     if LOADED_FILES.contains(&prefix) {
         return Ok(());
     }
 
+    log::info!("Load file_list begin");
     let files = storage::list(&prefix).await?;
     log::info!("Load file_list [{prefix}] got {} files", files.len());
 

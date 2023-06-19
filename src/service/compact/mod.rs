@@ -14,7 +14,7 @@
 
 use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
@@ -140,6 +140,8 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     for org_id in orgs {
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(&org_id, Some(stream_type));
+            let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+            let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip
                 if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None)
@@ -152,23 +154,31 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     );
                 }
 
-                tokio::task::yield_now().await; // yield to other tasks
-                if let Err(e) = merge::merge_by_stream(
-                    last_file_list_offset,
-                    &org_id,
-                    &stream_name,
-                    stream_type,
-                )
-                .await
-                {
-                    log::error!(
-                        "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
-                        org_id,
+                let org_id = org_id.clone();
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let task = tokio::task::spawn(async move {
+                    if let Err(e) = merge::merge_by_stream(
+                        last_file_list_offset,
+                        &org_id,
+                        &stream_name,
                         stream_type,
-                        stream_name,
-                        e
-                    );
-                }
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
+                            org_id,
+                            stream_type,
+                            stream_name,
+                            e
+                        );
+                    }
+                    drop(permit);
+                });
+                tasks.push(task);
+            }
+            for task in tasks {
+                task.await?;
             }
         }
     }
@@ -180,4 +190,3 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-
