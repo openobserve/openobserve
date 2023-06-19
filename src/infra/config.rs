@@ -360,6 +360,8 @@ pub struct S3 {
     pub bucket_prefix: String,
     #[env_config(name = "ZO_S3_CONNECT_TIMEOUT", default = 10)] // seconds
     pub connect_timeout: u64,
+    #[env_config(name = "ZO_S3_REQUEST_TIMEOUT", default = 3600)] // seconds
+    pub request_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
 }
