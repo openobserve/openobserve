@@ -234,14 +234,14 @@ pub enum AWSRecordType {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GCPIngestionRequest {
-    pub message: GCSMessage,
+    pub message: GCPMessage,
     pub subscription: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GCSMessage {
-    pub attributes: GCSAttributes,
+pub struct GCPMessage {
+    pub attributes: GCPAttributes,
     pub data: String,
     pub message_id: String,
     #[serde(rename = "message_id")]
@@ -253,7 +253,7 @@ pub struct GCSMessage {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GCSAttributes {
+pub struct GCPAttributes {
     #[serde(rename = "logging.googleapis.com/timestamp")]
     pub logging_googleapis_com_timestamp: String,
 }
