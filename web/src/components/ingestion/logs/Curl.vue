@@ -64,13 +64,18 @@ export default defineComponent({
       tls: "",
     });
     const url = new URL(store.state.API_ENDPOINT);
-    endpoint.value = {
-      url: store.state.API_ENDPOINT,
-      host: url.hostname,
-      port: url.port || (url.protocol === "https:" ? "443" : "80"),
-      protocol: url.protocol.replace(":", ""),
-      tls: url.protocol === "https:" ? "On" : "Off",
-    };
+    try {
+      console.log("Endpoint url", url);
+      endpoint.value = {
+        url: store.state.API_ENDPOINT,
+        host: url.hostname,
+        port: url.port || (url.protocol === "https:" ? "443" : "80"),
+        protocol: url.protocol.replace(":", ""),
+        tls: url.protocol === "https:" ? "On" : "Off",
+      };
+    } catch (e) {
+      console.log("error in curl", e);
+    }
     const content = ref(null);
     return {
       store,
