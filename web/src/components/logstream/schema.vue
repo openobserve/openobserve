@@ -412,7 +412,7 @@ export default defineComponent({
 
     const showPartitionColumn = computed(() => {
       return (
-        isCloud == "true" && modelValue.stream_type !== "enrichment_tables"
+        isCloud != "true" && modelValue.stream_type !== "enrichment_tables"
       );
     });
 
