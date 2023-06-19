@@ -1,23 +1,21 @@
-use actix_web::{http, web, HttpResponse};
+use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use std::io::prelude::*;
-use std::io::Error;
 use std::time::Instant;
 
+use crate::common::flatten;
 use crate::common::json;
-
 use crate::common::time::parse_timestamp_micro_from_value;
 use crate::infra::cluster;
 use crate::infra::config::CONFIG;
 use crate::infra::metrics;
 use crate::meta::alert::{Alert, Trigger};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::meta::ingestion::AWSRecordType;
-use crate::meta::ingestion::GCSIngestionRequest;
-use crate::meta::ingestion::GCSngestionResponse;
+use crate::meta::ingestion::GCPIngestionRequest;
+use crate::meta::ingestion::GCPIngestionResponse;
 use crate::meta::ingestion::RecordStatus;
 use crate::meta::ingestion::StreamStatus;
 use crate::meta::StreamType;
@@ -29,30 +27,22 @@ use super::StreamMeta;
 pub async fn process(
     org_id: &str,
     in_stream_name: &str,
-    request: GCSIngestionRequest,
+    request: GCPIngestionRequest,
     thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
+) -> Result<GCPIngestionResponse, anyhow::Error> {
     let start = Instant::now();
 
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(anyhow::anyhow!("not an ingester"));
     }
 
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        );
+        return Err(anyhow::anyhow!(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
     }
 
     #[cfg(feature = "zo_functions")]
@@ -114,7 +104,7 @@ pub async fn process(
             };
 
             // JSON Flattening
-            value = json::flatten_json_and_format_field(&value);
+            value = flatten::flatten(&value)?;
 
             // Start row based transform
             #[cfg(feature = "zo_functions")]
@@ -124,16 +114,10 @@ pub async fn process(
                 &stream_vrl_map,
                 stream_name,
                 &mut runtime,
-            );
+            )?;
             #[cfg(feature = "zo_functions")]
             if value.is_null() || !value.is_object() {
-                return Ok(
-                    HttpResponse::InternalServerError().json(GCSngestionResponse {
-                        request_id: request.message.message_id,
-                        error_message: Some("applying function to record failed".to_string()),
-                        timestamp: request.message.publish_time,
-                    }),
-                ); // transform failed or dropped
+                stream_status.status.failed += 1; // transform failed or dropped
             }
             // End row based transform
 
@@ -143,11 +127,8 @@ pub async fn process(
             // check ingestion time
             let earliest_time = Utc::now() + Duration::hours(0 - CONFIG.limit.ingest_allowed_upto);
             if timestamp < earliest_time.timestamp_micros() {
-                return Ok(HttpResponse::BadRequest().json(GCSngestionResponse {
-                    request_id: request.message.message_id,
-                    error_message: Some(super::get_upto_discard_error()),
-                    timestamp: request.message.publish_time,
-                }));
+                stream_status.status.failed += 1; // to old data, just discard
+                stream_status.status.error = super::get_upto_discard_error();
             }
 
             local_val.insert(
@@ -175,20 +156,20 @@ pub async fn process(
             }
         }
         Err(err) => {
-            return Ok(HttpResponse::BadRequest().json(GCSngestionResponse {
+            return Ok(GCPIngestionResponse {
                 request_id: request.message.message_id,
                 error_message: Some(err.to_string()),
                 timestamp: request.message.publish_time,
-            }));
+            });
         }
     }
 
     if stream_status.status.failed > 0 {
-        return Ok(HttpResponse::BadRequest().json(GCSngestionResponse {
+        return Ok(GCPIngestionResponse {
             request_id: request.message.message_id,
             error_message: Some(stream_status.status.error),
             timestamp: request.message.publish_time,
-        }));
+        });
     }
 
     // write to file
@@ -216,11 +197,11 @@ pub async fn process(
         ])
         .inc();
 
-    Ok(HttpResponse::Ok().json(GCSngestionResponse {
+    Ok(GCPIngestionResponse {
         request_id: request.message.message_id,
         timestamp: request.message.publish_time,
         error_message: None,
-    }))
+    })
 }
 
 fn decode_and_decompress(

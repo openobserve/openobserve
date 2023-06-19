@@ -17,7 +17,7 @@ use std::io::Error;
 
 use crate::meta::http::HttpResponse as MetaHttpResponse;
 use crate::{
-    meta::ingestion::{GCSIngestionRequest, KinesisFHRequest},
+    meta::ingestion::{GCPIngestionRequest, KinesisFHRequest},
     service::logs,
 };
 
@@ -179,10 +179,26 @@ pub async fn handle_kinesis_request(
 pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
     thread_id: web::Data<usize>,
-    post_data: web::Json<GCSIngestionRequest>,
+    post_data: web::Json<GCPIngestionRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), thread_id).await
+    Ok(
+        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), thread_id)
+            .await
+        {
+            Ok(v) => {
+                if v.error_message.is_some() {
+                    HttpResponse::BadRequest().json(v)
+                } else {
+                    HttpResponse::Ok().json(v)
+                }
+            }
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
+        },
+    )
 }
 
 #[post("/{org_id}/{stream_name}/_sub")]
