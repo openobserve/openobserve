@@ -115,7 +115,7 @@ fn format_key(key: &str) -> String {
     }
     key.chars()
         .map(|c| {
-            if c.is_lowercase() || c.is_numeric() || c == '_' {
+            if c.is_lowercase() || c.is_numeric() {
                 c
             } else if c.is_uppercase() {
                 c.to_lowercase().next().unwrap()
