@@ -12,33 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::io::{BufRead, BufReader, Error};
-use std::time::Instant;
+use std::{
+    io::{BufRead, BufReader},
+    time::Instant,
+};
 
 use super::StreamMeta;
-use crate::common::json;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-use crate::meta::alert::Alert;
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::infra::{cluster, config::CONFIG, metrics};
 #[cfg(feature = "zo_functions")]
-use crate::meta::functions::StreamTransform;
-#[cfg(feature = "zo_functions")]
-use crate::meta::functions::VRLRuntimeConfig;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::{
-    BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-    StreamSchemaChk,
+use crate::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    ingestion::{
+        BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+        StreamSchemaChk,
+    },
+    StreamType,
 };
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
-use crate::service::schema::stream_schema_exists;
-use crate::{common::time::parse_timestamp_micro_from_value, meta::alert::Trigger};
+use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
@@ -48,15 +44,10 @@ pub async fn ingest(
     org_id: &str,
     body: actix_web::web::Bytes,
     thread_id: web::Data<usize>,
-) -> Result<HttpResponse, Error> {
+) -> Result<BulkResponse, anyhow::Error> {
     let start = Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(anyhow::anyhow!("not an ingester"));
     }
     //let mut errors = false;
     let mut bulk_res = BulkResponse {
@@ -157,7 +148,7 @@ pub async fn ingest(
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
             //JSON Flattening
-            let mut value = json::flatten_json_and_format_field(&value);
+            let mut value = flatten::flatten(&value)?;
 
             #[cfg(feature = "zo_functions")]
             if let Some(transforms) = stream_tansform_map.get(&key) {
@@ -168,7 +159,7 @@ pub async fn ingest(
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,
-                );
+                )?;
 
                 if ret_value.is_null() || !ret_value.is_object() {
                     bulk_res.errors = true;
@@ -289,12 +280,9 @@ pub async fn ingest(
     for (stream_name, stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None) {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("stream [{stream_name}] is being deleted"),
-                )),
-            );
+            return Err(anyhow::anyhow!(format!(
+                "stream [{stream_name}] is being deleted"
+            )));
         }
         // write to file
         write_file(
@@ -332,7 +320,7 @@ pub async fn ingest(
         .inc();
     bulk_res.took = start.elapsed().as_millis();
 
-    Ok(HttpResponse::Ok().json(bulk_res))
+    Ok(bulk_res)
 }
 
 fn add_record_status(

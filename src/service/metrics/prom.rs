@@ -12,36 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
-use promql_parser::label::MatchOp;
-use promql_parser::parser;
+use promql_parser::{label::MatchOp, parser};
 use prost::Message;
-use std::{collections::HashMap, io, time::Instant};
+use std::{collections::HashMap, time::Instant};
 
-use crate::{
-    common::{json, time::parse_i64_to_timestamp_micros},
-    infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        errors::{Error, Result},
-        metrics,
-    },
-    meta::{
-        self,
-        alert::{Alert, Trigger},
-        prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
-        StreamType,
-    },
-    service::{
-        db,
-        ingestion::{chk_schema_by_record, write_file},
-        schema::{set_schema_metadata, stream_schema_exists},
-        search as search_service,
-    },
+use crate::common::{json, time::parse_i64_to_timestamp_micros};
+use crate::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+    errors::{Error, Result},
+    metrics,
+};
+use crate::meta::{
+    self,
+    alert::{Alert, Trigger},
+    prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+    StreamType,
+};
+use crate::service::{
+    db,
+    ingestion::{chk_schema_by_record, write_file},
+    schema::{set_schema_metadata, stream_schema_exists},
+    search as search_service,
 };
 
 pub(crate) mod prometheus {
@@ -52,15 +48,10 @@ pub async fn remote_write(
     org_id: &str,
     thread_id: actix_web::web::Data<usize>,
     body: actix_web::web::Bytes,
-) -> std::result::Result<HttpResponse, io::Error> {
+) -> std::result::Result<(), anyhow::Error> {
     let start = Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Ok(
-            HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
-            )),
-        );
+        return Err(anyhow::anyhow!("not an ingester"));
     }
 
     let mut min_ts =
@@ -78,9 +69,9 @@ pub async fn remote_write(
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
-        .expect("Invalid snappy compressed data");
-    let request =
-        prometheus::WriteRequest::decode(bytes::Bytes::from(decoded)).expect("Invalid protobuf");
+        .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {}", e.to_string()))?;
+    let request = prometheus::WriteRequest::decode(bytes::Bytes::from(decoded))
+        .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // parse metadata
     for item in request.metadata {
@@ -103,7 +94,7 @@ pub async fn remote_write(
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
-        return Ok(HttpResponse::Ok().into());
+        return Ok(());
     }
 
     // parse timeseries
@@ -187,7 +178,7 @@ pub async fn remote_write(
             }
             if !accept_record {
                 //do not accept any entries for request
-                return Ok(HttpResponse::Ok().into());
+                return Ok(());
             }
 
             // get partition keys
@@ -244,7 +235,7 @@ pub async fn remote_write(
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,
-            );
+            )?;
             // End row based transform
 
             // get json object
@@ -319,12 +310,9 @@ pub async fn remote_write(
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
         {
-            return Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("stream [{stream_name}] is being deleted"),
-                )),
-            );
+            return Err(anyhow::anyhow!(format!(
+                "stream [{stream_name}] is being deleted"
+            )));
         }
         // write to file
         write_file(
@@ -378,7 +366,7 @@ pub async fn remote_write(
         ])
         .inc();
 
-    Ok(HttpResponse::Ok().into())
+    Ok(())
 }
 
 pub(crate) async fn get_metadata(

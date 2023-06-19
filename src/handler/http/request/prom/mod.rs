@@ -50,7 +50,15 @@ pub async fn remote_write(
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type == "application/x-protobuf" {
-        metrics::prom::remote_write(&org_id, thread_id, body).await
+        Ok(
+            match metrics::prom::remote_write(&org_id, thread_id, body).await {
+                Ok(_) => HttpResponse::Ok().into(),
+                Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )),
+            },
+        )
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

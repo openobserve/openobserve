@@ -22,7 +22,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::{json, str::find};
+use crate::common::{flatten, json, str::find};
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{
     cluster,
@@ -370,7 +370,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
         if sql.uses_zo_fn {
             for source in sources {
-                result.add_hit(&json::flatten_json_and_format_field(&source));
+                result.add_hit(&flatten::flatten(&source).unwrap());
             }
         } else {
             for source in sources {

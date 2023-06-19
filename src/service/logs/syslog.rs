@@ -16,23 +16,25 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::net::SocketAddr;
-use std::time::Instant;
+use std::{net::SocketAddr, time::Instant};
 use syslog_loose::{Message, ProcId, Protocol};
 
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::infra::{
+    cluster,
+    config::{CONFIG, SYSLOG_ROUTES},
+    metrics,
+};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    http::HttpResponse as MetaHttpResponse,
+    ingestion::{IngestionResponse, RecordStatus, StreamSchemaChk, StreamStatus},
+    syslog::SyslogRoute,
+    StreamType,
+};
+use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
+
 use super::StreamMeta;
-use crate::common::json;
-use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::config::{CONFIG, SYSLOG_ROUTES};
-use crate::infra::{cluster, metrics};
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::{IngestionResponse, RecordStatus, StreamSchemaChk, StreamStatus};
-use crate::meta::syslog::SyslogRoute;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
-use crate::service::schema::stream_schema_exists;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let start = Instant::now();
@@ -121,7 +123,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
-    value = json::flatten_json_and_format_field(&value);
+    value = flatten::flatten(&value).unwrap();
 
     /* #[cfg(feature = "zo_functions")]
     let mut value = crate::service::ingestion::apply_stream_transform(
