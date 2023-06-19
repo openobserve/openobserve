@@ -23,7 +23,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated } from "vue";
+import { defineComponent, ref, onMounted, watch } from "vue";
 import * as monaco from "monaco-editor";
 import { useStore } from "vuex";
 import { getPath } from "@/utils/zincutils";
@@ -265,7 +265,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorRef.value, {
         value: props.query,
         language: "sql",
-        theme: "myCustomTheme",
+        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",
@@ -305,6 +305,12 @@ export default defineComponent({
       window.addEventListener("click", () => {
         editorObj.layout();
       });
+
+      // TODO: make this global
+      watch(() => store.state.theme, () => {
+        console.log('theme updated', store.state.theme);
+        monaco.editor.setTheme(store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme');
+      })
 
       // editorObj.onDidBlurEditorWidget(() => {
       //   // onBlur();

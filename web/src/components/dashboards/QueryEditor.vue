@@ -226,7 +226,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorRef.value, {
         value: props.query,
         language: "sql",
-        theme: "myCustomTheme",
+        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",

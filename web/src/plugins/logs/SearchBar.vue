@@ -454,7 +454,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: "myFnCustomTheme",
+        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",

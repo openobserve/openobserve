@@ -455,7 +455,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: "myCustomTheme",
+      theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
       });
       editorobj.onKeyUp((e: any) => {
         if (editorobj.getValue() != "") {

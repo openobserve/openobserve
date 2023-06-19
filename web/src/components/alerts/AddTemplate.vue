@@ -234,7 +234,7 @@ onMounted(async () => {
     minimap: {
       enabled: false,
     },
-    theme: "myCustomTheme",
+    theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
     automaticLayout: true,
     suggestOnTriggerCharacters: false,
   });
