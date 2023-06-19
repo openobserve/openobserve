@@ -45,7 +45,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(
-                        "[COMPACT] stream [{}] created_at is 0, just skip",
+                        "[COMPACT] file_list stream [{}] created_at is 0, just skip",
                         item.key()
                     );
                     continue;
@@ -59,7 +59,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     // still not found, just return
     if offset == 0 {
-        log::info!("[COMPACT] no stream, no need to compact");
+        log::info!("[COMPACT] file_list no stream, no need to compact");
         return Ok(()); // no stream
     }
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
@@ -78,18 +78,19 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
-        log::info!("[COMPACT] no stream had done compact, just waiting");
+        log::info!("[COMPACT] file_list no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
-            log::info!("[COMPACT] waiting for stream: {key}, offset: {val}");
+            log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
             return Ok(());
         }
     }
 
     // output file list
+    log::info!("[COMPACT] file_list is starting merge, offset: {offset}");
     merge_file_list(offset).await?;
 
     // write new sync offset
@@ -149,7 +150,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     // filter deleted file keys
     let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
     for file in file_list.clone() {
-        log::info!("[COMPACT] merge small file list: {}", file);
+        log::info!("[COMPACT] file_list merge small files: {}", file);
         let data = storage::get(&file).await?;
         // uncompress file
         let uncompress = zstd::decode_all(data.reader())?;
@@ -193,14 +194,11 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let new_file_ok = if has_content {
         match storage::put(&file_name, compressed_bytes.into()).await {
             Ok(_) => {
-                log::info!(
-                    "[COMPACT] merge file list succeeded, new file: {}",
-                    file_name
-                );
+                log::info!("[COMPACT] file_list merge succeed, new file: {}", file_name);
                 true
             }
             Err(err) => {
-                log::error!("[COMPACT] upload file list failed: {}", err);
+                log::error!("[COMPACT] file_list upload failed: {}", err);
                 false
             }
         }
@@ -212,7 +210,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         if let Err(e) =
             storage::del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
         {
-            log::error!("[COMPACT] delete small file list failed: {}", e);
+            log::error!("[COMPACT] file_list delete small file failed: {}", e);
         }
     }
 
