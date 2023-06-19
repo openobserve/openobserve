@@ -17,6 +17,7 @@ use arrow_schema::{DataType, Field};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
+use crate::common::hasher::get_fields_key_xxh3;
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
@@ -217,7 +218,7 @@ async fn add_valid_record(
         .unwrap();
     // get hour key
     let hour_key = super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val);
-    let hour_buf = buf.entry(hour_key.clone()).or_default();
+    let mut hour_buf = buf.entry(hour_key.clone()).or_default();
 
     let mut value_str = common::json::to_string(&local_val).unwrap();
     // check schema
@@ -238,6 +239,7 @@ async fn add_valid_record(
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
             } else {
+                let data_type_change_key = get_fields_key_xxh3(&delta);
                 (Some(value_str.clone()), None)
             };
             if ret_val.is_some() {
