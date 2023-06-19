@@ -28,13 +28,14 @@ export default {
       config.isCloud == "false" &&
       window.location.origin != "http://localhost:8081"
     ) {
-      let endpoint = window.location.origin + window.location.pathname;
-      let pos = window.location.pathname.indexOf("/web/");
-      if (pos > -1) {
-        endpoint =
-          window.location.origin + window.location.pathname.slice(0, pos);
-      }
-      // store.dispatch("endpoint", endpoint);
+      const pos = window.location.pathname.indexOf("/web/");
+      const path =
+        window.location.origin == "http://localhost:8081"
+          ? "/"
+          : pos > -1
+          ? window.location.pathname.slice(0, pos + 5)
+          : window.location.pathname;
+      store.dispatch("endpoint", path);
     }
     const router = useRouter();
     const creds = localStorage.getItem("creds");
