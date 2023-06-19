@@ -259,7 +259,7 @@ export const getPath = () => {
       ? "/"
       : pos > -1
       ? window.location.pathname.slice(0, pos + 5)
-      : window.location.pathname;
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
