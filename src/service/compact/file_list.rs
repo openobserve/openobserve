@@ -14,11 +14,11 @@
 
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use futures::future::try_join_all;
 use std::{
     io::{BufRead, BufReader, Write},
     sync::Arc,
 };
+use tokio::sync::Semaphore;
 
 use crate::common::json;
 use crate::infra::{
@@ -28,9 +28,6 @@ use crate::infra::{
 };
 use crate::meta::common::FileKey;
 use crate::service::db;
-
-// 1024 files merge into one chunk
-const FILE_LIST_CHUNK: usize = 1024;
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     run_merge(offset).await?;
@@ -162,64 +159,77 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 
     // filter deleted file keys
     let filter_file_keys: Arc<RwHashMap<String, FileKey>> = Arc::new(RwHashMap::default());
-    let mut tasks = Vec::with_capacity(file_list.len() / FILE_LIST_CHUNK + 1);
-    for chunk in file_list.chunks(FILE_LIST_CHUNK) {
-        let chunk = chunk.to_vec();
-        let offset_prefix = offset_prefix.clone();
-        let mut filter_file_keys = filter_file_keys.clone();
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let mut tasks = Vec::new();
+    for file in file_list.clone() {
+        let filter_file_keys = filter_file_keys.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
             tokio::task::spawn(async move {
-                if let Err(e) =
-                    merge_file_list_batch(&offset_prefix, &chunk, &mut filter_file_keys).await
-                {
-                    log::error!("[COMPACT] file_list merge small files error: {}", e);
+                log::info!("[COMPACT] file_list merge small files: {}", file);
+                let data = match storage::get(&file).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        drop(permit);
+                        return Err(err);
+                    }
+                };
+                // uncompress file
+                let uncompress = match zstd::decode_all(data.reader()) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        drop(permit);
+                        return Err(err.into());
+                    }
+                };
+                let uncompress_reader = BufReader::new(uncompress.reader());
+                // parse file list
+                for line in uncompress_reader.lines() {
+                    let line = match line {
+                        Ok(val) => val,
+                        Err(err) => {
+                            drop(permit);
+                            return Err(err.into());
+                        }
+                    };
+                    if line.is_empty() {
+                        continue;
+                    }
+                    let item: FileKey = match json::from_slice(line.as_bytes()) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            drop(permit);
+                            return Err(err.into());
+                        }
+                    };
+                    match filter_file_keys.get(&item.key) {
+                        Some(_) => {
+                            if item.deleted {
+                                filter_file_keys.insert(item.key.clone(), item);
+                            }
+                        }
+                        None => {
+                            filter_file_keys.insert(item.key.clone(), item);
+                        }
+                    }
                 }
+                drop(permit);
                 Ok(())
             });
         tasks.push(task);
     }
-    if let Err(e) = try_join_all(tasks).await {
-        log::error!("[COMPACT] file_list merge small files error: {}", e);
-    }
 
-    if locker.is_some() {
-        // release cluster lock
-        let mut lock = locker.unwrap();
-        lock.unlock().await?;
-    }
-
-    Ok(())
-}
-
-/// merge and delete the small file list keys in this hour from etcd
-/// upload new file list into storage
-async fn merge_file_list_batch(
-    offset_prefix: &str,
-    file_list: &[String],
-    filter_file_keys: &mut Arc<RwHashMap<String, FileKey>>,
-) -> Result<(), anyhow::Error> {
-    for file in file_list.clone() {
-        log::info!("[COMPACT] file_list merge small files: {}", file);
-        let data = storage::get(file).await?;
-        // uncompress file
-        let uncompress = zstd::decode_all(data.reader())?;
-        let uncompress_reader = BufReader::new(uncompress.reader());
-        // parse file list
-        for line in uncompress_reader.lines() {
-            let line = line?;
-            if line.is_empty() {
-                continue;
-            }
-            let item: FileKey = json::from_slice(line.as_bytes())?;
-            match filter_file_keys.get(&item.key) {
-                Some(_) => {
-                    if item.deleted {
-                        filter_file_keys.insert(item.key.clone(), item);
-                    }
+    // wait all tasks done
+    for task in tasks {
+        match task.await {
+            Ok(ret) => match ret {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("[COMPACT] file_list merge small files failed: {}", err);
                 }
-                None => {
-                    filter_file_keys.insert(item.key.clone(), item);
-                }
+            },
+            Err(err) => {
+                log::error!("[COMPACT] file_list merge small files failed: {}", err);
             }
         }
     }
@@ -262,6 +272,12 @@ async fn merge_file_list_batch(
         {
             log::error!("[COMPACT] file_list delete small file failed: {}", e);
         }
+    }
+
+    if locker.is_some() {
+        // release cluster lock
+        let mut lock = locker.unwrap();
+        lock.unlock().await?;
     }
 
     Ok(())
