@@ -131,17 +131,37 @@
           >
             <h5 class="text-center">No result found.</h5>
           </div>
-          <div style="height: 500px">
-            <chart-render
-              v-if="chartData"
-              :height="6"
-              :data="chartData"
-              :selected-time-date="dashboardPanelData.meta.dateTime"
-            />
-          </div>
+          <template v-if="searchObj.data.metrics.metricList.length">
+            <div class="flex justify-end q-px-sm">
+              <q-btn
+                class="q-px-sm"
+                no-caps
+                dense
+                color="primary"
+                @click="addToDashboard"
+                >Add to dashboard</q-btn
+              >
+            </div>
+            <div style="height: 500px">
+              <chart-render
+                v-if="chartData"
+                :height="6"
+                :data="chartData"
+                :selected-time-date="dashboardPanelData.meta.dateTime"
+              />
+            </div>
+          </template>
         </template>
       </q-splitter>
     </div>
+    <q-dialog
+      v-model="showAddToDashboardDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <add-to-dashboard @save="addPanelToDashboard"></add-to-dashboard>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -178,6 +198,8 @@ import QueryEditor from "@/components/dashboards/QueryEditor.vue";
 import ChartRender from "@/components/dashboards/addPanel/ChartRender.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { cloneDeep } from "lodash-es";
+import AddToDashboard from "./AddToDashboard.vue";
+import { addPanel } from "@/utils/commons";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -187,6 +209,7 @@ export default defineComponent({
     AutoRefreshInterval,
     QueryEditor,
     ChartRender,
+    AddToDashboard,
   },
   methods: {
     searchData() {
@@ -249,6 +272,8 @@ export default defineComponent({
         loadPageData();
       }
     };
+    const showAddToDashboardDialog = ref(false);
+
     onBeforeMount(() => {
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
@@ -666,6 +691,40 @@ export default defineComponent({
       dashboardPanelData.data.query = value;
     };
 
+    const addToDashboard = () => {
+      showAddToDashboardDialog.value = true;
+    };
+
+    const addPanelToDashboard = (dashboardId) => {
+      console.log("add panel to dashboard");
+      dismiss = $q.notify({
+        message: "Please wait while we add the panel to the dashboard",
+        type: "ongoing",
+        position: "bottom",
+      });
+      addPanel(store, dashboardId, dashboardPanelData.data)
+        .then(() => {
+          showAddToDashboardDialog.value = false;
+          $q.notify({
+            message: "Panel added to dashboard",
+            type: "positive",
+            position: "bottom",
+            timeout: 3000,
+          });
+        })
+        .catch((err) => {
+          console.log(err);
+          $q.notify({
+            message: "Error while adding panel",
+            type: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+        })
+        .finally(() => {
+          dismiss();
+        });
+    };
     return {
       store,
       router,
@@ -684,6 +743,9 @@ export default defineComponent({
       updateQueryValue,
       dashboardPanelData,
       chartData,
+      addToDashboard,
+      showAddToDashboardDialog,
+      addPanelToDashboard,
     };
   },
   computed: {

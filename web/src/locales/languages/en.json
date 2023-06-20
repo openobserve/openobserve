@@ -432,6 +432,8 @@
   },
   "metrics": {
     "searchMetric": "Search for a Metric",
-    "searchLabel": "Search metric label"
+    "searchLabel": "Search metric label",
+    "add": "Add",
+    "cancel": "Cancel"
   }
 }

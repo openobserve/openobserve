@@ -308,6 +308,7 @@ import {
   b64EncodeUnicode,
   getImageURL,
   convertTimeFromMicroToMilli,
+  formatLargeNumber,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
@@ -491,7 +492,7 @@ export default defineComponent({
                 .values.map((value: any) => {
                   return {
                     key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatNumberWithPrefix(value.zo_sql_num),
+                    count: formatLargeNumber(value.zo_sql_num),
                   };
                 });
             }
@@ -506,18 +507,6 @@ export default defineComponent({
         });
       }
     };
-
-    function formatNumberWithPrefix(number: number) {
-      if (number >= 1000000000) {
-        return (number / 1000000000).toFixed(1) + "B";
-      } else if (number >= 1000000) {
-        return (number / 1000000).toFixed(1) + "M";
-      } else if (number >= 1000) {
-        return (number / 1000).toFixed(1) + "K";
-      } else {
-        return number.toString();
-      }
-    }
 
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
