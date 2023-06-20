@@ -17,33 +17,23 @@
   <div class="tabContent q-ma-md">
     <div class="tabContent__head">
       <div class="title" data-test="curl-title-text">CURL</div>
-      <div class="copy_action">
-        <q-btn
-          data-test="curl-copy-btn"
-          flat
-          round
-          size="0.5rem"
-          padding="0.6rem"
-          :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
-          @click="$emit('copy-to-clipboard-fn', content)"
-        />
-      </div>
+      <div class="copy_action">Copy</div>
     </div>
-    <pre ref="content" data-test="curl-content-text">
+    <!-- <pre ref="content" data-test="curl-content-text">
 curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
         endpoint.url
       }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
-    </pre>
+    </pre> -->
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import type { Ref } from "vue";
-import config from "../../../aws-exports";
+import { defineComponent, onBeforeMount } from "vue";
+// import type { Ref } from "vue";
+// import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import type { Endpoint } from "@/ts/interfaces/";
+// import { getImageURL } from "../../../utils/zincutils";
+// import type { Endpoint } from "@/ts/interfaces/";
 export default defineComponent({
   name: "curl-mechanism",
   props: {
@@ -56,33 +46,42 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const endpoint: Ref<Endpoint> = ref({
-      url: "",
-      host: "",
-      port: "",
-      protocol: "",
-      tls: "",
+    onBeforeMount(() => {
+      console.log("curl mounted");
+      try {
+        const url = new URL(store.state.API_ENDPOINT);
+        console.log("url", url);
+      } catch (e) {
+        console.log("error in curl", e);
+      }
     });
-    const url = new URL(store.state.API_ENDPOINT);
-    try {
-      console.log("Endpoint url", url);
-      endpoint.value = {
-        url: store.state.API_ENDPOINT,
-        host: url.hostname,
-        port: url.port || (url.protocol === "https:" ? "443" : "80"),
-        protocol: url.protocol.replace(":", ""),
-        tls: url.protocol === "https:" ? "On" : "Off",
-      };
-    } catch (e) {
-      console.log("error in curl", e);
-    }
-    const content = ref(null);
+    // const endpoint: Ref<Endpoint> = ref({
+    //   url: "",
+    //   host: "",
+    //   port: "",
+    //   protocol: "",
+    //   tls: "",
+    // });
+    // const url = new URL(store.state.API_ENDPOINT);
+    // try {
+    //   console.log("Endpoint url", url);
+    //   endpoint.value = {
+    //     url: store.state.API_ENDPOINT,
+    //     host: url.hostname,
+    //     port: url.port || (url.protocol === "https:" ? "443" : "80"),
+    //     protocol: url.protocol.replace(":", ""),
+    //     tls: url.protocol === "https:" ? "On" : "Off",
+    //   };
+    // } catch (e) {
+    //   console.log("error in curl", e);
+    // }
+    // const content = ref(null);
     return {
-      store,
-      config,
-      endpoint,
-      content,
-      getImageURL,
+      // store,
+      // config,
+      // endpoint,
+      // content,
+      // getImageURL,
     };
   },
 });

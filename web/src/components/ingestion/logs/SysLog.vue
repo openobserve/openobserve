@@ -205,6 +205,10 @@ import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
 import { useQuasar, type QTableProps } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import config from "../../../aws-exports";
+// import { useStore } from "vuex";
+// import { getImageURL } from "../../../utils/zincutils";
+import type { Endpoint } from "@/ts/interfaces/";
 
 interface SyslogRoute {
   orgId: string;
