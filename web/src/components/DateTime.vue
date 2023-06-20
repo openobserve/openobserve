@@ -23,10 +23,9 @@
       outline
       no-caps
       :label="displayValue"
-      :icon="'img:' + getImageURL('images/common/time_icon.png')"
+      icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
-      color="grey-9"
     >
       <q-menu
         id="date-time-menu"

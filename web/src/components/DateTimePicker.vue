@@ -1,7 +1,7 @@
 <template>
   <q-btn id="date-time-button" ref="datetimeBtn" data-cy="date-time-button" outline no-caps :label="displayValue"
-    :icon="'img:' + getImageURL('images/common/time_icon.png')" icon-right="arrow_drop_down" class="date-time-button"
-    color="grey-9">
+    icon="schedule" icon-right="arrow_drop_down" class="date-time-button"
+    color="">
     <q-menu no-route-dismiss id="date-time-menu" class="date-time-dialog" anchor="bottom left" self="top left">
       <div class="flex justify-evenly q-py-sm">
         <q-btn class="tab-button no-border" color="primary" :flat="data.selectedDate.tab !== 'relative'"
@@ -299,7 +299,6 @@ export default defineComponent({
   padding: 0px 5px;
   // font-size: 12px;
   min-width: auto;
-  background: rgba(255, 255, 255, 1) !important;
 
   .q-icon.on-right {
     transition: transform 0.25s ease;

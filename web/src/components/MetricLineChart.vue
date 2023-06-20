@@ -20,8 +20,8 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 import { cloneDeep } from "lodash-es";
-
-import { defineComponent, onMounted, onUpdated, ref } from "vue";
+import { useStore } from "vuex";
+import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
 
 export default defineComponent({
   name: "MetricLineChart",
@@ -45,6 +45,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const store = useStore();
     const plotref: any = ref(null);
     const zoomFlag: any = ref(false);
     let traces: any = [
@@ -82,6 +83,17 @@ export default defineComponent({
         },
       },
     ];
+
+    const getThemeLayoutOptions = () => ({
+      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      font: {
+        color: store.state.theme === 'dark' ? '#fff' : '#333'
+      }
+    })
+    watch(() => store.state.theme, () => {
+      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
+    })
 
     let layout: any = {
       title: {
@@ -146,6 +158,7 @@ export default defineComponent({
       yaxis: {
         fixedrange: true,
       },
+        ...getThemeLayoutOptions(),
     };
     onMounted(async () => {
       if (props.title) layout.title.text = props.title;

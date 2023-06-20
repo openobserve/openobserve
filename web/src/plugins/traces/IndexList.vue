@@ -67,12 +67,10 @@
                 switch-toggle-side
                 :label="props.row.name"
                 expand-icon-class="field-expansion-icon"
-                :expand-icon="
-                  'img:' + getImageURL('images/common/down-solid.svg')
+                expand-icon="
+                   expand_more
                 "
-                :expanded-icon="
-                  'img:' + getImageURL('images/common/up-solid.svg')
-                "
+               
                 @before-show="(event: any) => openFilterCreator(event, props.row)"
               >
                 <template v-slot:header>

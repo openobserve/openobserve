@@ -188,7 +188,6 @@ export default defineComponent({
 
 .normal-mode {
   background-color: rgba(0, 0, 0, 0.05);
-  color: #202224;
 }
 
 .sql-mode {
