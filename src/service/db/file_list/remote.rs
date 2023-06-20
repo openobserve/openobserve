@@ -101,10 +101,10 @@ async fn proccess_file(file: &str) -> Result<usize, anyhow::Error> {
         count += 1;
         let item: FileKey = json::from_slice(line.as_bytes())?;
         // check backlist
-        if !super::BLACKLIST_ORGS.is_empty() {
+        if !super::BLOCKED_ORGS.is_empty() {
             let columns = item.key.split('/').collect::<Vec<&str>>();
             let org_id = columns.get(1).unwrap_or(&"");
-            if super::BLACKLIST_ORGS.contains(org_id) {
+            if super::BLOCKED_ORGS.contains(org_id) {
                 // log::error!("Load file_list skip blacklist org: {}", org_id);
                 continue;
             }

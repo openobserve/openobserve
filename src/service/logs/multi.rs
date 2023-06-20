@@ -43,9 +43,8 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
-    if !db::file_list::BLACKLIST_ORGS.is_empty() && db::file_list::BLACKLIST_ORGS.contains(&org_id)
-    {
-        return Err(anyhow::anyhow!("this organization is blacklisted"));
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
     // check if we are allowed to ingest

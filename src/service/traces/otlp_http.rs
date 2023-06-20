@@ -67,11 +67,10 @@ pub async fn traces_json(
         );
     }
 
-    if !db::file_list::BLACKLIST_ORGS.is_empty() && db::file_list::BLACKLIST_ORGS.contains(&org_id)
-    {
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "this organization is blacklisted".to_string(),
+            "Quota exceeded for this organisation".to_string(),
         )));
     }
 

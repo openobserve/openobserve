@@ -28,8 +28,8 @@ pub mod remote;
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
-pub static BLACKLIST_ORGS: Lazy<Vec<&str>> =
-    Lazy::new(|| CONFIG.compact.blacklist_orgs.split(',').collect());
+pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
+    Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
 
 #[inline]
 pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), anyhow::Error> {
