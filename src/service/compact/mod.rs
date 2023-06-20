@@ -45,7 +45,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         ];
         for org_id in orgs {
             for stream_type in stream_types {
-                let streams = db::schema::list_streams_from_cache(&org_id, Some(stream_type));
+                let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
                 for stream_name in streams {
                     let schema = db::schema::get(&org_id, &stream_name, Some(stream_type)).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
@@ -130,6 +130,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     // get last file_list compact offset
     let last_file_list_offset = db::compact::file_list::get_offset().await?;
 
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let orgs = db::schema::list_organizations_from_cache();
     let stream_types = [
         StreamType::Logs,
@@ -139,8 +140,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     ];
     for org_id in orgs {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(&org_id, Some(stream_type));
-            let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip

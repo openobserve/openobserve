@@ -315,7 +315,7 @@ pub struct Etcd {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
     pub command_timeout: u64,
-    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 600)]
+    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
     #[env_config(name = "ZO_ETCD_USER", default = "")]
     pub user: String,

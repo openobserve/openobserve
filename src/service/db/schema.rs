@@ -418,7 +418,7 @@ pub fn list_organizations_from_cache() -> Vec<String> {
     names.into_iter().collect::<Vec<String>>()
 }
 
-pub fn list_streams_from_cache(org_id: &str, stream_type: Option<StreamType>) -> Vec<String> {
+pub fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
     for schema in STREAM_SCHEMAS.iter() {
         if !schema.key().contains('/') {
@@ -430,7 +430,7 @@ pub fn list_streams_from_cache(org_id: &str, stream_type: Option<StreamType>) ->
             continue;
         }
         let cur_stream_type = StreamType::from(columns[1]);
-        if stream_type.is_some() && !stream_type.unwrap().eq(&cur_stream_type) {
+        if !stream_type.eq(&cur_stream_type) {
             continue;
         }
         let cur_stream_name = columns[2].to_string();
