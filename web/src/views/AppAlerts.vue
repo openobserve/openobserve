@@ -24,7 +24,6 @@ class="q-pa-none" style="min-height: inherit">
             data-test="alert-tabs"
             v-model="activeTab"
             indicator-color="transparent"
-            class="text-secondary"
             inline-label
             vertical
           >
@@ -169,7 +168,6 @@ export default defineComponent({
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
-        color: $dark;
         text-transform: capitalize;
         &__content.tab_content {
           .q-tab {
@@ -180,7 +178,7 @@ export default defineComponent({
           }
         }
         &--active {
-          background-color: $accent;
+          background-color: $primary;
         }
       }
     }

@@ -528,14 +528,14 @@ export default defineComponent({
 }
 
 .droppable {
-  border-color: white;
+  border-color: rgba(0, 0, 0, 0.042);
   border-style: dashed;
   border-width: 2px;
 }
 
 .drop-target {
   background-color: rgba(0, 0, 0, 0.042);
-  border-color: black;
+  border-color: white;
   border-style: dotted;
 }
 

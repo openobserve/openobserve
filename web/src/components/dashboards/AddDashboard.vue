@@ -15,13 +15,13 @@
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md text-black">
+    <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div v-if="beingUpdated" class="text-body1 text-bold text-dark">
+          <div v-if="beingUpdated" class="text-body1 text-bold">
             {{ t("dashboard.updatedashboard") }}
           </div>
-          <div v-else class="text-body1 text-bold text-dark">
+          <div v-else class="text-body1 text-bold">
             {{ t("dashboard.createdashboard") }}
           </div>
         </div>

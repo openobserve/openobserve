@@ -510,7 +510,6 @@ export default defineComponent({
   .head {
     line-height: 2.125rem;
     margin-bottom: 0.5rem;
-    color: $dark-page;
   }
 
   .para {

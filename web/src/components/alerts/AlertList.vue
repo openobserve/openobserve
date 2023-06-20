@@ -532,7 +532,6 @@ export default defineComponent({
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
-        color: $dark;
 
         &__content.tab_content {
           .q-tab {
