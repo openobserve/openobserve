@@ -12,18 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap as HashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::io::{BufRead, BufReader, Write};
+use futures::future::try_join_all;
+use std::{
+    io::{BufRead, BufReader, Write},
+    sync::Arc,
+};
 
 use crate::common::json;
-use crate::infra::config::{CONFIG, STREAM_SCHEMAS};
-use crate::infra::db::etcd;
-use crate::infra::ider;
-use crate::infra::storage;
+use crate::infra::{
+    config::{RwHashMap, CONFIG, STREAM_SCHEMAS},
+    db::etcd,
+    ider, storage,
+};
 use crate::meta::common::FileKey;
 use crate::service::db;
+
+// 1024 files merge into one chunk
+const FILE_LIST_CHUNK: usize = 1024;
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     run_merge(offset).await?;
@@ -154,11 +161,25 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     );
 
     // filter deleted file keys
-    let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
-    for chunk in file_list.chunks(1024) {
-        if let Err(e) = merge_file_list_batch(&offset_prefix, chunk, &mut filter_file_keys).await {
-            log::error!("[COMPACT] file_list merge small files error: {}", e);
-        }
+    let filter_file_keys: Arc<RwHashMap<String, FileKey>> = Arc::new(RwHashMap::default());
+    let mut tasks = Vec::with_capacity(file_list.len() / FILE_LIST_CHUNK + 1);
+    for chunk in file_list.chunks(FILE_LIST_CHUNK) {
+        let chunk = chunk.to_vec();
+        let offset_prefix = offset_prefix.clone();
+        let mut filter_file_keys = filter_file_keys.clone();
+        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
+            tokio::task::spawn(async move {
+                if let Err(e) =
+                    merge_file_list_batch(&offset_prefix, &chunk, &mut filter_file_keys).await
+                {
+                    log::error!("[COMPACT] file_list merge small files error: {}", e);
+                }
+                Ok(())
+            });
+        tasks.push(task);
+    }
+    if let Err(e) = try_join_all(tasks).await {
+        log::error!("[COMPACT] file_list merge small files error: {}", e);
     }
 
     if locker.is_some() {
@@ -175,7 +196,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 async fn merge_file_list_batch(
     offset_prefix: &str,
     file_list: &[String],
-    filter_file_keys: &mut HashMap<String, FileKey>,
+    filter_file_keys: &mut Arc<RwHashMap<String, FileKey>>,
 ) -> Result<(), anyhow::Error> {
     for file in file_list.clone() {
         log::info!("[COMPACT] file_list merge small files: {}", file);
@@ -208,7 +229,8 @@ async fn merge_file_list_batch(
     let file_name = format!("file_list{offset_prefix}{id}.json.zst");
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
     let mut has_content = false;
-    for (_, item) in filter_file_keys.iter() {
+    for item in filter_file_keys.iter() {
+        let item = item.value();
         if item.deleted {
             continue;
         }
