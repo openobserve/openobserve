@@ -48,6 +48,7 @@ const getDefaultDashboardPanelData = () => (
         title: "",
         description: "",
         show_legends: true,
+        legends_position: "right",
       },
       queryType: "sql",
       query: "",
@@ -55,7 +56,8 @@ const getDefaultDashboardPanelData = () => (
     },
     layout: {
       splitter: 20,
-      showQueryBar: false
+      showQueryBar: false,
+      isConfigPanelOpen: false
     },
     meta: {
       parsedQuery: "",
