@@ -34,6 +34,7 @@ use crate::meta::{
     StreamType,
 };
 use crate::service::{
+    db,
     ingestion::{format_stream_name, get_partition_key_record},
     schema::{add_stream_schema, stream_schema_exists},
 };
@@ -59,8 +60,16 @@ pub async fn handle_trace_request(
             )),
         );
     }
-    let traces_stream_name = "default";
 
+    if !db::file_list::BLACKLIST_ORGS.is_empty() && db::file_list::BLACKLIST_ORGS.contains(&org_id)
+    {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            "this organization is blacklisted".to_string(),
+        )));
+    }
+
+    let traces_stream_name = "default";
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();

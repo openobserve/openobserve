@@ -41,6 +41,11 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
+    if !db::file_list::BLACKLIST_ORGS.is_empty() && db::file_list::BLACKLIST_ORGS.contains(&org_id)
+    {
+        return Err(anyhow::anyhow!("this organization is blacklisted"));
+    }
+
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Err(anyhow::anyhow!(format!(

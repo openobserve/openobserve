@@ -38,6 +38,8 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let files = storage::list(&prefix).await?;
     log::info!("Load file_list [{prefix}] gets {} files", files.len());
     if files.is_empty() {
+        // cache result
+        rw.insert(prefix);
         return Ok(());
     }
 
@@ -76,6 +78,7 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         files.len(),
         count
     );
+
     // cache result
     rw.insert(prefix);
 
@@ -101,6 +104,15 @@ async fn proccess_file(file: &str) -> Result<usize, anyhow::Error> {
         }
         count += 1;
         let item: FileKey = json::from_slice(line.as_bytes())?;
+        // check backlist
+        if !super::BLACKLIST_ORGS.is_empty() {
+            let columns = item.key.split('/').collect::<Vec<&str>>();
+            let org_id = columns.get(1).unwrap_or(&"");
+            if super::BLACKLIST_ORGS.contains(org_id) {
+                // log::error!("Load file_list skip blacklist org: {}", org_id);
+                continue;
+            }
+        }
         // check deleted files
         if item.deleted {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());

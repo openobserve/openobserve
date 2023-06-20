@@ -49,6 +49,12 @@ pub async fn ingest(
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
+
+    if !db::file_list::BLACKLIST_ORGS.is_empty() && db::file_list::BLACKLIST_ORGS.contains(&org_id)
+    {
+        return Err(anyhow::anyhow!("this organization is blacklisted"));
+    }
+
     //let mut errors = false;
     let mut bulk_res = BulkResponse {
         took: 0,

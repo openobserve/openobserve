@@ -266,6 +266,8 @@ pub struct Compact {
     pub max_file_size: u64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // in days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_BLACKLIST_ORGS", default = "")] // use comma to split
+    pub blacklist_orgs: String,
 }
 
 #[derive(EnvConfig)]

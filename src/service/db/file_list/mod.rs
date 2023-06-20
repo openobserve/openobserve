@@ -28,6 +28,9 @@ pub mod remote;
 pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
     Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
+pub static BLACKLIST_ORGS: Lazy<Vec<&str>> =
+    Lazy::new(|| CONFIG.compact.blacklist_orgs.split(',').collect());
+
 #[inline]
 pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), anyhow::Error> {
     let old_data = cache::file_list::get_file_from_cache(key);
