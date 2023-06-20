@@ -20,7 +20,7 @@
         <div class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
-            :src="getImageURL('images/common/open_observe_logo.svg')"
+            :src="store.state.theme == 'dark' ? getImageURL('images/common/open_observe_logo_2.svg') : getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
