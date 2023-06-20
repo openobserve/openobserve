@@ -19,11 +19,11 @@
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
-        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
+        <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
         <span class="q-table__title q-mx-md q-mt-xs">{{ list[0].title }}</span>
       </div>
       <div class="flex">
-        <q-btn outline padding="xs" color="primary" text-color="black" no-caps icon="add" @click="addPanelData">
+        <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
         <!-- <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
@@ -40,7 +40,7 @@
           v-model="selectedDate"
         />
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
-        <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="refresh" @click="refreshData">
+        <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
         <ExportDashboard :dashboardId="list?.[0]?.dashboardId"/>
       </div>

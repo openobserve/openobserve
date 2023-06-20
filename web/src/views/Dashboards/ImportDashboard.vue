@@ -3,7 +3,7 @@
     <div class="row items-center no-wrap">
       <div class="col">
         <div class="flex">
-          <q-btn no-caps color="primary" @click="goBack()" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
+          <q-btn no-caps @click="goBack()"  padding="xs" outline icon="arrow_back_ios_new" />
           <div class="text-h6 q-ml-md">
             Import Dashboard
           </div>

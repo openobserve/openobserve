@@ -175,7 +175,7 @@
               <div class="q-pl-md">
                 {
                 <div
-                  class="log_json_content text-grey-8"
+                  class="log_json_content "
                   v-for="key in Object.keys(row)"
                   :key="key"
                 >
