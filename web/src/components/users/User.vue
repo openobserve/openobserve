@@ -78,7 +78,7 @@
             "
             icon="edit"
             :title="t('user.update')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"

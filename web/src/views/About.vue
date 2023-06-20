@@ -17,7 +17,7 @@
   <q-page class="aboutPage">
     <div class="about_head">
       <img
-        :src="getImageURL('images/common/open_observe_logo.svg')"
+        :src="store.state.theme == 'dark' ? getImageURL('images/common/open_observe_logo_2.svg') : getImageURL('images/common/open_observe_logo.svg')"
         class="logo"
         width="177"
       />
@@ -80,7 +80,6 @@ export default defineComponent({
   }
 
   .para {
-    color: $light-text;
     font-weight: 600;
   }
 
@@ -92,11 +91,9 @@ export default defineComponent({
     .head {
       margin-bottom: 0.5rem;
       font-weight: 700;
-      color: $dark;
     }
 
     .body {
-      color: $light-text;
       font-weight: 600;
     }
   }

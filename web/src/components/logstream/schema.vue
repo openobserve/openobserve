@@ -19,7 +19,7 @@
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold"
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
@@ -463,7 +463,6 @@ export default defineComponent({
       th {
         font-size: 0.875rem;
         font-weight: 700;
-        color: $dark;
       }
     }
 
@@ -472,7 +471,6 @@ export default defineComponent({
 
       td {
         font-size: 0.875rem;
-        color: $dark-page;
         font-weight: 600;
       }
     }

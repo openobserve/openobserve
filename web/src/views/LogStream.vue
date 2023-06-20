@@ -41,9 +41,9 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            :icon="'img:' + getImageURL('images/common/search_icon.svg')"
+            icon="search"
             :title="t('logStream.explore')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -52,9 +52,9 @@
             @click="exploreStream(props)"
           />
           <q-btn
-            :icon="'img:' + getImageURL('images/common/list_icon.svg')"
+            icon="list_alt"
             :title="t('logStream.schemaHeader')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -63,9 +63,9 @@
             @click="listSchema(props)"
           />
           <q-btn
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            icon="delete"
             :title="t('logStream.delete')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
