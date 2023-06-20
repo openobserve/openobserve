@@ -287,7 +287,7 @@ export default defineComponent({
 
             break;
           }
-          case 'a-stacked':
+          case 'area-stacked':
           case 'stacked':
           case 'h-stacked': {
             if (dashboardData.data.fields.y.length > 1 || dashboardData.data.fields.y.length == 0) {

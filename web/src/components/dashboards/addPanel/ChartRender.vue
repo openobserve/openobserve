@@ -621,7 +621,7 @@ export default defineComponent({
                 //   console.log("multiple:- traces", traces);
                   break;
               }
-              case "a-stacked": {
+              case "area-stacked": {
                   // stacked with xAxis's second value
                   // allow 2 xAxis and 1 yAxis value for stack chart
                   // get second x axis key
@@ -868,56 +868,6 @@ export default defineComponent({
       const getAxisDataFromKey = (key: string) => {
           // when the key is not available in the data that is not show the default value
           let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
-          // when the key is not available in the data make default value null using below line
-          // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
-
-          // check for the histogram _timestamp field
-          // If histogram _timestamp field is found, format the date labels
-          const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
-          if (field && field.alias == key) {
-              // get the format
-              const timestamps = selectedTimeObj.value
-              let keyFormat = "HH:mm:ss";
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (
-                  timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-                  keyFormat = "YYYY-MM-DD";
-              }
-
-              // now we have the format, convert that format
-              result = result.map((it: any) => moment(it + "Z").format(keyFormat))
-
-              // result = result.map((it: any) => it.replace("T", " "))
-              // console.log("with timestamps: " + result);
-              
-          }
-          // console.log("without timestamps: " + result);
           return result
       };
 
@@ -958,7 +908,7 @@ export default defineComponent({
                   return {
                       type: 'bar',
                   };
-              case "a-stacked":
+              case "area-stacked":
                   return {
                         mode: 'lines',  
                         // fill: 'none'
@@ -1152,45 +1102,71 @@ export default defineComponent({
 
                   return trace
               }
-              case "a-stacked":
-                console.log("a-stacked", textformat(xAxisDataWithTicks));
-                console.log("tickvals", xAxisDataWithTicks);
+              case "area-stacked":{
+
+                const xaxis: any = {
+                    title: props.data.fields?.x[0].label,
+                    tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                    automargin: true
+                  }
+
+                const yaxis: any = {
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    automargin: true,
+                    fixedrange: true
+                }
                 
-                  return {
-                      barmode: "stack",
-                      xaxis: {
-                          tickmode: "array",
-                          tickvals: xAxisDataWithTicks,
-                          ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.x[0].label,
-                          tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                          automargin: true,
-                      },
-                      yaxis: {
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                          automargin: true,
-                          fixedrange: true
-                      },
-                    };
-              case "stacked":
-                console.log('xAxisKey in layout', xAxisKey);
+                //show tickvals and ticktext value when the stacked chart hasn't timestamp
+                // if the first field is timestamp we dont want to show the tickvals
+                // format value only for without timestamp
+                // stacked chart is alwayes stacked with first field value
+                if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
+                    xaxis["tickmode"] = "array",
+                    xaxis["tickvals"] = xAxisDataWithTicks,
+                    xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                }
+
+                const layout = {
+                    barmode: "stack",
+                    xaxis: xaxis,
+                    yaxis: yaxis
+                }
                 
-                  return {
-                      barmode: "stack",
-                      xaxis: {
-                          tickmode: "array",
-                          tickvals: xAxisDataWithTicks,
-                          ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.x[0].label,
-                          tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                          automargin: true,
-                      },
-                      yaxis: {
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                          automargin: true,
-                          fixedrange: true
-                      },
-                  };
+                return layout
+                }
+              case "stacked":{
+
+                const xaxis: any = {
+                    title: props.data.fields?.x[0].label,
+                    tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                    automargin: true
+                  }
+
+                const yaxis: any = {
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    automargin: true,
+                    fixedrange: true
+                }
+
+                //show tickvals and ticktext value when the stacked chart hasn't timestamp
+                // if the first field is timestamp we dont want to show the tickvals
+                // format value only for without timestamp
+                // stacked chart is alwayes stacked with first field value
+                if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
+                    xaxis["tickmode"] = "array",
+                    xaxis["tickvals"] = xAxisDataWithTicks,
+                    xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                }
+
+                const layout = {
+                    barmode: "stack",
+                    xaxis: xaxis,
+                    yaxis: yaxis
+                }
+                
+                return layout
+              
+                }
               case "h-stacked":
                   return {
                       barmode: "stack",

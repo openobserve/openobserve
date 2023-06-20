@@ -118,7 +118,7 @@ const useDashboardPanelData = () => {
         return dashboardPanelData.data.fields.y.length >= 1
       case 'metric':
         return dashboardPanelData.data.fields.y.length >= 1
-      case 'a-stacked':
+      case 'area-stacked':
       case 'stacked':
       case 'h-stacked':
         return dashboardPanelData.data.fields.y.length >= 1
