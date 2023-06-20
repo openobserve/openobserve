@@ -307,10 +307,10 @@ export default defineComponent({
       });
 
       // TODO: make this global
-      watch(() => store.state.theme, () => {
-        console.log('theme updated', store.state.theme);
-        monaco.editor.setTheme(store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme');
-      })
+      // watch(() => store.state.theme, () => {
+      //   console.log('theme updated', store.state.theme);
+      //   monaco.editor.setTheme(store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme');
+      // })
 
       // editorObj.onDidBlurEditorWidget(() => {
       //   // onBlur();

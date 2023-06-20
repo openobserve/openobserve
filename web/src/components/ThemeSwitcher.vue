@@ -6,6 +6,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { useStore } from "vuex";
+import * as monaco from "monaco-editor";
 
 export default {
     setup() {
@@ -28,6 +29,10 @@ export default {
         watch(darkMode, () => {
             setTheme(darkMode.value ? 'dark' : 'light')
         });
+         watch(() => store.state.theme, () => {
+            console.log('theme updated', store.state.theme);
+            monaco.editor.setTheme(store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme');
+        })
 
         const setTheme = (theme: any) => {
             localStorage.setItem('theme', theme);
