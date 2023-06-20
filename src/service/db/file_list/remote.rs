@@ -52,7 +52,6 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
                 let mut count = 0;
                 for file in chunk {
                     count += proccess_file(&file).await?;
-                    tokio::task::yield_now().await;
                 }
                 Ok(count)
             });
