@@ -92,6 +92,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // output file list
     log::info!("[COMPACT] file_list is starting merge, offset: {offset}");
     merge_file_list(offset).await?;
+    log::info!("[COMPACT] file_list merging is done at offset: {offset}");
 
     // write new sync offset
     offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
