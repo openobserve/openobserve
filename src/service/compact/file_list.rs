@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::AHashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{
     io::{BufRead, BufReader, Write},
     sync::Arc,
 };
-use tokio::sync::Semaphore;
+use tokio::sync::{RwLock, Semaphore};
 
 use crate::common::json;
 use crate::infra::{
-    config::{RwHashMap, CONFIG, STREAM_SCHEMAS},
+    config::{CONFIG, STREAM_SCHEMAS},
     db::etcd,
     ider, storage,
 };
@@ -158,7 +159,8 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     );
 
     // filter deleted file keys
-    let filter_file_keys: Arc<RwHashMap<String, FileKey>> = Arc::new(RwHashMap::default());
+    let filter_file_keys: Arc<RwLock<AHashMap<String, FileKey>>> =
+        Arc::new(RwLock::new(AHashMap::default()));
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let mut tasks = Vec::new();
     for file in file_list.clone() {
@@ -202,6 +204,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
                             return Err(err.into());
                         }
                     };
+                    let mut filter_file_keys = filter_file_keys.write().await;
                     match filter_file_keys.get(&item.key) {
                         Some(_) => {
                             if item.deleted {
@@ -239,8 +242,8 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let file_name = format!("file_list{offset_prefix}{id}.json.zst");
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
     let mut has_content = false;
-    for item in filter_file_keys.iter() {
-        let item = item.value();
+    let filter_file_keys = filter_file_keys.read().await;
+    for (_, item) in filter_file_keys.iter() {
         if item.deleted {
             continue;
         }
