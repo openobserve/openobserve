@@ -13,51 +13,31 @@
 // limitations under the License.
 
 use bytes::Buf;
-use dashmap::DashSet;
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
+use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
+use tokio::sync::RwLock;
 
 use crate::common::json;
-use crate::infra::{
-    config::{RwHashSet, CONFIG},
-    db::etcd,
-    storage,
-};
+use crate::infra::{config::CONFIG, storage};
 use crate::meta::common::FileKey;
 
-pub static LOADED_FILES: Lazy<RwHashSet<String>> =
-    Lazy::new(|| DashSet::with_capacity_and_hasher(64, Default::default()));
+pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
+    Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
 
 pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
 
-    // get a cluster lock for compactor stream
-    let lock_key = format!("file_list/remote/cache/{prefix}");
-    let mut lock = etcd::Locker::new(&lock_key);
-    if lock.lock(0).await.is_err() {
-        return Ok(()); // lock failed, just skip
-    }
-
-    if LOADED_FILES.contains(&prefix) {
-        // release cluster lock
-        lock.unlock().await?;
+    let mut rw = LOADED_FILES.write().await;
+    if rw.contains(&prefix) {
         return Ok(());
     }
 
     log::info!("Load file_list [{prefix}] begin");
-    let files = match storage::list(&prefix).await {
-        Ok(v) => v,
-        Err(e) => {
-            // release cluster lock
-            lock.unlock().await?;
-            return Err(anyhow::anyhow!("Load file_list [{prefix}] failed: {}", e));
-        }
-    };
+    let files = storage::list(&prefix).await?;
     log::info!("Load file_list [{prefix}] gets {} files", files.len());
     if files.is_empty() {
-        // release cluster lock
-        lock.unlock().await?;
         return Ok(());
     }
 
@@ -81,32 +61,14 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     }
 
     let mut count = 0;
-    let task_results = match try_join_all(tasks).await {
-        Ok(v) => v,
-        Err(e) => {
-            // release cluster lock
-            lock.unlock().await?;
-            return Err(anyhow::anyhow!("Load file_list err: {}", e));
-        }
-    };
+    let task_results = try_join_all(tasks).await?;
     for task_result in task_results {
-        match task_result {
-            Ok(v) => {
-                count += v;
-            }
-            Err(e) => {
-                // release cluster lock
-                lock.unlock().await?;
-                return Err(anyhow::anyhow!("Load file_list err: {}", e));
-            }
-        }
+        count += task_result?;
     }
 
     // delete files
     for item in super::DELETED_FILES.iter() {
-        if let Err(e) = super::progress(item.key(), item.value().to_owned(), true).await {
-            log::error!("Delete file [{:?}] err: {}", item.key(), e);
-        }
+        super::progress(item.key(), item.value().to_owned(), true).await?;
     }
 
     log::info!(
@@ -114,14 +76,12 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         files.len(),
         count
     );
-    LOADED_FILES.insert(prefix);
+    // cache result
+    rw.insert(prefix);
 
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
-
-    // release cluster lock
-    lock.unlock().await?;
 
     Ok(())
 }
