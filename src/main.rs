@@ -243,7 +243,6 @@ fn init_grpc_server() -> Result<(), anyhow::Error> {
 }
 
 fn enable_tracing() -> Result<(), anyhow::Error> {
-    let service_name = format!("zo-{}", CONFIG.common.instance_name);
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
     let mut headers = HashMap::new();
     headers.insert(
@@ -259,7 +258,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_headers(headers),
         )
         .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", service_name),
+            KeyValue::new("instance_name", CONFIG.common.instance_name.as_str()),
             KeyValue::new("deployment_type", "k8s"),
         ])))
         .install_batch(opentelemetry::runtime::Tokio)?;
