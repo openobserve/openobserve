@@ -155,9 +155,31 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
 
     // filter deleted file keys
     let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
+    for chunk in file_list.chunks(1024) {
+        if let Err(e) = merge_file_list_batch(&offset_prefix, chunk, &mut filter_file_keys).await {
+            log::error!("[COMPACT] file_list merge small files error: {}", e);
+        }
+    }
+
+    if locker.is_some() {
+        // release cluster lock
+        let mut lock = locker.unwrap();
+        lock.unlock().await?;
+    }
+
+    Ok(())
+}
+
+/// merge and delete the small file list keys in this hour from etcd
+/// upload new file list into storage
+async fn merge_file_list_batch(
+    offset_prefix: &str,
+    file_list: &[String],
+    filter_file_keys: &mut HashMap<String, FileKey>,
+) -> Result<(), anyhow::Error> {
     for file in file_list.clone() {
         log::info!("[COMPACT] file_list merge small files: {}", file);
-        let data = storage::get(&file).await?;
+        let data = storage::get(file).await?;
         // uncompress file
         let uncompress = zstd::decode_all(data.reader())?;
         let uncompress_reader = BufReader::new(uncompress.reader());
@@ -218,12 +240,6 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         {
             log::error!("[COMPACT] file_list delete small file failed: {}", e);
         }
-    }
-
-    if locker.is_some() {
-        // release cluster lock
-        let mut lock = locker.unwrap();
-        lock.unlock().await?;
     }
 
     Ok(())

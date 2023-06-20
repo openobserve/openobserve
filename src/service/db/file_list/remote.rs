@@ -45,11 +45,8 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
 
     let mut tasks = Vec::new();
     let chunk_size = std::cmp::max(1, files.len() / CONFIG.limit.query_thread_num);
-    let files_chunks = files
-        .chunks(chunk_size)
-        .map(|chunk| chunk.to_vec())
-        .collect::<Vec<Vec<String>>>();
-    for chunk in files_chunks {
+    for chunk in files.chunks(chunk_size) {
+        let chunk = chunk.to_vec();
         let task: tokio::task::JoinHandle<Result<usize, anyhow::Error>> =
             tokio::task::spawn(async move {
                 let mut count = 0;

@@ -157,7 +157,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
                 let org_id = org_id.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
-                let task = tokio::task::spawn(async move { 
+                let task = tokio::task::spawn(async move {
                     if let Err(e) = merge::merge_by_stream(
                         last_file_list_offset,
                         &org_id,
@@ -186,7 +186,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 
     // after compact, compact file list from storage
     if let Err(e) = file_list::run(last_file_list_offset).await {
-        log::error!("[COMPACTOR] output file list error: {}", e);
+        log::error!("[COMPACTOR] merge file list error: {}", e);
     }
 
     Ok(())
