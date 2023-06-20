@@ -46,7 +46,14 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     }
 
     log::info!("Load file_list [{prefix}] begin");
-    let files = storage::list(&prefix).await?;
+    let files = match storage::list(&prefix).await {
+        Ok(v) => v,
+        Err(e) => {
+            // release cluster lock
+            lock.unlock().await?;
+            return Err(anyhow::anyhow!("Load file_list [{prefix}] failed: {}", e));
+        }
+    };
     log::info!("Load file_list [{prefix}] gets {} files", files.len());
     if files.is_empty() {
         // release cluster lock
@@ -74,7 +81,14 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     }
 
     let mut count = 0;
-    let task_results = try_join_all(tasks).await?;
+    let task_results = match try_join_all(tasks).await {
+        Ok(v) => v,
+        Err(e) => {
+            // release cluster lock
+            lock.unlock().await?;
+            return Err(anyhow::anyhow!("Load file_list err: {}", e));
+        }
+    };
     for task_result in task_results {
         match task_result {
             Ok(v) => {
@@ -83,14 +97,16 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
             Err(e) => {
                 // release cluster lock
                 lock.unlock().await?;
-                return Err(anyhow::anyhow!("Load file_list err: {:?}", e));
+                return Err(anyhow::anyhow!("Load file_list err: {}", e));
             }
         }
     }
 
     // delete files
     for item in super::DELETED_FILES.iter() {
-        super::progress(item.key(), item.value().to_owned(), true).await?;
+        if let Err(e) = super::progress(item.key(), item.value().to_owned(), true).await {
+            log::error!("Delete file [{:?}] err: {}", item.key(), e);
+        }
     }
 
     log::info!(
