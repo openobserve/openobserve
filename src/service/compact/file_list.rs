@@ -137,6 +137,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{offset_prefix}");
+    log::info!("[COMPACT] file_list is merging, prefix: {key}");
     let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
         if locker.is_some() {
@@ -146,6 +147,10 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         }
         return Ok(()); // only one file list, no need merge
     }
+    log::info!(
+        "[COMPACT] file_list is merging, prefix: {key}, got files: {}",
+        file_list.len()
+    );
 
     // filter deleted file keys
     let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
