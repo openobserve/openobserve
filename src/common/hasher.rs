@@ -10,7 +10,7 @@ impl From<Signature> for String {
     }
 }
 
-pub fn get_fields_key(fields: &Vec<Field>) -> String {
+pub fn get_fields_key(fields: &[Field]) -> String {
     let mut hasher = blake3::Hasher::new();
     fields.iter().sorted_by_key(|v| v.name()).for_each(|field| {
         hasher.update(field.name().as_bytes());
@@ -27,7 +27,7 @@ pub fn get_schema_key_xxh3(schema: &Schema) -> String {
     get_fields_key_xxh3(schema.fields())
 }
 
-pub fn get_fields_key_xxh3(fields: &Vec<Field>) -> String {
+pub fn get_fields_key_xxh3(fields: &[Field]) -> String {
     let mut hasher = xxhash_rust::xxh3::Xxh3::new();
     for field in fields.iter().sorted_by_key(|v| v.name()) {
         hasher.update(field.name().as_bytes());

@@ -237,13 +237,13 @@ async fn add_valid_record(
         local_val,
         Some(&schema_key),
     );
-    let hour_buf = buf.entry(hour_key.clone()).or_default();
+    let hour_buf = buf.entry(hour_key).or_default();
 
     if schema_conformance {
         let valid_record = if delta_data_type_fields.is_some() {
             let delta = delta_data_type_fields.unwrap();
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
-            let (ret_val, error) = if !delta.is_empty() {
+            let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
             } else {
                 (Some(value_str.clone()), None)
