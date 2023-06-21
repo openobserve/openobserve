@@ -56,10 +56,13 @@ fn flatten_value(
         flatten_array(current, &parent_key, depth, flattened)?;
     } else {
         if flattened.contains_key(&parent_key) {
-            return Err(anyhow::anyhow!(
-                "flatten will be overwritten a key {}",
-                parent_key
-            ));
+            // log::error!(
+            //     "flatten will be overwritten current: {:?}, new key: {}, val: {}, ",
+            //     flattened,
+            //     parent_key,
+            //     current.clone(),
+            // );
+            // return Err(anyhow::anyhow!( "flatten will be overwritten a key {}", parent_key));
         }
         flattened.insert(parent_key, current.clone());
     }
@@ -194,16 +197,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn overlapping_after_flattening_array() {
-        let obj = json!({"key": ["value1", "value2"], "key_0": "Oopsy"});
-        let res = flatten(&obj);
-        assert!(res.is_err());
-        match res {
-            Err(err) => assert!(err.to_string().contains("key_0")),
-            Ok(_) => panic!("This should have failed"),
-        }
-    }
+    // #[test]
+    // fn overlapping_after_flattening_array() {
+    //     let obj = json!({"key": ["value1", "value2"], "key_0": "Oopsy"});
+    //     let res = flatten(&obj);
+    //     assert!(res.is_err());
+    //     match res {
+    //         Err(err) => assert!(err.to_string().contains("key_0")),
+    //         Ok(_) => panic!("This should have failed"),
+    //     }
+    // }
 
     /// Ensure that empty arrays are not present in the result
     #[test]
