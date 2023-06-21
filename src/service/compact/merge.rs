@@ -15,7 +15,7 @@
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::{collections::HashMap, io::Write, sync::Arc, time::Instant};
+use std::{collections::HashMap, io::Write, sync::Arc};
 use tokio::time;
 
 use crate::common::json;
@@ -42,7 +42,7 @@ pub async fn merge_by_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let mut locker = None;
     if !CONFIG.common.local_mode {
         // get a cluster lock for compactor stream
@@ -55,7 +55,7 @@ pub async fn merge_by_stream(
     }
 
     // get schema
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type)).await?;
+    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let schema_metadata = schema.metadata.clone();
     let schema = Arc::new(schema.with_metadata(HashMap::new()));
 
@@ -140,12 +140,11 @@ pub async fn merge_by_stream(
     let files = file_list::get_file_list(
         org_id,
         stream_name,
-        Some(stream_type),
+        stream_type,
         offset_time_hour,
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
-    )
-    .await?;
+    )?;
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new offset
@@ -337,7 +336,7 @@ async fn merge_files(
     }
 
     // convert the file to the latest version of schema
-    let schema_versions = db::schema::get_versions(org_id, stream_name, Some(stream_type)).await?;
+    let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {

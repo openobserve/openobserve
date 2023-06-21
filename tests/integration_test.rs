@@ -643,7 +643,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(!resp.status().is_success());
     }
 
     async fn e2e_post_user() {

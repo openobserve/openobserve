@@ -56,7 +56,7 @@ pub async fn save_alert(
     }
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(&org_id, &stream_name, Some(stream_type))
+    let schema = db::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap();
     let fields = schema.fields;

@@ -48,7 +48,7 @@ pub async fn search(
 
     // fetch all schema versions, group files by version
     let schema_versions =
-        match db::schema::get_versions(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
+        match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
                 log::error!("get schema error: {}", err);
@@ -218,12 +218,10 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
     let results = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
-        Some(stream_type),
+        stream_type,
         time_min,
         time_max,
-    )
-    .await
-    {
+    ) {
         Ok(results) => results,
         Err(err) => {
             log::error!("get file list error: {}", err);

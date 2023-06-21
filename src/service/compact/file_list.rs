@@ -36,10 +36,23 @@ pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
 /// delete all small file list keys in this hour from storage
 /// node should load new file list from storage
 pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
+    let time_now: DateTime<Utc> = Utc::now();
+    let time_now_hour = Utc
+        .with_ymd_and_hms(
+            time_now.year(),
+            time_now.month(),
+            time_now.day(),
+            time_now.hour(),
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
+
     let mut offset = offset;
     if offset == 0 {
         // get earilest date from schema
-        offset = Utc::now().timestamp_micros();
+        offset = time_now.timestamp_micros();
         for item in STREAM_SCHEMAS.iter() {
             if let Some(val) = item.value().first().unwrap().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
@@ -62,6 +75,11 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         log::info!("[COMPACT] no stream, no need to compact");
         return Ok(()); // no stream
     }
+    // only compact for the past hour
+    if offset >= time_now_hour {
+        return Ok(());
+    }
+
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let offset_time_hour = Utc
         .with_ymd_and_hms(
@@ -81,6 +99,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         log::info!("[COMPACT] no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
+
     // compact offset already is next hour, we need fix it, get the latest compact offset
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {

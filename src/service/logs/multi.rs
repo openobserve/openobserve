@@ -16,16 +16,13 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::{
-    io::{BufRead, BufReader},
-    time::Instant,
-};
+use std::io::{BufRead, BufReader};
 
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::infra::{cluster, config::CONFIG, metrics};
 use crate::meta::{
     alert::{Alert, Trigger},
-    ingestion::{IngestionResponse, RecordStatus, StreamStatus},
+    ingestion::{IngestionResponse, StreamStatus},
     StreamType,
 };
 use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists};
@@ -33,10 +30,10 @@ use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream
 pub async fn ingest(
     org_id: &str,
     in_stream_name: &str,
-    body: actix_web::web::Bytes,
-    thread_id: web::Data<usize>,
+    body: web::Bytes,
+    thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -45,9 +42,7 @@ pub async fn ingest(
 
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-        return Err(anyhow::anyhow!(format!(
-            "stream [{stream_name}] is being deleted"
-        )));
+        return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
     #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -57,14 +52,7 @@ pub async fn ingest(
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_status = StreamStatus {
-        name: stream_name.to_owned(),
-        status: RecordStatus {
-            successful: 0,
-            failed: 0,
-            error: "".to_string(),
-        },
-    };
+    let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream

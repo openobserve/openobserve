@@ -17,6 +17,7 @@ use datafusion::arrow::datatypes::Schema;
 use crate::common;
 use crate::meta::prom::{Metadata, METADATA_LABEL};
 
+pub mod json;
 pub mod prom;
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {

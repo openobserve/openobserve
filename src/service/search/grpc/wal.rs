@@ -75,7 +75,7 @@ pub async fn search(
     log::info!("wal->search: load files {file_count}, scan_size {scan_size}");
 
     // fetch all schema versions, get latest schema
-    let schema = match db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type)).await {
+    let schema = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
             log::error!("get schema error: {}", err);

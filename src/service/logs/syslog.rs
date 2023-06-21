@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::{net::SocketAddr, time::Instant};
+use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
@@ -28,7 +28,7 @@ use crate::infra::{
 use crate::meta::{
     alert::{Alert, Trigger},
     http::HttpResponse as MetaHttpResponse,
-    ingestion::{IngestionResponse, RecordStatus, StreamSchemaChk, StreamStatus},
+    ingestion::{IngestionResponse, StreamSchemaChk, StreamStatus},
     syslog::SyslogRoute,
     StreamType,
 };
@@ -37,7 +37,7 @@ use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 use super::StreamMeta;
 
 pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let ip = addr.ip();
     let matching_route = get_org_for_ip(ip).await;
 
@@ -53,7 +53,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         }
     };
 
-    let thread_id = web::Data::new(0);
+    let thread_id = 0;
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
 
@@ -79,14 +79,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_status = StreamStatus {
-        name: stream_name.to_owned(),
-        status: RecordStatus {
-            successful: 0,
-            failed: 0,
-            error: "".to_string(),
-        },
-    };
+    let mut stream_status = StreamStatus::new(stream_name);
 
     let mut trigger: Option<Trigger> = None;
 

@@ -98,7 +98,7 @@ use crate::service::search as SearchService;
 pub async fn search(
     org_id: web::Path<String>,
     in_req: HttpRequest,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();

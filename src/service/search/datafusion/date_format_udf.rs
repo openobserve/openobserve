@@ -76,8 +76,7 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
                     // in arrow, any value can be null.
                     // Here we decide to make our UDF to return null when either argument is null.
                     (Some(timestamp), (Some(format), Some(timezone))) => {
-                        let timestamp = time::parse_i64_to_timestamp_micros(timestamp)
-                            .expect("timestamp field cast failed");
+                        let timestamp = time::parse_i64_to_timestamp_micros(timestamp);
                         let t = Utc.timestamp_nanos(timestamp * 1000);
                         let offset = time::parse_timezone_to_offset(timezone) as i32;
                         let result = if offset == 0 {

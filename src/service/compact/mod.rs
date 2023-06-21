@@ -47,7 +47,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             for stream_type in stream_types {
                 let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
                 for stream_name in streams {
-                    let schema = db::schema::get(&org_id, &stream_name, Some(stream_type)).await?;
+                    let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
                     let stream_data_lifecycle_end = if stream.settings.data_retention > 0 {
                         let date = now - chrono::Duration::days(stream.settings.data_retention);

@@ -39,7 +39,7 @@ pub async fn schema_evolution(
     inferred_schema: Arc<Schema>,
     min_ts: i64,
 ) {
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+    let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
 
@@ -231,7 +231,7 @@ pub async fn check_for_schema(
     let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
-        let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+        let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
@@ -303,7 +303,7 @@ pub async fn check_for_schema(
 
             // try getting schema
 
-            let chk_schema = db::schema::get_from_db(org_id, stream_name, Some(stream_type))
+            let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
 
@@ -474,7 +474,7 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.clone(),
         None => {
-            let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+            let schema = db::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
             stream_schema_map.insert(stream_name.to_string(), schema.clone());
@@ -546,7 +546,7 @@ pub async fn set_schema_metadata(
     stream_type: StreamType,
     extra_metadata: AHashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type)).await?;
+    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let mut metadata = schema.metadata().clone();
     let mut updated = false;
     for (key, value) in extra_metadata {

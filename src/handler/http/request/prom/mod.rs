@@ -45,13 +45,13 @@ pub async fn remote_write(
     org_id: web::Path<String>,
     thread_id: web::Data<usize>,
     req: HttpRequest,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type == "application/x-protobuf" {
         Ok(
-            match metrics::prom::remote_write(&org_id, thread_id, body).await {
+            match metrics::prom::remote_write(&org_id, **thread_id, body).await {
                 Ok(_) => HttpResponse::Ok().into(),
                 Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),

@@ -70,7 +70,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
 #[post("/{org_id}/kv/{key}")]
 pub async fn set(
     path: web::Path<(String, String)>,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (org_id, key) = path.into_inner();
     match kv::set(&org_id, &key, body).await {

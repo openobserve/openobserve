@@ -58,13 +58,13 @@ mod test {
         let schema = Schema::new(schmea_vec);
 
         let start1 = std::time::Instant::now();
-        for i in 0..100000 {
+        for _ in 0..100000 {
             get_schema_key(&schema);
         }
         log::info!("Time taken for blake3: {:?}", start1.elapsed());
 
         let start2 = std::time::Instant::now();
-        for i in 0..100000 {
+        for _ in 0..100000 {
             get_schema_key_xxh3(&schema);
         }
         log::info!("Time taken for xxh3: {:?}", start2.elapsed());
