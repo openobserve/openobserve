@@ -132,11 +132,12 @@ pub fn stats() -> Result<usize> {
 }
 
 fn format_key(path: &str) -> String {
-    if !path.is_empty() && !path.starts_with('/') {
+    let path = if !path.is_empty() && !path.starts_with('/') {
         format!("/{path}")
     } else {
         path.to_string()
-    }
+    };
+    url::form_urlencoded::byte_serialize(path.as_bytes()).collect::<String>()
 }
 
 #[cfg(test)]
