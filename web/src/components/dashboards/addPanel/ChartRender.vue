@@ -749,6 +749,7 @@ export default defineComponent({
               autosize: true,
               legend: {
                   bgcolor: "#f7f7f7",
+                  orientation: getLegendPosition('sql'),
                   itemclick: ['pie', 'donut'].includes(props.data.type) ? 'toggle' : false,
               },
               margin: {
@@ -777,8 +778,9 @@ export default defineComponent({
             case 'matrix': {
                 const traces = searchQueryData.data?.result?.map((metric: any) => {
                     const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
+
                     return  {
-                        name: JSON.stringify(metric.metric),
+                        name: getPromqlLegendName(metric.metric, props.data.config.promqlLegend),
                         x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
                         y: values.map((value: any) => value[1]),
                         hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"
@@ -792,7 +794,7 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
-                        orientation: "h",
+                        orientation: getLegendPosition('promql'),
                         itemclick: false,
                     },
                     margin: {
@@ -803,6 +805,8 @@ export default defineComponent({
                         b:50
                     }
                 };
+
+                console.log('plotly promql layout', layout);
 
                 Plotly.react(plotRef.value, traces, layout, {
                     responsive: true,
@@ -831,7 +835,7 @@ export default defineComponent({
                     autosize: true,
                     legend: {
                         bgcolor: "#f7f7f7",
-                        orientation: "h",
+                        orientation: getLegendPosition('promql'),
                         itemclick: false
                     },
                     margin: {
@@ -869,6 +873,45 @@ export default defineComponent({
         //                   hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
 
         //               };
+      }
+
+      const getPromqlLegendName = (metric: any, label: string) => {
+        if(label) {
+            let template = label || "";
+            const placeholders = template.match(/\{([^}]+)\}/g);
+
+            // Step 2: Iterate through each placeholder
+            placeholders?.forEach(function(placeholder: any) {
+                // Step 3: Extract the key from the placeholder
+                const key = placeholder.replace("{", "").replace("}", "");
+                
+                // Step 4: Retrieve the corresponding value from the JSON object
+                const value = metric[key];
+                
+                // Step 5: Replace the placeholder with the value in the template
+                if(value) {
+                    template = template.replace(placeholder, value);
+                }
+            });
+            return template
+        } else {
+            return JSON.stringify(metric)
+        }
+
+      }
+
+      const getLegendPosition = (type: string) => {
+        const legendPosition = props.data.config?.legends_position
+        console.log('legendPosition', legendPosition);
+        
+        switch (legendPosition) {
+            case 'bottom':
+                return 'h';
+            case 'right':
+                return 'v';
+            default:
+                return type == 'promql' ? 'h' : 'v';
+        }
       }
 
       // get the x axis key

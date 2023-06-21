@@ -71,6 +71,7 @@ export default {
   justify-content: flex-start;
   width: 50px;
   height: 100%;
+  overflow-y: auto;
   cursor: pointer;
 }
 

@@ -1,11 +1,31 @@
 <template>
   <div>
-    <q-toggle v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.show_legends" 
+    <q-toggle v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.show_legends"
       label="Show Legends" />
 
-    <q-select outlined v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense>
+    <div class="space"></div>
+
+    <q-select v-if="dashboardPanelData.data.type != 'table'" outlined
+      v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
+      label="Legends Positions" class="showLabelOnTop" stack-label emit-value>
     </q-select>
-    
+
+    <div class="space"></div>
+
+    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promqlLegend" label="Legend" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Legend
+          <div>
+            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+              Series name overrides. For example, {endpoint} with be replaced with the label value for endpoint.
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
   </div>
 </template>
 
@@ -14,41 +34,29 @@ import useDashboardPanelData from '@/composables/useDashboardPanel';
 import { ref, watch } from 'vue';
 
 export default {
-  props: {
-    title: {
-      type: String,
-      required: true
-    },
-    modelValue: {
-      type: Boolean,
-      required: true
-    }
-  },
-  emits: ['update:modelValue'],
-  setup(props, { emit }) {
-    const { dashboardPanelData} = useDashboardPanelData()
+  props: {},
+  emits: [],
+  setup(props) {
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData()
 
     // options for legends position
     const legendsPositionOptions = [
       {
-        label: 'Top',
-        value: 'top'
-      },
-      {
-        label: 'Bottom',
-        value: 'bottom'
-      },
-      {
-        label: 'Left',
-        value: 'left'
+        label: 'Auto',
+        value: null
       },
       {
         label: 'Right',
         value: 'right'
       },
+      {
+        label: 'Bottom',
+        value: 'bottom'
+      },
     ]
     return {
       dashboardPanelData,
+      promqlMode,
 
       // legends position options
       legendsPositionOptions,
@@ -59,54 +67,8 @@ export default {
 </script>
 
 <style scoped>
-.sidebar {
-  position: relative;
-  width: 50px;
-  height: 100%;
-}
-
-.sidebar.open {
-  width: 300px;
-}
-
-.sidebar-header-collapsed {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 50px;
-  height: 100%;
-  cursor: pointer;
-}
-
-.sidebar-header-expanded {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 60px;
-  padding: 0 10px;
-}
-
-.collapsed-icon {
+.space {
   margin-top: 10px;
-  font-size: 20px;
-}
-
-.collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
-
-.expanded-title {
-  font-weight: bold;
-}
-
-.collapse-button {
-  padding: 0px 5px;
-}
-
-.sidebar-content {
-  padding: 0px 10px;
+  margin-bottom: 10px;
 }
 </style>
