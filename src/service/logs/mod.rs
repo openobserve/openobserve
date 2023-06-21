@@ -26,6 +26,7 @@ use crate::meta::StreamType;
 use crate::service::schema::check_for_schema;
 
 pub mod bulk;
+pub mod gcs_pub_sub;
 pub mod json;
 pub mod kinesis_firehose;
 pub mod multi;

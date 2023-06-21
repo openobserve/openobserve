@@ -21,7 +21,7 @@ use std::sync::Arc;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use super::auth::{validator, validator_aws};
+use super::auth::{validator, validator_aws, validator_gcp};
 use super::request::dashboards::*;
 use super::request::functions;
 use super::request::kv;
@@ -206,8 +206,16 @@ pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
     let amz_auth = HttpAuthentication::with_fn(validator_aws);
     cfg.service(
         web::scope("/aws")
-            .wrap(cors)
+            .wrap(cors.clone())
             .wrap(amz_auth)
             .service(logs::ingest::handle_kinesis_request),
+    );
+
+    let gcp_auth = HttpAuthentication::with_fn(validator_gcp);
+    cfg.service(
+        web::scope("/gcp")
+            .wrap(cors)
+            .wrap(gcp_auth)
+            .service(logs::ingest::handle_gcp_request),
     );
 }

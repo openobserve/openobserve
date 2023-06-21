@@ -17,7 +17,7 @@ use actix_web::{
     error::{ErrorForbidden, ErrorUnauthorized},
     http::header,
     http::Method,
-    Error,
+    web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
@@ -184,6 +184,42 @@ pub async fn validator_aws(
             }
             Err(_) => Err((ErrorUnauthorized("Unauthorized Access"), req)),
         },
+        None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+    }
+}
+
+pub async fn validator_gcp(
+    req: ServiceRequest,
+    _credentials: Option<BasicAuth>,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let path = req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/gcp/", CONFIG.common.base_uri).as_str())
+        .unwrap_or(req.request().path());
+
+    let query =
+        web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
+            .unwrap();
+    match query.get("API_Key") {
+        Some(val) => {
+            let gcp_creds = common::base64::decode(val).unwrap();
+            let creds = gcp_creds
+                .split(':')
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>();
+
+            match validate_credentials(&creds[0], &creds[1], path).await {
+                Ok(res) => {
+                    if res {
+                        Ok(req)
+                    } else {
+                        Err((ErrorUnauthorized("Unauthorized Access"), req))
+                    }
+                }
+                Err(err) => Err((err, req)),
+            }
+        }
         None => Err((ErrorUnauthorized("Unauthorized Access"), req)),
     }
 }
