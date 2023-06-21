@@ -1,12 +1,13 @@
 <template>
   <div class="sidebar" :class="{ open: isOpen }">
     <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
-      <div class="collapsed-icon">+</div>
+      <!-- <div class="collapsed-icon">+</div> -->
+      <q-icon name="expand_all" class="collapsed-icon rotate-90"/>
       <div class="collapsed-title">{{ title }}</div>
     </div>
     <div v-else class="sidebar-header-expanded">
       <div class="expanded-title">{{ title }}</div>
-      <button class="collapse-button" @click="toggleSidebar">-</button>
+      <q-icon name="unfold_less" class="collapse-button rotate-90" @click="toggleSidebar"/>
     </div>
     <div class="sidebar-content" v-if="isOpen">
       <q-separator />
@@ -99,7 +100,9 @@ export default {
 }
 
 .collapse-button {
-  padding: 0px 5px;
+  height: 30px;
+  width: 30px;
+  padding: 0px 0px;
 }
 
 .sidebar-content {
