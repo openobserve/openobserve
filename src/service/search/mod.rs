@@ -68,7 +68,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     let (mut time_min, mut time_max) = sql.meta.time_range.unwrap();
     if time_min == 0 {
         // get created_at from schema
-        let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type))
+        let schema = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
             .await
             .unwrap_or_else(|_| Schema::empty());
         if schema != Schema::empty() {
@@ -90,12 +90,10 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
     match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
-        Some(stream_type),
+        stream_type,
         time_min,
         time_max,
-    )
-    .await
-    {
+    ) {
         Err(_) => vec![],
         Ok(file_list) => {
             let mut files = Vec::with_capacity(file_list.len());
@@ -467,7 +465,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 }
 
 /// match a source is a valid file or not
-pub async fn match_source(
+pub fn match_source(
     stream: StreamParams<'_>,
     time_range: Option<(i64, i64)>,
     filters: &[(&str, &str)],

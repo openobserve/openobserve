@@ -52,7 +52,7 @@
               flat
               size="xs"
               :icon="
-                expandedRow != props.row.name
+                expandedRow.name != props.row.name
                   ? 'img:' + getImageURL('images/common/down-solid.svg')
                   : 'img:' + getImageURL('images/common/up-solid.svg')
               "
@@ -63,7 +63,7 @@
           </q-td>
         </q-tr>
         <q-tr
-          v-show="expandedRow == props.row.name"
+          v-show="expandedRow.name == props.row.name"
           :props="props"
           no-hover
           style="
@@ -369,7 +369,7 @@ export default defineComponent({
     let deleteStreamName = "";
     let deleteStreamType = "";
     const loadingFunctions = ref(false);
-    const expandedRow = ref(null);
+    const expandedRow = ref({name:"", stream_type:""});
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any | null>(null);
     const filterFunctions = ref([]);
@@ -496,12 +496,13 @@ export default defineComponent({
         await jsTransformService
           .apply_stream_function(
             store.state.selectedOrganization.identifier,
-            expandedRow.value || "",
+            expandedRow.value.name,
+            expandedRow.value.stream_type,
             selectedFunction.value.name,
             apiData
           )
           .then(() => {
-            return getStreamFunctions(expandedRow.value);
+            return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
           })
           .finally(() => {
             addFunctionInProgressLoading.value = false;
@@ -512,23 +513,25 @@ export default defineComponent({
     });
 
     const toggleStreamRow = (props: any) => {
-      if (expandedRow.value == props.row.name) {
-        expandedRow.value = null;
+      if (expandedRow.value.name == props.row.name) {
+        expandedRow.value = {name:"", stream_type:""};
       } else {
-        expandedRow.value = props.row.name;
+        expandedRow.value.name = props.row.name;
+        expandedRow.value.stream_type = props.row.stream_type;
       }
-      if (expandedRow.value) {
+      if (expandedRow.value.name) {
         addFunctionInProgress.value = false;
-        getStreamFunctions(props.row.name);
+        getStreamFunctions(props.row.name, props.row.stream_type);
       }
     };
 
-    const getStreamFunctions = async (stream_name: any) => {
-      loadingFunctions.value = stream_name;
+    const getStreamFunctions = async (stream_name: any, stream_type: string) => {
+      loadingFunctions.value = stream_name ? true : false;
       await jsTransformService
         .stream_function(
           store.state.selectedOrganization.identifier,
-          stream_name
+          stream_name,
+          stream_type,
         )
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
@@ -547,15 +550,16 @@ export default defineComponent({
         });
     };
 
-    const deleteFunctionFromStream = async (functionName: any) => {
+    const deleteFunctionFromStream = async (functionName: string) => {
       await jsTransformService
         .remove_stream_function(
           store.state.selectedOrganization.identifier,
-          expandedRow.value || "",
+          expandedRow.value.name,
+          expandedRow.value.stream_type,
           functionName
         )
         .then(() => {
-          return getStreamFunctions(expandedRow.value);
+          return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
         })
         .finally(() => {
           addFunctionInProgressLoading.value = false;

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{http, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
@@ -45,8 +45,8 @@ const SERVICE: &str = "service";
 
 pub async fn traces_proto(
     org_id: &str,
-    thread_id: std::sync::Arc<usize>,
-    body: actix_web::web::Bytes,
+    thread_id: usize,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let request = ExportTraceServiceRequest::decode(body).expect("Invalid protobuf");
     super::handle_trace_request(org_id, thread_id, request).await
@@ -54,8 +54,8 @@ pub async fn traces_proto(
 
 pub async fn traces_json(
     org_id: &str,
-    thread_id: std::sync::Arc<usize>,
-    body: actix_web::web::Bytes,
+    thread_id: usize,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -374,7 +374,7 @@ pub async fn traces_json(
             write_buf.put("\n".as_bytes());
         }
         let file = wal::get_or_create(
-            *thread_id.as_ref(),
+            thread_id,
             org_id,
             traces_stream_name,
             StreamType::Traces,

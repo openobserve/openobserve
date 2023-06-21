@@ -29,6 +29,7 @@ use crate::meta;
         request::logs::ingest::handle_kinesis_request,
         request::logs::ingest::multi,
         request::logs::ingest::json,
+        request::metrics::ingest::json,
         request::dashboards::create_dashboard,
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,

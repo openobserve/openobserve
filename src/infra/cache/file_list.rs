@@ -191,8 +191,7 @@ fn scan_prefix(
     Ok(items)
 }
 
-#[tracing::instrument(name = "cache:file_list:get_file_list")]
-pub async fn get_file_list(
+pub fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -411,10 +410,10 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_file_list() {
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0).await;
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 0, 0);
         assert!(ret.is_ok());
 
-        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0).await;
+        let ret = get_file_list("default", "olympics", StreamType::Logs, 1678613530133899, 0);
         assert!(ret.is_ok());
 
         let ret = scan_prefix("default", "olympics", StreamType::Logs, "");

@@ -16,20 +16,21 @@ use std::io::Write;
 
 use crate::common;
 use crate::infra::{cache::file_list, ider, storage};
-use crate::meta::common::{FileKey, FileMeta};
-use crate::meta::StreamType;
+use crate::meta::{
+    common::{FileKey, FileMeta},
+    StreamType,
+};
 use crate::service::db;
 
 #[inline]
-pub async fn get_file_list(
+pub fn get_file_list(
     org_id: &str,
     stream_name: &str,
-    stream_type: Option<StreamType>,
+    stream_type: StreamType,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
-    let stream_type_loc = stream_type.unwrap_or(StreamType::Logs);
-    file_list::get_file_list(org_id, stream_name, stream_type_loc, time_min, time_max).await
+    file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
 }
 
 #[inline]
@@ -112,19 +113,6 @@ mod test {
         let res = get_file_meta(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
         );
-        assert!(res.is_ok());
-    }
-
-    #[actix_web::test]
-    async fn test_get_file_list() {
-        let res = get_file_list(
-            "default",
-            "olympics",
-            Some(StreamType::Logs),
-            1663064862606912,
-            1663064862606912,
-        )
-        .await;
         assert!(res.is_ok());
     }
 }

@@ -36,7 +36,7 @@ pub async fn get_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+    let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
     let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
@@ -173,7 +173,7 @@ pub async fn save_stream_settings(
         );
     }
 
-    let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+    let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
     let mut metadata = schema.metadata.clone();
@@ -208,7 +208,7 @@ pub async fn delete_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<HttpResponse, Error> {
-    let schema = db::schema::get_versions(org_id, stream_name, Some(stream_type))
+    let schema = db::schema::get_versions(org_id, stream_name, stream_type)
         .await
         .unwrap();
     if schema.is_empty() {

@@ -343,6 +343,7 @@ export default defineComponent({
       //     .delete_stream_function(
       //       store.state.selectedOrganization.identifier,
       //       selectedDelete.value.stream_name,
+      //       selectedDelete.value.stream_type,
       //       selectedDelete.value.name
       //     )
       //     .then((res: any) => {

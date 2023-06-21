@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use serde_json::{from_value, json, to_value, Error, Map, Value};
+pub use serde_json::{from_value, json, to_value, Error, Map, Number, Value};
 
 #[inline(always)]
 #[cfg(target_arch = "x86_64")]

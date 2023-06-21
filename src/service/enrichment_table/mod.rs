@@ -15,7 +15,7 @@
 use actix_multipart::Multipart;
 use actix_web::{
     http::{self, StatusCode},
-    web, HttpResponse,
+    HttpResponse,
 };
 use ahash::AHashMap;
 use chrono::Utc;
@@ -42,7 +42,7 @@ pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,
     mut payload: Multipart,
-    thread_id: web::Data<usize>,
+    thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     let mut hour_key = String::new();
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
@@ -123,7 +123,8 @@ pub async fn save_enrichment_data(
                     .await;
 
                     if records.is_empty() {
-                        hour_key = super::ingestion::get_hour_key(timestamp, vec![], &json_record,None);
+                        hour_key =
+                            super::ingestion::get_hour_key(timestamp, vec![], &json_record, None);
                     }
                     records.push(value_str);
                 }

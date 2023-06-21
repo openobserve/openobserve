@@ -29,13 +29,12 @@ fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }
 
-// XXX-TODO: `get` never fails. Return `Schema` instead of `Result<Schema, _>`.
 pub async fn get(
     org_id: &str,
     stream_name: &str,
-    stream_type: Option<StreamType>,
+    stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
-    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
+    let key = mk_key(org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
     if let Some(schema) = STREAM_SCHEMAS.get(map_key) {
@@ -64,9 +63,9 @@ pub async fn get(
 pub async fn get_from_db(
     org_id: &str,
     stream_name: &str,
-    stream_type: Option<StreamType>,
+    stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
-    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
+    let key = mk_key(org_id, stream_type, stream_name);
 
     let db = &crate::infra::db::DEFAULT;
     Ok(match db.get(&key).await {
@@ -90,9 +89,9 @@ pub async fn get_from_db(
 pub async fn get_versions(
     org_id: &str,
     stream_name: &str,
-    stream_type: Option<StreamType>,
+    stream_type: StreamType,
 ) -> Result<Vec<Schema>, anyhow::Error> {
-    let key = mk_key(org_id, stream_type.unwrap_or(StreamType::Logs), stream_name);
+    let key = mk_key(org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
     if STREAM_SCHEMAS.contains_key(map_key) {

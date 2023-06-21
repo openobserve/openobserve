@@ -48,7 +48,7 @@ const SERVICE: &str = "service";
 
 pub async fn handle_trace_request(
     org_id: &str,
-    thread_id: std::sync::Arc<usize>,
+    thread_id: usize,
     request: ExportTraceServiceRequest,
 ) -> Result<HttpResponse, Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -272,7 +272,7 @@ pub async fn handle_trace_request(
             write_buf.put("\n".as_bytes());
         }
         let file = wal::get_or_create(
-            *thread_id.as_ref(),
+            thread_id,
             org_id,
             traces_stream_name,
             StreamType::Traces,

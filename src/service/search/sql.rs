@@ -318,7 +318,7 @@ impl Sql {
         }
 
         // fetch schema
-        let schema = match db::schema::get(&org_id, &meta.source, Some(stream_type)).await {
+        let schema = match db::schema::get(&org_id, &meta.source, stream_type).await {
             Ok(schema) => schema,
             Err(_) => Schema::empty(),
         };
@@ -633,7 +633,6 @@ impl Sql {
             is_wal,
             match_min_ts_only,
         )
-        .await
     }
 }
 

@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
 
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::infra::{
@@ -46,10 +47,10 @@ pub(crate) mod prometheus {
 
 pub async fn remote_write(
     org_id: &str,
-    thread_id: actix_web::web::Data<usize>,
-    body: actix_web::web::Bytes,
+    thread_id: usize,
+    body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
@@ -147,10 +148,7 @@ pub async fn remote_write(
                 value: sample_val,
             };
 
-            let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp).unwrap_or_default();
-            if timestamp == 0 {
-                timestamp = Utc::now().timestamp_micros();
-            }
+            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             if timestamp < min_ts {
                 min_ts = timestamp;
             }
@@ -311,14 +309,12 @@ pub async fn remote_write(
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
         {
-            return Err(anyhow::anyhow!(format!(
-                "stream [{stream_name}] is being deleted"
-            )));
+            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
         }
         // write to file
         write_file(
             stream_data,
-            thread_id.clone(),
+            thread_id,
             org_id,
             &stream_name,
             StreamType::Metrics,
@@ -381,7 +377,7 @@ pub(crate) async fn get_metadata(
     let stream_type = StreamType::Metrics;
 
     if let Some(metric_name) = req.metric {
-        let schema = db::schema::get(org_id, &metric_name, Some(stream_type))
+        let schema = db::schema::get(org_id, &metric_name, stream_type)
             .await
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
@@ -444,7 +440,7 @@ pub(crate) async fn get_series(
         }
     };
 
-    let schema = db::schema::get(org_id, &metric_name, Some(StreamType::Metrics))
+    let schema = db::schema::get(org_id, &metric_name, StreamType::Metrics)
         .await
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
@@ -608,7 +604,7 @@ pub(crate) async fn get_label_values(
         }
     };
 
-    let schema = db::schema::get(org_id, &metric_name, Some(stream_type))
+    let schema = db::schema::get(org_id, &metric_name, stream_type)
         .await
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();

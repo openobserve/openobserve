@@ -1,9 +1,22 @@
-use actix_web::web;
+// Copyright 2022 Zinc Labs Inc. and Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
-use std::{io::Read, time::Instant};
+use std::io::Read;
 
 use crate::common::{
     flatten, json,
@@ -13,8 +26,7 @@ use crate::infra::{cluster, config::CONFIG, metrics};
 use crate::meta::{
     alert::{Alert, Trigger},
     ingestion::{
-        AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, RecordStatus,
-        StreamStatus,
+        AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, StreamStatus,
     },
     StreamType,
 };
@@ -26,9 +38,9 @@ pub async fn process(
     org_id: &str,
     in_stream_name: &str,
     request: KinesisFHRequest,
-    thread_id: web::Data<usize>,
+    thread_id: usize,
 ) -> Result<KinesisFHIngestionResponse, anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -37,9 +49,7 @@ pub async fn process(
 
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-        return Err(anyhow::anyhow!(format!(
-            "stream [{stream_name}] is being deleted"
-        )));
+        return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
     #[cfg(feature = "zo_functions")]
@@ -50,14 +60,7 @@ pub async fn process(
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_status = StreamStatus {
-        name: stream_name.to_owned(),
-        status: RecordStatus {
-            successful: 0,
-            failed: 0,
-            error: "".to_string(),
-        },
-    };
+    let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
@@ -142,14 +145,7 @@ pub async fn process(
                         value = local_val.clone().into();
                         // handling of timestamp
                         timestamp = match event.timestamp {
-                            Some(v) => match parse_i64_to_timestamp_micros(v) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    stream_status.status.failed += 1;
-                                    stream_status.status.error = e.to_string();
-                                    continue;
-                                }
-                            },
+                            Some(v) => parse_i64_to_timestamp_micros(v),
                             None => Utc::now().timestamp_micros(),
                         };
                     }

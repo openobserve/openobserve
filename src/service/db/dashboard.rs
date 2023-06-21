@@ -40,9 +40,7 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> 
         .into_values()
         .map(|val| {
             json::from_slice(&val).map_err(|_| {
-                anyhow::anyhow!(format!(
-                    "Failed to deserialize the value for key {db_key:?} as `Dashboard`"
-                ))
+                anyhow::anyhow!("Failed to deserialize the value for key {db_key:?} as `Dashboard`")
             })
         })
         .collect()

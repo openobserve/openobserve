@@ -28,11 +28,14 @@ use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
 use vrl::prelude::state;
 
 use super::{db, triggers};
+#[cfg(feature = "zo_functions")]
 use crate::common::flatten;
 #[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
-use crate::common::json::{Map, Value};
-use crate::common::notification::send_notification;
+use crate::common::{
+    json::{self, Map, Value},
+    notification::send_notification,
+};
 #[cfg(feature = "zo_functions")]
 use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::config::{CONFIG, STREAM_ALERTS};
@@ -126,25 +129,26 @@ pub async fn get_stream_partition_keys(
     stream_schema_map: &AHashMap<String, Schema>,
 ) -> Vec<String> {
     let mut keys: Vec<String> = vec![];
-    if stream_schema_map.contains_key(stream_name) {
-        let schema = stream_schema_map.get(stream_name).unwrap();
-        let mut meta = schema.metadata().clone();
-        meta.remove("created_at");
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema,
+        None => return keys,
+    };
 
-        let stream_settings = meta.get("settings");
+    let stream_settings = match schema.metadata().get("settings") {
+        Some(value) => value,
+        None => return keys,
+    };
 
-        if let Some(value) = stream_settings {
-            let settings: Value = crate::common::json::from_slice(value.as_bytes()).unwrap();
-            let part_keys = settings.get("partition_keys");
+    let settings: Value = json::from_slice(stream_settings.as_bytes()).unwrap();
+    let part_keys = match settings.get("partition_keys") {
+        Some(value) => value,
+        None => return keys,
+    };
 
-            if let Some(value) = part_keys {
-                let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
-                v.sort_by(|a, b| a.0.cmp(b.0));
-                for (_, value) in v {
-                    keys.push(value.as_str().unwrap().to_string());
-                }
-            }
-        }
+    let mut v: Vec<_> = part_keys.as_object().unwrap().into_iter().collect();
+    v.sort_by(|a, b| a.0.cmp(b.0));
+    for (_, value) in v {
+        keys.push(value.as_str().unwrap().to_string());
     }
     keys
 }
@@ -286,7 +290,7 @@ pub async fn chk_schema_by_record(
     let schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
-        let schema = db::schema::get(org_id, stream_name, Some(stream_type))
+        let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
@@ -314,7 +318,7 @@ pub async fn chk_schema_by_record(
 
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
-    thread_id: actix_web::web::Data<usize>,
+    thread_id: usize,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -325,7 +329,7 @@ pub fn write_file(
             continue;
         }
         let file = crate::infra::wal::get_or_create(
-            *thread_id.as_ref(),
+            thread_id,
             org_id,
             stream_name,
             stream_type,
