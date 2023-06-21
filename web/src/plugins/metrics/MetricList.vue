@@ -358,7 +358,7 @@ export default defineComponent({
       width: 100%;
 
       &:hover {
-        background-color: #5c5c5c;
+        background-color: #b6b5b5;
       }
 
       &.selected {

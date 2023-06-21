@@ -299,6 +299,7 @@ export default defineComponent({
           }
         }
         &--active {
+          color: white;
           background-color: $primary;
         }
       }

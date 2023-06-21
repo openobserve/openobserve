@@ -91,7 +91,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .tabContent {
-  background-color: $accent; // tab content bg color
+  background-color: rgba(136, 136, 136, 0.103);
+  // tab content bg color
   padding: 1rem 1.25rem 0.5rem;
   border-radius: 0.5rem;
   &__head {
@@ -101,7 +102,6 @@ export default defineComponent({
     display: flex;
     .title {
       font-size: 0.75rem;
-      color: $dark-page;
       line-height: 1rem;
       font-weight: 600;
     }
@@ -115,7 +115,6 @@ export default defineComponent({
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 0.75rem;
-    color: $dark-page;
     margin-bottom: 0;
   }
 }

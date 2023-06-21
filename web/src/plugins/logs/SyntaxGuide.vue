@@ -219,7 +219,7 @@ export default defineComponent({
   margin-bottom: 5px;
 }
 .bg-lightgray {
-  background-color: $selected-list-bg;
+  background-color: #b6b5b5;
   padding-left: 5px;
   padding-right: 5px;
 }

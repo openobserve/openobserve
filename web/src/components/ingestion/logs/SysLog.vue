@@ -114,7 +114,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-udpate-alert`"
                       icon="save"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -126,7 +126,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-delete-alert`"
                       icon="cancel"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -148,7 +148,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-udpate-alert`"
                       icon="edit"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -162,7 +162,7 @@
                       :icon="
                         'img:' + getImageURL('images/common/delete_icon.svg')
                       "
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -581,13 +581,13 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .tabContent {
-  background-color: $accent; // tab content bg color
+  background-color: rgba(136, 136, 136, 0.103);
+ // tab content bg color
   padding: 1rem;
   border-radius: 0.5rem;
   .title {
     text-transform: uppercase;
     font-size: 0.75rem;
-    color: $dark-page;
     line-height: 1rem;
     font-weight: 600;
   }

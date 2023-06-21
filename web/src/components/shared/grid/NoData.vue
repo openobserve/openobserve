@@ -15,7 +15,7 @@
 
 <template>
   <div
-    class="full-width column flex-center text-dark q-gutter-sm"
+    class="full-width column flex-center q-gutter-sm"
     style="font-size: 1.5rem"
   >
     <q-img
