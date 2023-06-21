@@ -24,7 +24,7 @@
     label="Syntax Guide"
     icon="help"
   >
-    <q-menu>
+    <q-menu :class="store.state.theme =='dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
           <div class="label">Syntax Guide</div>
@@ -36,34 +36,34 @@
               <ul class="guide-list">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >match_all('error') in query editor</span
                   >
                 </li>
                 <li>
                   For case-insensitive full text search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >match_all_ignore_case('error')</span
                   >
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-lightgray">code=200</span>
+                  <span class="bg-highlight">code=200</span>
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-lightgray">stream='stderr'</span>
+                  <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on cloumn
                   log use
-                  <span class="bg-lightgray">extract_ip(log) | code=200</span>
+                  <span class="bg-highlight">extract_ip(log) | code=200</span>
                 </li>
                 <li>
                   For additional examples,
@@ -89,40 +89,40 @@
               <ul class="guide-list">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   For case-insensitive full text search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all_ignore_case('error')</span
                   >
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on cloumn
                   log use
-                  <span class="bg-lightgray"
+                  <span class="bg-highlight"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
@@ -147,6 +147,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
@@ -158,8 +159,10 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18n();
+    const store = useStore();
     return {
       t,
+      store
     };
   },
 });
@@ -218,9 +221,16 @@ export default defineComponent({
 .syntax-section {
   margin-bottom: 5px;
 }
-.bg-lightgray {
-  background-color: #b6b5b5;
+.bg-highlight {
   padding-left: 5px;
   padding-right: 5px;
+}
+
+.theme-dark .bg-highlight {
+  background-color: #747474;
+}
+
+.theme-light .bg-highlight {
+  background-color: #e7e6e6;
 }
 </style>

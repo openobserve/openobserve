@@ -38,7 +38,7 @@
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -50,7 +50,7 @@
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"

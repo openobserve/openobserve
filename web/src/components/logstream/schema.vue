@@ -184,11 +184,10 @@
           <q-btn
             v-close-popup
             data-test="schema-cancel-button"
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('logStream.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
           />
           <q-btn

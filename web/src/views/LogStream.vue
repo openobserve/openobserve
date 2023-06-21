@@ -63,7 +63,7 @@
             @click="listSchema(props)"
           />
           <q-btn
-            icon="delete"
+            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
             :title="t('logStream.delete')"
             class="q-ml-xs"
             padding="sm"
