@@ -44,6 +44,7 @@ use std::sync::Arc;
 use super::storage::{file_list, StorageType};
 #[cfg(feature = "zo_functions")]
 use super::transform_udf::get_all_transform;
+#[cfg(feature = "zo_functions")]
 use crate::common::json;
 use crate::infra::{cache::tmpfs, config::CONFIG};
 use crate::meta::{common::FileMeta, search::Session as SearchSession, sql};

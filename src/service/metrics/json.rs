@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::io::BufReader;
-
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
+use std::{collections::HashMap, io::BufReader};
+#[cfg(feature = "zo_functions")]
+use vrl::compiler::runtime::Runtime;
 
 use crate::common::{flatten, json, time};
 use crate::infra::{cluster, config::CONFIG};
 use crate::meta::{
     ingestion::{IngestionResponse, StreamStatus},
-    prom::{Metadata, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+    prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
     StreamType,
 };
 use crate::service::{
@@ -39,6 +39,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
+
+    #[cfg(feature = "zo_functions")]
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
@@ -89,6 +92,22 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             VALUE_LABEL.to_string(),
             json::Number::from_f64(value).unwrap().into(),
         );
+        // remove type from labels
+        record.remove(TYPE_LABEL);
+        // add hash
+        let hash = super::signature_without_labels(
+            record,
+            &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
+        );
+        record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+
+        // apply functions
+        #[cfg(feature = "zo_functions")]
+        let mut record = json::Value::Object(record.to_owned());
+        #[cfg(feature = "zo_functions")]
+        apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
+        #[cfg(feature = "zo_functions")]
+        let record = record.as_object_mut().unwrap();
 
         // convert every label to string
         for (k, v) in record.iter_mut() {
@@ -106,7 +125,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 }
             }
         }
-        let record_str = json::to_string(record).unwrap();
+        let record_str = json::to_string(&record).unwrap();
 
         // check schema
         if stream_schema_map.get(&stream_name).is_none() {
@@ -176,4 +195,28 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         http::StatusCode::OK.into(),
         stream_status_map.values().map(|v| v.to_owned()).collect(),
     ))
+}
+
+#[cfg(feature = "zo_functions")]
+fn apply_func(
+    runtime: &mut Runtime,
+    org_id: &str,
+    metric_name: &str,
+    value: &mut json::Value,
+) -> Result<()> {
+    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+        org_id,
+        StreamType::Metrics,
+        metric_name,
+    );
+
+    *value = crate::service::ingestion::apply_stream_transform(
+        &local_tans,
+        value,
+        &stream_vrl_map,
+        metric_name,
+        runtime,
+    )?;
+
+    Ok(())
 }

@@ -29,9 +29,10 @@ use vrl::prelude::state;
 
 use super::{db, triggers};
 #[cfg(feature = "zo_functions")]
+use crate::common::flatten;
+#[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
 use crate::common::{
-    flatten,
     json::{self, Map, Value},
     notification::send_notification,
 };
