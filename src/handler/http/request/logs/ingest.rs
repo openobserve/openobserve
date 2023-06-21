@@ -16,8 +16,10 @@ use actix_web::{http, post, web, HttpResponse};
 use std::io::Error;
 
 use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::ingestion::KinesisFHRequest;
-use crate::service::logs;
+use crate::{
+    meta::ingestion::{GCPIngestionRequest, KinesisFHRequest},
+    service::logs,
+};
 
 /** _bulk ES compatible ingestion API */
 #[utoipa::path(
@@ -157,6 +159,32 @@ pub async fn handle_kinesis_request(
             **thread_id,
         )
         .await
+        {
+            Ok(v) => {
+                if v.error_message.is_some() {
+                    HttpResponse::BadRequest().json(v)
+                } else {
+                    HttpResponse::Ok().json(v)
+                }
+            }
+            Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )),
+        },
+    )
+}
+
+#[post("/{org_id}/{stream_name}/_sub")]
+pub async fn handle_gcp_request(
+    path: web::Path<(String, String)>,
+    thread_id: web::Data<usize>,
+    post_data: web::Json<GCPIngestionRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    Ok(
+        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), thread_id)
+            .await
         {
             Ok(v) => {
                 if v.error_message.is_some() {

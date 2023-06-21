@@ -63,7 +63,9 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
+
     const url = new URL(store.state.API_ENDPOINT);
+
     endpoint.value = {
       url: store.state.API_ENDPOINT,
       host: url.hostname,
@@ -71,6 +73,7 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
+
     const content = ref(null);
     return {
       store,

@@ -86,6 +86,7 @@ hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
 ipnetwork = "0.20"
+itertools = "0.10.5"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.10"
@@ -115,6 +116,8 @@ parquet = { version = "36", features = ["arrow", "async"] }
 prometheus = "0.13"
 promql-parser = "0.1"
 prost = "0.11"
+pyroscope = { version = "0.5.6", optional = true }
+pyroscope_pprofrs = { version = "0.2.5", optional = true }
 rand = "0.8"
 regex = "1.7"
 regex-syntax = "0.6"
@@ -150,9 +153,9 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee86
   "value",
 ] }
 walkdir = "2"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
-pyroscope = { version = "0.5.6", optional = true }
-pyroscope_pprofrs = { version = "0.2.5", optional = true }
+
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

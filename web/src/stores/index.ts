@@ -16,6 +16,7 @@ import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser } from "../utils/zincutils";
 
 const pos = window.location.pathname.indexOf("/web/");
+
 const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.endsWith("/")
     ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
@@ -23,8 +24,8 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   : window.location.origin == "http://localhost:8081"
   ? "/"
   : pos > -1
-  ? window.location.pathname.slice(0, pos)
-  : window.location.pathname;
+  ? window.location.origin + window.location.pathname.slice(0, pos)
+  : window.location.origin;
 
 export default createStore({
   state: {

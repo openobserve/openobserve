@@ -45,7 +45,19 @@
   compress gzip</pre
     >
   </div>
-  <a href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit" class="q-ml-md text-h6" target="_blank">Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!</a>
+  <div>
+    <a
+      href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
+      class="q-ml-lg text-bold"
+      style="padding-right: 2px"
+      target="_blank"
+      title="Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!"
+    >
+      Click here</a
+    >
+    to explore the process of sending logs from Kubernetes to OpenObserve using
+    FluentBit.
+  </div>
 </template>
 
 <script lang="ts">
