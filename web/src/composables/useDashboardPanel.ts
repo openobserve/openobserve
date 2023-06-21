@@ -253,7 +253,7 @@ const useDashboardPanelData = () => {
         dashboardPanelData.meta.filterValue.push({
           column: name,
           value: res?.data?.hits?.[0]?.values
-            .map((it: any) => it.key)
+            .map((it: any) => it.zo_sql_key)
             .filter((it: any) => it),
         });
 

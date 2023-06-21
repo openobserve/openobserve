@@ -504,8 +504,8 @@ export default defineComponent({
                 .find((field: any) => field.field === name)
                 .values.map((value: any) => {
                   return {
-                    key: value.key ? value.key : "null",
-                    count: formatNumberWithPrefix(value.num),
+                    key: value.zo_sql_key ? value.zo_sql_key : "null",
+                    count: formatNumberWithPrefix(value.zo_sql_num),
                   };
                 });
             }
