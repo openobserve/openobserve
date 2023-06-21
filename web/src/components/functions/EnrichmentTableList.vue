@@ -35,7 +35,7 @@
           <q-td :props="props">
             <q-btn
               icon="transform"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -46,7 +46,7 @@
             ></q-btn>
             <q-btn
               :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"

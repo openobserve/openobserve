@@ -655,7 +655,6 @@ export default defineComponent({
 
     &:hover {
       .field-container {
-        background-color: #e8e8e8;
       }
     }
   }

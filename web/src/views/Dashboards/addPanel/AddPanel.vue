@@ -30,7 +30,7 @@
         <DateTimePicker v-model="selectedDate" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
-        <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
+        <q-btn class="q-ml-md text-bold" outline padding="sm lg"  no-caps
           :label="t('panel.save')" @click="savePanelOnClick" />
         <q-btn class="q-ml-md text-bold no-border" padding="sm lg" color="secondary" no-caps :label="t('panel.apply')"
           @click="runQuery" />

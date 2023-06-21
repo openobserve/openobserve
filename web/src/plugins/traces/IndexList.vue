@@ -444,7 +444,7 @@ export default defineComponent({
       right: 0;
       top: 0;
       z-index: 5;
-      background-color: #e8e8e8;
+      background-color: #a3a1a1;
       padding: 0 6px;
       visibility: hidden;
       display: flex;

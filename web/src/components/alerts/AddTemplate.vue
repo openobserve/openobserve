@@ -72,11 +72,10 @@
             <q-btn
               data-test="add-template-cancel-btn"
               v-close-popup
-              class="q-mb-md text-bold no-border"
+              class="q-mb-md text-bold"
               :label="t('alerts.cancel')"
               text-color="light-text"
               padding="sm md"
-              color="accent"
               no-caps
               @click="$emit('cancel:hideform')"
             />
@@ -123,7 +122,7 @@
                   @click="copyTemplateBody(template.body)"
                 />
               </div>
-              <div class="bg-blue-grey-1 q-px-sm rounded-borders">
+              <div class="add-template q-px-sm rounded-borders">
                 <pre class="example-template-body q-my-0">
                     {{ template.body }}
                   </pre
@@ -337,5 +336,9 @@ const copyTemplateBody = (text: any) => {
 
 .example-template-body {
   font-size: 10px;
+}
+
+.add-template{
+  background: rgba(0,0,0,0.07);
 }
 </style>

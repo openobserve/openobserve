@@ -26,12 +26,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          />
+          <q-btn v-close-popup round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -43,18 +38,9 @@
           <q-tab data-test="log-detail-json-tab" name="json" label="JSON" />
         </q-tabs>
       </div>
-      <div
-        v-show="tab === 'table'"
-        class="col-2 flex justify-end align-center q-pr-md"
-      >
-        <q-toggle
-          data-test="log-detail-wrap-values-toggle-btn"
-          v-model="shouldWrapValues"
-          label="Wrap"
-          color="primary"
-          size="xs"
-          @update:model-value="toggleWrapLogDetails"
-        />
+      <div v-show="tab === 'table'" class="col-2 flex justify-end align-center q-pr-md">
+        <q-toggle data-test="log-detail-wrap-values-toggle-btn" v-model="shouldWrapValues" label="Wrap" color="primary"
+          size="xs" @update:model-value="toggleWrapLogDetails" />
       </div>
     </div>
 
@@ -62,23 +48,12 @@
 
     <q-tab-panels data-test="log-detail-tab-container" v-model="tab" animated>
       <q-tab-panel name="table">
-        <q-card-section
-          class="q-pa-none q-mb-lg"
-          data-test="log-detail-table-content"
-        >
-          <div
-            v-if="rowData.length == 0"
-            class="q-pt-md"
-            style="max-width: 350px"
-          >
+        <q-card-section class="q-pa-none q-mb-lg" data-test="log-detail-table-content">
+          <div v-if="rowData.length == 0" class="q-pt-md" style="max-width: 350px">
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
-            <q-list
-              separator
-              style="height: calc(100vh - 290)"
-              class="q-px-none q-py-none"
-            >
+            <q-list separator style="height: calc(100vh - 290)" class="q-px-none q-py-none">
               <q-item class="list-head">
                 <q-item-section class="text-bold col-3">
                   {{ t("search.sourceName") }}
@@ -88,88 +63,39 @@
                 </q-item-section>
               </q-item>
 
-              <q-item
-                v-for="(key, value) in rowData"
-                :key="'field_' + value"
-                class="list-item"
-              >
-                <q-item-section
-                  :data-test="`log-detail-${value}-key`"
-                  class="col-3"
-                  >{{ value }}</q-item-section
-                >
-                <q-item-section
-                  class="col-9"
-                  :class="!shouldWrapValues ? 'ellipsis' : ''"
-                  style="display: inline;relative"
-                >
-                  <q-btn-dropdown
-                    data-test="log-details-include-exclude-field-btn"
-                    size="0.5rem"
-                    outlined
-                    filled
-                    dense
-                    class="q-mr-sm pointer"
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  >
+              <q-item v-for="(key, value) in rowData" :key="'field_' + value" class="list-item">
+                <q-item-section :data-test="`log-detail-${value}-key`" class="col-3">{{ value }}</q-item-section>
+                <q-item-section class="col-9" :class="!shouldWrapValues ? 'ellipsis' : ''"
+                  style="display: inline;relative">
+                  <q-btn-dropdown data-test="log-details-include-exclude-field-btn" size="0.5rem" outlined filled dense
+                    class="q-mr-sm pointer" :name="'img:' + getImageURL('images/common/add_icon.svg')">
                     <q-list>
                       <q-item clickable v-close-popup>
                         <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="
-                              toggleIncludeSearchTerm(`${value}='${key}'`)
-                            "
-                            ><q-icon
-                              title="Add to search query"
-                              :name="
-                                'img:' +
-                                getImageURL('images/common/add_icon.svg')
-                              "
-                              size="1rem"
-                              outlined
-                              filled
-                              dense
-                              class="q-mr-sm pointer"
-                            ></q-icon
-                            >Include Search Term</q-item-label
-                          >
+                          <q-item-label data-test="log-details-include-field-btn" @click="
+                            toggleIncludeSearchTerm(`${value}='${key}'`)
+                            "><q-icon title="Add to search query" :name="'img:' +
+    getImageURL('images/common/add_icon.svg')
+    " size="1rem" outlined filled dense class="q-mr-sm pointer"></q-icon>Include Search
+                            Term</q-item-label>
                         </q-item-section>
                       </q-item>
 
                       <q-item clickable v-close-popup>
                         <q-item-section>
-                          <q-item-label
-                            data-test="log-details-exclude-field-btn"
-                            @click="
-                              toggleExcludeSearchTerm(`${value}!='${key}'`)
-                            "
-                            ><q-icon
-                              title="Add to search query"
-                              :name="
-                                'img:' +
-                                getImageURL('images/common/add_icon.svg')
-                              "
-                              size="1rem"
-                              outlined
-                              filled
-                              dense
-                              class="q-mr-sm pointer"
-                            ></q-icon
-                            >Exclude Search Term</q-item-label
-                          >
+                          <q-item-label data-test="log-details-exclude-field-btn" @click="
+                            toggleExcludeSearchTerm(`${value}!='${key}'`)
+                            "><q-icon title="Add to search query" :name="'img:' +
+    getImageURL('images/common/add_icon.svg')
+    " size="1rem" outlined filled dense class="q-mr-sm pointer"></q-icon>Exclude Search
+                            Term</q-item-label>
                         </q-item-section>
                       </q-item>
                     </q-list>
                   </q-btn-dropdown>
-                  <pre
-                    :data-test="`log-detail-${value}-value`"
-                    class="table-pre"
-                    :style="{
-                      'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
-                    }"
-                    >{{ key }}</pre
-                  >
+                  <pre :data-test="`log-detail-${value}-value`" class="table-pre" :style="{
+                    'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
+                  }">{{ key }}</pre>
                 </q-item-section>
               </q-item>
               <q-item></q-item>
@@ -179,10 +105,7 @@
       </q-tab-panel>
 
       <q-tab-panel name="json" class="q-pa-none">
-        <q-card-section
-          data-test="log-detail-json-content"
-          class="q-pa-none q-mb-lg"
-        >
+        <q-card-section data-test="log-detail-json-content" class="q-pa-none q-mb-lg">
           <div class="indexDetailsContainer">
             <pre class="json-pre">{{ rowData }}</pre>
           </div>
@@ -194,53 +117,24 @@
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col-2">
-          <q-btn
-            class="text-bold"
-            text-color="light-text"
-            no-caps
-            :disabled="currentIndex <= 0"
-            outline
-            @click="$emit('showPrevDetail', false, true)"
-            icon="navigate_before"
-            label="Previous"
-          />
+          <q-btn class="text-bold" text-color="light-text" no-caps :disabled="currentIndex <= 0" outline
+            @click="$emit('showPrevDetail', false, true)" icon="navigate_before" label="Previous" />
         </div>
         <div class="col-8 row justify-center align-center q-gutter-sm">
           <div style="line-height: 40px; font-weight: bold">No of Records:</div>
           <div class="" style="minwidth: 150px">
-            <q-select
-              v-model="selectedRelativeValue"
-              :options="recordSizeOptions"
-              dense
-              filled
-            ></q-select>
+            <q-select v-model="selectedRelativeValue" :options="recordSizeOptions" dense filled></q-select>
           </div>
           <div class="">
-            <q-btn
-              data-test="logs-detail-table-search-around-btn"
-              class="text-bold"
-              text-color="light-text"
-              no-caps
-              :disabled="currentIndex >= totalLength - 1"
-              outline
-              label="Search Around"
-              @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-              padding="sm md"
-            />
+            <q-btn data-test="logs-detail-table-search-around-btn" class="text-bold" text-color="light-text" no-caps
+              :disabled="currentIndex >= totalLength - 1" outline label="Search Around"
+              @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))" padding="sm md" />
           </div>
         </div>
         <div class="col-2 items-end">
-          <q-btn
-            data-test="log-detail-next-detail-btn"
-            class="text-bold"
-            text-color="light-text"
-            no-caps
-            :disabled="currentIndex >= totalLength - 1"
-            outline
-            @click="$emit('showNextDetail', true, false)"
-            icon-right="navigate_next"
-            label="Next"
-          />
+          <q-btn data-test="log-detail-next-detail-btn" class="text-bold" text-color="light-text" no-caps
+            :disabled="currentIndex >= totalLength - 1" outline @click="$emit('showNextDetail', true, false)"
+            icon-right="navigate_next" label="Next" />
         </div>
       </div>
     </q-card-section>

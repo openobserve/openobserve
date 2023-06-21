@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+            icon="cancel"
           />
         </div>
       </div>
@@ -73,11 +73,10 @@
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('dashboard.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
           />
           <q-btn

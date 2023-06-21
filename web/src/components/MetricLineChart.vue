@@ -106,7 +106,7 @@ export default defineComponent({
       autosize: true,
       height: 400,
       legend: {
-        bgcolor: "white",
+        // bgcolor: "white",
       },
       margin: {
         l: 32,

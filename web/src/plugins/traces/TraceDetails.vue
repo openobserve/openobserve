@@ -37,13 +37,7 @@
           </div>
           <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <q-btn
-          v-close-popup
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          size="md"
-        />
+        <q-btn v-close-popup round flat icon="cancel" size="md" />
       </div>
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
@@ -52,10 +46,7 @@
             activeVisual === "timeline" ? "Trace Timeline" : "Trace Service Map"
           }}
         </div>
-        <div
-          class="rounded-borders"
-          style="border: 1px solid #cacaca; padding: 2px"
-        >
+        <div class="rounded-borders" style="border: 1px solid #cacaca; padding: 2px">
           <template v-for="visual in traceVisuals" :key="visual.value">
             <q-btn
               :icon="'img:' + getImageURL(`images/common/${visual.icon}.svg`)"

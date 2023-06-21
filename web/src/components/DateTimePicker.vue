@@ -399,7 +399,7 @@ export default defineComponent({
   height: 32px;
   width: 32px;
   // border: $secondary;
-  background: $input-bg;
+  background: rgba(0,0,0,0.07);
 }
 
 .rp-selector-selected {

@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+            icon="close"
           />
         </div>
       </div>

@@ -40,7 +40,7 @@
               v-if="props.row.actions == 'true'"
               :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
               :title="t('dashboard.duplicate')"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -52,7 +52,7 @@
             v-if="props.row.actions == 'true'"
             :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
             :title="t('dashboard.delete')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
