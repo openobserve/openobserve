@@ -32,7 +32,7 @@
       </div>
     </div>
     <pre ref="gcpContent" data-test="vector-content-text">
-URL: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/default/_json?API-Key={{
+URL: {{ endpoint.url }}/gcp/{{ currOrgIdentifier }}/default/_sub?API-Key={{
         accessKey
       }}
   </pre

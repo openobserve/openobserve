@@ -230,3 +230,39 @@ pub enum AWSRecordType {
     JSON,
     Cloudwatch,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GCPIngestionRequest {
+    pub message: GCPMessage,
+    pub subscription: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GCPMessage {
+    pub attributes: GCPAttributes,
+    pub data: String,
+    pub message_id: String,
+    #[serde(rename = "message_id")]
+    pub message_id_dup: String,
+    pub publish_time: String,
+    #[serde(rename = "publish_time")]
+    pub publish_time_dup: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GCPAttributes {
+    #[serde(rename = "logging.googleapis.com/timestamp")]
+    pub logging_googleapis_com_timestamp: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GCPIngestionResponse {
+    pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    pub timestamp: String,
+}
