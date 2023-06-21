@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use arrow_schema::Field;
 use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
@@ -152,6 +153,13 @@ pub struct StreamParams<'a> {
     pub org_id: &'a str,
     pub stream_name: &'a str,
     pub stream_type: StreamType,
+}
+
+pub struct SchemaEvolution {
+    pub schema_compatible: bool,
+    pub types_delta: Option<Vec<Field>>,
+    pub schema_fields: Vec<Field>,
+    pub is_schema_changed: bool,
 }
 
 #[cfg(test)]
