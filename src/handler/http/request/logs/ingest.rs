@@ -183,7 +183,7 @@ pub async fn handle_gcp_request(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), thread_id)
+        match logs::gcs_pub_sub::process(&org_id, &stream_name, post_data.into_inner(), **thread_id)
             .await
         {
             Ok(v) => {

@@ -1,26 +1,19 @@
-use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
-use std::io::prelude::*;
-use std::time::Instant;
+use std::io::Read;
 
-use crate::common::flatten;
-use crate::common::json;
-use crate::common::time::parse_timestamp_micro_from_value;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-use crate::meta::alert::{Alert, Trigger};
-use crate::meta::ingestion::AWSRecordType;
-use crate::meta::ingestion::GCPIngestionRequest;
-use crate::meta::ingestion::GCPIngestionResponse;
-use crate::meta::ingestion::RecordStatus;
-use crate::meta::ingestion::StreamStatus;
-use crate::meta::StreamType;
-use crate::service::db;
-use crate::service::ingestion::write_file;
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::{
+    alert::{Alert, Trigger},
+    ingestion::{
+        AWSRecordType, GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus,
+    },
+    StreamType,
+};
+use crate::service::{db, ingestion::write_file};
 
 use super::StreamMeta;
 
@@ -28,9 +21,9 @@ pub async fn process(
     org_id: &str,
     in_stream_name: &str,
     request: GCPIngestionRequest,
-    thread_id: web::Data<usize>,
+    thread_id: usize,
 ) -> Result<GCPIngestionResponse, anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
 
     let stream_name = &crate::service::ingestion::format_stream_name(in_stream_name);
 

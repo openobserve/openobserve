@@ -163,7 +163,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 .await;
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_hour_key(timestamp, partition_keys, record);
+        let hour_key = get_hour_key(timestamp, partition_keys, record, None);
         let hour_buf = stream_buf.entry(hour_key).or_default();
         hour_buf.push(record_str);
 
