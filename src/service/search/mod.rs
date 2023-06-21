@@ -68,7 +68,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     let (mut time_min, mut time_max) = sql.meta.time_range.unwrap();
     if time_min == 0 {
         // get created_at from schema
-        let schema = db::schema::get(&sql.org_id, &sql.stream_name, Some(stream_type))
+        let schema = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
             .await
             .unwrap_or_else(|_| Schema::empty());
         if schema != Schema::empty() {

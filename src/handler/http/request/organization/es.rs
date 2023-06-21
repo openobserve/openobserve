@@ -71,7 +71,7 @@ async fn org_index_template(path: web::Path<(String, String)>) -> Result<HttpRes
 #[put("/{org_id}/_index_template/{name}")]
 async fn org_index_template_create(
     path: web::Path<(String, String)>,
-    _body: actix_web::web::Bytes,
+    _body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
     let es_info = r#"{"name":"logs","message":"ok"}"#;
@@ -96,7 +96,7 @@ async fn org_data_stream(path: web::Path<(String, String)>) -> Result<HttpRespon
 #[put("/{org_id}/_data_stream/{name}")]
 async fn org_data_stream_create(
     path: web::Path<(String, String)>,
-    _body: actix_web::web::Bytes,
+    _body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, name) = path.into_inner();
     let es_info = r#"{"name":"logs","message":"ok"}"#;

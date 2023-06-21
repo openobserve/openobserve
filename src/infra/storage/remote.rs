@@ -19,7 +19,7 @@ use object_store::{
     limit::LimitStore, path::Path, Error, GetResult, ListResult, MultipartId, ObjectMeta,
     ObjectStore, Result,
 };
-use std::{ops::Range, time::Instant};
+use std::ops::Range;
 use tokio::io::AsyncWrite;
 
 use super::{format_key, CONCURRENT_REQUESTS};
@@ -52,7 +52,7 @@ impl std::fmt::Display for Remote {
 #[async_trait]
 impl ObjectStore for Remote {
     async fn put(&self, location: &Path, bytes: Bytes) -> Result<()> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
         match self.client.put(&(format_key(&file).into()), bytes).await {
@@ -91,7 +91,7 @@ impl ObjectStore for Remote {
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let file = location.to_string();
         let result = self.client.get(&(format_key(&file).into())).await?;
 
@@ -116,7 +116,7 @@ impl ObjectStore for Remote {
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
             .client

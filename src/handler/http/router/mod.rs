@@ -26,6 +26,7 @@ use super::request::dashboards::*;
 use super::request::functions;
 use super::request::kv;
 use super::request::logs;
+use super::request::metrics;
 use super::request::organization;
 use super::request::prom;
 use super::request::search;
@@ -127,6 +128,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::bulk)
             .service(logs::ingest::multi)
             .service(logs::ingest::json)
+            .service(metrics::ingest::json)
             .service(search::search)
             .service(search::around)
             .service(search::values)

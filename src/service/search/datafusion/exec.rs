@@ -39,7 +39,7 @@ use datafusion::{
 };
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use super::storage::{file_list, StorageType};
 #[cfg(feature = "zo_functions")]
@@ -416,7 +416,7 @@ pub async fn merge(
         return Ok(batches.to_owned());
     }
 
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     // write temp file
     let (schema, work_dir) = merge_write_recordbatch(batches)?;
     log::info!(
@@ -737,7 +737,7 @@ pub async fn convert_parquet_file(
     schema: Arc<Schema>,
     rules: HashMap<String, DataType>,
 ) -> Result<()> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     // query data
     let ctx = prepare_datafusion_context()?;
 
@@ -821,7 +821,7 @@ pub async fn merge_parquet_files(
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
 ) -> Result<FileMeta> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     // query data
     let runtime_env = create_runtime_env()?;
     let session_config = SessionConfig::new()

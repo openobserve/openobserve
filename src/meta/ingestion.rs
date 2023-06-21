@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 use crate::common::json;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {
     pub successful: u32,
     pub failed: u32,
@@ -31,11 +31,20 @@ pub struct BulkStreamData {
     pub data: HashMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct StreamStatus {
     pub name: String,
     #[serde(flatten)]
     pub status: RecordStatus,
+}
+
+impl StreamStatus {
+    pub fn new(name: &str) -> Self {
+        StreamStatus {
+            name: name.to_string(),
+            status: RecordStatus::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

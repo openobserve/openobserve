@@ -94,7 +94,7 @@ pub(crate) async fn create_context(
 
     // fetch all schema versions, get latest schema
     let stream_type = StreamType::Metrics;
-    let schema = match db::schema::get(org_id, stream_name, Some(stream_type)).await {
+    let schema = match db::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
             log::error!("get schema error: {}", err);

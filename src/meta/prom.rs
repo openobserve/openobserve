@@ -73,6 +73,21 @@ impl From<proto::metric_metadata::MetricType> for MetricType {
     }
 }
 
+impl From<&str> for MetricType {
+    fn from(mt: &str) -> Self {
+        match mt.to_lowercase().as_str() {
+            "counter" => Self::Counter,
+            "gauge" => Self::Gauge,
+            "histogram" => Self::Histogram,
+            "gaugehistogram" => Self::GaugeHistogram,
+            "summary" => Self::Summary,
+            "info" => Self::Info,
+            "stateset" => Self::StateSet,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub metric_type: MetricType,

@@ -16,10 +16,7 @@ use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
-use std::{
-    io::{BufRead, BufReader},
-    time::Instant,
-};
+use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
@@ -42,10 +39,10 @@ pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
 pub async fn ingest(
     org_id: &str,
-    body: actix_web::web::Bytes,
-    thread_id: web::Data<usize>,
+    body: web::Bytes,
+    thread_id: usize,
 ) -> Result<BulkResponse, anyhow::Error> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
@@ -280,14 +277,12 @@ pub async fn ingest(
     for (stream_name, stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None) {
-            return Err(anyhow::anyhow!(format!(
-                "stream [{stream_name}] is being deleted"
-            )));
+            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
         }
         // write to file
         write_file(
             stream_data.data,
-            thread_id.clone(),
+            thread_id,
             org_id,
             &stream_name,
             StreamType::Logs,

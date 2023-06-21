@@ -39,11 +39,11 @@ use crate::service::logs;
 #[post("/{org_id}/_bulk")]
 pub async fn bulk(
     org_id: web::Path<String>,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    Ok(match logs::bulk::ingest(&org_id, body, thread_id).await {
+    Ok(match logs::bulk::ingest(&org_id, body, **thread_id).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
@@ -73,12 +73,12 @@ pub async fn bulk(
 #[post("/{org_id}/{stream_name}/_multi")]
 pub async fn multi(
     path: web::Path<(String, String)>,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::multi::ingest(&org_id, &stream_name, body, thread_id).await {
+        match logs::multi::ingest(&org_id, &stream_name, body, **thread_id).await {
             Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -109,12 +109,12 @@ pub async fn multi(
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
     path: web::Path<(String, String)>,
-    body: actix_web::web::Bytes,
+    body: web::Bytes,
     thread_id: web::Data<usize>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     Ok(
-        match logs::json::ingest(&org_id, &stream_name, body, thread_id).await {
+        match logs::json::ingest(&org_id, &stream_name, body, **thread_id).await {
             Ok(v) => HttpResponse::Ok().json(v),
             Err(e) => HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -154,7 +154,7 @@ pub async fn handle_kinesis_request(
             &org_id,
             &stream_name,
             post_data.into_inner(),
-            thread_id,
+            **thread_id,
         )
         .await
         {

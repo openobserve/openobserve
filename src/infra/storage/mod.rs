@@ -16,7 +16,6 @@ use chrono::{TimeZone, Utc};
 use futures::{StreamExt, TryStreamExt};
 use object_store::ObjectStore;
 use once_cell::sync::Lazy;
-use std::time::Instant;
 
 use super::{config::CONFIG, metrics};
 use crate::common::utils::is_local_disk_storage;
@@ -67,7 +66,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let start_time = Instant::now();
+    let start = std::time::Instant::now();
     let columns = files[0].split('/').collect::<Vec<&str>>();
     let files = files
         .iter()
@@ -88,7 +87,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
         .await;
 
     if columns[0] == "files" {
-        let time = start_time.elapsed().as_secs_f64();
+        let time = start.elapsed().as_secs_f64();
         metrics::STORAGE_TIME
             .with_label_values(&[columns[1], columns[3], columns[2], "del"])
             .inc_by(time);
