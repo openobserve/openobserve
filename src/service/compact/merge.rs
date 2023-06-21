@@ -140,12 +140,11 @@ pub async fn merge_by_stream(
     let files = file_list::get_file_list(
         org_id,
         stream_name,
-        Some(stream_type),
+        stream_type,
         offset_time_hour,
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
-    )
-    .await?;
+    )?;
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new offset

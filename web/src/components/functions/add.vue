@@ -400,6 +400,7 @@ end`;
           callTransform = jsTransformService.create_with_index(
             this.store.state.selectedOrganization.identifier,
             this.formData.stream_name,
+            this.formData.stream_type,
             this.formData
           );
         } else {

@@ -128,12 +128,10 @@ async fn get_file_list(
     let results = match file_list::get_file_list(
         org_id,
         stream_name,
-        Some(StreamType::Metrics),
+        StreamType::Metrics,
         time_min,
         time_max,
-    )
-    .await
-    {
+    ) {
         Ok(results) => results,
         Err(err) => {
             log::error!("get file list error: {}", err);
@@ -156,9 +154,7 @@ async fn get_file_list(
             &file,
             false,
             false,
-        )
-        .await
-        {
+        ) {
             files.push(file.clone());
         }
     }

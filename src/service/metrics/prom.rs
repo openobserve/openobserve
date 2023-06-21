@@ -148,10 +148,7 @@ pub async fn remote_write(
                 value: sample_val,
             };
 
-            let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp).unwrap_or_default();
-            if timestamp == 0 {
-                timestamp = Utc::now().timestamp_micros();
-            }
+            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             if timestamp < min_ts {
                 min_ts = timestamp;
             }

@@ -65,14 +65,22 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 return Err(anyhow::anyhow!("invalid __type__, need to be string"));
             }
         };
-        let timestamp: i64 = match record
-            .get(&CONFIG.common.column_timestamp)
-            .ok_or(anyhow!("missing _timestamp"))?
-        {
-            json::Value::Number(s) => {
-                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)?
+
+        // apply functions
+        #[cfg(feature = "zo_functions")]
+        let mut record = json::Value::Object(record.to_owned());
+        #[cfg(feature = "zo_functions")]
+        apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
+        #[cfg(feature = "zo_functions")]
+        let record = record.as_object_mut().unwrap();
+
+        // check timestamp & value
+        let timestamp: i64 = match record.get(&CONFIG.common.column_timestamp) {
+            None => chrono::Utc::now().timestamp_micros(),
+            Some(json::Value::Number(s)) => {
+                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
             }
-            _ => {
+            Some(_) => {
                 return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
             }
         };
@@ -82,7 +90,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 return Err(anyhow::anyhow!("invalid value, need to be number"));
             }
         };
-
         // reset time & value
         record.insert(
             CONFIG.common.column_timestamp.clone(),
@@ -100,14 +107,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
         );
         record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
-
-        // apply functions
-        #[cfg(feature = "zo_functions")]
-        let mut record = json::Value::Object(record.to_owned());
-        #[cfg(feature = "zo_functions")]
-        apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
-        #[cfg(feature = "zo_functions")]
-        let record = record.as_object_mut().unwrap();
 
         // convert every label to string
         for (k, v) in record.iter_mut() {
@@ -136,7 +135,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 let metadata = Metadata {
                     metric_family_name: stream_name.clone(),
                     metric_type: metrics_type.as_str().into(),
-                    help: stream_name.clone(),
+                    help: stream_name.clone().replace('_', " "),
                     unit: "".to_string(),
                 };
                 let mut extra_metadata: HashMap<String, String> = HashMap::new();

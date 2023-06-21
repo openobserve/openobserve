@@ -145,14 +145,7 @@ pub async fn process(
                         value = local_val.clone().into();
                         // handling of timestamp
                         timestamp = match event.timestamp {
-                            Some(v) => match parse_i64_to_timestamp_micros(v) {
-                                Ok(t) => t,
-                                Err(e) => {
-                                    stream_status.status.failed += 1;
-                                    stream_status.status.error = e.to_string();
-                                    continue;
-                                }
-                            },
+                            Some(v) => parse_i64_to_timestamp_micros(v),
                             None => Utc::now().timestamp_micros(),
                         };
                     }

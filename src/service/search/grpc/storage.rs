@@ -218,12 +218,10 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
     let results = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
-        Some(stream_type),
+        stream_type,
         time_min,
         time_max,
-    )
-    .await
-    {
+    ) {
         Ok(results) => results,
         Err(err) => {
             log::error!("get file list error: {}", err);

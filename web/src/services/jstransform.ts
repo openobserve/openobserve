@@ -33,49 +33,53 @@ const jstransform = {
   update: (org_identifier: string, data: any) => {
     return http().put(`/api/${org_identifier}/functions/${data.name}`, data);
   },
+  delete: (org_identifier: string, transform_name: string) => {
+    return http().delete(`/api/${org_identifier}/functions/${transform_name}`);
+  },
   create_with_index: (
     org_identifier: string,
     stream_name: string,
+    stream_type: string,
     data: any
   ) => {
     return http().post(
-      `/api/${org_identifier}/${stream_name}/functions/${data.name}?type=${data.stream_type}`,
+      `/api/${org_identifier}/${stream_name}/functions/${data.name}?type=${stream_type}`,
       data
     );
-  },
-  delete: (org_identifier: string, transform_name: string) => {
-    return http().delete(`/api/${org_identifier}/functions/${transform_name}`);
   },
   delete_stream_function: (
     org_identifier: string,
     stream_name: string,
+    stream_type: string,
     transform_name: string
   ) => {
     return http().delete(
-      `/api/${org_identifier}/${stream_name}/functions/${transform_name}`
+      `/api/${org_identifier}/${stream_name}/functions/${transform_name}?type=${stream_type}`
     );
   },
-  stream_function: (org_identifier: string, stream_name: string) => {
-    return http().get(`/api/${org_identifier}/${stream_name}/functions`);
+  stream_function: (org_identifier: string, stream_name: string, stream_type: string) => {
+    return http().get(`/api/${org_identifier}/${stream_name}/functions?type=${stream_type}`);
   },
   apply_stream_function: (
     org_identifier: string,
     stream_name: string,
+    stream_type: string,
     function_name: string,
     data: any
   ) => {
     return http().post(
-      `/api/${org_identifier}/${stream_name}/functions/${function_name}`,
+      `/api/${org_identifier}/${stream_name}/functions/${function_name}?type=${stream_type}`,
       data
     );
   },
   remove_stream_function: (
     org_identifier: string,
     stream_name: string,
+    stream_type: string,
     function_name: string
   ) => {
     return http().delete(
-      `/api/${org_identifier}/${stream_name}/functions/${function_name}`
+      `/api/${org_identifier}/${stream_name}/functions/${function_name}?type=${stream_type}`,
     );
   },
   create_enrichment_table: (
