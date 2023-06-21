@@ -688,7 +688,29 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value) => {
+      const { metricName, labels } = parsePromQlQuery(value);
+      console.log(metricName, labels);
       dashboardPanelData.data.query = value;
+    };
+
+    const parsePromQlQuery = (query) => {
+      // Extract metric name
+      const metricNameMatch = query.match(/(\w+)\{/);
+      const metricName = metricNameMatch ? metricNameMatch[1] : null;
+
+      // Extract labels
+      const labelsMatch = query.match(/\{(.+?)\}/);
+      const labels = {};
+      if (labelsMatch) {
+        const labelsStr = labelsMatch[1];
+        const labelPairs = labelsStr.match(/(\w+)="([^"]*)"/g);
+        labelPairs.forEach((pair) => {
+          const [key, value] = pair.match(/(\w+)="([^"]*)"/).slice(1);
+          labels[key] = value;
+        });
+      }
+
+      return { metricName, labels };
     };
 
     const addToDashboard = () => {
