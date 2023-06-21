@@ -17,6 +17,7 @@ use arrow_schema::{DataType, Field};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
+use crate::common::hasher::get_fields_key_xxh3;
 use crate::common::json::{Map, Value};
 use crate::infra::config::CONFIG;
 use crate::meta::alert::{Alert, Evaluate, Trigger};
@@ -215,13 +216,10 @@ async fn add_valid_record(
         .unwrap()
         .as_i64()
         .unwrap();
-    // get hour key
-    let hour_key = super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val);
-    let hour_buf = buf.entry(hour_key.clone()).or_default();
 
     let mut value_str = common::json::to_string(&local_val).unwrap();
     // check schema
-    let (schema_conformance, delta_data_type_fields) = check_for_schema(
+    let schema_evolution = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -231,14 +229,27 @@ async fn add_valid_record(
     )
     .await;
 
-    if schema_conformance {
-        let valid_record = if delta_data_type_fields.is_some() {
-            let delta = delta_data_type_fields.unwrap();
+    // get hour key
+    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+    let hour_key = super::ingestion::get_hour_key(
+        timestamp,
+        stream_meta.partition_keys,
+        local_val,
+        Some(&schema_key),
+    );
+    let hour_buf = buf.entry(hour_key).or_default();
+
+    if schema_evolution.schema_compatible {
+        let valid_record = if schema_evolution.types_delta.is_some() {
+            let delta = schema_evolution.types_delta.unwrap();
+            println!("delta: {:?}", delta);
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
-            } else {
+            } else if schema_evolution.is_schema_changed {
                 (Some(value_str.clone()), None)
+            } else {
+                cast_to_type(loc_value, delta)
             };
             if ret_val.is_some() {
                 value_str = ret_val.unwrap();

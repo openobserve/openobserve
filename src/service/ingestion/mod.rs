@@ -169,12 +169,17 @@ pub fn get_hour_key(
     timestamp: i64,
     partition_keys: Vec<String>,
     local_val: &Map<String, Value>,
+    suffix: Option<&str>,
 ) -> String {
     // get hour file name
+
     let mut hour_key = Utc
         .timestamp_nanos(timestamp * 1000)
         .format("%Y_%m_%d_%H")
         .to_string();
+    if let Some(s) = suffix {
+        hour_key.push_str(&format!("_{s}"));
+    }
 
     for key in &partition_keys {
         match local_val.get(key) {
@@ -384,7 +389,8 @@ mod tests {
             get_hour_key(
                 1620000000,
                 vec!["country".to_string(), "sport".to_string()],
-                &local_val
+                &local_val,
+                None
             ),
             "1970_01_01_00_country=USA_sport=basketball"
         );
@@ -396,14 +402,14 @@ mod tests {
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(1620000000, vec![], &local_val),
+            get_hour_key(1620000000, vec![], &local_val, None),
             "1970_01_01_00"
         );
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_hour_key(1620000000, vec![], &Map::new()),
+            get_hour_key(1620000000, vec![], &Map::new(), None),
             "1970_01_01_00"
         );
     }

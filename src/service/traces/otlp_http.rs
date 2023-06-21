@@ -291,6 +291,7 @@ pub async fn traces_json(
                                 timestamp.try_into().unwrap(),
                                 partition_keys.clone(),
                                 value.as_object().unwrap(),
+                                None,
                             );
 
                             if !stream_alerts_map.is_empty() {

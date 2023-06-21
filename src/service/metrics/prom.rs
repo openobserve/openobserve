@@ -262,6 +262,7 @@ pub async fn remote_write(
                 timestamp,
                 partition_keys.clone(),
                 value.as_object().unwrap(),
+                None,
             );
             let hour_buf = buf.entry(hour_key.clone()).or_default();
             hour_buf.push(value_str);
