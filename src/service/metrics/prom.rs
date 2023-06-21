@@ -642,6 +642,7 @@ pub(crate) async fn get_label_values(
         }
     };
     label_values.sort();
+    label_values.dedup();
     Ok(label_values)
 }
 

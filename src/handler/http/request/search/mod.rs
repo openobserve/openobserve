@@ -538,7 +538,7 @@ pub async fn values(
         req.aggs.insert(
                 field.clone(),
                 format!(
-                    "SELECT {field} AS key, COUNT(*) AS num FROM query GROUP BY key ORDER BY num DESC LIMIT {size}"
+                    "SELECT {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM query GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"
                 ),
             );
     }

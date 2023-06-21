@@ -936,7 +936,7 @@ mod tests {
                 true, 0, (1679202494333000, 1679203394333000),
             ),
             (
-                "select histogram(_timestamp, '5 second') AS key, count(*) AS num from table1 GROUP BY key ORDER BY key",
+                "select histogram(_timestamp, '5 second') AS zo_sql_key, count(*) AS zo_sql_num from table1 GROUP BY zo_sql_key ORDER BY zo_sql_key",
                 true, 0, (0,0),
             ),
             (
