@@ -216,13 +216,10 @@ async fn add_valid_record(
         .unwrap()
         .as_i64()
         .unwrap();
-    // get hour key
-    let hour_key = super::ingestion::get_hour_key(timestamp, stream_meta.partition_keys, local_val);
-    let mut hour_buf = buf.entry(hour_key.clone()).or_default();
 
     let mut value_str = common::json::to_string(&local_val).unwrap();
     // check schema
-    let (schema_conformance, delta_data_type_fields) = check_for_schema(
+    let (schema_conformance, delta_data_type_fields, fields) = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -232,14 +229,23 @@ async fn add_valid_record(
     )
     .await;
 
+    // get hour key
+    let schema_key = get_fields_key_xxh3(&fields);
+    let hour_key = super::ingestion::get_hour_key(
+        timestamp,
+        stream_meta.partition_keys,
+        local_val,
+        Some(&schema_key),
+    );
+    let hour_buf = buf.entry(hour_key.clone()).or_default();
+
     if schema_conformance {
         let valid_record = if delta_data_type_fields.is_some() {
             let delta = delta_data_type_fields.unwrap();
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
-            let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
+            let (ret_val, error) = if !delta.is_empty() {
                 cast_to_type(loc_value, delta)
             } else {
-                let data_type_change_key = get_fields_key_xxh3(&delta);
                 (Some(value_str.clone()), None)
             };
             if ret_val.is_some() {

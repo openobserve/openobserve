@@ -226,7 +226,7 @@ pub async fn check_for_schema(
     val_str: &str,
     stream_schema_map: &mut AHashMap<String, Schema>,
     record_ts: i64,
-) -> (bool, Option<Vec<Field>>) {
+) -> (bool, Option<Vec<Field>>, Vec<Field>) {
     let mut schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
@@ -248,7 +248,7 @@ pub async fn check_for_schema(
             let settings: json::Value = json::from_slice(stream_settings.as_bytes()).unwrap();
             if let Some(val) = settings.get("skip_schema_validation") {
                 if val.as_bool().unwrap_or(skip_validation) {
-                    return (true, None);
+                    return (true, None, schema.fields().to_vec());
                 }
             }
         }
@@ -257,11 +257,11 @@ pub async fn check_for_schema(
     let mut schema_reader = BufReader::new(val_str.as_bytes());
     let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
     if schema.fields.eq(&inferred_schema.fields) {
-        return (true, None);
+        return (true, None, schema.fields().to_vec());
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
-        return (false, None);
+        return (false, None, inferred_schema.fields().to_vec());
     }
 
     if schema == Schema::empty() {
@@ -309,7 +309,7 @@ pub async fn check_for_schema(
                     stream_name
                 );
 
-                return (true, None);
+                return (true, None, final_schema.fields().to_vec());
             } else {
                 schema = chk_schema;
                 lock.unlock().await.map_err(server_internal_error).unwrap();
@@ -329,7 +329,7 @@ pub async fn check_for_schema(
             )
             .await
             .unwrap();
-            return (true, None);
+            return (true, None, final_schema.fields().to_vec());
         }
     }
 
@@ -353,11 +353,11 @@ pub async fn check_for_schema(
         }
     }
     if !CONFIG.common.widening_schema_evolution {
-        return (true, Some(field_datatype_delta));
+        return (true, Some(field_datatype_delta), schema.fields().to_vec());
     }
     if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
         match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
-            Err(ref _e) => (false, Some(field_datatype_delta)), //return (false, None),
+            Err(ref _e) => (true, Some(field_datatype_delta), schema.fields().to_vec()), //return (false, None),
             Ok(merged) => {
                 log::info!("Schema widening for stream {:?} ", stream_name);
                 if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
@@ -369,23 +369,32 @@ pub async fn check_for_schema(
                             chrono::Utc::now().timestamp_micros().to_string(),
                         );
                     }
+                    let final_schema =
+                        Schema::new(merged.fields().to_vec()).with_metadata(metadata);
                     db::schema::set(
                         org_id,
                         stream_name,
                         stream_type,
-                        &Schema::new(merged.fields().to_vec()).with_metadata(metadata),
+                        &final_schema,
                         Some(record_ts),
                         is_field_delta,
                     )
                     .await
                     .unwrap();
+                    stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+                    (
+                        true,
+                        Some(field_datatype_delta),
+                        final_schema.fields().to_vec(),
+                    )
+                } else {
+                    stream_schema_map.insert(stream_name.to_string(), merged.clone());
+                    (true, Some(field_datatype_delta), merged.fields().to_vec())
                 }
-                stream_schema_map.insert(stream_name.to_string(), merged);
-                (true, Some(field_datatype_delta))
             }
         }
     } else {
-        (true, None)
+        (true, None, schema.fields().to_vec())
     }
 }
 
