@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="column index-menu">
+  <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
     <div>
       <q-select
         data-test="log-search-index-list-select-stream"
@@ -656,6 +656,32 @@ export default defineComponent({
     &:hover {
       .field-container {
         // background-color: #ffffff;
+    }
+  }
+}
+}
+
+.theme-dark {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+
+      .field_overlay {
+        background-color: #202224;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.theme-light {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+      .field_overlay {
+        background-color: white;
+        opacity: 1;
       }
     }
   }
