@@ -243,7 +243,6 @@ async fn add_valid_record(
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
             let delta = schema_evolution.types_delta.unwrap();
-            println!("delta: {:?}", delta);
             let loc_value: Value = common::json::from_slice(value_str.as_bytes()).unwrap();
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
