@@ -15,7 +15,7 @@
 
 <template>
   <div
-    class="flex justify-start items-center q-px-sm bg-grey-11"
+    class="flex justify-start items-center q-px-sm border border-bottom"
     :style="{ height: '30px' }"
   >
     <div :style="{ width: 'calc(100% - 22px)' }" class="q-pb-none ellipsis">

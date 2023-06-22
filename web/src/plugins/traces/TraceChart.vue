@@ -20,8 +20,8 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 import { cloneDeep } from "lodash-es";
-
-import { defineComponent, onMounted, onUpdated, ref } from "vue";
+import { useStore } from "vuex";
+import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
 
 export default defineComponent({
   name: "TraceChart",
@@ -45,10 +45,22 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const store = useStore();
     const plotref: any = ref(null);
     const zoomFlag: any = ref(false);
     let traces: any = [{}];
 
+    const getThemeLayoutOptions = () => ({
+      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      font: {
+        color: store.state.theme === 'dark' ? '#fff' : '#333'
+      }
+    })
+    watch(() => store.state.theme, () => {
+      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
+    })
+    
     let layout: any = {
       width: "100%",
       scrollZoom: true,
@@ -130,6 +142,7 @@ export default defineComponent({
       ],
       hovermode: "closest",
       showlegend: true,
+      ...getThemeLayoutOptions(),
     };
 
     onMounted(async () => {

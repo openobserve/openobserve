@@ -52,7 +52,7 @@
             />
           </div>
           <div
-            class="text-blue-grey-6 ellipsis q-ml-xs"
+            class=" ellipsis q-ml-xs"
             :style="{
               paddingLeft: '4px',
               borderLeft: `3px solid ${span.style.color}`,

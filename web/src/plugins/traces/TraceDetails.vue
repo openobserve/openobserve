@@ -18,7 +18,7 @@
     class="trace-details"
     :style="{
       width: '97vw !important',
-      background: '#ffffff',
+      background: '#565656',
     }"
   >
     <div

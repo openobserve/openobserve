@@ -16,10 +16,10 @@
 <template>
   <div
     :style="{ height: '30px', border: '1px solid #ececec' }"
-    class="flex justify-start items-center bg-grey-11"
+    class="flex justify-start items-center "
   >
     <div
-      class="flex justify-start items-center no-wrap row q-px-sm bg-grey-11"
+      class="flex justify-start items-center no-wrap row q-px-sm "
       :style="{
         width: splitterWidth + '%',
       }"
@@ -27,7 +27,7 @@
       Operation Name
     </div>
     <div
-      class="flex justify-start items-center no-wrap row bg-grey-11 relative-position"
+      class="flex justify-start items-center no-wrap row  relative-position"
       :style="{
         width: 100 - splitterWidth + '%',
       }"
