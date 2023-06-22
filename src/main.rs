@@ -153,6 +153,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(router::config)
                     .service(router::api)
                     .service(router::aws)
+                    .service(router::gcp)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
@@ -160,6 +161,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .service(router::config)
                         .service(router::api)
                         .service(router::aws)
+                        .service(router::gcp)
                         .configure(get_basic_routes),
                 )
             }
