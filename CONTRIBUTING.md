@@ -80,7 +80,7 @@ There are 2 areas of development.
 ### Server
 
 ```shell
-ZO_ROOT_USER_EMAIL=root@example.com ZO_ROOT_USER_PASSWORD=Complexpass#123 cargo run
+ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" cargo run
 ```
 
 This will start the openobserve API server on port 5080

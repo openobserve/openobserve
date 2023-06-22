@@ -173,8 +173,8 @@ use crate::meta;
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
     ),
     info(
-        description = "OpenObserve API documents [https://docs.zinc.dev/](https://docs.zinc.dev/)",
-        contact(name = "OpenObserve", email = "hello@zinclabs.io", url = "https://zinc.dev/"),
+        description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
+        contact(name = "OpenObserve", email = "hello@zinclabs.io", url = "https://openobserve.ai/"),
     ),
 )]
 pub struct ApiDoc;
