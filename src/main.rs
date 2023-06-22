@@ -49,7 +49,7 @@ use openobserve::{
     },
     infra::{
         cluster,
-        config::{self, CONFIG},
+        config::{CONFIG, USERS, VERSION},
         metrics, wal,
     },
     job, meta,
@@ -101,7 +101,7 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         env_logger::init_from_env(env_logger::Env::new().default_filter_or(&CONFIG.log.level));
     }
-    log::info!("Starting OpenObserve {}", config::VERSION);
+    log::info!("Starting OpenObserve {}", VERSION);
 
     // init jobs
     // it must be initialized before the server starts
@@ -153,6 +153,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .service(router::config)
                     .service(router::api)
                     .service(router::aws)
+                    .service(router::gcp)
                     .configure(get_basic_routes)
             } else {
                 App::new().wrap(prometheus.clone()).service(
@@ -160,6 +161,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .service(router::config)
                         .service(router::api)
                         .service(router::aws)
+                        .service(router::gcp)
                         .configure(get_basic_routes),
                 )
             }
@@ -258,8 +260,8 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_headers(headers),
         )
         .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("instance_name", CONFIG.common.instance_name.as_str()),
-            KeyValue::new("deployment_type", "k8s"),
+            KeyValue::new("service.name", CONFIG.common.instance_name.as_str()),
+            KeyValue::new("service.version", VERSION),
         ])))
         .install_batch(opentelemetry::runtime::Tokio)?;
 
@@ -345,7 +347,7 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 "user" => {
                     db::user::cache().await?;
                     let mut id = 0;
-                    for user in config::USERS.iter() {
+                    for user in USERS.iter() {
                         id += 1;
                         println!("{id}\t{:?}\n{:?}", user.key(), user.value());
                     }

@@ -183,7 +183,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_json",
+            "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
             stream_name,
@@ -192,7 +192,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_json",
+            "/api/org/ingest/logs/_syslog",
             "200",
             org_id,
             stream_name,

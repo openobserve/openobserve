@@ -137,7 +137,7 @@ pub async fn search(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_search",
+                    "/api/org/_search",
                     "200",
                     &org_id,
                     "",
@@ -146,7 +146,7 @@ pub async fn search(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_search",
+                    "/api/org/_search",
                     "200",
                     &org_id,
                     "",
@@ -160,7 +160,7 @@ pub async fn search(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_search",
+                    "/api/org/_search",
                     "500",
                     &org_id,
                     "",
@@ -169,7 +169,7 @@ pub async fn search(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_search",
+                    "/api/org/_search",
                     "500",
                     &org_id,
                     "",
@@ -311,7 +311,7 @@ pub async fn around(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_around",
+                    "/api/org/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -320,7 +320,7 @@ pub async fn around(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_around",
+                    "/api/org/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -363,7 +363,7 @@ pub async fn around(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_around",
+                    "/api/org/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -372,7 +372,7 @@ pub async fn around(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_around",
+                    "/api/org/_around",
                     "500",
                     &org_id,
                     &stream_name,
@@ -410,7 +410,7 @@ pub async fn around(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_around",
+            "/api/org/_around",
             "200",
             &org_id,
             &stream_name,
@@ -419,7 +419,7 @@ pub async fn around(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_around",
+            "/api/org/_around",
             "200",
             &org_id,
             &stream_name,
@@ -548,7 +548,7 @@ pub async fn values(
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
-                    "/_values",
+                    "/api/org/_values",
                     "500",
                     &org_id,
                     &stream_name,
@@ -557,7 +557,7 @@ pub async fn values(
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
                 .with_label_values(&[
-                    "/_values",
+                    "/api/org/_values",
                     "500",
                     &org_id,
                     &stream_name,
@@ -593,7 +593,7 @@ pub async fn values(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_values",
+            "/api/org/_values",
             "200",
             &org_id,
             &stream_name,
@@ -602,7 +602,7 @@ pub async fn values(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_values",
+            "/api/org/_values",
             "200",
             &org_id,
             &stream_name,

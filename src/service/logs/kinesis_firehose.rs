@@ -236,7 +236,7 @@ pub async fn process(
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_multi",
+            "/api/org/ingest/logs/_kinesis",
             "200",
             org_id,
             stream_name,
@@ -245,7 +245,7 @@ pub async fn process(
         .observe(start.elapsed().as_secs_f64());
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_multi",
+            "/api/org/ingest/logs/_kinesis",
             "200",
             org_id,
             stream_name,

@@ -55,6 +55,10 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+    }
+
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;

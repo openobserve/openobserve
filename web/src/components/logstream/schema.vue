@@ -95,23 +95,7 @@
               </tbody>
             </table>
           </div>
-          <q-separator
-            v-if="showSchemaActions || showDataRetention"
-            class="q-mt-lg q-mb-lg"
-          />
-          <div class="row flex items-center q-pb-xs" v-if="showSchemaActions">
-            <label class="q-pr-sm text-bold"
-              >Skip schema check during ingestion</label
-            >
-            <q-checkbox
-              data-test="stream-details-skip-schema-check-checkbox"
-              v-model="skipSchemaCheck"
-              dense
-              filled
-              round
-              class="q-mr-sm"
-            />
-          </div>
+          <q-separator v-if="showDataRetention" class="q-mt-lg q-mb-lg" />
 
           <template v-if="showDataRetention">
             <div class="row flex items-center q-pb-xs q-mt-lg">
@@ -194,7 +178,7 @@
         </div>
 
         <div
-          v-if="indexData.schema.length > 0 && showSchemaActions"
+          v-if="indexData.schema.length > 0"
           class="flex justify-center q-mt-sm"
         >
           <q-btn
@@ -263,7 +247,6 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
-    const skipSchemaCheck = ref(false);
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -341,8 +324,6 @@ export default defineComponent({
               res.data.settings.data_retention ||
               store.state.zoConfig.data_retention_days;
 
-          skipSchemaCheck.value = res.data.settings.skip_schema_validation;
-
           dismiss();
         });
     };
@@ -366,8 +347,6 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
-
-      settings["skip_schema_validation"] = skipSchemaCheck.value;
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -420,10 +399,6 @@ export default defineComponent({
       () => modelValue.stream_type !== "enrichment_tables"
     );
 
-    const showSchemaActions = computed(
-      () => showFullTextSearchColumn.value || showPartitionColumn.value
-    );
-
     const showDataRetention = computed(
       () =>
         !!(store.state.zoConfig.data_retention_days || false) &&
@@ -443,10 +418,8 @@ export default defineComponent({
       showPartitionColumn,
       showFullTextSearchColumn,
       getImageURL,
-      showSchemaActions,
       dataRetentionDays,
       showDataRetention,
-      skipSchemaCheck,
     };
   },
   created() {

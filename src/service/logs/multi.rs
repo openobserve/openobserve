@@ -40,6 +40,10 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("not an ingester"));
     }
 
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+    }
+
     // check if we are allowed to ingest
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
@@ -170,7 +174,7 @@ pub async fn ingest(
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_multi",
+            "/api/org/ingest/logs/_multi",
             "200",
             org_id,
             stream_name,
@@ -179,7 +183,7 @@ pub async fn ingest(
         .observe(start.elapsed().as_secs_f64());
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_multi",
+            "/api/org/ingest/logs/_multi",
             "200",
             org_id,
             stream_name,

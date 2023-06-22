@@ -116,15 +116,10 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(default = "default_skip_schema_validation")]
-    pub skip_schema_validation: bool,
     #[serde(default)]
     pub data_retention: i64,
 }
-
-fn default_skip_schema_validation() -> bool {
-    CONFIG.common.skip_schema_validation
-}
+ 
 
 impl Serialize for StreamSettings {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -138,7 +133,6 @@ impl Serialize for StreamSettings {
         }
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
-        state.serialize_field("skip_schema_validation", &self.skip_schema_validation)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.end()
     }
