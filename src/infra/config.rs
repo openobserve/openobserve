@@ -276,14 +276,14 @@ pub struct MemoryCache {
     pub enabled: bool,
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
-    #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     // MB, default is 50% of system memory
+    #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
+    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     // MB, when cache is full will release how many data once time, default is 1% of max_size
+    #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
 }
 

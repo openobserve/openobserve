@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::infra::{cache, config::CONFIG};
+use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
@@ -36,7 +36,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         let date = now - chrono::Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-        let orgs = cache::file_list::get_all_organization()?;
+        let orgs = db::schema::list_organizations_from_cache();
         let stream_types = [
             StreamType::Logs,
             StreamType::Metrics,
@@ -45,7 +45,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         ];
         for org_id in orgs {
             for stream_type in stream_types {
-                let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+                let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
                 for stream_name in streams {
                     let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
@@ -131,7 +131,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     let last_file_list_offset = db::compact::file_list::get_offset().await?;
 
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    let orgs = cache::file_list::get_all_organization()?;
+    let orgs = db::schema::list_organizations_from_cache();
     let stream_types = [
         StreamType::Logs,
         StreamType::Metrics,
@@ -140,7 +140,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     ];
     for org_id in orgs {
         for stream_type in stream_types {
-            let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip

@@ -161,8 +161,6 @@ pub async fn search(
 
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
-    // clear fast session data
-    datafusion::storage::file_list::clear(&format!("{session_id}-fast"));
 
     // final result
     let mut hits_buf = Vec::new();

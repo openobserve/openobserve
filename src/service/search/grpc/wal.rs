@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
+use datafusion::arrow::datatypes::Schema;
 use datafusion::datasource::file_format::file_type::FileType;
 use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
 
@@ -89,6 +90,11 @@ pub async fn search(
             .to_owned()
             .with_metadata(std::collections::HashMap::new()),
     );
+
+    // convert files to latest schema version
+    if CONFIG.common.widening_schema_evolution {
+        file_evolution(schema.clone(), &work_dir).await?;
+    }
 
     let session = meta::search::Session {
         id: session_id.to_string(),
@@ -182,4 +188,19 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     }
     Ok(result)
+}
+
+#[tracing::instrument(name = "service:search:grpc:wal:file_evolution", skip_all)]
+async fn file_evolution(_schema: Arc<Schema>, work_dir: &str) -> Result<(), Error> {
+    for _file in tmpfs::list(work_dir).unwrap_or_default() {
+        // get schema of the file
+
+        // calulate schema diff
+
+        // convert the file to latest schema version
+
+        // reset the tmpfs file
+    }
+
+    Ok(())
 }

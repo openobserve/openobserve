@@ -106,10 +106,10 @@ pub fn stream_res(
     meta.remove("created_at");
     let mut partition_keys = Vec::new();
     let mut full_text_search_keys = vec![];
-    let stream_settings = meta.get("settings"); 
+    let stream_settings = meta.get("settings");
     let mut data_retention = 0;
     if let Some(value) = stream_settings {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap(); 
+        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
         let keys = settings.get("partition_keys");
 
         if let Some(value) = keys {

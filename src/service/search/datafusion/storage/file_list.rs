@@ -45,7 +45,14 @@ pub fn set(session_id: &str, files: &[String]) {
 }
 
 pub fn clear(session_id: &str) {
-    FILES.remove(session_id);
+    let keys = FILES
+        .iter()
+        .filter(|x| x.key().starts_with(session_id))
+        .map(|x| x.key().clone())
+        .collect::<Vec<_>>();
+    for key in keys {
+        FILES.remove(&key);
+    }
 }
 
 #[cfg(test)]
