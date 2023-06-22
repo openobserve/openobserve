@@ -36,6 +36,7 @@ pub async fn toggle_state(details: web::Json<SyslogServer>) -> Result<HttpRespon
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
         content = SyslogRoute,
@@ -60,6 +61,7 @@ pub async fn create_route(details: web::Json<SyslogRoute>) -> Result<HttpRespons
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Route ID"),
     ),
     request_body(
@@ -90,6 +92,7 @@ async fn update_route(
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
         (status = StatusCode::OK, body = SyslogRoutes),
@@ -109,6 +112,7 @@ async fn list_routes() -> impl Responder {
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "SyslogRoute Id"),
     ),
     responses(
