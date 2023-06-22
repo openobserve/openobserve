@@ -54,8 +54,8 @@
                 <q-chip
                   v-if="col.closable"
                   :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                  :icon-remove="
-                    'img:' + getImageURL('images/common/close_icon.svg')
+                  icon-remove="
+                    cancel
                   "
                   class="q-ma-none table-head-chip"
                   removable
@@ -581,7 +581,7 @@ export default defineComponent({
     // text-transform: capitalize;
 
     .table-head-chip {
-      background-color: $accent;
+      background-color: #f5f5f5;
       padding: 0px;
 
       .q-chip__content {
@@ -645,6 +645,14 @@ export default defineComponent({
 .q-table--dark .tfoot-sticky tr > * {
   background: #565656;
 }
+
+.q-table--dark .table-header {
+    // text-transform: capitalize;
+
+    .table-head-chip {
+      background-color: #565656;
+    }
+  }
 
 .thead-sticky tr:last-child > * {
   top: 0;
