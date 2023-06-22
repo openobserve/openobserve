@@ -238,27 +238,14 @@ pub async fn check_for_schema(
         schema
     };
 
-    // Fetch metadata
-    let metadata = schema.metadata();
-
-    // Fetch the "skip_schema_validation" configuration
-    let skip_validation = CONFIG.common.skip_schema_validation;
-
-    if !schema.fields().is_empty() && (skip_validation || !metadata.is_empty()) {
-        if let Some(stream_settings) = metadata.get("settings") {
-            let settings: json::Value = json::from_slice(stream_settings.as_bytes()).unwrap();
-            if let Some(val) = settings.get("skip_schema_validation") {
-                if val.as_bool().unwrap_or(skip_validation) {
-                    //return (true, None, schema.fields().to_vec());
-                    return SchemaEvolution {
-                        schema_compatible: true,
-                        types_delta: None,
-                        schema_fields: schema.fields().to_vec(),
-                        is_schema_changed: false,
-                    };
-                }
-            }
-        }
+    if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
+        //return (true, None, schema.fields().to_vec());
+        return SchemaEvolution {
+            schema_compatible: true,
+            types_delta: None,
+            schema_fields: schema.fields().to_vec(),
+            is_schema_changed: false,
+        };
     }
 
     let mut schema_reader = BufReader::new(val_str.as_bytes());
@@ -519,7 +506,6 @@ pub async fn add_stream_schema(
         let settings = crate::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
-            skip_schema_validation: false,
             data_retention: 0,
         };
         metadata.insert(

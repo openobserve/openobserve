@@ -185,6 +185,8 @@ pub struct Common {
     pub column_timestamp: String,
     #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = false)]
     pub widening_schema_evolution: bool,
+    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
+    pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
@@ -217,8 +219,6 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
-    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
-    pub skip_schema_validation: bool,
 }
 
 #[derive(EnvConfig)]
