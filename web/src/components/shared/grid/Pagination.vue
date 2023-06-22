@@ -236,7 +236,7 @@ export default defineComponent({
   .max-records-input {
     .q-field {
       &__control {
-        background-color: #fafbfd !important;
+        // background-color: #fafbfd !important;
         max-width: 2.5rem;
         height: 1.5rem;
         padding: 0;
@@ -245,7 +245,7 @@ export default defineComponent({
         font-size: 0.75rem;
         text-align: center;
         font-weight: 600;
-        color: $dark;
+        // color: $dark;
         padding: 0;
       }
     }

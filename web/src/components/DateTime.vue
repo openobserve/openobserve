@@ -521,7 +521,7 @@ export default defineComponent({
   }
   .label {
     font-size: 0.75rem;
-    color: $dark-page;
+    // color: $dark-page;
     font-weight: 600;
   }
   .timeInput {

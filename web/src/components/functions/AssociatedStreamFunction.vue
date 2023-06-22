@@ -68,7 +68,7 @@
           no-hover
           style="
             height: min-content;
-            background-color: white;
+            /* background-color: white; */
             border: 1px solid black;
           "
         >

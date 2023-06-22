@@ -468,7 +468,7 @@ export default defineComponent({
     }
     &:hover {
       .field-container {
-        background-color: #e8e8e8;
+        background-color: #a3a1a1;
       }
     }
   }
