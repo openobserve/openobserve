@@ -7,7 +7,7 @@
     </div>
     <div v-else class="sidebar-header-expanded">
       <div class="expanded-title">{{ title }}</div>
-      <q-icon name="unfold_less" class="collapse-button rotate-90" @click="toggleSidebar"/>
+      <q-btn square icon="unfold_less" class="collapse-button rotate-90" @click="toggleSidebar"/>
     </div>
     <div class="sidebar-content" v-if="isOpen">
       <q-separator />
