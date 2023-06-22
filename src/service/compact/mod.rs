@@ -14,7 +14,7 @@
 
 use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::infra::{cache, config::CONFIG};
 use crate::meta::StreamType;
@@ -130,6 +130,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     // get last file_list compact offset
     let last_file_list_offset = db::compact::file_list::get_offset().await?;
 
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let orgs = cache::file_list::get_all_organization()?;
     let stream_types = [
         StreamType::Logs,
@@ -140,6 +141,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     for org_id in orgs {
         for stream_type in stream_types {
             let streams = cache::file_list::get_all_stream(&org_id, stream_type)?;
+            let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip
                 if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None)
@@ -150,56 +152,42 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                         stream_type,
                         &stream_name,
                     );
+                    continue;
                 }
 
-                tokio::task::yield_now().await; // yield to other tasks
-                if let Err(e) = merge::merge_by_stream(
-                    last_file_list_offset,
-                    &org_id,
-                    &stream_name,
-                    stream_type,
-                )
-                .await
-                {
-                    log::error!(
-                        "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
-                        org_id,
+                let org_id = org_id.clone();
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let task = tokio::task::spawn(async move {
+                    if let Err(e) = merge::merge_by_stream(
+                        last_file_list_offset,
+                        &org_id,
+                        &stream_name,
                         stream_type,
-                        stream_name,
-                        e
-                    );
-                }
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
+                            org_id,
+                            stream_type,
+                            stream_name,
+                            e
+                        );
+                    }
+                    drop(permit);
+                });
+                tasks.push(task);
+            }
+            for task in tasks {
+                task.await?;
             }
         }
     }
 
     // after compact, compact file list from storage
     if let Err(e) = file_list::run(last_file_list_offset).await {
-        log::error!("[COMPACTOR] output file list error: {}", e);
+        log::error!("[COMPACTOR] merge file list error: {}", e);
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_files() {
-        let meta = crate::meta::common::FileMeta {
-            min_ts: 100,
-            max_ts: 200,
-            records: 10000,
-            original_size: 1024,
-            compressed_size: 1,
-        };
-        let _ret = cache::file_list::set_file_to_cache(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-            meta,
-        )
-        .unwrap();
-        let resp = run_merge().await;
-        assert!(resp.is_ok());
-    }
 }

@@ -143,8 +143,8 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
         );
     }
 
-    let nodes = crate::infra::cluster::load_local_node_role();
-    if !crate::infra::cluster::is_single_node(nodes) {
+    let roles = crate::infra::cluster::load_local_node_role();
+    if !crate::infra::cluster::is_single_node(&roles) {
         match crate::infra::cluster::get_cached_online_nodes() {
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));

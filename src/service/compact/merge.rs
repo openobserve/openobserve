@@ -137,14 +137,24 @@ pub async fn merge_by_stream(
     }
 
     // get current hour all files
-    let files = file_list::get_file_list(
+    let files = match file_list::get_file_list(
         org_id,
         stream_name,
         stream_type,
         offset_time_hour,
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
-    )?;
+    ) {
+        Ok(files) => files,
+        Err(err) => {
+            if locker.is_some() {
+                // release cluster lock
+                let mut lock = locker.unwrap();
+                lock.unlock().await?;
+            }
+            return Err(err);
+        }
+    };
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new offset

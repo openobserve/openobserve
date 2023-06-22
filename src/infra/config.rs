@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use datafusion::arrow::datatypes::Schema;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
@@ -32,6 +32,7 @@ use crate::meta::user::User;
 use crate::service::enrichment::StreamTable;
 
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
+pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
@@ -265,6 +266,8 @@ pub struct Compact {
     pub max_file_size: u64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // in days
     pub data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
+    pub blocked_orgs: String,
 }
 
 #[derive(EnvConfig)]
@@ -314,7 +317,7 @@ pub struct Etcd {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
     pub command_timeout: u64,
-    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 600)]
+    #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
     #[env_config(name = "ZO_ETCD_USER", default = "")]
     pub user: String,
@@ -360,6 +363,8 @@ pub struct S3 {
     pub bucket_prefix: String,
     #[env_config(name = "ZO_S3_CONNECT_TIMEOUT", default = 10)] // seconds
     pub connect_timeout: u64,
+    #[env_config(name = "ZO_S3_REQUEST_TIMEOUT", default = 3600)] // seconds
+    pub request_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
 }
