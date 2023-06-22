@@ -42,7 +42,7 @@ For full list of features check [documentation](https://openobserve.ai/docs/#pro
 
 # Installation
 
-You can install OpenObserve in under 2 minutes by following the [quickstart](https://openobserve.ai/docs/guide/quickstart/) documentation
+You can install OpenObserve in under 2 minutes by following the [quickstart](https://openobserve.ai/docs/quickstart/) documentation
 
 # OpenObserve Cloud
 
