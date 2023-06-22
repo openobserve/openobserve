@@ -21,7 +21,7 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::{flatten, json, time};
-use crate::infra::{cluster, config::CONFIG};
+use crate::infra::{cluster, config::CONFIG, metrics};
 use crate::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
@@ -33,11 +33,14 @@ use crate::service::{
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
-    // let start = std::time::Instant::now();
-    // let body_size = body.len();
+    let start = std::time::Instant::now();
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
+    }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
     #[cfg(feature = "zo_functions")]
@@ -189,6 +192,26 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             StreamType::Metrics,
         );
     }
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/ingest/metrics/_json",
+            "200",
+            org_id,
+            "",
+            &StreamType::Metrics.to_string(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/ingest/metrics/_json",
+            "200",
+            org_id,
+            "",
+            &StreamType::Metrics.to_string(),
+        ])
+        .inc();
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),

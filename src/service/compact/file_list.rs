@@ -12,16 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ahash::AHashMap as HashMap;
+use ahash::AHashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use std::io::{BufRead, BufReader, Write};
+use std::{
+    io::{BufRead, BufReader, Write},
+    sync::Arc,
+};
+use tokio::sync::{RwLock, Semaphore};
 
 use crate::common::json;
-use crate::infra::config::{CONFIG, STREAM_SCHEMAS};
-use crate::infra::db::etcd;
-use crate::infra::ider;
-use crate::infra::storage;
+use crate::infra::{
+    config::{CONFIG, STREAM_SCHEMAS},
+    db::etcd,
+    ider, storage,
+};
 use crate::meta::common::FileKey;
 use crate::service::db;
 
@@ -58,7 +63,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(
-                        "[COMPACT] stream [{}] created_at is 0, just skip",
+                        "[COMPACT] file_list stream [{}] created_at is 0, just skip",
                         item.key()
                     );
                     continue;
@@ -72,7 +77,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     // still not found, just return
     if offset == 0 {
-        log::info!("[COMPACT] no stream, no need to compact");
+        log::info!("[COMPACT] file_list no stream, no need to compact");
         return Ok(()); // no stream
     }
     // only compact for the past hour
@@ -96,20 +101,21 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
-        log::info!("[COMPACT] no stream had done compact, just waiting");
+        log::info!("[COMPACT] file_list no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
-
     // compact offset already is next hour, we need fix it, get the latest compact offset
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
-            log::info!("[COMPACT] waiting for stream: {key}, offset: {val}");
+            log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
             return Ok(());
         }
     }
 
     // output file list
+    log::info!("[COMPACT] file_list is starting merge, offset: {offset}");
     merge_file_list(offset).await?;
+    log::info!("[COMPACT] file_list merging is done at offset: {offset}");
 
     // write new sync offset
     offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
@@ -155,6 +161,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let offset = Utc.timestamp_nanos(offset * 1000);
     let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{offset_prefix}");
+    log::info!("[COMPACT] file_list is merging, prefix: {key}");
     let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
         if locker.is_some() {
@@ -164,31 +171,86 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         }
         return Ok(()); // only one file list, no need merge
     }
+    log::info!(
+        "[COMPACT] file_list is merging, prefix: {key}, got files: {}",
+        file_list.len()
+    );
 
     // filter deleted file keys
-    let mut filter_file_keys: HashMap<String, FileKey> = HashMap::with_capacity(1024);
+    let filter_file_keys: Arc<RwLock<AHashMap<String, FileKey>>> =
+        Arc::new(RwLock::new(AHashMap::default()));
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    let mut tasks = Vec::new();
     for file in file_list.clone() {
-        log::info!("[COMPACT] merge small file list: {}", file);
-        let data = storage::get(&file).await?;
-        // uncompress file
-        let uncompress = zstd::decode_all(data.reader())?;
-        let uncompress_reader = BufReader::new(uncompress.reader());
-        // parse file list
-        for line in uncompress_reader.lines() {
-            let line = line?;
-            if line.is_empty() {
-                continue;
-            }
-            let item: FileKey = json::from_slice(line.as_bytes())?;
-            match filter_file_keys.get(&item.key) {
-                Some(_) => {
-                    if item.deleted {
-                        filter_file_keys.insert(item.key.clone(), item);
+        let filter_file_keys = filter_file_keys.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let task: tokio::task::JoinHandle<Result<(), anyhow::Error>> =
+            tokio::task::spawn(async move {
+                log::info!("[COMPACT] file_list merge small files: {}", file);
+                let data = match storage::get(&file).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        drop(permit);
+                        return Err(err);
+                    }
+                };
+                // uncompress file
+                let uncompress = match zstd::decode_all(data.reader()) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        drop(permit);
+                        return Err(err.into());
+                    }
+                };
+                let uncompress_reader = BufReader::new(uncompress.reader());
+                // parse file list
+                for line in uncompress_reader.lines() {
+                    let line = match line {
+                        Ok(val) => val,
+                        Err(err) => {
+                            drop(permit);
+                            return Err(err.into());
+                        }
+                    };
+                    if line.is_empty() {
+                        continue;
+                    }
+                    let item: FileKey = match json::from_slice(line.as_bytes()) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            drop(permit);
+                            return Err(err.into());
+                        }
+                    };
+                    let mut filter_file_keys = filter_file_keys.write().await;
+                    match filter_file_keys.get(&item.key) {
+                        Some(_) => {
+                            if item.deleted {
+                                filter_file_keys.insert(item.key.clone(), item);
+                            }
+                        }
+                        None => {
+                            filter_file_keys.insert(item.key.clone(), item);
+                        }
                     }
                 }
-                None => {
-                    filter_file_keys.insert(item.key.clone(), item);
+                drop(permit);
+                Ok(())
+            });
+        tasks.push(task);
+    }
+
+    // wait all tasks done
+    for task in tasks {
+        match task.await {
+            Ok(ret) => match ret {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("[COMPACT] file_list merge small files failed: {}", err);
                 }
+            },
+            Err(err) => {
+                log::error!("[COMPACT] file_list merge small files failed: {}", err);
             }
         }
     }
@@ -198,6 +260,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let file_name = format!("file_list{offset_prefix}{id}.json.zst");
     let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
     let mut has_content = false;
+    let filter_file_keys = filter_file_keys.read().await;
     for (_, item) in filter_file_keys.iter() {
         if item.deleted {
             continue;
@@ -212,14 +275,11 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let new_file_ok = if has_content {
         match storage::put(&file_name, compressed_bytes.into()).await {
             Ok(_) => {
-                log::info!(
-                    "[COMPACT] merge file list succeeded, new file: {}",
-                    file_name
-                );
+                log::info!("[COMPACT] file_list merge succeed, new file: {}", file_name);
                 true
             }
             Err(err) => {
-                log::error!("[COMPACT] upload file list failed: {}", err);
+                log::error!("[COMPACT] file_list upload failed: {}", err);
                 false
             }
         }
@@ -231,7 +291,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         if let Err(e) =
             storage::del(&file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
         {
-            log::error!("[COMPACT] delete small file list failed: {}", e);
+            log::error!("[COMPACT] file_list delete small file failed: {}", e);
         }
     }
 

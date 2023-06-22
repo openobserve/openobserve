@@ -80,6 +80,20 @@ pub async fn aws(
     dispatch(req, payload).await
 }
 
+#[route(
+    "/gcp/{path:.*}",
+    method = "GET",
+    method = "POST",
+    method = "PUT",
+    method = "DELETE"
+)]
+pub async fn gcp(
+    req: HttpRequest,
+    payload: web::Payload,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload).await
+}
+
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,

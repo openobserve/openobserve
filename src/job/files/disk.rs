@@ -26,9 +26,6 @@ use crate::infra::{cluster, config::CONFIG, metrics, storage, wal};
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
-/// TaskResult (local file path, remote file key, file meta, stream type)
-type TaskResult = (String, String, FileMeta, StreamType);
-
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
@@ -59,8 +56,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let files = scan_files(&pattern);
 
     // use multiple threads to upload files
-    let mut tasks: Vec<task::JoinHandle<Result<TaskResult, anyhow::Error>>> = Vec::new();
-
+    let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for file in files {
         let local_file = file.to_owned();
@@ -117,33 +113,22 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<(String, String, FileMeta, StreamType), anyhow::Error>> =
-            task::spawn(async move {
-                let ret = upload_file(
-                    &org_id,
-                    &stream_name,
-                    stream_type,
-                    &local_file,
-                    partition_key,
-                )
-                .await;
-                drop(permit);
-                match ret {
-                    Ok((key, meta, stream_type)) => Ok((local_file, key, meta, stream_type)),
-                    Err(e) => Err(e),
-                }
-            });
-        tasks.push(task);
-        task::yield_now().await;
-    }
-
-    for task in tasks {
-        match task.await {
-            Ok(ret) => match ret {
-                Ok((path, key, meta, _stream_type)) => {
+        let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
+            let ret = upload_file(
+                &org_id,
+                &stream_name,
+                stream_type,
+                &local_file,
+                partition_key,
+            )
+            .await;
+            drop(permit);
+            match ret {
+                Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
+                Ok((key, meta, _stream_type)) => {
                     match db::file_list::local::set(&key, meta, false).await {
                         Ok(_) => {
-                            match fs::remove_file(&path) {
+                            match fs::remove_file(&local_file) {
                                 Ok(_) => {
                                     // metrics
                                     let columns = key.split('/').collect::<Vec<&str>>();
@@ -158,7 +143,7 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                                 Err(e) => {
                                     log::error!(
                                         "[JOB] Failed to remove disk file from disk: {}, {}",
-                                        path,
+                                        local_file,
                                         e.to_string()
                                     )
                                 }
@@ -166,14 +151,20 @@ async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                         }
                         Err(e) => log::error!(
                             "[JOB] Failed write disk file meta:{}, error: {}",
-                            path,
+                            local_file,
                             e.to_string()
                         ),
                     }
                 }
-                Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
-            },
-            Err(e) => log::error!("[JOB] Error while uploading disk file to storage {}", e),
+            };
+            Ok(())
+        });
+        tasks.push(task);
+    }
+
+    for task in tasks {
+        if let Err(e) = task.await {
+            log::error!("[JOB] Error while uploading disk file to storage {}", e);
         };
     }
     Ok(())

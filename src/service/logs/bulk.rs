@@ -46,6 +46,11 @@ pub async fn ingest(
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow::anyhow!("not an ingester"));
     }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
+        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+    }
+
     //let mut errors = false;
     let mut bulk_res = BulkResponse {
         took: 0,
@@ -297,7 +302,7 @@ pub async fn ingest(
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/_bulk",
+            "/api/org/ingest/logs/_bulk",
             "200",
             org_id,
             "",
@@ -306,7 +311,7 @@ pub async fn ingest(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/_bulk",
+            "/api/org/ingest/logs/_bulk",
             "200",
             org_id,
             "",

@@ -201,7 +201,7 @@ pub async fn validator_gcp(
     let query =
         web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
             .unwrap();
-    match query.get("API_Key") {
+    match query.get("API-Key") {
         Some(val) => {
             let gcp_creds = common::base64::decode(val).unwrap();
             let creds = gcp_creds
