@@ -46,6 +46,17 @@
       </div>
     </div>
     <q-separator></q-separator>
+    <q-q-separator></q-q-separator>
+    <div  v-if="list[0].variables?.list?.length > 0">
+      <div v-for="item in list[0].variables?.list">
+        <div v-if="item.type === 'textBox'" style="width: 20%;">
+          <q-input v-model="item.name" :label="item.label" dense></q-input>
+        </div>
+        <div v-else-if="item.type === 'dateBox'" style="width: 20%;">
+          <q-input v-model="item.name" :label="item.label" dense></q-input>
+        </div>
+      </div>
+    </div>
     <div class="displayDiv">
       <grid-layout v-if="list[0].panels?.length > 0" v-model:layout.sync="list[0].layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
@@ -105,6 +116,7 @@ import { deletePanel, updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
+import streamService from "../../services/stream";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -243,6 +255,59 @@ export default defineComponent({
     };
 
     let list = computed(function () {
+      console.log("before",toRaw(currentDashboardData.data));
+      
+      let data = toRaw(currentDashboardData.data);
+      const variables = {}
+      const variable = {}
+      let list = []
+      // variable["type"] = "constant"
+      // variable["name"] = "namespace1"
+      // variable["label"] = "NameSpace"
+      // list.push(variable)
+      // variables["list"] = list
+
+      // data["variables"] = variables
+
+      let queryData = {}
+      variable["type"] = "query_value"
+      variable["name"] = "namespace1"
+      variable["label"] = "NameSpace"
+      queryData["streamType"] = "logs"
+      queryData["stream"] = "gke-fluentbit"
+      queryData["streamField"] = "kubernetes_host"
+      variable["queryData"] = queryData
+
+      list.push(variable)
+      variables["list"] = list
+
+      data["variables"] = variables
+
+      console.log("-after-",data)
+
+      streamService
+        .fieldValues({
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+          fields: [name],
+          size: 10,
+          type: "traces",
+        })
+        .then((res: any) => {
+          if (res.data.hits.length) {
+            fieldValues.value[name]["values"] = res.data.hits
+              .find((field: any) => field.field === name)
+              .values.map((value: any) => {
+                return {
+                  key: value.key ? value.key : "null",
+                  count: formatNumberWithPrefix(value.num),
+                };
+              });
+          }
+        })
+      
       return [toRaw(currentDashboardData.data)];
     });
 

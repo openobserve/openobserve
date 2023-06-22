@@ -378,6 +378,21 @@ export default defineComponent({
               endISOTimestamp =
                   new Date(timestamps.end_time.toISOString()).getTime() * 1000;
           }
+          console.log("before querydata", queryData);
+
+          const variables :any= {
+            namespace1: "ziox-alpha1",
+          }
+            //replace values with given values
+            if(variables) {
+
+                Object.keys(variables).forEach((it)=> {    
+                    queryData = queryData.replace("$" + it, variables[it]);
+                })
+                console.log("after querydata", queryData);
+            }
+            
+
           const query = {
               query: {
                   sql: queryData,
@@ -394,7 +409,7 @@ export default defineComponent({
             if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
                 // Call metrics_query_range API
                 await queryService
-                    .metrics_query_range({
+                    .metrics_query({
                         org_identifier: store.state.selectedOrganization.identifier,
                         query: queryData,
                         start_time: startISOTimestamp,
