@@ -424,14 +424,11 @@ pub async fn merge(
         "merge_write_recordbatch took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
+    if schema.fields().is_empty() {
+        return Ok(vec![]);
+    }
 
     // rewrite sql
-    let schema = match schema {
-        Some(schema) => schema,
-        None => {
-            return Ok(vec![]);
-        }
-    };
     let query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
             if offset > 0
@@ -523,26 +520,30 @@ pub async fn merge(
     Ok(vec![batches])
 }
 
-fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Option<Arc<Schema>>, String)> {
-    let mut schema = None;
+fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>, String)> {
+    let mut i = 0;
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
-    for (i, item) in batches.iter().enumerate() {
+    let mut schema = Schema::empty();
+    for item in batches.iter() {
         if item.is_empty() {
             continue;
         }
-        if schema.is_none() {
-            schema = Some(item[0].schema().clone());
-        }
-        let file_name = format!("{work_dir}{i}.parquet");
-        let mut buf_parquet = Vec::new();
-        let mut writer = ArrowWriter::try_new(&mut buf_parquet, item[0].schema().clone(), None)?;
         for row in item.iter() {
+            if row.num_rows() == 0 {
+                continue;
+            }
+            i += 1;
+            let row_schema = row.schema();
+            schema = Schema::try_merge(vec![schema, row_schema.as_ref().to_owned()])?;
+            let file_name = format!("{work_dir}{i}.parquet");
+            let mut buf_parquet = Vec::new();
+            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema.clone(), None)?;
             writer.write(row)?;
+            writer.close().unwrap();
+            tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
         }
-        writer.close().unwrap();
-        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-    Ok((schema, work_dir))
+    Ok((Arc::new(schema), work_dir))
 }
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
@@ -1125,7 +1126,7 @@ mod test {
         .unwrap();
 
         let res = merge_write_recordbatch(&[vec![batch, batch2]]).unwrap();
-        assert!(res.0.is_some());
+        assert!(!res.0.fields().is_empty());
         assert!(!res.1.is_empty())
     }
 
