@@ -18,7 +18,7 @@
     class="trace-details"
     :style="{
       width: '97vw !important',
-      background: '#565656',
+      background: store.state.theme === 'dark' ? '#565656' : '#ffffff',
     }"
   >
     <div
@@ -465,6 +465,16 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
+      const getThemeLayoutOptions = () => ({
+        paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+        plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+        font: {
+          color: store.state.theme === 'dark' ? '#fff' : '#333'
+        }
+      })
+      watch(() => store.state.theme, () => {
+        Plotly.update(plotref.value, {}, getThemeLayoutOptions())
+      })
       const layout: any = {
         autosize: true,
         scrollZoom: true,
@@ -505,6 +515,8 @@ export default defineComponent({
         shapes: [],
         hovermode: "closest",
         showlegend: true,
+        ...getThemeLayoutOptions(),
+
       };
       const shapes: any = [];
       let size = 0;
@@ -683,6 +695,7 @@ export default defineComponent({
       activeVisual,
       traceVisuals,
       getImageURL,
+      store,
     };
   },
 });

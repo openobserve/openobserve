@@ -51,7 +51,9 @@
                 <div class="field_label ellipsis">
                   {{ props.row.name }}
                 </div>
-                <div class="field_overlay">
+                <div class="field_overlay" :style="{
+                  background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
+                }">
                   <q-icon
                     :name="'img:' + getImageURL('images/common/add_icon.svg')"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
@@ -81,7 +83,7 @@
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div class="field_overlay">
+                      <div class="field_overlay">
                       <q-icon
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :name="
@@ -444,7 +446,6 @@ export default defineComponent({
       right: 0;
       top: 0;
       z-index: 5;
-      background-color: #a3a1a1;
       padding: 0 6px;
       visibility: hidden;
       display: flex;
@@ -468,7 +469,7 @@ export default defineComponent({
     }
     &:hover {
       .field-container {
-        background-color: #a3a1a1;
+        background-color: color-mix(in srgb, currentColor 15%, transparent);
       }
     }
   }

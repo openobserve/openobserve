@@ -44,7 +44,7 @@
               dense
               round
               flat
-              :name="'img:' + getImageURL('images/common/down-solid.svg')"
+              name="expand_more"
               class="collapse-btn"
               :style="{
                 rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
