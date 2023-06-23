@@ -51,7 +51,10 @@
               dense
               flat
               size="xs"
-              icon="expand_more"
+               :icon="expandedRow.name != props.row.name
+                   ? 'expand_more'
+                   :'expand_less'
+                 "
             />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">

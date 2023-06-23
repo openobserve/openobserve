@@ -110,7 +110,7 @@
                     filled
                     dense
                     class="q-mr-sm pointer"
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
                     <q-list>
                       <q-item clickable v-close-popup>

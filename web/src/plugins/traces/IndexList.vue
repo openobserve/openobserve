@@ -55,7 +55,7 @@
                   background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
                 }">
                   <q-icon
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    name="add_circle"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="1rem"
@@ -86,9 +86,7 @@
                       <div class="field_overlay">
                       <q-icon
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :name="
-                          'img:' + getImageURL('images/common/add_icon.svg')
-                        "
+                        name="add_circle"
                         style="margin-right: 0.375rem"
                         size="1rem"
                         @click.stop="addToFilter(props.row.name)"

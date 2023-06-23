@@ -44,7 +44,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+              icon="delete" color="red"
               class="q-ml-xs"
               padding="sm"
               unelevated

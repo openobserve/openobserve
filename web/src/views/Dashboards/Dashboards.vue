@@ -50,7 +50,7 @@
             ></q-btn>
           <q-btn
             v-if="props.row.actions == 'true'"
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            icon="delete" color="red"
             :title="t('dashboard.delete')"
             class="q-ml-xs"
             padding="sm"

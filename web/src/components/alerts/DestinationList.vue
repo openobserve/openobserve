@@ -43,7 +43,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+              :icon="outlinedDelete" color="red"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -142,6 +142,8 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationData } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
+
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 interface ConformDelete {
   visible: boolean;
@@ -374,6 +376,7 @@ export default defineComponent({
       perPageOptions,
       resultTotal,
       pagination,
+      outlinedDelete
     };
   },
 });

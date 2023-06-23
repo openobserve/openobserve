@@ -59,7 +59,7 @@
               !props.row.isLoggedinUser &&
               props.row.role !== 'root'
             "
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            icon="delete" color="red"
             :title="t('user.delete')"
             class="q-ml-xs iconHoverBtn"
             padding="sm"
