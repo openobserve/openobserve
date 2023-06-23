@@ -42,6 +42,9 @@ pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
 
+pub static FILE_EXT_JSON: &str = ".json";
+pub static FILE_EXT_PARQUET: &str = ".parquet";
+
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
@@ -175,10 +178,6 @@ pub struct Common {
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
     pub wal_line_mode_enabled: bool,
-    #[env_config(name = "ZO_FILE_EXT_JSON", default = ".json")]
-    pub file_ext_json: String,
-    #[env_config(name = "ZO_FILE_EXT_PARQUET", default = ".parquet")]
-    pub file_ext_parquet: String,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]

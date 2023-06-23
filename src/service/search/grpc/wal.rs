@@ -13,21 +13,26 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use datafusion::arrow::datatypes::Schema;
-use datafusion::datasource::file_format::file_type::FileType;
-use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
+use datafusion::{
+    arrow::{datatypes::Schema, json::reader::infer_json_schema},
+    datasource::file_format::file_type::FileType,
+};
+use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::infra::{
     cache::tmpfs,
-    config::CONFIG,
+    config::{CONFIG, FILE_EXT_JSON, FILE_EXT_PARQUET},
     errors::{Error, ErrorCodes},
     ider, wal,
 };
 use crate::meta;
 use crate::service::{
     db,
-    search::{datafusion::storage::StorageType, sql::Sql},
+    search::{
+        datafusion::{exec, storage::StorageType},
+        sql::Sql,
+    },
 };
 
 /// search in local WAL, which haven't been sync to object storage
@@ -100,13 +105,18 @@ pub async fn search(
         id: session_id.to_string(),
         storage_type: StorageType::Tmpfs,
     };
+    let file_type = if CONFIG.common.widening_schema_evolution {
+        FileType::PARQUET
+    } else {
+        FileType::JSON
+    };
     let result = match super::datafusion::exec::sql(
         &session,
         schema,
         &HashMap::new(),
         &sql,
         &files,
-        FileType::JSON,
+        file_type,
     )
     .await
     {
@@ -121,6 +131,52 @@ pub async fn search(
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
 
     Ok((result, file_count, scan_size))
+}
+
+#[tracing::instrument(name = "service:search:grpc:wal:file_evolution", skip_all)]
+async fn file_evolution(schema_latest: Arc<Schema>, work_dir: &str) -> Result<(), Error> {
+    for file in tmpfs::list(work_dir).unwrap_or_default() {
+        // get schema of the file
+        let file_data = tmpfs::get(&file.location).unwrap();
+        let mut schema_reader = BufReader::new(file_data.as_ref());
+        let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+            Ok(schema) => schema,
+            Err(err) => {
+                return Err(Error::from(err));
+            }
+        };
+        // calulate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = inferred_schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+                }
+            }
+        }
+        // convert the file to latest schema version
+        let mut buf = Vec::new();
+        let file_tmp_dir = tmpfs::Directory::default();
+        file_tmp_dir.set("1.json", file_data)?;
+        exec::convert_parquet_file(
+            file_tmp_dir.name(),
+            &mut buf,
+            Arc::new(inferred_schema),
+            diff_fields,
+            FileType::JSON,
+        )
+        .await
+        .map_err(Error::from)?;
+        // replace the file in tmpfs
+        tmpfs::delete(&file.location, false)?;
+        tmpfs::set(
+            &file.location.replace(FILE_EXT_JSON, FILE_EXT_PARQUET),
+            buf.into(),
+        )?;
+    }
+
+    Ok(())
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
@@ -188,19 +244,4 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     }
     Ok(result)
-}
-
-#[tracing::instrument(name = "service:search:grpc:wal:file_evolution", skip_all)]
-async fn file_evolution(_schema: Arc<Schema>, work_dir: &str) -> Result<(), Error> {
-    for _file in tmpfs::list(work_dir).unwrap_or_default() {
-        // get schema of the file
-
-        // calulate schema diff
-
-        // convert the file to latest schema version
-
-        // reset the tmpfs file
-    }
-
-    Ok(())
 }

@@ -22,7 +22,10 @@ use std::{
 };
 
 use crate::common::file::get_file_contents;
-use crate::infra::{config::CONFIG, ider, metrics};
+use crate::infra::{
+    config::{CONFIG, FILE_EXT_JSON},
+    ider, metrics,
+};
 use crate::meta::StreamType;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
@@ -289,7 +292,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}_{key}_{id}{}", &CONFIG.common.file_ext_json);
+        let file_name = format!("{thread_id}_{key}_{id}{}", FILE_EXT_JSON);
         let file_path = format!("{dir_path}{file_name}");
         std::fs::create_dir_all(&dir_path).unwrap();
 
