@@ -372,7 +372,6 @@ export default defineComponent({
           settings
         )
         .then((res) => {
-          getSchema();
           q.notify({
             color: "positive",
             message: "Stream settings updated successfully.",
@@ -385,6 +384,13 @@ export default defineComponent({
             user_id: store.state.userInfo.email,
             stream_name: indexData.value.name,
             page: "Schema Details",
+          });
+        })
+        .catch((err: any) => {
+          q.notify({
+            color: "negative",
+            message: err.response.data.message,
+            timeout: 2000,
           });
         });
     };

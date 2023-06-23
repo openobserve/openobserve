@@ -416,7 +416,6 @@ export default defineComponent({
     });
 
     const exploreStream = (props: any) => {
-      console.log(props);
       router.push({
         name: "streamExplorer",
         query: {
