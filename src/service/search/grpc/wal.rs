@@ -14,15 +14,16 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::{
-    arrow::{datatypes::Schema, json::reader::infer_json_schema},
+    arrow::{json::reader::infer_json_schema, record_batch::RecordBatch},
     datasource::file_format::file_type::FileType,
 };
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
+use tracing::{info_span, Instrument};
 
 use crate::common::file::{get_file_contents, get_file_meta, scan_files};
 use crate::infra::{
     cache::tmpfs,
-    config::{CONFIG, FILE_EXT_JSON, FILE_EXT_PARQUET},
+    config::CONFIG,
     errors::{Error, ErrorCodes},
     ider, wal,
 };
@@ -81,7 +82,7 @@ pub async fn search(
     log::info!("wal->search: load files {file_count}, scan_size {scan_size}");
 
     // fetch all schema versions, get latest schema
-    let schema = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
+    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
             log::error!("get schema error: {}", err);
@@ -90,54 +91,33 @@ pub async fn search(
             )));
         }
     };
-    let schema = Arc::new(
-        schema
+    let schema_latest = Arc::new(
+        schema_latest
             .to_owned()
             .with_metadata(std::collections::HashMap::new()),
     );
 
-    // convert files to latest schema version
-    if CONFIG.common.widening_schema_evolution {
-        file_evolution(schema.clone(), &work_dir).await?;
+    // check schema version
+    let files = tmpfs::list(&work_dir).unwrap_or_default();
+    let mut files_group: HashMap<String, Vec<String>> = HashMap::with_capacity(2);
+    if !CONFIG.common.widening_schema_evolution {
+        files_group.insert(
+            "latest".to_string(),
+            files.iter().map(|x| x.location.to_string()).collect(),
+        );
+    } else {
+        for file in files {
+            let schema_version = get_schema_version(&file.location)?;
+            let entry = files_group.entry(schema_version).or_insert_with(Vec::new);
+            entry.push(file.location);
+        }
     }
 
-    let session = meta::search::Session {
-        id: session_id.to_string(),
-        storage_type: StorageType::Tmpfs,
-    };
-    let file_type = if CONFIG.common.widening_schema_evolution {
-        FileType::PARQUET
-    } else {
-        FileType::JSON
-    };
-    let result = match super::datafusion::exec::sql(
-        &session,
-        schema,
-        &HashMap::new(),
-        &sql,
-        &files,
-        file_type,
-    )
-    .await
-    {
-        Ok(res) => res,
-        Err(err) => {
-            log::error!("datafusion execute error: {}", err);
-            return Err(super::handle_datafusion_error(err));
-        }
-    };
-
-    // clear tmpfs
-    tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
-
-    Ok((result, file_count, scan_size))
-}
-
-#[tracing::instrument(name = "service:search:grpc:wal:file_evolution", skip_all)]
-async fn file_evolution(schema_latest: Arc<Schema>, work_dir: &str) -> Result<(), Error> {
-    for file in tmpfs::list(work_dir).unwrap_or_default() {
+    let mut tasks = Vec::new();
+    let single_group = files_group.len() == 1;
+    for (ver, files) in files_group {
         // get schema of the file
-        let file_data = tmpfs::get(&file.location).unwrap();
+        let file_data = tmpfs::get(files.first().unwrap()).unwrap();
         let mut schema_reader = BufReader::new(file_data.as_ref());
         let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
             Ok(schema) => schema,
@@ -155,28 +135,68 @@ async fn file_evolution(schema_latest: Arc<Schema>, work_dir: &str) -> Result<()
                 }
             }
         }
-        // convert the file to latest schema version
-        let mut buf = Vec::new();
-        let file_tmp_dir = tmpfs::Directory::default();
-        file_tmp_dir.set("1.json", file_data)?;
-        exec::convert_parquet_file(
-            file_tmp_dir.name(),
-            &mut buf,
-            Arc::new(inferred_schema),
-            diff_fields,
-            FileType::JSON,
-        )
-        .await
-        .map_err(Error::from)?;
-        // replace the file in tmpfs
-        tmpfs::delete(&file.location, false)?;
-        tmpfs::set(
-            &file.location.replace(FILE_EXT_JSON, FILE_EXT_PARQUET),
-            buf.into(),
-        )?;
+        let schema = Arc::new(inferred_schema);
+        let sql = sql.clone();
+        let session = if single_group {
+            meta::search::Session {
+                id: session_id.to_string(),
+                storage_type: StorageType::Tmpfs,
+            }
+        } else {
+            let id = format!("{session_id}-{ver}");
+            // move data to group tmpfs
+            for file in files.iter() {
+                let file_data = tmpfs::get(file).unwrap();
+                let file_name = format!(
+                    "/{}/{}",
+                    id,
+                    file.strip_prefix(&format!("/{}/", work_dir)).unwrap()
+                );
+                tmpfs::set(&file_name, file_data).expect("tmpfs set success");
+            }
+            meta::search::Session {
+                id,
+                storage_type: StorageType::Tmpfs,
+            }
+        };
+        let datafusion_span = info_span!("service:search:grpc:wal:datafusion");
+        let task =
+            tokio::task::spawn(
+                async move {
+                    exec::sql(&session, schema, &diff_fields, &sql, &files, FileType::JSON).await
+                }
+                .instrument(datafusion_span),
+            );
+        tasks.push(task);
     }
 
-    Ok(())
+    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    for task in tasks {
+        match task.await {
+            Ok(ret) => match ret {
+                Ok(ret) => {
+                    for (k, v) in ret {
+                        let group = results.entry(k).or_insert_with(Vec::new);
+                        group.extend(v);
+                    }
+                }
+                Err(err) => {
+                    log::error!("datafusion execute error: {}", err);
+                    return Err(super::handle_datafusion_error(err));
+                }
+            },
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
+    }
+
+    // clear tmpfs
+    tmpfs::delete(session_id, true).unwrap();
+
+    Ok((results, file_count, scan_size))
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
@@ -244,4 +264,13 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     }
     Ok(result)
+}
+
+fn get_schema_version(file: &str) -> Result<String, Error> {
+    // eg: 0_2023_06_23_04_12e2211ba6a46272_level=INFO_7077863742821761024s2sgQB.json
+    let column = file.split('_').collect::<Vec<&str>>();
+    if column.len() < 7 {
+        return Err(Error::Message("invalid wal file name".to_string()));
+    }
+    Ok(column[5].to_string())
 }
