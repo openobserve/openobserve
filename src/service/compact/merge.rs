@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
+use ::datafusion::{
+    arrow::datatypes::Schema, datasource::file_format::file_type::FileType, error::DataFusionError,
+};
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
 use tokio::time;
 
 use crate::common::json;
-use crate::infra::{cache, config::CONFIG, db::etcd, ider, metrics, storage};
+use crate::infra::{
+    cache,
+    config::{CONFIG, FILE_EXT_PARQUET},
+    db::etcd,
+    ider, metrics, storage,
+};
 use crate::meta::{
     common::{FileKey, FileMeta},
     StreamType,
@@ -404,6 +411,7 @@ async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 diff_fields,
+                FileType::PARQUET,
             )
             .await
             .map_err(|e| {
@@ -431,7 +439,7 @@ async fn merge_files(
     new_file_meta.compressed_size = buf.len() as u64;
 
     let id = ider::generate();
-    let new_file_key = format!("{prefix}/{id}{}", &CONFIG.common.file_ext_parquet);
+    let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
 
     log::info!(
         "[COMPACT] merge file succeeded, new file: {}, orginal_size: {}, compressed_size: {}",

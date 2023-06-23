@@ -18,7 +18,11 @@ use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
 use crate::common::{json, utils::populate_file_meta};
-use crate::infra::{cluster, config::CONFIG, metrics, storage, wal};
+use crate::infra::{
+    cluster,
+    config::{CONFIG, FILE_EXT_PARQUET},
+    metrics, storage, wal,
+};
 use crate::meta::{common::FileMeta, StreamType};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
@@ -244,7 +248,7 @@ async fn upload_file(
         stream_name,
         stream_type,
         file_meta.min_ts,
-        &CONFIG.common.file_ext_parquet,
+        FILE_EXT_PARQUET,
     );
 
     let new_file_key = if partition_key.eq("") {

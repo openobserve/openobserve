@@ -737,16 +737,32 @@ pub async fn convert_parquet_file(
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     rules: HashMap<String, DataType>,
+    file_type: FileType,
 ) -> Result<()> {
     let start = std::time::Instant::now();
     // query data
     let ctx = prepare_datafusion_context()?;
 
     // Configure listing options
-    let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(CONFIG.limit.cpu_num);
+    let listing_options = match file_type {
+        FileType::PARQUET => {
+            let file_format = ParquetFormat::default().with_enable_pruning(Some(false));
+            ListingOptions::new(Arc::new(file_format))
+                .with_file_extension(FileType::PARQUET.get_ext())
+                .with_target_partitions(CONFIG.limit.cpu_num)
+        }
+        FileType::JSON => {
+            let file_format = JsonFormat::default();
+            ListingOptions::new(Arc::new(file_format))
+                .with_file_extension(FileType::JSON.get_ext())
+                .with_target_partitions(CONFIG.limit.cpu_num)
+        }
+        _ => {
+            return Err(DataFusionError::Execution(format!(
+                "Unsupported file type scheme {file_type:?}",
+            )));
+        }
+    };
 
     let prefix = match ListingTableUrl::parse(format!("tmpfs:///{session_id}/")) {
         Ok(url) => url,
@@ -984,7 +1000,7 @@ pub async fn register_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let schema = if session.storage_type.eq(&StorageType::Tmpfs) {
+    let schema = if session.storage_type.eq(&StorageType::Tmpfs) && file_type == FileType::JSON {
         config = config.infer_schema(&ctx.state()).await.unwrap();
         let table = ListingTable::try_new(config.clone())?;
         let infered_schema = table.schema();

@@ -17,7 +17,7 @@ use datafusion::{datasource::MemTable, prelude::SessionContext};
 use std::sync::Arc;
 
 use crate::common::json;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, FILE_EXT_JSON};
 use crate::meta::common::FileMeta;
 use crate::meta::StreamType;
 
@@ -25,7 +25,7 @@ use crate::meta::StreamType;
 pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {
     let last_file_suffix_stream = &file_name.rfind('_').unwrap() + 1;
     let last_file_suffix =
-        &file_name[last_file_suffix_stream..file_name.len() - CONFIG.common.file_ext_json.len()];
+        &file_name[last_file_suffix_stream..file_name.len() - FILE_EXT_JSON.len()];
     last_file_suffix.parse::<u32>().unwrap() + 1
 }
 
@@ -33,7 +33,7 @@ pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {
 pub fn get_stream_file_num_v1(file_name: &str) -> u32 {
     let last_file_suffix_stream = &file_name.rfind('_').unwrap() + 1;
     let last_file_suffix =
-        &file_name[last_file_suffix_stream..file_name.len() - CONFIG.common.file_ext_json.len()];
+        &file_name[last_file_suffix_stream..file_name.len() - FILE_EXT_JSON.len()];
     last_file_suffix.parse::<u32>().unwrap()
 }
 
@@ -48,7 +48,7 @@ pub fn get_file_name_v1(org_id: &str, stream_name: &str, suffix: u32) -> String 
         stream_name,
         stream_name,
         suffix,
-        &CONFIG.common.file_ext_json
+        FILE_EXT_JSON
     )
 }
 

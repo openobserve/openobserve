@@ -119,7 +119,6 @@ pub struct StreamSettings {
     #[serde(default)]
     pub data_retention: i64,
 }
- 
 
 impl Serialize for StreamSettings {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

@@ -127,7 +127,7 @@ pub fn generate_partioned_file_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::config::CONFIG;
+    use crate::infra::config::FILE_EXT_PARQUET;
 
     #[test]
     fn test_generate_partioned_file_key() {
@@ -136,7 +136,7 @@ mod tests {
             "stream_name",
             StreamType::Logs,
             1665580243211047,
-            &CONFIG.common.file_ext_parquet,
+            FILE_EXT_PARQUET,
         );
         assert_eq!(file_key.0.as_str(), "org/logs/stream_name/2022/10/12/13/");
         assert!(file_key.1.as_str().contains(".parquet"));
