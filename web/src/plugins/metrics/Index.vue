@@ -77,8 +77,8 @@
                   id="metrics-query-editor"
                   ref="metricsQueryEditorRef"
                   class="monaco-editor"
-                  :show-auto-complete="false"
                   v-model:query="searchObj.data.query"
+                  :keywords="promqlKeywords"
                   @update-query="updateQueryValue"
                   @run-query="searchData"
                 />
@@ -132,12 +132,12 @@
             <h5 class="text-center">No result found.</h5>
           </div>
           <template v-if="searchObj.data.metrics.metricList.length">
-            <div class="flex justify-end q-px-sm">
+            <div class="flex justify-end q-pr-lg">
               <q-btn
+                size="md"
                 class="q-px-sm"
                 no-caps
                 dense
-                color="primary"
                 @click="addToDashboard"
                 >Add to dashboard</q-btn
               >
@@ -174,6 +174,7 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -194,12 +195,14 @@ import { logsErrorMessage } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
-import QueryEditor from "@/components/dashboards/QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import ChartRender from "@/components/dashboards/addPanel/ChartRender.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
-import { addPanel } from "@/utils/commons";
+import { addPanel, getPanelId } from "@/utils/commons";
+import SearchService from "@/services/search";
+import { label } from "aws-amplify";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -242,6 +245,7 @@ export default defineComponent({
     const metricsQueryEditorRef = ref(null);
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData();
+    const promqlKeywords = ref([]);
 
     const chartData = ref({});
 
@@ -666,7 +670,6 @@ export default defineComponent({
       searchObj.data.datetime = value;
 
       const timestamp = getConsumableDateTime(searchObj.data.datetime);
-      console.log(timestamp);
       dashboardPanelData.meta.dateTime = timestamp;
 
       if (config.isCloud == "true" && value.userChangedValue) {
@@ -687,10 +690,218 @@ export default defineComponent({
       }
     };
 
-    const updateQueryValue = (value) => {
-      const { metricName, labels } = parsePromQlQuery(value);
-      console.log(metricName, labels);
-      dashboardPanelData.data.query = value;
+    const updateQueryValue = async (event, value) => {
+      try {
+        const { metricName, labels } = parsePromQlQuery(value);
+        promqlKeywords.value = [];
+        dashboardPanelData.data.query = value;
+        const timestamps = getConsumableDateTime(searchObj.data.datetime);
+        const startISOTimestamp: any =
+          new Date(timestamps.start_time.toISOString()).getTime() * 1000;
+        const endISOTimestamp: any =
+          new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+        // import search service and call search.get_promql_series
+        if (metricName) labels["__name__"] = metricName;
+        const formattedLabels = Object.keys(labels).map((key) => {
+          return `${key}="${labels[key]}"`;
+        });
+
+        // const cursorPostition = {
+        //   actualIndex: event.changes[0],
+        //   ...event.changes[0].range,
+        // };
+
+        // When we press backspace, the cursor position is not updated, so we need to update it manually
+        const rangeOffset = !event.changes[0].text.length
+          ? event.changes[0].rangeOffset - 1
+          : event.changes[0].rangeOffset;
+
+        const editingLabel = detectKeyAndValue(value, rangeOffset);
+        let labelSuggestions;
+
+        if (!editingLabel.hasLabels) {
+          updatePromqlKeywords([], editingLabel, event.changes[0].text);
+          return;
+        }
+        SearchService.get_promql_series({
+          org_identifier: store.state.selectedOrganization.identifier,
+          labels: `{${formattedLabels.join(",")}}`,
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+        })
+          .then((response) => {
+            labelSuggestions = getLabelSuggestions(
+              response.data.data,
+              editingLabel.labels,
+              formattedLabels.join(",")
+            );
+            // dashboardPanelData.data.queryResults = response.data;
+          })
+          .finally(() => {
+            if (labelSuggestions)
+              updatePromqlKeywords(
+                labelSuggestions,
+                editingLabel,
+                event.changes[0].text
+              );
+          });
+      } catch (e) {
+        console.log(e);
+      }
+    };
+
+    function detectKeyAndValue(query, cursorIndex) {
+      const keyValuePairRegex = /\b(\w+)\s*=\s*("([^"]*)|,|\})/g;
+      const metricNameRegex = /^([^\{\[\s]+)/;
+
+      const curlyBracesRegex = /{([^{}]*?)}/;
+      const hasCurlyBraces = curlyBracesRegex.exec(query);
+      let isValue = false;
+      let isKey = false;
+      if (hasCurlyBraces) {
+        const start = hasCurlyBraces.index;
+        const end = start + hasCurlyBraces[0].length;
+        if (start <= cursorIndex && cursorIndex <= end) {
+          const value = hasCurlyBraces[0][cursorIndex - start];
+          // Check is value
+          if (
+            (value === '"' &&
+              hasCurlyBraces[0][cursorIndex - start + 1] === '"') ||
+            value === "="
+          ) {
+            console.log("Show values --------------------------------------");
+            isValue = true;
+          }
+
+          if (
+            (value === "{" &&
+              hasCurlyBraces[0][cursorIndex - start + 1] === "}") ||
+            (value === "," &&
+              hasCurlyBraces[0][cursorIndex - start - 1] === '"')
+          ) {
+            isKey = true;
+            console.log("Show Keys  --------------------------------------");
+          }
+        }
+      }
+
+      let match;
+      // Extract metric name
+      const metricNameMatch = metricNameRegex.exec(query);
+      const metricName = metricNameMatch ? metricNameMatch[1] : null;
+
+      const cursorOn = {
+        labels: null,
+        metricName: null,
+      };
+
+      // Detect cursor position for metric name
+      cursorOn.metricName =
+        metricName &&
+        cursorIndex !== undefined &&
+        cursorIndex >= metricNameMatch.index &&
+        cursorIndex <= metricNameMatch.index + metricName.length;
+
+      // Extract labels
+      while (
+        hasCurlyBraces &&
+        (match = keyValuePairRegex.exec(query)) !== null
+      ) {
+        const [fullMatch, key, val, value] = match;
+        const start = match.index;
+        const end = start + fullMatch.length;
+        // Detect cursor position for labels and values
+        if (start <= cursorIndex && cursorIndex <= end) {
+          let showValues: boolean;
+          if (cursorIndex - start < key.length) {
+            showValues = false;
+          } else {
+            showValues = true;
+          }
+          cursorOn.labels = {
+            key: key,
+            value,
+            isLabel: !showValues,
+            isValue: showValues,
+          };
+          break;
+        }
+      }
+
+      if ((isValue || isKey) && !cursorOn.labels) cursorOn.labels = {};
+      if (isKey) cursorOn.labels.isLabel = true;
+      if (isValue) cursorOn.labels.isValue = true;
+      if (hasCurlyBraces) cursorOn["hasLabels"] = true;
+      if (!cursorOn.labels && hasCurlyBraces) {
+        cursorOn.labels = {};
+        cursorOn.labels["break"] = true;
+      }
+      return cursorOn;
+    }
+
+    const getLabelSuggestions = (labels, meta, queryLabels) => {
+      if (!meta || meta["break"]) return;
+      const keywords = [];
+      const keywordLabels = [];
+      if (meta.isLabel)
+        Object.keys(labels[0]).forEach((key) => {
+          if (queryLabels.indexOf(key + "=") === -1)
+            keywords.push({
+              label: key,
+              kind: "Variable",
+              insertText: key,
+            });
+        });
+
+      if (meta.isValue)
+        labels.forEach((label) => {
+          if (
+            label[meta.key] &&
+            keywordLabels.indexOf(label[meta.key]) === -1
+          ) {
+            keywordLabels.push(label[meta.key]);
+            keywords.push({
+              label: label[meta.key],
+              kind: "Variable",
+              insertText: `"${label[meta.key]}"`,
+            });
+          }
+        });
+      return keywords;
+    };
+
+    const updatePromqlKeywords = async (data, editingItem, value) => {
+      const keywords = [];
+      const functions = [
+        "sum",
+        "avg_over_time",
+        "rate",
+        "avg",
+        "max",
+        "topk",
+        "histogram_quantile",
+      ];
+      if (!data.length) {
+        functions.forEach((fun) => {
+          keywords.push({
+            label: fun,
+            kind: "Function",
+            insertText: fun,
+          });
+        });
+        searchObj.data.metrics.metricList.forEach((metric) => {
+          keywords.push({
+            label: metric.label,
+            kind: "Variable",
+            insertText: metric.label,
+          });
+        });
+      } else {
+        keywords.push(...data);
+      }
+      promqlKeywords.value = cloneDeep(keywords);
+      await nextTick();
+      metricsQueryEditorRef.value.triggerAutoComplete(value);
     };
 
     const parsePromQlQuery = (query) => {
@@ -704,10 +915,11 @@ export default defineComponent({
       if (labelsMatch) {
         const labelsStr = labelsMatch[1];
         const labelPairs = labelsStr.match(/(\w+)="([^"]*)"/g);
-        labelPairs.forEach((pair) => {
-          const [key, value] = pair.match(/(\w+)="([^"]*)"/).slice(1);
-          labels[key] = value;
-        });
+        if (labelPairs?.length)
+          labelPairs.forEach((pair) => {
+            const [key, value] = pair.match(/(\w+)="([^"]*)"/).slice(1);
+            labels[key] = value;
+          });
       }
 
       return { metricName, labels };
@@ -718,12 +930,12 @@ export default defineComponent({
     };
 
     const addPanelToDashboard = (dashboardId) => {
-      console.log("add panel to dashboard");
       dismiss = $q.notify({
         message: "Please wait while we add the panel to the dashboard",
         type: "ongoing",
         position: "bottom",
       });
+      dashboardPanelData.data.id = getPanelId();
       addPanel(store, dashboardId, dashboardPanelData.data)
         .then(() => {
           showAddToDashboardDialog.value = false;
@@ -732,6 +944,10 @@ export default defineComponent({
             type: "positive",
             position: "bottom",
             timeout: 3000,
+          });
+          router.push({
+            name: "viewDashboard",
+            query: { dashboard: dashboardId },
           });
         })
         .catch((err) => {
@@ -768,6 +984,7 @@ export default defineComponent({
       addToDashboard,
       showAddToDashboardDialog,
       addPanelToDashboard,
+      promqlKeywords,
     };
   },
   computed: {

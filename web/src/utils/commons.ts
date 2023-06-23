@@ -277,3 +277,7 @@ export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   const currentDashboard = findDashboard(dashboardId, store);
   return currentDashboard.panels?.find((it: any) => it.id == panelId);
 };
+
+export const getPanelId = () => {
+  return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+};
