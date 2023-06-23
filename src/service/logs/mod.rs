@@ -247,7 +247,16 @@ async fn add_valid_record(
             let (ret_val, error) = if !CONFIG.common.widening_schema_evolution {
                 cast_to_type(loc_value, delta)
             } else if schema_evolution.is_schema_changed {
-                (Some(value_str.clone()), None)
+                let local_delta = delta
+                    .into_iter()
+                    .filter(|x| x.metadata().contains_key("zo_cast"))
+                    .collect::<Vec<_>>();
+
+                if local_delta.is_empty() {
+                    (Some(value_str.clone()), None)
+                } else {
+                    cast_to_type(loc_value, local_delta)
+                }
             } else {
                 cast_to_type(loc_value, delta)
             };
