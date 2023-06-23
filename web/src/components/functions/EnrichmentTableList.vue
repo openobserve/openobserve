@@ -45,7 +45,7 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-              icon="delete" color="red"
+              :icon="outlinedDelete" color="red"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -146,6 +146,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -376,6 +377,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];

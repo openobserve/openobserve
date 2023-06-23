@@ -44,7 +44,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              icon="delete" color="red"
+              :icon="outlinedDelete" color="red"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -114,6 +114,8 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
