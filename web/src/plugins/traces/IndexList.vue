@@ -476,7 +476,7 @@ export default defineComponent({
 }
 
 .q-item {
-  color: $dark-page;
+  // color: $dark-page;
   min-height: 1.3rem;
   padding: 5px 10px;
 

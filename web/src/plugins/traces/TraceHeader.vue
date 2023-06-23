@@ -16,7 +16,7 @@
 <template>
   <div
     :style="{ height: '30px', border: '1px solid #ececec' }"
-    class="flex justify-start items-center "
+    class="flex justify-start items-center header-bg "
   >
     <div
       class="flex justify-start items-center no-wrap row q-px-sm "
@@ -101,5 +101,9 @@ $traceChartHeight: 250px;
 }
 .trace-tic {
   height: calc(100vh - $toolbarHeight - 5px - $traceChartHeight);
+}
+
+.header-bg {
+  background-color: color-mix(in srgb, currentColor 5%, transparent)
 }
 </style>

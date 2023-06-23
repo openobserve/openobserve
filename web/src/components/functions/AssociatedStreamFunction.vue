@@ -51,11 +51,7 @@
               dense
               flat
               size="xs"
-              :icon="
-                expandedRow.name != props.row.name
-                  ? 'img:' + getImageURL('images/common/down-solid.svg')
-                  : 'img:' + getImageURL('images/common/up-solid.svg')
-              "
+              icon="expand_more"
             />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
