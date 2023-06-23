@@ -42,6 +42,9 @@ pub static HAS_FUNCTIONS: bool = true;
 #[cfg(not(feature = "zo_functions"))]
 pub static HAS_FUNCTIONS: bool = false;
 
+pub static FILE_EXT_JSON: &str = ".json";
+pub static FILE_EXT_PARQUET: &str = ".parquet";
+
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
 pub static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
@@ -175,10 +178,6 @@ pub struct Common {
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
     pub wal_line_mode_enabled: bool,
-    #[env_config(name = "ZO_FILE_EXT_JSON", default = ".json")]
-    pub file_ext_json: String,
-    #[env_config(name = "ZO_FILE_EXT_PARQUET", default = ".parquet")]
-    pub file_ext_parquet: String,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
@@ -276,14 +275,14 @@ pub struct MemoryCache {
     pub enabled: bool,
     #[env_config(name = "ZO_MEMORY_CACHE_CACHE_LATEST_FILES", default = false)]
     pub cache_latest_files: bool,
-    #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     // MB, default is 50% of system memory
+    #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     // MB, will skip the cache when a query need cache great than this value, default is 80% of max_size
+    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     // MB, when cache is full will release how many data once time, default is 1% of max_size
+    #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
 }
 
@@ -367,6 +366,8 @@ pub struct S3 {
     pub request_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
+    #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
+    pub allow_invalid_certificates: bool,
 }
 
 #[derive(Debug, EnvConfig)]

@@ -13,22 +13,27 @@
 // limitations under the License.
 
 use ahash::AHashMap as HashMap;
-use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::datasource::file_format::file_type::FileType;
+use datafusion::{arrow::record_batch::RecordBatch, datasource::file_format::file_type::FileType};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{info_span, Instrument};
 
-use crate::infra::cache::file_data;
-use crate::infra::config::CONFIG;
-use crate::infra::errors::{Error, ErrorCodes};
+use crate::infra::{
+    cache::file_data,
+    config::CONFIG,
+    errors::{Error, ErrorCodes},
+};
 use crate::meta;
-use crate::service::search::datafusion::storage::StorageType;
-use crate::service::search::sql::Sql;
-use crate::service::{db, file_list};
+use crate::service::{
+    db, file_list,
+    search::{
+        datafusion::{exec, storage::StorageType},
+        sql::Sql,
+    },
+};
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:storage:enter", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all)]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -168,10 +173,10 @@ pub async fn search(
                 }
             }
         }
-        let datafusion_span = info_span!("service:search:storage:datafusion");
+        let datafusion_span = info_span!("service:search:grpc:storage:datafusion");
         let task = tokio::task::spawn(
             async move {
-                super::datafusion::exec::sql(
+                exec::sql(
                     &session,
                     schema,
                     &diff_fields,
