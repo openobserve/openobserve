@@ -255,59 +255,70 @@ export default defineComponent({
     };
 
     let list = computed(function () {
-      console.log("before",toRaw(currentDashboardData.data));
+      console.log("before",JSON.stringify(toRaw(currentDashboardData.data)));
       
-      let data = toRaw(currentDashboardData.data);
-      const variables = {}
-      const variable = {}
-      let list = []
-      // variable["type"] = "constant"
-      // variable["name"] = "namespace1"
-      // variable["label"] = "NameSpace"
-      // list.push(variable)
-      // variables["list"] = list
+      // let data = toRaw(currentDashboardData.data);
+      // console.log("-currentTimeObj-", JSON.stringify(currentTimeObj.value));
+      
+      // const variables = {}
+
+      // variables["list"] = [
+      //     {
+      //       "type" : "query_value",
+      //       "name" : "namespace1",
+      //       "label" : "NameSpace",
+      //       "queryData" : {
+      //         "streamType" : "logs",
+      //         "stream" : "gke-fluentbit",
+      //         "streamField" : "kubernetes_host",
+      //       }
+      //     }
+      //   ]
 
       // data["variables"] = variables
 
-      let queryData = {}
-      variable["type"] = "query_value"
-      variable["name"] = "namespace1"
-      variable["label"] = "NameSpace"
-      queryData["streamType"] = "logs"
-      queryData["stream"] = "gke-fluentbit"
-      queryData["streamField"] = "kubernetes_host"
-      variable["queryData"] = queryData
+      // data.variables.map((it)=> {
+      //   const obj = {name: it.name, value: null, isLoading: false }
+      //   switch (it.type) {
+          
+      //     case query_value:{
+      //       obj.isLoading = true
 
-      list.push(variable)
-      variables["list"] = list
+      //       streamService
+      //       .fieldValues({
+      //         org_identifier: store.state.selectedOrganization.identifier,
+      //         stream_name: it.queryData.stream,
+      //         start_time: currentTimeObj.start_time,
+      //         end_time: currentTimeObj.end_time,
+      //         fields: [it.queryData.streamField],
+      //         size: 10,
+      //         type: "traces",
+      //       })
+      //       .then((res: any) => {
+      //         if (res.data.hits.length) {
+      //           fieldValues.value[it.queryData.streamField]["values"] = res.data.hits
+      //             .find((field: any) => field.field === name)
+      //             .values.map((value: any) => {
+      //               return {
+      //                 key: value.key ? value.key : "null",
+      //                 count: formatNumberWithPrefix(value.num),
+      //               };
+      //             });
+      //         }
+      //   })
+      //       break;
+      //     }
+            
+        
+      //     default:{
 
-      data["variables"] = variables
+      //       break;
+      //     }
+      //   }
+      // })
 
-      console.log("-after-",data)
+      // console.log("-after-",data)
 
-      streamService
-        .fieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-          fields: [name],
-          size: 10,
-          type: "traces",
-        })
-        .then((res: any) => {
-          if (res.data.hits.length) {
-            fieldValues.value[name]["values"] = res.data.hits
-              .find((field: any) => field.field === name)
-              .values.map((value: any) => {
-                return {
-                  key: value.key ? value.key : "null",
-                  count: formatNumberWithPrefix(value.num),
-                };
-              });
-          }
-        })
-      
       return [toRaw(currentDashboardData.data)];
     });
 
