@@ -16,6 +16,7 @@ use ahash::AHashMap;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::json::reader::infer_json_schema;
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
@@ -132,9 +133,10 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
             }
             merged_metadata.insert(key.to_string(), value.to_string());
         }
+
         // merge fields
         let mut found_at = 0;
-        for field in schema.fields().iter() {
+        for field in schema.fields().iter().sorted_by_key(|v| v.name()) {
             let mut new_field = true;
             let mut allowed = false;
             for (stream, mut merged_field) in merged_fields.iter_mut().enumerate() {
@@ -161,7 +163,14 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
                     }
                 }
                 found_at = stream;
-                merged_field.try_merge(field)?;
+                match merged_field.try_merge(field) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        let mut meta = field.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        merged_field.set_metadata(meta);
+                    }
+                };
             }
             // found a new field, add to field list
             if new_field {
@@ -175,6 +184,85 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
     let merged = Schema::new_with_metadata(merged_fields, merged_metadata);
     Ok(merged)
 }
+
+// fn try_merge_zo(
+//     schema: Schema,
+//     inferred: Schema,
+//     delta_types: Vec<Field>,
+// ) -> Result<Schema, ArrowError> {
+//     let mut merged_metadata: HashMap<String, String> = HashMap::new();
+//     let mut merged_fields: Vec<Field> = Vec::new();
+//     // TODO : this dummy initialization is to avoid compiler complaining for uninitialized value
+//     let mut temp_field = Field::new("dummy", DataType::Utf8, false);
+
+//     for field in delta_types {
+//         let orig_f = schema.field_with_name(field.name());
+//         let inferred_f = inferred.field_with_name(field.name());
+//     }
+
+//     for schema in schemas {
+//         for (key, value) in schema.metadata() {
+//             // merge metadata
+//             if let Some(old_val) = merged_metadata.get(key) {
+//                 if old_val != value {
+//                     return Err(ArrowError::SchemaError(
+//                         "Fail to merge schema due to conflicting metadata.".to_string(),
+//                     ));
+//                 }
+//             }
+//             merged_metadata.insert(key.to_string(), value.to_string());
+//         }
+
+//         // merge fields
+//         let mut found_at = 0;
+//         for field in schema.fields().iter().sorted_by_key(|v| v.name()) {
+//             let mut new_field = true;
+//             let mut allowed = false;
+//             for (stream, mut merged_field) in merged_fields.iter_mut().enumerate() {
+//                 if field.name() != merged_field.name() {
+//                     continue;
+//                 }
+//                 new_field = false;
+//                 if merged_field.data_type() != field.data_type() {
+//                     if !CONFIG.common.widening_schema_evolution {
+//                         return Err(ArrowError::SchemaError(format!(
+//                             "Fail to merge schema due to conflicting data type[{}:{}].",
+//                             merged_field.data_type(),
+//                             field.data_type()
+//                         )));
+//                     }
+//                     allowed = is_widening_conversion(merged_field.data_type(), field.data_type());
+//                     if allowed {
+//                         temp_field = Field::new(
+//                             merged_field.name(),
+//                             field.data_type().to_owned(),
+//                             merged_field.is_nullable(),
+//                         );
+//                         merged_field = &mut temp_field;
+//                     }
+//                 }
+//                 found_at = stream;
+//                 match merged_field.try_merge(field) {
+//                     Ok(_) => {}
+//                     Err(_) => {
+//                         let mut meta = field.metadata().clone();
+//                         meta.insert("cast".to_owned(), true.to_string());
+//                         merged_field.set_metadata(meta);
+//                     }
+//                 };
+//             }
+//             // found a new field, add to field list
+//             if new_field {
+//                 merged_fields.push(field.clone());
+//             }
+//             if allowed {
+//                 let _ = std::mem::replace(&mut merged_fields[found_at], temp_field.to_owned());
+//             }
+//         }
+//     }
+//     let merged = Schema::new_with_metadata(merged_fields, merged_metadata);
+//     Ok(merged)
+// }
 
 fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     let allowed_type = match from {
@@ -416,6 +504,23 @@ pub async fn check_for_schema(
                     .unwrap();
                     stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
                     //(true, Some(field_datatype_delta),final_schema.fields().to_vec());
+                    //before returning delta map, check merged schema fields metadata for casting required
+
+                    let mut meta_fields = merged
+                        .fields()
+                        .iter()
+                        .filter(|x| x.metadata().contains_key("zo_cast"))
+                        .collect::<Vec<_>>();
+
+                    meta_fields.sort_by_key(|k| k.name());
+
+                    for meta in meta_fields {
+                        field_datatype_delta.iter_mut().for_each(|x| {
+                            if x.name() == meta.name() {
+                                x.set_metadata(meta.metadata().clone());
+                            }
+                        });
+                    }
                     return SchemaEvolution {
                         schema_compatible: true,
                         types_delta: Some(field_datatype_delta),
