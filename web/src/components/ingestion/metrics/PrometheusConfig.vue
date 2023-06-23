@@ -111,7 +111,7 @@ export default defineComponent({
     }
     .copy_action {
       .q-btn {
-        background-color: white;
+        // background-color: white;
       }
     }
   }
