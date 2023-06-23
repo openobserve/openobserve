@@ -184,6 +184,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
                 .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
+                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates)
                 .with_allow_http(true),
         )
         .with_profile("default")
@@ -209,7 +210,8 @@ fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzu
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout)),
+                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
+                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates),
         )
         .with_container_name(&CONFIG.s3.bucket_name);
     if !CONFIG.s3.access_key.is_empty() {
@@ -226,7 +228,8 @@ fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStora
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout)),
+                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
+                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates),
         )
         .with_bucket_name(&CONFIG.s3.bucket_name);
     if !CONFIG.s3.access_key.is_empty() {
