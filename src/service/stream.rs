@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::http;
-use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::{http, http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
 use std::io::Error;
 
-use crate::common::json;
-use crate::common::utils::is_local_disk_storage;
-use crate::infra::cache::stats;
-use crate::infra::config::STREAM_SCHEMAS;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::stream::{Stream, StreamProperty, StreamSettings, StreamStats};
-use crate::meta::StreamType;
+use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
+use crate::infra::{cache::stats, config::STREAM_SCHEMAS};
+use crate::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    stream::{Stream, StreamProperty, StreamSettings, StreamStats},
+    StreamType,
+};
 use crate::service::db;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
@@ -168,6 +167,15 @@ pub async fn save_stream_settings(
         );
     }
 
+    for key in setting.partition_keys.iter() {
+        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.as_str()) {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("field [{key}] can't be used for partition key"),
+            )));
+        }
+    }
+
     let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
@@ -179,7 +187,6 @@ pub async fn save_stream_settings(
             chrono::Utc::now().timestamp_micros().to_string(),
         );
     }
-    log::info!("Saving setting for schema {:?}", stream_name);
     db::schema::set(
         org_id,
         stream_name,
