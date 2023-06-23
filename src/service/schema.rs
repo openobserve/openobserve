@@ -16,6 +16,7 @@ use ahash::AHashMap;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::error::ArrowError;
 use datafusion::arrow::json::reader::infer_json_schema;
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
@@ -132,9 +133,10 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
             }
             merged_metadata.insert(key.to_string(), value.to_string());
         }
+
         // merge fields
         let mut found_at = 0;
-        for field in schema.fields().iter() {
+        for field in schema.fields().iter().sorted_by_key(|v| v.name()) {
             let mut new_field = true;
             let mut allowed = false;
             for (stream, mut merged_field) in merged_fields.iter_mut().enumerate() {
@@ -161,7 +163,14 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
                     }
                 }
                 found_at = stream;
-                merged_field.try_merge(field)?;
+                match merged_field.try_merge(field) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        let mut meta = field.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        merged_field.set_metadata(meta);
+                    }
+                };
             }
             // found a new field, add to field list
             if new_field {
@@ -416,6 +425,23 @@ pub async fn check_for_schema(
                     .unwrap();
                     stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
                     //(true, Some(field_datatype_delta),final_schema.fields().to_vec());
+                    //before returning delta map, check merged schema fields metadata for casting required
+
+                    let mut meta_fields = merged
+                        .fields()
+                        .iter()
+                        .filter(|x| x.metadata().contains_key("zo_cast"))
+                        .collect::<Vec<_>>();
+
+                    meta_fields.sort_by_key(|k| k.name());
+
+                    for meta in meta_fields {
+                        field_datatype_delta.iter_mut().for_each(|x| {
+                            if x.name() == meta.name() {
+                                x.set_metadata(meta.metadata().clone());
+                            }
+                        });
+                    }
                     return SchemaEvolution {
                         schema_compatible: true,
                         types_delta: Some(field_datatype_delta),
