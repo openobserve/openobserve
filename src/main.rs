@@ -131,7 +131,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
-    let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
+    let haddr4: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
+    let haddr6: SocketAddr = format!("[::]:{}", CONFIG.http.port).parse()?;
     meta::telemetry::Telemetry::new()
         .event("OpenObserve - Starting server", None, false)
         .await;
@@ -143,7 +144,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         log::info!(
             "starting HTTP server at: {}, thread_id: {}",
-            haddr,
+            haddr4,
             local_id
         );
         let app = if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
@@ -190,7 +191,8 @@ async fn main() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .bind(haddr)?;
+    .bind(haddr4)?
+    .bind(haddr6)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
 
