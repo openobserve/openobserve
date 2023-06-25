@@ -55,7 +55,7 @@
                   background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
                 }">
                   <q-icon
-                    name="add_circle"
+                    :name="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="1rem"
@@ -86,7 +86,7 @@
                       <div class="field_overlay">
                       <q-icon
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        name="add_circle"
+                        :name="outlinedAdd"
                         style="margin-right: 0.375rem"
                         size="1rem"
                         @click.stop="addToFilter(props.row.name)"
@@ -218,6 +218,7 @@ import useTraces from "../../composables/useTraces";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
+import { outlinedAdd } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -344,6 +345,7 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
+      outlinedAdd,
     };
   },
 });
