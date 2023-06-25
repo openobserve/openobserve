@@ -159,7 +159,7 @@
                     ></q-btn>
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-delete-alert`"
-                      icon="delete" color="red"
+                      icon="outlinedDelete" color="red"
                       class="q-ml-xs"
                       padding="sm"
                       unelevated
@@ -203,6 +203,7 @@ import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
 import { useQuasar, type QTableProps } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 interface SyslogRoute {
   orgId: string;
@@ -572,6 +573,7 @@ export default defineComponent({
       showConformDelete,
       cancelDeleteRoute,
       disableToggle,
+      outlinedDelete,
     };
   },
 });

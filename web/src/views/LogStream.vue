@@ -63,7 +63,7 @@
             @click="listSchema(props)"
           />
           <q-btn
-            icon="delete" color="red"
+            icon="outlinedDelete" color="red"
             :title="t('logStream.delete')"
             class="q-ml-xs"
             padding="sm"
@@ -175,6 +175,7 @@ import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
 import config from "@/aws-exports";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "PageLogStream",
@@ -449,6 +450,7 @@ export default defineComponent({
       maxRecordToReturn,
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
