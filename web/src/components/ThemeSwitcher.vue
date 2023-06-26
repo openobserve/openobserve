@@ -1,9 +1,11 @@
 <template>
-    <q-toggle v-model="darkMode" label="Dark Mode"></q-toggle>
+    <q-btn class="round-button" flat @click="toggleDarkMode">
+      <q-icon :name="DarkModeIcon"></q-icon>
+    </q-btn>
 </template>
 
 <script lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { useQuasar } from 'quasar';
 import { useStore } from "vuex";
 import * as monaco from "monaco-editor";
@@ -26,6 +28,10 @@ export default {
             setTheme(darkMode.value ? 'dark' : 'light');
         });
 
+        const DarkModeIcon = computed(() => {
+            return darkMode.value ? 'dark_mode' : 'light_mode'
+        });
+
         watch(darkMode, () => {
             setTheme(darkMode.value ? 'dark' : 'light')
         });
@@ -42,9 +48,15 @@ export default {
             store.dispatch("appTheme", theme);
         }
 
+        const toggleDarkMode = () => {
+            darkMode.value = !darkMode.value;
+        };
+
         return {
             store,
             darkMode,
+            DarkModeIcon,
+            toggleDarkMode
         };
     },
 };
@@ -60,5 +72,16 @@ export default {
 .dark-mode {
     background-color: #36383A;
     color: #ffffff;
+}
+
+.round-button {
+  border: none;
+  border-radius: 50%;
+  box-shadow: none;
+  transition: box-shadow 0.3s ease;
+}
+
+.round-button:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 </style>
