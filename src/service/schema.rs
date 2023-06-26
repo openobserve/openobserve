@@ -98,11 +98,25 @@ pub async fn schema_evolution(
             Ok(merged) => {
                 if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
                     let is_field_delta = !field_datatype_delta.is_empty();
+                    let mut final_fields = vec![];
+
+                    let metadata = merged.metadata().clone();
+
+                    for field in merged.fields.into_iter() {
+                        let mut field = field.clone();
+                        let mut new_meta = field.metadata().clone();
+                        if new_meta.contains_key("zo_cast") {
+                            new_meta.remove_entry("zo_cast");
+                            field.set_metadata(new_meta);
+                        }
+                        final_fields.push(field);
+                    }
+                    let final_schema = Schema::new(final_fields.to_vec()).with_metadata(metadata);
                     db::schema::set(
                         org_id,
                         stream_name,
                         stream_type,
-                        &merged,
+                        &final_schema,
                         Some(min_ts),
                         is_field_delta,
                     )
@@ -411,21 +425,6 @@ pub async fn check_for_schema(
                             chrono::Utc::now().timestamp_micros().to_string(),
                         );
                     }
-                    let final_schema =
-                        Schema::new(merged.fields().to_vec()).with_metadata(metadata);
-                    db::schema::set(
-                        org_id,
-                        stream_name,
-                        stream_type,
-                        &final_schema,
-                        Some(record_ts),
-                        is_field_delta,
-                    )
-                    .await
-                    .unwrap();
-                    stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
-                    //(true, Some(field_datatype_delta),final_schema.fields().to_vec());
-                    //before returning delta map, check merged schema fields metadata for casting required
 
                     let mut meta_fields = merged
                         .fields()
@@ -442,6 +441,33 @@ pub async fn check_for_schema(
                             }
                         });
                     }
+                    let mut final_fields = vec![];
+
+                    for field in merged.fields.into_iter() {
+                        let mut field = field.clone();
+                        let mut new_meta = field.metadata().clone();
+                        if new_meta.contains_key("zo_cast") {
+                            new_meta.remove_entry("zo_cast");
+                            field.set_metadata(new_meta);
+                        }
+                        final_fields.push(field);
+                    }
+
+                    let final_schema = Schema::new(final_fields.to_vec()).with_metadata(metadata);
+                    db::schema::set(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &final_schema,
+                        Some(record_ts),
+                        is_field_delta,
+                    )
+                    .await
+                    .unwrap();
+                    stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+                    //(true, Some(field_datatype_delta),final_schema.fields().to_vec());
+                    //before returning delta map, check merged schema fields metadata for casting required
+
                     return SchemaEvolution {
                         schema_compatible: true,
                         types_delta: Some(field_datatype_delta),
