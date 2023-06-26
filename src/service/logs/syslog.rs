@@ -84,7 +84,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
-    /*  #[cfg(feature = "zo_functions")]
+    /*
     let (local_tans, _, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         stream_name,
@@ -118,7 +118,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     let mut value = message_to_value(parsed_msg);
     value = flatten::flatten(&value).unwrap();
 
-    /* #[cfg(feature = "zo_functions")]
+    /*
     let mut value = crate::service::ingestion::apply_stream_transform(
         &local_tans,
         &value,
@@ -128,7 +128,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         stream_name,
         &mut runtime,
     );
-    #[cfg(feature = "zo_functions")]
+
     if value.is_null() || !value.is_object() {
         stream_status.status.failed += 1; // transform failed or dropped
     } */
@@ -174,11 +174,22 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     if local_trigger.is_some() {
         trigger = Some(local_trigger.unwrap());
     }
-
-    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
+    let mut stream_file_name = "".to_string();
+    write_file(
+        buf,
+        thread_id,
+        org_id,
+        stream_name,
+        &mut stream_file_name,
+        StreamType::Logs,
+    );
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
+
+    /*     req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_ingest_stats(&req_stats, org_id, StreamType::Logs, UsageEvent::Syslog).await; */
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME

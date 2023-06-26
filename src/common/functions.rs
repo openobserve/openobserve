@@ -16,7 +16,6 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
         .collect()
 }
 
-#[cfg(feature = "zo_functions")]
 pub fn init_vrl_runtime() -> vrl::compiler::runtime::Runtime {
     vrl::compiler::runtime::Runtime::new(vrl::prelude::state::RuntimeState::default())
 }

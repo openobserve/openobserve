@@ -14,7 +14,6 @@
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
-use bytes::{BufMut, BytesMut};
 use chrono::{Duration, Utc};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -24,18 +23,25 @@ use std::{
     io::{BufRead, BufReader, Error},
 };
 
-use crate::common::{flatten, json};
-use crate::infra::{cluster, config::CONFIG, wal};
 use crate::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
     traces::{Event, Span, SpanRefType},
+    usage::UsageType,
     StreamType,
 };
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record},
     schema::{add_stream_schema, stream_schema_exists},
+};
+use crate::{
+    common::{flatten, json},
+    service::ingestion::write_file,
+};
+use crate::{
+    infra::{cluster, config::CONFIG},
+    service::usage::report_usage_stats,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -74,6 +80,7 @@ pub async fn traces_json(
         )));
     }
 
+    let start = std::time::Instant::now();
     let traces_stream_name = "default";
     let mut trace_meta_coll: AHashMap<String, Vec<json::Map<String, json::Value>>> =
         AHashMap::new();
@@ -107,9 +114,9 @@ pub async fn traces_json(
 
     let mut trigger: Option<Trigger> = None;
     /*   // Start Register Transforms for stream
-    #[cfg(feature = "zo_functions")]
+
     let (lua, mut runtime) = crate::service::ingestion::init_functions_runtime();
-    #[cfg(feature = "zo_functions")]
+
     let (local_tans, stream_lua_map, stream_vrl_map) =
         crate::service::ingestion::register_stream_transforms(
             org_id,
@@ -269,7 +276,7 @@ pub async fn traces_json(
                             value = flatten::flatten(&value).unwrap();
 
                             /*     // Start row based transform
-                            #[cfg(feature = "zo_functions")]
+
                             let mut value = crate::service::ingestion::apply_stream_transform(
                                 &local_tans,
                                 &value,
@@ -279,7 +286,7 @@ pub async fn traces_json(
                                 traces_stream_name,
                                 &mut runtime,
                             );
-                            #[cfg(feature = "zo_functions")]
+
                             if value.is_null() || !value.is_object() {
                                 continue;
                             }
@@ -370,51 +377,41 @@ pub async fn traces_json(
             )));
         }
     }
-    let mut write_buf = BytesMut::new();
-    for (key, entry) in data_buf {
-        if entry.is_empty() {
-            continue;
-        }
 
-        write_buf.clear();
-        for row in &entry {
-            write_buf.put(row.as_bytes());
-            write_buf.put("\n".as_bytes());
-        }
-        let file = wal::get_or_create(
-            thread_id,
+    let mut traces_file_name = "".to_string();
+    let mut req_stats = write_file(
+        data_buf,
+        thread_id,
+        org_id,
+        traces_stream_name,
+        &mut traces_file_name,
+        StreamType::Traces,
+    );
+    req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_usage_stats(req_stats, org_id, StreamType::Traces, UsageType::Traces, 0).await;
+
+    let schema_exists = stream_schema_exists(
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        &mut traces_schema_map,
+    )
+    .await;
+    if !schema_exists.has_fields && !traces_file_name.is_empty() {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(&traces_file_name)
+            .unwrap();
+        add_stream_schema(
             org_id,
             traces_stream_name,
             StreamType::Traces,
-            &key,
-            false,
-        );
-        let traces_file_name = file.full_name();
-
-        file.write(write_buf.as_ref());
-
-        let schema_exists = stream_schema_exists(
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
+            &file,
             &mut traces_schema_map,
+            min_ts,
         )
         .await;
-        if !schema_exists.has_fields && !traces_file_name.is_empty() {
-            let file = OpenOptions::new()
-                .read(true)
-                .open(&traces_file_name)
-                .unwrap();
-            add_stream_schema(
-                org_id,
-                traces_stream_name,
-                StreamType::Traces,
-                &file,
-                &mut traces_schema_map,
-                min_ts,
-            )
-            .await;
-        }
     }
 
     // only one trigger per request, as it updates etcd

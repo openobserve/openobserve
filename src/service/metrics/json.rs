@@ -17,16 +17,17 @@ use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
 use std::{collections::HashMap, io::BufReader};
-#[cfg(feature = "zo_functions")]
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::{flatten, json, time};
 use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::usage::{RequestStats, UsageType};
 use crate::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
     StreamType,
 };
+use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
     ingestion::{get_hour_key, write_file},
@@ -43,9 +44,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
-    #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
     let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
@@ -70,11 +69,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         };
 
         // apply functions
-        #[cfg(feature = "zo_functions")]
         let mut record = json::Value::Object(record.to_owned());
-        #[cfg(feature = "zo_functions")]
         apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
-        #[cfg(feature = "zo_functions")]
+
         let record = record.as_object_mut().unwrap();
 
         // check timestamp & value
@@ -176,24 +173,28 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             .or_insert(StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
-
+    let mut final_req_stats = RequestStats::default();
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
         {
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
-        // write to file
-        write_file(
+        let mut stream_file_name = "".to_string();
+        let req_stats = write_file(
             stream_data,
             thread_id,
             org_id,
             &stream_name,
-            StreamType::Metrics,
+            &mut stream_file_name,
+            StreamType::Logs,
         );
+        final_req_stats.size += req_stats.size;
+        final_req_stats.records += req_stats.records;
     }
 
     let time = start.elapsed().as_secs_f64();
+    final_req_stats.response_time += time;
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/metrics/_json",
@@ -212,6 +213,15 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &StreamType::Metrics.to_string(),
         ])
         .inc();
+    //let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+    report_usage_stats(
+        final_req_stats,
+        org_id,
+        StreamType::Logs,
+        UsageType::JsonMetrics,
+        0,
+    )
+    .await;
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
@@ -219,7 +229,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     ))
 }
 
-#[cfg(feature = "zo_functions")]
 fn apply_func(
     runtime: &mut Runtime,
     org_id: &str,

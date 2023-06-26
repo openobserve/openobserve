@@ -34,6 +34,7 @@ pub mod stream;
 pub mod syslogs_route;
 pub mod traces;
 pub mod triggers;
+pub mod usage;
 pub mod users;
 
 // generate partition key for query
