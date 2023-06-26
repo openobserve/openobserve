@@ -249,8 +249,8 @@
             dense
             :rules="[
               (val) =>
-                /^[a-zA-Z][a-zA-Z0-9]*$/.test(val) ||
-                'Input must start with a letter and be alphanumeric',
+                /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
+                'Input must start with a letter and be alphanumeric _ or -',
             ]"
           />
 

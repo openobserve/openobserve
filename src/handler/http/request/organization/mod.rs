@@ -91,30 +91,29 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
                 orgs.push(org)
             }
         }
-    } else {
-        for user in USERS.iter() {
-            if !user.key().contains('/') {
-                continue;
-            }
-            if !user.key().ends_with(&format!("/{user_id}")) {
-                continue;
-            }
+    }
+    for user in USERS.iter() {
+        if !user.key().contains('/') {
+            continue;
+        }
+        if !user.key().ends_with(&format!("/{user_id}")) {
+            continue;
+        }
 
-            id += 1;
-            let org = OrgDetails {
-                id,
-                identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                user_email: user_id.to_string(),
-                ingest_threshold: THRESHOLD,
-                search_threshold: THRESHOLD,
-                org_type: CUSTOM.to_string(),
-                user_obj: user_detail.clone(),
-            };
-            if !org_names.contains(&org.identifier) {
-                org_names.insert(org.identifier.clone());
-                orgs.push(org)
-            }
+        id += 1;
+        let org = OrgDetails {
+            id,
+            identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+            name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+            user_email: user_id.to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: CUSTOM.to_string(),
+            user_obj: user_detail.clone(),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org)
         }
     }
     let org_response = OrganizationResponse { data: orgs };
