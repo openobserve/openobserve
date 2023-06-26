@@ -102,6 +102,10 @@ pub fn stream_res(
         };
         mappings.push(stream_prop);
     }
+    let created_at: i64 = match meta.get("created_at") {
+        Some(v) => v.parse().unwrap(),
+        None => 0,
+    };
     meta.remove("created_at");
     let mut partition_keys = Vec::new();
     let mut full_text_search_keys = vec![];
@@ -131,10 +135,11 @@ pub fn stream_res(
     }
 
     let storage_type = if is_local_disk_storage() { LOCAL } else { S3 };
-    let stats = match stats {
+    let mut stats = match stats {
         Some(v) => v,
         None => StreamStats::default(),
     };
+    stats.created_at = created_at;
 
     Stream {
         name: stream_name.to_string(),
