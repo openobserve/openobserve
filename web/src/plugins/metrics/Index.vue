@@ -706,11 +706,6 @@ export default defineComponent({
           return `${key}="${labels[key]}"`;
         });
 
-        // const cursorPostition = {
-        //   actualIndex: event.changes[0],
-        //   ...event.changes[0].range,
-        // };
-
         // When we press backspace, the cursor position is not updated, so we need to update it manually
         const rangeOffset = !event.changes[0].text.length
           ? event.changes[0].rangeOffset - 1
@@ -769,7 +764,6 @@ export default defineComponent({
               hasCurlyBraces[0][cursorIndex - start + 1] === '"') ||
             value === "="
           ) {
-            console.log("Show values --------------------------------------");
             isValue = true;
           }
 
@@ -780,7 +774,6 @@ export default defineComponent({
               hasCurlyBraces[0][cursorIndex - start - 1] === '"')
           ) {
             isKey = true;
-            console.log("Show Keys  --------------------------------------");
           }
         }
       }
@@ -812,16 +805,21 @@ export default defineComponent({
         const end = start + fullMatch.length;
         // Detect cursor position for labels and values
         if (start <= cursorIndex && cursorIndex <= end) {
-          let showValues: boolean;
+          let showValues: boolean = false;
+          let showLabels: boolean = false;
           if (cursorIndex - start < key.length) {
-            showValues = false;
-          } else {
+            showLabels = true;
+          } else if (
+            key &&
+            value &&
+            cursorIndex - start < key.length + value.length
+          ) {
             showValues = true;
           }
           cursorOn.labels = {
             key: key,
             value,
-            isLabel: !showValues,
+            isLabel: showLabels,
             isValue: showValues,
           };
           break;
@@ -899,9 +897,12 @@ export default defineComponent({
       } else {
         keywords.push(...data);
       }
-      promqlKeywords.value = cloneDeep(keywords);
+      promqlKeywords.value = keywords;
+      metricsQueryEditorRef.value.disableSuggestionPopup();
       await nextTick();
-      metricsQueryEditorRef.value.triggerAutoComplete(value);
+      setTimeout(() => {
+        metricsQueryEditorRef.value.triggerAutoComplete(value);
+      }, 100);
     };
 
     const parsePromQlQuery = (query) => {

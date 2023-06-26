@@ -23,14 +23,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, nextTick } from "vue";
 import * as monaco from "monaco-editor";
 import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
+import { debounce } from "quasar";
 
 export default defineComponent({
   props: {
-    autocompleteKeywords: [],
     id: {
       type: String,
       default: "editor",
@@ -38,14 +38,6 @@ export default defineComponent({
     query: {
       type: String,
       default: "",
-    },
-    fields: {
-      type: Array,
-      default: () => [],
-    },
-    functions: {
-      type: Array,
-      default: () => [],
     },
     showAutoComplete: {
       type: Boolean,
@@ -58,6 +50,10 @@ export default defineComponent({
     suggestions: {
       type: Array,
       default: () => [],
+    },
+    debounceTime: {
+      type: Number,
+      default: 500,
     },
   },
   emits: ["update-query", "run-query"],
@@ -171,11 +167,6 @@ export default defineComponent({
             return {
               suggestions: filteredSuggestions,
             };
-            // } else {
-            //   return {
-            //     suggestions: filteredSuggestions,
-            //   };
-            // }
           },
         });
 
@@ -206,9 +197,11 @@ export default defineComponent({
         minimap: { enabled: false },
       });
 
-      editorObj.onDidChangeModelContent((e: any) => {
-        emit("update-query", e, editorObj.getValue());
-      });
+      editorObj.onDidChangeModelContent(
+        debounce((e: any) => {
+          emit("update-query", e, editorObj.getValue());
+        }, props.debounceTime)
+      );
 
       editorObj.createContextKey("ctrlenter", true);
       editorObj.addCommand(
@@ -238,8 +231,12 @@ export default defineComponent({
       editorObj.layout();
     };
 
-    const triggerAutoComplete = (value: string) => {
+    const triggerAutoComplete = async (value: string) => {
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
+    };
+
+    const disableSuggestionPopup = () => {
+      editorObj.focus();
     };
 
     return {
@@ -247,6 +244,7 @@ export default defineComponent({
       editorObj,
       setValue,
       resetEditorLayout,
+      disableSuggestionPopup,
       triggerAutoComplete,
     };
   },
