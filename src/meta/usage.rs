@@ -44,7 +44,6 @@ impl From<UsageType> for UsageEvent {
             }
             UsageType::Functions => UsageEvent::Functions,
             UsageType::Retention => UsageEvent::Other,
-            UsageType::HEAD => todo!(),
         }
     }
 }
