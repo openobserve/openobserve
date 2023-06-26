@@ -47,6 +47,7 @@ pub struct StreamQueryParams {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct StreamStats {
+    pub created_at: i64,
     pub doc_time_min: i64,
     pub doc_time_max: i64,
     pub doc_num: u64,
