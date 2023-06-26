@@ -34,8 +34,6 @@ import useDashboardPanelData from '@/composables/useDashboardPanel';
 import { defineComponent } from 'vue';
 
 export default defineComponent({
-  props: {},
-  emits: [],
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
 
