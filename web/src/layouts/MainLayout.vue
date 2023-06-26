@@ -229,6 +229,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedGridOn, outlinedWarning, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -307,48 +308,48 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: "home",
+        icon: outlinedHome,
         link: "/",
         exact: true,
       },
       {
         title: t("menu.search"),
-        icon: "search",
+        icon: outlinedSearch,
         link: "/logs",
       },
       {
         title: t("menu.metrics"),
-        icon: "bar_chart",
+        icon: outlinedBarChart,
         link: "/metrics",
       },
       {
         title: t("menu.traces"),
-        icon: "account_tree",
+        icon: outlinedAccountTree,
         link: "/traces",
       },
       {
         title: t("menu.dashboard"),
-        icon: "dashboard",
+        icon: outlinedDashboard,
         link: "/dashboards",
       },
       {
         title: t("menu.index"),
-        icon: "grid_on",
+        icon: outlinedGridOn,
         link: "/logstreams",
       },
       {
         title: t("menu.alerts"),
-        icon: "warning",
+        icon: outlinedWarning,
         link: "/alerts",
       },
       {
         title: t("menu.ingestion"),
-        icon: "filter_alt",
+        icon: outlinedFilterAlt,
         link: "/ingestion/",
       },
       {
         title: t("menu.user"),
-        icon: "person",
+        icon: outlinedPerson,
         link: "/users",
         display: store.state.currentuser.role == "admin" ? true : false,
       },
@@ -361,7 +362,7 @@ export default defineComponent({
       },
       {
         title: t("menu.about"),
-        icon: "format_list_bulleted",
+        icon: outlinedFormatListBulleted,
         link: "/about",
       },
     ]);
