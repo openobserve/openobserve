@@ -27,7 +27,6 @@ use datafusion::{
         },
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
         object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry},
-        TableProvider,
     },
     error::{DataFusionError, Result},
     execution::{
@@ -70,8 +69,7 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
-    let (mut ctx, schema) =
-        register_table(session, schema, "tbl", files, file_type.clone()).await?;
+    let mut ctx = register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -377,8 +375,8 @@ async fn get_fast_mode_ctx(
         id: format!("{}-fast", session.id),
         storage_type: session.storage_type.clone(),
     };
-    let (mut ctx, schema) =
-        register_table(&fast_sesison, schema, "tbl", &new_files, file_type).await?;
+    let mut ctx =
+        register_table(&fast_sesison, schema.clone(), "tbl", &new_files, file_type).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -955,7 +953,7 @@ pub async fn register_table(
     table_name: &str,
     files: &[String],
     file_type: FileType,
-) -> Result<(SessionContext, Arc<Schema>)> {
+) -> Result<SessionContext> {
     let ctx = prepare_datafusion_context()?;
     // Configure listing options
     let listing_options = match file_type {
@@ -1000,31 +998,13 @@ pub async fn register_table(
         }
     };
 
-    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let schema = if session.storage_type.eq(&StorageType::Tmpfs) && file_type == FileType::JSON {
-        config = config.infer_schema(&ctx.state()).await.unwrap();
-        let table = ListingTable::try_new(config.clone())?;
-        let infered_schema = table.schema();
-        match Schema::try_merge(vec![
-            schema.as_ref().to_owned(),
-            infered_schema.as_ref().to_owned(),
-        ]) {
-            Ok(schema) => Arc::new(schema),
-            Err(e) => {
-                return Err(datafusion::error::DataFusionError::Execution(format!(
-                    "ListingTable Merge schema error: {e}"
-                )));
-            }
-        }
-    } else {
-        schema.clone()
-    };
-    config = config.with_schema(schema.clone());
-
+    let config = ListingTableConfig::new(prefix)
+        .with_listing_options(listing_options)
+        .with_schema(schema);
     let table = ListingTable::try_new(config)?;
     ctx.register_table(table_name, Arc::new(table))?;
 
-    Ok((ctx, schema))
+    Ok(ctx)
 }
 
 #[cfg(not(feature = "zo_functions"))]

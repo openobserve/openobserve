@@ -183,6 +183,8 @@ pub fn get_hour_key(
         .to_string();
     if let Some(s) = suffix {
         hour_key.push_str(&format!("_{s}"));
+    } else {
+        hour_key.push_str("_keeping");
     }
 
     for key in &partition_keys {
