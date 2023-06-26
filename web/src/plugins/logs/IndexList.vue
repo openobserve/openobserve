@@ -82,12 +82,14 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_overlay">
-                  <q-icon
-                    :name="outlinedAdd"
+                  <q-btn
+                    :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
-                    size="1rem"
+                    size="0.4rem"
+                    class="q-mr-sm"
                     @click.stop="addToFilter(props.row.name)"
+                    round
                   />
                   <q-icon
                     :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
@@ -140,12 +142,14 @@
                       {{ props.row.name }}
                     </div>
                     <div class="field_overlay">
-                      <q-icon
+                      <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :name="outlinedAdd"
+                        :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
-                        size="1rem"
+                        size="0.4rem"
+                        class="q-mr-sm"
                         @click.stop="addToFilter(props.row.name)"
+                        round
                       />
                       <q-icon
                         :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
@@ -226,10 +230,6 @@
                             </div>
                             <div class="flex row">
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/equals.svg')
-                                "
                                 class="q-mr-xs"
                                 size="6px"
                                 @click="
@@ -239,12 +239,12 @@
                                 "
                                 title="Include Term"
                                 round
-                              />
+                              >
+                                <q-icon color="currentColor">
+                                  <EqualIcon></EqualIcon>
+                                </q-icon>
+                              </q-btn>
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/not_equals.svg')
-                                "
                                 size="6px"
                                 @click="
                                   addSearchTerm(
@@ -253,7 +253,11 @@
                                 "
                                 title="Exclude Term"
                                 round
-                              />
+                              >
+                             <q-icon color="currentColor">
+                              <NotEqualIcon></NotEqualIcon>
+                             </q-icon>
+                            </q-btn>
                             </div>
                           </q-item>
                         </q-list>
@@ -303,9 +307,9 @@ import {
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import { Parser } from "node-sql-parser";
-import { outlinedAdd } from '@quasar/extras/material-icons-outlined'
-import { outlinedVisibility } from '@quasar/extras/material-icons-outlined'
-import { outlinedVisibilityOff } from '@quasar/extras/material-icons-outlined'
+import { outlinedAdd, outlinedVisibility, outlinedVisibilityOff } from '@quasar/extras/material-icons-outlined'
+import EqualIcon from "@/components/EqualIcon.vue";
+import NotEqualIcon from "@/components/NotEqualIcon.vue";
 
 interface Filter {
   fieldName: string;
@@ -314,6 +318,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
+  components:{ EqualIcon, NotEqualIcon },
   setup() {
     const store = useStore();
     const router = useRouter();

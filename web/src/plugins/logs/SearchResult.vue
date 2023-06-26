@@ -138,7 +138,6 @@
                 :title="row.name"
               >
                 <q-btn
-                  :icon="'img:' + getImageURL('images/common/equals.svg')"
                   class="q-mr-xs"
                   size="6px"
                   @click.prevent.stop="
@@ -146,16 +145,23 @@
                   "
                   title="Include Term"
                   round
-                />
+                >
+                  <q-icon color="currentColor">
+                    <EqualIcon></EqualIcon>
+                  </q-icon>
+                </q-btn>
                 <q-btn
-                  :icon="'img:' + getImageURL('images/common/not_equals.svg')"
                   size="6px"
                   @click.prevent.stop="
                     addSearchTerm(`${column.name}!='${row[column.name]}'`)
                   "
                   title="Exclude Term"
                   round
-                />
+                >
+                <q-icon color="currentColor">
+                  <NotEqualIcon></NotEqualIcon>
+                </q-icon>
+              </q-btn>
               </div>
             </q-td>
           </q-tr>
@@ -197,13 +203,14 @@
                             @click="addSearchTerm(`${key}='${row[key]}'`)"
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' + getImageURL('images/common/equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                              <EqualIcon></EqualIcon>
+                             </q-icon>
+                            </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -216,14 +223,14 @@
                             @click="addSearchTerm(`${key}!='${row[key]}'`)"
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/not_equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                              <NotEqualIcon></NotEqualIcon>
+                             </q-icon>
+                            </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -235,9 +242,8 @@
                             @click="addFieldToTable(key)"
                             ><q-btn
                               title="Add field to table"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/visibility_on.svg')
+                              icon="
+                                visibility
                               "
                               size="6px"
                               round
@@ -300,6 +306,8 @@ import DetailTable from "./DetailTable.vue";
 import useLogs from "../../composables/useLogs";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
+import EqualIcon from "../../components/EqualIcon.vue";
+import NotEqualIcon from "../../components/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -307,6 +315,7 @@ export default defineComponent({
     HighLight,
     BarChart,
     DetailTable,
+    EqualIcon, NotEqualIcon
   },
   emits: [
     "update:scroll",

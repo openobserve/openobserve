@@ -122,13 +122,14 @@
                             "
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' + getImageURL('images/common/equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                                <EqualIcon></EqualIcon>
+                              </q-icon>
+                            </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -143,14 +144,14 @@
                             "
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/not_equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                              <q-icon color="currentColor">
+                               <NotEqualIcon></NotEqualIcon>
+                              </q-icon>
+                            </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -259,6 +260,8 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import dashboards from "@/services/dashboards";
 import useLogs from "@/composables/useLogs";
+import EqualIcon from "@/components/EqualIcon.vue";
+import NotEqualIcon from "@/components/NotEqualIcon.vue";
 
 const defaultValue: any = () => {
   return {
@@ -268,6 +271,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
+  components: { EqualIcon, NotEqualIcon },
   emits: [
     "showPrevDetail",
     "showNextDetail",
