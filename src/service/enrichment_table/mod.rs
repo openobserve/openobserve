@@ -23,19 +23,20 @@ use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
 
-use crate::common::json;
 use crate::infra::{
     cache::stats,
     cluster,
     config::{CONFIG, STREAM_SCHEMAS},
 };
 use crate::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+use crate::{common::json, meta::usage::UsageType};
 
 use super::{
     compact::delete,
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::stream_schema_exists,
+    usage::report_usage_stats,
 };
 
 pub async fn save_enrichment_data(
@@ -44,6 +45,7 @@ pub async fn save_enrichment_data(
     mut payload: Multipart,
     thread_id: usize,
 ) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
     let mut hour_key = String::new();
     let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
     let stream_name = &crate::service::ingestion::format_stream_name(table_name);
@@ -142,13 +144,25 @@ pub async fn save_enrichment_data(
     }
 
     buf.insert(hour_key.clone(), records.clone());
-    write_file(
+    let mut stream_file_name = "".to_string();
+    let mut req_stats = write_file(
         buf,
         thread_id,
         org_id,
         stream_name,
+        &mut stream_file_name,
         StreamType::EnrichmentTables,
     );
+    req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_usage_stats(
+        req_stats,
+        org_id,
+        StreamType::Logs,
+        UsageType::EnrichmentTable,
+        0,
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK.into(),

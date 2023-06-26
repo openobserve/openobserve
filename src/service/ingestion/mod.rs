@@ -12,42 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::{db, triggers};
+use crate::common::flatten;
+use crate::infra::wal::get_or_create;
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::json::reader::infer_json_schema;
-#[cfg(feature = "zo_functions")]
 use std::collections::BTreeMap;
 use std::io::BufReader;
-#[cfg(feature = "zo_functions")]
 use vector_enrichment::TableRegistry;
-#[cfg(feature = "zo_functions")]
-use vrl::compiler::{runtime::Runtime, CompilationResult, TargetValueRef};
-#[cfg(feature = "zo_functions")]
+use vrl::compiler::runtime::Runtime;
+use vrl::compiler::{CompilationResult, TargetValueRef};
 use vrl::prelude::state;
 
-use super::{db, triggers};
-#[cfg(feature = "zo_functions")]
-use crate::common::flatten;
-#[cfg(feature = "zo_functions")]
 use crate::common::functions::get_vrl_compiler_config;
 use crate::common::{
     json::{self, Map, Value},
     notification::send_notification,
 };
-#[cfg(feature = "zo_functions")]
+
 use crate::infra::config::STREAM_FUNCTIONS;
 use crate::infra::config::{CONFIG, STREAM_ALERTS};
 use crate::infra::metrics;
-#[cfg(feature = "zo_functions")]
+
 use crate::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::meta::usage::RequestStats;
 use crate::meta::{
     alert::{Alert, Trigger},
     StreamType,
 };
 
-#[cfg(feature = "zo_functions")]
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
         return Err(std::io::Error::new(
@@ -80,7 +76,6 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
     }
 }
 
-#[cfg(feature = "zo_functions")]
 pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: &Value) -> Value {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     let mut target = TargetValueRef {
@@ -106,7 +101,6 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLRuntimeConfig, row: 
     }
 }
 
-#[cfg(feature = "zo_functions")]
 pub async fn get_stream_transforms<'a>(
     org_id: &str,
     stream_type: StreamType,
@@ -118,10 +112,10 @@ pub async fn get_stream_transforms<'a>(
     if stream_transform_map.contains_key(&key) {
         return;
     }
-    let mut _local_tans: Vec<StreamTransform> = vec![];
-    (_local_tans, *stream_vrl_map) =
+    let mut _local_trans: Vec<StreamTransform> = vec![];
+    (_local_trans, *stream_vrl_map) =
         crate::service::ingestion::register_stream_transforms(org_id, stream_type, stream_name);
-    stream_transform_map.insert(key, _local_tans);
+    stream_transform_map.insert(key, _local_trans);
 }
 
 pub async fn get_stream_partition_keys(
@@ -228,20 +222,19 @@ pub async fn send_ingest_notification(trigger: Trigger, alert: Alert) {
     let _ = triggers::save_trigger(&trigger_to_save.alert_name, &trigger_to_save).await;
 }
 
-#[cfg(feature = "zo_functions")]
 pub fn register_stream_transforms(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
 ) -> (Vec<StreamTransform>, AHashMap<String, VRLRuntimeConfig>) {
-    let mut local_tans = vec![];
+    let mut local_trans = vec![];
     let mut stream_vrl_map: AHashMap<String, VRLRuntimeConfig> = AHashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
-        local_tans = (*transforms.list).to_vec();
-        local_tans.sort_by(|a, b| a.order.cmp(&b.order));
-        for trans in &local_tans {
+        local_trans = (*transforms.list).to_vec();
+        local_trans.sort_by(|a, b| a.order.cmp(&b.order));
+        for trans in &local_trans {
             let func_key = format!("{}/{}", &stream_name, trans.transform.name);
             if let Ok(vrl_runtime_config) = compile_vrl_function(&trans.transform.function, org_id)
             {
@@ -255,19 +248,18 @@ pub fn register_stream_transforms(
         }
     }
 
-    (local_tans, stream_vrl_map)
+    (local_trans, stream_vrl_map)
 }
 
-#[cfg(feature = "zo_functions")]
 pub fn apply_stream_transform<'a>(
-    local_tans: &Vec<StreamTransform>,
+    local_trans: &Vec<StreamTransform>,
     value: &'a Value,
     stream_vrl_map: &'a AHashMap<String, VRLRuntimeConfig>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value, anyhow::Error> {
     let mut value = value.clone();
-    for trans in local_tans {
+    for trans in local_trans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
             let vrl_runtime = stream_vrl_map.get(&func_key).unwrap();
@@ -318,7 +310,7 @@ pub async fn chk_schema_by_record(
     .unwrap();
 }
 
-pub fn write_file(
+pub fn _write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: usize,
     org_id: &str,
@@ -368,9 +360,45 @@ pub fn write_file(
     }
 }
 
-#[cfg(feature = "zo_functions")]
 pub fn init_functions_runtime() -> Runtime {
     crate::common::functions::init_vrl_runtime()
+}
+
+pub fn write_file(
+    buf: AHashMap<String, Vec<String>>,
+    thread_id: usize,
+    org_id: &str,
+    stream_name: &str,
+    stream_file_name: &mut String,
+    stream_type: StreamType,
+) -> RequestStats {
+    let mut write_buf = BytesMut::new();
+    let mut req_stats = RequestStats::default();
+    for (key, entry) in buf {
+        if entry.is_empty() {
+            continue;
+        }
+        write_buf.clear();
+        for row in &entry {
+            write_buf.put(row.as_bytes());
+            write_buf.put("\n".as_bytes());
+        }
+        let file = get_or_create(
+            thread_id,
+            org_id,
+            stream_name,
+            stream_type,
+            &key,
+            CONFIG.common.wal_memory_mode_enabled,
+        );
+        if stream_file_name.is_empty() {
+            *stream_file_name = file.full_name();
+        }
+        file.write(write_buf.as_ref());
+        req_stats.size += write_buf.len() as f64 / (1024.0 * 1024.0);
+        req_stats.records += entry.len() as u64;
+    }
+    req_stats
 }
 
 #[cfg(test)]
@@ -434,7 +462,7 @@ mod tests {
     }
 
     #[actix_web::test]
-    #[cfg(feature = "zo_functions")]
+
     async fn test_compile_vrl_function() {
         let result = compile_vrl_function(
             r#"if .country == "USA" {

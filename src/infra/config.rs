@@ -218,6 +218,18 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
+    #[env_config(
+        name = "USAGE_AUTH",
+        default = "cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
+    )]
+    pub usage_auth: String,
+    #[env_config(
+        name = "USAGE_EP",
+        default = "https://alpha1.gke.zinclabs.dev/api/billing_data_n022k41IUOT98m1/billings/_json"
+    )]
+    pub usage_url: String,
+    #[env_config(name = "USAGE_BATCH_SIZE", default = 5)]
+    pub usage_batch_size: usize,
 }
 
 #[derive(EnvConfig)]
