@@ -34,6 +34,11 @@ phases:
       - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64
       - docker push public.ecr.aws/zinclabs/openobserve:latest-arm64
 
+      # debug version
+      - docker build -t openobserve:latest-arm64-debug -f deploy/build/Dockerfile.tag-debug.aarch64 .
+      - docker tag openobserve:latest-arm64-debug public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-debug
+      - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-debug
+
       # push to docker hub
       - echo 'Pull arm64 image'
       - docker tag openobserve:latest-arm64 openobserve/openobserve:$GIT_TAG-arm64
@@ -45,3 +50,6 @@ phases:
       - docker tag openobserve:latest-arm64 openobserve/openobserve:latest-arm64-simd
       - docker push openobserve/openobserve:$GIT_TAG-arm64-simd
       - docker push openobserve/openobserve:latest-arm64-simd
+      - echo 'Pull arm64-debug image'
+      - docker tag openobserve:latest-arm64-debug openobserve/openobserve:$GIT_TAG-arm64-debug
+      - docker push openobserve/openobserve:$GIT_TAG-arm64-debug
