@@ -57,82 +57,105 @@
             <q-tr :props="props">
               <q-td :props="props" class="field_list">
                 <!-- TODO OK : Repeated code make seperate component to display field  -->
-                <q-expansion-item
-                  dense
-                  switch-toggle-side
-                  :label="props.row.name"
-                  expand-icon-class="field-expansion-icon"
-                  :expand-icon="
-                    'img:' + getImageURL('images/common/down-solid.svg')
+                <template
+                  v-if="
+                    props.row.name === store.state.zoConfig.timestamp_column
                   "
-                  :expanded-icon="
-                    'img:' + getImageURL('images/common/up-solid.svg')
-                  "
-                  @before-show="(event: any) => openFilterCreator(event, props.row)"
                 >
-                  <template v-slot:header>
-                    <div
-                      class="flex content-center ellipsis"
-                      :title="props.row.name"
-                    >
-                      <div class="field_label ellipsis">
-                        {{ props.row.name }}
+                  <div class="field_label ellipsis q-pl-lg">
+                    {{ props.row.name }}
+                  </div>
+                </template>
+                <template v-else>
+                  <q-expansion-item
+                    dense
+                    switch-toggle-side
+                    :label="props.row.name"
+                    expand-icon-class="field-expansion-icon"
+                    :expand-icon="
+                      'img:' + getImageURL('images/common/down-solid.svg')
+                    "
+                    :expanded-icon="
+                      'img:' + getImageURL('images/common/up-solid.svg')
+                    "
+                    @before-show="(event: any) => openFilterCreator(event, props.row)"
+                  >
+                    <template v-slot:header>
+                      <div
+                        class="flex content-center ellipsis"
+                        :title="props.row.name"
+                      >
+                        <div class="field_label ellipsis">
+                          {{ props.row.name }}
+                        </div>
                       </div>
-                    </div>
-                  </template>
-                  <q-card>
-                    <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                      <div class="filter-values-container">
-                        <div
-                          v-show="metricLabelValues[props.row.name]?.isLoading"
-                          class="q-pl-md q-py-xs"
-                          style="height: 60px"
-                        >
-                          <q-inner-loading
-                            size="xs"
-                            :showing="
+                    </template>
+                    <q-card>
+                      <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+                        <div class="filter-values-container">
+                          <div
+                            v-show="
                               metricLabelValues[props.row.name]?.isLoading
                             "
-                            label="Fetching values..."
-                            label-style="font-size: 1.1em"
-                          />
-                        </div>
-                        <div
-                          v-show="
-                            !metricLabelValues[props.row.name]?.values
-                              ?.length &&
-                            !metricLabelValues[props.row.name]?.isLoading
-                          "
-                          class="q-pl-md q-py-xs text-subtitle2"
-                        >
-                          No values found
-                        </div>
-                        <div
-                          v-for="value in metricLabelValues[props.row.name]
-                            ?.values || []"
-                          :key="value"
-                        >
-                          <q-list dense>
-                            <q-item tag="label" class="q-pr-none">
-                              <div
-                                class="flex row wrap justify-between"
-                                style="width: 100%"
+                            class="q-pl-md q-py-xs"
+                            style="height: 60px"
+                          >
+                            <q-inner-loading
+                              size="xs"
+                              :showing="
+                                metricLabelValues[props.row.name]?.isLoading
+                              "
+                              label="Fetching values..."
+                              label-style="font-size: 1.1em"
+                            />
+                          </div>
+                          <div
+                            v-show="
+                              !metricLabelValues[props.row.name]?.values
+                                ?.length &&
+                              !metricLabelValues[props.row.name]?.isLoading
+                            "
+                            class="q-pl-md q-py-xs text-subtitle2"
+                          >
+                            No values found
+                          </div>
+                          <div
+                            v-for="value in metricLabelValues[props.row.name]
+                              ?.values || []"
+                            :key="value"
+                          >
+                            <q-list dense>
+                              <q-item
+                                tag="label"
+                                class="q-pr-none no-pointer-events"
                               >
                                 <div
-                                  :title="value"
-                                  class="ellipsis q-pr-xs"
+                                  class="flex row wrap justify-between text-grey-8"
                                   style="width: 100%"
                                 >
-                                  {{ value }}
+                                  <div
+                                    :title="value.key"
+                                    class="ellipsis q-pr-xs"
+                                    style="width: calc(100% - 50px)"
+                                  >
+                                    {{ value.key }}
+                                  </div>
+                                  <div
+                                    :title="value.count"
+                                    class="ellipsis text-right q-pr-sm"
+                                    style="width: 50px"
+                                  >
+                                    {{ value.count }}
+                                  </div>
                                 </div>
-                              </div>
-                            </q-item>
-                          </q-list>
+                              </q-item>
+                            </q-list>
+                          </div>
                         </div>
-                      </div>
-                    </q-card-section>
-                  </q-card>
-                </q-expansion-item>
+                      </q-card-section>
+                    </q-card>
+                  </q-expansion-item>
+                </template>
               </q-td>
             </q-tr>
           </template>
@@ -267,18 +290,16 @@ export default defineComponent({
             size: 10,
           })
           .then((res: any) => {
-            metricLabelValues.value[name]["values"] = res.data?.data || [];
-          });
-        stream
-          .labelValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchMetricValue.value,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            label: name,
-          })
-          .then((res: any) => {
-            metricLabelValues.value[name]["values"] = res.data?.data || [];
+            if (res.data.hits.length) {
+              metricLabelValues.value[name]["values"] = res.data.hits
+                .find((field: any) => field.field === name)
+                .values.map((value: any) => {
+                  return {
+                    key: value.zo_sql_key ? value.zo_sql_key : "null",
+                    count: formatLargeNumber(value.zo_sql_num),
+                  };
+                });
+            }
           })
           .finally(() => {
             metricLabelValues.value[name]["isLoading"] = false;
