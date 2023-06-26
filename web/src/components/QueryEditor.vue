@@ -56,7 +56,7 @@ export default defineComponent({
       default: 500,
     },
   },
-  emits: ["update-query", "run-query"],
+  emits: ["update-query", "run-query", "update:query"],
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
@@ -200,6 +200,7 @@ export default defineComponent({
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
           emit("update-query", e, editorObj.getValue());
+          emit("update:query", editorObj.getValue());
         }, props.debounceTime)
       );
 
