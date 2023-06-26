@@ -77,7 +77,8 @@ pub(crate) async fn create_context(
         storage_type: StorageType::Tmpfs,
     };
 
-    register_table(&session, schema, stream_name, &[], FileType::JSON).await
+    let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
+    Ok((ctx, schema))
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
