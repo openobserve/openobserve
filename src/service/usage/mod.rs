@@ -22,6 +22,9 @@ pub async fn report_usage_stats(
     event: UsageType,
     num_functions: u16,
 ) {
+    if !CONFIG.common.usage_enabled {
+        return;
+    }
     let local_stream_type = stream_type.to_string();
     // metrics
     metrics::HTTP_RESPONSE_TIME

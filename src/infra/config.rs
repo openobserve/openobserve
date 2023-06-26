@@ -225,11 +225,13 @@ pub struct Common {
     pub usage_auth: String,
     #[env_config(
         name = "USAGE_EP",
-        default = "https://alpha1.gke.zinclabs.dev/api/billing_data_n022k41IUOT98m1/billings/_json"
+        default = "https://alpha1.gke.zinclabs.dev/api/atest/billings/_json"
     )]
     pub usage_url: String,
     #[env_config(name = "USAGE_BATCH_SIZE", default = 5)]
     pub usage_batch_size: usize,
+    #[env_config(name = "USAGE_REPORTING_ENABLED", default = false)]
+    pub usage_enabled: bool,
 }
 
 #[derive(EnvConfig)]
