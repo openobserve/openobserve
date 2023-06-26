@@ -14,7 +14,7 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::{
-    arrow::{json::reader::infer_json_schema, record_batch::RecordBatch},
+    arrow::{datatypes::Schema, json::reader::infer_json_schema, record_batch::RecordBatch},
     datasource::file_format::file_type::FileType,
 };
 use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
@@ -119,7 +119,7 @@ pub async fn search(
         // get schema of the file
         let file_data = tmpfs::get(files.first().unwrap()).unwrap();
         let mut schema_reader = BufReader::new(file_data.as_ref());
-        let inferred_schema = match infer_json_schema(&mut schema_reader, None) {
+        let mut inferred_schema = match infer_json_schema(&mut schema_reader, None) {
             Ok(schema) => schema,
             Err(err) => {
                 return Err(Error::from(err));
@@ -134,6 +134,17 @@ pub async fn search(
                     diff_fields.insert(v.name().clone(), v.data_type().clone());
                 }
             }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in schema_latest.fields() {
+            if inferred_schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            inferred_schema = Schema::try_merge(vec![inferred_schema, new_schema])?;
         }
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
