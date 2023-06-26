@@ -20,11 +20,13 @@ use std::io::{BufRead, BufReader};
 
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::usage::UsageType;
 use crate::meta::{
     alert::{Alert, Trigger},
     ingestion::{IngestionResponse, StreamStatus},
     StreamType,
 };
+use crate::service::usage::report_usage_stats;
 use crate::service::{db, ingestion::write_file, logs::StreamMeta, schema::stream_schema_exists};
 
 pub async fn ingest(
@@ -48,7 +50,6 @@ pub async fn ingest(
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
-    #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut min_ts =
@@ -60,7 +61,7 @@ pub async fn ingest(
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
-    #[cfg(feature = "zo_functions")]
+
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
@@ -99,7 +100,7 @@ pub async fn ingest(
         // JSON Flattening
         value = flatten::flatten(&value)?;
         // Start row based transform
-        #[cfg(feature = "zo_functions")]
+
         if !local_trans.is_empty() {
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
@@ -109,7 +110,7 @@ pub async fn ingest(
                 &mut runtime,
             )?;
         }
-        #[cfg(feature = "zo_functions")]
+
         if value.is_null() || !value.is_object() {
             stream_status.status.failed += 1; // transform failed or dropped
             continue;
@@ -167,10 +168,37 @@ pub async fn ingest(
     }
 
     // write to file
-    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
+    let mut stream_file_name = "".to_string();
+
+    let mut req_stats = write_file(
+        buf,
+        thread_id,
+        org_id,
+        stream_name,
+        &mut stream_file_name,
+        StreamType::Logs,
+    );
+
+    if stream_file_name.is_empty() {
+        return Ok(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ));
+    }
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
+
+    req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_usage_stats(
+        req_stats,
+        org_id,
+        StreamType::Logs,
+        UsageType::Multi,
+        local_trans.len() as u16,
+    )
+    .await;
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

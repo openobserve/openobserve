@@ -28,12 +28,15 @@ use crate::infra::{
     errors::{Error, Result},
     metrics,
 };
+use crate::meta::functions::StreamTransform;
+use crate::meta::usage::{RequestStats, UsageType};
 use crate::meta::{
     self,
     alert::{Alert, Trigger},
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
     StreamType,
 };
+use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, write_file},
@@ -71,6 +74,8 @@ pub async fn remote_write(
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
+    let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
+    let mut final_req_stats = RequestStats::default();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -152,7 +157,10 @@ pub async fn remote_write(
                 value: sample_val,
             };
 
-            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            let mut timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            if timestamp == 0 {
+                timestamp = Utc::now().timestamp_micros();
+            }
             if timestamp < min_ts {
                 min_ts = timestamp;
             }
@@ -210,34 +218,32 @@ pub async fn remote_write(
             crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
             // End get stream alert
 
-            #[cfg(feature = "zo_functions")]
             let mut runtime = crate::service::ingestion::init_functions_runtime();
 
             // Start Register Transforms for stream
-            #[cfg(feature = "zo_functions")]
-            let (local_tans, stream_vrl_map) =
+
+            let (local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
                     StreamType::Metrics,
                     &metric_name,
                 );
+
+            stream_transform_map.insert(metric_name.to_owned(), local_trans.clone());
             // End Register Transforms for stream
 
-            #[cfg(not(feature = "zo_functions"))]
             let mut value: json::Value = json::to_value(&metric).unwrap();
 
-            #[cfg(feature = "zo_functions")]
-            let value: json::Value = json::to_value(&metric).unwrap();
-
             // Start row based transform
-            #[cfg(feature = "zo_functions")]
-            let mut value = crate::service::ingestion::apply_stream_transform(
-                &local_tans,
+
+            value = crate::service::ingestion::apply_stream_transform(
+                &local_trans,
                 &value,
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,
             )?;
+
             // End row based transform
 
             // get json object
@@ -310,19 +316,33 @@ pub async fn remote_write(
     }
 
     for (stream_name, stream_data) in metric_data_map {
+        // write to file
+        let mut stream_file_name = "".to_string();
+
         // check if we are allowed to ingest
         if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
         {
             return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
         }
-        // write to file
-        write_file(
+
+        let req_stats = write_file(
             stream_data,
             thread_id,
             org_id,
             &stream_name,
-            StreamType::Metrics,
+            &mut stream_file_name,
+            StreamType::Logs,
         );
+        final_req_stats.size += req_stats.size;
+        final_req_stats.records += req_stats.records;
+
+        let _schema_exists = stream_schema_exists(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            &mut metric_schema_map,
+        )
+        .await;
     }
 
     // only one trigger per request, as it updates etcd
@@ -366,6 +386,17 @@ pub async fn remote_write(
             &StreamType::Metrics.to_string(),
         ])
         .inc();
+    final_req_stats.response_time += time;
+    //metric + data usage
+    let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+    report_usage_stats(
+        final_req_stats,
+        org_id,
+        StreamType::Metrics,
+        UsageType::Metrics,
+        fns_length as u16,
+    )
+    .await;
 
     Ok(())
 }

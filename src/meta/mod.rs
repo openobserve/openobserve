@@ -30,6 +30,7 @@ pub mod stream;
 pub mod syslog;
 pub mod telemetry;
 pub mod traces;
+pub mod usage;
 pub mod user;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]

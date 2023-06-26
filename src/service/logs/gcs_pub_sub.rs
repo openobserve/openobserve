@@ -6,6 +6,7 @@ use std::io::Read;
 
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::infra::{cluster, config::CONFIG, metrics};
+use crate::meta::usage::UsageType;
 use crate::meta::{
     alert::{Alert, Trigger},
     ingestion::{
@@ -13,6 +14,7 @@ use crate::meta::{
     },
     StreamType,
 };
+use crate::service::usage::report_usage_stats;
 use crate::service::{db, ingestion::write_file};
 
 use super::StreamMeta;
@@ -38,7 +40,6 @@ pub async fn process(
         )));
     }
 
-    #[cfg(feature = "zo_functions")]
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -55,8 +56,8 @@ pub async fn process(
     let mut trigger: Option<Trigger> = None;
 
     // Start Register Transforms for stream
-    #[cfg(feature = "zo_functions")]
-    let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
+
+    let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
         stream_name,
@@ -100,15 +101,14 @@ pub async fn process(
             value = flatten::flatten(&value)?;
 
             // Start row based transform
-            #[cfg(feature = "zo_functions")]
+
             let mut value = crate::service::ingestion::apply_stream_transform(
-                &local_tans,
+                &local_trans,
                 &value,
                 &stream_vrl_map,
                 stream_name,
                 &mut runtime,
             )?;
-            #[cfg(feature = "zo_functions")]
             if value.is_null() || !value.is_object() {
                 stream_status.status.failed += 1; // transform failed or dropped
             }
@@ -164,9 +164,16 @@ pub async fn process(
             timestamp: request.message.publish_time,
         });
     }
-
+    let mut stream_file_name = "".to_string();
     // write to file
-    write_file(buf, thread_id, org_id, stream_name, StreamType::Logs);
+    let mut req_stats = write_file(
+        buf,
+        thread_id,
+        org_id,
+        stream_name,
+        &mut stream_file_name,
+        StreamType::Logs,
+    );
 
     // only one trigger per request, as it updates etcd
     super::evaluate_trigger(trigger, stream_alerts_map).await;
@@ -189,6 +196,17 @@ pub async fn process(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+
+    req_stats.response_time = start.elapsed().as_secs_f64();
+    //metric + data usage
+    report_usage_stats(
+        req_stats,
+        org_id,
+        StreamType::Logs,
+        UsageType::GCPSubscription,
+        local_trans.len() as u16,
+    )
+    .await;
 
     Ok(GCPIngestionResponse {
         request_id: request.message.message_id,
