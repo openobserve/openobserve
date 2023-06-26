@@ -37,7 +37,8 @@ impl From<UsageType> for UsageEvent {
             | UsageType::KinesisFirehose
             | UsageType::GCPSubscription
             | UsageType::EnrichmentTable
-            | UsageType::Syslog => UsageEvent::Ingestion,
+            | UsageType::Syslog
+            | UsageType::JsonMetrics => UsageEvent::Ingestion,
             UsageType::Search | UsageType::SearchAround | UsageType::SearchTopNValues => {
                 UsageEvent::Search
             }
@@ -49,11 +50,11 @@ impl From<UsageType> for UsageEvent {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum UsageType {
-    #[serde(rename = "/_bulk")]
+    #[serde(rename = "logs/_bulk")]
     Bulk,
-    #[serde(rename = "/_json")]
+    #[serde(rename = "logs/_json")]
     Json,
-    #[serde(rename = "/_multi")]
+    #[serde(rename = "logs/_multi")]
     Multi,
     #[serde(rename = "/traces")]
     Traces,
@@ -73,6 +74,8 @@ pub enum UsageType {
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
     GCPSubscription,
+    #[serde(rename = "metrics/_json")]
+    JsonMetrics,
     Syslog,
     EnrichmentTable,
 }
@@ -80,9 +83,10 @@ pub enum UsageType {
 impl ToString for UsageType {
     fn to_string(&self) -> String {
         match self {
-            UsageType::Bulk => "/_bulk".to_owned(),
-            UsageType::Json => "/_json".to_owned(),
-            UsageType::Multi => "/_multi".to_owned(),
+            UsageType::Bulk => "logs/_bulk".to_owned(),
+            UsageType::Json => "logs/_json".to_owned(),
+            UsageType::JsonMetrics => "metrics/_json".to_owned(),
+            UsageType::Multi => "logs/_multi".to_owned(),
             UsageType::Traces => "/traces".to_owned(),
             UsageType::Metrics => "/v1/write".to_owned(),
             UsageType::Search => "/_search".to_owned(),

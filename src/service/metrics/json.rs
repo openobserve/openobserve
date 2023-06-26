@@ -218,7 +218,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         final_req_stats,
         org_id,
         StreamType::Logs,
-        UsageType::Bulk,
+        UsageType::JsonMetrics,
         0,
     )
     .await;
