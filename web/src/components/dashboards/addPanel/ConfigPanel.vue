@@ -31,12 +31,12 @@
 
 <script lang="ts">
 import useDashboardPanelData from '@/composables/useDashboardPanel';
-import { ref, watch } from 'vue';
+import { defineComponent } from 'vue';
 
-export default {
+export default defineComponent({
   props: {},
   emits: [],
-  setup(props) {
+  setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData()
 
     // options for legends position
@@ -63,7 +63,7 @@ export default {
 
     };
   }
-};
+});
 </script>
 
 <style scoped>

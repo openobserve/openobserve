@@ -17,9 +17,9 @@
 </template>
 
 <script lang="ts">
-import { ref, watch } from 'vue';
+import { defineComponent, ref, watch } from 'vue';
 
-export default {
+export default defineComponent({
   props: {
     title: {
       type: String,
@@ -51,7 +51,7 @@ export default {
       toggleSidebar
     };
   }
-};
+});
 </script>
 
 <style scoped>
