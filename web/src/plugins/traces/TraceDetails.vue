@@ -49,7 +49,6 @@
         <div class="rounded-borders" style="border: 1px solid #cacaca; padding: 2px">
           <template v-for="visual in traceVisuals" :key="visual.value">
             <q-btn
-              :icon="'img:' + getImageURL(`images/common/${visual.icon}.svg`)"
               :color="visual.value === activeVisual ? 'primary' : ''"
               :flat="visual.value === activeVisual ? false : true"
               dense
@@ -57,7 +56,9 @@
               size="11px"
               class="q-px-sm visual-selection-btn"
               @click="activeVisual = visual.value"
-              >{{ visual.label }}</q-btn
+              >
+              <q-icon><component :is="visual.icon"/></q-icon>
+              {{ visual.label }}</q-btn
             >
           </template>
         </div>
@@ -143,6 +144,8 @@ import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
 import { getImageURL } from "@/utils/zincutils";
+import TraceTimeline from "@/components/icons/TraceTimeline.vue";
+import ServiceMap from "@/components/icons/ServiceMap.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -159,6 +162,8 @@ export default defineComponent({
     TraceHeader,
     TraceChart,
     D3Chart,
+    TraceTimeline,
+    ServiceMap
   },
 
   setup() {
@@ -189,8 +194,8 @@ export default defineComponent({
     };
 
     const traceVisuals = [
-      { label: "Timeline", value: "timeline", icon: "trace_timeline" },
-      { label: "Service Map", value: "service_map", icon: "service_map" },
+      { label: "Timeline", value: "timeline", icon: TraceTimeline },
+      { label: "Service Map", value: "service_map", icon: ServiceMap },
     ];
 
     const activeVisual = ref("timeline");

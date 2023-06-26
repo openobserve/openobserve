@@ -306,8 +306,8 @@ import DetailTable from "./DetailTable.vue";
 import useLogs from "../../composables/useLogs";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
-import EqualIcon from "../../components/EqualIcon.vue";
-import NotEqualIcon from "../../components/NotEqualIcon.vue";
+import EqualIcon from "../../components/icons/EqualIcon.vue";
+import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "SearchResult",

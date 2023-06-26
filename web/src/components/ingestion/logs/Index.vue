@@ -121,7 +121,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/syslog.svg')"
+          icon="Syslog"
           label="Syslog"
           content-class="tab_content"
         />
@@ -150,10 +150,11 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import Syslog from "@/components/icons/Syslog.vue";
 
 export default defineComponent({
   name: "IngestLogs",
-  components: {},
+  components: { Syslog },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -253,6 +254,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       ingestiontabs,
       showSyslog,
+      Syslog,
     };
   },
 });

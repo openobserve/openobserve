@@ -260,8 +260,8 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import dashboards from "@/services/dashboards";
 import useLogs from "@/composables/useLogs";
-import EqualIcon from "@/components/EqualIcon.vue";
-import NotEqualIcon from "@/components/NotEqualIcon.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 const defaultValue: any = () => {
   return {

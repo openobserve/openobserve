@@ -308,8 +308,8 @@ import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import { Parser } from "node-sql-parser";
 import { outlinedAdd, outlinedVisibility, outlinedVisibilityOff } from '@quasar/extras/material-icons-outlined'
-import EqualIcon from "@/components/EqualIcon.vue";
-import NotEqualIcon from "@/components/NotEqualIcon.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 interface Filter {
   fieldName: string;
