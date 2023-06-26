@@ -706,18 +706,17 @@ export default defineComponent({
           return `${key}="${labels[key]}"`;
         });
 
-        // When we press backspace, the cursor position is not updated, so we need to update it manually
-        const rangeOffset = !event.changes[0].text.length
-          ? event.changes[0].rangeOffset - 1
-          : event.changes[0].rangeOffset;
+        const cursorIndex = metricsQueryEditorRef.value.getCursorIndex();
 
-        const editingLabel = detectKeyAndValue(value, rangeOffset);
+        const labelFocus = analyzeLabelFocus(value, cursorIndex);
+
         let labelSuggestions;
 
-        if (!editingLabel.hasLabels) {
-          updatePromqlKeywords([], editingLabel, event.changes[0].text);
+        if (!labelFocus.isFocused) {
+          updatePromqlKeywords([], labelFocus, event.changes[0].text);
           return;
         }
+
         SearchService.get_promql_series({
           org_identifier: store.state.selectedOrganization.identifier,
           labels: `{${formattedLabels.join(",")}}`,
@@ -727,7 +726,7 @@ export default defineComponent({
           .then((response) => {
             labelSuggestions = getLabelSuggestions(
               response.data.data,
-              editingLabel.labels,
+              labelFocus,
               formattedLabels.join(",")
             );
             // dashboardPanelData.data.queryResults = response.data;
@@ -736,7 +735,7 @@ export default defineComponent({
             if (labelSuggestions)
               updatePromqlKeywords(
                 labelSuggestions,
-                editingLabel,
+                labelFocus,
                 event.changes[0].text
               );
           });
@@ -745,14 +744,46 @@ export default defineComponent({
       }
     };
 
-    function detectKeyAndValue(query, cursorIndex) {
+    const getMetricName = () => {
+      // // Extract metric name      // const metricNameRegex = /^([^\{\[\s]+)/;
+      // const metricNameMatch = metricNameRegex.exec(query);
+      // const metricName = metricNameMatch ? metricNameMatch[1] : null;
+      // const cursorOn = {
+      //   labels: null,
+      // };
+      // // Detect cursor position for metric name
+      // cursorOn.metricName =
+      //   metricName &&
+      //   cursorIndex !== undefined &&
+      //   cursorIndex >= metricNameMatch.index &&
+      //   cursorIndex <= metricNameMatch.index + metricName.length;
+    };
+
+    function analyzeLabelFocus(query, cursorIndex) {
       const keyValuePairRegex = /\b(\w+)\s*=\s*("([^"]*)|,|\})/g;
-      const metricNameRegex = /^([^\{\[\s]+)/;
+
+      const labelMeta = {
+        hasLabels: false,
+        isFocused: false,
+        isEmpty: true,
+        focusOn: "", // label or value
+        meta: {
+          label: "",
+          value: "",
+        },
+      };
 
       const curlyBracesRegex = /{([^{}]*?)}/;
+
       const hasCurlyBraces = curlyBracesRegex.exec(query);
-      let isValue = false;
-      let isKey = false;
+      if (hasCurlyBraces) {
+        labelMeta.hasLabels = true;
+        labelMeta.isEmpty = !!hasCurlyBraces[1].length;
+        labelMeta.isFocused =
+          hasCurlyBraces.index <= cursorIndex &&
+          hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
+      }
+
       if (hasCurlyBraces) {
         const start = hasCurlyBraces.index;
         const end = start + hasCurlyBraces[0].length;
@@ -764,7 +795,7 @@ export default defineComponent({
               hasCurlyBraces[0][cursorIndex - start + 1] === '"') ||
             value === "="
           ) {
-            isValue = true;
+            labelMeta["focusOn"] = "value";
           }
 
           if (
@@ -773,29 +804,13 @@ export default defineComponent({
             (value === "," &&
               hasCurlyBraces[0][cursorIndex - start - 1] === '"')
           ) {
-            isKey = true;
+            labelMeta["focusOn"] = "label";
           }
         }
       }
 
-      let match;
-      // Extract metric name
-      const metricNameMatch = metricNameRegex.exec(query);
-      const metricName = metricNameMatch ? metricNameMatch[1] : null;
-
-      const cursorOn = {
-        labels: null,
-        metricName: null,
-      };
-
-      // Detect cursor position for metric name
-      cursorOn.metricName =
-        metricName &&
-        cursorIndex !== undefined &&
-        cursorIndex >= metricNameMatch.index &&
-        cursorIndex <= metricNameMatch.index + metricName.length;
-
       // Extract labels
+      let match;
       while (
         hasCurlyBraces &&
         (match = keyValuePairRegex.exec(query)) !== null
@@ -805,43 +820,31 @@ export default defineComponent({
         const end = start + fullMatch.length;
         // Detect cursor position for labels and values
         if (start <= cursorIndex && cursorIndex <= end) {
-          let showValues: boolean = false;
-          let showLabels: boolean = false;
           if (cursorIndex - start < key.length) {
-            showLabels = true;
+            labelMeta["focusOn"] = "label";
           } else if (
             key &&
             value &&
             cursorIndex - start < key.length + value.length
           ) {
-            showValues = true;
+            labelMeta["focusOn"] = "value";
           }
-          cursorOn.labels = {
-            key: key,
-            value,
-            isLabel: showLabels,
-            isValue: showValues,
-          };
+
+          labelMeta["meta"]["label"] = key;
+          labelMeta["meta"]["value"] = value;
+
           break;
         }
       }
 
-      if ((isValue || isKey) && !cursorOn.labels) cursorOn.labels = {};
-      if (isKey) cursorOn.labels.isLabel = true;
-      if (isValue) cursorOn.labels.isValue = true;
-      if (hasCurlyBraces) cursorOn["hasLabels"] = true;
-      if (!cursorOn.labels && hasCurlyBraces) {
-        cursorOn.labels = {};
-        cursorOn.labels["break"] = true;
-      }
-      return cursorOn;
+      return labelMeta;
     }
 
     const getLabelSuggestions = (labels, meta, queryLabels) => {
-      if (!meta || meta["break"]) return;
+      if (!(meta.focusOn === "value" || meta.focusOn === "label")) return null;
       const keywords = [];
       const keywordLabels = [];
-      if (meta.isLabel)
+      if (meta.focusOn === "label")
         Object.keys(labels[0]).forEach((key) => {
           if (queryLabels.indexOf(key + "=") === -1)
             keywords.push({
@@ -851,17 +854,17 @@ export default defineComponent({
             });
         });
 
-      if (meta.isValue)
+      if (meta.focusOn === "value")
         labels.forEach((label) => {
           if (
-            label[meta.key] &&
-            keywordLabels.indexOf(label[meta.key]) === -1
+            label[meta.meta.label] &&
+            keywordLabels.indexOf(label[meta.meta.label]) === -1
           ) {
-            keywordLabels.push(label[meta.key]);
+            keywordLabels.push(label[meta.meta.label]);
             keywords.push({
-              label: label[meta.key],
+              label: label[meta.meta.label],
               kind: "Variable",
-              insertText: `"${label[meta.key]}"`,
+              insertText: `"${label[meta.meta.label]}"`,
             });
           }
         });

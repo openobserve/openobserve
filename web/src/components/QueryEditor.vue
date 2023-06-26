@@ -215,12 +215,6 @@ export default defineComponent({
       window.addEventListener("click", () => {
         editorObj.layout();
       });
-
-      // editorObj.onDidBlurEditorWidget(() => {
-      //   // onBlur();
-      // });
-
-      //   //   editorObj.dispose();
     });
 
     const setValue = (value: string) => {
@@ -239,6 +233,12 @@ export default defineComponent({
       editorObj.focus();
     };
 
+    const getCursorIndex = () => {
+      const currentPosition = editorObj.getPosition();
+      const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
+      return cursorIndex || null;
+    };
+
     return {
       editorRef,
       editorObj,
@@ -246,6 +246,7 @@ export default defineComponent({
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,
+      getCursorIndex,
     };
   },
 });
