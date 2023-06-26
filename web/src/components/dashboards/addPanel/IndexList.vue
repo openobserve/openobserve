@@ -15,7 +15,7 @@
 
 <template>
   <div class="column index-menu">
-    <div>
+    <div class="col-auto">
       <q-select
         v-model="dashboardPanelData.data.fields.stream_type"
         :label="t('dashboard.selectStreamType')"
@@ -50,8 +50,9 @@
         </template>
       </q-select>
     </div>
-    <div class="index-table q-mt-xs">
+    <div class="column col index-table q-mt-xs">
       <q-table
+        class="col"
         :columns="[
           {
             name: 'name',
@@ -68,6 +69,7 @@
         :pagination="{ rowsPerPage: 10000 }"
         hide-header
         hide-bottom
+        virtual-scroll
         id="fieldList"
       >
         <template #body-cell-name="props">
@@ -368,6 +370,7 @@ export default defineComponent({
 
   .index-table {
     width: 100%;
+    height: 100%;
     // border: 1px solid rgba(0, 0, 0, 0.02);
     .q-table {
       display: block;
