@@ -207,8 +207,8 @@ export default defineComponent({
           }
         }
         &--active {
-          color: white;
-          background-color: $primary;
+          color: black;
+          background-color: $accent;
         }
       }
     }
