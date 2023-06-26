@@ -32,6 +32,11 @@ phases:
       - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-amd64
       - docker push public.ecr.aws/zinclabs/openobserve:latest-amd64
 
+      # debug version
+      - docker build -t openobserve:latest-amd64-debug -f deploy/build/Dockerfile.tag-debug.amd64 .
+      - docker tag openobserve:latest-amd64-debug public.ecr.aws/zinclabs/openobserve:$GIT_TAG-amd64-debug
+      - docker push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-amd64-debug
+
       # create manifests for simd version
       - echo 'Pull arm64 image'
       - docker pull public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-simd
@@ -57,6 +62,12 @@ phases:
       - echo 'Push manifests'
       - docker manifest push public.ecr.aws/zinclabs/openobserve:$GIT_TAG
       - docker manifest push public.ecr.aws/zinclabs/openobserve:latest
+
+      # create manifests for debug version
+      - echo 'Create debug manifests'
+      - docker pull public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-debug
+      - docker manifest create public.ecr.aws/zinclabs/openobserve:$GIT_TAG-debug --amend public.ecr.aws/zinclabs/openobserve:$GIT_TAG-amd64-debug --amend public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-debug
+      - docker manifest push public.ecr.aws/zinclabs/openobserve:$GIT_TAG-debug
 
       # push to docker hub
       - echo 'Pull amd64 image'
@@ -89,3 +100,8 @@ phases:
       - echo 'Push manifests'
       - docker manifest push openobserve/openobserve:$GIT_TAG-simd
       - docker manifest push openobserve/openobserve:latest-simd 
+      # create manifests for debug version
+      - docker tag openobserve:latest-amd64-debug openobserve/openobserve:$GIT_TAG-amd64-debug
+      - docker pull openobserve/openobserve:$GIT_TAG-arm64-debug
+      - docker manifest create openobserve/openobserve:$GIT_TAG-debug --amend openobserve/openobserve:$GIT_TAG-amd64-debug --amend openobserve/openobserve:$GIT_TAG-arm64-debug
+      - docker manifest push openobserve/openobserve:$GIT_TAG-debug

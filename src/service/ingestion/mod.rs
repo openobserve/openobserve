@@ -398,7 +398,7 @@ mod tests {
                 &local_val,
                 None
             ),
-            "1970_01_01_00_country=USA_sport=basketball"
+            "1970_01_01_00_keeping_country=USA_sport=basketball"
         );
     }
 
@@ -409,14 +409,14 @@ mod tests {
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
             get_hour_key(1620000000, vec![], &local_val, None),
-            "1970_01_01_00"
+            "1970_01_01_00_keeping"
         );
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
         assert_eq!(
             get_hour_key(1620000000, vec![], &Map::new(), None),
-            "1970_01_01_00"
+            "1970_01_01_00_keeping"
         );
     }
     #[actix_web::test]

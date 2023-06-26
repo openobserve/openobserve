@@ -163,6 +163,7 @@ mod tests {
         assert_eq!(get_stream_stats_len(), stats.len());
 
         let val = StreamStats {
+            created_at: 1667978841102,
             doc_time_min: 1667978841102,
             doc_time_max: 1667978845374,
             doc_num: 5000,
