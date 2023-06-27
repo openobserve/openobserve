@@ -23,7 +23,6 @@ publish = false
 [features]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
-zo_functions = []
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 
 [profile.release]
