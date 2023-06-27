@@ -153,8 +153,6 @@
               ref="queryEditorRef"
               class="monaco-editor"
               v-model:query="searchObj.data.query"
-              v-model:fields="searchObj.data.stream.selectedStreamFields"
-              v-model:functions="searchObj.data.stream.functions"
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
