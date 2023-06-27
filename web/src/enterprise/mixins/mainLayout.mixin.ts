@@ -30,7 +30,7 @@ const MainLayoutCloudMixin = {
       });
       linksList.value.splice(7, 0, {
         title: t("menu.organizations"),
-        icon: "img:" + getImageURL("images/left_nav/organization_icon.svg"),
+        icon: "corporate_fare",
         link: "/organizations",
       });
       linksList.value.splice(10, 0, {
