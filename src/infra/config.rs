@@ -37,11 +37,7 @@ pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
 pub static VERSION: &str = env!("GIT_VERSION");
 pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-#[cfg(feature = "zo_functions")]
 pub static HAS_FUNCTIONS: bool = true;
-#[cfg(not(feature = "zo_functions"))]
-pub static HAS_FUNCTIONS: bool = false;
-
 pub static FILE_EXT_JSON: &str = ".json";
 pub static FILE_EXT_PARQUET: &str = ".parquet";
 
