@@ -89,17 +89,11 @@ mod tests {
         e2e_get_org().await;
 
         // functions
-        #[cfg(feature = "zo_functions")]
         e2e_post_function().await;
-        #[cfg(feature = "zo_functions")]
         e2e_add_stream_function().await;
-        #[cfg(feature = "zo_functions")]
         e2e_list_functions().await;
-        #[cfg(feature = "zo_functions")]
         e2e_list_stream_functions().await;
-        #[cfg(feature = "zo_functions")]
         e2e_remove_stream_function().await;
-        #[cfg(feature = "zo_functions")]
         e2e_delete_function().await;
 
         /* FIXME: Revise and restore the e2e tests for search API calls.
@@ -334,7 +328,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_post_function() {
         let auth = setup();
         let body_str = r#"{
@@ -360,7 +353,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_add_stream_function() {
         let auth = setup();
         let body_str = r#"{
@@ -387,7 +379,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_list_functions() {
         let auth = setup();
         let app = test::init_service(
@@ -407,7 +398,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_list_stream_functions() {
         let auth = setup();
         let app = test::init_service(
@@ -427,7 +417,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_delete_function() {
         let auth = setup();
         let app = test::init_service(
@@ -447,7 +436,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[cfg(feature = "zo_functions")]
     async fn e2e_remove_stream_function() {
         let auth = setup();
         let app = test::init_service(

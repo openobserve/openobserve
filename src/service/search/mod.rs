@@ -364,9 +364,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             sources = handle_metrics_response(sources);
         }
 
-        /*  #[cfg(feature = "zo_functions")]
-        let sources = apply_query_fn(&req, &sources); */
-
         if sql.uses_zo_fn {
             for source in sources {
                 result.add_hit(&flatten::flatten(&source).unwrap());

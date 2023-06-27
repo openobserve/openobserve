@@ -17,20 +17,6 @@
   <div class="column index-menu">
     <div>
       <q-select
-        data-test="log-search-index-list-field-search-input"
-        v-model="searchObj.data.stream.streamType"
-        :options="streamTypes"
-        data-cy="logs-index-list-select-stream-type"
-        filled
-        borderless
-        dense
-        debounce="1"
-        class="q-pb-xs"
-        emit-value
-        map-options
-        :placeholder="t('search.searchField')"
-      />
-      <q-select
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
         :label="
