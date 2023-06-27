@@ -1,20 +1,26 @@
 <template>
-    <q-btn class="round-button" flat @click="toggleDarkMode">
+    <q-btn class="round-button" round flat @click="toggleDarkMode">
       <q-icon :name="DarkModeIcon"></q-icon>
     </q-btn>
 </template>
 
 <script lang="ts">
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, onMounted, computed, defineComponent } from 'vue';
 import { useQuasar } from 'quasar';
 import { useStore } from "vuex";
 import * as monaco from "monaco-editor";
+import { outlinedDarkMode, outlinedLightMode } from "@quasar/extras/material-icons-outlined";
 
-export default {
+export default defineComponent({
     setup() {
         const store = useStore();
         const $q = useQuasar();
         const darkMode = ref(false);
+
+        const DarkModeIcons = {
+            light: outlinedLightMode,
+            dark: outlinedDarkMode
+        };
 
         onMounted(() => {
             const savedTheme = localStorage.getItem('theme');
@@ -29,7 +35,7 @@ export default {
         });
 
         const DarkModeIcon = computed(() => {
-            return darkMode.value ? 'dark_mode' : 'light_mode'
+            return darkMode.value ? DarkModeIcons.dark : DarkModeIcons.light;
         });
 
         watch(darkMode, () => {
@@ -56,10 +62,12 @@ export default {
             store,
             darkMode,
             DarkModeIcon,
-            toggleDarkMode
+            toggleDarkMode,
+            outlinedDarkMode,
+            outlinedLightMode
         };
     },
-};
+});
 </script>
 
 
