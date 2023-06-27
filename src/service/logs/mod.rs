@@ -36,7 +36,7 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub(crate) fn get_upto_discard_error() -> String {
     format!(
-        "Too old data,only last {} hours data can be ingested. Data discarded.",
+        "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
         CONFIG.limit.ingest_allowed_upto
     )
 }
