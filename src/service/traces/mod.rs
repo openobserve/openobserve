@@ -344,14 +344,14 @@ fn get_val(attr_val: Option<AnyValue>) -> json::Value {
                     inner_val,
                 ) => json::json!(inner_val.as_str()),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(inner_val) => {
-                    json::json!(inner_val.to_string())
+                    json::json!(inner_val)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(inner_val) => {
-                    json::json!(inner_val.to_string())
+                    json::json!(inner_val)
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
                     inner_val,
-                ) => json::json!(inner_val.to_string()),
+                ) => json::json!(inner_val),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(inner_val) => {
                     let mut vals = vec![];
                     for item in inner_val.values.iter().cloned() {
