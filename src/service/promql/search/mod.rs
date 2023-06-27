@@ -24,15 +24,23 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
-    cluster,
-    config::CONFIG,
-    errors::{Error, ErrorCodes, Result},
+use crate::{
+    handler::grpc::cluster_rpc, meta::usage::RequestStats, service::usage::report_usage_stats,
 };
-use crate::service::{
-    promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
-    search::{server_internal_error, MetadataMap},
+use crate::{
+    infra::{
+        cluster,
+        config::CONFIG,
+        errors::{Error, ErrorCodes, Result},
+    },
+    meta::StreamType,
+};
+use crate::{
+    meta::usage::UsageType,
+    service::{
+        promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
+        search::{server_internal_error, MetadataMap},
+    },
 };
 
 pub mod grpc;
@@ -249,6 +257,22 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         file_count,
         scan_size,
     );
+
+    let req_stats = RequestStats {
+        records: 0,
+        response_time: op_start.elapsed().as_secs_f64(),
+        size: scan_size as f64,
+        request_body: Some(req.query.unwrap().query),
+    };
+
+    report_usage_stats(
+        req_stats,
+        &req.org_id,
+        StreamType::Metrics,
+        UsageType::MetricSearch,
+        0,
+    )
+    .await;
     Ok(values)
 }
 
