@@ -1,3 +1,4 @@
+use crate::common::schema_ext::SchemaExt;
 use arrow_schema::{Field, Schema};
 use itertools::Itertools;
 
@@ -20,11 +21,11 @@ pub fn get_fields_key(fields: &[Field]) -> String {
 }
 
 pub fn get_schema_key(schema: &Schema) -> String {
-    get_fields_key(schema.fields())
+    get_fields_key(&schema.to_cloned_fields())
 }
 
 pub fn get_schema_key_xxh3(schema: &Schema) -> String {
-    get_fields_key_xxh3(schema.fields())
+    get_fields_key_xxh3(&schema.to_cloned_fields())
 }
 
 pub fn get_fields_key_xxh3(fields: &[Field]) -> String {

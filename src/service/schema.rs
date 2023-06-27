@@ -23,6 +23,7 @@ use std::io::{BufReader, Seek, SeekFrom};
 use std::sync::Arc;
 
 use crate::common::json;
+use crate::common::schema_ext::SchemaExt;
 use crate::infra::config::CONFIG;
 use crate::infra::db::etcd;
 use crate::meta::prom::METADATA_LABEL;
@@ -98,20 +99,21 @@ pub async fn schema_evolution(
             Ok(merged) => {
                 if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
                     let is_field_delta = !field_datatype_delta.is_empty();
-                    let mut final_fields = vec![];
+                    let mut final_fields: Vec<Field> = vec![];
 
                     let metadata = merged.metadata().clone();
 
-                    for field in merged.fields.into_iter() {
-                        let mut field = field.clone();
+                    for mut field in merged.to_cloned_fields().into_iter() {
                         let mut new_meta = field.metadata().clone();
                         if new_meta.contains_key("zo_cast") {
                             new_meta.remove_entry("zo_cast");
                             field.set_metadata(new_meta);
                         }
+
                         final_fields.push(field);
                     }
-                    let final_schema = Schema::new(final_fields.to_vec()).with_metadata(metadata);
+
+                    let final_schema = Schema::new(final_fields).with_metadata(metadata);
                     db::schema::set(
                         org_id,
                         stream_name,
@@ -131,6 +133,8 @@ pub async fn schema_evolution(
 // Hack to allow widening conversion, method overrides Schema::try_merge
 fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowError> {
     let mut merged_metadata: HashMap<String, String> = HashMap::new();
+    // let mut merged_fields: Fields = Fields::empty();
+    // let mut merged_fields: Vec<Arc<Field>> = Vec::new();
     let mut merged_fields: Vec<Field> = Vec::new();
     // TODO : this dummy initialization is to avoid compiler complaining for uninitialized value
     let mut temp_field = Field::new("dummy", DataType::Utf8, false);
@@ -151,6 +155,7 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
         // merge fields
         let mut found_at = 0;
         for field in schema.fields().iter().sorted_by_key(|v| v.name()) {
+            let field = (**field).clone(); // Get the clone of the underlying Field object.
             let mut new_field = true;
             let mut allowed = false;
             for (stream, mut merged_field) in merged_fields.iter_mut().enumerate() {
@@ -174,10 +179,12 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
                             merged_field.is_nullable(),
                         );
                         merged_field = &mut temp_field;
+                        // merged_field = Arc::new(temp_field).borrow_mut();
                     }
                 }
                 found_at = stream;
-                match merged_field.try_merge(field) {
+
+                match merged_field.try_merge(&field) {
                     Ok(_) => {}
                     Err(_) => {
                         let mut meta = field.metadata().clone();
@@ -251,7 +258,7 @@ pub async fn check_for_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
     record_ts: i64,
 ) -> SchemaEvolution {
-    let mut schema = if stream_schema_map.contains_key(stream_name) {
+    let mut schema: Schema = if stream_schema_map.contains_key(stream_name) {
         stream_schema_map.get(stream_name).unwrap().clone()
     } else {
         let schema = db::schema::get(org_id, stream_name, stream_type)
@@ -262,33 +269,36 @@ pub async fn check_for_schema(
     };
 
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
-        //return (true, None, schema.fields().to_vec());
+        //return (true, None, schema.fields);
+        let schema_fields: Vec<Field> = schema.to_cloned_fields();
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.fields().to_vec(),
+            schema_fields,
             is_schema_changed: false,
         };
     }
 
-    let mut schema_reader = BufReader::new(val_str.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+    let schema_reader = BufReader::new(val_str.as_bytes());
+    let inferred_schema = infer_json_schema(schema_reader, None).unwrap();
     if schema.fields.eq(&inferred_schema.fields) {
-        //return (true, None, schema.fields().to_vec());
+        //return (true, None, schema.fields);
+        let schema_fields: Vec<Field> = schema.to_cloned_fields();
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.fields().to_vec(),
+            schema_fields,
             is_schema_changed: false,
         };
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
-        //return (false, None, inferred_schema.fields().to_vec());
+        //return (false, None, inferred_schema.fields);
+        let inferred_schema: Vec<Field> = inferred_schema.to_cloned_fields();
         return SchemaEvolution {
             schema_compatible: false,
             types_delta: None,
-            schema_fields: inferred_schema.fields().to_vec(),
+            schema_fields: inferred_schema,
             is_schema_changed: false,
         };
     }
@@ -338,11 +348,12 @@ pub async fn check_for_schema(
                     stream_name
                 );
 
-                //return (true, None, final_schema.fields().to_vec());
+                //return (true, None, final_schema.fields);
+                let f_schema: Vec<Field> = final_schema.to_cloned_fields();
                 return SchemaEvolution {
                     schema_compatible: true,
                     types_delta: None,
-                    schema_fields: final_schema.fields().to_vec(),
+                    schema_fields: f_schema,
                     is_schema_changed: true,
                 };
             } else {
@@ -364,11 +375,12 @@ pub async fn check_for_schema(
             )
             .await
             .unwrap();
-            //return (true, None, final_schema.fields().to_vec());
+            //return (true, None, final_schema.fields);
+            let f_schema: Vec<Field> = final_schema.to_cloned_fields();
             return SchemaEvolution {
                 schema_compatible: true,
                 types_delta: None,
-                schema_fields: final_schema.fields().to_vec(),
+                schema_fields: f_schema,
                 is_schema_changed: true,
             };
         }
@@ -385,7 +397,7 @@ pub async fn check_for_schema(
         match schema.fields.iter().find(|f| f.name() == item_name) {
             Some(existing_field) => {
                 if existing_field.data_type() != item_data_type {
-                    field_datatype_delta.push(existing_field.to_owned().clone());
+                    field_datatype_delta.push((**existing_field).clone());
                 }
             }
             None => {
@@ -394,23 +406,27 @@ pub async fn check_for_schema(
         }
     }
     if !CONFIG.common.widening_schema_evolution {
-        //return (true, Some(field_datatype_delta), schema.fields().to_vec());
+        //return (true, Some(field_datatype_delta), schema.fields);
+        let schema_fields: Vec<Field> = schema.to_cloned_fields();
+
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: Some(field_datatype_delta),
-            schema_fields: schema.fields().to_vec(),
+            schema_fields,
             is_schema_changed: false,
         };
     }
     if !field_datatype_delta.is_empty() || !new_field_delta.is_empty() {
         match try_merge(vec![schema.clone(), inferred_schema.clone()]) {
             Err(ref _e) =>
-            //(true, Some(field_datatype_delta), schema.fields().to_vec())
+            //(true, Some(field_datatype_delta), schema.fields)
             {
-                return SchemaEvolution {
+                let schema_fields: Vec<Field> = schema.to_cloned_fields();
+
+                SchemaEvolution {
                     schema_compatible: true,
                     types_delta: Some(field_datatype_delta),
-                    schema_fields: schema.fields().to_vec(),
+                    schema_fields,
                     is_schema_changed: false,
                 }
             } //return (false, None),
@@ -441,10 +457,29 @@ pub async fn check_for_schema(
                             }
                         });
                     }
-                    let mut final_fields = vec![];
+                    let mut final_fields: Vec<Field> = vec![];
+                    // let new_field_datatype_delta: Vec<Field> = meta_fields
+                    //     .iter()
+                    //     .flat_map(|meta| {
+                    //         let new_field_datatype_delta: Vec<Field> = field_datatype_delta
+                    //             .iter()
+                    //             .flat_map(|x| {
+                    //                 if x.name() == meta.name() {
+                    //                     let mut inner = x.clone();
+                    //                     inner.set_metadata(meta.metadata().clone());
+                    //                     Some(inner)
+                    //                 } else {
+                    //                     None
+                    //                 }
+                    //             })
+                    //             .collect();
+                    //         new_field_datatype_delta
+                    //     })
+                    //     .collect();
 
-                    for field in merged.fields.into_iter() {
-                        let mut field = field.clone();
+                    // let mut final_fields = Fields::empty().to_vec();
+
+                    for mut field in merged.to_cloned_fields().into_iter() {
                         let mut new_meta = field.metadata().clone();
                         if new_meta.contains_key("zo_cast") {
                             new_meta.remove_entry("zo_cast");
@@ -465,36 +500,40 @@ pub async fn check_for_schema(
                     .await
                     .unwrap();
                     stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
-                    //(true, Some(field_datatype_delta),final_schema.fields().to_vec());
+                    //(true, Some(field_datatype_delta),final_schema.fields);
                     //before returning delta map, check merged schema fields metadata for casting required
+                    let f_schema: Vec<Field> = final_schema.to_cloned_fields();
 
-                    return SchemaEvolution {
+                    SchemaEvolution {
                         schema_compatible: true,
                         types_delta: Some(field_datatype_delta),
-                        schema_fields: final_schema.fields().to_vec(),
+                        schema_fields: f_schema,
                         is_schema_changed: true,
-                    };
+                    }
                 } else {
                     stream_schema_map.insert(stream_name.to_string(), merged.clone());
-                    //(true, Some(field_datatype_delta), merged.fields().to_vec())
+                    //(true, Some(field_datatype_delta.into()), merged.fields)
+                    let merged_fields: Vec<Field> = merged.to_cloned_fields();
 
-                    return SchemaEvolution {
+                    SchemaEvolution {
                         schema_compatible: true,
                         types_delta: Some(field_datatype_delta),
-                        schema_fields: merged.fields().to_vec(),
+                        schema_fields: merged_fields,
                         is_schema_changed: false,
-                    };
+                    }
                 }
             }
         }
     } else {
-        //(true, None, schema.fields().to_vec())
-        return SchemaEvolution {
+        //(true, None, schema.fields)
+        let schema_fields: Vec<Field> = schema.to_cloned_fields();
+
+        SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.fields().to_vec(),
+            schema_fields,
             is_schema_changed: false,
-        };
+        }
     }
 }
 

@@ -455,7 +455,8 @@ mod tests {
             "settings".to_string(),
             r#"{"partition_keys": {"country": "country", "sport": "sport"}}"#.to_string(),
         );
-        let schema = Schema::new(vec![]).with_metadata(meta);
+
+        let schema = Schema::empty().with_metadata(meta);
         stream_schema_map.insert("olympics".to_string(), schema);
         let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
         assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);

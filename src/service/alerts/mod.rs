@@ -21,6 +21,7 @@ use std::io::Error;
 use super::search::sql::Sql;
 use super::{db, triggers};
 use crate::common::notification::send_notification;
+use crate::common::schema_ext::SchemaExt;
 use crate::handler::grpc::cluster_rpc;
 use crate::meta::alert::{Alert, AlertList, Trigger};
 use crate::meta::http::HttpResponse as MetaHttpResponse;
@@ -59,7 +60,7 @@ pub async fn save_alert(
     let schema = db::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap();
-    let fields = schema.fields;
+    let fields = schema.to_cloned_fields();
     if fields.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),

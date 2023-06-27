@@ -75,7 +75,8 @@ pub async fn populate_file_meta(
     );
     let df = ctx.sql(sql.as_str()).await?;
     let batches = df.collect().await?;
-    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches[..])?;
+    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
+    let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches_ref)?;
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
 
     let record = result.pop().expect("No record found");
