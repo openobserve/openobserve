@@ -20,6 +20,7 @@ use std::io::Error;
 use utoipa::ToSchema;
 
 use crate::common::json;
+use crate::infra::config::HAS_FUNCTIONS;
 use crate::infra::{
     cache, cluster,
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
@@ -71,7 +72,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
         commit_hash: config::COMMIT_HASH.to_string(),
         build_date: config::BUILD_DATE.to_string(),
-        functions_enabled: true,
+        functions_enabled: config::HAS_FUNCTIONS,
         telemetry_enabled: CONFIG.common.telemetry_enabled,
         default_fts_keys: crate::common::stream::SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
