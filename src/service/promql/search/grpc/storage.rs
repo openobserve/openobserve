@@ -38,18 +38,18 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     filters: &[(&str, &str)],
-) -> Result<(SessionContext, Arc<Schema>)> {
+) -> Result<(SessionContext, Arc<Schema>, usize, usize)> {
     // check if we are allowed to search
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
         log::error!("stream [{}] is being deleted", stream_name);
-        return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+        return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
     }
 
     // get file list
     let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
     let file_count = files.len();
     if files.is_empty() {
-        return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+        return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
     }
 
     // calcuate scan size
@@ -122,7 +122,7 @@ pub(crate) async fn create_context(
         FileType::PARQUET,
     )
     .await?;
-    Ok((ctx, schema))
+    Ok((ctx, schema, file_count, scan_original_size as usize))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all)]

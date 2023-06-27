@@ -232,12 +232,13 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 };
 
                 log::info!(
-                    "search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}",
+                    "search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
                     node.id,
                     is_querier,
                     response.total,
                     response.took,
-                    response.file_count
+                    response.file_count,
+                    response.scan_size
                 );
                 Ok(response)
             }

@@ -190,11 +190,12 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                 };
 
                 log::info!(
-                    "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}",
+                    "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}, scan_size: {}",
                     node.id,
                     req_need_wal,
                     response.took,
-                    response.file_count
+                    response.file_count,
+                    response.scan_size
                 );
                 Ok(response)
             }
