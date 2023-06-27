@@ -215,6 +215,8 @@ export default defineComponent({
     };
 
     const triggerAutoComplete = async (value: string) => {
+      disableSuggestionPopup();
+      await nextTick();
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
     };
 
