@@ -401,6 +401,7 @@ export default defineComponent({
                         if (customMessage != "") {
                             errStr = t(customMessage);
                         }
+                        errStr != '' ? errStr : 'Something went wrong';
                         $q.notify({
                             type: "negative",
                             message: errStr,
@@ -424,18 +425,26 @@ export default defineComponent({
                     .catch((error) => {
                         let errStr = ""
                         if (error.response != undefined) {
-                            errStr = error.response.data.error;
+                            errStr = error.response.data.error_detail;
                         } else {
                             errStr = error.message;
                         }
-                        const customMessage = logsErrorMessage(error.response.data.code);
-                        searchQueryData.data.errorCode = error.response.data.code;
+                        const customMessage = logsErrorMessage(error.response.data.error_detail);
+                        searchQueryData.data.error_detail = error.response.data.error_detail;
                         if (customMessage != "") {
                             errStr = t(customMessage);
                         }
+
+                        const words = errStr.split(" ");
+
+                        let trimmedText = words.slice(0, 300).join(" ");
+
+                        if (trimmedText.length > 300) {
+                            trimmedText = trimmedText.slice(0, 300) + " ...";
+                        }        
                         $q.notify({
                             type: "negative",
-                            message: errStr,
+                            message: trimmedText,
                             timeout: 5000,
                         });
                     })
