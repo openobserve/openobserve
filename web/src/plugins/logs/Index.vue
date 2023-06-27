@@ -28,6 +28,7 @@
           <search-bar
             data-test="logs-search-bar"
             ref="searchBarRef"
+            :fieldValues="fieldValues"
             :key="searchObj.data.stream.streamLists.length || 1"
             @searchdata="searchData"
           />
@@ -295,6 +296,8 @@ export default defineComponent({
     const searchBarRef = ref(null);
     const parser = new Parser();
     const expandedLogs = ref({});
+
+    const fieldValues = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -881,8 +884,11 @@ export default defineComponent({
               //   ...res.data.aggs.histogram
               // );
             } else {
+              resetFieldValues();
               searchObj.data.queryResults = res.data;
             }
+
+            updateFieldValues(res.data.hits);
 
             //extract fields from query response
             extractFields();
@@ -915,6 +921,34 @@ export default defineComponent({
         throw new ErrorException("Request failed.");
       }
     }
+
+    const resetFieldValues = () => {
+      fieldValues.value = {};
+    };
+
+    const updateFieldValues = (data) => {
+      const excludedFields = [
+        store.state.zoConfig.timestamp_column,
+        "log",
+        "msg",
+      ];
+      data.forEach((item) => {
+        // Create set for each field values and add values to corresponding set
+        Object.keys(item).forEach((key) => {
+          if (excludedFields.includes(key)) {
+            return;
+          }
+
+          if (fieldValues.value[key] == undefined) {
+            fieldValues.value[key] = new Set();
+          }
+
+          if (!fieldValues.value[key].has(item[key])) {
+            fieldValues.value[key].add(item[key]);
+          }
+        });
+      });
+    };
 
     function extractFields() {
       try {
@@ -1472,6 +1506,7 @@ export default defineComponent({
       toggleExpandLog,
       expandedLogs,
       updateUrlQueryParams,
+      fieldValues,
     };
   },
   computed: {

@@ -84,6 +84,7 @@ export default defineComponent({
     const createDependencyProposals = (range: any) => {
       return props.keywords.map((keyword: any) => {
         const itemObj: any = {
+          ...keyword,
           label: keyword["label"],
           kind: CompletionKind[keyword["kind"]],
           insertText: keyword["insertText"],
@@ -142,27 +143,14 @@ export default defineComponent({
             const lastElement = arr.pop();
             props.suggestions.forEach((suggestion: any) => {
               filteredSuggestions.push({
-                label: suggestion.getLabel(lastElement),
+                label: suggestion.label(lastElement),
                 kind: monaco.languages.CompletionItemKind[
                   suggestion.kind || "Text"
                 ],
-                insertText: suggestion.getInsertText(lastElement),
+                insertText: suggestion.insertText(lastElement),
                 range: range,
               });
             });
-
-            // filteredSuggestions.push({
-            //   label: `match_all('${lastElement}')`,
-            //   kind: monaco.languages.CompletionItemKind.Text,
-            //   insertText: `match_all('${lastElement}')`,
-            //   range: range,
-            // });
-            // filteredSuggestions.push({
-            //   label: `match_all_ignore_case('${lastElement}')`,
-            //   kind: monaco.languages.CompletionItemKind.Text,
-            //   insertText: `match_all_ignore_case('${lastElement}')`,
-            //   range: range,
-            // });
 
             return {
               suggestions: filteredSuggestions,
@@ -231,7 +219,13 @@ export default defineComponent({
     };
 
     const disableSuggestionPopup = () => {
-      editorObj.focus();
+      const escEvent = new KeyboardEvent("keydown", {
+        keyCode: 27,
+        code: "Escape",
+        key: "Escape",
+        bubbles: true,
+      });
+      editorRef.value.dispatchEvent(escEvent);
     };
 
     const getCursorIndex = () => {

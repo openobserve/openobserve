@@ -155,7 +155,9 @@
               v-model:query="searchObj.data.query"
               v-model:fields="searchObj.data.stream.selectedStreamFields"
               v-model:functions="searchObj.data.stream.functions"
-              @update-query="updateQueryValue"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
+              @update:query="updateQueryValue"
               @run-query="searchData"
             ></query-editor>
           </template>
@@ -186,7 +188,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -194,7 +196,7 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
-import QueryEditor from "./QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 
@@ -205,6 +207,9 @@ import config from "@/aws-exports";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import search from "../../services/search";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import stream from "@/services/stream";
+import { getConsumableDateTime } from "@/utils/commons";
+import { a } from "aws-amplify";
 
 const defaultValue: any = () => {
   return {
@@ -252,7 +257,13 @@ export default defineComponent({
       }
     },
   },
-  setup() {
+  props: {
+    fieldValues: {
+      type: Array,
+      default: () => [],
+    },
+  },
+  setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -272,13 +283,123 @@ export default defineComponent({
     let fnEditorobj: any = null;
     let streamName = "";
 
+    const defaultKeywords = [
+      {
+        label: "and",
+        kind: "Keyword",
+        insertText: "and ",
+      },
+      {
+        label: "or",
+        kind: "Keyword",
+        insertText: "or ",
+      },
+      {
+        label: "like",
+        kind: "Keyword",
+        insertText: "like '%${1:params}%' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "in",
+        kind: "Keyword",
+        insertText: "in ('${1:params}') ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "not in",
+        kind: "Keyword",
+        insertText: "not in ('${1:params}') ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "between",
+        kind: "Keyword",
+        insertText: "between '${1:params}' and '${1:params}' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "not between",
+        kind: "Keyword",
+        insertText: "not between '${1:params}' and '${1:params}' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "is null",
+        kind: "Keyword",
+        insertText: "is null ",
+      },
+      {
+        label: "is not null",
+        kind: "Keyword",
+        insertText: "is not null ",
+      },
+      {
+        label: ">",
+        kind: "Operator",
+        insertText: "> ",
+      },
+      {
+        label: "<",
+        kind: "Operator",
+        insertText: "< ",
+      },
+      {
+        label: ">=",
+        kind: "Operator",
+        insertText: ">= ",
+      },
+      {
+        label: "<=",
+        kind: "Operator",
+        insertText: "<= ",
+      },
+      {
+        label: "<>",
+        kind: "Operator",
+        insertText: "<> ",
+      },
+      {
+        label: "=",
+        kind: "Operator",
+        insertText: "= ",
+      },
+      {
+        label: "!=",
+        kind: "Operator",
+        insertText: "!= ",
+      },
+      {
+        label: "()",
+        kind: "Keyword",
+        insertText: "(${1:condition}) ",
+        insertTextRules: "InsertAsSnippet",
+      },
+    ];
+
+    const defaultSuggestions = [
+      {
+        label: (_keyword) => `match_all('${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword) => `match_all('${_keyword}')`,
+      },
+      {
+        label: (_keyword) => `match_all_ignore_case('${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword) => `match_all_ignore_case('${_keyword}')`,
+      },
+    ];
+
+    const autoCompleteKeywords = ref([]);
+    const autoCompleteSuggestions = ref([...defaultSuggestions]);
+
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
     };
 
     const updateQueryValue = (value: string) => {
       searchObj.data.editorValue = value;
-      searchObj.data.query = value;
+      updateSqlSuggestions(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery.from.length > 0) {
@@ -319,6 +440,134 @@ export default defineComponent({
         }
       }
     };
+
+    const updateSqlSuggestions = async (value) => {
+      autoCompleteKeywords.value = [];
+      const cursorIndex = queryEditorRef.value.getCursorIndex();
+      const sqlWhereClause = analyzeSqlWhereClause(value, cursorIndex);
+      if (
+        sqlWhereClause.meta.label &&
+        props.fieldValues[sqlWhereClause.meta.label]
+      ) {
+        let values = Array.from(
+          props.fieldValues[sqlWhereClause.meta.label] || new Set()
+        ).map((item) => {
+          return {
+            label: item,
+            insertText: `'${item}'`,
+            kind: "Keyword",
+          };
+        });
+
+        autoCompleteKeywords.value = [
+          ...values,
+          {
+            label: "...Loading more values",
+            kind: "Text",
+            insertText: "",
+            sortText: "zzzzzzz",
+          },
+        ];
+
+        await nextTick();
+
+        queryEditorRef.value.triggerAutoComplete(value);
+
+        const timestamps = getConsumableDateTime(searchObj.data.datetime);
+
+        const startISOTimestamp: any =
+          new Date(timestamps.start_time.toISOString()).getTime() * 1000;
+        const endISOTimestamp: any =
+          new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+        stream
+          .fieldValues({
+            org_identifier: store.state.selectedOrganization.identifier,
+            stream_name: searchObj.data.stream.selectedStream.value,
+            fields: [sqlWhereClause.meta.label],
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: 20,
+            query_context: "U0VMRUNUICogRlJPTSAiY2xvdWR3YXRjaCI=",
+          })
+          .then((response) => {
+            queryEditorRef.value.disableSuggestionPopup();
+            autoCompleteKeywords.value.pop();
+            response.data.hits.forEach((field) => {
+              if (field["field"] === sqlWhereClause.meta.label) {
+                field.values.forEach((item) => {
+                  if (item.zo_sql_key)
+                    autoCompleteKeywords.value.push({
+                      label: item.zo_sql_key,
+                      insertText: `'${item.zo_sql_key}'`,
+                      kind: "Keyword",
+                    });
+                });
+              }
+            });
+          })
+          .finally(async () => {
+            await nextTick();
+            queryEditorRef.value.triggerAutoComplete(value);
+          });
+        queryEditorRef.value.disableSuggestionPopup();
+        if (!autoCompleteKeywords.value.length) return;
+        await nextTick();
+        queryEditorRef.value.triggerAutoComplete(value);
+      } else {
+        searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+          if (field.name == store.state.zoConfig.timestamp_column) {
+            return;
+          }
+          let itemObj = {
+            label: field.name,
+            kind: "Text",
+            insertText: field.name,
+            insertTextRules: "InsertAsSnippet",
+          };
+          autoCompleteKeywords.value.push(itemObj);
+        });
+
+        searchObj.data.stream.functions.forEach((field: any) => {
+          let itemObj = {
+            label: field.name,
+            kind: "Text",
+            insertText: field.name + field.args,
+            insertTextRules: "InsertAsSnippet",
+          };
+          autoCompleteKeywords.value.push(itemObj);
+        });
+        autoCompleteKeywords.value.push(...defaultKeywords);
+      }
+    };
+
+    function analyzeSqlWhereClause(whereClause, cursorIndex) {
+      const labelMeta = {
+        hasLabels: false,
+        isFocused: false,
+        isEmpty: true,
+        focusOn: "", // label or value
+        meta: {
+          label: "",
+          value: "",
+        },
+      };
+
+      const columnValueRegex = /(\w+)\s*=\s*$|\w+\s+IN\s+\($/i;
+
+      let match;
+      while ((match = columnValueRegex.exec(whereClause)) !== null) {
+        const column = match[1];
+
+        if (cursorIndex <= match.index + match[0].length - 1) {
+          labelMeta.focusOn = "value";
+          labelMeta.isFocused = true;
+          labelMeta.meta.label = column;
+
+          break; // Exit the loop after processing the match
+        }
+      }
+      return labelMeta;
+    }
 
     const updateDateTime = (value: object) => {
       searchObj.data.datetime = value;
@@ -363,10 +612,6 @@ export default defineComponent({
 
       return csv;
     };
-
-    onBeforeRouteUpdate(() => {
-      console.log("on search bar update");
-    });
 
     const downloadLogs = () => {
       const filename = "logs-data.csv";
@@ -648,6 +893,8 @@ export default defineComponent({
       functionModel,
       functionOptions,
       filterFn,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
     };
   },
   computed: {
