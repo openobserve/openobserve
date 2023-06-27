@@ -39,9 +39,10 @@ impl From<UsageType> for UsageEvent {
             | UsageType::EnrichmentTable
             | UsageType::Syslog
             | UsageType::JsonMetrics => UsageEvent::Ingestion,
-            UsageType::Search | UsageType::SearchAround | UsageType::SearchTopNValues => {
-                UsageEvent::Search
-            }
+            UsageType::Search
+            | UsageType::SearchAround
+            | UsageType::SearchTopNValues
+            | UsageType::MetricSearch => UsageEvent::Search,
             UsageType::Functions => UsageEvent::Functions,
             UsageType::Retention => UsageEvent::Other,
         }
@@ -62,6 +63,8 @@ pub enum UsageType {
     Metrics,
     #[serde(rename = "/_search")]
     Search,
+    #[serde(rename = "/metrics/_search")]
+    MetricSearch,
     #[serde(rename = "/_around")]
     SearchAround,
     #[serde(rename = "/_values")]
@@ -98,6 +101,7 @@ impl ToString for UsageType {
             UsageType::SearchAround => "/_around".to_owned(),
             UsageType::SearchTopNValues => "/_values".to_owned(),
             UsageType::GCPSubscription => "/gcp/_sub".to_owned(),
+            UsageType::MetricSearch => "/metrics/_search".to_owned(),
         }
     }
 }
