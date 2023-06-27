@@ -46,18 +46,23 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     _filters: &[(&str, &str)],
-) -> Result<(SessionContext, Arc<Schema>)> {
+) -> Result<(SessionContext, Arc<Schema>, usize, usize)> {
     // get file list
     let files = get_file_list(org_id, stream_name, time_range).await?;
     if files.is_empty() {
-        return Ok((SessionContext::new(), Arc::new(Schema::empty())));
+        return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
     }
 
+    let file_count = files.len();
+    let mut scan_size = 0;
     let work_dir = session_id.to_string();
     for file in files {
+        scan_size += file.body.len();
         let file_name = format!("/{work_dir}/{}", file.name);
         tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
     }
+
+    log::info!("promql->wal->search: load files {file_count}, scan_size {scan_size}");
 
     // fetch all schema versions, get latest schema
     let stream_type = StreamType::Metrics;
@@ -78,7 +83,7 @@ pub(crate) async fn create_context(
     };
 
     let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
-    Ok((ctx, schema))
+    Ok((ctx, schema, file_count, scan_size))
 }
 
 /// get file list from local cache, no need match_source, each file will be searched

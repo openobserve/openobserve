@@ -187,7 +187,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             org_id,
             &stream_name,
             &mut stream_file_name,
-            StreamType::Logs,
+            StreamType::Metrics,
         );
         final_req_stats.size += req_stats.size;
         final_req_stats.records += req_stats.records;
@@ -217,7 +217,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     report_usage_stats(
         final_req_stats,
         org_id,
-        StreamType::Logs,
+        StreamType::Metrics,
         UsageType::JsonMetrics,
         0,
     )

@@ -331,7 +331,7 @@ pub async fn remote_write(
             org_id,
             &stream_name,
             &mut stream_file_name,
-            StreamType::Logs,
+            StreamType::Metrics,
         );
         final_req_stats.size += req_stats.size;
         final_req_stats.records += req_stats.records;

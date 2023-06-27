@@ -43,7 +43,7 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>)>> {
+    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, usize, usize)>> {
         let mut resp = Vec::new();
         // register storage table
         let ctx =
@@ -95,7 +95,7 @@ pub async fn search(
         },
     );
 
-    let (value, result_type) = engine.exec(eval_stmt).await?;
+    let (value, result_type, file_count, scan_size) = engine.exec(eval_stmt).await?;
     let result_type = match result_type {
         Some(v) => v,
         None => value.get_type().to_string(),
@@ -110,6 +110,8 @@ pub async fn search(
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
         result_type,
+        file_count: file_count as i32,
+        scan_size: (scan_size / 1024 / 1024) as i32, // MB
         ..Default::default()
     };
 
