@@ -144,13 +144,11 @@ export default defineComponent({
       const isVisible: any = ref(false);
 
       const handleIntersection = (entries:any) => {
-        console.log(props.data.config.title, "-visible state-", entries[0].isIntersecting);
         isVisible.value = entries[0].isIntersecting;
       }
 
       watch(()=> isVisible.value, async()=> {
           if(isDirty.value){
-            console.log('isDirty', isDirty.value, props.data.config.title)
               fetchQueryData()
           }
       })
@@ -167,16 +165,10 @@ export default defineComponent({
           () => [props.data, props.selectedTimeDate],
           async () => {
               isDirty.value = true
-              console.log('props updated for: ' , props.data.config.title);
               
               if (props.data.query) {
-                console.log("inside props.data.query");
-                
                   // load the data if visible
                   if(isVisible.value){
-                    console.log("inside is visible");
-                    
-                    console.log('props updated and visible: ' , props.data.config.title);
                     fetchQueryData();
                     updateTableColumns();
                   }
@@ -199,7 +191,6 @@ export default defineComponent({
 
       // just wait till the component is mounted and then create a plotly instance
       onMounted(async () => {
-        console.log("mounted-");
         
           await nextTick();
           if (props.data.type != "table") {
@@ -352,7 +343,7 @@ export default defineComponent({
       // Chart Related Functions
       const fetchQueryData = async () => {
         isDirty.value = false
-        console.log("fetching query data for panel: ", props.data.config.title);
+        // console.log("fetching query data for panel: ", props.data.config.title);
 
         
           const queryData = props.data.query;
