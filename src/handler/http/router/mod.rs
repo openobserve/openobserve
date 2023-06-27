@@ -72,6 +72,8 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             )
             .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
     );
+    cfg.service(web::redirect("/swagger", "/swagger/"));
+    cfg.service(web::redirect("/docs", "/swagger/"));
 
     if CONFIG.common.ui_enabled {
         cfg.service(web::redirect("/", "./web/"));
