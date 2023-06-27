@@ -20,7 +20,6 @@ use std::io::Error;
 use utoipa::ToSchema;
 
 use crate::common::json;
-use crate::infra::config::HAS_FUNCTIONS;
 use crate::infra::{
     cache, cluster,
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
