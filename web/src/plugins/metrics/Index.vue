@@ -138,6 +138,7 @@
                 class="q-px-sm"
                 no-caps
                 dense
+                color="primary"
                 @click="addToDashboard"
                 >Add to dashboard</q-btn
               >
@@ -710,12 +711,24 @@ export default defineComponent({
 
         const labelFocus = analyzeLabelFocus(value, cursorIndex);
 
-        let labelSuggestions;
+        if (cursorIndex === -1) return;
 
         if (!labelFocus.isFocused) {
           updatePromqlKeywords([], labelFocus, event.changes[0].text);
           return;
         }
+
+        if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
+          return;
+
+        let labelSuggestions;
+
+        promqlKeywords.value.push({
+          label: "...Loading",
+          insertText: "",
+          kind: "Text",
+        });
+        metricsQueryEditorRef.value.triggerAutoComplete(value);
 
         SearchService.get_promql_series({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -738,6 +751,10 @@ export default defineComponent({
                 labelFocus,
                 event.changes[0].text
               );
+            else {
+              promqlKeywords.value = [];
+              metricsQueryEditorRef.value.disableSuggestionPopup();
+            }
           });
       } catch (e) {
         console.log(e);
@@ -841,7 +858,6 @@ export default defineComponent({
     }
 
     const getLabelSuggestions = (labels, meta, queryLabels) => {
-      if (!(meta.focusOn === "value" || meta.focusOn === "label")) return null;
       const keywords = [];
       const keywordLabels = [];
       if (meta.focusOn === "label")
@@ -850,7 +866,7 @@ export default defineComponent({
             keywords.push({
               label: key,
               kind: "Variable",
-              insertText: key,
+              insertText: key + "=",
             });
         });
 
@@ -901,11 +917,8 @@ export default defineComponent({
         keywords.push(...data);
       }
       promqlKeywords.value = keywords;
-      metricsQueryEditorRef.value.disableSuggestionPopup();
       await nextTick();
-      setTimeout(() => {
-        metricsQueryEditorRef.value.triggerAutoComplete(value);
-      }, 100);
+      metricsQueryEditorRef.value.triggerAutoComplete(value);
     };
 
     const parsePromQlQuery = (query) => {
