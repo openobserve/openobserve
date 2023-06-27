@@ -44,7 +44,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<Vec<(SessionContext, Arc<Schema>)>>;
+    ) -> Result<Vec<(SessionContext, Arc<Schema>, usize, usize)>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

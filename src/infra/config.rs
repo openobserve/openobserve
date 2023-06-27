@@ -198,10 +198,7 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
-    #[env_config(
-        name = "OTEL_OTLP_HTTP_ENDPOINT",
-        default = "http://127.0.0.1:5080/api/nexus/traces"
-    )]
+    #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
     pub tracing_header_key: String,
@@ -218,20 +215,14 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
-    #[env_config(
-        name = "USAGE_AUTH",
-        default = "cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
-    )]
-    pub usage_auth: String,
-    #[env_config(
-        name = "USAGE_EP",
-        default = "https://alpha1.gke.zinclabs.dev/api/atest/billings/_json"
-    )]
-    pub usage_url: String,
-    #[env_config(name = "USAGE_BATCH_SIZE", default = 5)]
-    pub usage_batch_size: usize,
     #[env_config(name = "USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
+    #[env_config(name = "USAGE_ENDPOINT", default = "")]
+    pub usage_url: String,
+    #[env_config(name = "USAGE_AUTH", default = "")]
+    pub usage_auth: String,
+    #[env_config(name = "USAGE_BATCH_SIZE", default = 5)]
+    pub usage_batch_size: usize,
 }
 
 #[derive(EnvConfig)]
