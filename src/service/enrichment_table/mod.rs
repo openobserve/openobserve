@@ -32,7 +32,7 @@ use crate::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
 use crate::{common::json, meta::usage::UsageType};
 
 use super::{
-    compact::delete,
+    compact::retention,
     db,
     ingestion::{chk_schema_by_record, write_file},
     schema::stream_schema_exists,
@@ -60,7 +60,7 @@ pub async fn save_enrichment_data(
     }
 
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(
+    if db::compact::retention::is_deleting_stream(
         org_id,
         stream_name,
         StreamType::EnrichmentTables,
@@ -177,7 +177,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
         log::error!("Error deleting stream schema: {}", e);
     }
 
-    if let Err(e) = delete::delete_all(org_id, stream_name, stream_type).await {
+    if let Err(e) = retention::delete_all(org_id, stream_name, stream_type).await {
         log::error!("Error deleting stream {}", e);
     }
 

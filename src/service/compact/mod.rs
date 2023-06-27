@@ -20,10 +20,10 @@ use crate::infra::config::CONFIG;
 use crate::meta::StreamType;
 use crate::service::db;
 
-pub(crate) mod delete;
 mod file_list;
 mod lifecycle;
 mod merge;
+pub(crate) mod retention;
 
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
@@ -77,7 +77,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
     }
 
     // delete files
-    let jobs = db::compact::delete::list().await?;
+    let jobs = db::compact::retention::list().await?;
     for job in jobs {
         let columns = job.split('/').collect::<Vec<&str>>();
         let org_id = columns[0];
@@ -87,10 +87,10 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         tokio::task::yield_now().await; // yield to other tasks
 
         let ret = if retention.eq("all") {
-            delete::delete_all(org_id, stream_name, stream_type).await
+            retention::delete_all(org_id, stream_name, stream_type).await
         } else {
             let date_range = retention.split(',').collect::<Vec<&str>>();
-            delete::delete_by_date(
+            retention::delete_by_date(
                 org_id,
                 stream_name,
                 stream_type,
@@ -144,8 +144,12 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip
-                if db::compact::delete::is_deleting_stream(&org_id, &stream_name, stream_type, None)
-                {
+                if db::compact::retention::is_deleting_stream(
+                    &org_id,
+                    &stream_name,
+                    stream_type,
+                    None,
+                ) {
                     log::info!(
                         "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
                         &org_id,

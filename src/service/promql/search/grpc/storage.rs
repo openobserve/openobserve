@@ -40,7 +40,7 @@ pub(crate) async fn create_context(
     filters: &[(&str, &str)],
 ) -> Result<(SessionContext, Arc<Schema>, usize, usize)> {
     // check if we are allowed to search
-    if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
+    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
         log::error!("stream [{}] is being deleted", stream_name);
         return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
     }

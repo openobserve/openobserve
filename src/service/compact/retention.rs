@@ -30,6 +30,10 @@ pub async fn delete_all(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
+    // fetch lock, if already progress by other node, just skip
+    // TODO!!!
+    // let lock = db::compact::retention::get_stream_lock(org_id, stream_name, stream_type).await?;
+
     if is_local_disk_storage() {
         let data_dir = format!(
             "{}/files/{org_id}/{stream_type}/{stream_name}",
@@ -78,7 +82,7 @@ pub async fn delete_all(
     );
 
     // mark delete done
-    db::compact::delete::delete_stream_done(org_id, stream_name, stream_type, None).await?;
+    db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, None).await?;
     log::info!(
         "deleted stream all: {}/{}/{}",
         org_id,
@@ -150,21 +154,13 @@ pub async fn delete_by_date(
     }
 
     // update metadata
-    cache::stats::reset_stream_stats(
-        org_id,
-        stream_name,
-        stream_type,
-        FileMeta {
-            min_ts: time_range.1,
-            ..Default::default()
-        },
-    )?;
+    cache::stats::reset_stream_stats_time(org_id, stream_name, stream_type, (time_range.1, 0))?;
 
     // delete from file list
     delete_from_file_list(org_id, stream_name, stream_type, time_range).await?;
 
     // mark delete done
-    db::compact::delete::delete_stream_done(org_id, stream_name, stream_type, Some(date_range))
+    db::compact::retention::delete_stream_done(org_id, stream_name, stream_type, Some(date_range))
         .await
 }
 

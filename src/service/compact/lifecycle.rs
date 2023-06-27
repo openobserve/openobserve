@@ -38,7 +38,7 @@ pub async fn delete_by_stream(
     }
 
     // delete files
-    db::compact::delete::delete_stream(
+    db::compact::retention::delete_stream(
         org_id,
         stream_name,
         stream_type,

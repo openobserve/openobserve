@@ -163,7 +163,7 @@ pub async fn save_stream_settings(
     setting: StreamSettings,
 ) -> Result<HttpResponse, Error> {
     // check if we are allowed to ingest
-    if db::compact::delete::is_deleting_stream(org_id, stream_name, stream_type, None) {
+    if db::compact::retention::is_deleting_stream(org_id, stream_name, stream_type, None) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -226,7 +226,8 @@ pub async fn delete_stream(
     }
 
     // create delete for compactor
-    if let Err(e) = db::compact::delete::delete_stream(org_id, stream_name, stream_type, None).await
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_name, stream_type, None).await
     {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
