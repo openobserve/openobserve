@@ -121,6 +121,8 @@ pub struct Auth {
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
+    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    pub ipv6_enabled: bool,
 }
 
 #[derive(EnvConfig)]
