@@ -741,8 +741,8 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
           };
 
-          console.log('layout', layout);
-          console.log('traces', traces);
+        //   console.log('layout', layout);
+        //   console.log('traces', traces);
 
 
           Plotly.react(plotRef.value, traces, layout, {
@@ -934,7 +934,7 @@ export default defineComponent({
           const xAxisData = getAxisDataFromKey(xAxisKey)
           const xAxisDataWithTicks = getTickLimits(xAxisData)
 
-          console.log("data with tick",xAxisDataWithTicks);
+        //   console.log("data with tick",xAxisDataWithTicks);
           
 
           switch (props.data.type) {
