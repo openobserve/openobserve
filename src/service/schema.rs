@@ -417,12 +417,9 @@ pub async fn check_for_schema(
             }
         }
     }
-    let inferred_fields: HashSet<_> = inferred_schema.fields().iter().collect();
     let schema_fields = schema.fields();
-
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
-    let mut final_fields: Vec<Field> = vec![];
     let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
     let mut is_schema_changed = false;
 
@@ -430,11 +427,11 @@ pub async fn check_for_schema(
         merged_fields.insert(f.name().to_owned(), f.to_owned().clone());
     }
 
-    for item in inferred_fields.iter() {
+    for item in inferred_schema.fields().iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
 
-        match schema_fields.iter().find(|f| f.name() == item_name) {
+        match merged_fields.get(item_name) {
             Some(existing_field) => {
                 if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
@@ -461,6 +458,7 @@ pub async fn check_for_schema(
             }
         }
     }
+    let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
     if is_schema_changed {
         let is_field_delta = !field_datatype_delta.is_empty();
         let mut metadata = schema.metadata().clone();
@@ -470,7 +468,7 @@ pub async fn check_for_schema(
                 chrono::Utc::now().timestamp_micros().to_string(),
             );
         }
-        final_fields = merged_fields.drain().map(|(_key, value)| value).collect();
+        metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
         db::schema::set(
             org_id,
