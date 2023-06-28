@@ -148,7 +148,7 @@ export default defineComponent({
       }
 
       watch(()=> isVisible.value, async()=> {
-          if(isDirty.value){
+          if(isDirty.value && props.data.query){
               fetchQueryData()
           }
       })
