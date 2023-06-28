@@ -1,5 +1,6 @@
 import searchService from "@/services/search";
 import { getConsumableDateTime } from "@/utils/commons";
+import { clone, cloneDeep } from "lodash-es";
 import { nextTick, ref } from "vue";
 import { useStore } from "vuex";
 
@@ -147,8 +148,6 @@ const usePromlqSuggestions = () => {
         cursorIndex
       );
 
-      console.log("update suggestions", labelFocus);
-
       if (cursorIndex === -1) return;
 
       if (!labelFocus.isFocused) {
@@ -199,7 +198,7 @@ const usePromlqSuggestions = () => {
     const keywords: any = [];
     const keywordLabels: any = [];
     if (meta.focusOn === "label")
-      Object.keys(labels[0]).forEach((key) => {
+      Object.keys(labels[0] || {}).forEach((key) => {
         if (queryLabels.indexOf(key + "=") === -1)
           keywords.push({
             label: key,
@@ -254,6 +253,7 @@ const usePromlqSuggestions = () => {
   };
 
   const updateMetricKeywords = (metrics: any[]) => {
+    metricKeywords.value = [];
     metrics.forEach((metric: any) => {
       metricKeywords.value.push({
         label: metric.label,
