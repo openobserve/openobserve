@@ -154,6 +154,7 @@ vrl = { git = "https://github.com/zinclabs/vrl", rev = "2bbe6728fc0a9d0c20b6ee86
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
+flatten-serde-json = "0.1.0"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -161,6 +162,11 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 datafusion-expr = "22"
 expect-test = "1.4"
 float-cmp = "0.9"
+
+[[bench]]
+name = "flatten_benchmark"
+harness = false
