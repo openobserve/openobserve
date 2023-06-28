@@ -153,9 +153,9 @@
               ref="queryEditorRef"
               class="monaco-editor"
               v-model:query="searchObj.data.query"
-              v-model:fields="searchObj.data.stream.selectedStreamFields"
-              v-model:functions="searchObj.data.stream.functions"
-              @update-query="updateQueryValue"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
+              @update:query="updateQueryValue"
               @run-query="searchData"
             ></query-editor>
           </template>
@@ -186,7 +186,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -194,7 +194,7 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
-import QueryEditor from "./QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 
@@ -205,6 +205,9 @@ import config from "@/aws-exports";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import search from "../../services/search";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import stream from "@/services/stream";
+import { getConsumableDateTime } from "@/utils/commons";
+import useSqlSuggestions from "@/composables/useSuggestions";
 
 const defaultValue: any = () => {
   return {
@@ -252,7 +255,13 @@ export default defineComponent({
       }
     },
   },
-  setup() {
+  props: {
+    fieldValues: {
+      type: Array,
+      default: () => [],
+    },
+  },
+  setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -261,7 +270,6 @@ export default defineComponent({
     const { searchObj } = useLogs();
     const queryEditorRef = ref(null);
 
-    const parser = new Parser();
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
@@ -270,54 +278,44 @@ export default defineComponent({
     const confirmDialogVisible: boolean = ref(false);
     let confirmCallback;
     let fnEditorobj: any = null;
-    let streamName = "";
+
+    const {
+      autoCompleteData,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
+      getSuggestions,
+      updateFieldKeywords,
+      updateFunctionKeywords,
+    } = useSqlSuggestions(searchObj.data.datetime);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
     };
 
-    const updateQueryValue = (value: string) => {
-      searchObj.data.editorValue = value;
-      searchObj.data.query = value;
-      if (searchObj.meta.sqlMode == true) {
-        searchObj.data.parsedQuery = parser.astify(value);
-        if (searchObj.data.parsedQuery.from.length > 0) {
-          if (
-            searchObj.data.parsedQuery.from[0].table !==
-              searchObj.data.stream.selectedStream.value &&
-            searchObj.data.parsedQuery.from[0].table !== streamName
-          ) {
-            let streamFound = false;
-            streamName = searchObj.data.parsedQuery.from[0].table;
-            searchObj.data.streamResults.list.forEach((stream) => {
-              if (stream.name == searchObj.data.parsedQuery.from[0].table) {
-                streamFound = true;
-                let itemObj = {
-                  label: stream.name,
-                  value: stream.name,
-                };
-                searchObj.data.stream.selectedStream = itemObj;
-                stream.schema.forEach((field) => {
-                  searchObj.data.stream.selectedStreamFields.push({
-                    name: field.name,
-                  });
-                });
-              }
-            });
+    watch(
+      () => searchObj.data.stream.selectedStreamFields,
+      (fields) => {
+        if (fields.length) updateFieldKeywords(fields);
+      },
+      { immediate: true, deep: true }
+    );
 
-            if (streamFound == false) {
-              searchObj.data.stream.selectedStream = { label: "", value: "" };
-              searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
-                message: "Stream not found",
-                color: "negative",
-                position: "top",
-                timeout: 2000,
-              });
-            }
-          }
-        }
-      }
+    watch(
+      () => searchObj.data.stream.functions,
+      (funs) => {
+        if (funs.length) updateFunctionKeywords(funs);
+      },
+      { immediate: true, deep: true }
+    );
+
+    const updateQueryValue = (value: string) => {
+      autoCompleteData.value.query = value;
+      autoCompleteData.value.cursorIndex =
+        queryEditorRef.value.getCursorIndex();
+      autoCompleteData.value.fieldValues = props.fieldValues;
+      autoCompleteData.value.popup.open =
+        queryEditorRef.value.triggerAutoComplete;
+      getSuggestions();
     };
 
     const updateDateTime = (value: object) => {
@@ -363,10 +361,6 @@ export default defineComponent({
 
       return csv;
     };
-
-    onBeforeRouteUpdate(() => {
-      console.log("on search bar update");
-    });
 
     const downloadLogs = () => {
       const filename = "logs-data.csv";
@@ -648,6 +642,8 @@ export default defineComponent({
       functionModel,
       functionOptions,
       filterFn,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
     };
   },
   computed: {
