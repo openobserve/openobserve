@@ -45,8 +45,8 @@ message Job {
 }
 
 message ScanStats {
-    uint64  files          = 1;
-    uint64  records        = 2;
+    uint64 files           = 1;
+    uint64 records         = 2;
     uint64 original_size   = 3; // unit: MB
     uint64 compressed_size = 4; // unit: MB
 }
