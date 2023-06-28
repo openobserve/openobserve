@@ -44,7 +44,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="outlinedDelete" color="red"
+              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated

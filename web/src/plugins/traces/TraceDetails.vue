@@ -144,8 +144,8 @@ import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
 import { getImageURL } from "@/utils/zincutils";
-import TraceTimeline from "@/components/icons/TraceTimeline.vue";
-import ServiceMap from "@/components/icons/ServiceMap.vue";
+import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
+import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -162,8 +162,8 @@ export default defineComponent({
     TraceHeader,
     TraceChart,
     D3Chart,
-    TraceTimeline,
-    ServiceMap
+    TraceTimelineIcon,
+    ServiceMapIcon
   },
 
   setup() {
@@ -194,8 +194,8 @@ export default defineComponent({
     };
 
     const traceVisuals = [
-      { label: "Timeline", value: "timeline", icon: TraceTimeline },
-      { label: "Service Map", value: "service_map", icon: ServiceMap },
+      { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
+      { label: "Service Map", value: "service_map", icon: ServiceMapIcon },
     ];
 
     const activeVisual = ref("timeline");

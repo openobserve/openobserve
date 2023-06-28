@@ -63,7 +63,7 @@
             @click="listSchema(props)"
           />
           <q-btn
-            :icon="outlinedDelete" color="red"
+            :icon="outlinedDelete"
             :title="t('logStream.delete')"
             class="q-ml-xs"
             padding="sm"

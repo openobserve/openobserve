@@ -1310,7 +1310,7 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
       /* bg color is important for th; just specify one */
-      background-color: #fff;
+    //   background-color: #fff;
   }
 
   :deep(thead tr th) {

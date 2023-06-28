@@ -45,7 +45,7 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-              :icon="outlinedDelete" color="red"
+              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated

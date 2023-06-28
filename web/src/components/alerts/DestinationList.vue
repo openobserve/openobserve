@@ -43,7 +43,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-              :icon="outlinedDelete" color="red"
+              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated

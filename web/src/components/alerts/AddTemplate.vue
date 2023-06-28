@@ -63,7 +63,7 @@
               :label="t('alerts.sql')"
               stack-label
               style="border: 1px solid #dbdbdb; border-radius: 5px"
-              class="q-py-sm showLabelOnTop"
+              class=" showLabelOnTop"
               resize
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
@@ -328,7 +328,7 @@ const copyTemplateBody = (text: any) => {
 #editor {
   width: 100%;
   min-height: 310px;
-  padding-bottom: 14px;
+  // padding-bottom: 14px;
   resize: vertical;
   overflow: auto;
   max-height: 350px;

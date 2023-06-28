@@ -50,7 +50,7 @@
             ></q-btn>
           <q-btn
             v-if="props.row.actions == 'true'"
-            icon="outlinedDelete" color="red"
+            :icon="outlinedDelete"
             :title="t('dashboard.delete')"
             class="q-ml-xs"
             padding="sm"

@@ -14,6 +14,6 @@ import { defineComponent } from "vue";
 
 export default defineComponent({
 
-    name: "Syslog",
+    name: "SyslogIcon",
 })
 </script>

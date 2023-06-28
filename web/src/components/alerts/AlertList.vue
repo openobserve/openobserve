@@ -49,7 +49,7 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="outlinedDelete" color="red"
+              :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
               unelevated
@@ -153,6 +153,8 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+
 export default defineComponent({
   name: "AlertList",
   components: { QTablePagination, AddAlert, NoData, ConfirmDialog },
@@ -473,6 +475,7 @@ export default defineComponent({
       maxRecordToReturn,
       showAddAlertDialog,
       changeMaxRecordToReturn,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];

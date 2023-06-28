@@ -10,6 +10,6 @@ import { defineComponent } from "vue";
 
 export default defineComponent({
 
-    name: "ServiceMap",
+    name: "ServiceMapIcon",
 })
 </script>

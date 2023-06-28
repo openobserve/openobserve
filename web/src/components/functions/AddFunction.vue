@@ -94,7 +94,7 @@
           stack-label
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
-          class="q-py-md showLabelOnTop"
+          class=" showLabelOnTop"
           resize
         ></div>
 
@@ -367,7 +367,7 @@ end`;
 #editor {
   width: 100%;
   min-height: 15rem;
-  padding-bottom: 14px;
+  /* padding-bottom: 14px; */
   resize: both;
 }
 </style>
