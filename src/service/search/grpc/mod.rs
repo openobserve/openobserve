@@ -201,7 +201,6 @@ pub async fn search(
     }
 
     scan_stats.format_to_mb();
-    let scan_stats = cluster_rpc::ScanStats::from(&scan_stats);
     let result = cluster_rpc::SearchResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
@@ -210,7 +209,7 @@ pub async fn search(
         total: 0,
         hits: hits_buf,
         aggs: aggs_buf,
-        scan_stats: Some(scan_stats),
+        scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
     };
 
     Ok(result)
