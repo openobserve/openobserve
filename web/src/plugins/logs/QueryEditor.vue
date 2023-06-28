@@ -321,11 +321,18 @@ export default defineComponent({
       editorObj.layout();
     };
 
+    const getCursorIndex = () => {
+      const currentPosition = editorObj.getPosition();
+      const cursorIndex = editorObj.getModel().getOffsetAt(currentPosition) - 1;
+      return cursorIndex || null;
+    };
+
     return {
       editorRef,
       editorObj,
       setValue,
       resetEditorLayout,
+      getCursorIndex,
     };
   },
 });

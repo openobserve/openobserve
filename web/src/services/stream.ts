@@ -73,6 +73,17 @@ const stream = {
     return http().get(url);
   },
 
+  labelValues: ({
+    org_identifier,
+    stream_name,
+    start_time,
+    end_time,
+    label,
+  }: any) => {
+    const url = `/api/${org_identifier}/prometheus/api/v1/label/${label}/values?&match[]=${stream_name}&start=${start_time}&end=${end_time}`;
+    return http().get(url);
+  },
+
   delete: (
     org_identifier: string,
     stream_name: string,
