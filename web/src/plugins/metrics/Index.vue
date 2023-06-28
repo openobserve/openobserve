@@ -199,7 +199,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import QueryEditor from "@/components/QueryEditor.vue";
 import ChartRender from "@/components/dashboards/addPanel/ChartRender.vue";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
@@ -247,7 +247,7 @@ export default defineComponent({
     const parser = new Parser();
     const metricsQueryEditorRef = ref(null);
     const { dashboardPanelData, resetDashboardPanelData } =
-      useDashboardPanelData();
+      useMetricsExplorer();
     const {
       autoCompleteData,
       autoCompletePromqlKeywords,
