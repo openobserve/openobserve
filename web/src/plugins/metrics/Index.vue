@@ -332,7 +332,8 @@ export default defineComponent({
       () => searchObj.data.metrics.metricList,
       (metrics) => {
         updateMetricKeywords(metrics);
-      }
+      },
+      { deep: true }
     );
 
     function getStreamList() {
