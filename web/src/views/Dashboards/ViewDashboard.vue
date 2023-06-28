@@ -20,7 +20,7 @@
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
         <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
-        <span class="q-table__title q-mx-md q-mt-xs">{{ dashboardData.title }}</span>
+        <span class="q-table__title q-mx-md q-mt-xs">{{ currentDashboardData.data.title }}</span>
       </div>
       <div class="flex">
         <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
@@ -34,40 +34,48 @@
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
-        <ExportDashboard :dashboardId="dashboardData?.dashboardId"/>
+        <ExportDashboard :dashboardId="currentDashboardData.data?.dashboardId"/>
       </div>
     </div>
     <q-separator></q-separator>
     <q-q-separator></q-q-separator>
-    <div  v-if="dashboardData.variables?.list?.length > 0">
-      <div v-for="item in dashboardData.variables?.list">
-        <div v-if="item.type === 'textBox'" style="width: 20%;">
-          <q-input v-model="item.name" :label="item.label" dense></q-input>
+    <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading"
+      class="flex q-mt-sm q-ml-sm">
+      <div v-for="item in variablesData.values" class="q-mr-lg">
+        <div v-if="item.type == 'query_value'">
+          <q-select
+              outlined
+              dense
+              v-model="item.value"
+              :options="item.options"
+              :label="item.label"
+            ></q-select>
+          <!-- <q-input v-model="item.name" :label="item.label" dense></q-input> -->
         </div>
-        <div v-else-if="item.type === 'dateBox'" style="width: 20%;">
-          <q-input v-model="item.name" :label="item.label" dense></q-input>
+        <div v-else-if="item.type == 'constant'">
+          <q-input v-model="item.name" :label="item.label" dense outlined></q-input>
         </div>
       </div>
     </div>
-    <div class="displayDiv">
-      <grid-layout v-if="dashboardData.panels?.length > 0" v-model:layout.sync="dashboardData.layouts" :col-num="12" :row-height="30"
+    <div class="displayDiv" v-if="!(variablesData.isVariablesLoading)">
+      <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
         :restore-on-drag="true" :use-css-transforms="true">
-        <grid-item class="plotlyBackground" v-for="item in dashboardData.panels" :key="item.id"
-          :x="getPanelLayout(dashboardData.layouts, item.id, 'x')" :y="getPanelLayout(dashboardData.layouts, item.id, 'y')"
-          :w="getPanelLayout(dashboardData.layouts, item.id, 'w')" :h="getPanelLayout(dashboardData.layouts, item.id, 'h')"
-          :i="getPanelLayout(dashboardData.layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
+        <grid-item class="plotlyBackground" v-for="item in currentDashboardData.data.panels" :key="item.id"
+          :x="getPanelLayout(currentDashboardData.data.layouts, item.id, 'x')" :y="getPanelLayout(currentDashboardData.data.layouts, item.id, 'y')"
+          :w="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :h="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')"
+          :i="getPanelLayout(currentDashboardData.data.layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
             <PanelContainer @updated:chart="onUpdatePanel" @duplicatePanel="onDuplicatePanel" :draggable="draggable" :data="item"
-              :selectedTimeDate="currentTimeObj" 
-              :width="getPanelLayout(dashboardData.layouts, item.id, 'w')" :height="getPanelLayout(dashboardData.layouts, item.id, 'h')">
+              :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
+              :width="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :height="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')">
             </PanelContainer>
           </div>
         </grid-item>
       </grid-layout>
     </div>
-    <div v-if="!dashboardData.panels?.length">
+    <div v-if="!currentDashboardData.data.panels?.length">
      <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" />
     </div>
@@ -135,13 +143,110 @@ export default defineComponent({
     const currentTimeObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref()
+    const variablesData = reactive({
+      isVariablesLoading: false,
+      values: []
+    })
 
     onActivated(async () => {
-     currentDashboardData.data = await getDashboard(
+      console.log("on activated called");
+      
+      await loadDashboard();
+    })
+
+    const loadDashboard = async () => {
+      console.log("inside load dashboard");
+      
+      let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
         route.query.dashboard
-      );
-    })
+      )))
+      // let data = toRaw(currentDashboardData.data);
+      const variables = {}
+
+      variables["list"] = [
+          {
+            "type" : "query_value",
+            "name" : "namespace",
+            "label" : "NameSpace",
+            "queryData" : {
+              "streamType" : "logs",
+              "stream" : "gke-fluentbit",
+              "streamField" : "kubernetes_host",
+            }
+          },
+          {
+            "type" : "constant",
+            "name" : "namespace2",
+            "label" : "NameSpace2",
+            "value" : "alpha1"
+          }
+        ]
+
+      data["variables"] = variables
+      variablesData.isVariablesLoading = true
+      // currentDashboardData.data = data
+      await getVariablesData(data)
+      currentDashboardData.data = data
+    };
+
+    const getVariablesData = async(data: any) => {
+
+      const currentTempDashboardData = data || currentDashboardData.data
+      const promise = currentTempDashboardData.variables?.list?.map((it)=> {
+        
+        const obj = {name: it.name, label : it.label, type: it.type, value: "", isLoading: false }
+        switch (it.type) {
+          
+          case "query_value":{
+            obj.isLoading = true
+            console.log("------",currentTimeObj.value.start_time);
+            return streamService
+            .fieldValues({
+              org_identifier: store.state.selectedOrganization.identifier,
+              stream_name: it.queryData.stream,
+              start_time: new Date(currentTimeObj.value.start_time?.toISOString()).getTime() * 1000,
+              end_time: new Date(currentTimeObj.value.end_time?.toISOString()).getTime() * 1000,
+              fields: [it.queryData.streamField],
+              size: 10,
+              type: it.queryData.streamType,
+            })
+            .then((res: any) => {
+              obj.isLoading = false
+              if (res.data.hits.length) {
+                console.log("-res-", res.data.hits);
+                
+                obj["options"] = res.data.hits
+                  .find((field: any) => field.field === it.queryData.streamField)
+                  .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
+                obj.value = obj.options[0] || ""
+
+                return obj
+              } else {
+                return obj
+              }
+            })
+            .catch((err: any) => {
+              return obj
+            })
+            // break;
+          }
+          case "constant":{
+            obj.value = it.value
+            return obj
+            // break;
+          }
+          default:
+            console.log("default");
+            break;
+        }
+      })
+      variablesData.values = await Promise.all(promise)
+      variablesData.isVariablesLoading = false
+      console.log("variablesData", JSON.stringify(variablesData));
+      
+      console.log("-after-",data)
+    }
 
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
@@ -221,73 +326,90 @@ export default defineComponent({
       });
     };
 
-    const dashboardData = computed(function () {
-      console.log("before",JSON.stringify(toRaw(currentDashboardData.data)));
+    // const currentDashboardData.data = computed(async function () {
+    //   console.log("before",JSON.stringify(toRaw(currentDashboardData.data)));
       
-      let data = toRaw(currentDashboardData.data);
-      console.log("-currentTimeObj-", JSON.stringify(currentTimeObj.value));
-      
-      const variables = {}
+    //   let data = toRaw(currentDashboardData.data);
+    //   const variables = {}
 
-      variables["list"] = [
-          {
-            "type" : "query_value",
-            "name" : "namespace1",
-            "label" : "NameSpace",
-            "queryData" : {
-              "streamType" : "logs",
-              "stream" : "gke-fluentbit",
-              "streamField" : "kubernetes_host",
-            }
-          }
-        ]
+    //   variables["list"] = [
+    //       {
+    //         "type" : "query_value",
+    //         "name" : "namespace1",
+    //         "label" : "NameSpace",
+    //         "queryData" : {
+    //           "streamType" : "logs",
+    //           "stream" : "gke-fluentbit",
+    //           "streamField" : "kubernetes_host",
+    //         }
+    //       },
+    //       {
+    //         "type" : "constant",
+    //         "name" : "namespace2",
+    //         "label" : "NameSpace2",
+    //         "value" : "alpha1"
+    //       }
+    //     ]
 
-      data["variables"] = variables
-
-      // data.variables.map((it)=> {
-      //   const obj = {name: it.name, value: null, isLoading: false }
-      //   switch (it.type) {
-          
-      //     case query_value:{
-      //       obj.isLoading = true
-
-      //       streamService
-      //       .fieldValues({
-      //         org_identifier: store.state.selectedOrganization.identifier,
-      //         stream_name: it.queryData.stream,
-      //         start_time: currentTimeObj.start_time,
-      //         end_time: currentTimeObj.end_time,
-      //         fields: [it.queryData.streamField],
-      //         size: 10,
-      //         type: "traces",
-      //       })
-      //       .then((res: any) => {
-      //         if (res.data.hits.length) {
-      //           fieldValues.value[it.queryData.streamField]["values"] = res.data.hits
-      //             .find((field: any) => field.field === name)
-      //             .values.map((value: any) => {
-      //               return {
-      //                 key: value.key ? value.key : "null",
-      //                 count: formatNumberWithPrefix(value.num),
-      //               };
-      //             });
-      //         }
-      //   })
-      //       break;
-      //     }
-            
+    //   data["variables"] = variables
+    //   variablesData.isVariablesLoading = true
+    //   const promise = data.variables.list.map((it)=> {
         
-      //     default:{
+    //     const obj = {name: it.name, label : it.label, value: "", isLoading: false }
+    //     switch (it.type) {
+          
+    //       case "query_value":{
+    //         obj.isLoading = true
+    //         console.log("------",currentTimeObj.value.start_time);
+    //         return streamService
+    //         .fieldValues({
+    //           org_identifier: store.state.selectedOrganization.identifier,
+    //           stream_name: it.queryData.stream,
+    //           start_time: new Date(currentTimeObj.value.start_time?.toISOString()).getTime() * 1000,
+    //           end_time: new Date(currentTimeObj.value.end_time?.toISOString()).getTime() * 1000,
+    //           fields: [it.queryData.streamField],
+    //           size: 10,
+    //           type: "traces",
+    //         })
+    //         .then((res: any) => {
+    //           obj.isLoading = false
+    //           if (res.data.hits.length) {
+    //             console.log("-res-", res.data.hits);
+                
+    //             obj["options"] = res.data.hits
+    //               .find((field: any) => field.field === it.queryData.streamField)
+    //               .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
+    //             obj.value = obj.options[0] || ""
 
-      //       break;
-      //     }
-      //   }
-      // })
+    //             return obj
+    //           } else {
+    //             return obj
+    //           }
+    //         })
+    //         .catch((err: any) => {
+    //           return obj
+    //         })
+    //         // break;
+    //       }
+    //       case "constant":{
+    //         obj.value = it.value
+    //         return obj
+    //         // break;
+    //       }
+    //       default:{
+    //         console.log("default");
+    //         break;
+    //       }
+    //     }
+    //   })
+    //   variablesData.values =await Promise.all(promise)
+    //   variablesData.isVariablesLoading = false
+    //   console.log("variablesData", JSON.stringify(variablesData));
+      
+    //   console.log("-after-",data)
 
-      console.log("-after-",data)
-
-      return toRaw(currentDashboardData.data);
-    });
+    //   return data;
+    // });
     
     const refreshData = () => {
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
@@ -297,6 +419,7 @@ export default defineComponent({
       const c = toRaw(unref(selectedDate.value));
       currentDurationSelectionObj.value = selectedDate.value
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
+      getVariablesData()
     })
 
     // ------- work with query params ----------
@@ -337,15 +460,14 @@ export default defineComponent({
     }
 
     const onUpdatePanel = async(panelDataElementValue: any) => {
+      console.log("on update panel called");
+      
       await deletePanel(
         store,
         route.query.dashboard,
         panelDataElementValue.id
       );
-      currentDashboardData.data = await getDashboard(
-        store,
-        route.query.dashboard
-      );
+      await loadDashboard()
     }
 
     const movedEvent = (i, newX, newY) => {
@@ -412,7 +534,7 @@ export default defineComponent({
       addPanelData,
       onDuplicatePanel,
       t,
-      dashboardData,
+      currentDashboardData,
       getDashboard,
       saveDashboard,
       store,
@@ -439,7 +561,8 @@ export default defineComponent({
       eventLog,
       getPanelLayout,
       getMinimumHeight,
-      getMinimumWidth
+      getMinimumWidth,
+      variablesData
     };
   }
 });

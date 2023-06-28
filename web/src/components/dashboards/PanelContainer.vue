@@ -29,6 +29,7 @@
       :selectedTimeDate="props.selectedTimeDate"
       :width="props.width"
       :height="props.height"
+      :variablesData="props.variablesData"
     ></ChartRender>
   </div>
 </template>
@@ -41,7 +42,7 @@ import PanelHeader from "./PanelHeader.vue";
 export default defineComponent({
   name: "PanelContainer",
   emits: ["updated:chart", "duplicatePanel"],
-  props: ["data", "selectedTimeDate", "draggable","width", "height"],
+  props: ["data", "selectedTimeDate", "draggable","width", "height", "variablesData"],
   components: {
     ChartRender,
     PanelHeader,
