@@ -28,14 +28,17 @@ const usePromlqSuggestions = () => {
 
     // Extract labels
     const labelsMatch = query.match(/\{(.+?)\}/);
-    const labels = {};
+    const labels: { [key: string]: string } = {};
     if (labelsMatch) {
       const labelsStr = labelsMatch[1];
       const labelPairs = labelsStr.match(/(\w+)="([^"]*)"/g);
       if (labelPairs?.length)
         labelPairs.forEach((pair) => {
-          const [key, value] = pair.match(/(\w+)="([^"]*)"/).slice(1);
-          labels[key] = value;
+          const matchResult = pair.match(/(\w+)="([^"]*)"/);
+          const [key, value] = matchResult
+            ? matchResult.slice(1)
+            : [null, null];
+          if (key && value) labels[key] = value;
         });
     }
 
@@ -179,7 +182,6 @@ const usePromlqSuggestions = () => {
             labelFocus,
             formattedLabels.join(",")
           );
-          // dashboardPanelData.data.queryResults = response.data;
         })
         .finally(() => {
           if (labelSuggestions) updatePromqlKeywords(labelSuggestions);

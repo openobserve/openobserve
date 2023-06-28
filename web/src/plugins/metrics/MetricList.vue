@@ -122,7 +122,7 @@
                           <div
                             v-for="value in metricLabelValues[props.row.name]
                               ?.values || []"
-                            :key="value"
+                            :key="value.key + value.count"
                           >
                             <q-list dense>
                               <q-item
@@ -141,7 +141,7 @@
                                     {{ value.key }}
                                   </div>
                                   <div
-                                    :title="value.count"
+                                    :title="value.count?.toString()"
                                     class="ellipsis text-right q-pr-sm"
                                     style="width: 50px"
                                   >
@@ -207,7 +207,10 @@ export default defineComponent({
     const searchMetricLabel = ref("");
     const filteredMetricLabels = ref([]);
     const metricLabelValues: Ref<{
-      [key: string]: { isLoading: boolean; values: [] };
+      [key: string]: {
+        isLoading: boolean;
+        values: { key: string; count: number | string }[];
+      };
     }> = ref({});
     const { dashboardPanelData } = useDashboardPanelData();
 
@@ -222,7 +225,7 @@ export default defineComponent({
       searchObj.data.metrics.selectedMetrics[0]
     );
 
-    const filterMetrics = (val, update) => {
+    const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;
         const needle = val.toLowerCase();
