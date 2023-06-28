@@ -30,8 +30,9 @@
           </div>
       </div>
       <div v-else style="height: 100%; position: relative;">
-          <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
+          <div v-show="!errorDetail" ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
           <div style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
+          <div v-if="errorDetail" style="position: absolute; top:20%;width:100%;text-align:center;color: brown;">{{ errorDetail }}</div>
           <div v-if="searchQueryData.loading" class="row" style="position: absolute; top:0px; width:100%;">
             <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
           </div>
@@ -59,7 +60,6 @@ import Plotly from "plotly.js";
 import moment from "moment";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
-
 
 export default defineComponent({
   name: "ChartRender",
@@ -90,6 +90,9 @@ export default defineComponent({
           data: [] as (any | Array<any>),
           loading: false
       });
+      const errorDetail = ref("");
+
+      // const noData = ref('')
 
       //render the plotly chart if the chart type is not table
       onUpdated(() => {
@@ -401,7 +404,6 @@ export default defineComponent({
                         if (customMessage != "") {
                             errStr = t(customMessage);
                         }
-                        errStr != '' ? errStr : 'Something went wrong';
                         $q.notify({
                             type: "negative",
                             message: errStr,
@@ -423,37 +425,40 @@ export default defineComponent({
                         searchQueryData.data = res.data.hits;
                     })
                     .catch((error) => {
-                        let errStr = ""
+                        // let errStr = ""
                         if (error.response != undefined) {
-                            errStr = error.response.data.error_detail;
+                            // errStr = error.response.data.error_detail;
+                            errorDetail.value = error.response.data.error_detail;
                         } else {
-                            errStr = error.message;
+                            errorDetail.value = error.message;
                         }
-                        const customMessage = logsErrorMessage(error.response.data.error_detail);
-                        searchQueryData.data.error_detail = error.response.data.error_detail;
-                        if (customMessage != "") {
-                            errStr = t(customMessage);
-                        }
+                        // const customMessage = logsErrorMessage(errorDetail.value);
+                        // searchQueryData.data.error_detail = errorDetail.value;
+                        // if (customMessage != "") {
+                        //     errStr = t(customMessage);
+                        // }
+                           console.log("errStr",errorDetail.value);                           
 
-                        const words = errStr.split(" ");
+                        const words = errorDetail.value.split(" ");
 
                         let trimmedText = words.slice(0, 300).join(" ");
 
                         if (trimmedText.length > 300) {
                             trimmedText = trimmedText.slice(0, 300) + " ...";
-                        }        
-                        $q.notify({
-                            type: "negative",
-                            message: trimmedText,
-                            timeout: 5000,
-                        });
+                        }      
+                        errorDetail.value = trimmedText;
+
+                        // $q.notify({
+                        //     type: "negative",
+                        //     message: trimmedText,
+                        //     timeout: 5000,
+                        // });
                     })
                     .finally(() => {
                         searchQueryData.loading = false
                     });     
         }
       };
-
       // If data or chart type is updated, rerender the chart
       watch(
           () => [searchQueryData.data, props.data.type],
@@ -1222,7 +1227,8 @@ export default defineComponent({
           }),
           chartID,
           tableColumn,
-          noData
+          noData,
+          errorDetail,
       };
   },
 });
