@@ -45,10 +45,9 @@ message SearchResponse {
     int64                     total = 3;
     int32                      from = 4;
     int32                      size = 5;
-    int32                file_count = 6;
-    int32                 scan_size = 7; // unit: mb
-    bytes                      hits = 8;
-    repeated SearchAggResponse aggs = 9;
+    bytes                      hits = 6;
+    repeated SearchAggResponse aggs = 7;
+    ScanStats            scan_stats = 8;
 }
 
 message SearchAggRequest {

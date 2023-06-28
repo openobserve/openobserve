@@ -22,7 +22,11 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use crate::infra::{cache::file_data, config::CONFIG};
-use crate::meta::{search::Session as SearchSession, stream::StreamParams, StreamType};
+use crate::meta::{
+    search::Session as SearchSession,
+    stream::{ScanStats, StreamParams},
+    StreamType,
+};
 use crate::service::{
     db, file_list,
     search::{
@@ -38,41 +42,47 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     filters: &[(&str, &str)],
-) -> Result<(SessionContext, Arc<Schema>, usize, usize)> {
+) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // check if we are allowed to search
     if db::compact::delete::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
         log::error!("stream [{}] is being deleted", stream_name);
-        return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
+        return Ok((
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+        ));
     }
 
     // get file list
     let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
-    let file_count = files.len();
     if files.is_empty() {
-        return Ok((SessionContext::new(), Arc::new(Schema::empty()), 0, 0));
+        return Ok((
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+        ));
     }
 
     // calcuate scan size
-    let (scan_original_size, scan_compressed_size) =
-        match file_list::calculate_files_size(&files.to_vec()) {
-            Ok(size) => size,
-            Err(err) => {
-                log::error!("calculate files size error: {}", err);
-                return Err(datafusion::error::DataFusionError::Execution(
-                    "calculate files size error".to_string(),
-                ));
-            }
-        };
+    let scan_stats = match file_list::calculate_files_size(&files.to_vec()) {
+        Ok(size) => size,
+        Err(err) => {
+            log::error!("calculate files size error: {}", err);
+            return Err(datafusion::error::DataFusionError::Execution(
+                "calculate files size error".to_string(),
+            ));
+        }
+    };
     log::info!(
         "promql->search->storage: load files {}, scan_size {}, compressed_size {}",
-        file_count,
-        scan_original_size,
-        scan_compressed_size
+        scan_stats.files,
+        scan_stats.original_size,
+        scan_stats.compressed_size
     );
 
     // if scan_compressed_size > 80% of total memory cache, skip memory cache
     let storage_type = if !CONFIG.memory_cache.enabled
-        || scan_compressed_size > CONFIG.memory_cache.skip_size as u64
+        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as u64
     {
         StorageType::FsNoCache
     } else {
@@ -88,7 +98,7 @@ pub(crate) async fn create_context(
         }
         log::info!(
             "promql->search->storage: load files {}, into memory cache done",
-            file_count
+            scan_stats.files
         );
     }
 
@@ -122,7 +132,7 @@ pub(crate) async fn create_context(
         FileType::PARQUET,
     )
     .await?;
-    Ok((ctx, schema, file_count, scan_original_size as usize))
+    Ok((ctx, schema, scan_stats))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip_all)]
