@@ -31,10 +31,9 @@ message MetricsQueryStmt {
 message MetricsQueryResponse {
     Job                         job = 1;
     int32                      took = 2;
-    int32                file_count = 3;
-    int32                 scan_size = 4; // unit: mb
-    string              result_type = 5; // vector, matrix, scalar
-    repeated Series          result = 6;
+    string              result_type = 3; // vector, matrix, scalar
+    repeated Series          result = 4;
+    ScanStats            scan_stats = 5;
 }
 
 message Series {

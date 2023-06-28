@@ -26,13 +26,13 @@ use crate::infra::{
     cluster,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::StreamType;
+use crate::meta::{stream::ScanStats, StreamType};
 use crate::service::db;
 
 mod storage;
 mod wal;
 
-pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, usize, usize), Error>;
+pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), Error>;
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all)]
 pub async fn search(
@@ -52,8 +52,7 @@ pub async fn search(
     }
 
     let mut results = HashMap::new();
-    let mut file_count = 0;
-    let mut scan_size = 0;
+    let mut scan_stats = ScanStats::new();
 
     // search in WAL
     let session_id1 = session_id.clone();
@@ -64,7 +63,7 @@ pub async fn search(
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
                 wal::search(&session_id1, sql1, stream_type).await
             } else {
-                Ok((HashMap::new(), 0, 0))
+                Ok((HashMap::new(), ScanStats::default()))
             }
         }
         .instrument(wal_span),
@@ -79,7 +78,7 @@ pub async fn search(
     let task2 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
-                Ok((HashMap::new(), 0, 0))
+                Ok((HashMap::new(), ScanStats::default()))
             } else {
                 storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
             }
@@ -88,11 +87,8 @@ pub async fn search(
     );
 
     // merge data from local WAL
-    let (batches1, file_count1, scan_size1) = match task1.await {
-        Ok(result) => match result {
-            Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
-            Err(err) => return Err(err),
-        },
+    let (batches1, scan_stats1) = match task1.await {
+        Ok(result) => result?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
@@ -108,15 +104,11 @@ pub async fn search(
             }
         }
     }
-    file_count += file_count1;
-    scan_size += scan_size1;
+    scan_stats.add(&scan_stats1);
 
     // merge data from object storage search
-    let (batches2, file_count2, scan_size2) = match task2.await {
-        Ok(result) => match result {
-            Ok((search_result, file_count, scan_size)) => (search_result, file_count, scan_size),
-            Err(err) => return Err(err),
-        },
+    let (batches2, scan_stats2) = match task2.await {
+        Ok(result) => result?,
         Err(err) => {
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 err.to_string(),
@@ -132,8 +124,7 @@ pub async fn search(
             }
         }
     }
-    file_count += file_count2;
-    scan_size += scan_size2;
+    scan_stats.add(&scan_stats2);
 
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
@@ -209,17 +200,16 @@ pub async fn search(
         });
     }
 
-    let scan_size = scan_size / 1024 / 1024; // MB
+    scan_stats.format_to_mb();
     let result = cluster_rpc::SearchResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
         total: 0,
-        file_count: file_count as i32,
-        scan_size: scan_size as i32,
         hits: hits_buf,
         aggs: aggs_buf,
+        scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
     };
 
     Ok(result)

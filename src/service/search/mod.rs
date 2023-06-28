@@ -30,7 +30,11 @@ use crate::infra::{
     db::etcd,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::{search, stream::StreamParams, StreamType};
+use crate::meta::{
+    search,
+    stream::{ScanStats, StreamParams},
+    StreamType,
+};
 use crate::service::{db, file_list};
 
 use super::get_partition_key_query;
@@ -237,8 +241,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                     is_querier,
                     response.total,
                     response.took,
-                    response.file_count,
-                    response.scan_size
+                    response.scan_stats.as_ref().unwrap().files,
+                    response.scan_stats.as_ref().unwrap().original_size,
                 );
                 Ok(response)
             }
@@ -272,13 +276,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         }
     }
     // merge multiple instances data
-    let mut file_count = 0;
-    let mut scan_size = 0;
+    let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
     let sql = Arc::new(meta);
     for resp in results {
-        file_count += resp.file_count;
-        scan_size += resp.scan_size;
+        scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         // handle hits
         let value = batches.entry("query".to_string()).or_default();
         if !resp.hits.is_empty() {
@@ -404,8 +406,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
     result.set_total(total);
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
-    result.set_file_count(file_count as usize);
-    result.set_scan_size(scan_size as usize);
+    result.set_file_count(scan_stats.files as usize);
+    result.set_scan_size(scan_stats.original_size as usize);
 
     if query_type == "metrics" {
         result.response_type = "matrix".to_string();

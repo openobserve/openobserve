@@ -18,6 +18,7 @@ use crate::common;
 use crate::infra::{cache::file_list, ider, storage};
 use crate::meta::{
     common::{FileKey, FileMeta},
+    stream::ScanStats,
     StreamType,
 };
 use crate::service::db;
@@ -42,15 +43,16 @@ pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
 }
 
 #[inline]
-pub fn calculate_files_size(files: &[String]) -> Result<(u64, u64), anyhow::Error> {
-    let mut original_size = 0;
-    let mut compressed_size = 0;
+pub fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error> {
+    let mut stats = ScanStats::new();
+    stats.files = files.len() as u64;
     for file in files {
         let resp = get_file_meta(file).unwrap_or_default();
-        original_size += resp.original_size;
-        compressed_size += resp.compressed_size;
+        stats.records += resp.records;
+        stats.original_size += resp.original_size;
+        stats.compressed_size += resp.compressed_size;
     }
-    Ok((original_size, compressed_size))
+    Ok(stats)
 }
 
 #[inline]

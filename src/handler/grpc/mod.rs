@@ -157,6 +157,28 @@ impl From<&promql::value::Sample> for cluster_rpc::Sample {
     }
 }
 
+impl From<&meta::stream::ScanStats> for cluster_rpc::ScanStats {
+    fn from(req: &meta::stream::ScanStats) -> Self {
+        cluster_rpc::ScanStats {
+            files: req.files,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<&cluster_rpc::ScanStats> for meta::stream::ScanStats {
+    fn from(req: &cluster_rpc::ScanStats) -> Self {
+        meta::stream::ScanStats {
+            files: req.files,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
