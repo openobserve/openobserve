@@ -46,6 +46,8 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryStmt", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
+        .type_attribute("ScanStats", "#[derive(Eq)]")
+        .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
         .compile(
             &[
                 "proto/cluster/common.proto",
