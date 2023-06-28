@@ -23,7 +23,7 @@ use crate::infra::{
     config::CONFIG,
     errors::{Error, ErrorCodes},
 };
-use crate::meta;
+use crate::meta::{self, stream::ScanStats};
 use crate::service::{
     db, file_list,
     search::{
@@ -45,10 +45,8 @@ pub async fn search(
         true => get_file_list(&sql, stream_type).await?,
         false => file_list.to_vec(),
     };
-    let file_count = files.len();
-
-    if file_count == 0 {
-        return Ok((HashMap::new(), 0, 0));
+    if files.is_empty() {
+        return Ok((HashMap::new(), ScanStats::default()));
     }
 
     // fetch all schema versions, group files by version
@@ -71,11 +69,10 @@ pub async fn search(
     let schema_latest_id = schema_versions.len() - 1;
     let mut files_group: HashMap<usize, Vec<String>> =
         HashMap::with_capacity(schema_versions.len());
-    let mut scan_original_size = 0;
-    let mut scan_compressed_size = 0;
+    let mut scan_stats = ScanStats::new();
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
-        (scan_original_size, scan_compressed_size) = match file_list::calculate_files_size(&files) {
+        scan_stats = match file_list::calculate_files_size(&files) {
             Ok(size) => size,
             Err(err) => {
                 log::error!("calculate files size error: {}", err);
@@ -86,11 +83,13 @@ pub async fn search(
         };
         files_group.insert(schema_latest_id, files);
     } else {
+        scan_stats.files = files.len() as u64;
         for file in &files {
             let file_meta = file_list::get_file_meta(file).unwrap_or_default();
             // calculate scan size
-            scan_original_size += file_meta.original_size;
-            scan_compressed_size += file_meta.compressed_size;
+            scan_stats.records += file_meta.records;
+            scan_stats.original_size += file_meta.original_size;
+            scan_stats.compressed_size += file_meta.compressed_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -118,14 +117,14 @@ pub async fn search(
         "search->storage: org {}, stream {}, load files {}, scan_size {}, compressed_size {}",
         &sql.org_id,
         &sql.stream_name,
-        file_count,
-        scan_original_size,
-        scan_compressed_size
+        scan_stats.files,
+        scan_stats.original_size,
+        scan_stats.compressed_size
     );
 
     // if scan_compressed_size > 80% of total memory cache, skip memory cache
     let storage_type = if !CONFIG.memory_cache.enabled
-        || scan_compressed_size > CONFIG.memory_cache.skip_size as u64
+        || scan_stats.compressed_size > CONFIG.memory_cache.skip_size as u64
     {
         StorageType::FsNoCache
     } else {
@@ -145,7 +144,7 @@ pub async fn search(
             "search->storage: org {}, stream {}, load files {}, into memory cache done",
             &sql.org_id,
             &sql.stream_name,
-            file_count
+            scan_stats.files
         );
     }
 
@@ -214,7 +213,7 @@ pub async fn search(
         };
     }
 
-    Ok((results, file_count, scan_original_size as usize))
+    Ok((results, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]

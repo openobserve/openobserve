@@ -156,6 +156,32 @@ pub struct SchemaEvolution {
     pub is_schema_changed: bool,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct ScanStats {
+    pub files: u64,
+    pub records: u64,
+    pub original_size: u64,
+    pub compressed_size: u64,
+}
+
+impl ScanStats {
+    pub fn new() -> Self {
+        ScanStats::default()
+    }
+
+    pub fn add(&mut self, other: &ScanStats) {
+        self.files += other.files;
+        self.records += other.records;
+        self.original_size += other.original_size;
+        self.compressed_size += other.compressed_size;
+    }
+
+    pub fn format_to_mb(&mut self) {
+        self.original_size = self.original_size / 1024 / 1024;
+        self.compressed_size = self.compressed_size / 1024 / 1024;
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
