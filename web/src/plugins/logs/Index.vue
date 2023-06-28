@@ -1611,6 +1611,8 @@ export default defineComponent({
       if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
         this.searchObj.data.tempFunctionContent = "";
         this.searchBarRef.resetFunctionContent();
+        this.searchObj.data.query = "";
+        this.setQuery(this.searchObj.meta.sqlMode);
         setTimeout(() => {
           this.runQueryFn();
         }, 500);
