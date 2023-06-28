@@ -278,6 +278,9 @@ export default defineComponent({
     const confirmDialogVisible: boolean = ref(false);
     let confirmCallback;
     let fnEditorobj: any = null;
+    let streamName = "";
+
+    const parser = new Parser();
 
     const {
       autoCompleteData,
@@ -308,7 +311,7 @@ export default defineComponent({
       { immediate: true, deep: true }
     );
 
-    const updateQueryValue = (value: string) => {
+    const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex =
         queryEditorRef.value.getCursorIndex();
@@ -316,6 +319,51 @@ export default defineComponent({
       autoCompleteData.value.popup.open =
         queryEditorRef.value.triggerAutoComplete;
       getSuggestions();
+    };
+
+    const updateQueryValue = (value: string) => {
+      searchObj.data.editorValue = value;
+
+      updateAutoComplete(value);
+
+      if (searchObj.meta.sqlMode == true) {
+        searchObj.data.parsedQuery = parser.astify(value);
+        if (searchObj.data.parsedQuery.from.length > 0) {
+          if (
+            searchObj.data.parsedQuery.from[0].table !==
+              searchObj.data.stream.selectedStream.value &&
+            searchObj.data.parsedQuery.from[0].table !== streamName
+          ) {
+            let streamFound = false;
+            streamName = searchObj.data.parsedQuery.from[0].table;
+            searchObj.data.streamResults.list.forEach((stream) => {
+              if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+                streamFound = true;
+                let itemObj = {
+                  label: stream.name,
+                  value: stream.name,
+                };
+                searchObj.data.stream.selectedStream = itemObj;
+                stream.schema.forEach((field) => {
+                  searchObj.data.stream.selectedStreamFields.push({
+                    name: field.name,
+                  });
+                });
+              }
+            });
+            if (streamFound == false) {
+              searchObj.data.stream.selectedStream = { label: "", value: "" };
+              searchObj.data.stream.selectedStreamFields = [];
+              $q.notify({
+                message: "Stream not found",
+                color: "negative",
+                position: "top",
+                timeout: 2000,
+              });
+            }
+          }
+        }
+      }
     };
 
     const updateDateTime = (value: object) => {
