@@ -131,7 +131,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // HTTP server
     let thread_id = Arc::new(AtomicU8::new(0));
-    let haddr: SocketAddr = format!("[::]:{}", CONFIG.http.port).parse()?;
+    let haddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.http.port).parse()?;
     meta::telemetry::Telemetry::new()
         .event("OpenObserve - Starting server", None, false)
         .await;
