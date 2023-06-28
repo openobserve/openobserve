@@ -78,7 +78,7 @@
                   ref="metricsQueryEditorRef"
                   class="monaco-editor"
                   v-model:query="searchObj.data.query"
-                  :keywords="promqlKeywords"
+                  :keywords="autoCompletePromqlKeywords"
                   @update-query="updateQueryValue"
                   @run-query="searchData"
                 />
@@ -176,6 +176,7 @@ import {
   onActivated,
   onBeforeMount,
   nextTick,
+  watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -204,6 +205,7 @@ import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import SearchService from "@/services/search";
 import { label } from "aws-amplify";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -246,6 +248,12 @@ export default defineComponent({
     const metricsQueryEditorRef = ref(null);
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData();
+    const {
+      autoCompleteData,
+      autoCompletePromqlKeywords,
+      getSuggestions,
+      updateMetricKeywords,
+    } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
 
     const chartData = ref({});
@@ -319,6 +327,13 @@ export default defineComponent({
         ],
       });
     }
+
+    watch(
+      () => searchObj.data.metrics.metricList,
+      (metrics) => {
+        updateMetricKeywords(metrics);
+      }
+    );
 
     function getStreamList() {
       try {
@@ -472,35 +487,6 @@ export default defineComponent({
       }
     }
 
-    function buildSearch() {
-      try {
-        var req: any = {
-          sql: searchObj.data.query,
-          start_time: (new Date().getTime() - 900000) * 1000,
-          end_time: new Date().getTime() * 1000,
-        };
-
-        var timestamps: any = getConsumableDateTime();
-        if (
-          timestamps.start_time != "Invalid Date" &&
-          timestamps.end_time != "Invalid Date"
-        ) {
-          const startISOTimestamp: any =
-            new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-          const endISOTimestamp: any =
-            new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          req.start_time = startISOTimestamp;
-          req.end_time = endISOTimestamp;
-        } else {
-          return false;
-        }
-
-        return req;
-      } catch (e) {
-        throw new ErrorException(e.message);
-      }
-    }
-
     function runQuery() {
       try {
         if (
@@ -531,79 +517,6 @@ export default defineComponent({
         },
       };
     };
-
-    function generateHistogramData() {
-      const unparsed_x_data: any[] = [];
-      const xData: string[] = [];
-
-      const minTrace = getDefaultTrace({
-        name: "Min",
-        color: "#7fc845",
-        opacity: 0.8,
-      });
-      const maxTrace = getDefaultTrace({
-        name: "Max",
-        color: "#458cc8",
-        opacity: 0.8,
-      });
-      const avgTrace = getDefaultTrace({
-        name: "Avg",
-        color: "#c85e45",
-        opacity: 0.8,
-      });
-
-      if (searchObj.data.queryResults.hits.length) {
-        searchObj.data.queryResults.hits.forEach(
-          (bucket: {
-            avg: number;
-            max: number;
-            min: number;
-            zo_timestamp: string | Date | number;
-          }) => {
-            unparsed_x_data.push(bucket.zo_timestamp);
-            let histDate = new Date(bucket.zo_timestamp + "Z");
-            xData.push(Math.floor(histDate.getTime()));
-            minTrace.y.push(parseInt(bucket.min, 10));
-            maxTrace.y.push(parseInt(bucket.max, 10));
-            avgTrace.y.push(parseInt(bucket.avg, 10));
-          }
-        );
-      }
-
-      minTrace.x = xData;
-      minTrace.unparsed_x = unparsed_x_data;
-
-      maxTrace.x = xData;
-      maxTrace.unparsed_x = unparsed_x_data;
-
-      avgTrace.x = xData;
-      avgTrace.unparsed_x = unparsed_x_data;
-
-      const chartParams = {
-        title:
-          "Showing " +
-          Math.min(
-            searchObj.data.queryResults.size,
-            searchObj.data.queryResults.total
-          ) +
-          " out of " +
-          searchObj.data.queryResults.total.toLocaleString() +
-          " hits in " +
-          searchObj.data.queryResults.took +
-          " ms. (Scan Size: " +
-          searchObj.data.queryResults.scan_size +
-          "MB)",
-      };
-      searchObj.data.histogram = {
-        data: [minTrace, maxTrace, avgTrace],
-        layout: chartParams,
-      };
-      if (searchResultRef.value?.reDrawChart) {
-        setTimeout(() => {
-          searchResultRef.value.reDrawChart();
-        }, 500);
-      }
-    }
 
     function loadPageData() {
       // searchObj.loading = true;
@@ -692,254 +605,17 @@ export default defineComponent({
     };
 
     const updateQueryValue = async (event, value) => {
-      try {
-        const { metricName, labels } = parsePromQlQuery(value);
-        promqlKeywords.value = [];
-        dashboardPanelData.data.query = value;
-        const timestamps = getConsumableDateTime(searchObj.data.datetime);
-        const startISOTimestamp: any =
-          new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-        const endISOTimestamp: any =
-          new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-        // import search service and call search.get_promql_series
-        if (metricName) labels["__name__"] = metricName;
-        const formattedLabels = Object.keys(labels).map((key) => {
-          return `${key}="${labels[key]}"`;
-        });
-
-        const cursorIndex = metricsQueryEditorRef.value.getCursorIndex();
-
-        const labelFocus = analyzeLabelFocus(value, cursorIndex);
-
-        if (cursorIndex === -1) return;
-
-        if (!labelFocus.isFocused) {
-          updatePromqlKeywords([], labelFocus, event.changes[0].text);
-          return;
-        }
-
-        if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
-          return;
-
-        let labelSuggestions;
-
-        promqlKeywords.value.push({
-          label: "...Loading",
-          insertText: "",
-          kind: "Text",
-        });
-        metricsQueryEditorRef.value.triggerAutoComplete(value);
-
-        SearchService.get_promql_series({
-          org_identifier: store.state.selectedOrganization.identifier,
-          labels: `{${formattedLabels.join(",")}}`,
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-        })
-          .then((response) => {
-            labelSuggestions = getLabelSuggestions(
-              response.data.data,
-              labelFocus,
-              formattedLabels.join(",")
-            );
-            // dashboardPanelData.data.queryResults = response.data;
-          })
-          .finally(() => {
-            if (labelSuggestions)
-              updatePromqlKeywords(
-                labelSuggestions,
-                labelFocus,
-                event.changes[0].text
-              );
-            else {
-              promqlKeywords.value = [];
-              metricsQueryEditorRef.value.disableSuggestionPopup();
-            }
-          });
-      } catch (e) {
-        console.log(e);
-      }
-    };
-
-    const getMetricName = () => {
-      // // Extract metric name      // const metricNameRegex = /^([^\{\[\s]+)/;
-      // const metricNameMatch = metricNameRegex.exec(query);
-      // const metricName = metricNameMatch ? metricNameMatch[1] : null;
-      // const cursorOn = {
-      //   labels: null,
-      // };
-      // // Detect cursor position for metric name
-      // cursorOn.metricName =
-      //   metricName &&
-      //   cursorIndex !== undefined &&
-      //   cursorIndex >= metricNameMatch.index &&
-      //   cursorIndex <= metricNameMatch.index + metricName.length;
-    };
-
-    function analyzeLabelFocus(query, cursorIndex) {
-      const keyValuePairRegex = /\b(\w+)\s*=\s*("([^"]*)|,|\})/g;
-
-      const labelMeta = {
-        hasLabels: false,
-        isFocused: false,
-        isEmpty: true,
-        focusOn: "", // label or value
-        meta: {
-          label: "",
-          value: "",
-        },
-      };
-
-      const curlyBracesRegex = /{([^{}]*?)}/;
-
-      const hasCurlyBraces = curlyBracesRegex.exec(query);
-      if (hasCurlyBraces) {
-        labelMeta.hasLabels = true;
-        labelMeta.isEmpty = !!hasCurlyBraces[1].length;
-        labelMeta.isFocused =
-          hasCurlyBraces.index <= cursorIndex &&
-          hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
-      }
-
-      if (hasCurlyBraces) {
-        const start = hasCurlyBraces.index;
-        const end = start + hasCurlyBraces[0].length;
-        if (start <= cursorIndex && cursorIndex <= end) {
-          const value = hasCurlyBraces[0][cursorIndex - start];
-          // Check is value
-          if (
-            (value === '"' &&
-              hasCurlyBraces[0][cursorIndex - start + 1] === '"') ||
-            value === "="
-          ) {
-            labelMeta["focusOn"] = "value";
-          }
-
-          if (
-            (value === "{" &&
-              hasCurlyBraces[0][cursorIndex - start + 1] === "}") ||
-            (value === "," &&
-              hasCurlyBraces[0][cursorIndex - start - 1] === '"')
-          ) {
-            labelMeta["focusOn"] = "label";
-          }
-        }
-      }
-
-      // Extract labels
-      let match;
-      while (
-        hasCurlyBraces &&
-        (match = keyValuePairRegex.exec(query)) !== null
-      ) {
-        const [fullMatch, key, val, value] = match;
-        const start = match.index;
-        const end = start + fullMatch.length;
-        // Detect cursor position for labels and values
-        if (start <= cursorIndex && cursorIndex <= end) {
-          if (cursorIndex - start < key.length) {
-            labelMeta["focusOn"] = "label";
-          } else if (
-            key &&
-            value &&
-            cursorIndex - start < key.length + value.length
-          ) {
-            labelMeta["focusOn"] = "value";
-          }
-
-          labelMeta["meta"]["label"] = key;
-          labelMeta["meta"]["value"] = value;
-
-          break;
-        }
-      }
-
-      return labelMeta;
-    }
-
-    const getLabelSuggestions = (labels, meta, queryLabels) => {
-      const keywords = [];
-      const keywordLabels = [];
-      if (meta.focusOn === "label")
-        Object.keys(labels[0]).forEach((key) => {
-          if (queryLabels.indexOf(key + "=") === -1)
-            keywords.push({
-              label: key,
-              kind: "Variable",
-              insertText: key + "=",
-            });
-        });
-
-      if (meta.focusOn === "value")
-        labels.forEach((label) => {
-          if (
-            label[meta.meta.label] &&
-            keywordLabels.indexOf(label[meta.meta.label]) === -1
-          ) {
-            keywordLabels.push(label[meta.meta.label]);
-            keywords.push({
-              label: label[meta.meta.label],
-              kind: "Variable",
-              insertText: `"${label[meta.meta.label]}"`,
-            });
-          }
-        });
-      return keywords;
-    };
-
-    const updatePromqlKeywords = async (data, editingItem, value) => {
-      const keywords = [];
-      const functions = [
-        "sum",
-        "avg_over_time",
-        "rate",
-        "avg",
-        "max",
-        "topk",
-        "histogram_quantile",
-      ];
-      if (!data.length) {
-        functions.forEach((fun) => {
-          keywords.push({
-            label: fun,
-            kind: "Function",
-            insertText: fun,
-          });
-        });
-        searchObj.data.metrics.metricList.forEach((metric) => {
-          keywords.push({
-            label: metric.label,
-            kind: "Variable",
-            insertText: metric.label,
-          });
-        });
-      } else {
-        keywords.push(...data);
-      }
-      promqlKeywords.value = keywords;
-      await nextTick();
-      metricsQueryEditorRef.value.triggerAutoComplete(value);
-    };
-
-    const parsePromQlQuery = (query) => {
-      // Extract metric name
-      const metricNameMatch = query.match(/(\w+)\{/);
-      const metricName = metricNameMatch ? metricNameMatch[1] : null;
-
-      // Extract labels
-      const labelsMatch = query.match(/\{(.+?)\}/);
-      const labels = {};
-      if (labelsMatch) {
-        const labelsStr = labelsMatch[1];
-        const labelPairs = labelsStr.match(/(\w+)="([^"]*)"/g);
-        if (labelPairs?.length)
-          labelPairs.forEach((pair) => {
-            const [key, value] = pair.match(/(\w+)="([^"]*)"/).slice(1);
-            labels[key] = value;
-          });
-      }
-
-      return { metricName, labels };
+      dashboardPanelData.data.query = value;
+      autoCompleteData.value.query = value;
+      autoCompleteData.value.text = event.changes[0].text;
+      autoCompleteData.value.dateTime = searchObj.data.datetime;
+      autoCompleteData.value.position.cursorIndex =
+        metricsQueryEditorRef.value.getCursorIndex();
+      autoCompleteData.value.popup.open =
+        metricsQueryEditorRef.value.triggerAutoComplete;
+      autoCompleteData.value.popup.close =
+        metricsQueryEditorRef.value.disableSuggestionPopup;
+      getSuggestions();
     };
 
     const addToDashboard = () => {
@@ -1002,6 +678,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       promqlKeywords,
+      autoCompletePromqlKeywords,
     };
   },
   computed: {

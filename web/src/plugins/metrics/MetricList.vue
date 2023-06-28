@@ -200,7 +200,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+    const quasar = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(searchObj.data.metrics.metricList);
     const selectedMetricLabels = ref([]);
@@ -305,7 +305,7 @@ export default defineComponent({
             metricLabelValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
-        $q.notify({
+        quasar.notify({
           type: "negative",
           message: "Error while fetching field values",
         });
@@ -313,7 +313,7 @@ export default defineComponent({
     };
 
     return {
-      $q,
+      quasar,
       t,
       store,
       router,
