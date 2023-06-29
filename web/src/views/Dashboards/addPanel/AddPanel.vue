@@ -62,7 +62,7 @@
                 <Layout />
                 <q-separator />
                 <div style="flex:1;">
-                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @trimmed-text="handleTrimmedText"/>
                 </div>
                 <DashboardErrorsComponent :errors="errorData"/>
                 <q-separator />
@@ -435,7 +435,9 @@ export default defineComponent({
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"))
     }
-
+    const handleTrimmedText = (trimmedText: any) => {
+      errorData.errors.push(trimmedText);
+    };
     return {
       t,
       updateDateTime,
@@ -451,6 +453,7 @@ export default defineComponent({
       editMode,
       selectedDate,
       errorData,
+      handleTrimmedText
     };
   },
   methods: {

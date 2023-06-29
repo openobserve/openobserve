@@ -31,8 +31,15 @@
       </div>
       <div v-else style="height: 100%; position: relative;">
           <div v-show="!errorDetail" ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
-          <div style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
-          <div v-if="errorDetail" style="position: absolute; top:20%;width:100%;text-align:center;color: brown;">{{ errorDetail }}</div>
+          <div v-if="!errorDetail" style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
+          <div v-if="errorDetail" style="position: absolute; top:20%;width:100%;text-align:center;color: rgba(255, 0, 0, 0.61);">
+            <q-icon size="md" name="warning" />
+          <div>{{ errorDetail }}</div>
+          </div>
+          <!-- <div v-if="errStr" style="position: absolute; top:20%;width:100%;text-align:center;color: rgba(255, 0, 0, 0.61);">
+            <q-icon size="md" name="warning" />
+          <div>{{ errStr }}</div> -->
+          <!-- </div> -->
           <div v-if="searchQueryData.loading" class="row" style="position: absolute; top:0px; width:100%;">
             <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
           </div>
@@ -63,6 +70,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "ChartRender",
+  emits:["trimmedText"],
   props: {
       data: {
           type: Object,
@@ -82,7 +90,7 @@ export default defineComponent({
       }
   },
 
-  setup(props) {
+  setup(props, { emit }) {
       const $q = useQuasar();
       const { t } = useI18n();
       const store = useStore();
@@ -391,24 +399,34 @@ export default defineComponent({
                     })
                     .then((res) => {
                         searchQueryData.data = res.data.data;
+                        errorDetail.value = ""
                     })
                     .catch((error) => {
-                       let errStr = ""
+                    //    let errStr = ""
                         if (error.response != undefined) {
-                            errStr = error.response.data.error;
+                            errorDetail.value = error.response.data.error;
                         } else {
-                            errStr = error.message;
+                            errorDetail.value = error.message;
                         }
-                        const customMessage = logsErrorMessage(error.response.data.code);
-                        searchQueryData.data.errorCode = error.response.data.code;
-                        if (customMessage != "") {
-                            errStr = t(customMessage);
+                        // const customMessage = logsErrorMessage(error.response.data.code);
+                        // searchQueryData.data.errorCode = error.response.data.code;
+                        // if (customMessage != "") {
+                        //     errStr.value = t(customMessage);
+                        // }
+                        // $q.notify({
+                        //     type: "negative",
+                        //     message: errStr,
+                        //     timeout: 5000,
+                        // });
+                         const words = errorDetail.value.split(" ");
+
+                        let trimmedText = words.slice(0, 300).join(" ");
+
+                        if (trimmedText.length > 300) {
+                            trimmedText = trimmedText.slice(0, 300) + " ...";
                         }
-                        $q.notify({
-                            type: "negative",
-                            message: errStr,
-                            timeout: 5000,
-                        });
+                        errorDetail.value = trimmedText;
+                        emit('trimmedText', trimmedText);
                     })
                     .finally(() => {
                         searchQueryData.loading = false
@@ -423,6 +441,7 @@ export default defineComponent({
                     })
                     .then((res) => {
                         searchQueryData.data = res.data.hits;
+                        errorDetail.value = ""
                     })
                     .catch((error) => {
                         // let errStr = ""
@@ -432,21 +451,22 @@ export default defineComponent({
                         } else {
                             errorDetail.value = error.message;
                         }
+                        
                         // const customMessage = logsErrorMessage(errorDetail.value);
                         // searchQueryData.data.error_detail = errorDetail.value;
                         // if (customMessage != "") {
                         //     errStr = t(customMessage);
                         // }
-                           console.log("errStr",errorDetail.value);                           
-
+                        
                         const words = errorDetail.value.split(" ");
-
+                        
                         let trimmedText = words.slice(0, 300).join(" ");
-
+                        
                         if (trimmedText.length > 300) {
                             trimmedText = trimmedText.slice(0, 300) + " ...";
                         }      
                         errorDetail.value = trimmedText;
+                        emit('trimmedText', trimmedText);                         
 
                         // $q.notify({
                         //     type: "negative",
