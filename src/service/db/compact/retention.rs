@@ -37,7 +37,6 @@ fn mk_key(
 // delete data from stream
 // if date_range is empty, delete all data
 // date_range is a tuple of (start, end), eg: (20230102, 20230103)
-#[inline]
 pub async fn delete_stream(
     org_id: &str,
     stream_name: &str,
@@ -58,8 +57,38 @@ pub async fn delete_stream(
     Ok(db.put(&db_key, "OK".into()).await?)
 }
 
+// set the stream is processing by the node
+pub async fn process_stream(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    date_range: Option<(&str, &str)>,
+    node: &str,
+) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = mk_key(org_id, stream_type, stream_name, date_range);
+    let db_key = format!("/compact/delete/{key}");
+    Ok(db.put(&db_key, node.to_string().into()).await?)
+}
+
+// get the stream processing information
+pub async fn get_stream(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    date_range: Option<(&str, &str)>,
+) -> Result<String, anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = mk_key(org_id, stream_type, stream_name, date_range);
+    let db_key = format!("/compact/delete/{key}");
+    let value = match db.get(&db_key).await {
+        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
+        Err(_) => String::from(""),
+    };
+    Ok(value)
+}
+
 // check if stream is deleting from cache
-#[inline]
 pub fn is_deleting_stream(
     org_id: &str,
     stream_name: &str,
@@ -69,7 +98,6 @@ pub fn is_deleting_stream(
     CACHE.contains(&mk_key(org_id, stream_type, stream_name, date_range))
 }
 
-#[inline]
 pub async fn delete_stream_done(
     org_id: &str,
     stream_name: &str,

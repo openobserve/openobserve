@@ -12,27 +12,85 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use tokio::time;
 
-use crate::common::json;
-use crate::common::utils::is_local_disk_storage;
-use crate::infra::config::CONFIG;
-use crate::infra::{cache, ider, storage};
-use crate::meta::common::{FileKey, FileMeta};
-use crate::meta::StreamType;
+use crate::common::{json, utils::is_local_disk_storage};
+use crate::infra::{
+    cache,
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
+    config::CONFIG,
+    dist_lock, ider, storage,
+};
+use crate::meta::{
+    common::{FileKey, FileMeta},
+    StreamType,
+};
 use crate::service::{db, file_list};
+
+pub async fn delete_by_stream(
+    lifecycle_end: &str,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<(), anyhow::Error> {
+    // get schema
+    let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
+    let created_at = stats.doc_time_min;
+    if created_at == 0 {
+        return Ok(()); // no data, just skip
+    }
+    let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
+    let lifecycle_start = created_at.format("%Y-%m-%d").to_string();
+    let lifecycle_start = lifecycle_start.as_str();
+    if lifecycle_start.ge(lifecycle_end) {
+        return Ok(()); // created_at is after lifecycle_end, just skip
+    }
+
+    // delete files
+    db::compact::retention::delete_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        Some((lifecycle_start, lifecycle_end)),
+    )
+    .await
+}
 
 pub async fn delete_all(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
-    // fetch lock, if already progress by other node, just skip
-    // TODO!!!
-    // let lock = db::compact::retention::get_stream_lock(org_id, stream_name, stream_type).await?;
+    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let mut locker = dist_lock::lock(&lock_key).await?;
+    let node =
+        match db::compact::retention::get_stream(org_id, stream_name, stream_type, None).await {
+            Ok(v) => v,
+            Err(e) => {
+                dist_lock::unlock(&mut locker).await?;
+                return Err(e);
+            }
+        };
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        dist_lock::unlock(&mut locker).await?;
+        return Ok(()); // not this node, just skip
+    }
+
+    // before start merging, set current node to lock the stream
+    db::compact::retention::process_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        None,
+        &LOCAL_NODE_UUID.clone(),
+    )
+    .await?;
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&mut locker).await?;
+    drop(locker);
 
     if is_local_disk_storage() {
         let data_dir = format!(
@@ -99,6 +157,40 @@ pub async fn delete_by_date(
     stream_type: StreamType,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
+    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let mut locker = dist_lock::lock(&lock_key).await?;
+    let node = match db::compact::retention::get_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        Some(date_range),
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            dist_lock::unlock(&mut locker).await?;
+            return Err(e);
+        }
+    };
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        dist_lock::unlock(&mut locker).await?;
+        return Ok(()); // not this node, just skip
+    }
+
+    // before start merging, set current node to lock the stream
+    db::compact::retention::process_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        Some(date_range),
+        &LOCAL_NODE_UUID.clone(),
+    )
+    .await?;
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&mut locker).await?;
+    drop(locker);
+
     let mut date_start =
         Utc.datetime_from_str(&format!("{}T00:00:00Z", date_range.0), "%Y-%m-%dT%H:%M:%SZ")?;
     let date_end =
