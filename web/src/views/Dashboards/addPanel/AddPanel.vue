@@ -62,7 +62,7 @@
                 <Layout />
                 <q-separator />
                 <div style="flex:1;">
-                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @trimmed-text="handleTrimmedText"/>
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @error="handleChartApiError"/>
                 </div>
                 <DashboardErrorsComponent :errors="errorData"/>
                 <q-separator />
@@ -435,8 +435,10 @@ export default defineComponent({
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"))
     }
-    const handleTrimmedText = (trimmedText: any) => {
-      errorData.errors.push(trimmedText);
+    const handleChartApiError = (errorMessage: any) => {
+      const errorList = errorData.errors;
+      errorList.splice(0);
+      errorList.push(errorMessage);
     };
     return {
       t,
@@ -453,7 +455,7 @@ export default defineComponent({
       editMode,
       selectedDate,
       errorData,
-      handleTrimmedText
+      handleChartApiError
     };
   },
   methods: {
