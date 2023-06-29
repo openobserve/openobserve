@@ -240,7 +240,7 @@
                                 title="Include Term"
                                 round
                               >
-                                <q-icon color="currentColor">
+                                <q-icon>
                                   <EqualIcon></EqualIcon>
                                 </q-icon>
                               </q-btn>
@@ -254,7 +254,7 @@
                                 title="Exclude Term"
                                 round
                               >
-                             <q-icon color="currentColor">
+                             <q-icon>
                               <NotEqualIcon></NotEqualIcon>
                              </q-icon>
                             </q-btn>

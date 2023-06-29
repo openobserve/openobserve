@@ -160,7 +160,7 @@
                                   )
                                 "
                               >
-                              <q-icon color="currentColor">
+                              <q-icon>
                                 <EqualIcon></EqualIcon>
                               </q-icon>
                             </q-btn>
@@ -175,7 +175,7 @@
                                   )
                                 "
                               >
-                               <q-icon color="currentColor">
+                               <q-icon>
                                 <NotEqualIcon></NotEqualIcon>
                                </q-icon>
                             </q-btn>
