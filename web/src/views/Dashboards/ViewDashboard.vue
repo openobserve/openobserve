@@ -277,6 +277,7 @@ export default defineComponent({
       
       router.replace({
         query: {
+          org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value)
