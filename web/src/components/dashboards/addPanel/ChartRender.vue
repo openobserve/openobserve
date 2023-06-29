@@ -188,7 +188,7 @@ export default defineComponent({
                   Plotly.react(
                       plotRef.value,
                       [],
-                      {},
+                      {...getThemeLayoutOptions()},
                       {
                           responsive: true,
                           displaylogo: false,
@@ -208,7 +208,7 @@ export default defineComponent({
               await Plotly.newPlot(
                   plotRef.value,
                   [{}],
-                  {},
+                  {...getThemeLayoutOptions()},
                   {
                       responsive: true,
                       displaylogo: false,
@@ -804,7 +804,8 @@ export default defineComponent({
                         r:50,
                         t:50,
                         b:50
-                    }
+                    },
+                    ...getThemeLayoutOptions()
                 };
 
                 console.log('plotly promql layout', layout);
@@ -844,7 +845,8 @@ export default defineComponent({
                         r: props.data.type == 'pie' ? 60 : 16,
                         t: 38,
                         b: 32,
-                    }
+                    },
+                    ...getThemeLayoutOptions()
                 };
 
                 Plotly.react(plotRef.value, traces, layout, {
