@@ -53,7 +53,20 @@
           <!-- <q-input v-model="item.name" :label="item.label" dense></q-input> -->
         </div>
         <div v-else-if="item.type == 'constant'">
+          <q-input v-model="item.name" :label="item.label" dense outlined readonly></q-input>
+        </div>
+        <div v-else-if="item.type == 'textbox'">
           <q-input v-model="item.name" :label="item.label" dense outlined></q-input>
+        </div>
+         <!-- v-model="item.value" -->
+        <div v-if="item.type == 'custom_fields'">
+          <q-select
+              outlined
+              dense
+              v-model="item.value"
+              :options="item.options"
+              :label="item.label"
+            ></q-select>
         </div>
       </div>
     </div>
@@ -180,6 +193,22 @@ export default defineComponent({
             "name" : "namespace2",
             "label" : "NameSpace2",
             "value" : "alpha1"
+          },
+          {
+            "type" : "textbox",
+            "name" : "namespace3",
+            "label" : "NameSpace3",
+            "value" : "alpha1"
+          },
+          {
+            "type" : "custom_fields",
+            "name" : "namespace4",
+            "label" : "NameSpace4",
+            "options" : [
+                        {"label":"label1","value":"value1"},
+                        {"label":"label2","value":"value2"},
+                        {"label":"label3","value":"value3"},
+                      ]
           }
         ]
 
@@ -236,9 +265,20 @@ export default defineComponent({
             return obj
             // break;
           }
+          case "textbox":{
+            obj.value = it.value
+            return obj
+            // break;
+          }
+          case "custom_fields":{
+            obj["options"] = it.options
+            obj.value = obj.options[0] || ""
+            return obj
+            // break;
+          }
           default:
-            console.log("default");
-            break;
+            obj.value = it.value
+            return obj
         }
       })
       variablesData.values = await Promise.all(promise)
