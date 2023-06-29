@@ -20,18 +20,26 @@
   <div ref="chartPanelRef" style="margin-top: 0px; height: calc(100% - 40px);">
       <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">
           <div class="column" style="height: 100%; position: relative;">
-            <q-table class="my-sticky-virtscroll-table" virtual-scroll v-model:pagination="pagination"
+            <q-table v-show="!errorDetail" class="my-sticky-virtscroll-table" virtual-scroll v-model:pagination="pagination"
                 :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" dense
                 :rows="searchQueryData?.data || []" :columns="tableColumn" row-key="id">
             </q-table>
+              <div v-if="errorDetail" class="errorMessage">
+                <q-icon size="md" name="warning" />
+                <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
+              </div>
             <div v-if="searchQueryData.loading" class="row" style="position: absolute; top:0px; width:100%; z-index: 1;">
                 <q-spinner-dots color="primary" style="margin: 0 auto; height: 10px; width: 40px;" />
             </div>
           </div>
       </div>
       <div v-else style="height: 100%; position: relative;">
-          <div ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
-          <div style="position: absolute; top:20%;width:100%;text-align:center;">{{ noData }}</div>
+          <div v-show="!errorDetail" ref="plotRef" :id="chartID" class="plotlycontainer" style="height: 100%"></div>
+          <div v-if="!errorDetail" class="noData">{{ noData }}</div>
+          <div v-if="errorDetail" class="errorMessage">
+            <q-icon size="md" name="warning" />
+            <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
+          </div>
           <div v-if="searchQueryData.loading" class="row" style="position: absolute; top:0px; width:100%;">
             <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
           </div>
@@ -60,9 +68,9 @@ import moment from "moment";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
 
-
 export default defineComponent({
   name: "ChartRender",
+  emits:["error"],
   props: {
       data: {
           type: Object,
@@ -82,7 +90,7 @@ export default defineComponent({
       }
   },
 
-  setup(props) {
+  setup(props, { emit }) {
       const $q = useQuasar();
       const { t } = useI18n();
       const store = useStore();
@@ -90,6 +98,9 @@ export default defineComponent({
           data: [] as (any | Array<any>),
           loading: false
       });
+      const errorDetail = ref("");
+
+      // const noData = ref('')
 
       //render the plotly chart if the chart type is not table
       onUpdated(() => {
@@ -377,8 +388,11 @@ export default defineComponent({
               },
           };
 
-          searchQueryData.loading = true
+         searchQueryData.loading = true;
+
+            // Check if stream_type is "metrics", customQuery exists, and queryType is "promql"
             if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
+                // Call metrics_query_range API
                 await queryService
                     .metrics_query_range({
                         org_identifier: store.state.selectedOrganization.identifier,
@@ -387,31 +401,20 @@ export default defineComponent({
                         end_time: endISOTimestamp
                     })
                     .then((res) => {
+                        // Set searchQueryData.data to the API response data
                         searchQueryData.data = res.data.data;
+                        // Clear errorDetail
+                        errorDetail.value = "";
                     })
                     .catch((error) => {
-                       let errStr = ""
-                        if (error.response != undefined) {
-                            errStr = error.response.data.error;
-                        } else {
-                            errStr = error.message;
-                        }
-                        const customMessage = logsErrorMessage(error.response.data.code);
-                        searchQueryData.data.errorCode = error.response.data.code;
-                        if (customMessage != "") {
-                            errStr = t(customMessage);
-                        }
-                        $q.notify({
-                            type: "negative",
-                            message: errStr,
-                            timeout: 5000,
-                        });
+                        // Process API error for "promql"
+                        processApiError(error, "promql");
                     })
                     .finally(() => {
-                        searchQueryData.loading = false
+                        searchQueryData.loading = false;
                     });
-            }
-            else{
+            } else {
+                // Call search API
                 await queryService
                     .search({
                         org_identifier: store.state.selectedOrganization.identifier,
@@ -419,32 +422,20 @@ export default defineComponent({
                         page_type: props.data.fields.stream_type,
                     })
                     .then((res) => {
+                        // Set searchQueryData.data to the API response hits
                         searchQueryData.data = res.data.hits;
+                        // Clear errorDetail
+                        errorDetail.value = "";
                     })
                     .catch((error) => {
-                        let errStr = ""
-                        if (error.response != undefined) {
-                            errStr = error.response.data.error;
-                        } else {
-                            errStr = error.message;
-                        }
-                        const customMessage = logsErrorMessage(error.response.data.code);
-                        searchQueryData.data.errorCode = error.response.data.code;
-                        if (customMessage != "") {
-                            errStr = t(customMessage);
-                        }
-                        $q.notify({
-                            type: "negative",
-                            message: errStr,
-                            timeout: 5000,
-                        });
+                        // Process API error for "sql"
+                        processApiError(error, "sql");
                     })
                     .finally(() => {
-                        searchQueryData.loading = false
-                    });     
-        }
+                        searchQueryData.loading = false;
+                    });
+            }
       };
-
       // If data or chart type is updated, rerender the chart
       watch(
           () => [searchQueryData.data, props.data.type],
@@ -458,6 +449,34 @@ export default defineComponent({
           { deep: true }
       );
 
+      const processApiError = async (error:any, type: string) => {
+        switch (type) {
+            case "promql": {
+                // Get the error detail value from the response data or error message
+                const errorDetailValue = error.response?.data?.error || error.message;
+                // Trim the error message if it exceeds 300 characters
+                const trimmedErrorMessage = errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
+                // Set the trimmed error message to the errorDetail value
+                errorDetail.value = trimmedErrorMessage;
+                // Emit an 'error' event with the trimmed error message
+                emit('error', trimmedErrorMessage);
+                break;
+            }
+            case "sql": {
+                // Get the error detail value from the response data or error message
+                const errorDetailValue = error.response?.data.error_detail ?? error.message;
+                // Trim the error message if it exceeds 300 characters
+                const trimmedErrorMessage = errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
+                // Set the trimmed error message to the errorDetail value
+                errorDetail.value = trimmedErrorMessage;
+                // Emit an 'error' event with the trimmed error message
+                emit('error', trimmedErrorMessage);
+                break;
+            }
+            default:
+                break;
+        }
+      }
       const renderChart = async () => {
         if (props.data?.fields?.stream_type == "metrics" && props.data?.customQuery && props.data?.queryType == "promql") {
             renderPromQlBasedChart()
@@ -1213,7 +1232,8 @@ export default defineComponent({
           }),
           chartID,
           tableColumn,
-          noData
+          noData,
+          errorDetail,
       };
   },
 });
@@ -1256,5 +1276,21 @@ export default defineComponent({
   :deep(.q-virtual-scroll) {
       will-change: auto !important;
   }
+}
+
+.errorMessage{
+    position: absolute; 
+    top:20%;width:100%; 
+    height: 80%; 
+    overflow: hidden;
+    text-align:center;
+    color: rgba(255, 0, 0, 0.8); 
+    text-overflow: ellipsis;
+}
+.noData{
+    position: absolute; 
+    top:20%;
+    width:100%;
+    text-align:center;
 }
 </style>
