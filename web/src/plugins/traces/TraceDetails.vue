@@ -46,7 +46,10 @@
             activeVisual === "timeline" ? "Trace Timeline" : "Trace Service Map"
           }}
         </div>
-        <div class="rounded-borders" style="border: 1px solid #cacaca; padding: 2px">
+        <div
+          class="rounded-borders"
+          style="border: 1px solid #cacaca; padding: 2px"
+        >
           <template v-for="visual in traceVisuals" :key="visual.value">
             <q-btn
               :color="visual.value === activeVisual ? 'primary' : ''"
@@ -56,8 +59,8 @@
               size="11px"
               class="q-px-sm visual-selection-btn"
               @click="activeVisual = visual.value"
-              >
-              <q-icon><component :is="visual.icon"/></q-icon>
+            >
+              <q-icon><component :is="visual.icon" /></q-icon>
               {{ visual.label }}</q-btn
             >
           </template>
@@ -163,7 +166,7 @@ export default defineComponent({
     TraceChart,
     D3Chart,
     TraceTimelineIcon,
-    ServiceMapIcon
+    ServiceMapIcon,
   },
 
   setup() {
@@ -470,26 +473,22 @@ export default defineComponent({
       });
     };
     const buildTraceChart = () => {
-      const getThemeLayoutOptions = () => ({
-        paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
-        plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
-        font: {
-          color: store.state.theme === 'dark' ? '#fff' : '#333'
-        }
-      })
-      watch(() => store.state.theme, () => {
-        Plotly.update(plotref.value, {}, getThemeLayoutOptions())
-      })
       const layout: any = {
         autosize: true,
         scrollZoom: true,
+        paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+        plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
         title: {
           text: "",
           font: {
             size: 12,
+            color: store.state.theme === "dark" ? "#fff" : "#333",
           },
         },
-        font: { size: 12 },
+        font: {
+          size: 12,
+          color: store.state.theme === "dark" ? "#fff" : "#333",
+        },
         height: 200,
         margin: {
           l: 16,
@@ -520,8 +519,6 @@ export default defineComponent({
         shapes: [],
         hovermode: "closest",
         showlegend: true,
-        ...getThemeLayoutOptions(),
-
       };
       const shapes: any = [];
       let size = 0;

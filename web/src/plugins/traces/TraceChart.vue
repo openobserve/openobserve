@@ -51,16 +51,20 @@ export default defineComponent({
     let traces: any = [{}];
 
     const getThemeLayoutOptions = () => ({
-      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
-      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+      plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
       font: {
-        color: store.state.theme === 'dark' ? '#fff' : '#333'
+        color: store.state.theme === "dark" ? "#fff" : "#333",
+      },
+    });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        Plotly.update(plotref.value, {}, getThemeLayoutOptions());
       }
-    })
-    watch(() => store.state.theme, () => {
-      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
-    })
-    
+    );
+
     let layout: any = {
       width: "100%",
       scrollZoom: true,
@@ -142,7 +146,6 @@ export default defineComponent({
       ],
       hovermode: "closest",
       showlegend: true,
-      ...getThemeLayoutOptions(),
     };
 
     onMounted(async () => {

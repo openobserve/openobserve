@@ -933,6 +933,7 @@ export default defineComponent({
           text: "",
           font: {
             size: 12,
+            color: store.state.theme === "dark" ? "#fff" : "#333",
           },
         },
         margin: {
@@ -941,11 +942,16 @@ export default defineComponent({
           t: 22,
           b: 50,
         },
-        font: { size: 12 },
+        font: {
+          size: 12,
+          color: store.state.theme === "dark" ? "#fff" : "#333",
+        },
         xaxis: { type: "date" },
         yaxis: { ticksuffix: "ms" },
         scattergap: 0.7,
         height: 150,
+        paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+        plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
         autosize: true,
       };
 
