@@ -72,12 +72,8 @@
                     switch-toggle-side
                     :label="props.row.name"
                     expand-icon-class="field-expansion-icon"
-                    :expand-icon="
-                      'img:' + getImageURL('images/common/down-solid.svg')
-                    "
-                    :expanded-icon="
-                      'img:' + getImageURL('images/common/up-solid.svg')
-                    "
+                    expand-icon="expand_more"
+                    expanded-icon="expand_less"
                     @before-show="(event: any) => openFilterCreator(event, props.row)"
                   >
                     <template v-slot:header>
@@ -130,7 +126,12 @@
                                 class="q-pr-none no-pointer-events"
                               >
                                 <div
-                                  class="flex row wrap justify-between text-grey-8"
+                                  class="flex row wrap justify-between"
+                                  :class="
+                                    store.state.theme === 'dark'
+                                      ? 'text-grey-4'
+                                      : 'text-grey-8'
+                                  "
                                   style="width: 100%"
                                 >
                                   <div
@@ -358,7 +359,7 @@ export default defineComponent({
       width: 100%;
 
       &:hover {
-        background-color: color-mix(in srgb, currentColor 15%, transparent);;
+        background-color: color-mix(in srgb, currentColor 15%, transparent);
       }
 
       &.selected {

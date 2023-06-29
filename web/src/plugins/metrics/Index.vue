@@ -132,10 +132,10 @@
             <h5 class="text-center">No result found.</h5>
           </div>
           <template v-if="searchObj.data.metrics.metricList.length">
-            <div class="flex justify-end q-pr-lg">
+            <div class="flex justify-end q-pr-lg q-mb-md">
               <q-btn
                 size="md"
-                class="q-px-sm"
+                class="q-px-sm no-border"
                 no-caps
                 dense
                 color="primary"
