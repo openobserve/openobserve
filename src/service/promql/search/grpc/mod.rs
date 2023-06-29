@@ -101,13 +101,13 @@ pub async fn search(
         Some(v) => v,
         None => value.get_type().to_string(),
     };
-    scan_stats.format_to_mb();
 
     // clear session
     search::datafusion::storage::file_list::clear(&session_id);
     // clear tmpfs
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
 
+    scan_stats.format_to_mb();
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,

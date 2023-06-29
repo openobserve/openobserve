@@ -466,6 +466,6 @@ mod tests {
         let in_val = 10.00;
         let input = json!({ "key": in_val });
         let resp = get_val_for_attr(input);
-        assert_eq!(resp.as_f64().unwrap(), in_val);
+        assert_eq!(resp.as_str().unwrap(), in_val.to_string());
     }
 }
