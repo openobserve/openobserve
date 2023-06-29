@@ -148,7 +148,7 @@
                                 {{ value.count }}
                               </div>
                             </div>
-                            <div class="flex row">
+                            <div class="flex row" :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'">
                               <q-btn
                                 class="q-mr-xs"
                                 size="6px"
