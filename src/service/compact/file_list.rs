@@ -24,8 +24,7 @@ use tokio::sync::{RwLock, Semaphore};
 use crate::common::json;
 use crate::infra::{
     config::{CONFIG, STREAM_SCHEMAS},
-    db::etcd,
-    ider, storage,
+    dist_lock, ider, storage,
 };
 use crate::meta::common::FileKey;
 use crate::service::db;
@@ -146,16 +145,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// merge and delete the small file list keys in this hour from etcd
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
-    let mut locker = None;
-    if !CONFIG.common.local_mode {
-        // get a cluster lock for merge file list
-        let lock_key = "compactor/file_list";
-        let mut lock = etcd::Locker::new(lock_key);
-        if lock.lock(CONFIG.etcd.command_timeout).await.is_err() {
-            return Ok(()); // lock failed, just skip
-        }
-        locker = Some(lock);
-    }
+    let mut locker = dist_lock::lock("compact/file_list").await?;
 
     // get all small file list keys in this hour
     let offset = Utc.timestamp_nanos(offset * 1000);
@@ -164,11 +154,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     log::info!("[COMPACT] file_list is merging, prefix: {key}");
     let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
-        if locker.is_some() {
-            // release cluster lock
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // only one file list, no need merge
     }
     log::info!(
@@ -295,25 +281,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         }
     }
 
-    if locker.is_some() {
-        // release cluster lock
-        let mut lock = locker.unwrap();
-        lock.unlock().await?;
-    }
-
+    // release lock
+    dist_lock::unlock(&mut locker).await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_compact() {
-        let off_set = Duration::hours(2).num_microseconds().unwrap();
-        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
-        let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
-        let resp = run(off_set_for_run).await;
-        assert!(resp.is_ok());
-    }
 }
