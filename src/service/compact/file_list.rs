@@ -23,6 +23,7 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::common::json;
 use crate::infra::{
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, STREAM_SCHEMAS},
     dist_lock, ider, storage,
 };
@@ -145,16 +146,35 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// merge and delete the small file list keys in this hour from etcd
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
-    let mut locker = dist_lock::lock("compact/file_list").await?;
+    let lock_key = format!("compact/file_list/{offset}");
+    let mut locker = dist_lock::lock(&lock_key).await?;
+    let node = match db::compact::file_list::get_process(offset).await {
+        Ok(v) => v,
+        Err(e) => {
+            dist_lock::unlock(&mut locker).await?;
+            return Err(e);
+        }
+    };
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!("[COMPACT] list_list offset [{offset}] is merging by {node}");
+        dist_lock::unlock(&mut locker).await?;
+        return Ok(()); // not this node, just skip
+    }
+
+    // before start merging, set current node to lock the offset
+    db::compact::file_list::set_process(offset, &LOCAL_NODE_UUID.clone()).await?;
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&mut locker).await?;
+    drop(locker);
 
     // get all small file list keys in this hour
-    let offset = Utc.timestamp_nanos(offset * 1000);
-    let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
+    let offset_time = Utc.timestamp_nanos(offset * 1000);
+    let offset_prefix = offset_time.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{offset_prefix}");
     log::info!("[COMPACT] file_list is merging, prefix: {key}");
     let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
-        dist_lock::unlock(&mut locker).await?;
+        db::compact::file_list::del_process(offset).await?;
         return Ok(()); // only one file list, no need merge
     }
     log::info!(
@@ -281,7 +301,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         }
     }
 
-    // release lock
-    dist_lock::unlock(&mut locker).await?;
+    // clean progress mark
+    db::compact::file_list::del_process(offset).await?;
     Ok(())
 }

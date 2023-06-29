@@ -64,6 +64,7 @@ pub async fn merge_by_stream(
             }
         };
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is merging by {node}");
         dist_lock::unlock(&mut locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -450,7 +451,7 @@ async fn merge_files(
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_compact() {
         let off_set = Duration::hours(2).num_microseconds().unwrap();
         let _ =

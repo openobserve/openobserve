@@ -75,6 +75,7 @@ pub async fn delete_all(
             }
         };
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&mut locker).await?;
         return Ok(()); // not this node, just skip
     }
@@ -174,6 +175,10 @@ pub async fn delete_by_date(
         }
     };
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!(
+            "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
+            date_range
+        );
         dist_lock::unlock(&mut locker).await?;
         return Ok(()); // not this node, just skip
     }
