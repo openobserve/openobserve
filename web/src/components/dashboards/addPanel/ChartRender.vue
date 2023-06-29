@@ -780,7 +780,7 @@ export default defineComponent({
                     const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
 
                     return  {
-                        name: getPromqlLegendName(metric.metric, props.data.config.promqlLegend),
+                        name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
                         x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
                         y: values.map((value: any) => value[1]),
                         hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"

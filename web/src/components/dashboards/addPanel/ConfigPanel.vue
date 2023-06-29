@@ -12,7 +12,7 @@
 
     <div class="space"></div>
 
-    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promqlLegend" label="Legend" color="input-border"
+    <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot>
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
