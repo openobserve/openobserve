@@ -35,7 +35,7 @@
               :name="item.image"
               class="q-mx-auto q-mb-sm"
             />
-            <q-item-label class="q-pa-none q-mx-auto" caption>{{
+            <q-item-label class="q-pa-none q-mx-auto" style="text-align: center" caption>{{
               item.title
             }}</q-item-label>
           </q-item-section>
@@ -59,9 +59,14 @@ export default defineComponent({
     // array of charts
     const chartsArray = ref([
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area.png"),
         title: "Area",
         id: "area",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        title: "Area Stacked",
+        id: "area-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),

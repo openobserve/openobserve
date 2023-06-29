@@ -17,7 +17,7 @@
   <!-- <div style="height: 40px; z-index: 10;">
       <q-spinner-dots v-if="searchQueryData.loading" color="primary" size="40px" style="margin: 0 auto; display: block;" />
   </div> -->
-  <div style="margin-top: 0px; height: calc(100% - 40px);">
+  <div ref="chartPanelRef" style="margin-top: 0px; height: calc(100% - 40px);">
       <div v-if="props.data.type == 'table'" class="q-pa-sm" style="height: 100%">
           <div class="column" style="height: 100%; position: relative;">
             <q-table class="my-sticky-virtscroll-table" virtual-scroll v-model:pagination="pagination"
@@ -50,6 +50,7 @@ import {
   watch,
   computed,
   onActivated,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
@@ -89,7 +90,6 @@ export default defineComponent({
           data: [] as (any | Array<any>),
           loading: false
       });
-      // const noData = ref('')
 
       //render the plotly chart if the chart type is not table
       onUpdated(() => {
@@ -138,13 +138,40 @@ export default defineComponent({
           tableColumn.value = column
       }
 
+      const chartPanelRef = ref(null)
+      let observer: any = null;
+      const isDirty: any = ref(true);
+      const isVisible: any = ref(false);
+
+      const handleIntersection = (entries:any) => {
+        isVisible.value = entries[0].isIntersecting;
+      }
+
+      watch(()=> isVisible.value, async()=> {
+          if(isDirty.value && props.data.query){
+              fetchQueryData()
+          }
+      })
+
+      // remove intersection observer
+      onUnmounted(() => {
+        if (observer) {
+            observer.disconnect();
+        }
+      });
+
       // If query changes, we need to get the data again and rerender the chart
       watch(
           () => [props.data, props.selectedTimeDate],
           async () => {
+              isDirty.value = true
+              
               if (props.data.query) {
-                  fetchQueryData();
-                  updateTableColumns();
+                  // load the data if visible
+                  if(isVisible.value){
+                    fetchQueryData();
+                    updateTableColumns();
+                  }
               } else {
                   await nextTick();
                   Plotly.react(
@@ -164,6 +191,7 @@ export default defineComponent({
 
       // just wait till the component is mounted and then create a plotly instance
       onMounted(async () => {
+        
           await nextTick();
           if (props.data.type != "table") {
               await Plotly.newPlot(
@@ -235,9 +263,17 @@ export default defineComponent({
               updateTableColumns()
           }
 
-          if (props.data.query) {
-              fetchQueryData();
-          }
+        //   if (props.data.query) {
+        //       fetchQueryData();
+        //   }
+
+        observer = new IntersectionObserver(handleIntersection, {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1 // Adjust as needed
+        });
+
+        observer.observe(chartPanelRef.value);
       });
 
       // this is used to clear the data after next tick 
@@ -306,6 +342,10 @@ export default defineComponent({
 
       // Chart Related Functions
       const fetchQueryData = async () => {
+        isDirty.value = false
+        // console.log("fetching query data for panel: ", props.data.config.title);
+
+        
           const queryData = props.data.query;
           const chartParams = {
               title: "Found " + "2" + " hits in " + "10" + " ms",
@@ -581,6 +621,35 @@ export default defineComponent({
                 //   console.log("multiple:- traces", traces);
                   break;
               }
+              case "area-stacked": {
+                  // stacked with xAxis's second value
+                  // allow 2 xAxis and 1 yAxis value for stack chart
+                  // get second x axis key
+                  const key1 = xAxisKeys[1]
+                  // get the unique value of the second xAxis's key
+                  const stackedXAxisUniqueValue =  [...new Set( searchQueryData.data.map((obj: any) => obj[key1])) ].filter((it)=> it);
+                //   console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+                  
+                  // create a trace based on second xAxis's unique values
+                  traces = stackedXAxisUniqueValue?.map((key: any) => {
+                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+                      
+                      const trace = {
+                          name: key,
+                          ...getPropsByChartTypeForTraces(),
+                          showlegend: props.data.config?.show_legends,
+                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
+                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
+                          customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                          hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
+                          stackgroup: 'one'
+
+                      };
+                      return trace
+                  })
+                //   console.log("multiple:- traces", traces);
+                  break;
+              }
               case "stacked": {
                   // stacked with xAxis's second value
                   // allow 2 xAxis and 1 yAxis value for stack chart
@@ -602,7 +671,6 @@ export default defineComponent({
                           y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
                           customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
-
                       };
                       return trace
                   })
@@ -675,7 +743,9 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
           };
 
-        //   console.log('layout', layout);
+          console.log('layout', layout);
+          console.log('traces', traces);
+
 
           Plotly.react(plotRef.value, traces, layout, {
               responsive: true,
@@ -798,56 +868,6 @@ export default defineComponent({
       const getAxisDataFromKey = (key: string) => {
           // when the key is not available in the data that is not show the default value
           let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
-          // when the key is not available in the data make default value null using below line
-          // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
-
-          // check for the histogram _timestamp field
-          // If histogram _timestamp field is found, format the date labels
-          const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == '_timestamp')
-          if (field && field.alias == key) {
-              // get the format
-              const timestamps = selectedTimeObj.value
-              let keyFormat = "HH:mm:ss";
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 5) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 10) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 20) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
-                  keyFormat = "HH:mm:ss";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
-                  keyFormat = "MM-DD HH:mm";
-              }
-              if (
-                  timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 30) {
-                  keyFormat = "YYYY-MM-DD";
-              }
-
-              // now we have the format, convert that format
-              result = result.map((it: any) => moment(it + "Z").format(keyFormat))
-
-              // result = result.map((it: any) => it.replace("T", " "))
-              // console.log("with timestamps: " + result);
-              
-          }
-          // console.log("without timestamps: " + result);
           return result
       };
 
@@ -888,6 +908,11 @@ export default defineComponent({
                   return {
                       type: 'bar',
                   };
+              case "area-stacked":
+                  return {
+                        mode: 'lines',  
+                        // fill: 'none'
+                  };
               case "metric":
                   return {
                       type: "indicator",
@@ -910,6 +935,9 @@ export default defineComponent({
           const xAxisKey = getXAxisKeys().length ? getXAxisKeys()[0] : '';
           const xAxisData = getAxisDataFromKey(xAxisKey)
           const xAxisDataWithTicks = getTickLimits(xAxisData)
+
+          console.log("data with tick",xAxisDataWithTicks);
+          
 
           switch (props.data.type) {
               case "bar": {
@@ -1074,23 +1102,71 @@ export default defineComponent({
 
                   return trace
               }
-              case "stacked":
-                  return {
-                      barmode: "stack",
-                      xaxis: {
-                          tickmode: "array",
-                          tickvals: xAxisDataWithTicks,
-                          ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.x[0].label,
-                          tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
-                          automargin: true,
-                      },
-                      yaxis: {
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
-                          automargin: true,
-                          fixedrange: true
-                      },
-                  };
+              case "area-stacked":{
+
+                const xaxis: any = {
+                    title: props.data.fields?.x[0].label,
+                    tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                    automargin: true
+                  }
+
+                const yaxis: any = {
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    automargin: true,
+                    fixedrange: true
+                }
+                
+                //show tickvals and ticktext value when the stacked chart hasn't timestamp
+                // if the first field is timestamp we dont want to show the tickvals
+                // format value only for without timestamp
+                // stacked chart is alwayes stacked with first field value
+                if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
+                    xaxis["tickmode"] = "array",
+                    xaxis["tickvals"] = xAxisDataWithTicks,
+                    xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                }
+
+                const layout = {
+                    barmode: "stack",
+                    xaxis: xaxis,
+                    yaxis: yaxis
+                }
+                
+                return layout
+                }
+              case "stacked":{
+
+                const xaxis: any = {
+                    title: props.data.fields?.x[0].label,
+                    tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
+                    automargin: true
+                  }
+
+                const yaxis: any = {
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    automargin: true,
+                    fixedrange: true
+                }
+
+                //show tickvals and ticktext value when the stacked chart hasn't timestamp
+                // if the first field is timestamp we dont want to show the tickvals
+                // format value only for without timestamp
+                // stacked chart is alwayes stacked with first field value
+                if(props.data.fields?.x.length && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
+                    xaxis["tickmode"] = "array",
+                    xaxis["tickvals"] = xAxisDataWithTicks,
+                    xaxis["ticktext"] = textformat(xAxisDataWithTicks)
+                }
+
+                const layout = {
+                    barmode: "stack",
+                    xaxis: xaxis,
+                    yaxis: yaxis
+                }
+                
+                return layout
+              
+                }
               case "h-stacked":
                   return {
                       barmode: "stack",
@@ -1130,6 +1206,7 @@ export default defineComponent({
       };
 
       return {
+          chartPanelRef,
           plotRef,
           props,
           searchQueryData,

@@ -25,7 +25,7 @@ pub mod match_udf;
 pub mod regexp_udf;
 pub mod storage;
 mod time_range_udf;
-#[cfg(feature = "zo_functions")]
+
 mod transform_udf;
 
 /// The name of the match UDF given to DataFusion.

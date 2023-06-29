@@ -277,17 +277,15 @@ impl Engine {
             .await?;
 
         let mut tasks = Vec::new();
-        for (ctx, schema, file_count, scan_size) in ctxs {
+        for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
             let task = tokio::task::spawn(async move {
                 selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
             });
             tasks.push(task);
             // update stats
-            let mut ctx_file_count = self.ctx.file_count.write().await;
-            *ctx_file_count += file_count;
-            let mut ctx_scan_size = self.ctx.scan_size.write().await;
-            *ctx_scan_size += scan_size;
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&scan_stats);
         }
         let task_results = try_join_all(tasks)
             .await

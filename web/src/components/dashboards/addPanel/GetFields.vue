@@ -14,15 +14,11 @@
 -->
 
 <template>
-    <div class="col" style="height: 100%">
-        <div class="q-pa-sm">
+    <div class="column" style="height: 100%">
+        <div class="col-auto q-pa-sm">
             <span class="text-weight-bold">{{ t('panel.fields') }}</span>
         </div>
-        <div
-            class="scroll"
-            style="width: 100%;"
-            v-if="true"
-        >
+        <div class="col" style="width: 100%">
             <index-list :editMode="props.editMode"/>
         </div>
     </div>

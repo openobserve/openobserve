@@ -32,6 +32,8 @@ pub mod value;
 pub use engine::Engine;
 pub use exec::Query;
 
+use crate::meta::stream::ScanStats;
+
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s
 pub(crate) const MAX_DATA_POINTS: i64 = 1000; // Width of panel
@@ -44,7 +46,7 @@ pub trait TableProvider: Sync + Send + 'static {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> Result<Vec<(SessionContext, Arc<Schema>, usize, usize)>>;
+    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

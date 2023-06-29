@@ -18,7 +18,17 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onUpdated,
+  watch,
+  onActivated,
+  onUnmounted,
+  onDeactivated,
+  type Ref,
+} from "vue";
 import * as monaco from "monaco-editor";
 import { useStore } from "vuex";
 
@@ -46,6 +56,7 @@ export default defineComponent({
     const store = useStore();
     const editorRef: any = ref();
     let editorObj: any = null;
+    let provider: Ref<monaco.IDisposable | null> = ref(null);
 
     const createDependencyProposals = (range: any) => {
       const keywords = [
@@ -210,7 +221,66 @@ export default defineComponent({
         },
       });
 
-      monaco.languages.registerCompletionItemProvider("sql", {
+      registerAutoCompleteProvider();
+
+      editorObj = monaco.editor.create(editorRef.value, {
+        value: props.query,
+        language: "sql",
+        theme: "myCustomTheme",
+        showFoldingControls: "never",
+        wordWrap: "on",
+        lineNumbers: "on",
+        lineNumbersMinChars: 0,
+        overviewRulerLanes: 0,
+        fixedOverflowWidgets: false,
+        overviewRulerBorder: false,
+        lineDecorationsWidth: 15,
+        hideCursorInOverviewRuler: true,
+        renderLineHighlight: "none",
+        glyphMargin: false,
+        folding: false,
+        scrollBeyondLastColumn: 0,
+        scrollBeyondLastLine: true,
+        scrollbar: { horizontal: "auto", vertical: "visible" },
+        find: {
+          addExtraSpaceOnTop: false,
+          autoFindInSelection: "never",
+          seedSearchStringFromSelection: "never",
+        },
+        minimap: { enabled: false },
+        readOnly: props.readOnly,
+      });
+
+      editorObj.onDidChangeModelContent((e: any) => {
+        emit("update-query", editorObj.getValue());
+        emit("update:query", editorObj.getValue());
+      });
+
+      editorObj.createContextKey("ctrlenter", true);
+      editorObj.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        function () {
+          emit("run-query");
+        },
+        "ctrlenter"
+      );
+    });
+
+    onActivated(async () => {
+      provider.value?.dispose();
+      registerAutoCompleteProvider();
+    });
+
+    onDeactivated(() => {
+      provider.value?.dispose();
+    });
+
+    onUnmounted(() => {
+      provider.value?.dispose();
+    });
+
+    const registerAutoCompleteProvider = () => {
+      provider.value = monaco.languages.registerCompletionItemProvider("sql", {
         provideCompletionItems: function (model, position) {
           // find out if we are completing a property in the 'dependencies' object.
           var textUntilPosition = model.getValueInRange({
@@ -257,49 +327,7 @@ export default defineComponent({
           };
         },
       });
-
-      editorObj = monaco.editor.create(editorRef.value, {
-        value: props.query,
-        language: "sql",
-        theme: "myCustomTheme",
-        showFoldingControls: "never",
-        wordWrap: "on",
-        lineNumbers: "on",
-        lineNumbersMinChars: 0,
-        overviewRulerLanes: 0,
-        fixedOverflowWidgets: false,
-        overviewRulerBorder: false,
-        lineDecorationsWidth: 15,
-        hideCursorInOverviewRuler: true,
-        renderLineHighlight: "none",
-        glyphMargin: false,
-        folding: false,
-        scrollBeyondLastColumn: 0,
-        scrollBeyondLastLine: true,
-        scrollbar: { horizontal: "auto", vertical: "visible" },
-        find: {
-          addExtraSpaceOnTop: false,
-          autoFindInSelection: "never",
-          seedSearchStringFromSelection: "never",
-        },
-        minimap: { enabled: false },
-        readOnly: props.readOnly,
-      });
-
-      editorObj.onDidChangeModelContent((e: any) => {
-        emit("update-query", editorObj.getValue());
-        emit("update:query", editorObj.getValue());
-      });
-
-      editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        function () {
-          emit("run-query");
-        },
-        "ctrlenter"
-      );
-    });
+    };
 
     const setValue = (value: string) => {
       editorObj.setValue(value);

@@ -24,15 +24,25 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
-    cluster,
-    config::CONFIG,
-    errors::{Error, ErrorCodes, Result},
+use crate::{
+    handler::grpc::cluster_rpc,
+    meta::{stream::ScanStats, usage::RequestStats},
+    service::usage::report_usage_stats,
 };
-use crate::service::{
-    promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
-    search::{server_internal_error, MetadataMap},
+use crate::{
+    infra::{
+        cluster,
+        config::CONFIG,
+        errors::{Error, ErrorCodes, Result},
+    },
+    meta::StreamType,
+};
+use crate::{
+    meta::usage::UsageType,
+    service::{
+        promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
+        search::{server_internal_error, MetadataMap},
+    },
 };
 
 pub mod grpc;
@@ -188,14 +198,15 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
                         return Err(server_internal_error("search node error"));
                     }
                 };
+                let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
                     "promql->search->grpc: result node: {}, need_wal: {}, took: {}, files: {}, scan_size: {}",
                     node.id,
                     req_need_wal,
                     response.took,
-                    response.file_count,
-                    response.scan_size
+                    scan_stats.files,
+                    scan_stats.original_size,
                 );
                 Ok(response)
             }
@@ -218,13 +229,11 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     }
 
     // merge multiple instances data
-    let mut file_count = 0;
-    let mut scan_size = 0;
+    let mut scan_stats = ScanStats::new();
     let mut result_type = String::new();
     let mut series_data: Vec<cluster_rpc::Series> = Vec::new();
     for resp in results {
-        file_count += resp.file_count;
-        scan_size += resp.scan_size;
+        scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         if result_type.is_empty() {
             result_type = resp.result_type.clone();
         }
@@ -246,9 +255,25 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     log::info!(
         "promql->search->result: took: {}, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
-        file_count,
-        scan_size,
+        scan_stats.files,
+        scan_stats.original_size,
     );
+
+    let req_stats = RequestStats {
+        records: scan_stats.records,
+        size: scan_stats.original_size as f64,
+        response_time: op_start.elapsed().as_secs_f64(),
+        request_body: Some(req.query.unwrap().query),
+    };
+
+    report_usage_stats(
+        req_stats,
+        &req.org_id,
+        StreamType::Metrics,
+        UsageType::MetricSearch,
+        0,
+    )
+    .await;
     Ok(values)
 }
 

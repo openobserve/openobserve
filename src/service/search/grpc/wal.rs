@@ -27,7 +27,7 @@ use crate::infra::{
     errors::{Error, ErrorCodes},
     ider, wal,
 };
-use crate::meta;
+use crate::meta::{self, stream::ScanStats};
 use crate::service::{
     db,
     search::{
@@ -45,7 +45,7 @@ pub async fn search(
 ) -> super::SearchResult {
     // get file list
     let mut files = get_file_list(&sql, stream_type).await?;
-    let mut scan_size = 0;
+    let mut scan_stats = ScanStats::new();
 
     // cache files
     let work_dir = session_id.to_string();
@@ -55,7 +55,7 @@ pub async fn search(
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
-                scan_size += file_data.len();
+                scan_stats.original_size += file_data.len() as u64;
                 let file_name =
                     format!("/{work_dir}/{}", file.split('/').last().unwrap_or_default());
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
@@ -68,18 +68,22 @@ pub async fn search(
         let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name, stream_type)
             .unwrap_or_default();
         for file_data in mem_files {
-            scan_size += file_data.len();
+            scan_stats.original_size += file_data.len() as u64;
             let file_name = format!("/{work_dir}/{}.json", ider::generate());
             tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             files.push(file_name);
         }
     }
 
-    let file_count = files.len();
-    if file_count == 0 {
-        return Ok((HashMap::new(), 0, 0));
+    scan_stats.files = files.len() as u64;
+    if scan_stats.files == 0 {
+        return Ok((HashMap::new(), scan_stats));
     }
-    log::info!("wal->search: load files {file_count}, scan_size {scan_size}");
+    log::info!(
+        "wal->search: load files {}, scan_size {}",
+        scan_stats.files,
+        scan_stats.original_size
+    );
 
     // fetch all schema versions, get latest schema
     let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
@@ -207,7 +211,7 @@ pub async fn search(
     // clear tmpfs
     tmpfs::delete(session_id, true).unwrap();
 
-    Ok((results, file_count, scan_size))
+    Ok((results, scan_stats))
 }
 
 /// get file list from local wal, no need match_source, each file will be searched

@@ -21,6 +21,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
+use crate::meta::stream::ScanStats;
 use crate::service::promql::{
     micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
 };
@@ -39,8 +40,7 @@ pub struct Query {
     pub lookback_delta: i64,
     /// key — metric name; value — time series data
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
-    pub file_count: Arc<RwLock<usize>>,
-    pub scan_size: Arc<RwLock<usize>>,
+    pub scan_stats: Arc<RwLock<ScanStats>>,
 }
 
 impl Query {
@@ -58,13 +58,12 @@ impl Query {
             interval: five_min,
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
-            file_count: Arc::new(RwLock::new(0)),
-            scan_size: Arc::new(RwLock::new(0)),
+            scan_stats: Arc::new(RwLock::new(ScanStats::default())),
         }
     }
 
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
-    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<(Value, Option<String>, usize, usize)> {
+    pub async fn exec(&mut self, stmt: EvalStmt) -> Result<(Value, Option<String>, ScanStats)> {
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
         if stmt.interval > Duration::ZERO {
@@ -93,12 +92,7 @@ impl Query {
             if result_type_exec.is_some() {
                 result_type = result_type_exec;
             }
-            return Ok((
-                value,
-                result_type,
-                *self.file_count.read().await,
-                *self.scan_size.read().await,
-            ));
+            return Ok((value, result_type, *self.scan_stats.read().await));
         }
 
         // Range query
@@ -140,12 +134,7 @@ impl Query {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((
-                Value::None,
-                result_type,
-                *self.file_count.read().await,
-                *self.scan_size.read().await,
-            ));
+            return Ok((Value::None, result_type, *self.scan_stats.read().await));
         }
 
         // merge data
@@ -168,11 +157,6 @@ impl Query {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((
-            value,
-            result_type,
-            *self.file_count.read().await,
-            *self.scan_size.read().await,
-        ))
+        Ok((value, result_type, *self.scan_stats.read().await))
     }
 }

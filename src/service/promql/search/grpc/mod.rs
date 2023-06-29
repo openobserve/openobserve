@@ -22,6 +22,7 @@ use std::{
 
 use crate::handler::grpc::cluster_rpc;
 use crate::infra::{cache::tmpfs, errors::Result};
+use crate::meta::stream::ScanStats;
 use crate::service::{
     promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
     search,
@@ -43,7 +44,7 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &[(&str, &str)],
-    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, usize, usize)>> {
+    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut resp = Vec::new();
         // register storage table
         let ctx =
@@ -95,7 +96,7 @@ pub async fn search(
         },
     );
 
-    let (value, result_type, file_count, scan_size) = engine.exec(eval_stmt).await?;
+    let (value, result_type, mut scan_stats) = engine.exec(eval_stmt).await?;
     let result_type = match result_type {
         Some(v) => v,
         None => value.get_type().to_string(),
@@ -106,12 +107,12 @@ pub async fn search(
     // clear tmpfs
     tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
 
+    scan_stats.format_to_mb();
     let mut resp = cluster_rpc::MetricsQueryResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
         result_type,
-        file_count: file_count as i32,
-        scan_size: (scan_size / 1024 / 1024) as i32, // MB
+        scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
         ..Default::default()
     };
 

@@ -344,14 +344,14 @@ fn get_val(attr_val: Option<AnyValue>) -> json::Value {
                     inner_val,
                 ) => json::json!(inner_val.as_str()),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::BoolValue(inner_val) => {
-                    json::json!(inner_val)
+                    json::json!(inner_val.to_string())
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(inner_val) => {
-                    json::json!(inner_val)
+                    json::json!(inner_val.to_string())
                 }
                 opentelemetry_proto::tonic::common::v1::any_value::Value::DoubleValue(
                     inner_val,
-                ) => json::json!(inner_val),
+                ) => json::json!(inner_val.to_string()),
                 opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(inner_val) => {
                     let mut vals = vec![];
                     for item in inner_val.values.iter().cloned() {
@@ -402,14 +402,14 @@ mod tests {
             ),
         };
         let resp = get_val(Some(bool_val));
-        assert_eq!(resp.as_bool().unwrap(), in_bool);
+        assert_eq!(resp.as_str().unwrap(), in_bool.to_string());
 
         let in_int = 20;
         let int_val = AnyValue {
             value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::IntValue(in_int)),
         };
         let resp = get_val(Some(int_val.clone()));
-        assert_eq!(resp.as_i64().unwrap(), in_int);
+        assert_eq!(resp.as_str().unwrap(), in_int.to_string());
 
         let in_double = 20.00;
         let double_val = AnyValue {
@@ -418,7 +418,7 @@ mod tests {
             ),
         };
         let resp = get_val(Some(double_val));
-        assert_eq!(resp.as_f64().unwrap(), in_double);
+        assert_eq!(resp.as_str().unwrap(), in_double.to_string());
 
         let in_arr = vec![int_val.clone()];
         let arr_val = AnyValue {

@@ -23,13 +23,6 @@ use std::{
     io::{BufRead, BufReader, Error},
 };
 
-use crate::meta::{
-    alert::{Alert, Evaluate, Trigger},
-    http::HttpResponse as MetaHttpResponse,
-    traces::{Event, Span, SpanRefType},
-    usage::UsageType,
-    StreamType,
-};
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record},
@@ -42,6 +35,16 @@ use crate::{
 use crate::{
     infra::{cluster, config::CONFIG},
     service::usage::report_usage_stats,
+};
+use crate::{
+    meta::{
+        alert::{Alert, Evaluate, Trigger},
+        http::HttpResponse as MetaHttpResponse,
+        traces::{Event, Span, SpanRefType},
+        usage::UsageType,
+        StreamType,
+    },
+    service::logs::get_value,
 };
 
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
@@ -448,7 +451,7 @@ pub async fn traces_json(
 fn get_val_for_attr(attr_val: json::Value) -> json::Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((_key, value)) = local_val.into_iter().next() {
-        return value.clone();
+        return serde_json::Value::String(get_value(value));
     };
     ().into()
 }
@@ -463,6 +466,6 @@ mod tests {
         let in_val = 10.00;
         let input = json!({ "key": in_val });
         let resp = get_val_for_attr(input);
-        assert_eq!(resp.as_f64().unwrap(), in_val);
+        assert_eq!(resp.as_str().unwrap(), in_val.to_string());
     }
 }
