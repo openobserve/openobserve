@@ -48,6 +48,7 @@
 import { computed, defineComponent } from "vue";
 import { toRaw } from 'vue';
 import { useRouter } from "vue-router";
+import { useStore } from "vuex"
 
 export default defineComponent({
   name: "PanelHeader",
@@ -55,6 +56,7 @@ export default defineComponent({
   panelData: [],
 
   setup(props, { emit }) {
+    const store = useStore();
     const panelDataElementObject = toRaw(props.panelDataElement)
     const dashboardId = props.dashboardId
     const router = useRouter();
@@ -74,7 +76,7 @@ export default defineComponent({
     const deletePanel = () => {
         return router.push({
         path: "/dashboards/view",
-        query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
+        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: String(dashboardId), panelId:panelDataElementObject.id },
       });
     }
 
