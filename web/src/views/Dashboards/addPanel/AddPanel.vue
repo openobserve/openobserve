@@ -62,7 +62,7 @@
                 <Layout />
                 <q-separator />
                 <div style="flex:1;">
-                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" />
+                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @error="handleChartApiError"/>
                 </div>
                 <DashboardErrorsComponent :errors="errorData"/>
                 <q-separator />
@@ -435,7 +435,11 @@ export default defineComponent({
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"))
     }
-
+    const handleChartApiError = (errorMessage: any) => {
+      const errorList = errorData.errors;
+      errorList.splice(0);
+      errorList.push(errorMessage);
+    };
     return {
       t,
       updateDateTime,
@@ -451,6 +455,7 @@ export default defineComponent({
       editMode,
       selectedDate,
       errorData,
+      handleChartApiError
     };
   },
   methods: {
