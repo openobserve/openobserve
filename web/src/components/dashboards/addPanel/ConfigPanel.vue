@@ -7,7 +7,8 @@
 
     <q-select v-if="dashboardPanelData.data.type != 'table'" outlined
       v-model="dashboardPanelData.data.config.legends_position" :options="legendsPositionOptions" dense
-      label="Legends Positions" class="showLabelOnTop" stack-label emit-value>
+      label="Legends Positions" class="showLabelOnTop" stack-label emit-value
+      :display-value="`${dashboardPanelData.data.config.legends_position ?? 'Auto'}`">
     </q-select>
 
     <div class="space"></div>
