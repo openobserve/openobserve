@@ -632,15 +632,13 @@ export default defineComponent({
                   
                   // create a trace based on second xAxis's unique values
                   traces = stackedXAxisUniqueValue?.map((key: any) => {
-                    //   console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
-                      
                       const trace = {
                           name: key,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
-                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
-                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
-                          customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                          x: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))),
+                          y: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0),
+                          customdata: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>", //TODO: need to check for the data value
                           stackgroup: 'one'
 
@@ -667,9 +665,9 @@ export default defineComponent({
                           name: key,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
-                          x: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]),
-                          y: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[yAxisKeys[0]]),
-                          customdata: searchQueryData.data.filter((item: any) => (item[key1] === key)).map((it: any) => it[xAxisKeys[0]]), //TODO: need to check for the data value
+                          x: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))),
+                          y: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))).map((it: any) => (searchQueryData.data.find((it2:any)=>it2[xAxisKeys[0]] == it && it2[key1] == key))?.[yAxisKeys[0]] || 0),
+                          customdata: Array.from(new Set(searchQueryData.data.map((it: any) => it[xAxisKeys[0]]))), //TODO: need to check for the data value
                           hovertemplate: "%{fullData.name}: %{y}<br>%{customdata}<extra></extra>" //TODO: need to check for the data value
                       };
                       return trace
@@ -743,8 +741,8 @@ export default defineComponent({
               ...getPropsByChartTypeForLayout(),
           };
 
-          console.log('layout', layout);
-          console.log('traces', traces);
+        //   console.log('layout', layout);
+        //   console.log('traces', traces);
 
 
           Plotly.react(plotRef.value, traces, layout, {
@@ -936,7 +934,7 @@ export default defineComponent({
           const xAxisData = getAxisDataFromKey(xAxisKey)
           const xAxisDataWithTicks = getTickLimits(xAxisData)
 
-          console.log("data with tick",xAxisDataWithTicks);
+        //   console.log("data with tick",xAxisDataWithTicks);
           
 
           switch (props.data.type) {
