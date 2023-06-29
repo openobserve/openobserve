@@ -308,7 +308,8 @@
     "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
-    "promQL": "PromQL"
+    "promQL": "PromQL",
+    "setting": "Add variable"
   },
   "alerts": {
     "header": "Alerts",

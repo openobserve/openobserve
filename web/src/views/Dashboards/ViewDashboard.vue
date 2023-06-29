@@ -23,7 +23,10 @@
         <span class="q-table__title q-mx-md q-mt-xs">{{ currentDashboardData.data.title }}</span>
       </div>
       <div class="flex">
-        <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
+        <q-btn outline padding="xs" color="primary" text-color="black" no-caps icon="settings" @click="addSettingsData">
+          <q-tooltip>{{ t('panel.setting') }}</q-tooltip>
+        </q-btn>
+        <q-btn outline padding="xs" color="primary" text-color="black" no-caps icon="add" @click="addPanelData">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
         <DateTimePicker 
@@ -92,6 +95,14 @@
      <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" />
     </div>
+    <q-dialog
+      v-model="showDashboardSettingsDialog"
+      position="right"
+      full-height
+      maximized
+    >
+     <DashboardSettings @updated="updateDashboardList" />
+    </q-dialog>
     
   </q-page>
 </template>
@@ -127,6 +138,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
 import streamService from "../../services/stream";
+import DashboardSettings from "./DashboardSettings.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -137,8 +149,9 @@ export default defineComponent({
     PanelContainer,
     NoPanel,
     AutoRefreshInterval,
-    ExportDashboard
-  },
+    ExportDashboard,
+    DashboardSettings
+},
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -147,6 +160,7 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    const showDashboardSettingsDialog = ref(false);
     const draggable = ref(true);
     const eventLog = ref([])
 
@@ -217,6 +231,10 @@ export default defineComponent({
       // currentDashboardData.data = data
       await getVariablesData(data)
       currentDashboardData.data = data
+    };
+
+    const addSettingsData = () => {
+      showDashboardSettingsDialog.value = true;
     };
 
     const getVariablesData = async(data: any) => {
@@ -602,7 +620,9 @@ export default defineComponent({
       getPanelLayout,
       getMinimumHeight,
       getMinimumWidth,
-      variablesData
+      variablesData,
+      addSettingsData,
+      showDashboardSettingsDialog
     };
   }
 });
