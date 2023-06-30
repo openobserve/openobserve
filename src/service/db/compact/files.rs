@@ -69,11 +69,14 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let value = String::from_utf8_lossy(&item_value)
-            .to_string()
-            .parse()
-            .unwrap();
-        items.push((item_key.to_string(), value));
+        let value = String::from_utf8_lossy(&item_value).to_string();
+        let offset = if value.contains(';') {
+            let mut parts = value.split(';');
+            parts.next().unwrap().parse().unwrap()
+        } else {
+            value.parse().unwrap()
+        };
+        items.push((item_key.to_string(), offset));
     }
     Ok(items)
 }
