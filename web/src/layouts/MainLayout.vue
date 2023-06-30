@@ -230,6 +230,7 @@ import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedGridOn, outlinedWarning, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
+import SlackIcon from "@/components/icons/SlackIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -262,6 +263,7 @@ export default defineComponent({
     "q-icon": QIcon,
     "q-select": QSelect,
     ThemeSwitcher,
+    SlackIcon
 },
   methods: {
     navigateToDocs() {
@@ -355,7 +357,7 @@ export default defineComponent({
       },
       {
         title: t("menu.slack"),
-        icon: "img:" + getImageURL("images/common/slack.svg"),
+        iconComponent: SlackIcon,
         link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,

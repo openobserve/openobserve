@@ -36,6 +36,9 @@
     <q-item-section v-if="icon" avatar>
       <q-icon :name="icon" />
     </q-item-section>
+    <q-item-section v-else-if="iconComponent" avatar>
+      <q-icon><component :is="iconComponent" /></q-icon>
+    </q-item-section>
 
     <q-item-section>
       {{ title }}
@@ -66,6 +69,11 @@ export default defineComponent({
     },
 
     icon: {
+      type: String,
+      default: "",
+    },
+
+    iconComponent: {
       type: String,
       default: "",
     },
