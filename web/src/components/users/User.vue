@@ -61,7 +61,7 @@
             "
             :icon="outlinedDelete"
             :title="t('user.delete')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"

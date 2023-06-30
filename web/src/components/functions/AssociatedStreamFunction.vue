@@ -106,11 +106,9 @@
                     </q-td>
                     <q-td key="actions" :props="props">
                       <q-btn
-                        :icon="
-                          'img:' + getImageURL('images/common/delete_icon.svg')
-                        "
+                        :icon="outlinedDelete"
                         :title="t('dashboard.delete')"
-                        class="q-ml-xs iconHoverBtn"
+                        class="q-ml-xs"
                         padding="sm"
                         unelevated
                         size="sm"
@@ -265,6 +263,7 @@ import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "PageLogStream",
@@ -681,6 +680,7 @@ export default defineComponent({
       filterFunctions,
       addFunctionInProgressLoading,
       toggleStreamRow,
+      outlinedDelete,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();
