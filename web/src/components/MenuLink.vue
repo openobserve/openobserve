@@ -74,8 +74,8 @@ export default defineComponent({
     },
 
     iconComponent: {
-      type: String,
-      default: "",
+      type: Object,
+      default: () => ({}),
     },
 
     mini: {
