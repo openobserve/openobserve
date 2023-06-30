@@ -85,7 +85,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // initialize metadata
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::schema::watch().await });
-    tokio::task::spawn(async move { db::compact::delete::watch().await });
+    tokio::task::spawn(async move { db::compact::retention::watch().await });
     tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::triggers::watch().await });
@@ -98,7 +98,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::functions::cache()
         .await
         .expect("functions cache failed");
-    db::compact::delete::cache()
+    db::compact::retention::cache()
         .await
         .expect("compact delete cache failed");
     db::metrics::cache_prom_cluster_leader()

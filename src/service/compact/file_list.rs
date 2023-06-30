@@ -23,9 +23,9 @@ use tokio::sync::{RwLock, Semaphore};
 
 use crate::common::json;
 use crate::infra::{
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, STREAM_SCHEMAS},
-    db::etcd,
-    ider, storage,
+    dist_lock, ider, storage,
 };
 use crate::meta::common::FileKey;
 use crate::service::db;
@@ -146,29 +146,29 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// merge and delete the small file list keys in this hour from etcd
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
-    let mut locker = None;
-    if !CONFIG.common.local_mode {
-        // get a cluster lock for merge file list
-        let lock_key = "compactor/file_list";
-        let mut lock = etcd::Locker::new(lock_key);
-        if lock.lock(CONFIG.etcd.command_timeout).await.is_err() {
-            return Ok(()); // lock failed, just skip
-        }
-        locker = Some(lock);
+    let lock_key = format!("compact/file_list/{offset}");
+    let mut locker = dist_lock::lock(&lock_key).await?;
+    let node = db::compact::file_list::get_process(offset).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!("[COMPACT] list_list offset [{offset}] is merging by {node}");
+        dist_lock::unlock(&mut locker).await?;
+        return Ok(()); // not this node, just skip
     }
 
+    // before start merging, set current node to lock the offset
+    db::compact::file_list::set_process(offset, &LOCAL_NODE_UUID.clone()).await?;
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&mut locker).await?;
+    drop(locker);
+
     // get all small file list keys in this hour
-    let offset = Utc.timestamp_nanos(offset * 1000);
-    let offset_prefix = offset.format("/%Y/%m/%d/%H/").to_string();
+    let offset_time = Utc.timestamp_nanos(offset * 1000);
+    let offset_prefix = offset_time.format("/%Y/%m/%d/%H/").to_string();
     let key = format!("file_list{offset_prefix}");
     log::info!("[COMPACT] file_list is merging, prefix: {key}");
     let file_list = storage::list(&key).await?;
     if file_list.len() <= 1 {
-        if locker.is_some() {
-            // release cluster lock
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        db::compact::file_list::del_process(offset).await?;
         return Ok(()); // only one file list, no need merge
     }
     log::info!(
@@ -295,25 +295,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
         }
     }
 
-    if locker.is_some() {
-        // release cluster lock
-        let mut lock = locker.unwrap();
-        lock.unlock().await?;
-    }
-
+    // clean progress mark
+    db::compact::file_list::del_process(offset).await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_compact() {
-        let off_set = Duration::hours(2).num_microseconds().unwrap();
-        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
-        let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
-        let resp = run(off_set_for_run).await;
-        assert!(resp.is_ok());
-    }
 }

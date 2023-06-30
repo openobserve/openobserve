@@ -193,8 +193,8 @@ pub async fn register() -> Result<()> {
         id: node_id,
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_node_ip(), CONFIG.http.port),
-        grpc_addr: format!("http://{}:{}", get_node_ip(), CONFIG.grpc.port),
+        http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
+        grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
         cpu_num: sys_info::cpu_num().unwrap() as u64,
         status: NodeStatus::Prepare,
@@ -240,8 +240,8 @@ pub async fn set_online() -> Result<()> {
             id: unsafe { LOCAL_NODE_ID },
             uuid: LOCAL_NODE_UUID.clone(),
             name: CONFIG.common.instance_name.clone(),
-            http_addr: format!("http://{}:{}", get_node_ip(), CONFIG.http.port),
-            grpc_addr: format!("http://{}:{}", get_node_ip(), CONFIG.grpc.port),
+            http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
+            grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
             cpu_num: sys_info::cpu_num().unwrap() as u64,
             status: NodeStatus::Online,
@@ -403,6 +403,16 @@ fn load_local_node_uuid() -> String {
 }
 
 #[inline(always)]
+pub fn get_local_node_ip() -> String {
+    for adapter in get_if_addrs::get_if_addrs().unwrap() {
+        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
+            return adapter.ip().to_string();
+        }
+    }
+    String::new()
+}
+
+#[inline(always)]
 pub fn load_local_node_role() -> Vec<Role> {
     CONFIG
         .common
@@ -449,18 +459,8 @@ pub fn is_offline() -> bool {
 }
 
 #[inline(always)]
-pub fn ge_node_by_uuid(uuid: &str) -> Option<Node> {
+pub fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.get(uuid).map(|node| node.clone())
-}
-
-#[inline(always)]
-pub fn get_node_ip() -> String {
-    for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
-            return adapter.ip().to_string();
-        }
-    }
-    String::new()
 }
 
 #[cfg(test)]
@@ -541,6 +541,6 @@ mod tests {
 
     #[test]
     fn test_get_node_ip() {
-        assert!(!get_node_ip().is_empty());
+        assert!(!get_local_node_ip().is_empty());
     }
 }

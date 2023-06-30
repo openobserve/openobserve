@@ -57,7 +57,7 @@ async fn send_to_node(
     rx: &mut mpsc::Receiver<Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     loop {
-        if cluster::ge_node_by_uuid(&node.uuid).is_none() {
+        if cluster::get_node_by_uuid(&node.uuid).is_none() {
             return Ok(());
         }
         let token: MetadataValue<_> = get_internal_grpc_token().parse()?;
@@ -88,7 +88,7 @@ async fn send_to_node(
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {
-                        if cluster::ge_node_by_uuid(&node.uuid).is_none() {
+                        if cluster::get_node_by_uuid(&node.uuid).is_none() {
                             return Ok(());
                         }
                         log::error!("broadcast to node[{}] error: {}", &node.uuid, e);

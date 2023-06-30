@@ -44,7 +44,8 @@ pub async fn search(
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
 
     // check if we are allowed to search
-    if db::compact::delete::is_deleting_stream(&sql.org_id, &sql.stream_name, stream_type, None) {
+    if db::compact::retention::is_deleting_stream(&sql.org_id, &sql.stream_name, stream_type, None)
+    {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
             "stream [{}] is being deleted",
             &sql.stream_name

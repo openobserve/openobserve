@@ -102,6 +102,7 @@ phases:
       - docker manifest push openobserve/openobserve:latest-simd 
       # create manifests for debug version
       - docker tag openobserve:latest-amd64-debug openobserve/openobserve:$GIT_TAG-amd64-debug
+      - docker push openobserve/openobserve:$GIT_TAG-amd64-debug
       - docker pull openobserve/openobserve:$GIT_TAG-arm64-debug
       - docker manifest create openobserve/openobserve:$GIT_TAG-debug --amend openobserve/openobserve:$GIT_TAG-amd64-debug --amend openobserve/openobserve:$GIT_TAG-arm64-debug
       - docker manifest push openobserve/openobserve:$GIT_TAG-debug

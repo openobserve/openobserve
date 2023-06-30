@@ -18,14 +18,14 @@ use ::datafusion::{
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
-use tokio::time;
 
 use crate::common::json;
 use crate::infra::{
     cache,
+    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, FILE_EXT_PARQUET},
     db::etcd,
-    ider, metrics, storage,
+    dist_lock, ider, metrics, storage,
 };
 use crate::meta::{
     common::{FileKey, FileMeta},
@@ -50,24 +50,21 @@ pub async fn merge_by_stream(
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-    let mut locker = None;
-    if !CONFIG.common.local_mode {
-        // get a cluster lock for compactor stream
-        let lock_key = format!("compactor/files/{org_id}/{stream_type}/{stream_name}");
-        let mut lock = etcd::Locker::new(&lock_key);
-        if lock.lock(CONFIG.etcd.command_timeout).await.is_err() {
-            return Ok(()); // lock failed, just skip
-        }
-        locker = Some(lock);
+    let lock_key = format!("compact/files/{org_id}/{stream_type}/{stream_name}");
+    let mut locker = dist_lock::lock(&lock_key).await?;
+
+    // get last compacted offset
+    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_name, stream_type).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is merging by {node}");
+        dist_lock::unlock(&mut locker).await?;
+        return Ok(()); // not this node, just skip
     }
 
     // get schema
     let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let schema_metadata = schema.metadata.clone();
     let schema = Arc::new(schema.with_metadata(HashMap::new()));
-
-    // get last compacted offset
-    let mut offset = db::compact::files::get_offset(org_id, stream_name, stream_type).await?;
     if offset == 0 {
         offset = schema_metadata
             .get("created_at")
@@ -76,13 +73,10 @@ pub async fn merge_by_stream(
             .unwrap();
     }
     if offset == 0 {
-        if locker.is_some() {
-            // release cluster lock
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // no data
     }
+    let offset = offset;
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let offset_time_hour = Utc
         .with_ymd_and_hms(
@@ -99,13 +93,10 @@ pub async fn merge_by_stream(
     // check sync offset, if already synced, just set to next hour
     if offset < last_file_list_offset {
         // write new offset
-        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+        let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+        db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
         // release cluster lock
-        if locker.is_some() {
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // the time is current hour, just wait
     }
 
@@ -135,13 +126,22 @@ pub async fn merge_by_stream(
                     .unwrap()
                     * 3)
     {
-        if locker.is_some() {
-            // release cluster lock
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // the time is future, just wait
     }
+
+    // before start merging, set current node to lock the stream
+    db::compact::files::set_offset(
+        org_id,
+        stream_name,
+        stream_type,
+        offset,
+        Some(&LOCAL_NODE_UUID.clone()),
+    )
+    .await?;
+    // already bind to this node, we can unlock now
+    dist_lock::unlock(&mut locker).await?;
+    drop(locker);
 
     // get current hour all files
     let files = match file_list::get_file_list(
@@ -154,11 +154,6 @@ pub async fn merge_by_stream(
     ) {
         Ok(files) => files,
         Err(err) => {
-            if locker.is_some() {
-                // release cluster lock
-                let mut lock = locker.unwrap();
-                lock.unlock().await?;
-            }
             return Err(err);
         }
     };
@@ -168,13 +163,8 @@ pub async fn merge_by_stream(
         // if offset > 0 && offset_time_hour + Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() < time_now_hour {
         // -- no check it
         // }
-        offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
-        if locker.is_some() {
-            // release cluster lock
-            let mut lock = locker.unwrap();
-            lock.unlock().await?;
-        }
+        let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+        db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
         return Ok(());
     }
 
@@ -253,7 +243,7 @@ pub async fn merge_by_stream(
                     {
                         cache_success = false;
                         log::error!("[COMPACT] set local cache failed, retrying: {}", e);
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         break;
                     }
                 }
@@ -263,7 +253,7 @@ pub async fn merge_by_stream(
                 // send broadcast to other nodes
                 if let Err(e) = db::file_list::broadcast::send(&events).await {
                     log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
-                    time::sleep(time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
                 // broadcast success
@@ -284,14 +274,8 @@ pub async fn merge_by_stream(
     }
 
     // write new offset
-    offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-    db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
-
-    if locker.is_some() {
-        // release cluster lock
-        let mut lock = locker.unwrap();
-        lock.unlock().await?;
-    }
+    let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+    db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
 
     // metrics
     let time = start.elapsed().as_secs_f64();
@@ -323,6 +307,7 @@ async fn merge_files(
 
     let mut new_file_size = 0;
     let mut new_file_list = Vec::new();
+    let mut deleted_files = Vec::new();
     for (new_files_num, (file, size)) in files_with_size.iter().enumerate() {
         if new_files_num > etcd::MAX_OPS_PER_TXN
             || new_file_size + size > CONFIG.compact.max_file_size
@@ -348,7 +333,14 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
-        let data = storage::get(file).await?;
+        let data = match storage::get(file).await {
+            Ok(body) => body,
+            Err(err) => {
+                log::error!("[COMPACT] merge small file: {}, err: {}", file, err);
+                deleted_files.push(file);
+                continue;
+            }
+        };
         tmp_dir.set(file, data)?;
     }
 
@@ -358,6 +350,9 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
+            if deleted_files.contains(&file) {
+                continue;
+            }
             // get the schema version of the file
             let mut file_meta = file_list::get_file_meta(file).unwrap_or_default();
             let schema_ver_id = match db::schema::filter_schema_version_id(
@@ -459,10 +454,11 @@ async fn merge_files(
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_compact() {
         let off_set = Duration::hours(2).num_microseconds().unwrap();
-        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
+        let _ =
+            db::compact::files::set_offset("nexus", "default", "logs".into(), off_set, None).await;
         let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
         let resp = merge_by_stream(off_set_for_run, "nexus", "default", "logs".into()).await;
         assert!(resp.is_ok());
