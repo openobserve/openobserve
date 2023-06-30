@@ -182,10 +182,10 @@ export default defineComponent({
       }, { deep: true });
 
       const isQueryDependentOnTheVariables = () => {
-        const dependentVariables = props.variablesData.values.filter((it: any) =>
+        const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
             props.data.query.includes(`$${it.name}`)
         );
-        return dependentVariables.length > 0;
+        return dependentVariables?.length > 0;
       }
 
       // If query changes, we need to get the data again and rerender the chart
@@ -369,25 +369,25 @@ export default defineComponent({
         // console.log('data query:', props.data.query);
         console.log(`${props.data.config.title}: checking variables dependency`);
         
-        const dependentVariables = props.variablesData.values.filter((it: any) =>
+        const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
             props.data.query.includes(`$${it.name}`)
         );
         console.log(`${props.data.config.title}: dependentVariables` + JSON.stringify(dependentVariables));
 
-        if (dependentVariables.length > 0) {
+        if (dependentVariables?.length > 0) {
             const dependentAvailableVariables = dependentVariables.filter(
-            (it: any) => !it.isLoading
-            );
+                (it: any) => !it.isLoading
+                );
             console.log(
             `${props.data.config.title}: dependentAvailableVariables-`,
             JSON.stringify(dependentAvailableVariables)
             );
             if (dependentAvailableVariables.length == dependentVariables.length) {
-            console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: true`);
-            return true;
+                console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: true`);
+                return true;
             } else {
-            console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: false`);
-            return false;
+                console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: false`);
+                return false;
             }
         } else {
             console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: true`);
@@ -396,30 +396,30 @@ export default defineComponent({
       };
 
     const replaceQueryValue = (query: any) => {
-    if (props.variablesData.values.length) {
-        const dependentVariables = props.variablesData.values.filter((it: any) =>
-            query.includes(`$${it.name}`)
-        );
-        console.log(`dependentVariables-: ${dependentVariables}`);
-        
+        if (props?.variablesData?.values?.length) {
+            const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+                query.includes(`$${it.name}`)
+            );
+            console.log(`dependentVariables-: ${dependentVariables}`);
+            
 
-            if(dependentVariables.length){
+                if(dependentVariables?.length){
 
-                props.variablesData.values.forEach((variable:any, index:number) => {
-                const variableName = `$${variable.name}`;
-                const variableValue = variable.value;
-                console.log(`Replacing ${variableName} with ${variableValue}`);
-                query = query.replace(variableName, variableValue);
-                });
-                console.log(`Updated query: ${query}`);
-                return query;
-            }else{
-                return query
-            }
-    } else {
-        console.log("No variables data found, returning original query");
-        return query;
-    }
+                    props?.variablesData?.values?.forEach((variable:any, index:number) => {
+                        const variableName = `$${variable.name}`;
+                        const variableValue = variable.value;
+                        console.log(`Replacing ${variableName} with ${variableValue}`);
+                        query = query.replace(variableName, variableValue);
+                    });
+                    console.log(`Updated query: ${query}`);
+                    return query;
+                }else{
+                    return query
+                }
+        } else {
+            console.log("No variables data found, returning original query");
+            return query;
+        }
     }
 
       // returns tick length
