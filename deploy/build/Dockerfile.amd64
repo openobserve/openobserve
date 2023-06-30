@@ -15,11 +15,11 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 # RUN rustup default nightly-2023-05-21
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
-ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
-ENV SCCACHE_REGION=us-west-2
-ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
-ENV SCCACHE_NO_DAEMON=1
-ENV SCCACHE_LOG=debug
+# ENV SCCACHE_BUCKET=codepipeline-us-west-2-scccache
+# ENV SCCACHE_REGION=us-west-2
+# ENV SCCACHE_S3_KEY_PREFIX=zincobserve/dev/amd64/
+# ENV SCCACHE_NO_DAEMON=1
+# ENV SCCACHE_LOG=debug
 
 RUN rustc --version && sccache --version
 
