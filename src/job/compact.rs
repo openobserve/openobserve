@@ -47,6 +47,7 @@ async fn run_delete() -> Result<(), anyhow::Error> {
         drop(locker);
     }
 }
+
 async fn run_merge() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
     interval.tick().await; // trigger the first run

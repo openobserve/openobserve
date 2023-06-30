@@ -54,12 +54,34 @@ pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
     Ok(items)
 }
 
+pub async fn get_process(offset: i64) -> String {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/compact/file_list/process/{offset}");
+    match db.get(&key).await {
+        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
+        Err(_) => String::from(""),
+    }
+}
+
+pub async fn set_process(offset: i64, node: &str) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/compact/file_list/process/{offset}");
+    db.put(&key, node.to_string().into()).await?;
+    Ok(())
+}
+
+pub async fn del_process(offset: i64) -> Result<(), anyhow::Error> {
+    let db = &crate::infra::db::DEFAULT;
+    let key = format!("/compact/file_list/process/{offset}");
+    db.delete_if_exists(&key, false).await.map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[actix_web::test]
-    async fn test_files() {
+    #[tokio::test]
+    async fn test_file_list_offset() {
         const OFFSET: i64 = 100;
 
         set_offset(OFFSET).await.unwrap();
@@ -68,5 +90,14 @@ mod tests {
         let delete_day = "2023-03-03";
         set_delete(delete_day).await.unwrap();
         assert_eq!(list_delete().await.unwrap(), vec![delete_day.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_file_list_process_offset() {
+        const OFFSET: i64 = 100;
+        const NODE: &str = "node1";
+
+        set_process(OFFSET, NODE).await.unwrap();
+        assert_eq!(get_process(OFFSET).await, NODE);
     }
 }

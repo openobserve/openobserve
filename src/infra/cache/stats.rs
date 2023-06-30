@@ -120,22 +120,22 @@ pub fn decr_stream_stats(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 }
 
 #[inline]
-pub fn reset_stream_stats(
+pub fn reset_stream_stats_time(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    val: FileMeta,
+    time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     if !STATS.contains_key(&key) {
         return Ok(());
     }
     let mut stats = STATS.entry(key).or_default();
-    if val.min_ts != 0 {
-        stats.doc_time_min = val.min_ts;
+    if time_range.0 > 0 {
+        stats.doc_time_min = time_range.0;
     }
-    if val.max_ts != 0 {
-        stats.doc_time_max = val.max_ts;
+    if time_range.1 > 0 {
+        stats.doc_time_max = time_range.1;
     }
     Ok(())
 }
@@ -227,14 +227,8 @@ mod tests {
 
     #[test]
     fn test_reset_stream_stats() {
-        let file_meta = FileMeta {
-            min_ts: 1667978841130,
-            max_ts: 1667978845384,
-            records: 300,
-            original_size: 10,
-            compressed_size: 1,
-        };
-        let ret = reset_stream_stats("default", "olympics", StreamType::Logs, file_meta);
+        let time_range = (1667978841102, 1667978845374);
+        let ret = reset_stream_stats_time("default", "olympics", StreamType::Logs, time_range);
         assert!(ret.is_ok());
     }
 }

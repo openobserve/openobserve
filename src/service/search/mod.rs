@@ -27,7 +27,7 @@ use crate::handler::grpc::cluster_rpc;
 use crate::infra::{
     cluster,
     config::CONFIG,
-    db::etcd,
+    dist_lock,
     errors::{Error, ErrorCodes},
 };
 use crate::meta::{
@@ -59,13 +59,6 @@ pub async fn search(
     tokio::task::spawn(async move { search_in_cluster(req).await })
         .await
         .map_err(server_internal_error)?
-}
-
-#[inline(always)]
-async fn get_queue_lock() -> Result<etcd::Locker, Error> {
-    let mut lock = etcd::Locker::new("search/cluster_queue");
-    lock.lock(0).await.map_err(server_internal_error)?;
-    Ok(lock)
 }
 
 async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
@@ -121,11 +114,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     let meta = sql::Sql::new(&req).await?;
 
     // get a cluster search queue lock
-    let locker = if CONFIG.common.local_mode {
-        None
-    } else {
-        Some(get_queue_lock().await?)
-    };
+    let mut locker = dist_lock::lock("search/cluster_queue").await?;
     let took_wait = start.elapsed().as_millis() as usize;
 
     // get nodes from cluster
@@ -260,21 +249,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             Ok(res) => results.push(res),
             Err(err) => {
                 // search done, release lock
-                if locker.is_some() {
-                    if let Err(e) = locker.unwrap().unlock().await {
-                        log::error!("search in cluster unlock error: {}", e);
-                    }
-                }
+                dist_lock::unlock(&mut locker).await?;
                 return Err(err);
             }
         }
     }
     // search done, release lock
-    if locker.is_some() {
-        if let Err(e) = locker.unwrap().unlock().await {
-            log::error!("search in cluster unlock error: {}", e);
-        }
-    }
+    dist_lock::unlock(&mut locker).await?;
+
     // merge multiple instances data
     let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();

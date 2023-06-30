@@ -176,8 +176,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let mut final_req_stats = RequestStats::default();
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
-        if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
-        {
+        if db::compact::retention::is_deleting_stream(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            None,
+        ) {
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
         let mut stream_file_name = "".to_string();

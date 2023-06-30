@@ -320,8 +320,12 @@ pub async fn remote_write(
         let mut stream_file_name = "".to_string();
 
         // check if we are allowed to ingest
-        if db::compact::delete::is_deleting_stream(org_id, &stream_name, StreamType::Metrics, None)
-        {
+        if db::compact::retention::is_deleting_stream(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            None,
+        ) {
             return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
         }
 

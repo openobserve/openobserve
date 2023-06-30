@@ -37,7 +37,8 @@ phases:
 
       # build openobserve
       - docker pull public.ecr.aws/zinclabs/rust:bullseye-sccache
-      - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      # - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
+      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:latest-arm64 -f deploy/build/Dockerfile.aarch64 .
       - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
       - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-arm64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-arm64
