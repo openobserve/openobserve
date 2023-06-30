@@ -27,8 +27,6 @@
         </div>
       </div>
       <div class="flex q-gutter-sm">
-        <q-toggle v-if="dashboardPanelData.data.type != 'table'" v-model="dashboardPanelData.data.config.show_legends"
-          label="Show Legends" />
         <DateTimePicker v-model="selectedDate" />
         <q-btn class="q-ml-md text-bold" outline padding="sm lg" color="red" no-caps :label="t('panel.discard')"
           @click="goBackToDashboardList" />
@@ -58,15 +56,24 @@
           </template>
           <template #after>
             <div class="row" style="height: calc(100vh - 115px); overflow-y: auto; ">
-              <div class="layout-panel-container col scroll" style="height:100%;">
-                <Layout />
-                <q-separator />
-                <div style="flex:1;">
-                  <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @error="handleChartApiError"/>
+              <div class="col">
+                <div class="layout-panel-container col scroll" style="height:100%;">
+                  <Layout />
+                  <q-separator />
+                  <div style="flex:1;">
+                    <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @error="handleChartApiError"/>
+                  </div>
+                  <DashboardErrorsComponent :errors="errorData" />
+                  <q-separator />
+                  <SearchBar />
                 </div>
-                <DashboardErrorsComponent :errors="errorData"/>
-                <q-separator />
-                <SearchBar />
+
+              </div>
+              <q-separator vertical />
+              <div class="col-auto">
+                <PanelSidebar title="Config" v-model="dashboardPanelData.layout.isConfigPanelOpen">
+                  <ConfigPanel />
+                </PanelSidebar>
               </div>
             </div>
           </template>
@@ -88,6 +95,8 @@ import {
   reactive,
   onDeactivated,
 } from "vue";
+import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
+import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import GetFields from "../../../components/dashboards/addPanel/GetFields.vue";
 import { useQuasar, date } from "quasar";
@@ -118,7 +127,9 @@ export default defineComponent({
     SearchBar,
     DateTimePicker,
     ChartRender,
-    DashboardErrorsComponent
+    DashboardErrorsComponent,
+    PanelSidebar,
+    ConfigPanel
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
@@ -133,7 +144,7 @@ export default defineComponent({
       useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref()
-    const errorData : any= reactive({
+    const errorData: any = reactive({
       errors: []
     })
 
@@ -193,6 +204,11 @@ export default defineComponent({
       updateDateTime(selectedDate.value)
     })
 
+    // resize the chart when config panel is opened and closed
+    watch(() => dashboardPanelData.layout.isConfigPanelOpen, () => {
+      window.dispatchEvent(new Event("resize"));
+    })
+
     const runQuery = () => {
       // console.log("query change detected to run");
       if (!isValid(true)) {
@@ -221,7 +237,7 @@ export default defineComponent({
       if (promqlMode.value) {
         // 1. chart type: only line chart is supported
         const allowedChartTypes = ['line']
-        if(!allowedChartTypes.includes(dashboardPanelData.data.type)) {
+        if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
           errors.push('Selected chart type is not supported for PromQL. Only line chart is supported.')
         }
 
@@ -365,12 +381,12 @@ export default defineComponent({
             errors.push(...customQueryYFieldError.map((it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`))
           }
 
-      } else {
-        // check if field selection is from the selected stream fields when the custom query mode is OFF
-        const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
-        if (customQueryXFieldError.length) {
-          errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`))
-        }
+        } else {
+          // check if field selection is from the selected stream fields when the custom query mode is OFF
+          const customQueryXFieldError = dashboardPanelData.data.fields.x.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
+          if (customQueryXFieldError.length) {
+            errors.push(...customQueryXFieldError.map((it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`))
+          }
 
           const customQueryYFieldError = dashboardPanelData.data.fields.y.filter((it: any) => !dashboardPanelData.meta.stream.selectedStreamFields.find((i: any) => i.name == it.column))
           if (customQueryYFieldError.length) {
