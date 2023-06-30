@@ -275,8 +275,12 @@
     "actions": "Actions",
     "nameRequired": "Name is required",
     "id": "Id",
-    "goBackToDashboard": "Go back to Dashboard",
-    "import": "Import"
+    "goBackToDashboard": "Go back to dashboard",
+    "import": "Import",
+    "setting": "Settings",
+    "generalSettings": "General settings",
+    "variableSettings": "Variable settings",
+    "NewVariable": "New variable"
   },
   "panel": {
     "header": "Panel",
@@ -308,8 +312,7 @@
     "sql": "Query",
     "back": "<< Back",
     "auto": "Auto",
-    "promQL": "PromQL",
-    "setting": "Add variable"
+    "promQL": "PromQL"
   },
   "alerts": {
     "header": "Alerts",

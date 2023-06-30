@@ -41,7 +41,8 @@ import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Functions from "../../views/Functions.vue";
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
-
+import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue"
+import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue"
 const useRoutes = () => {
   const parentRoutes: never[] = [];
 
@@ -142,6 +143,18 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
       },
+      children: [
+        {
+          path: "general-settings",
+          name: "generalSettings",
+          component: GeneralSettings,
+        },
+        {
+          path: "variable-settings",
+          name: "variableSettings",
+          component: VariableSettings,
+        }
+      ]
     },
     {
       path: "/dashboards/import",
