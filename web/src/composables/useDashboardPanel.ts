@@ -48,6 +48,8 @@ const getDefaultDashboardPanelData = () => (
         title: "",
         description: "",
         show_legends: true,
+        legends_position: null,
+        promql_legend: ""
       },
       queryType: "sql",
       query: "",
@@ -55,7 +57,8 @@ const getDefaultDashboardPanelData = () => (
     },
     layout: {
       splitter: 20,
-      showQueryBar: false
+      showQueryBar: false,
+      isConfigPanelOpen: false
     },
     meta: {
       parsedQuery: "",

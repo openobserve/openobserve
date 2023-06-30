@@ -300,7 +300,7 @@ export default defineComponent({
     const routeToViewD = (row) => {
       return router.push({
         path: "/dashboards/view",
-        query: { dashboard: row.identifier },
+        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: row.identifier },
       });
     };
     const getDashboards = async () => {
@@ -424,7 +424,7 @@ export default defineComponent({
 
       this.$router.push({
         path: "/dashboards/view",
-        query: { dashboard: it },
+        query: { org_identifier: store.state.selectedOrganization.identifier, dashboard: it },
       });
     },
     onRowClick(evt, row) {
