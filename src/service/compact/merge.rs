@@ -315,6 +315,7 @@ async fn merge_files(
 
     let mut new_file_size = 0;
     let mut new_file_list = Vec::new();
+    let mut deleted_files = Vec::new();
     for (new_files_num, (file, size)) in files_with_size.iter().enumerate() {
         if new_files_num > etcd::MAX_OPS_PER_TXN
             || new_file_size + size > CONFIG.compact.max_file_size
@@ -340,7 +341,14 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
-        let data = storage::get(file).await?;
+        let data = match storage::get(file).await {
+            Ok(body) => body,
+            Err(err) => {
+                log::error!("[COMPACT] merge small file: {}, err: {}", file, err);
+                deleted_files.push(file);
+                continue;
+            }
+        };
         tmp_dir.set(file, data)?;
     }
 
@@ -350,6 +358,9 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
+            if deleted_files.contains(&file) {
+                continue;
+            }
             // get the schema version of the file
             let mut file_meta = file_list::get_file_meta(file).unwrap_or_default();
             let schema_ver_id = match db::schema::filter_schema_version_id(
