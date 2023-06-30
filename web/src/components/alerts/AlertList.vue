@@ -38,7 +38,7 @@
             <q-btn
               :data-test="`alert-list-${props.row.name}-udpate-alert`"
               icon="edit"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -49,8 +49,8 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -153,6 +153,8 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+
 export default defineComponent({
   name: "AlertList",
   components: { QTablePagination, AddAlert, NoData, ConfirmDialog },
@@ -473,6 +475,7 @@ export default defineComponent({
       maxRecordToReturn,
       showAddAlertDialog,
       changeMaxRecordToReturn,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -532,7 +535,6 @@ export default defineComponent({
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
-        color: $dark;
 
         &__content.tab_content {
           .q-tab {

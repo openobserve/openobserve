@@ -24,7 +24,6 @@
       <q-tabs
         v-model="ingestiontabs"
         indicator-color="transparent"
-        class="text-secondary"
         inline-label
         vertical
       >
@@ -122,7 +121,7 @@
               org_identifier: store.state.selectedOrganization.identifier,
             },
           }"
-          :icon="'img:' + getImageURL('images/ingestion/syslog.svg')"
+          icon="plagiarism"
           label="Syslog"
           content-class="tab_content"
         />
@@ -154,7 +153,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IngestLogs",
-  components: {},
   props: {
     currOrgIdentifier: {
       type: String,
@@ -273,7 +271,6 @@ export default defineComponent({
         padding: 0 0.6rem 0 0.6rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
-        color: $dark;
         text-transform: capitalize;
 
         &__content.tab_content {
@@ -285,6 +282,7 @@ export default defineComponent({
           }
         }
         &--active {
+          color: black;
           background-color: $accent;
         }
       }

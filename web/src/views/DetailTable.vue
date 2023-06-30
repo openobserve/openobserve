@@ -23,12 +23,7 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          />
+          <q-btn v-close-popup round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>

@@ -33,7 +33,7 @@
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-udpate-template`"
               icon="edit"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -44,8 +44,8 @@
             ></q-btn>
             <q-btn
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -114,6 +114,8 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();

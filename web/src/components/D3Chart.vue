@@ -7,6 +7,7 @@ import { hierarchy, tree } from "d3-hierarchy";
 import { select } from "d3-selection";
 import { cloneDeep } from "lodash-es";
 import { defineComponent } from "vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "D3Chart",
@@ -25,6 +26,7 @@ export default defineComponent({
       svg: null as any,
       layout: null as any,
       g: null as any,
+      store: useStore(),
     };
   },
   mounted() {
@@ -167,7 +169,7 @@ export default defineComponent({
       nodeEnter
         .append("circle")
         .attr("r", 10)
-        .style("fill", "#fff")
+        .style("fill", this.store.state.theme === "dark" ? "#565656" : "#fff")
         .style("stroke-width", "2px")
         .style("stroke", (d: any) => {
           return d.data.color;
@@ -182,7 +184,8 @@ export default defineComponent({
           return d.data.duration + "ms";
         })
         .attr("font-size", "12px")
-        .style("cursor", "pointer");
+        .style("cursor", "pointer")
+        .style("fill", this.store.state.theme === "dark" ? "#fff" : "#000");
 
       let text = nodeEnter
         .append("text")
@@ -196,7 +199,8 @@ export default defineComponent({
           return d.data.name;
         })
         .attr("font-size", "12px")
-        .style("cursor", "pointer");
+        .style("cursor", "pointer")
+        .style("fill", this.store.state.theme === "dark" ? "#fff" : "#000");
 
       text.append("title").text((d: any) => d.data.name);
 

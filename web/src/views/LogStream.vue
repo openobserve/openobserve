@@ -41,9 +41,9 @@
       <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
-            :icon="'img:' + getImageURL('images/common/search_icon.svg')"
+            icon="search"
             :title="t('logStream.explore')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -52,9 +52,9 @@
             @click="exploreStream(props)"
           />
           <q-btn
-            :icon="'img:' + getImageURL('images/common/list_icon.svg')"
+            icon="list_alt"
             :title="t('logStream.schemaHeader')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -63,9 +63,9 @@
             @click="listSchema(props)"
           />
           <q-btn
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            :icon="outlinedDelete"
             :title="t('logStream.delete')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -175,6 +175,7 @@ import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
 import config from "@/aws-exports";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "PageLogStream",
@@ -449,6 +450,7 @@ export default defineComponent({
       maxRecordToReturn,
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -510,7 +512,6 @@ export default defineComponent({
   .head {
     line-height: 2.125rem;
     margin-bottom: 0.5rem;
-    color: $dark-page;
   }
 
   .para {

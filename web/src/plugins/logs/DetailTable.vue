@@ -19,7 +19,7 @@
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold "
             data-test="log-detail-title-text"
           >
             {{ t("search.rowDetail") }}
@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+            icon="cancel"
           />
         </div>
       </div>
@@ -110,7 +110,7 @@
                     filled
                     dense
                     class="q-mr-sm pointer"
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                    name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
                     <q-list>
                       <q-item clickable v-close-popup>
@@ -122,13 +122,14 @@
                             "
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' + getImageURL('images/common/equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                                <EqualIcon></EqualIcon>
+                              </q-icon>
+                            </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -143,14 +144,14 @@
                             "
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/not_equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                              <q-icon color="currentColor">
+                               <NotEqualIcon></NotEqualIcon>
+                              </q-icon>
+                            </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -259,6 +260,8 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import dashboards from "@/services/dashboards";
 import useLogs from "@/composables/useLogs";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 const defaultValue: any = () => {
   return {
@@ -268,6 +271,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
+  components: { EqualIcon, NotEqualIcon },
   emits: [
     "showPrevDetail",
     "showNextDetail",

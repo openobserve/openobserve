@@ -168,8 +168,8 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: #f5f5f5;
-  color: #090909;
+  background: #565656;
+  // color: #090909;
 }
 .thead-sticky tr:last-child > * {
   top: 0;

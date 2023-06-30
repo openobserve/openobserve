@@ -18,7 +18,7 @@
     class="trace-details"
     :style="{
       width: '97vw !important',
-      background: '#ffffff',
+      background: store.state.theme === 'dark' ? '#565656' : '#ffffff',
     }"
   >
     <div
@@ -37,13 +37,7 @@
           </div>
           <div class="q-pb-xs">Spans: {{ spanList.length - 1 }}</div>
         </div>
-        <q-btn
-          v-close-popup
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          size="md"
-        />
+        <q-btn v-close-popup round flat icon="cancel" size="md" />
       </div>
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-px-sm q-pt-sm">
@@ -58,7 +52,6 @@
         >
           <template v-for="visual in traceVisuals" :key="visual.value">
             <q-btn
-              :icon="'img:' + getImageURL(`images/common/${visual.icon}.svg`)"
               :color="visual.value === activeVisual ? 'primary' : ''"
               :flat="visual.value === activeVisual ? false : true"
               dense
@@ -66,7 +59,9 @@
               size="11px"
               class="q-px-sm visual-selection-btn"
               @click="activeVisual = visual.value"
-              >{{ visual.label }}</q-btn
+            >
+              <q-icon><component :is="visual.icon" /></q-icon>
+              {{ visual.label }}</q-btn
             >
           </template>
         </div>
@@ -152,6 +147,8 @@ import { useStore } from "vuex";
 import { duration } from "moment";
 import D3Chart from "@/components/D3Chart.vue";
 import { getImageURL } from "@/utils/zincutils";
+import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
+import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -168,6 +165,8 @@ export default defineComponent({
     TraceHeader,
     TraceChart,
     D3Chart,
+    TraceTimelineIcon,
+    ServiceMapIcon,
   },
 
   setup() {
@@ -198,8 +197,8 @@ export default defineComponent({
     };
 
     const traceVisuals = [
-      { label: "Timeline", value: "timeline", icon: "trace_timeline" },
-      { label: "Service Map", value: "service_map", icon: "service_map" },
+      { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
+      { label: "Service Map", value: "service_map", icon: ServiceMapIcon },
     ];
 
     const activeVisual = ref("timeline");
@@ -477,13 +476,19 @@ export default defineComponent({
       const layout: any = {
         autosize: true,
         scrollZoom: true,
+        paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+        plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
         title: {
           text: "",
           font: {
             size: 12,
+            color: store.state.theme === "dark" ? "#fff" : "#333",
           },
         },
-        font: { size: 12 },
+        font: {
+          size: 12,
+          color: store.state.theme === "dark" ? "#fff" : "#333",
+        },
         height: 200,
         margin: {
           l: 16,
@@ -692,6 +697,7 @@ export default defineComponent({
       activeVisual,
       traceVisuals,
       getImageURL,
+      store,
     };
   },
 });

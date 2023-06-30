@@ -19,13 +19,14 @@
 
 <script lang="ts">
 import Plotly from "plotly.js";
-
-import { defineComponent, onMounted, onUpdated, ref } from "vue";
+import { useStore } from "vuex";
+import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
 
 export default defineComponent({
   name: "logBarChart",
   emits: ["updated:chart"],
   setup(props, { emit }) {
+      const store = useStore();
     const plotref: any = ref(null);
     const zoomFlag: any = ref(false);
     const trace: any = {
@@ -39,7 +40,17 @@ export default defineComponent({
         opacity: 0.8,
       },
     };
-
+    const getThemeLayoutOptions = () => ({
+      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      font: {
+        size: 12 ,
+        color: store.state.theme === 'dark' ? '#fff' : '#333'
+      }
+    })
+    watch(() => store.state.theme, () => {
+      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
+    })
     const layout: any = {
       title: {
         text: "",
@@ -47,7 +58,6 @@ export default defineComponent({
           size: 12,
         },
       },
-      font: { size: 12 },
       autosize: true,
       height: 150,
       legend: {
@@ -98,11 +108,13 @@ export default defineComponent({
             dtickrange: ["M12", null],
             value: "%Y",
           },
+          
         ],
       },
       yaxis: {
         fixedrange: true,
       },
+       ...getThemeLayoutOptions(),
     };
     onMounted(async () => {
       await Plotly.newPlot(plotref.value, [trace], layout, {
@@ -172,7 +184,7 @@ export default defineComponent({
         zoomFlag.value = false;
       }
     };
-
+  
     return {
       plotref,
       reDraw,

@@ -94,7 +94,7 @@
           stack-label
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
-          class="q-py-md showLabelOnTop"
+          class=" showLabelOnTop"
           resize
         ></div>
 
@@ -106,11 +106,10 @@
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('function.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
             @click="$emit('cancel:hideform')"
           />
@@ -214,7 +213,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: "myCustomTheme",
+        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
       });
 
       editorobj.onKeyUp((e: any) => {
@@ -368,7 +367,7 @@ end`;
 #editor {
   width: 100%;
   min-height: 15rem;
-  padding-bottom: 14px;
+  /* padding-bottom: 14px; */
   resize: both;
 }
 </style>

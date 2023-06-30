@@ -114,7 +114,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-udpate-alert`"
                       icon="save"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -126,7 +126,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-delete-alert`"
                       icon="cancel"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -148,7 +148,7 @@
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-udpate-alert`"
                       icon="edit"
-                      class="q-ml-xs iconHoverBtn"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -159,10 +159,8 @@
                     ></q-btn>
                     <q-btn
                       :data-test="`alert-list-${props.row.name}-delete-alert`"
-                      :icon="
-                        'img:' + getImageURL('images/common/delete_icon.svg')
-                      "
-                      class="q-ml-xs iconHoverBtn"
+                      :icon="outlinedDelete"
+                      class="q-ml-xs"
                       padding="sm"
                       unelevated
                       size="sm"
@@ -205,6 +203,7 @@ import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
 import { useQuasar, type QTableProps } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 interface SyslogRoute {
   orgId: string;
@@ -574,6 +573,7 @@ export default defineComponent({
       showConformDelete,
       cancelDeleteRoute,
       disableToggle,
+      outlinedDelete,
     };
   },
 });
@@ -581,13 +581,13 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .tabContent {
-  background-color: $accent; // tab content bg color
+  background-color: rgba(136, 136, 136, 0.103);
+ // tab content bg color
   padding: 1rem;
   border-radius: 0.5rem;
   .title {
     text-transform: uppercase;
     font-size: 0.75rem;
-    color: $dark-page;
     line-height: 1rem;
     font-weight: 600;
   }

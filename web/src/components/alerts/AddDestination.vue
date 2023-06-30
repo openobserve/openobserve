@@ -82,8 +82,8 @@
       </div>
     </div>
     <div class="flex justify-center q-mt-lg">
-      <q-btn data-test="add-destination-cancel-btn" v-close-popup class="q-mb-md text-bold no-border"
-        :label="t('alerts.cancel')" text-color="light-text" padding="sm md" color="accent" no-caps
+      <q-btn data-test="add-destination-cancel-btn" v-close-popup class="q-mb-md text-bold"
+        :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
         @click="$emit('cancel:hideform')" />
       <q-btn data-test="add-destination-submit-btn" :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md"
         color="secondary" padding="sm xl" @click="saveDestination" no-caps />

@@ -14,7 +14,6 @@
         <q-tabs
           v-model="billingtab"
           indicator-color="transparent"
-          class="text-secondary"
           inline-label
           vertical
         >
@@ -120,7 +119,7 @@ export default defineComponent({
         // padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
-        color: $dark;
+        // color: $dark;
 
         &__content.tab_content {
           .q-tab {
@@ -132,6 +131,7 @@ export default defineComponent({
         }
         &--active {
           background-color: $accent;
+          color: black;
         }
       }
     }

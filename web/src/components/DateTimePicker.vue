@@ -1,7 +1,7 @@
 <template>
   <q-btn id="date-time-button" ref="datetimeBtn" data-cy="date-time-button" outline no-caps :label="displayValue"
-    :icon="'img:' + getImageURL('images/common/time_icon.png')" icon-right="arrow_drop_down" class="date-time-button"
-    color="grey-9">
+    icon="schedule" icon-right="arrow_drop_down" class="date-time-button"
+    color="">
     <q-menu no-route-dismiss id="date-time-menu" class="date-time-dialog" anchor="bottom left" self="top left">
       <div class="flex justify-evenly q-py-sm">
         <q-btn class="tab-button no-border" color="primary" :flat="data.selectedDate.tab !== 'relative'"
@@ -299,7 +299,6 @@ export default defineComponent({
   padding: 0px 5px;
   // font-size: 12px;
   min-width: auto;
-  background: rgba(255, 255, 255, 1) !important;
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
@@ -336,7 +335,6 @@ export default defineComponent({
 
       &.text-primary {
         .q-btn__content {
-          color: $dark-page !important;
         }
       }
     }
@@ -401,7 +399,7 @@ export default defineComponent({
   height: 32px;
   width: 32px;
   // border: $secondary;
-  background: $input-bg;
+  background: rgba(0,0,0,0.07);
 }
 
 .rp-selector-selected {
@@ -450,7 +448,6 @@ export default defineComponent({
 
     &-weekdays>div {
       font-size: 0.875rem;
-      color: $dark-page;
       font-weight: 700;
       opacity: 1;
     }
@@ -484,7 +481,7 @@ export default defineComponent({
 
   .label {
     font-size: 0.75rem;
-    color: $dark-page;
+    // color: $dark-page;
     font-weight: 600;
   }
 

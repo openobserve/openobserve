@@ -3,7 +3,7 @@
     <div class="row items-center no-wrap">
       <div class="col">
         <div class="flex">
-          <q-btn no-caps color="primary" @click="goBack()" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
+          <q-btn no-caps @click="goBack()"  padding="xs" outline icon="arrow_back_ios_new" />
           <div class="text-h6 q-ml-md">
             Import Dashboard
           </div>
@@ -34,11 +34,10 @@
         <div class="flex q-mt-lg">
           <q-btn
             v-close-popup
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('function.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
             @click="goBack()"
           />

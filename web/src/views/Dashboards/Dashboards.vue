@@ -38,9 +38,9 @@
         <q-td :props="props">
            <q-btn
               v-if="props.row.actions == 'true'"
-              :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+              icon="content_copy"
               :title="t('dashboard.duplicate')"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -50,9 +50,9 @@
             ></q-btn>
           <q-btn
             v-if="props.row.actions == 'true'"
-            :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
+            :icon="outlinedDelete"
             :title="t('dashboard.delete')"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs"
             padding="sm"
             unelevated
             size="sm"
@@ -151,6 +151,7 @@ import { isProxy, toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import { getDashboard } from "../../utils/commons.ts";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "Dashboards",
@@ -390,6 +391,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
+      outlinedDelete,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,

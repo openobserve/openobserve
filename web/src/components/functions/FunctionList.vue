@@ -35,7 +35,7 @@
           <q-td :props="props">
             <q-btn
               icon="transform"
-              class="q-ml-xs iconHoverBtn"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -45,8 +45,8 @@
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
-              :icon="'img:' + getImageURL('images/common/delete_icon.svg')"
-              class="q-ml-xs iconHoverBtn"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
               padding="sm"
               unelevated
               size="sm"
@@ -146,6 +146,7 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 
 export default defineComponent({
   name: "FunctionList",
@@ -434,6 +435,7 @@ export default defineComponent({
       maxRecordToReturn,
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
+      outlinedDelete,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];

@@ -15,12 +15,12 @@
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header>
+    <q-header :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
-            :src="getImageURL('images/common/open_observe_logo.svg')"
+            :src="store.state.theme == 'dark' ? getImageURL('images/common/open_observe_logo_2.svg') : getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
@@ -29,6 +29,7 @@
         </div>
 
         <q-toolbar-title></q-toolbar-title>
+          <ThemeSwitcher></ThemeSwitcher>
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
           <div
             type="warning"
@@ -69,16 +70,7 @@
           @click="navigateToDocs()"
         />
         <div class="languageWrapper">
-          <q-btn-dropdown
-            unelevated
-            no-caps
-            flat
-            class="languageDdl"
-            :icon="selectedLanguage.icon"
-            :dropdown-icon="
-              'img:' + getImageURL('images/common/language_menu_arrow.svg')
-            "
-          >
+          <q-btn-dropdown unelevated no-caps flat class="languageDdl" :icon="selectedLanguage.icon">
             <template #label>
               <div class="row no-wrap">
                 {{ selectedLanguage.label }}
@@ -118,15 +110,7 @@
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown
-            flat
-            unelevated
-            no-caps
-            padding="xs sm"
-            :dropdown-icon="
-              'img:' + getImageURL('images/common/user_menu_arrow.svg')
-            "
-          >
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md" color="grey" text-color="white">
@@ -171,14 +155,8 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-      :mini="miniMode"
-      bordered
-      show-if-above
-      @mouseover="miniMode = false"
-      @mouseout="miniMode = true"
-      mini-to-overlay
-    >
+    <q-drawer :mini="miniMode" bordered show-if-above @mouseover="miniMode = false" @mouseout="miniMode = true"
+      mini-to-overlay>
       <q-list class="leftNavList">
         <menu-link
           v-for="nav in linksList"
@@ -225,6 +203,7 @@ import {
   QAvatar,
   QIcon,
   QSelect,
+  useQuasar,
 } from "quasar";
 import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
@@ -236,7 +215,7 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive, computed, onMounted } from "vue";
+import { ref, defineComponent, KeepAlive, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -249,6 +228,9 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
+import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedWindow, outlinedReportProblem, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
+import SlackIcon from "@/components/icons/SlackIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -280,7 +262,9 @@ export default defineComponent({
     "q-avatar": QAvatar,
     "q-icon": QIcon,
     "q-select": QSelect,
-  },
+    ThemeSwitcher,
+    SlackIcon
+},
   methods: {
     navigateToDocs() {
       window.open("https://openobserve.ai/docs", "_blank");
@@ -307,8 +291,11 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
+      const $q = useQuasar();
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
+
+
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
     )
@@ -323,61 +310,61 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: "home",
+        icon: outlinedHome,
         link: "/",
         exact: true,
       },
       {
         title: t("menu.search"),
-        icon: "img:" + getImageURL("images/left_nav/search_icon.svg"),
+        icon: outlinedSearch,
         link: "/logs",
       },
       {
         title: t("menu.metrics"),
-        icon: "img:" + getImageURL("images/left_nav/metrics.svg"),
+        icon: outlinedBarChart,
         link: "/metrics",
       },
       {
         title: t("menu.traces"),
-        icon: "img:" + getImageURL("images/left_nav/traces.svg"),
+        icon: outlinedAccountTree,
         link: "/traces",
       },
       {
         title: t("menu.dashboard"),
-        icon: "dashboard",
+        icon: outlinedDashboard,
         link: "/dashboards",
       },
       {
         title: t("menu.index"),
-        icon: "img:" + getImageURL("images/left_nav/index_icon.svg"),
+        icon: outlinedWindow,
         link: "/logstreams",
       },
       {
         title: t("menu.alerts"),
-        icon: "img:" + getImageURL("images/left_nav/warning_icon.svg"),
+        icon: outlinedReportProblem,
         link: "/alerts",
       },
       {
         title: t("menu.ingestion"),
-        icon: "filter_alt",
+        icon: outlinedFilterAlt,
         link: "/ingestion/",
       },
       {
         title: t("menu.user"),
-        icon: "img:" + getImageURL("images/left_nav/user_icon.svg"),
+        icon: outlinedPerson,
         link: "/users",
         display: store.state.currentuser.role == "admin" ? true : false,
       },
       {
         title: t("menu.slack"),
-        icon: "img:" + getImageURL("images/common/slack.svg"),
+        iconComponent: SlackIcon,
         link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
       },
       {
         title: t("menu.about"),
-        icon: "img:" + getImageURL("images/left_nav/about_icon.svg"),
+        icon: outlinedFormatListBulleted,
         link: "/about",
       },
     ]);
@@ -667,7 +654,6 @@ export default defineComponent({
 .q-header {
   color: unset;
   @extend .border-bottom;
-  @extend .bg-white;
 
   .beta-text {
     font-size: 11px;
@@ -696,7 +682,6 @@ export default defineComponent({
 
 .q-drawer {
   @extend .border-right;
-  @extend .bg-white;
   min-width: 50px;
   max-width: 210px;
   color: unset;
@@ -714,32 +699,6 @@ export default defineComponent({
   .block {
     font-weight: 700;
     color: #404040;
-  }
-}
-
-.languageWrapper {
-  .q-btn__content {
-    color: #646464;
-  }
-}
-
-.languageDdl {
-  padding-right: 0.75rem;
-  padding-left: 0.75rem;
-
-  &.q-btn {
-    .q-icon {
-      &.q-btn-dropdown__arrow {
-        margin-left: 0.5rem;
-        height: 0.875rem;
-        width: 0.875rem;
-      }
-
-      & + .row {
-        margin-left: 0.875rem;
-        margin-right: 0.5rem;
-      }
-    }
   }
 }
 
@@ -786,7 +745,6 @@ export default defineComponent({
     }
 
     &__label {
-      color: $dark-page;
       font-weight: 400;
     }
 
@@ -808,7 +766,6 @@ export default defineComponent({
 
   .userName {
     line-height: 1.25rem;
-    color: #404040;
     font-weight: 700;
   }
 
@@ -832,10 +789,6 @@ export default defineComponent({
 .languageWrapper {
   margin-right: 0.75rem;
   margin-left: 1rem;
-
-  .q-btn__content {
-    color: #646464;
-  }
 }
 
 .languageDdl {
@@ -844,13 +797,7 @@ export default defineComponent({
 
   &.q-btn {
     .q-icon {
-      &.q-btn-dropdown__arrow {
-        margin-left: 0.5rem;
-        height: 0.875rem;
-        width: 0.875rem;
-      }
-
-      & + .row {
+      &+.row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }
@@ -891,7 +838,6 @@ export default defineComponent({
     }
 
     &__label {
-      color: $dark-page;
       font-weight: 400;
     }
 
@@ -913,7 +859,6 @@ export default defineComponent({
 
   .userName {
     line-height: 1.25rem;
-    color: #404040;
     font-weight: 700;
   }
 
@@ -923,5 +868,10 @@ export default defineComponent({
     color: #565656;
     font-weight: 600;
   }
+
+}
+
+.dark-mode {
+  background-color: $dark-page;
 }
 </style>

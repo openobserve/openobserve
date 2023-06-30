@@ -20,14 +20,15 @@
 
 <script lang="ts">
 import Plotly from "plotly.js";
-
-import { defineComponent, onMounted, ref, onUpdated, onBeforeMount } from "vue";
+import { useStore } from "vuex";
+import { defineComponent, onMounted, ref, onUpdated, onBeforeMount, watch  } from "vue";
 
 export default defineComponent({
   name: "DoubleLineChart",
   emits: ["updated:chart"],
   props: ["data"],
   setup(props) {
+    const store = useStore();
     const plotref: any = ref(props.data ? props.data.id : 1);
     const zoomFlag: any = ref(false);
     const trace1: any = {
@@ -54,6 +55,18 @@ export default defineComponent({
 
     const chartID = ref("");
 
+    const getThemeLayoutOptions = () => ({
+      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      font: {
+        size: 12 ,
+        color: store.state.theme === 'dark' ? '#fff' : '#333'
+      }
+    })
+    watch(() => store.state.theme, () => {
+      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
+    })
+
     const layout: any = {
       title: {
         text: "",
@@ -61,7 +74,6 @@ export default defineComponent({
           size: 14,
         },
       },
-      font: { size: 12 },
       autosize: true,
       legend: {
         // bgcolor: "red",
@@ -72,6 +84,7 @@ export default defineComponent({
         t: 0,
         b: 32,
       },
+       ...getThemeLayoutOptions(),
     };
 
     onMounted(async () => {

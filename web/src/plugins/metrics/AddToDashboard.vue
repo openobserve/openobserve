@@ -1,23 +1,15 @@
 <template>
   <q-card class="column full-height no-wrap">
-    <div style="background-color: #ffffff; width: 40vw" class="q-px-sm q-py-md">
+    <div style="width: 40vw" class="q-px-sm q-py-md">
       <q-card-section class="q-pb-sm q-px-sm q-pt-none">
         <div class="row items-center no-wrap">
           <div class="col">
-            <div
-              class="text-body1 text-bold text-dark"
-              data-test="schema-title-text"
-            >
+            <div class="text-body1 text-bold" data-test="schema-title-text">
               Add to Dashboard
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup
-              round
-              flat
-              :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-            />
+            <q-btn v-close-popup round flat icon="cancel" />
           </div>
         </div>
       </q-card-section>
@@ -88,11 +80,10 @@
             <q-btn
               v-close-popup
               data-test="schema-cancel-button"
-              class="q-mb-md text-bold no-border"
+              class="q-mb-md text-bold"
               :label="t('metrics.cancel')"
               text-color="light-text"
               padding="sm md"
-              color="accent"
               no-caps
             />
             <q-btn
@@ -120,6 +111,7 @@ import { useI18n } from "vue-i18n";
 import { getAllDashboards } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
+import type store from "@/test/unit/helpers/store";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -224,6 +216,7 @@ export default defineComponent({
       shouldCreateNewDashboard,
       newDashboardForm,
       addPanelToDashboard,
+      store,
     };
   },
 });
