@@ -745,7 +745,6 @@ export default defineComponent({
           const layout: any = {
               title: false,
               showlegend: props.data.config?.show_legends,
-              font: { size: 12 },
               autosize: true,
               legend: {
                   bgcolor: "#0000000b",
@@ -791,7 +790,6 @@ export default defineComponent({
                 const layout: any = {
                     title: false,
                     showlegend: props.data.config?.show_legends,
-                    font: { size: 12 },
                     autosize: true,
                     legend: {
                         // bgcolor: "#f7f7f7",
@@ -833,7 +831,6 @@ export default defineComponent({
                 const layout: any = {
                     title: false,
                     showlegend: props.data.config?.show_legends,
-                    font: { size: 12 },
                     autosize: true,
                     legend: {
                         // bgcolor: "#f7f7f7",
@@ -1272,6 +1269,7 @@ export default defineComponent({
         paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
         plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
         font: {
+                size: 12 ,
                 color: store.state.theme === 'dark' ? '#fff' : '#333'
             }
     })

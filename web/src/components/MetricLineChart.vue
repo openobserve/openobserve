@@ -87,7 +87,7 @@ export default defineComponent({
     const getThemeLayoutOptions = () => ({
       paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
       plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
-      font: {
+      font: {size:12,
         color: store.state.theme === 'dark' ? '#fff' : '#333'
       }
     })
@@ -102,7 +102,6 @@ export default defineComponent({
           size: 12,
         },
       },
-      font: { size: 12 },
       autosize: true,
       height: 400,
       legend: {

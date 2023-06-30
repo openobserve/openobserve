@@ -59,6 +59,7 @@ export default defineComponent({
       paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
       plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
       font: {
+        size: 12 ,
         color: store.state.theme === 'dark' ? '#fff' : '#333'
       }
     })
@@ -73,7 +74,6 @@ export default defineComponent({
           size: 14,
         },
       },
-      font: { size: 12 },
       autosize: true,
       legend: {
         // bgcolor: "red",
