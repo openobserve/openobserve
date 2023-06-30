@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use std::collections::{HashMap, HashSet};
-use std::io::Write;
-use tokio::time;
+use std::{
+    collections::{HashMap, HashSet},
+    io::Write,
+};
 
 use crate::common::{json, utils::is_local_disk_storage};
 use crate::infra::{
@@ -298,7 +299,7 @@ async fn delete_from_file_list(
                         "[COMPACT] delete_from_file_list set local cache failed, retrying: {}",
                         e
                     );
-                    time::sleep(time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     break;
                 }
             }
@@ -311,7 +312,7 @@ async fn delete_from_file_list(
                     "[COMPACT] delete_from_file_list send broadcast failed, retrying: {}",
                     e
                 );
-                time::sleep(time::Duration::from_secs(1)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             break;

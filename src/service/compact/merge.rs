@@ -18,7 +18,6 @@ use ::datafusion::{
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
-use tokio::time;
 
 use crate::common::json;
 use crate::infra::{
@@ -244,7 +243,7 @@ pub async fn merge_by_stream(
                     {
                         cache_success = false;
                         log::error!("[COMPACT] set local cache failed, retrying: {}", e);
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         break;
                     }
                 }
@@ -254,7 +253,7 @@ pub async fn merge_by_stream(
                 // send broadcast to other nodes
                 if let Err(e) = db::file_list::broadcast::send(&events).await {
                     log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
-                    time::sleep(time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
                 // broadcast success
