@@ -38,6 +38,6 @@ phases:
       - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
 
-# cache:
-#   paths:
-#     - /root/.cache/
+cache:
+  paths:
+    - /root/.cache/
