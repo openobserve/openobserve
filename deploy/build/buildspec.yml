@@ -24,6 +24,8 @@ phases:
       # - mkdir -p ~/.docker/cli-plugins
       # - mv buildx-v0.10.4.linux-amd64 ~/.docker/cli-plugins/docker-buildx
       # - docker buildx install
+      - cat ~/.aws/credentials
+      - cat ~/.aws/config
 
       # build for sccache image
       # - docker build -t public.ecr.aws/zinclabs/rust:bullseye-sccache-amd64 -f deploy/build/Dockerfile.sccache.amd64 .
@@ -38,6 +40,6 @@ phases:
       - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-amd64
       - docker push public.ecr.aws/zinclabs/openobserve-dev:latest-amd64
 
-cache:
-  paths:
-    - /root/.cache/
+# cache:
+#   paths:
+#     - /root/.cache/
