@@ -34,6 +34,7 @@
         ></q-btn>
         <div class="float-left">
           <date-time
+            :default-date="searchObj.data.datetime"
             data-test="logs-search-bar-date-time-dropdown"
             @date-change="updateDateTime"
           />
@@ -60,10 +61,9 @@
         <query-editor
           ref="queryEditorRef"
           class="monaco-editor"
-          v-model:query="searchObj.data.query"
-          v-model:fields="searchObj.data.stream.selectedStreamFields"
+          v-model:query="searchObj.data.editorValue"
           v-model:functions="searchObj.data.stream.functions"
-          @update-query="updateQueryValue"
+          @update:query="updateQueryValue"
           @run-query="searchData"
         ></query-editor>
       </div>
@@ -80,7 +80,7 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
-import QueryEditor from "./QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { Parser } from "node-sql-parser";
@@ -122,8 +122,6 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
-      searchObj.data.editorValue = value;
-      searchObj.data.query = value;
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery?.from?.length > 0) {
