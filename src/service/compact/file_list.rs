@@ -148,13 +148,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let lock_key = format!("compact/file_list/{offset}");
     let mut locker = dist_lock::lock(&lock_key).await?;
-    let node = match db::compact::file_list::get_process(offset).await {
-        Ok(v) => v,
-        Err(e) => {
-            dist_lock::unlock(&mut locker).await?;
-            return Err(e);
-        }
-    };
+    let node = db::compact::file_list::get_process(offset).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::error!("[COMPACT] list_list offset [{offset}] is merging by {node}");
         dist_lock::unlock(&mut locker).await?;

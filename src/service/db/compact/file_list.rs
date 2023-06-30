@@ -54,14 +54,13 @@ pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
     Ok(items)
 }
 
-pub async fn get_process(offset: i64) -> Result<String, anyhow::Error> {
+pub async fn get_process(offset: i64) -> String {
     let db = &crate::infra::db::DEFAULT;
     let key = format!("/compact/file_list/process/{offset}");
-    let value = match db.get(&key).await {
+    match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from(""),
-    };
-    Ok(value)
+    }
 }
 
 pub async fn set_process(offset: i64, node: &str) -> Result<(), anyhow::Error> {
@@ -99,6 +98,6 @@ mod tests {
         const NODE: &str = "node1";
 
         set_process(OFFSET, NODE).await.unwrap();
-        assert_eq!(get_process(OFFSET).await.unwrap(), NODE);
+        assert_eq!(get_process(OFFSET).await, NODE);
     }
 }

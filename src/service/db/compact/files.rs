@@ -18,26 +18,21 @@ fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
 }
 
-pub async fn get_offset(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<(i64, String), anyhow::Error> {
+pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType) -> (i64, String) {
     let db = &crate::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
-    let (offset, node) = if value.contains(';') {
+    if value.contains(';') {
         let mut parts = value.split(';');
         let offset: i64 = parts.next().unwrap().parse().unwrap();
         let node = parts.next().unwrap().to_string();
         (offset, node)
     } else {
         (value.parse().unwrap(), String::from(""))
-    };
-    Ok((offset, node))
+    }
 }
 
 pub async fn set_offset(
@@ -95,7 +90,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            get_offset("nexus", "default", "logs".into()).await.unwrap(),
+            get_offset("nexus", "default", "logs".into()).await,
             (OFFSET, "".to_string())
         );
         assert!(!list_offset().await.unwrap().is_empty());
@@ -105,7 +100,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            get_offset("nexus", "default", "logs".into()).await.unwrap(),
+            get_offset("nexus", "default", "logs".into()).await,
             (OFFSET, "node1".to_string())
         );
     }

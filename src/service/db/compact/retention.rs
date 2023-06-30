@@ -77,15 +77,14 @@ pub async fn get_stream(
     stream_name: &str,
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
-) -> Result<String, anyhow::Error> {
+) -> String {
     let db = &crate::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
-    let value = match db.get(&db_key).await {
+    match db.get(&db_key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from(""),
-    };
-    Ok(value)
+    }
 }
 
 // check if stream is deleting from cache

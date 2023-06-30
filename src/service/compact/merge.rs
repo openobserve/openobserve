@@ -55,14 +55,7 @@ pub async fn merge_by_stream(
     let mut locker = dist_lock::lock(&lock_key).await?;
 
     // get last compacted offset
-    let (mut offset, node) =
-        match db::compact::files::get_offset(org_id, stream_name, stream_type).await {
-            Ok((offset, node)) => (offset, node),
-            Err(e) => {
-                dist_lock::unlock(&mut locker).await?;
-                return Err(e);
-            }
-        };
+    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_name, stream_type).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is merging by {node}");
         dist_lock::unlock(&mut locker).await?;
