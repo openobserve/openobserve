@@ -14,8 +14,8 @@
 -->
 
 <template>
-    <q-card class="column full-height">
-      <q-card-section class="q-px-md q-py-md text-black">
+    <div class="column full-height">
+      <div class="q-px-md q-py-md text-black">
         <div class="row items-center no-wrap">
           <div class="col">
             <!-- <div v-if="beingUpdated" class="text-body1 text-bold text-dark">
@@ -24,19 +24,22 @@
             <div v-else class="text-body1 text-bold text-dark">
               {{ t("dashboard.createdashboard") }}
             </div> -->
+             <div class="text-body1 text-bold text-dark">
+                {{ t("dashboard.generalSettingsTitle") }}
+             </div>
           </div>
-          <div class="col-auto">
+          <!-- <div class="col-auto">
             <q-btn
               v-close-popup
               round
               flat
               :icon="'img:' + getImageURL('images/common/close_icon.svg')"
             />
-          </div>
+          </div> -->
         </div>
-      </q-card-section>
+      </div>
       <q-separator />
-      <q-card-section class="q-w-md q-mx-lg">
+      <div class="q-w-md q-mx-lg">
         <q-form ref="addDashboardForm" @submit="onSubmit">
           <q-input
             v-if="beingUpdated"
@@ -72,11 +75,10 @@
           <div class="flex justify-center q-mt-lg">
             <q-btn
               v-close-popup
-              class="q-mb-md text-bold no-border"
+              class="q-mb-md text-bold"
               :label="t('dashboard.cancel')"
               text-color="light-text"
               padding="sm md"
-              color="accent"
               no-caps
             />
             <q-btn
@@ -90,8 +92,8 @@
             />
           </div>
         </q-form>
-      </q-card-section>
-    </q-card>
+      </div>
+    </div>
 </template>
   
   <script lang="ts">
@@ -99,7 +101,7 @@
   import dashboardService from "../../../services/dashboards";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
-  import { isProxy, toRaw } from "vue";
+  import { isProxy, toRaw, reactive } from "vue";
   import { getImageURL } from "../../../utils/zincutils";
   
   const defaultValue = () => {

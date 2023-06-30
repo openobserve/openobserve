@@ -280,7 +280,8 @@
     "setting": "Settings",
     "generalSettings": "General settings",
     "variableSettings": "Variable settings",
-    "NewVariable": "New variable"
+    "NewVariable": "New variable",
+    "generalSettingsTitle": "General Settings"
   },
   "panel": {
     "header": "Panel",
