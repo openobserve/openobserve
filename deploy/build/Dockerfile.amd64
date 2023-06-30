@@ -8,8 +8,8 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # FROM public.ecr.aws/docker/library/rust:bullseye as builder
 FROM public.ecr.aws/zinclabs/rust:bullseye-sccache as builder
-ARG AWS_DEFAULT_REGION
-ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
+# ARG AWS_DEFAULT_REGION
+# ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
 # RUN rustup toolchain install nightly-2023-05-21
 # RUN rustup default nightly-2023-05-21
