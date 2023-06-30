@@ -24,7 +24,7 @@ WORKDIR /app
 COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 
-RUN cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu && sccache --show-stats
+RUN SCCACHE_LOG=debug SCCACHE_NO_DAEMON=1 cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu && sccache --show-stats
 RUN mv /app/target/x86_64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
 
 # FROM gcr.io/distroless/cc as runtime
