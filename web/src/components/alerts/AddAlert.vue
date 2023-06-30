@@ -290,11 +290,10 @@
           <q-btn
             data-test="add-alert-cancel-btn"
             v-close-popup
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
             @click="$emit('cancel:hideform')"
           />
@@ -455,7 +454,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: "myCustomTheme",
+      theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
       });
       editorobj.onKeyUp((e: any) => {
         if (editorobj.getValue() != "") {

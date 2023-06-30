@@ -23,10 +23,9 @@
       outline
       no-caps
       :label="displayValue"
-      :icon="'img:' + getImageURL('images/common/time_icon.png')"
+      icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
-      color="grey-9"
     >
       <q-menu
         id="date-time-menu"
@@ -366,7 +365,6 @@ export default defineComponent({
 
   .q-icon.on-right {
     transition: transform 0.25s ease;
-    color: $light-text2;
   }
   &.isOpen .q-icon.on-right {
     transform: rotate(180deg);
@@ -376,7 +374,6 @@ export default defineComponent({
     justify-content: flex-start;
 
     .block {
-      color: $dark-page;
       font-weight: 600;
 
       &::before {
@@ -398,7 +395,6 @@ export default defineComponent({
 
       &.text-primary {
         .q-btn__content {
-          color: $dark-page !important;
         }
       }
     }
@@ -422,12 +418,10 @@ export default defineComponent({
         height: 40px;
       }
       &__native {
-        color: $light-text2;
         font-size: 0.875rem;
         font-weight: 600;
       }
       .q-select__dropdown-icon {
-        color: $light-text2;
       }
     }
 
@@ -458,7 +452,7 @@ export default defineComponent({
   height: 32px;
   width: 32px;
   // border: $secondary;
-  background: $input-bg;
+  background: rgba(0,0,0,0.07);
 }
 
 .rp-selector-selected {
@@ -474,7 +468,6 @@ export default defineComponent({
   padding-right: 1.5rem;
   padding-left: 1.5rem;
   font-size: 0.625rem;
-  color: $light-text;
 }
 .q-date {
   &__navigation {
@@ -492,18 +485,15 @@ export default defineComponent({
 
     .q-btn .block {
       font-size: 0.75rem;
-      color: $dark-page;
       font-weight: 700;
     }
   }
   &__calendar {
     &-item .block {
-      color: $light-text;
       font-weight: 700;
     }
     &-weekdays > div {
       font-size: 0.875rem;
-      color: $dark-page;
       font-weight: 700;
       opacity: 1;
     }
@@ -531,7 +521,7 @@ export default defineComponent({
   }
   .label {
     font-size: 0.75rem;
-    color: $dark-page;
+    // color: $dark-page;
     font-weight: 600;
   }
   .timeInput {

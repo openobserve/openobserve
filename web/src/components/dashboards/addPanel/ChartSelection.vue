@@ -18,9 +18,11 @@
     <div class="q-pa-none" style="max-width: 90px;">
       <q-list separator>
         <q-item
-          :class="
-            selectedChartType === item.id ? 'q-pa-none bg-grey-3' : 'q-pa-none'
-          "
+          :class="[
+            'q-pa-none',
+            selectedChartType === item.id ? (store.state.theme === 'dark' ? 'bg-grey-5' : 'bg-grey-3') : ''
+          ]"
+
           v-for="(item, index) in ChartsArray"
           :disable="promqlMode && item.id != 'line'"
           :key="index"
@@ -49,6 +51,7 @@
 import { defineComponent, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ChartSelection",
@@ -56,6 +59,7 @@ export default defineComponent({
   emits: ["update:selectedChartType"],
 
   setup() {
+    const store = useStore();
     // array of charts
     const chartsArray = ref([
       {
@@ -129,7 +133,8 @@ export default defineComponent({
     return {
       ChartsArray: chartsArray,
       promqlMode,
-      dashboardPanelData
+      dashboardPanelData,
+      store
     };
   },
   components: {},

@@ -314,7 +314,6 @@ export default defineComponent({
   height: 40px !important;
   overflow: hidden;
   cursor: pointer;
-  background-color: white;
 
   &:hover {
     background-color: #eaeaeaa5;

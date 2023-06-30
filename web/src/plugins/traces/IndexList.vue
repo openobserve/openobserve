@@ -51,13 +51,17 @@
                 <div class="field_label ellipsis">
                   {{ props.row.name }}
                 </div>
-                <div class="field_overlay">
-                  <q-icon
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                <div class="field_overlay" :style="{
+                  background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
+                }">
+                  <q-btn
+                    :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
-                    size="1rem"
+                    size="0.4rem"
+                    class="q-mr-sm"
                     @click.stop="addToFilter(props.row.name)"
+                    round
                   />
                 </div>
               </div>
@@ -67,12 +71,10 @@
                 switch-toggle-side
                 :label="props.row.name"
                 expand-icon-class="field-expansion-icon"
-                :expand-icon="
-                  'img:' + getImageURL('images/common/down-solid.svg')
+                expand-icon="
+                   expand_more
                 "
-                :expanded-icon="
-                  'img:' + getImageURL('images/common/up-solid.svg')
-                "
+               
                 @before-show="(event: any) => openFilterCreator(event, props.row)"
               >
                 <template v-slot:header>
@@ -83,15 +85,15 @@
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                    <div class="field_overlay">
-                      <q-icon
+                      <div class="field_overlay">
+                      <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :name="
-                          'img:' + getImageURL('images/common/add_icon.svg')
-                        "
+                        :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
-                        size="1rem"
+                        size="0.4rem"
+                        class="q-mr-sm"
                         @click.stop="addToFilter(props.row.name)"
+                        round
                       />
                     </div>
                   </div>
@@ -146,12 +148,8 @@
                                 {{ value.count }}
                               </div>
                             </div>
-                            <div class="flex row">
+                            <div class="flex row" :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'">
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/equals.svg')
-                                "
                                 class="q-mr-xs"
                                 size="6px"
                                 title="Include Term"
@@ -161,12 +159,12 @@
                                     `${props.row.name}='${value.key}'`
                                   )
                                 "
-                              />
+                              >
+                              <q-icon>
+                                <EqualIcon></EqualIcon>
+                              </q-icon>
+                            </q-btn>
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/not_equals.svg')
-                                "
                                 class="q-mr-xs"
                                 size="6px"
                                 title="Include Term"
@@ -176,7 +174,11 @@
                                     `${props.row.name}!='${value.key}'`
                                   )
                                 "
-                              />
+                              >
+                               <q-icon>
+                                <NotEqualIcon></NotEqualIcon>
+                               </q-icon>
+                            </q-btn>
                             </div>
                           </q-item>
                         </q-list>
@@ -220,9 +222,15 @@ import useTraces from "../../composables/useTraces";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
+import { outlinedAdd } from '@quasar/extras/material-icons-outlined'
+import EqualIcon from "../../components/icons/EqualIcon.vue";
+import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
+  components: {
+    EqualIcon, NotEqualIcon
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -346,6 +354,7 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
+      outlinedAdd,
     };
   },
 });
@@ -446,7 +455,6 @@ export default defineComponent({
       right: 0;
       top: 0;
       z-index: 5;
-      background-color: #e8e8e8;
       padding: 0 6px;
       visibility: hidden;
       display: flex;
@@ -470,14 +478,14 @@ export default defineComponent({
     }
     &:hover {
       .field-container {
-        background-color: #e8e8e8;
+        background-color: color-mix(in srgb, currentColor 15%, transparent);
       }
     }
   }
 }
 
 .q-item {
-  color: $dark-page;
+  // color: $dark-page;
   min-height: 1.3rem;
   padding: 5px 10px;
 
@@ -588,7 +596,7 @@ export default defineComponent({
         }
 
         .field_overlay {
-          background-color: #ffffff;
+          // background-color: #ffffff;
         }
       }
     }

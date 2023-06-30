@@ -476,7 +476,11 @@ export default defineComponent({
   opacity: 1;
   z-index: 1;
   background: #f5f5f5;
-  color: #090909;
+}
+
+.q-table--dark .thead-sticky tr > *,
+.q-table--dark .tfoot-sticky tr > * {
+  background: #565656;
 }
 .thead-sticky tr:last-child > * {
   top: 0;

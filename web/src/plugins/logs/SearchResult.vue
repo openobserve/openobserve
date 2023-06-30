@@ -54,8 +54,8 @@
                 <q-chip
                   v-if="col.closable"
                   :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                  :icon-remove="
-                    'img:' + getImageURL('images/common/close_icon.svg')
+                  icon-remove="
+                    cancel
                   "
                   class="q-ma-none table-head-chip"
                   removable
@@ -138,7 +138,6 @@
                 :title="row.name"
               >
                 <q-btn
-                  :icon="'img:' + getImageURL('images/common/equals.svg')"
                   class="q-mr-xs"
                   size="6px"
                   @click.prevent.stop="
@@ -146,16 +145,23 @@
                   "
                   title="Include Term"
                   round
-                />
+                >
+                  <q-icon color="currentColor">
+                    <EqualIcon></EqualIcon>
+                  </q-icon>
+                </q-btn>
                 <q-btn
-                  :icon="'img:' + getImageURL('images/common/not_equals.svg')"
                   size="6px"
                   @click.prevent.stop="
                     addSearchTerm(`${column.name}!='${row[column.name]}'`)
                   "
                   title="Exclude Term"
                   round
-                />
+                >
+                <q-icon color="currentColor">
+                  <NotEqualIcon></NotEqualIcon>
+                </q-icon>
+              </q-btn>
               </div>
             </q-td>
           </q-tr>
@@ -175,7 +181,7 @@
               <div class="q-pl-md">
                 {
                 <div
-                  class="log_json_content text-grey-8"
+                  class="log_json_content "
                   v-for="key in Object.keys(row)"
                   :key="key"
                 >
@@ -197,13 +203,14 @@
                             @click="addSearchTerm(`${key}='${row[key]}'`)"
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' + getImageURL('images/common/equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                              <EqualIcon></EqualIcon>
+                             </q-icon>
+                            </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -216,14 +223,14 @@
                             @click="addSearchTerm(`${key}!='${row[key]}'`)"
                             ><q-btn
                               title="Add to search query"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/not_equals.svg')
-                              "
                               size="6px"
                               round
                               class="q-mr-sm pointer"
-                            ></q-btn
+                            >
+                             <q-icon color="currentColor">
+                              <NotEqualIcon></NotEqualIcon>
+                             </q-icon>
+                            </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -235,9 +242,8 @@
                             @click="addFieldToTable(key)"
                             ><q-btn
                               title="Add field to table"
-                              :icon="
-                                'img:' +
-                                getImageURL('images/common/visibility_on.svg')
+                              icon="
+                                visibility
                               "
                               size="6px"
                               round
@@ -300,6 +306,8 @@ import DetailTable from "./DetailTable.vue";
 import useLogs from "../../composables/useLogs";
 import BarChart from "../../components/logBarChart.vue";
 import { getImageURL } from "../../utils/zincutils";
+import EqualIcon from "../../components/icons/EqualIcon.vue";
+import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -307,6 +315,7 @@ export default defineComponent({
     HighLight,
     BarChart,
     DetailTable,
+    EqualIcon, NotEqualIcon
   },
   emits: [
     "update:scroll",
@@ -581,7 +590,7 @@ export default defineComponent({
     // text-transform: capitalize;
 
     .table-head-chip {
-      background-color: $accent;
+      background-color: #f5f5f5;
       padding: 0px;
 
       .q-chip__content {
@@ -639,8 +648,21 @@ export default defineComponent({
   opacity: 1;
   z-index: 1;
   background: #f5f5f5;
-  color: #090909;
 }
+
+.q-table--dark .thead-sticky tr > *,
+.q-table--dark .tfoot-sticky tr > * {
+  background: #565656;
+}
+
+.q-table--dark .table-header {
+    // text-transform: capitalize;
+
+    .table-head-chip {
+      background-color: #565656;
+    }
+  }
+
 .thead-sticky tr:last-child > * {
   top: 0;
 }

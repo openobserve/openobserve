@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="column index-menu">
+  <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
     <div>
       <q-select
         data-test="log-search-index-list-select-stream"
@@ -82,12 +82,14 @@
                   {{ props.row.name }}
                 </div>
                 <div class="field_overlay">
-                  <q-icon
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
+                  <q-btn
+                    :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
-                    size="1rem"
+                    size="0.4rem"
+                    class="q-mr-sm"
                     @click.stop="addToFilter(props.row.name)"
+                    round
                   />
                   <q-icon
                     :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
@@ -97,7 +99,7 @@
                       )
                     "
                     :name="
-                      'img:' + getImageURL('images/common/visibility_on.svg')
+                      outlinedVisibility
                     "
                     size="1.1rem"
                     title="Add field to table"
@@ -110,9 +112,7 @@
                         props.row.name
                       )
                     "
-                    :name="
-                      'img:' + getImageURL('images/common/visibility_off.svg')
-                    "
+                    :name="outlinedVisibilityOff"
                     size="1.1rem"
                     title="Remove field from table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -125,11 +125,11 @@
                 switch-toggle-side
                 :label="props.row.name"
                 expand-icon-class="field-expansion-icon"
-                :expand-icon="
-                  'img:' + getImageURL('images/common/down-solid.svg')
+                expand-icon="
+                  expand_more
                 "
-                :expanded-icon="
-                  'img:' + getImageURL('images/common/up-solid.svg')
+                expanded-icon="
+                  expand_less
                 "
                 @before-show="(event: any) => openFilterCreator(event, props.row)"
               >
@@ -142,14 +142,14 @@
                       {{ props.row.name }}
                     </div>
                     <div class="field_overlay">
-                      <q-icon
+                      <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :name="
-                          'img:' + getImageURL('images/common/add_icon.svg')
-                        "
+                        :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
-                        size="1rem"
+                        size="0.4rem"
+                        class="q-mr-sm"
                         @click.stop="addToFilter(props.row.name)"
+                        round
                       />
                       <q-icon
                         :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
@@ -158,10 +158,7 @@
                             props.row.name
                           )
                         "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_on.svg')
-                        "
+                        :name="outlinedVisibility"
                         size="1.1rem"
                         title="Add field to table"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -173,10 +170,7 @@
                             props.row.name
                           )
                         "
-                        :name="
-                          'img:' +
-                          getImageURL('images/common/visibility_off.svg')
-                        "
+                        :name="outlinedVisibilityOff"
                         title="Remove field from table"
                         size="1.1rem"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -234,12 +228,8 @@
                                 {{ value.count }}
                               </div>
                             </div>
-                            <div class="flex row">
+                            <div class="flex row" :class="store.state.theme ==='dark'?'text-white':'text-black'">
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/equals.svg')
-                                "
                                 class="q-mr-xs"
                                 size="6px"
                                 @click="
@@ -249,12 +239,12 @@
                                 "
                                 title="Include Term"
                                 round
-                              />
+                              >
+                                <q-icon>
+                                  <EqualIcon></EqualIcon>
+                                </q-icon>
+                              </q-btn>
                               <q-btn
-                                :icon="
-                                  'img:' +
-                                  getImageURL('images/common/not_equals.svg')
-                                "
                                 size="6px"
                                 @click="
                                   addSearchTerm(
@@ -263,7 +253,11 @@
                                 "
                                 title="Exclude Term"
                                 round
-                              />
+                              >
+                             <q-icon>
+                              <NotEqualIcon></NotEqualIcon>
+                             </q-icon>
+                            </q-btn>
                             </div>
                           </q-item>
                         </q-list>
@@ -313,6 +307,9 @@ import {
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import { Parser } from "node-sql-parser";
+import { outlinedAdd, outlinedVisibility, outlinedVisibilityOff } from '@quasar/extras/material-icons-outlined'
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 interface Filter {
   fieldName: string;
@@ -321,6 +318,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
+  components:{ EqualIcon, NotEqualIcon },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -528,6 +526,9 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       streamTypes,
+      outlinedAdd,
+      outlinedVisibilityOff,
+      outlinedVisibility,
     };
   },
 });
@@ -631,7 +632,6 @@ export default defineComponent({
       right: 0;
       top: 0;
       z-index: 5;
-      background-color: #e8e8e8;
       padding: 0 6px;
       visibility: hidden;
       display: flex;
@@ -656,14 +656,39 @@ export default defineComponent({
 
     &:hover {
       .field-container {
+        // background-color: #ffffff;
+    }
+  }
+}
+}
+
+.theme-dark {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+
+      .field_overlay {
+        background-color: #3f4143;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.theme-light {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+      .field_overlay {
         background-color: #e8e8e8;
+        opacity: 1;
       }
     }
   }
 }
 
 .q-item {
-  color: $dark-page;
   min-height: 1.3rem;
   padding: 5px 10px;
 
@@ -678,7 +703,7 @@ export default defineComponent({
 
   &.q-manual-focusable--focused > .q-focus-helper,
   &--active {
-    background-color: $selected-list-bg !important;
+    // background-color: $selected-list-bg !important;
   }
 
   &.q-manual-focusable--focused > .q-focus-helper,
@@ -710,7 +735,7 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .index-table {
   .q-table {
     width: 100%;
@@ -780,7 +805,7 @@ export default defineComponent({
         }
 
         .field_overlay {
-          background-color: #ffffff;
+          // background-color: #ffffff;
         }
       }
     }

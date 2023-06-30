@@ -132,10 +132,10 @@
             <h5 class="text-center">No result found.</h5>
           </div>
           <template v-if="searchObj.data.metrics.metricList.length">
-            <div class="flex justify-end q-pr-lg">
+            <div class="flex justify-end q-pr-lg q-mb-md">
               <q-btn
                 size="md"
-                class="q-px-sm"
+                class="q-px-sm no-border"
                 no-caps
                 dense
                 color="primary"
@@ -301,7 +301,7 @@ export default defineComponent({
         timeout: 10000,
         actions: [
           {
-            icon: "close",
+            icon: "cancel",
             color: "white",
             handler: () => {
               /* ... */
@@ -318,7 +318,7 @@ export default defineComponent({
         timeout: 10000,
         actions: [
           {
-            icon: "close",
+            icon: "cancel",
             color: "white",
             handler: () => {
               /* ... */
@@ -799,7 +799,6 @@ div.plotly-notifier {
     .date-time-button {
       height: 100%;
       padding: 0 8px;
-      background-color: #ffffff !important;
     }
   }
 

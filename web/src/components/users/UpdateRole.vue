@@ -24,30 +24,15 @@
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          />
+          <q-btn v-close-popup round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-        <q-input
-          v-model="orgMemberData.first_name"
-          :label="t('user.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          readonly
-          filled
-          dense
-        />
+        <q-input v-model="orgMemberData.first_name" :label="t('user.name')" color="input-border" bg-color="input-bg"
+          class="q-py-md showLabelOnTop" stack-label outlined readonly filled dense />
 
         <!--
         <q-input
@@ -64,37 +49,14 @@
         />
         -->
 
-        <q-select
-          v-model="orgMemberData.role"
-          :label="t('user.role')"
-          :options="roleOptions"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-pt-md q-pb-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-        />
+        <q-select v-model="orgMemberData.role" :label="t('user.role')" :options="roleOptions" color="input-border"
+          bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup
-            class="q-mb-md text-bold no-border"
-            :label="t('user.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-          />
-          <q-btn
-            :label="t('user.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <q-btn v-close-popup class="q-mb-md text-bold no-border" :label="t('user.cancel')" text-color="light-text"
+            padding="sm md" color="accent" no-caps />
+          <q-btn :label="t('user.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+            type="submit" no-caps />
         </div>
       </q-form>
     </q-card-section>

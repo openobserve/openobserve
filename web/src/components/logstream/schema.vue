@@ -19,7 +19,7 @@
       <div class="row items-center no-wrap">
         <div class="col">
           <div
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold"
             data-test="schema-title-text"
           >
             {{ t("logStream.schemaHeader") }}
@@ -30,7 +30,7 @@
             v-close-popup
             round
             flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+            icon="close"
           />
         </div>
       </div>
@@ -184,11 +184,10 @@
           <q-btn
             v-close-popup
             data-test="schema-cancel-button"
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('logStream.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
           />
           <q-btn
@@ -463,7 +462,6 @@ export default defineComponent({
       th {
         font-size: 0.875rem;
         font-weight: 700;
-        color: $dark;
       }
     }
 
@@ -472,7 +470,6 @@ export default defineComponent({
 
       td {
         font-size: 0.875rem;
-        color: $dark-page;
         font-weight: 600;
       }
     }
@@ -488,7 +485,6 @@ export default defineComponent({
       &__section {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
-        color: $dark-page;
 
         &:not(:first-child) {
           border-left: 1px solid $input-field-border-color;

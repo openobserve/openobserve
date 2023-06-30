@@ -44,7 +44,7 @@
               dense
               round
               flat
-              :name="'img:' + getImageURL('images/common/down-solid.svg')"
+              name="expand_more"
               class="collapse-btn"
               :style="{
                 rotate: collapseMapping[span.spanId] ? '0deg' : '270deg',
@@ -52,7 +52,7 @@
             />
           </div>
           <div
-            class="text-blue-grey-6 ellipsis q-ml-xs"
+            class=" ellipsis q-ml-xs"
             :style="{
               paddingLeft: '4px',
               borderLeft: `3px solid ${span.style.color}`,

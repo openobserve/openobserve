@@ -1,5 +1,5 @@
 <template>
-  <q-btn class="q-ml-sm" outline padding="xs" color="primary" text-color="black" no-caps icon="download" @click="downloadDashboard()">
+  <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="download" @click="downloadDashboard()">
   </q-btn>
 </template>
 <script lang="ts">

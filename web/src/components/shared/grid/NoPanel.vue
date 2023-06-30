@@ -1,4 +1,4 @@
-!-- Copyright 2022 Zinc Labs Inc. and Contributors
+<!-- Copyright 2022 Zinc Labs Inc. and Contributors
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 <template>
   <div
-  class="flex column justify-center q-pa-xs text-dark"
+  class="flex column justify-center q-pa-xs"
   style="font-size: 1.5rem"
   >
     <q-img
@@ -28,9 +28,7 @@
     <div class="flex justify-center">
       <q-btn 
           :label="t('panel.add')"
-          no-caps color="primary"
           stack 
-          text-color="black" 
           padding="md" 
           outline icon="insert_drive_file"
           class=""

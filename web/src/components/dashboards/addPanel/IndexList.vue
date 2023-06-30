@@ -14,35 +14,14 @@
 -->
 
 <template>
-  <div class="column index-menu">
+  <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
     <div class="col-auto">
-      <q-select
-        v-model="dashboardPanelData.data.fields.stream_type"
-        :label="t('dashboard.selectStreamType')"
-        :options="data.streamType"
-        data-cy="index-dropdown"
-        input-debounce="0"
-        behavior="menu"
-        filled
-        borderless
-        dense
-        class="q-mb-xs"
-      ></q-select>
-      <q-select
-        v-model="dashboardPanelData.data.fields.stream"
-        :label="t('dashboard.selectIndex')"
-        :options="filteredStreams"
-        data-cy="index-dropdown"
-        input-debounce="0"
-        behavior="menu"
-        use-input
-        filled
-        borderless
-        dense
-        hide-selected
-        fill-input
-        @filter="filterStreamFn"
-      >
+      <q-select v-model="dashboardPanelData.data.fields.stream_type" :label="t('dashboard.selectStreamType')"
+        :options="data.streamType" data-cy="index-dropdown" input-debounce="0" behavior="menu" filled borderless dense
+        class="q-mb-xs"></q-select>
+      <q-select v-model="dashboardPanelData.data.fields.stream" :label="t('dashboard.selectIndex')"
+        :options="filteredStreams" data-cy="index-dropdown" input-debounce="0" behavior="menu" use-input filled borderless
+        dense hide-selected fill-input @filter="filterStreamFn">
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -74,69 +53,39 @@
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
-            <q-td
-              class="field_list"
-              :props="props"
-              v-mutation="mutationHandler"
-              @dragenter="onDragEnter"
-              @dragleave="onDragLeave"
-              @dragover="onDragOver"
-              @drop="onDrop"
-              :style="dashboardPanelData.data.customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''"
-            >
+            <q-td class="field_list" :props="props" v-mutation="mutationHandler" @dragenter="onDragEnter"
+              @dragleave="onDragLeave" @dragover="onDragOver" @drop="onDrop"
+              :style="dashboardPanelData.data.customQuery && props.pageIndex == dashboardPanelData.meta.stream.customQueryFields.length ? 'border: 1px solid black' : ''">
               <div class="field_overlay" :title="props.row.name">
-                <div
-                  class="field_label"
+                <div class="field_label"
                   :draggable="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))"
-                  @dragstart="onDragStart($event, props.row)"
-                >
-                  <q-icon
-                    name="drag_indicator"
-                    color="grey-13"
+                  @dragstart="onDragStart($event, props.row)">
+                  <q-icon name="drag_indicator" color="grey-13"
                     :class="['q-mr-xs', !(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length)) ? 'drag_indicator' : 'drag_disabled']"
-                    v-if="!promqlMode"
-                  />
+                    v-if="!promqlMode" />
 
                   <q-icon
-                    :name="props.row.type == 'Utf8'? 'text_fields' : props.row.type == 'Int64'? 'tag' : 'toggle_off'"
-                    color="grey-6"
-                    class="q-mr-xs"
-                  />
+                    :name="props.row.type == 'Utf8' ? 'text_fields' : props.row.type == 'Int64' ? 'tag' : 'toggle_off'"
+                    color="grey-6" class="q-mr-xs" />
                   {{ props.row.name }}
                 </div>
-                <div class="field_icons" v-if="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
-                  <q-btn
-                    color="white"
-                    padding="sm"
-                    text-color="black"
-                    :disabled="isAddXAxisNotAllowed"
-                    @click="addXAxisItem(props.row)"
-                  >
+                <div class="field_icons"
+                  v-if="!(promqlMode || (dashboardPanelData.data.customQuery && props.pageIndex >= dashboardPanelData.meta.stream.customQueryFields.length))">
+                  <q-btn padding="sm" :disabled="isAddXAxisNotAllowed" @click="addXAxisItem(props.row)">
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
                       }}
                     </div>
                   </q-btn>
-                  <q-btn
-                    color="white"
-                    padding="sm"
-                    text-color="black"
-                    :disabled="isAddYAxisNotAllowed"
-                    @click="addYAxisItem(props.row)"
-                  >
+                  <q-btn padding="sm" :disabled="isAddYAxisNotAllowed" @click="addYAxisItem(props.row)">
                     <div>
                       {{
                         dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
                       }}
                     </div>
                   </q-btn>
-                  <q-btn
-                    color="white"
-                    padding="sm"
-                    text-color="black"
-                    @click="addFilteredItem(props.row.name)"
-                  >
+                  <q-btn padding="sm" @click="addFilteredItem(props.row.name)">
                     <div>+F</div>
                   </q-btn>
                 </div>
@@ -145,16 +94,8 @@
           </q-tr>
         </template>
         <template #top-right>
-          <q-input
-            v-model="dashboardPanelData.meta.stream.filterField"
-            data-cy="index-field-search-input"
-            filled
-            borderless
-            dense
-            clearable
-            debounce="1"
-            :placeholder="t('search.searchField')"
-          >
+          <q-input v-model="dashboardPanelData.meta.stream.filterField" data-cy="index-field-search-input" filled
+            borderless dense clearable debounce="1" :placeholder="t('search.searchField')">
             <template #prepend>
               <q-icon name="search" />
             </template>
@@ -202,7 +143,7 @@ export default defineComponent({
       () => [data.schemaList, dashboardPanelData.data.fields.stream, dashboardPanelData.data.fields.stream_type],
       () => {
         // console.log("stream:", dashboardPanelData.data.fields.stream);
-        
+
         const fields: any = data.schemaList.find(
           (it: any) => it.name == dashboardPanelData.data.fields.stream
         );
@@ -211,25 +152,25 @@ export default defineComponent({
       }
     );
 
-    watch(()=> [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], ()=> {
-      
-        if(!props.editMode){
-          dashboardPanelData.data.fields.stream = ""
-        }
-      
-        data.indexOptions = dashboardPanelData.meta.stream.streamResults
-          .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
-          .map((data: any) => {
-            return data.name;
-          });
+    watch(() => [dashboardPanelData.data.fields.stream_type, dashboardPanelData.meta.stream.streamResults], () => {
 
-        // set the first stream as the selected stream when the api loads the data
-        if (!props.editMode &&
-          !dashboardPanelData.data.fields.stream &&
-          data.indexOptions.length > 0
-        ) {
-          dashboardPanelData.data.fields.stream = data.indexOptions[0];
-        }
+      if (!props.editMode) {
+        dashboardPanelData.data.fields.stream = ""
+      }
+
+      data.indexOptions = dashboardPanelData.meta.stream.streamResults
+        .filter((data: any) => data.stream_type == dashboardPanelData.data.fields.stream_type)
+        .map((data: any) => {
+          return data.name;
+        });
+
+      // set the first stream as the selected stream when the api loads the data
+      if (!props.editMode &&
+        !dashboardPanelData.data.fields.stream &&
+        data.indexOptions.length > 0
+      ) {
+        dashboardPanelData.data.fields.stream = data.indexOptions[0];
+      }
     })
 
     // update the current list fields if any of the lists changes
@@ -274,7 +215,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const mutationHandler = (mutationRecords: any) => {};
+    const mutationHandler = (mutationRecords: any) => { };
 
     const onDragEnter = (e: any) => {
       e.preventDefault();
@@ -345,6 +286,7 @@ export default defineComponent({
     padding: 0.5rem;
   }
 }
+
 .index-menu {
   width: 100%;
   height: 100%;
@@ -359,6 +301,7 @@ export default defineComponent({
         padding-top: 0px !important;
       }
     }
+
     &__native :first-of-type {
       padding-top: 0.25rem;
     }
@@ -375,9 +318,11 @@ export default defineComponent({
     .q-table {
       display: block;
     }
+
     tr {
       margin-bottom: 1px;
     }
+
     tbody,
     tr,
     td {
@@ -390,15 +335,18 @@ export default defineComponent({
       padding: 0px !important;
       border-bottom: unset;
     }
+
     :deep(.q-table__control),
     label.q-field {
       width: 100%;
     }
+
     .q-table thead tr,
     .q-table tbody td {
       height: auto;
     }
   }
+
   .field-table {
     width: 100%;
   }
@@ -428,7 +376,7 @@ export default defineComponent({
       .field_icons {
         padding: 0 0 0 0.25rem;
         transition: all 0.3s ease;
-        background-color: white;
+        // background-color: white;
         position: absolute;
         z-index: 3;
         opacity: 0;
@@ -462,11 +410,12 @@ export default defineComponent({
     &.selected {
       .field_overlay {
         background-color: rgba(89, 96, 178, 0.3);
-
+        
         .field_icons {
           opacity: 0;
         }
       }
+
       &:hover {
         .field_overlay {
           box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
@@ -478,18 +427,46 @@ export default defineComponent({
         }
       }
     }
+
     &:hover {
       .field_overlay {
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
 
         .field_icons {
-          background-color: white;
+          // background-color: white;
           opacity: 1;
         }
       }
     }
   }
 }
+
+.theme-dark {
+
+  .field_overlay {
+    &:hover {
+      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+
+      .field_icons {
+        background-color: #202224;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.theme-light {
+  .field_overlay {
+    &:hover {
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+      .field_icons {
+        background-color: white;
+        opacity: 1;
+      }
+    }
+  }
+}
+
 .q-item {
   color: $dark-page;
   min-height: 1.3rem;
@@ -499,28 +476,30 @@ export default defineComponent({
     font-size: 0.75rem;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper {
+  &.q-manual-focusable--focused>.q-focus-helper {
     background: none !important;
     opacity: 0.3 !important;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
+  &.q-manual-focusable--focused>.q-focus-helper,
   &--active {
     background-color: $selected-list-bg !important;
   }
 
-  &.q-manual-focusable--focused > .q-focus-helper,
+  &.q-manual-focusable--focused>.q-focus-helper,
   &:hover,
   &--active {
     color: $primary;
   }
 }
+
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
   height: auto;
   line-height: auto;
 }
+
 .q-field__native,
 .q-field__input {
   padding: 0px 0px 0px 0px;
@@ -529,6 +508,7 @@ export default defineComponent({
 .q-field--dense .q-field__label {
   top: 5px;
 }
+
 .q-field--dense .q-field__control,
 .q-field--dense .q-field__marginal {
   height: 34px;

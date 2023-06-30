@@ -35,7 +35,7 @@
         v-mutation="handler2">
         <q-btn-group class="q-mr-sm" v-for="(itemX,index) in dashboardPanelData.data.fields.x" :key="index">
           <q-btn  
-            icon-right="arrow_drop_down" no-caps dense color="primary" rounded size="sm"
+            icon-right="arrow_drop_down" no-caps color="primary" dense rounded size="sm"
             :label="itemX.column" class="q-pl-sm">
               <q-menu class="q-pa-md">
                 <div>
@@ -528,14 +528,14 @@ export default defineComponent({
 }
 
 .droppable {
-  border-color: white;
+  border-color: transparent;
   border-style: dashed;
   border-width: 2px;
 }
 
 .drop-target {
-  background-color: #dfdfdf;
-  border-color: black;
+  background-color: rgba(0, 0, 0, 0.042);
+  border-color: white;
   border-style: dotted;
 }
 

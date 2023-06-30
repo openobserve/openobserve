@@ -15,19 +15,19 @@
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md text-black">
+    <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
           <div
             v-if="beingUpdated"
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold"
             data-test="update-org"
           >
             {{ t("organization.updateOrganization") }}
           </div>
           <div
             v-else
-            class="text-body1 text-bold text-dark"
+            class="text-body1 text-bold"
             data-test="create-org"
           >
             {{ t("organization.createOrganization") }}
@@ -73,11 +73,10 @@
         <div class="flex justify-center q-mt-lg">
           <q-btn
             v-close-popup
-            class="q-mb-md text-bold no-border"
+            class="q-mb-md text-bold"
             :label="t('organization.cancel')"
             text-color="light-text"
             padding="sm md"
-            color="accent"
             no-caps
             @click="router.replace({ name: 'organizations' })"
           />

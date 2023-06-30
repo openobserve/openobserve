@@ -188,7 +188,7 @@ export default defineComponent({
                   Plotly.react(
                       plotRef.value,
                       [],
-                      {},
+                      {...getThemeLayoutOptions()},
                       {
                           responsive: true,
                           displaylogo: false,
@@ -208,7 +208,7 @@ export default defineComponent({
               await Plotly.newPlot(
                   plotRef.value,
                   [{}],
-                  {},
+                  {...getThemeLayoutOptions()},
                   {
                       responsive: true,
                       displaylogo: false,
@@ -745,10 +745,9 @@ export default defineComponent({
           const layout: any = {
               title: false,
               showlegend: props.data.config?.show_legends,
-              font: { size: 12 },
               autosize: true,
               legend: {
-                  bgcolor: "#f7f7f7",
+                  bgcolor: "#0000000b",
                   orientation: getLegendPosition('sql'),
                   itemclick: ['pie', 'donut'].includes(props.data.type) ? 'toggle' : false,
               },
@@ -759,6 +758,7 @@ export default defineComponent({
                   b: 32,
               },
               ...getPropsByChartTypeForLayout(),
+              ...getThemeLayoutOptions()
           };
 
         //   console.log('layout', layout);
@@ -790,10 +790,9 @@ export default defineComponent({
                 const layout: any = {
                     title: false,
                     showlegend: props.data.config?.show_legends,
-                    font: { size: 12 },
                     autosize: true,
                     legend: {
-                        bgcolor: "#f7f7f7",
+                        // bgcolor: "#f7f7f7",
                         orientation: getLegendPosition('promql'),
                         itemclick: false,
                     },
@@ -803,7 +802,8 @@ export default defineComponent({
                         r:50,
                         t:50,
                         b:50
-                    }
+                    },
+                    ...getThemeLayoutOptions()
                 };
 
                 console.log('plotly promql layout', layout);
@@ -831,10 +831,9 @@ export default defineComponent({
                 const layout: any = {
                     title: false,
                     showlegend: props.data.config?.show_legends,
-                    font: { size: 12 },
                     autosize: true,
                     legend: {
-                        bgcolor: "#f7f7f7",
+                        // bgcolor: "#f7f7f7",
                         orientation: getLegendPosition('promql'),
                         itemclick: false
                     },
@@ -843,7 +842,8 @@ export default defineComponent({
                         r: props.data.type == 'pie' ? 60 : 16,
                         t: 38,
                         b: 32,
-                    }
+                    },
+                    ...getThemeLayoutOptions()
                 };
 
                 Plotly.react(plotRef.value, traces, layout, {
@@ -1265,6 +1265,19 @@ export default defineComponent({
           }
       };
 
+    const getThemeLayoutOptions = () => ({
+        paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+        plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+        font: {
+                size: 12 ,
+                color: store.state.theme === 'dark' ? '#fff' : '#333'
+            }
+    })
+
+    watch(() => store.state.theme, () => {
+        Plotly.update(plotRef.value, {}, getThemeLayoutOptions())
+    })
+
       return {
           chartPanelRef,
           plotRef,
@@ -1297,7 +1310,7 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
       /* bg color is important for th; just specify one */
-      background-color: #fff;
+    //   background-color: #fff;
   }
 
   :deep(thead tr th) {

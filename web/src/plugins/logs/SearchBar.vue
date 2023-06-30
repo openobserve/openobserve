@@ -454,7 +454,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: "myFnCustomTheme",
+        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",
@@ -801,7 +801,6 @@ export default defineComponent({
 
     .q-field__input {
       cursor: pointer;
-      color: #36383a;
       font-weight: 600;
       font-size: 12px;
     }
