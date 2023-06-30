@@ -1,39 +1,19 @@
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md text-black">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <!-- <div v-if="beingUpdated" class="text-body1 text-bold text-dark">
-                    {{ t("dashboard.updatedashboard") }}
-                    </div>
-                    <div v-else class="text-body1 text-bold text-dark">
-                    {{ t("dashboard.createdashboard") }}
-                    </div> -->
+    <div class="column full-height">
+        <div>
+            <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" />
         </div>
-        <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-          />
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
-        <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" />
-    </q-card-section>
-  </q-card>
+    </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, onActivated } from "vue";
 import dashboardService from "../../../services/dashboards";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isProxy, toRaw } from "vue";
+import { useRoute } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
+import { getDashboard } from "../../../utils/commons";
 
 const defaultValue = () => {
   return {
@@ -46,7 +26,7 @@ const defaultValue = () => {
 let callDashboard: Promise<{ data: any }>;
 
 export default defineComponent({
-  name: "GeneralSettings",
+  name: "VariableSettings",
   props: {
     modelValue: {
       type: Object,
@@ -62,17 +42,27 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const route = useRoute();
 
-    onMounted(() => {
+    onMounted(async () => {
+        await getDashboardData();
       if (props.modelValue && props.modelValue.id) {
         beingUpdated.value = true;
         disableColor.value = "grey-5";
       }
     });
 
-    //generate random integer number for dashboard Id
-    function getRandInteger() {
-      return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
+    onActivated(async () => {
+      console.log("on activated called");
+      
+      await getDashboardData();
+    })
+
+   
+    const getDashboardData = async () => {
+        let data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))
+        console.log("data=", data);
+        
     }
 
     return {
@@ -84,9 +74,9 @@ export default defineComponent({
       dashboardData,
       addDashboardForm,
       store,
-      getRandInteger,
       isValidIdentifier,
       getImageURL,
+      getDashboardData
     };
   },
 });

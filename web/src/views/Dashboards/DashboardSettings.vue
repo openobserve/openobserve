@@ -12,16 +12,28 @@
 
 <template>
     <div class="q-pa-none bg-white" style="min-height: inherit">
-    <div class="text-h4 q-ma-sm">
-    {{ t('dashboard.setting') }}
-    </div>
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div class="text-body1 q-mx-md text-bold text-dark">
+            {{ t('dashboard.setting') }}
+          </div>
+        </div>
+        <div class="col-auto">
+          <q-btn
+            v-close-popup
+            round
+            flat
+            :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          />
+        </div>
+      </div>
       <q-splitter
         v-model="splitterModel"
         unit="px"
         style="min-height: calc(100vh - 57px)"
       >
         <template v-slot:before>
-          <div class="functions-tabs">
+          <div class="functions-tabs" style="width: 100%;">
             <q-tabs
               v-model="activeTab"
               class="text-secondary"
@@ -35,7 +47,7 @@
           </div>
         </template>
         <template v-slot:after>
-          <div class="q-mx-md q-my-sm">
+          <div class="q-mx-md q-my-sm" style="width: 50vw;">
             <q-tab-panels
                 v-model="activeTab"
                 animated
@@ -68,7 +80,8 @@
   import { useRouter } from "vue-router";
   import { useI18n } from "vue-i18n";
   import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue"
-  import VariableSettings from "../../components/dashboards/settings/variableSettings.vue"
+  import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue"
+  import { getImageURL } from "../../utils/zincutils";
   
   export default defineComponent({
     name: "AppSettings",
@@ -92,6 +105,7 @@
         splitterModel,
         activeTab,
         templates,
+        getImageURL
       };
     },
   });
