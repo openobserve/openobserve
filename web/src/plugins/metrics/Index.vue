@@ -44,6 +44,7 @@
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
             <date-time
+              :default-date="searchObj.data.datetime"
               data-test="logs-search-bar-date-time-dropdown"
               @date-change="updateDateTime"
             />
@@ -114,7 +115,7 @@
               }}</q-item-label>
             </h5>
           </div>
-          <div v-else-if="!!!searchObj.data.metrics.selectedMetrics.length">
+          <div v-else-if="!!!searchObj.data.metrics.selectedMetric">
             <h5
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
@@ -175,7 +176,6 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
-  nextTick,
   watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
@@ -184,16 +184,13 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import MetricList from "./MetricList.vue";
-import MetricsViewer from "./MetricsViewer.vue";
 import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
@@ -203,9 +200,12 @@ import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
-import SearchService from "@/services/search";
-import { label } from "aws-amplify";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import {
+  getQueryParamsForDuration,
+  getDurationObjectFromParams,
+} from "@/utils/date";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -228,7 +228,7 @@ export default defineComponent({
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.metrics.selectedMetrics[0],
+          stream_name: this.searchObj.data.metrics.selectedMetric,
           page: "Metrics explorer",
         });
       }
@@ -288,9 +288,34 @@ export default defineComponent({
     const showAddToDashboardDialog = ref(false);
 
     onBeforeMount(() => {
+      if (searchObj.loading == false) {
+        loadPageData(true);
+        refreshData();
+      }
+      restoreUrlQueryParams();
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;
+    });
+
+    onDeactivated(() => {
+      clearInterval(refreshIntervalID);
+    });
+
+    onActivated(() => {
+      if (!searchObj.loading) updateStreams();
+      refreshData();
+
+      if (
+        searchObj.organizationIdetifier !=
+        store.state.selectedOrganization.identifier
+      ) {
+        loadPageData();
+      }
+
+      setTimeout(() => {
+        if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      }, 1500);
     });
 
     function ErrorException(message) {
@@ -336,7 +361,7 @@ export default defineComponent({
       { deep: true }
     );
 
-    function getStreamList() {
+    function getStreamList(isFirstLoad = false) {
       try {
         streamService
           .nameList(
@@ -349,7 +374,7 @@ export default defineComponent({
 
             if (res.data.list.length > 0) {
               //extract stream data from response
-              loadStreamLists();
+              loadStreamLists(isFirstLoad);
             } else {
               searchObj.loading = false;
               searchObj.data.errorMsg =
@@ -379,10 +404,10 @@ export default defineComponent({
       }
     }
 
-    function loadStreamLists() {
+    function loadStreamLists(isFirstLoad = false) {
       try {
         searchObj.data.metrics.metricList = [];
-        searchObj.data.metrics.selectedMetrics = [];
+        searchObj.data.metrics.selectedMetric = "";
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -393,26 +418,43 @@ export default defineComponent({
             };
             searchObj.data.metrics.metricList.push(itemObj);
 
-            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+            // If isFirstLoad is true, then select the stream from query params
+            if (
+              isFirstLoad &&
+              router.currentRoute.value?.query?.stream == item.name
+            ) {
+              lastUpdatedStreamTime = item.stats.doc_time_max;
+              selectedStreamItemObj = itemObj;
+            }
+
+            // If stream from query params dosent match the selected stream, then select the stream from last updated time
+            if (
+              item.stats.doc_time_max >= lastUpdatedStreamTime &&
+              !(
+                router.currentRoute.value.query?.stream &&
+                selectedStreamItemObj.value &&
+                router.currentRoute.value.query.stream ===
+                  selectedStreamItemObj.value
+              )
+            ) {
               lastUpdatedStreamTime = item.stats.doc_time_max;
               selectedStreamItemObj = itemObj;
             }
           });
           if (selectedStreamItemObj.label != undefined) {
-            searchObj.data.metrics.selectedMetrics = [];
-            searchObj.data.metrics.selectedMetrics.push(
-              selectedStreamItemObj.value
-            );
+            searchObj.data.metrics.selectedMetric = selectedStreamItemObj.value;
           } else {
             searchObj.loading = false;
             searchObj.data.queryResults = {};
-            searchObj.data.metrics.selectedMetrics = [];
+            searchObj.data.metrics.selectedMetric = "";
             searchObj.data.histogram = {
               xData: [],
               yData: [],
               chartParams: {},
             };
           }
+
+          if (isFirstLoad) runQuery();
         } else {
           searchObj.loading = false;
         }
@@ -493,16 +535,13 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        if (
-          !searchObj.data.metrics.selectedMetrics.length ||
-          !searchObj.data.query
-        ) {
+        if (!searchObj.data.metrics.selectedMetric || !searchObj.data.query) {
           return false;
         }
 
         // dismiss = Notify();
-
         chartData.value = cloneDeep(dashboardPanelData.data);
+        updateUrlQueryParams();
       } catch (e) {
         searchObj.loading = false;
         showErrorNotification("Request failed.");
@@ -523,43 +562,15 @@ export default defineComponent({
       };
     };
 
-    function loadPageData() {
+    function loadPageData(isFirstLoad = false) {
       // searchObj.loading = true;
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list
-      getStreamList();
+      getStreamList(isFirstLoad);
     }
-
-    onMounted(() => {
-      if (searchObj.loading == false) {
-        loadPageData();
-
-        refreshData();
-      }
-    });
-
-    onDeactivated(() => {
-      clearInterval(refreshIntervalID);
-    });
-
-    onActivated(() => {
-      if (!searchObj.loading) updateStreams();
-      refreshData();
-
-      if (
-        searchObj.organizationIdetifier !=
-        store.state.selectedOrganization.identifier
-      ) {
-        loadPageData();
-      }
-
-      setTimeout(() => {
-        if (searchResultRef.value) searchResultRef.value.reDrawChart();
-      }, 1500);
-    });
 
     const refreshData = () => {
       if (
@@ -603,7 +614,7 @@ export default defineComponent({
           button: "Date Change",
           tab: value.tab,
           value: dateTimeVal,
-          metric_name: searchObj.data.metrics.selectedMetrics[0],
+          metric_name: searchObj.data.metrics.selectedMetric,
           page: "Search Metrics",
         });
       }
@@ -661,6 +672,45 @@ export default defineComponent({
           dismiss();
         });
     };
+
+    function restoreUrlQueryParams() {
+      const queryParams = router.currentRoute.value.query;
+      const date = getDurationObjectFromParams(queryParams);
+      if (date) {
+        searchObj.data.datetime = date;
+        updateDateTime(date);
+      }
+      if (queryParams.query) {
+        searchObj.data.query = b64DecodeUnicode(queryParams.query);
+        dashboardPanelData.data.query = searchObj.data.query;
+      }
+      if (queryParams.refresh) {
+        searchObj.meta.refreshInterval = queryParams.refresh;
+      }
+    }
+    function updateUrlQueryParams() {
+      try {
+        const date = getQueryParamsForDuration(searchObj.data.datetime);
+        const query = {
+          stream: searchObj.data.metrics.selectedMetric,
+        };
+        if (date.period) {
+          query["period"] = date.period;
+        }
+        if (date.from && date.to) {
+          query["from"] = date.from;
+          query["to"] = date.to;
+        }
+        query["refresh"] = searchObj.meta.refreshInterval;
+        if (searchObj.data.query) {
+          query["query"] = b64EncodeUnicode(searchObj.data.query);
+        }
+        query["org_identifier"] = store.state.selectedOrganization.identifier;
+        router.push({ query });
+      } catch (err) {
+        console.log(err);
+      }
+    }
     return {
       store,
       router,
@@ -694,7 +744,7 @@ export default defineComponent({
       return this.store.state.selectedOrganization.identifier;
     },
     selectedMetrics() {
-      return this.searchObj.data.metrics.selectedMetrics;
+      return this.searchObj.data.metrics.selectedMetric;
     },
     changeRelativeDate() {
       return (
@@ -715,22 +765,13 @@ export default defineComponent({
       );
       this.loadPageData();
     },
-    selectedMetrics: {
-      deep: true,
-      handler: function () {
-        if (this.searchObj.data.metrics.selectedMetrics.length) {
-          setTimeout(() => {
-            this.runQuery();
-          }, 500);
-        }
-      },
-    },
     changeRelativeDate() {
       if (this.searchObj.data.datetime.tab == "relative") {
         this.runQuery();
       }
     },
     changeRefreshInterval() {
+      this.updateUrlQueryParams();
       this.refreshData();
     },
   },
