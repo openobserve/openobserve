@@ -229,7 +229,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
-import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedGridOn, outlinedWarning, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
+import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedWindow, outlinedReportProblem, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 
 let mainLayoutMixin: any = null;
@@ -336,12 +336,12 @@ export default defineComponent({
       },
       {
         title: t("menu.index"),
-        icon: outlinedGridOn,
+        icon: outlinedWindow,
         link: "/logstreams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedWarning,
+        icon: outlinedReportProblem,
         link: "/alerts",
       },
       {

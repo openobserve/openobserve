@@ -38,7 +38,7 @@
         <q-td :props="props">
            <q-btn
               v-if="props.row.actions == 'true'"
-              :icon="'img:' + getImageURL('images/common/copy_icon.svg')"
+              icon="content_copy"
               :title="t('dashboard.duplicate')"
               class="q-ml-xs"
               padding="sm"
