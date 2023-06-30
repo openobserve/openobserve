@@ -55,6 +55,6 @@ phases:
       # - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH
       # - docker manifest push public.ecr.aws/zinclabs/openobserve-dev:latest
 
-cache:
-  paths:
-    - /root/.cache/
+# cache:
+#   paths:
+#     - /root/.cache/
