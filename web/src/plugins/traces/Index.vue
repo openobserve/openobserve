@@ -22,6 +22,7 @@
         data-test="logs-search-bar"
         ref="searchBarRef"
         v-show="searchObj.data.stream.streamLists.length > 0"
+        :fieldValues="fieldValues"
         :key="searchObj.data.stream.streamLists.length"
         @searchdata="searchData"
       />
@@ -137,7 +138,8 @@
       </div>
       <div v-else>
         <h5 data-test="logs-search-error-message" class="text-center">
-          <q-icon name="warning" color="warning" size="10rem" /><br />{{
+          <q-icon name="warning"
+color="warning" size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
         </h5>
@@ -150,12 +152,11 @@
 // @ts-nocheck
 import {
   defineComponent,
-  onMounted,
-  onUpdated,
   ref,
   onDeactivated,
   onActivated,
   onBeforeMount,
+  watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -187,6 +188,7 @@ import {
   getDurationObjectFromParams,
   getQueryParamsForDuration,
 } from "@/utils/date";
+import useSqlSuggestions from "@/composables/useSuggestions";
 
 export default defineComponent({
   name: "PageSearch",
@@ -194,6 +196,12 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
+  },
+  props: {
+    fieldValues: {
+      type: Object,
+      default: () => {},
+    },
   },
   methods: {
     searchData() {
@@ -252,7 +260,7 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
-    const tracesScatterChart = ref({});
+    const fieldValues = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -681,6 +689,27 @@ export default defineComponent({
       return req;
     };
 
+    const updateFieldValues = (data) => {
+      const excludedFields = [store.state.zoConfig.timestamp_column];
+      data.forEach((item) => {
+        // Create set for each field values and add values to corresponding set
+        Object.keys(item).forEach((key) => {
+          if (excludedFields.includes(key)) {
+            return;
+          }
+
+          if (fieldValues.value[key] == undefined) {
+            fieldValues.value[key] = new Set();
+          }
+
+          if (!fieldValues.value[key].has(item[key])) {
+            fieldValues.value[key].add(item[key]);
+          }
+        });
+      });
+      console.log("fieldValues", fieldValues.value);
+    };
+
     function getQueryData() {
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
@@ -738,6 +767,7 @@ export default defineComponent({
               searchObj.data.queryResults = res.data;
             }
 
+            updateFieldValues(res.data.hits);
             //extract fields from query response
             extractFields();
 
@@ -1239,6 +1269,7 @@ export default defineComponent({
       searchAroundData,
       getTraceDetails,
       verifyOrganizationStatus,
+      fieldValues,
     };
   },
   computed: {

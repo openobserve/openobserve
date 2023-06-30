@@ -62,6 +62,7 @@
           ref="queryEditorRef"
           class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
+          :keywords="autoCompleteKeywords"
           v-model:functions="searchObj.data.stream.functions"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -73,7 +74,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -86,6 +87,7 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import { Parser } from "node-sql-parser";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import useSqlSuggestions from "@/composables/useSuggestions";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -95,6 +97,12 @@ export default defineComponent({
     SyntaxGuide,
   },
   emits: ["searchdata"],
+  props: {
+    fieldValues: {
+      type: Object,
+      default: () => {},
+    },
+  },
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -103,7 +111,7 @@ export default defineComponent({
       }
     },
   },
-  setup() {
+  setup(props) {
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -115,13 +123,39 @@ export default defineComponent({
     const parser = new Parser();
     let streamName = "";
 
+    const {
+      autoCompleteData,
+      autoCompleteKeywords,
+      getSuggestions,
+      updateFieldKeywords,
+    } = useSqlSuggestions();
+
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = item.value;
       searchObj.meta.refreshIntervalLabel = item.label;
       btnRefreshInterval.value = false;
     };
 
+    watch(
+      () => searchObj.data.stream.selectedStreamFields,
+      (fields) => {
+        if (fields.length) updateFieldKeywords(fields);
+      },
+      { immediate: true, deep: true }
+    );
+
+    const updateAutoComplete = (value) => {
+      autoCompleteData.value.query = value;
+      autoCompleteData.value.cursorIndex =
+        queryEditorRef.value.getCursorIndex();
+      autoCompleteData.value.fieldValues = props.fieldValues;
+      autoCompleteData.value.popup.open =
+        queryEditorRef.value.triggerAutoComplete;
+      getSuggestions();
+    };
+
     const updateQueryValue = (value: string) => {
+      updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery?.from?.length > 0) {
@@ -241,6 +275,7 @@ export default defineComponent({
       udpateQuery,
       downloadLogs,
       setEditorValue,
+      autoCompleteKeywords,
     };
   },
   computed: {
