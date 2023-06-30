@@ -580,18 +580,8 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
-    match cfg.s3.provider.as_str() {
-        "oss" => {
-            cfg.s3.feature_force_path_style = true;
-        }
-        "minio" => {
-            cfg.s3.feature_force_path_style = true;
-        }
-        "swift" => {
-            cfg.s3.feature_force_path_style = true;
-            std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
-        }
-        _ => {}
+    if cfg.s3.provider.eq("swift") {
+        std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
     Ok(())
 }
