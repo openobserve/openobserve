@@ -1,8 +1,13 @@
 <template>
-    <div class="column full-height">
-        <div>
-            <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" @click="addVariables" />
-        </div>
+    <div>
+      <div v-if="isAddVariable" class="column full-height">
+        <AddSettingVariable />
+      </div>
+      <div  v-else class="column full-height">
+          <div>
+              <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" @click="addVariables" />
+          </div>
+      </div>
     </div>
 </template>
 
@@ -14,6 +19,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 import { getDashboard } from "../../../utils/commons";
+import  AddSettingVariable from "./AddSettingVariable.vue"
 
 const defaultValue = () => {
   return {
@@ -27,6 +33,9 @@ let callDashboard: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "VariableSettings",
+  components: {
+    AddSettingVariable
+  },
   props: {
     modelValue: {
       type: Object,
@@ -43,6 +52,7 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const route = useRoute();
+    const isAddVariable = ref(false)
 
     onMounted(async () => {
         await getDashboardData();
@@ -54,21 +64,17 @@ export default defineComponent({
 
     onActivated(async () => {
       console.log("on activated called");
-      
       await getDashboardData();
     })
 
    
     const getDashboardData = async () => {
-        let data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))
-        console.log("data=", data);
-        
+      let data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))
+      console.log("data=", data);
     }
 
     const addVariables = () => {
-      // router.push({
-      //   path: "/dashboards/import",
-      // });
+      isAddVariable.value = true
     }
 
     return {
@@ -83,7 +89,8 @@ export default defineComponent({
       isValidIdentifier,
       getImageURL,
       getDashboardData,
-      addVariables
+      addVariables,
+      isAddVariable
     };
   },
 });
