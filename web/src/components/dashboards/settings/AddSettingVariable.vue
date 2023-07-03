@@ -38,13 +38,34 @@
                         :options="filteredStreams" input-debounce="0" behavior="menu" use-input filled borderless
                         dense hide-selected fill-input @filter="filterStreamFn">
                     </q-select>
+                    <q-select
+                        filled
+                        :model-value="model"
+                        use-input
+                        hide-selected
+                        fill-input
+                        input-debounce="0"
+                        :options="data.currentFieldsList"
+                        @filter="filterFn"
+                        @input-value="setModel"
+                        hint="Text autocomplete"
+                        style="width: 250px; padding-bottom: 32px"
+                    >
+                        <template v-slot:no-option>
+                        <q-item>
+                            <q-item-section class="text-grey">
+                            No results
+                            </q-item-section>
+                        </q-item>
+                        </template>
+                    </q-select>
             </div>
         </div>
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted, onActivated } from "vue";
+import { defineComponent, ref, reactive, onMounted, onActivated, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import IndexService from "../../../services/index"
 import { useStore } from "vuex";
@@ -55,12 +76,14 @@ export default defineComponent({
     setup(props) {
         const { t } = useI18n();
         const store = useStore();
-        const data = reactive({
+        const data: any = reactive({
             schemaList: [],
             indexOptions: [],
             streamType: ["logs", "metrics", "traces"],
             currentFieldsList: [],
+            selectedStreamFields: []
         });
+        const model = ref(null)
         const filteredStreams = ref([]);
         const variableTypes= ref([
                 {
@@ -90,6 +113,7 @@ export default defineComponent({
               streamField : "",
             }
         })
+        const editMode = ref(false)
 
         onMounted(() => {
             getStreamList();
@@ -115,6 +139,65 @@ export default defineComponent({
             });
         };
 
+        const filterFn = (val: string, update: any) => {
+        update(() => {
+          const needle = val.toLocaleLowerCase()
+          data.currentFieldsList = data.currentFieldsList.filter((v:any) => v.toLocaleLowerCase().indexOf(needle) > -1)
+        })
+      }
+
+        const setModel = (val: any) => {
+            model.value = val
+        }
+
+        watch(() => [variableData.queryData.streamType], () => {
+
+            if (!editMode.value) {
+                variableData.queryData.stream = ""
+            }
+
+            data.indexOptions = data.schemaList.filter((data: any) => data.stream_type == variableData.queryData.streamType)
+            .map((data: any) => {
+                return data.name;
+            });
+
+            // set the first stream as the selected stream when the api loads the data
+            if (!editMode.value &&
+            !variableData.queryData.stream &&
+            data.indexOptions.length > 0
+            ) {
+                variableData.queryData.stream = data.indexOptions[0];
+            }
+        })
+
+        watch(() => [data.schemaList, variableData.queryData.stream, variableData.queryData.streamType],
+            () => {
+                // console.log("stream:", dashboardPanelData.data.fields.stream);
+
+                const fields: any = data.schemaList.find(
+                (it: any) => it.name == variableData.queryData.stream
+                );
+                data.selectedStreamFields =
+                fields?.schema || [];
+            }
+        );
+
+        // update the current list fields if any of the lists changes
+        watch(
+        () => [
+            data.selectedStreamFields,
+        ],
+        () => {
+            // console.log("updated custom query fields or selected stream fields");
+
+            data.currentFieldsList = [];
+            data.currentFieldsList = [
+            ... data.selectedStreamFields
+            ];
+        }
+        );
+
+
         return {
             variableData,
             t,
@@ -123,7 +206,8 @@ export default defineComponent({
             filterStreamFn,
             filteredStreams,
             variableTypes,
-            onActivated
+            onActivated,
+            setModel
         }
     }
     
