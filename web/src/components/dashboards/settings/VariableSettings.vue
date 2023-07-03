@@ -1,7 +1,7 @@
 <template>
     <div class="column full-height">
         <div>
-            <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" />
+            <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" @click="addVariables" />
         </div>
     </div>
 </template>
@@ -65,6 +65,12 @@ export default defineComponent({
         
     }
 
+    const addVariables = () => {
+      // router.push({
+      //   path: "/dashboards/import",
+      // });
+    }
+
     return {
       t,
       disableColor,
@@ -76,7 +82,8 @@ export default defineComponent({
       store,
       isValidIdentifier,
       getImageURL,
-      getDashboardData
+      getDashboardData,
+      addVariables
     };
   },
 });
