@@ -23,14 +23,13 @@ use std::io::{BufReader, Seek, SeekFrom};
 use std::sync::Arc;
 
 use crate::common::json;
-use crate::infra::config::CONFIG;
+use crate::infra::config::{CONFIG, LOCAL_SCHEMA_LOCKER};
 use crate::infra::db::etcd;
 use crate::meta::prom::METADATA_LABEL;
 use crate::meta::stream::SchemaEvolution;
 use crate::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
-
-use super::search::server_internal_error;
+use crate::service::search::server_internal_error;
 
 #[tracing::instrument(name = "service:schema:schema_evolution", skip(inferred_schema))]
 pub async fn schema_evolution(
@@ -354,26 +353,70 @@ pub async fn check_for_schema(
                 );
             }
         } else {
-            db::schema::set(
-                org_id,
-                stream_name,
-                stream_type,
-                &final_schema,
-                Some(record_ts),
-                false,
-            )
-            .await
-            .unwrap();
-            //return (true, None, final_schema.fields().to_vec());
-            return SchemaEvolution {
-                schema_compatible: true,
-                types_delta: None,
-                schema_fields: final_schema.fields().to_vec(),
-                is_schema_changed: true,
-            };
+            let key = format!(
+                "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
+                &CONFIG.sled.prefix
+            );
+
+            let value = LOCAL_SCHEMA_LOCKER
+                .entry(key.clone())
+                .or_insert_with(|| tokio::sync::RwLock::new(false));
+
+            let mut lock_acquired = value.write().await; // lock acquired
+
+            if !*lock_acquired {
+                *lock_acquired = true; // We've acquired the lock.
+                log::info!(
+                    "Acquired lock for stream {} as schema is empty",
+                    stream_name
+                );
+                let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
+                    .await
+                    .unwrap();
+                if chk_schema.fields().is_empty() {
+                    log::info!(
+                        "Setting schema for stream {} as schema is empty",
+                        stream_name
+                    );
+                    db::schema::set(
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        &final_schema,
+                        Some(record_ts),
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                    return SchemaEvolution {
+                        schema_compatible: true,
+                        types_delta: None,
+                        schema_fields: final_schema.fields().to_vec(),
+                        is_schema_changed: true,
+                    };
+                } else {
+                    // Someone else has already acquired the lock.
+                    drop(lock_acquired); // release lock
+                    schema = chk_schema;
+                    log::info!(
+                        "Schema exists for stream {} after schema is set 1",
+                        stream_name
+                    );
+                }
+            } else {
+                // Someone else has already acquired the lock.
+                drop(lock_acquired); // release lock
+                let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
+                    .await
+                    .unwrap();
+                schema = chk_schema;
+                log::info!(
+                    "Schema exists for stream {} after schema is set 2",
+                    stream_name
+                );
+            }
         }
     }
-
     let inferred_fields: HashSet<_> = inferred_schema.fields().iter().collect();
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
