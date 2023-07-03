@@ -49,7 +49,7 @@
             :label="t('dashboard.id')"
           />
           <q-input
-            v-model="dashboardData.name"
+            v-model="dashboardData.title"
             :label="t('dashboard.name') + ' *'"
             color="input-border"
             bg-color="input-bg"
@@ -97,46 +97,60 @@
 </template>
   
   <script lang="ts">
-  import { defineComponent, ref } from "vue";
+  import { defineComponent, onActivated, onMounted, ref } from "vue";
   import dashboardService from "../../../services/dashboards";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
   import { isProxy, toRaw, reactive } from "vue";
   import { getImageURL } from "../../../utils/zincutils";
-  
-  const defaultValue = () => {
-    return {
-      id: "",
-      name: "",
-      description: "",
-    };
-  };
+  import { getDashboard } from "@/utils/commons";
+  import { useRoute } from "vue-router";
+
+  // const defaultValue = () => {
+  //   return {
+  //     id: "",
+  //     name: "",
+  //     description: "",
+  //   };
+  // };
   
   let callDashboard: Promise<{ data: any }>;
   
   export default defineComponent({
     name: "GeneralSettings",
-    props: {
-      modelValue: {
-        type: Object,
-        default: () => defaultValue(),
-      },
-    },
+    // props: {
+    //   modelValue: {
+    //     type: Object,
+    //     default: () => defaultValue(),
+    //   },
+    // },
     emits: ["update:modelValue", "updated", "finish"],
     setup() {
       const store: any = useStore();
       const beingUpdated: any = ref(false);
       const addDashboardForm: any = ref(null);
       const disableColor: any = ref("");
-      const dashboardData: any = ref(defaultValue());
+      const dashboardData = reactive({
+         data:{}
+      });
       const isValidIdentifier: any = ref(true);
       const { t } = useI18n();
-  
+      const route = useRoute();
+
       //generate random integer number for dashboard Id
       function getRandInteger() {
         return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
       }
-  
+      
+   const getDashboardData = async () => {
+        let dashboardData = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))
+        console.log("data:", dashboardData.title);
+        console.log("data:", dashboardData.description);
+      }
+      console.log("dashboardDataget", getDashboardData());
+      onActivated(async () => {
+        await getDashboardData();
+      })
       return {
         t,
         disableColor,
@@ -149,19 +163,22 @@
         getRandInteger,
         isValidIdentifier,
         getImageURL,
+        getDashboardData
       };
     },
-    created() {
-      if (this.modelValue && this.modelValue.id) {
-        this.beingUpdated = true;
-        this.disableColor = "grey-5";
-        this.dashboardData = {
-          id: this.modelValue.id,
-          name: this.modelValue.name,
-          description: this.modelValue.description,
-        };
-      }
-    },
+    
+    // created() {
+    //   if (this.modelValue && this.modelValue.id) {
+    //     this.beingUpdated = true;
+    //     this.disableColor = "grey-5";
+    //     this.dashboardData = {
+    //       id: this.modelValue.id,
+    //       name: this.modelValue.name,
+    //       description: this.modelValue.description,
+    //     };
+    //   }
+    // },
+    
     methods: {
       onRejected(rejectedEntries: string | any[]) {
         this.$q.notify({
