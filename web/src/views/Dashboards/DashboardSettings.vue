@@ -11,10 +11,10 @@
 -->
 
 <template>
-    <div class="q-pa-none bg-white" style="min-height: inherit">
+    <div class="q-pa-none" :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" style="min-height: inherit">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 q-mx-md text-bold text-dark">
+          <div class="text-body1 q-mx-md text-bold">
             {{ t('dashboard.setting') }}
           </div>
         </div>
@@ -36,7 +36,6 @@
           <div class="functions-tabs" style="width: 100%;">
             <q-tabs
               v-model="activeTab"
-              class="text-secondary"
               indicator-color="transparent"
               inline-label
               vertical
@@ -112,6 +111,9 @@
   </script>
   
   <style scoped lang="scss">
+  .dark-mode {
+    background-color: $dark-page;
+  }
   .q-table {
     &__top {
       border-bottom: 1px solid $border-color;
@@ -127,7 +129,7 @@
           padding: 0 1rem 0 1.25rem;
           border-radius: 0.5rem;
           margin-bottom: 0.5rem;
-          color: $dark;
+          // color: $dark;
           text-transform: capitalize;
           &__content.tab_content {
             .q-tab {
@@ -139,6 +141,7 @@
           }
           &--active {
             background-color: $accent;
+            color: $dark;
           }
         }
       }

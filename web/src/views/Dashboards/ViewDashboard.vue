@@ -19,14 +19,14 @@
   <q-page class="q-pa-md">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
-        <q-btn no-caps color="primary" @click="goBackToDashboardList" text-color="black" padding="xs" outline icon="arrow_back_ios_new" />
+        <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
         <span class="q-table__title q-mx-md q-mt-xs">{{ currentDashboardData.data.title }}</span>
       </div>
       <div class="flex">
-        <q-btn outline padding="xs" color="primary" text-color="black" no-caps icon="add" @click="addPanelData">
+        <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
-        <q-btn outline padding="xs" class="q-ml-sm" color="primary" text-color="black" no-caps icon="settings" @click="addSettingsData">
+        <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="addSettingsData">
           <q-tooltip>{{ t('dashboard.setting') }}</q-tooltip>
         </q-btn>
         <DateTimePicker 

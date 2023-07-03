@@ -15,7 +15,7 @@
 
 <template>
     <div class="column full-height">
-      <div class="q-px-md q-py-md text-black">
+      <div class="q-px-md q-py-md">
         <div class="row items-center no-wrap">
           <div class="col">
             <!-- <div v-if="beingUpdated" class="text-body1 text-bold text-dark">
@@ -24,7 +24,7 @@
             <div v-else class="text-body1 text-bold text-dark">
               {{ t("dashboard.createdashboard") }}
             </div> -->
-             <div class="text-body1 text-bold text-dark">
+             <div class="text-body1 text-bold">
                 {{ t("dashboard.generalSettingsTitle") }}
              </div>
           </div>
