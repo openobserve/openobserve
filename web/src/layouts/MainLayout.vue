@@ -87,9 +87,6 @@
                 active-class="activeLang"
                 @click="changeLanguage(lang)"
               >
-                <q-item-section avatar>
-                  <q-icon :name="lang.icon" class="flagIcon" />
-                </q-item-section>
 
                 <q-item-section>
                   <q-item-label>{{ lang.label }}</q-item-label>
@@ -118,7 +115,7 @@
                     :src="
                       user.picture
                         ? user.picture
-                        : getImageURL('images/common/profile.svg')
+                        : getImageURL('images/common/profile.png')
                     "
                   />
                 </q-avatar>
@@ -373,57 +370,12 @@ export default defineComponent({
       {
         label: "English",
         code: "en-gb",
-        icon: "img:" + getImageURL("images/language_flags/en-gb.svg"),
-      },
-      {
-        label: "Türkçe",
-        code: "tr-turk",
-        icon: "img:" + getImageURL("images/language_flags/tr-turk.svg"),
-      },
-      {
-        label: "简体中文",
-        code: "zh-cn",
-        icon: "img:" + getImageURL("images/language_flags/zh-cn.svg"),
-      },
-      {
-        label: "French",
-        code: "fr",
-        icon: "img:" + getImageURL("images/language_flags/fr.svg"),
-      },
-      {
-        label: "Spanish",
-        code: "es",
-        icon: "img:" + getImageURL("images/language_flags/es.svg"),
-      },
-      {
-        label: "German",
-        code: "de",
-        icon: "img:" + getImageURL("images/language_flags/de.svg"),
-      },
-      {
-        label: "Italian",
-        code: "it",
-        icon: "img:" + getImageURL("images/language_flags/it.svg"),
-      },
-      {
-        label: "Japanese",
-        code: "ja",
-        icon: "img:" + getImageURL("images/language_flags/ja.svg"),
+        icon: "img:",
       },
       {
         label: "Korean",
         code: "ko",
-        icon: "img:" + getImageURL("images/language_flags/ko.svg"),
-      },
-      {
-        label: "Dutch",
-        code: "nl",
-        icon: "img:" + getImageURL("images/language_flags/nl.svg"),
-      },
-      {
-        label: "Portuguese",
-        code: "pt",
-        icon: "img:" + getImageURL("images/language_flags/pt.svg"),
+        icon: "img:",
       },
     ];
 

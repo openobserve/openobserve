@@ -266,7 +266,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .attr-text {
   font-size: 12px;
-  font-family: monospace;
+  font-family: D2Coding, Menlo, Monaco, Consolas, monospace;
 }
 .table-header {
   // text-transform: capitalize;
@@ -385,7 +385,7 @@ export default defineComponent({
   overflow: visible;
   cursor: default;
   font-size: 12px;
-  font-family: monospace;
+  font-family: D2Coding, Menlo, Monaco, Consolas, monospace;
 
   .field_overlay {
     position: absolute;

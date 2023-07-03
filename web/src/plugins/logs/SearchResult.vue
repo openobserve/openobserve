@@ -639,7 +639,7 @@ export default defineComponent({
 
   .log_json_content {
     white-space: pre-wrap;
-    font-family: monospace;
+    font-family: D2Coding, Menlo, Monaco, Consolas, monospace;
   }
 }
 .thead-sticky tr > *,
@@ -678,7 +678,7 @@ export default defineComponent({
   overflow: visible;
   cursor: default;
   font-size: 12px;
-  font-family: monospace;
+  font-family: D2Coding, Menlo, Monaco, Consolas, monospace;
 
   .field_overlay {
     position: absolute;
