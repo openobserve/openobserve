@@ -125,6 +125,8 @@ pub struct PanelConfig {
     title: String,
     description: String,
     show_legends: bool,
+    legends_position: Option<String>,
+    promql_legend: Option<String>,
 }
 
 #[cfg(test)]
@@ -180,7 +182,9 @@ mod tests {
                 "config": {
                     "title": "p5",
                     "description": "sample config blah blah blah",
-                    "show_legends": true
+                    "show_legends": true,
+                    "legends_position": "bottom",
+                    "promql_legend": "right"
                 },
                 "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
                 "customQuery": false
@@ -254,6 +258,12 @@ mod tests {
                             title: "p5",
                             description: "sample config blah blah blah",
                             show_legends: true,
+                            legends_position: Some(
+                                "bottom",
+                            ),
+                            promql_legend: Some(
+                                "right",
+                            ),
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE method IS NOT NULL GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
                         query_type: "",
@@ -419,6 +429,8 @@ mod tests {
                             title: "p1",
                             description: "",
                             show_legends: true,
+                            legends_position: None,
+                            promql_legend: None,
                         },
                         query: "SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\"  FROM \"default\" WHERE log IS NOT NULL AND stream IN ('stdout', 'stderr') GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"",
                         query_type: "",
