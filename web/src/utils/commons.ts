@@ -204,7 +204,12 @@ export const addVariable = async (
     currentDashboard.variables.list = []
   }
 
-  // currentDashboard.variables.list.filter((it: any) => it.name == variableData.id)
+  const variableExists = currentDashboard.variables.list.filter((it: any) => it.name == variableData.name)
+
+  if(variableExists.length){
+    throw new Error("Variable already exists")
+  }
+
   currentDashboard.variables.list.push(variableData)
 
   return await updateDashboard(
@@ -258,12 +263,18 @@ export const updateVariable = async (
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store);
 
+  const variableExists = currentDashboard.variables.list.filter((it: any) => it.name == variableData.name)
+
+  if(variableExists.length){
+    throw new Error("Variable already exists")
+  }
+
   //remove panel from current dashboard
-  const panelIndex = currentDashboard.panels.findIndex(
-    (panel: any) => panel.id == panelData.id
+  const variableIndex = currentDashboard.variables.list.findIndex(
+    (variable: any) => variable.name == variableData.name
   );
-  currentDashboard.panels[panelIndex] = panelData;
-  currentDashboard.panels = currentDashboard.panels;
+  currentDashboard.variables.list[variableIndex] = variableData;
+  currentDashboard.variables.list = currentDashboard.variables.list;
 
   await updateDashboard(
     store,

@@ -79,7 +79,7 @@ import { useI18n } from "vue-i18n";
 import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete"
 import { useStore } from "vuex";
-import { addVariable } from "../../../utils/commons"
+import { addVariable, updateVariable } from "../../../utils/commons"
 import { useRoute } from "vue-router";
 
 export default defineComponent({
@@ -149,7 +149,7 @@ export default defineComponent({
         const saveData = async() => {
             const dashId = route.query.dashboard + "";
             if (editMode.value) {
-                await updatePanel(
+                await updateVariable(
                 store,
                 dashId,
                 variableData
