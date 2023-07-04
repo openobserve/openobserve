@@ -145,13 +145,13 @@
       
       const getDashboardData = async () => {
         const data = await getDashboard(store, route.query.dashboard);
-        console.log("data:", data.title);
-        console.log("data:", data.description);
+        // console.log("data:", data.title);
+        // console.log("data:", data.description);
         dashboardData.title = data.title;
         dashboardData.description = data.description;
       };
-      console.log("dashboardDataget", getDashboardData());
-      onActivated(async () => {
+      // console.log("dashboardDataget", getDashboardData());
+      onMounted(async () => {
         await getDashboardData();
       })
       return {
