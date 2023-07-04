@@ -14,6 +14,7 @@
 
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
+
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -163,7 +164,7 @@ impl Engine {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
-        let metrics_name = selector.name.as_ref().unwrap();
+        let metrics_name = selector.name.as_ref().expect("Missing selector name");
         let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
         if !cache_exists {
             self.selector_load_data(selector, None).await?;
@@ -430,30 +431,10 @@ impl Engine {
                 )));
             }
             Func::CountOverTime => functions::count_over_time(&input)?,
-            Func::DayOfMonth => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
-            Func::DayOfWeek => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
-            Func::DayOfYear => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
-            Func::DaysInMonth => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::DayOfMonth => functions::day_of_month(&input)?,
+            Func::DayOfWeek => functions::day_of_week(&input)?,
+            Func::DayOfYear => functions::day_of_year(&input)?,
+            Func::DaysInMonth => functions::days_in_month(&input)?,
             Func::Delta => functions::delta(&input)?,
             Func::Deriv => {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -520,12 +501,7 @@ impl Engine {
                     func_name
                 )));
             }
-            Func::Hour => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Hour => functions::hour(&input)?,
             Func::Idelta => functions::idelta(&input)?,
             Func::Increase => functions::increase(&input)?,
             Func::Irate => functions::irate(&input)?,
@@ -561,18 +537,8 @@ impl Engine {
             }
             Func::MaxOverTime => functions::max_over_time(&input)?,
             Func::MinOverTime => functions::min_over_time(&input)?,
-            Func::Minute => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
-            Func::Month => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Minute => functions::minute(&input)?,
+            Func::Month => functions::month(&input)?,
             Func::PredictLinear => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {:?}",
@@ -598,12 +564,15 @@ impl Engine {
                     func_name
                 )));
             }
-            Func::Scalar => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Scalar => match input {
+                Value::Float(_) => input,
+                _ => {
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "Invalid scalar value: {:?}",
+                        input
+                    )));
+                }
+            },
             Func::Sgn => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {:?}",
