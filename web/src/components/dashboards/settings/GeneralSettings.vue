@@ -130,8 +130,9 @@
       const beingUpdated: any = ref(false);
       const addDashboardForm: any = ref(null);
       const disableColor: any = ref("");
-      const dashboardData = reactive({
-         data:{}
+       const dashboardData = reactive({
+        title: "",
+        description: "",
       });
       const isValidIdentifier: any = ref(true);
       const { t } = useI18n();
@@ -142,11 +143,13 @@
         return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
       }
       
-   const getDashboardData = async () => {
-        let dashboardData = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))
-        console.log("data:", dashboardData.title);
-        console.log("data:", dashboardData.description);
-      }
+      const getDashboardData = async () => {
+        const data = await getDashboard(store, route.query.dashboard);
+        console.log("data:", data.title);
+        console.log("data:", data.description);
+        dashboardData.title = data.title;
+        dashboardData.description = data.description;
+      };
       console.log("dashboardDataget", getDashboardData());
       onActivated(async () => {
         await getDashboardData();
