@@ -98,6 +98,7 @@ impl Query {
         // Range query
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
         let mut instant_vectors = Vec::new();
+        let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
         let nr_steps = ((self.end - self.start) / self.interval) + 1;
         for i in 0..nr_steps {
@@ -128,8 +129,18 @@ impl Query {
                 Value::Sample(s) => instant_vectors.push(RangeValue::new(Labels::default(), [s])),
                 Value::Float(val) => instant_vectors
                     .push(RangeValue::new(Labels::default(), [Sample::new(time, val)])),
+                Value::String(val) => string_literals.push(val),
                 Value::None => continue,
             };
+        }
+
+        if !string_literals.is_empty() {
+            let output_str = string_literals.join(", ");
+            return Ok((
+                Value::String(output_str),
+                result_type,
+                *self.scan_stats.read().await,
+            ));
         }
 
         // empty result quick return
