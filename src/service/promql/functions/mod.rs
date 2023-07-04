@@ -28,6 +28,7 @@ mod max_over_time;
 mod min_over_time;
 mod rate;
 mod sum_over_time;
+mod time_operations;
 
 pub(crate) use avg_over_time::avg_over_time;
 pub(crate) use count_over_time::count_over_time;
@@ -39,9 +40,9 @@ pub(crate) use irate::irate;
 pub(crate) use max_over_time::max_over_time;
 pub(crate) use min_over_time::min_over_time;
 pub(crate) use rate::rate;
-pub(crate) use sum_over_time::sum_over_time;
-
 use strum::EnumString;
+pub(crate) use sum_over_time::sum_over_time;
+pub(crate) use time_operations::*;
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
