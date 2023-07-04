@@ -116,6 +116,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
             orgs.push(org)
         }
     }
+    orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))
