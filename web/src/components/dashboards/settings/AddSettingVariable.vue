@@ -30,18 +30,12 @@
                     @update:model-value="streamTypeUpdated"></q-select>
                 <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex')"
                     :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
-                    hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated">
+                    hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated"
+                    option-value="name" option-label="name" emit-value>
                 </q-select>
                 <q-select filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
                     @filter="fieldsFilterFn" hint="Text autocomplete" style="width: 250px; padding-bottom: 32px"
-                    @update:model-value="fieldTypeUpdated">
-                    <template v-slot:no-option>
-                        <q-item>
-                            <q-item-section class="text-grey">
-                                No results
-                            </q-item-section>
-                        </q-item>
-                    </template>
+                    option-value="name" option-label="name">
                 </q-select>
             </div>
         </div>
@@ -49,7 +43,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, onMounted, onActivated, watch } from "vue";
+import { defineComponent, ref, reactive, onMounted, onActivated, watch, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete"
@@ -105,8 +99,6 @@ export default defineComponent({
         const editMode = ref(false)
 
         onMounted(() => {
-            console.log("on mounted");
-            
             getStreamList();
         });
 
@@ -121,78 +113,19 @@ export default defineComponent({
         };
 
         // select filters
-        const { filterFn: streamsFilterFn, filteredOptions: streamsFilteredOptions } = useSelectAutoComplete(data.streams, 'name')
-        const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(data.currentFieldsList, 'name')
+        const { filterFn: streamsFilterFn, filteredOptions: streamsFilteredOptions } = useSelectAutoComplete(toRef(data, 'streams'), 'name')
+        const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(toRef(data, 'currentFieldsList'), 'name')
 
         const streamTypeUpdated = () => {
             const streamType = variableData.query_data.stream_type;
-            console.log("Stream type:", streamType); // Added logging statement
             const filteredStreams = data.schemaResponse.filter((data: any) => data.stream_type === streamType);
-            console.log("Filtered streams:", filteredStreams); // Added logging statement
             data.streams = filteredStreams;
         };
 
         const streamUpdated = () => {
             const stream = variableData.query_data.stream;
-            data.currentFieldsList = data.schemaResponse.find((it: any) => {
-                if (it.name == stream) {
-                    console.log("Schema found for stream:", stream);
-                    return true;
-                }
-                return false;
-            })?.schema?.map((it: any) => {
-                console.log("Mapping schema:", it.name);
-                return it.name;
-            }) || [];
+            data.currentFieldsList = data.schemaResponse.find((item) => item.name === stream)?.schema || [];
         }
-
-        // watch(() => [variableData.queryData.streamType], () => {
-
-        //     if (!editMode.value) {
-        //         variableData.queryData.stream = ""
-        //     }
-
-        //     data.indexOptions = data.schemaList.filter((data: any) => data.stream_type == variableData.queryData.streamType)
-        //         .map((data: any) => {
-        //             return data.name;
-        //         });
-
-        //     // set the first stream as the selected stream when the api loads the data
-        //     if (!editMode.value &&
-        //         !variableData.queryData.stream &&
-        //         data.indexOptions.length > 0
-        //     ) {
-        //         variableData.queryData.stream = data.indexOptions[0];
-        //     }
-        // })
-
-        // watch(() => [data.schemaList, variableData.queryData.stream, variableData.queryData.streamType],
-        //     () => {
-        //         // console.log("stream:", dashboardPanelData.data.fields.stream);
-
-        //         const fields: any = data.schemaList.find(
-        //             (it: any) => it.name == variableData.queryData.stream
-        //         );
-        //         data.selectedStreamFields =
-        //             fields?.schema || [];
-        //     }
-        // );
-
-        // // update the current list fields if any of the lists changes
-        // watch(
-        //     () => [
-        //         data.selectedStreamFields,
-        //     ],
-        //     () => {
-        //         // console.log("updated custom query fields or selected stream fields");
-
-        //         data.currentFieldsList = [];
-        //         data.currentFieldsList = [
-        //             ...data.selectedStreamFields
-        //         ];
-        //     }
-        // );
-
 
         return {
             variableData,
