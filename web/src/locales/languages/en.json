@@ -285,7 +285,8 @@
     "addGeneralSettings": "General",
     "extraOptions": "Options",
     "nameOfVariable": "Name of variable",
-    "labelOfVariable": "Label of variable"
+    "labelOfVariable": "Label of variable",
+    "typeOfVariable": "Type of variable"
   },
   "panel": {
     "header": "Panel",

@@ -185,6 +185,37 @@ export const addPanel = async (
   );
 };
 
+export const addVariable = async (
+  store: any,
+  dashboardId: any,
+  variableData: any
+) => {
+
+  if (
+    !store.state.allDashboardList ||
+    store.state.allDashboardList.length == 0
+  ) {
+    await getAllDashboards(store);
+  }
+
+  const currentDashboard = findDashboard(dashboardId, store);
+  if (!currentDashboard.variables) {
+    currentDashboard.variables = {};
+    currentDashboard.variables.list = []
+  }
+
+  // currentDashboard.variables.list.filter((it: any) => it.name == variableData.id)
+  currentDashboard.variables.list.push(variableData)
+
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+
+}
+
 export const deletePanel = async (
   store: any,
   dashboardId: any,
@@ -216,6 +247,31 @@ export const deletePanel = async (
     currentDashboard
   );
 };
+
+export const updateVariable = async (
+  store: any,
+  dashboardId: any,
+  variableData: any
+) => {
+    // get the object of panel id
+  // find the dashboard and remove the panel data to dashboard object
+  // call the update dashboard function
+  const currentDashboard = findDashboard(dashboardId, store);
+
+  //remove panel from current dashboard
+  const panelIndex = currentDashboard.panels.findIndex(
+    (panel: any) => panel.id == panelData.id
+  );
+  currentDashboard.panels[panelIndex] = panelData;
+  currentDashboard.panels = currentDashboard.panels;
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+}
 
 export const updatePanel = async (
   store: any,

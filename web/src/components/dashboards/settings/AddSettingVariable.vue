@@ -9,7 +9,7 @@
             <div class="col">
                 <div>
                     <q-select class="textbox" outlined dense v-model="variableData.type" :options="variableTypes"
-                        :label="variableTypes[0].label"></q-select>
+                        :label="t('dashboard.typeOfVariable')"></q-select>
                 </div>
                 <q-separator></q-separator>
                 <div class="text-body1 text-bold text-dark q-my-sm">
@@ -26,17 +26,48 @@
                     {{ t("dashboard.extraOptions") }}
                 </div>
                 <q-select v-model="variableData.query_data.stream_type" :label="t('dashboard.selectStreamType')"
-                    :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense class="q-mb-xs"
+                    :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense class="textbox"
                     @update:model-value="streamTypeUpdated"></q-select>
                 <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex')"
                     :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
                     hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated"
-                    option-value="name" option-label="name" emit-value>
+                    option-value="name" option-label="name" emit-value class="textbox">
                 </q-select>
-                <q-select filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
-                    @filter="fieldsFilterFn" hint="Text autocomplete" style="width: 250px; padding-bottom: 32px"
+                <q-select v-model="variableData.query_data.field" filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
+                    @filter="fieldsFilterFn" style="width: 250px; padding-bottom: 32px" class="textbox"
                     option-value="name" option-label="name">
                 </q-select>
+
+                <q-input v-model="variableData.value" :label="t('dashboard.labelOfVariable')" dense outlined></q-input>
+
+                <div class="flex flex-row justify-evenly space-x-4 items-end">
+                    <div class="flex flex-col w-full justify-items-center items-stretch">
+                        <div
+                            v-for="(option, index) in variableData.options"
+                            :key="index"
+                            class="flex flex-row space-x-4"
+                        >
+                            <q-input outlined class="textbox q-mx-sm"
+                                v-model="variableData.options[index].label"
+                                :label="'Item ' + (index + 1)"
+                                name="label"
+                            />
+                            <q-input outlined class="textbox q-mx-sm"
+                                v-model="variableData.options[index].value"
+                                label="Value"
+                                name="value"
+                            />
+                            <div>
+                                <q-btn round color="primary" @click="removeField(index)" icon="cancel" />
+                            </div>
+                        </div>
+                    </div>
+                    <div  class="flex flex-col">
+                        <q-btn @click="addField()">Add Options</q-btn>
+                       
+                    </div>
+                </div>
+                <q-btn  @click="saveData()">Save</q-btn>
             </div>
         </div>
     </div>
@@ -48,6 +79,8 @@ import { useI18n } from "vue-i18n";
 import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete"
 import { useStore } from "vuex";
+import { addVariable } from "../../../utils/commons"
+import { useRoute } from "vue-router";
 
 export default defineComponent({
     name: "AddSettingVariable",
@@ -59,11 +92,12 @@ export default defineComponent({
             schemaResponse: [],
             streamType: ["logs", "metrics", "traces"],
             streams: [],
-            currentFieldsList: [],
+            currentFieldsList: [ { label: '', value: '' }],
 
             // selected values
             selectedStreamFields: []
         });
+        const route = useRoute();
         // const model = ref(null)
         // const filteredStreams = ref([]);
         const variableTypes = ref([
@@ -93,7 +127,9 @@ export default defineComponent({
                 stream_type: "",
                 stream: "",
                 field: "",
-            }
+            },
+            value: "",
+            options: []
         })
 
         const editMode = ref(false)
@@ -101,6 +137,31 @@ export default defineComponent({
         onMounted(() => {
             getStreamList();
         });
+
+        const addField = () => {
+            variableData.options.push({ label: '', value: '' })
+        }
+
+        const removeField = (index: any) => {
+            variableData.options.splice(index, 1)
+        }
+
+        const saveData = async() => {
+            const dashId = route.query.dashboard + "";
+            if (editMode.value) {
+                await updatePanel(
+                store,
+                dashId,
+                variableData
+                );
+            } else {
+                await addVariable(
+                store,
+                dashId,
+                variableData
+                );
+            }
+        }
 
         const getStreamList = () => {
             IndexService.nameList(
@@ -124,7 +185,7 @@ export default defineComponent({
 
         const streamUpdated = () => {
             const stream = variableData.query_data.stream;
-            data.currentFieldsList = data.schemaResponse.find((item) => item.name === stream)?.schema || [];
+            data.currentFieldsList = data.schemaResponse.find((item:any) => item.name === stream)?.schema || [];
         }
 
         return {
@@ -140,6 +201,9 @@ export default defineComponent({
             streamTypeUpdated,
             streamUpdated,
             onActivated,
+            removeField,
+            addField,
+            saveData,
         }
     }
 
