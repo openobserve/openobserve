@@ -116,6 +116,8 @@ export default defineComponent({
         const editMode = ref(false)
 
         onMounted(() => {
+            console.log("on mounted");
+            
             getStreamList();
         });
 
@@ -125,6 +127,8 @@ export default defineComponent({
                 "",
                 true
             ).then((res) => {
+                console.log("res", res);
+                
                 data.schemaList = res.data.list;
                 // dashboardPanelData.meta.stream.streamResults = res.data.list;
             });
@@ -141,17 +145,20 @@ export default defineComponent({
 
         const filterFn = (val: string, update: any) => {
         update(() => {
-          const needle = val.toLocaleLowerCase()
-          data.currentFieldsList = data.currentFieldsList.filter((v:any) => v.toLocaleLowerCase().indexOf(needle) > -1)
+          data.currentFieldsList = data.currentFieldsList.filter((v:any) => v.toLocaleLowerCase().indexOf(val.toLocaleLowerCase()) > -1)
         })
+        console.log("filterFn=", data.currentFieldsList);
+        
       }
 
         const setModel = (val: any) => {
             model.value = val
         }
 
-        watch(() => [variableData.queryData.streamType], () => {
-
+        watch(() => [variableData.queryData.streamType, data.schemaList], () => {
+            console.log("schema list changes" + variableData.queryData.streamType);
+            console.log("editmode"+ editMode.value);
+            
             if (!editMode.value) {
                 variableData.queryData.stream = ""
             }
@@ -160,6 +167,8 @@ export default defineComponent({
             .map((data: any) => {
                 return data.name;
             });
+            console.log("data.indexOptions", data.indexOptions);
+            
 
             // set the first stream as the selected stream when the api loads the data
             if (!editMode.value &&
@@ -177,24 +186,30 @@ export default defineComponent({
                 const fields: any = data.schemaList.find(
                 (it: any) => it.name == variableData.queryData.stream
                 );
+                console.log("fields", fields);
+                
                 data.selectedStreamFields =
                 fields?.schema || [];
+                console.log("-selectedStreamFields--", data.selectedStreamFields);
+                
             }
         );
 
         // update the current list fields if any of the lists changes
         watch(
-        () => [
-            data.selectedStreamFields,
-        ],
-        () => {
-            // console.log("updated custom query fields or selected stream fields");
+            () => [
+                data.selectedStreamFields,
+            ],
+            () => {
+                // console.log("updated custom query fields or selected stream fields");
 
-            data.currentFieldsList = [];
-            data.currentFieldsList = [
-            ... data.selectedStreamFields
-            ];
-        }
+                data.currentFieldsList = [];
+                data.currentFieldsList = [
+                ... data.selectedStreamFields
+                ];
+                console.log("-currentFieldsList--", data.currentFieldsList);
+                
+            }
         );
 
 
@@ -207,7 +222,10 @@ export default defineComponent({
             filteredStreams,
             variableTypes,
             onActivated,
-            setModel
+            setModel,
+            editMode,
+            filterFn,
+            model
         }
     }
     
