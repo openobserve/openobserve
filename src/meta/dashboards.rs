@@ -41,6 +41,7 @@ pub struct Dashboard {
     pub panels: Vec<Panel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layouts: Option<Vec<Layout>>,
+    pub variables: Option<Variables>,
 }
 
 fn datetime_now() -> DateTime<FixedOffset> {
@@ -127,6 +128,41 @@ pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
     promql_legend: Option<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Variables {
+    pub list: Vec<List>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct List {
+    #[serde(rename = "type")]
+    pub type_field: String,
+    pub name: String,
+    pub label: String,
+    #[serde(rename = "query_data")]
+    pub query_data: Option<QueryData>,
+    pub value: Option<String>,
+    pub options: Option<Vec<CustomFieldsOption>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryData {
+    #[serde(rename = "stream_type")]
+    pub stream_type: StreamType,
+    pub stream: String,
+    pub field: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomFieldsOption {
+    pub label: String,
+    pub value: String,
 }
 
 #[cfg(test)]
@@ -283,6 +319,7 @@ mod tests {
                         },
                     ],
                 ),
+                variables: None,
             }
         "##]].assert_debug_eq(&dashboard);
     }
@@ -450,6 +487,7 @@ mod tests {
                         },
                     ],
                 ),
+                variables: None,
             }
         "##]].assert_debug_eq(&dashboard);
     }
