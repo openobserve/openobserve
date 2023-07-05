@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::meta::prom::NAME_LABEL;
-use crate::service::promql::value::Labels;
-
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::value::{InstantValue, Labels, LabelsExt, Sample, Value};
 use chrono::{Datelike, NaiveDate, Timelike};
 use datafusion::error::{DataFusionError, Result};
 use strum::EnumIter;
@@ -29,6 +26,7 @@ pub enum TimeOperationType {
     DayOfYear,
     DaysInMonth,
     Month,
+    Year,
 }
 
 impl TimeOperationType {
@@ -40,6 +38,7 @@ impl TimeOperationType {
             Self::Minute => naive_datetime.minute(),
             Self::Hour => naive_datetime.hour(),
             Self::Month => naive_datetime.month(),
+            Self::Year => naive_datetime.year() as u32,
             Self::DayOfWeek => naive_datetime.weekday().num_days_from_sunday(), // Starting from 0
             Self::DayOfMonth => naive_datetime.day(),
             Self::DayOfYear => naive_datetime.ordinal(), // Starting from 1
@@ -59,6 +58,7 @@ impl TimeOperationType {
         }
     }
 }
+
 pub(crate) fn minute(data: &Value) -> Result<Value> {
     exec(data, &TimeOperationType::Minute)
 }
@@ -69,6 +69,10 @@ pub(crate) fn hour(data: &Value) -> Result<Value> {
 
 pub(crate) fn month(data: &Value) -> Result<Value> {
     exec(data, &TimeOperationType::Month)
+}
+
+pub(crate) fn year(data: &Value) -> Result<Value> {
+    exec(data, &TimeOperationType::Year)
 }
 
 pub(crate) fn day_of_month(data: &Value) -> Result<Value> {
@@ -103,10 +107,8 @@ fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
                 .iter()
                 .map(|instant| {
                     let ts = op.get_component_from_ts(instant.sample.timestamp);
-                    let mut labels = instant.labels.clone();
-                    labels.retain(|x| x.name != NAME_LABEL);
                     InstantValue {
-                        labels,
+                        labels: instant.labels.without_metric_name(),
                         sample: Sample::new(instant.sample.timestamp, ts as f64),
                     }
                 })
