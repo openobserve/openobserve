@@ -103,6 +103,7 @@ export default defineComponent({
                     // act like you confirmed without opening the popup
                     popupSelectedButtonType.value = selectedQueryType;
                     changeToggle()
+                    dashboardPanelData.layout.showQueryBar = true
                 } else {
                     popupSelectedButtonType.value = selectedQueryType;
                     confirmQueryModeChangeDialog.value = true;
@@ -114,6 +115,7 @@ export default defineComponent({
             await nextTick() // let the watchers execute first
             removeXYFilters()
             updateXYFieldsForCustomQueryMode()
+            dashboardPanelData.layout.showQueryBar = true
         };
 
         watch(() => dashboardPanelData.data.fields.stream_type, () => {
