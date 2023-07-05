@@ -1308,13 +1308,14 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
       /* bg color is important for th; just specify one */
-    //   background-color: #fff;
+      background-color: #fff;
   }
 
   :deep(thead tr th) {
       will-change: auto !important;
       position: sticky;
       z-index: 1;
+
   }
 
   /* this will be the loading indicator */
@@ -1329,6 +1330,15 @@ export default defineComponent({
 
   :deep(.q-virtual-scroll) {
       will-change: auto !important;
+  }
+}
+.my-sticky-virtscroll-table.q-dark {
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+      /* bg color is important for th; just specify one */
+    //   background-color: #fff;
+      background-color: $dark-page !important;
   }
 }
 
