@@ -166,7 +166,7 @@
       </q-list>
     </q-drawer>
 
-    <q-page-container>
+    <q-page-container v-if="isLoading">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
@@ -294,6 +294,7 @@ export default defineComponent({
       const $q = useQuasar();
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
+    const isLoading = ref(false);
 
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
@@ -487,6 +488,8 @@ export default defineComponent({
       )
         ? router.currentRoute.value.query.org_identifier
         : "";
+      let tempDefaultOrg = {};
+      let localOrgFlag = false;
       if (store.state.organizations.length > 0) {
         const localOrg: any = useLocalOrganization();
         orgOptions.value = store.state.organizations.map(
@@ -528,6 +531,10 @@ export default defineComponent({
               useLocalOrganization(optiondata);
             }
 
+            if (localOrg.value.identifier == data.identifier) {
+              localOrgFlag = true;
+            }
+
             if (
               ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
                 data.type == "default" &&
@@ -545,9 +552,20 @@ export default defineComponent({
               useLocalOrganization(optiondata);
               store.dispatch("setSelectedOrganization", optiondata);
             }
+
+            if (data.type == "default") {
+              tempDefaultOrg = optiondata;
+            }
+
             return optiondata;
           }
         );
+      }
+
+      if (localOrgFlag == false) {
+        selectedOrg.value = tempDefaultOrg;
+        useLocalOrganization(tempDefaultOrg);
+        store.dispatch("setSelectedOrganization", tempDefaultOrg);
       }
 
       if (router.currentRoute.value.query.action == "subscribe") {
@@ -559,6 +577,8 @@ export default defineComponent({
       if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
         mainLayoutMixin.setup().getOrganizationThreshold(store);
       }
+
+      isLoading.value = true;
     };
 
     /**
@@ -606,6 +626,7 @@ export default defineComponent({
       miniMode,
       user,
       zoBackendUrl,
+      isLoading,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
