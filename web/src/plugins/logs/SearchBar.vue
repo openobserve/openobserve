@@ -119,7 +119,7 @@
               style="padding-left: 0 !important"
               v-model="searchObj.meta.refreshInterval"
             />
-            <q-separator vertical inset />
+            <!-- <q-separator vertical inset /> -->
             <q-btn
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
@@ -927,8 +927,8 @@ export default defineComponent({
     color: white;
 
     .q-btn__content {
-      background: $primary;
-      border-radius: 0px 3px 3px 0px;
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
 
       .q-icon {
         font-size: 15px;

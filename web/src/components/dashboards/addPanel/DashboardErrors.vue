@@ -66,7 +66,6 @@ export default defineComponent({
 .expand-bar {
   overflow: hidden;
   cursor: pointer;
-  background-color: white;
 
   &:hover {
     background-color: #eaeaeaa5;

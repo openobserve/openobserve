@@ -99,7 +99,7 @@
           </q-btn-dropdown>
         </div>
 
-        <div class="q-ml-md current-organization">
+        <div class="q-mx-sm current-organization">
           <q-select
             v-model="selectedOrg"
             borderless
