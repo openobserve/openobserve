@@ -235,6 +235,13 @@ export default defineComponent({
       errors.splice(0)
       const dashboardData = dashboardPanelData
 
+      // check if name of panel is there
+      if (!onlyChart) {
+        if (dashboardData.data.config.title == null || dashboardData.data.config.title == '') {
+          errors.push("Name of Panel is required")
+        }
+      }
+
       if (promqlMode.value) {
         // 1. chart type: only line chart is supported
         const allowedChartTypes = ['line']
@@ -253,6 +260,10 @@ export default defineComponent({
 
         if (dashboardData.data.fields.filter.length > 0) {
           errors.push("Filters are not supported for PromQL. Remove anything added to the Fitlers.")
+        }
+
+        if(!dashboardPanelData.data.query) {
+          errors.push("Query should not be empty")
         }
       } else {
         switch (dashboardPanelData.data.type) {
@@ -330,13 +341,6 @@ export default defineComponent({
         const labelError = dashboardData.data.fields.y.filter((it: any) => (it.label == null || it.label == ''))
         if (dashboardData.data.fields.y.length && labelError.length) {
           errors.push(...labelError.map((it: any) => `${currentYLabel.value}: ${it.column}: Label required`))
-        }
-
-        // check if name of panel is there
-        if (!onlyChart) {
-          if (dashboardData.data.config.title == null || dashboardData.data.config.title == '') {
-            errors.push("Name of Panel is required")
-          }
         }
 
         // if there are filters
