@@ -806,7 +806,6 @@ export default defineComponent({
                     ...getThemeLayoutOptions()
                 };
 
-                console.log('plotly promql layout', layout);
 
                 Plotly.react(plotRef.value, traces, layout, {
                     responsive: true,
@@ -902,7 +901,6 @@ export default defineComponent({
 
       const getLegendPosition = (type: string) => {
         const legendPosition = props.data.config?.legends_position
-        console.log('legendPosition', legendPosition);
         
         switch (legendPosition) {
             case 'bottom':
