@@ -45,7 +45,7 @@
     <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading"
       class="flex q-mt-sm q-ml-sm">
       <div v-for="item in variablesData.values" class="q-mr-lg">
-        <div v-if="item.type == 'query_value'">
+        <div v-if="item.type == 'query'">
           <q-select
               outlined
               dense
@@ -188,49 +188,20 @@ export default defineComponent({
         store,
         route.query.dashboard
       )))
-      // let data = toRaw(currentDashboardData.data);
-      const variables = {}
-
-      variables["list"] = [
-          {
-            "type" : "query_value",
-            "name" : "namespace",
-            "label" : "NameSpace",
-            "queryData" : {
-              "streamType" : "logs",
-              "stream" : "gke-fluentbit",
-              "streamField" : "kubernetes_host",
-            }
-          },
-          {
-            "type" : "constant",
-            "name" : "namespace2",
-            "label" : "NameSpace2",
-            "value" : "alpha1"
-          },
-          {
-            "type" : "textbox",
-            "name" : "namespace3",
-            "label" : "NameSpace3",
-            "value" : "alpha1"
-          },
-          {
-            "type" : "custom_fields",
-            "name" : "namespace4",
-            "label" : "NameSpace4",
-            "options" : [
-                        {"label":"label1","value":"value1"},
-                        {"label":"label2","value":"value2"},
-                        {"label":"label3","value":"value3"},
-                      ]
-          }
-        ]
-
-      data["variables"] = variables
-      variablesData.isVariablesLoading = true
-      // currentDashboardData.data = data
-      await getVariablesData(data)
       currentDashboardData.data = data
+
+      if(data?.variables && data?.variables?.list.length){
+        console.log("viewDashboard: inside if");
+        
+        variablesData.isVariablesLoading = true
+        await getVariablesData(data)
+      }else{
+        console.log("viewDashboard: inside else");
+        data.variables = null
+        variablesData.isVariablesLoading = false
+        variablesData.values = []
+      }
+     
     };
 
     const addSettingsData = () => {
@@ -239,24 +210,26 @@ export default defineComponent({
 
     const getVariablesData = async(data: any) => {
 
+      console.log("data:", data);
+      
       const currentTempDashboardData = data || currentDashboardData.data
       const promise = currentTempDashboardData.variables?.list?.map((it)=> {
         
         const obj = {name: it.name, label : it.label, type: it.type, value: "", isLoading: false }
         switch (it.type) {
           
-          case "query_value":{
+          case "query":{
             obj.isLoading = true
             console.log("------",currentTimeObj.value.start_time);
             return streamService
             .fieldValues({
               org_identifier: store.state.selectedOrganization.identifier,
-              stream_name: it.queryData.stream,
+              stream_name: it.query_data.stream,
               start_time: new Date(currentTimeObj.value.start_time?.toISOString()).getTime() * 1000,
               end_time: new Date(currentTimeObj.value.end_time?.toISOString()).getTime() * 1000,
-              fields: [it.queryData.streamField],
+              fields: [it.query_data.field],
               size: 10,
-              type: it.queryData.streamType,
+              type: it.query_data.stream_type,
             })
             .then((res: any) => {
               obj.isLoading = false
@@ -264,7 +237,7 @@ export default defineComponent({
                 console.log("-res-", res.data.hits);
                 
                 obj["options"] = res.data.hits
-                  .find((field: any) => field.field === it.queryData.streamField)
+                  .find((field: any) => field.field === it.query_data.field)
                   .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
                 obj.value = obj.options[0] || ""
 
@@ -302,7 +275,6 @@ export default defineComponent({
       variablesData.values = await Promise.all(promise)
       variablesData.isVariablesLoading = false
       console.log("variablesData", JSON.stringify(variablesData));
-      
       console.log("-after-",data)
     }
 

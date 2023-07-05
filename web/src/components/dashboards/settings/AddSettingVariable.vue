@@ -36,7 +36,7 @@
                     </q-select>
                     <q-select v-model="variableData.query_data.field" filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
                         @filter="fieldsFilterFn" style="width: 250px; padding-bottom: 32px" class="textbox"
-                        option-value="name" option-label="name">
+                        option-value="name" option-label="name" emit-value>
                     </q-select>
                 </div>
             </div>
@@ -152,13 +152,19 @@ export default defineComponent({
 
         const saveData = async() => {
             const dashId = route.query.dashboard + "";
+            console.log("dashId", dashId);
+            
             if (editMode.value) {
+                console.log(" inside update variable");
+                
                 await updateVariable(
                 store,
                 dashId,
                 variableData
                 );
             } else {
+                console.log("Inside add variable");
+                
                 await addVariable(
                 store,
                 dashId,

@@ -191,6 +191,8 @@ export const addVariable = async (
   variableData: any
 ) => {
 
+  console.log("common: Inside add variable");
+  
   if (
     !store.state.allDashboardList ||
     store.state.allDashboardList.length == 0
@@ -200,11 +202,17 @@ export const addVariable = async (
 
   const currentDashboard = findDashboard(dashboardId, store);
   if (!currentDashboard.variables) {
+    console.log("common: currentDashboard", currentDashboard);
+    
     currentDashboard.variables = {};
     currentDashboard.variables.list = []
   }
+  console.log("common: currentDashboard", currentDashboard);
+  
 
   const variableExists = currentDashboard.variables.list.filter((it: any) => it.name == variableData.name)
+  console.log("common: variableExists", variableExists);
+  
 
   if(variableExists.length){
     throw new Error("Variable already exists")
@@ -212,12 +220,14 @@ export const addVariable = async (
 
   currentDashboard.variables.list.push(variableData)
 
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard
-  );
+  console.log("common: currentDashboard", currentDashboard);
+  
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard
+    );
 
 }
 
