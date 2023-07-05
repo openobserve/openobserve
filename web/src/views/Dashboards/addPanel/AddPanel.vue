@@ -216,6 +216,7 @@ export default defineComponent({
       }
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      updateDateTime(selectedDate.value)
     };
 
     const updateDateTime = (value: object) => {
