@@ -302,23 +302,6 @@ export default defineComponent({
 
     const getStreamType = computed(() => searchObj.data.stream.streamType);
 
-    function showErrorNotification(message) {
-      $q.notify({
-        type: "negative",
-        message: message,
-        timeout: 5000,
-        actions: [
-          {
-            icon: "close",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
     function Notify() {
       return $q.notify({
         type: "positive",
