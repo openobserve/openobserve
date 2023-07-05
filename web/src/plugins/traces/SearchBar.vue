@@ -126,7 +126,7 @@ export default defineComponent({
       searchObj.data.query = value;
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
-        if (searchObj.data.parsedQuery.from?.length > 0) {
+        if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&

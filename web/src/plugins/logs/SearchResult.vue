@@ -114,7 +114,7 @@
                       ? column.prop(row)
                       : searchObj.data.resultGrid.columns.length > 2 &&
                         (column.prop(row, column.name)?.length || 0) > 100
-                      ? (column.prop(row, column.name)?.substr(0, 100)) + '...'
+                      ? (column.prop(row, column.name)?.substr(0, 100) || '') + '...'
                       : column.name != '@timestamp'
                       ? row[column.name]
                       : column.prop(row, column.name)

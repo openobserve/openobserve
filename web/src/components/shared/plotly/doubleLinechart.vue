@@ -21,7 +21,14 @@
 <script lang="ts">
 import Plotly from "plotly.js";
 import { useStore } from "vuex";
-import { defineComponent, onMounted, ref, onUpdated, onBeforeMount, watch  } from "vue";
+import {
+  defineComponent,
+  onMounted,
+  ref,
+  onUpdated,
+  onBeforeMount,
+  watch,
+} from "vue";
 
 export default defineComponent({
   name: "DoubleLineChart",
@@ -56,16 +63,20 @@ export default defineComponent({
     const chartID = ref("");
 
     const getThemeLayoutOptions = () => ({
-      paper_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
-      plot_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
+      paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+      plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
       font: {
-        size: 12 ,
-        color: store.state.theme === 'dark' ? '#fff' : '#181a1b'
+        size: 12,
+        color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+      },
+    });
+
+    watch(
+      () => store.state.theme,
+      () => {
+        Plotly.update(plotref.value, {}, getThemeLayoutOptions());
       }
-    })
-    watch(() => store.state.theme, () => {
-      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
-    })
+    );
 
     const layout: any = {
       title: {
@@ -84,7 +95,7 @@ export default defineComponent({
         t: 0,
         b: 32,
       },
-       ...getThemeLayoutOptions(),
+      ...getThemeLayoutOptions(),
     };
 
     onMounted(async () => {
@@ -110,17 +121,19 @@ export default defineComponent({
       chart: any,
       params: { title: any; unparsed_x_data: any }
     ) => {
-      trace1.x = chart.data[0].x;
-      trace1.y = chart.data[0].y;
-      trace1.unparsed_x = params.unparsed_x_data;
+      if (Array.isArray(chart.data) && chart.data.length) {
+        trace1.x = chart.data[0].x;
+        trace1.y = chart.data[0].y;
+        trace1.unparsed_x = params.unparsed_x_data;
 
-      trace2.x = chart.data[1].x;
-      trace2.y = chart.data[1].y;
-      trace2.unparsed_x = params.unparsed_x_data;
+        trace2.x = chart.data[1].x;
+        trace2.y = chart.data[1].y;
+        trace2.unparsed_x = params.unparsed_x_data;
 
-      trace3.x = chart.data[2].x;
-      trace3.y = chart.data[2].y;
-      trace3.unparsed_x = params.unparsed_x_data;
+        trace3.x = chart.data[2].x;
+        trace3.y = chart.data[2].y;
+        trace3.unparsed_x = params.unparsed_x_data;
+      }
 
       Plotly.redraw(chartID.value);
       forceReLayout();

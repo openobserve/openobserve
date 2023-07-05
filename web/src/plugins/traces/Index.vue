@@ -1214,7 +1214,7 @@ export default defineComponent({
       return this.searchObj.config.splitterModel;
     },
     changeOrganization() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
     changeStream() {
       return this.searchObj.data.stream.selectedStream;
