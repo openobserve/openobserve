@@ -162,14 +162,17 @@ export default defineComponent({
                 dashId,
                 variableData
                 );
+
             } else {
                 console.log("Inside add variable");
-                
-                await addVariable(
-                store,
-                dashId,
-                variableData
-                );
+                if(variableData.type != 'query'){
+                    delete variableData["query_data"]; 
+                }
+                    await addVariable(
+                    store,
+                    dashId,
+                    variableData
+                    );
             }
         }
 

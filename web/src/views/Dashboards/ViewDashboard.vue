@@ -196,6 +196,7 @@ export default defineComponent({
         variablesData.isVariablesLoading = true
         await getVariablesData(data)
       }else{
+        
         console.log("viewDashboard: inside else");
         data.variables = null
         variablesData.isVariablesLoading = false
