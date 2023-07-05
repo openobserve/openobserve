@@ -214,7 +214,7 @@ import {
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage } from "@/utils/common";
+import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import {
   verifyOrganizationStatus,
   convertTimeFromMicroToMilli,
@@ -223,7 +223,6 @@ import {
   getQueryParamsForDuration,
   getDurationObjectFromParams,
 } from "@/utils/date";
-import { first } from "lodash-es";
 
 export default defineComponent({
   name: "PageSearch",
@@ -304,13 +303,11 @@ export default defineComponent({
 
     const getStreamType = computed(() => searchObj.data.stream.streamType);
 
-    function ErrorException(message) {
-      searchObj.loading = false;
-      // searchObj.data.errorMsg = message;
+    function showErrorNotification(message) {
       $q.notify({
         type: "negative",
         message: message,
-        timeout: 10000,
+        timeout: 5000,
         actions: [
           {
             icon: "close",
@@ -375,7 +372,9 @@ export default defineComponent({
 
         return;
       } catch (e) {
-        throw new ErrorException(e.message);
+        console.log(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while fetching functions");
       }
     }
 
@@ -423,7 +422,9 @@ export default defineComponent({
             });
           });
       } catch (e) {
-        throw new ErrorException(e.message);
+        console.log(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while fetching streams");
       }
     }
 
@@ -483,7 +484,8 @@ export default defineComponent({
           searchObj.loading = false;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while loading streams.");
       }
     }
 
@@ -576,7 +578,8 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while getting consumable date time :", e.message);
       }
     }
 
@@ -776,7 +779,8 @@ export default defineComponent({
 
         return req;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Invalid SQL Syntax");
       }
     }
 
@@ -918,7 +922,8 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        searchObj.loading = false;
+        showErrorNotification("Error while searching");
       }
     }
 
@@ -998,7 +1003,8 @@ export default defineComponent({
           });
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while extracting fields :", e.message);
       }
     }
 
@@ -1088,7 +1094,8 @@ export default defineComponent({
         searchObj.loading = false;
         if (searchObj.data.queryResults.aggs) reDrawGrid();
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while updating grid columns:", e.message);
       }
     }
 
@@ -1461,7 +1468,9 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        console.log(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Search around request failed.");
       }
     };
 

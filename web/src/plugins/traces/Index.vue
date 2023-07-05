@@ -179,7 +179,7 @@ import {
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage } from "@/utils/common";
+import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import { number } from "@intlify/core-base";
 import { stringLiteral } from "@babel/types";
 
@@ -319,7 +319,8 @@ export default defineComponent({
 
         return;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while getting functions");
       }
     }
 
@@ -363,7 +364,8 @@ export default defineComponent({
             });
           });
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while getting streams");
       }
     }
 
@@ -403,7 +405,8 @@ export default defineComponent({
           searchObj.loading = false;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while loading streams");
       }
     }
 
@@ -476,7 +479,8 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while getting consumable date time");
       }
     }
 
@@ -631,7 +635,8 @@ export default defineComponent({
 
         return req;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Invalid SQL Syntax");
       }
     }
 
@@ -756,7 +761,9 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        console.log(e?.message);
+        searchObj.loading = false;
+        showErrorNotification("Search request failed");
       }
     }
 
@@ -841,7 +848,8 @@ export default defineComponent({
           });
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while extracting fields");
       }
     }
 
@@ -900,7 +908,8 @@ export default defineComponent({
 
         searchObj.loading = false;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while updaing grid columns");
       }
     }
 
@@ -1168,7 +1177,8 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        searchObj.loading = false;
+        showErrorNotification("Request failed.");
       }
     };
 
