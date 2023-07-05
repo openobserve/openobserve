@@ -24,6 +24,7 @@ mod histogram;
 mod idelta;
 mod increase;
 mod irate;
+mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod rate;
@@ -37,6 +38,7 @@ pub(crate) use histogram::histogram_quantile;
 pub(crate) use idelta::idelta;
 pub(crate) use increase::increase;
 pub(crate) use irate::irate;
+pub(crate) use math_operations::*;
 pub(crate) use max_over_time::max_over_time;
 pub(crate) use min_over_time::min_over_time;
 pub(crate) use rate::rate;
@@ -93,6 +95,7 @@ pub(crate) enum Func {
     Sgn,
     Sort,
     SortDesc,
+    Sqrt,
     SumOverTime,
     Time,
     Timestamp,
