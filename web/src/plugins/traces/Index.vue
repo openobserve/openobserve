@@ -933,7 +933,7 @@ export default defineComponent({
           text: "",
           font: {
             size: 12,
-            color: store.state.theme === "dark" ? "#fff" : "#333",
+            color: store.state.theme === "dark" ? "#fff" : "#181a1b",
           },
         },
         margin: {
@@ -944,14 +944,14 @@ export default defineComponent({
         },
         font: {
           size: 12,
-          color: store.state.theme === "dark" ? "#fff" : "#333",
+          color: store.state.theme === "dark" ? "#fff" : "#181a1b",
         },
         xaxis: { type: "date" },
         yaxis: { ticksuffix: "ms" },
         scattergap: 0.7,
         height: 150,
-        paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
-        plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+        paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+        plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
         autosize: true,
       };
 
