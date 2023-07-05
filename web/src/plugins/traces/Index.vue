@@ -138,8 +138,7 @@
       </div>
       <div v-else>
         <h5 data-test="logs-search-error-message" class="text-center">
-          <q-icon name="warning"
-color="warning" size="10rem" /><br />{{
+          <q-icon name="warning" color="warning" size="10rem" /><br />{{
             searchObj.data.errorMsg
           }}
         </h5>
