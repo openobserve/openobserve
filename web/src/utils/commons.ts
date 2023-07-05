@@ -231,6 +231,31 @@ export const addVariable = async (
 
 }
 
+export const deleteVariable = async (
+  store: any,
+  dashboardId: any,
+  variableName: any
+) => {
+  // get the object of panel id
+  // find the dashboard and remove the panel data to dashboard object
+  // call the update dashboard function
+  const currentDashboard = findDashboard(dashboardId, store);
+
+  //remove panel from current dashboard
+  const variableIndex = currentDashboard.variables.list.findIndex(
+    (variable: any) => variable.name == variableName
+  );
+  currentDashboard.variables.list.splice(variableIndex, 1);
+  currentDashboard.variables.list = currentDashboard.variables.list;
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+}
+
 export const deletePanel = async (
   store: any,
   dashboardId: any,

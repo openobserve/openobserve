@@ -88,6 +88,7 @@ import { useRoute } from "vue-router";
 
 export default defineComponent({
     name: "AddSettingVariable",
+    props: ['isAddVariable'],
 
     setup(props) {
         const { t } = useI18n();
@@ -163,16 +164,22 @@ export default defineComponent({
                 variableData
                 );
 
+                props.isAddVariable = false
+
             } else {
+
                 console.log("Inside add variable");
                 if(variableData.type != 'query'){
                     delete variableData["query_data"]; 
                 }
-                    await addVariable(
-                    store,
-                    dashId,
-                    variableData
-                    );
+
+                await addVariable(
+                store,
+                dashId,
+                variableData
+                );
+
+                props.isAddVariable = false
             }
         }
 

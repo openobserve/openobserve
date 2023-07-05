@@ -1,65 +1,118 @@
 <template>
     <div>
       <div v-if="isAddVariable" class="column full-height">
-        <AddSettingVariable />
+        <div>
+            <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
+          </div>
+        <AddSettingVariable :isAddVariable="isAddVariable"/>
       </div>
-      <div  v-else class="column full-height">
+      <div v-else class="column full-height">
+          
           <div>
               <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" @click="addVariables" />
+          </div>
+          <div>
+              <q-table
+                ref="qTable"
+                :rows="dashboardVariableData?.data"
+                :columns="columns"
+                row-key="name"
+                :pagination="pagination"
+                :loading="loading"
+              >
+                <template #no-data>
+                  <NoData />
+                </template>
+                <!-- add delete icon in actions column -->
+                <template #body-cell-actions="props">
+                  <q-td :props="props">
+                    <q-btn
+                      :icon="outlinedDelete"
+                      :title="t('dashboard.delete')"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      @click.stop="showDeleteDialogFn(props)"
+                    ></q-btn>
+                  </q-td>
+                </template>
+              </q-table>
+              <ConfirmDialog
+                title="Delete dashboard"
+                message="Are you sure you want to delete the dashboard?"
+                @update:ok="deleteVariableFn"
+                @update:cancel="confirmDeleteDialog = false"
+                v-model="confirmDeleteDialog"
+              />
           </div>
       </div>
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated } from "vue";
-import dashboardService from "../../../services/dashboards";
+import { defineComponent, ref, onMounted, onActivated, reactive, toRef} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
-import { getDashboard } from "../../../utils/commons";
+import { getDashboard, deleteVariable } from "../../../utils/commons";
 import  AddSettingVariable from "./AddSettingVariable.vue"
-
-const defaultValue = () => {
-  return {
-    id: "",
-    name: "",
-    description: "",
-  };
-};
-
-let callDashboard: Promise<{ data: any }>;
+import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import NoData from "../../shared/grid/NoData.vue";
+import ConfirmDialog from "../../ConfirmDialog.vue";
 
 export default defineComponent({
   name: "VariableSettings",
   components: {
-    AddSettingVariable
+    AddSettingVariable,
+    NoData,
+    ConfirmDialog
   },
-  props: {
-    modelValue: {
-      type: Object,
-      default: () => defaultValue(),
-    },
-  },
-  emits: ["update:modelValue", "updated", "finish"],
+ 
   setup(props) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
-    const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const route = useRoute();
     const isAddVariable = ref(false)
+    const dashboardVariableData = reactive({
+      data: []
+    })
+    const pagination: any = ref({
+      rowsPerPage: 20,
+    });
+    const confirmDeleteDialog = ref<boolean>(false);
+    const selectedDelete = ref(null);
+    const columns = ref<QTableProps["columns"]>([
+      {
+        name: "#",
+        label: "#",
+        field: "#",
+        align: "left",
+      },
+      {
+        name: "name",
+        field: "name",
+        label: t("dashboard.name"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("dashboard.actions"),
+        align: "center",
+      },
+    ]);
 
     onMounted(async () => {
-        await getDashboardData();
-      if (props.modelValue && props.modelValue.id) {
-        beingUpdated.value = true;
-        disableColor.value = "grey-5";
-      }
+      await getDashboardData();
     });
 
     onActivated(async () => {
@@ -69,12 +122,44 @@ export default defineComponent({
 
    
     const getDashboardData = async () => {
-      let data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))
-      console.log("data=", data);
+      const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))?.variables?.list
+      dashboardVariableData.data = data.map((it:any, index:number) => {
+        console.log("---it", it);
+        
+        return {
+          "#": index < 9 ? `0${index + 1}` : index + 1,
+          name: it.name,
+        }
+      })
     }
 
     const addVariables = () => {
       isAddVariable.value = true
+    }
+
+    const showDeleteDialogFn = (props: any) => {
+      console.log("props", props);
+      
+      selectedDelete.value = props.row;
+      confirmDeleteDialog.value = true;
+    };
+
+    const deleteVariableFn = async () => {
+      if (selectedDelete.value) {
+        const variableName = selectedDelete?.value?.name
+
+        await deleteVariable(
+          store,
+          route.query.dashboard,
+          variableName
+        );
+
+        await getDashboardData()
+      }
+    }
+
+    const goBackToDashboardList = () => {
+      isAddVariable.value = false
     }
 
     return {
@@ -83,14 +168,22 @@ export default defineComponent({
       isPwd: ref(true),
       beingUpdated,
       status,
-      dashboardData,
       addDashboardForm,
       store,
       isValidIdentifier,
       getImageURL,
       getDashboardData,
       addVariables,
-      isAddVariable
+      dashboardVariableData,
+      isAddVariable,
+      columns,
+      pagination,
+      loading: ref(false),
+      outlinedDelete,
+      showDeleteDialogFn,
+      confirmDeleteDialog,
+      deleteVariableFn,
+      goBackToDashboardList
     };
   },
 });

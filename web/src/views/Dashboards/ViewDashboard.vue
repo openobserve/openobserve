@@ -47,12 +47,12 @@
       <div v-for="item in variablesData.values" class="q-mr-lg">
         <div v-if="item.type == 'query'">
           <q-select
-              outlined
-              dense
-              v-model="item.value"
-              :options="item.options"
-              :label="item.label"
-            ></q-select>
+            outlined
+            dense
+            v-model="item.value"
+            :options="item.options"
+            :label="item.label"
+          ></q-select>
           <!-- <q-input v-model="item.name" :label="item.label" dense></q-input> -->
         </div>
         <div v-else-if="item.type == 'constant'">
@@ -196,7 +196,7 @@ export default defineComponent({
         variablesData.isVariablesLoading = true
         await getVariablesData(data)
       }else{
-        
+
         console.log("viewDashboard: inside else");
         data.variables = null
         variablesData.isVariablesLoading = false
