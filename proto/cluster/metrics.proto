@@ -41,6 +41,7 @@ message Series {
     repeated Sample samples = 2;
     optional Sample  sample = 3;
     optional double  scalar = 4;
+    optional string stringliteral = 5;
 }
 
 message Label {

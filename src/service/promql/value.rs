@@ -18,10 +18,31 @@ use serde::{
 };
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
+use crate::meta::prom::NAME_LABEL;
+
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 pub type Labels = Vec<Arc<Label>>;
+
+/// Added functionalities on Labels
+pub trait LabelsExt {
+    /// Remove the metric name i.e. __name__ from the given label
+    ///
+    /// ```
+    /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
+    /// ```
+    fn without_metric_name(&self) -> Labels;
+}
+
+impl LabelsExt for Labels {
+    fn without_metric_name(&self) -> Labels {
+        self.iter()
+            .filter(|label| label.name != NAME_LABEL)
+            .cloned()
+            .collect()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Label {
@@ -292,6 +313,7 @@ pub enum Value {
     Matrix(Vec<RangeValue>),
     Sample(Sample), // only used for return literal value
     Float(f64),
+    String(String),
     None,
 }
 
@@ -311,6 +333,7 @@ impl Value {
             Value::Matrix(_) => "matrix",
             Value::Sample(_) => "scalar",
             Value::Float(_) => "scalar",
+            Value::String(_) => "string",
             Value::None => "scalar",
         }
     }
