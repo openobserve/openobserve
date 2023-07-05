@@ -8,8 +8,8 @@
             </div>
             <div class="col">
                 <div>
-                    <q-select class="textbox" outlined dense v-model="variableData.type" :options="variableTypes"
-                        :label="t('dashboard.typeOfVariable')"></q-select>
+                    <q-select class="textbox" filled use-input hide-selected fill-input input-debounce="0" outlined dense v-model="variableData.type" :options="variableTypes"
+                        :label="t('dashboard.typeOfVariable')" option-value="value"  emit-value></q-select>
                 </div>
                 <q-separator></q-separator>
                 <div class="text-body1 text-bold text-dark q-my-sm">
@@ -25,48 +25,52 @@
                 <div class="text-body1 text-bold text-dark q-my-sm">
                     {{ t("dashboard.extraOptions") }}
                 </div>
-                <q-select v-model="variableData.query_data.stream_type" :label="t('dashboard.selectStreamType')"
-                    :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense class="textbox"
-                    @update:model-value="streamTypeUpdated"></q-select>
-                <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex')"
-                    :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
-                    hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated"
-                    option-value="name" option-label="name" emit-value class="textbox">
-                </q-select>
-                <q-select v-model="variableData.query_data.field" filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
-                    @filter="fieldsFilterFn" style="width: 250px; padding-bottom: 32px" class="textbox"
-                    option-value="name" option-label="name">
-                </q-select>
-
-                <q-input v-model="variableData.value" :label="t('dashboard.labelOfVariable')" dense outlined></q-input>
-
-                <div class="flex flex-row justify-evenly space-x-4 items-end">
-                    <div class="flex flex-col w-full justify-items-center items-stretch">
-                        <div
-                            v-for="(option, index) in variableData.options"
-                            :key="index"
-                            class="flex flex-row space-x-4"
-                        >
-                            <q-input outlined class="textbox q-mx-sm"
-                                v-model="variableData.options[index].label"
-                                :label="'Item ' + (index + 1)"
-                                name="label"
-                            />
-                            <q-input outlined class="textbox q-mx-sm"
-                                v-model="variableData.options[index].value"
-                                label="Value"
-                                name="value"
-                            />
-                            <div>
-                                <q-btn round color="primary" @click="removeField(index)" icon="cancel" />
-                            </div>
+                <div v-if="variableData.type == 'query'">
+                    <q-select v-model="variableData.query_data.stream_type" :label="t('dashboard.selectStreamType')"
+                        :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense class="textbox"
+                        @update:model-value="streamTypeUpdated"></q-select>
+                    <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex')"
+                        :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
+                        hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated"
+                        option-value="name" option-label="name" emit-value class="textbox">
+                    </q-select>
+                    <q-select v-model="variableData.query_data.field" filled use-input hide-selected fill-input input-debounce="0" :options="fieldsFilteredOptions"
+                        @filter="fieldsFilterFn" style="width: 250px; padding-bottom: 32px" class="textbox"
+                        option-value="name" option-label="name">
+                    </q-select>
+                </div>
+            </div>
+            <div class="textbox" v-if="['textbox', 'constant'].includes(variableData.type)">
+                <q-input v-model="variableData.value" :label="t('dashboard.ValueOfVariable')" dense outlined></q-input>
+            </div>
+                <!-- show the auto add variables for the custom fields -->
+            <div v-if="variableData.type == 'custom_fields'" class="flex textbox flex-row justify-evenly space-x-4 items-end">
+                <div class="flex flex-col w-full justify-items-center items-stretch">
+                    <div
+                        v-for="(option, index) in variableData.options"
+                        :key="index"
+                        class="flex flex-row space-x-4"
+                    >
+                        <q-input outlined class="textbox q-mx-sm"
+                            v-model="variableData.options[index].label"
+                            :label="'Item ' + (index + 1)"
+                            name="label"
+                        />
+                        <q-input outlined class="textbox q-mx-sm"
+                            v-model="variableData.options[index].value"
+                            label="Value"
+                            name="value"
+                        />
+                        <div>
+                            <q-btn round color="primary" @click="removeField(index)" icon="cancel" />
                         </div>
                     </div>
-                    <div  class="flex flex-col">
-                        <q-btn @click="addField()">Add Options</q-btn>
-                       
-                    </div>
                 </div>
+                <div  class="flex flex-col">
+                    <q-btn @click="addField()">Add Options</q-btn>
+                </div>
+            </div>
+            <div>
                 <q-btn  @click="saveData()">Save</q-btn>
             </div>
         </div>

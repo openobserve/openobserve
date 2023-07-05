@@ -286,6 +286,7 @@
     "extraOptions": "Options",
     "nameOfVariable": "Name of variable",
     "labelOfVariable": "Label of variable",
+    "ValueOfVariable": "Value of variable",
     "typeOfVariable": "Type of variable"
   },
   "panel": {
