@@ -49,7 +49,7 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: "0",
+    refreshInterval: 0,
     refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
@@ -124,7 +124,6 @@ const defaultObject = {
     tempFunctionLoading: false,
   },
 };
-
 
 let searchObj = reactive(Object.assign({}, defaultObject));
 

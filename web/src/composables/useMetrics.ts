@@ -46,7 +46,7 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: "0",
+    refreshInterval: 0,
     refreshIntervalLabel: "Off",
     totalMetricValues: 1000,
   },
@@ -81,7 +81,6 @@ const defaultObject = {
     },
   },
 };
-
 
 let searchObj = reactive(Object.assign({}, defaultObject));
 

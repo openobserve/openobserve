@@ -47,7 +47,7 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: "0",
+    refreshInterval: 0,
     refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
