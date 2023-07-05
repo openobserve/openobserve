@@ -18,7 +18,7 @@
     class="trace-details"
     :style="{
       width: '97vw !important',
-      background: store.state.theme === 'dark' ? '#565656' : '#ffffff',
+      background: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
     }"
   >
     <div
@@ -476,18 +476,18 @@ export default defineComponent({
       const layout: any = {
         autosize: true,
         scrollZoom: true,
-        paper_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
-        plot_bgcolor: store.state.theme === "dark" ? "#333" : "#fff",
+        paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+        plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
         title: {
           text: "",
           font: {
             size: 12,
-            color: store.state.theme === "dark" ? "#fff" : "#333",
+            color: store.state.theme === "dark" ? "#fff" : "#181a1b",
           },
         },
         font: {
           size: 12,
-          color: store.state.theme === "dark" ? "#fff" : "#333",
+          color: store.state.theme === "dark" ? "#fff" : "#181a1b",
         },
         height: 200,
         margin: {

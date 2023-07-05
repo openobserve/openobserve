@@ -56,11 +56,11 @@ export default defineComponent({
     const chartID = ref("");
 
     const getThemeLayoutOptions = () => ({
-      paper_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
-      plot_bgcolor: store.state.theme === 'dark' ? '#333' : '#fff',
+      paper_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
+      plot_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
       font: {
         size: 12 ,
-        color: store.state.theme === 'dark' ? '#fff' : '#333'
+        color: store.state.theme === 'dark' ? '#fff' : '#181a1b'
       }
     })
     watch(() => store.state.theme, () => {

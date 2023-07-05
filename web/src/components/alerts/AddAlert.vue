@@ -122,7 +122,7 @@
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
           @focusout="updateCondtions"
-          class="q-py-sm showLabelOnTop"
+          class="showLabelOnTop"
           resize
           :rules="[(val: any) => !!val || 'Field is required!']"
         ></div>
@@ -714,7 +714,7 @@ export default defineComponent({
 #editor {
   width: 100%;
   min-height: 5rem;
-  padding-bottom: 14px;
+  // padding-bottom: 14px;
   resize: both;
 }
 .alert-condition {

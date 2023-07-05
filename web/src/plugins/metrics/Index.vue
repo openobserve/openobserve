@@ -811,8 +811,8 @@ div.plotly-notifier {
     color: white;
 
     .q-btn__content {
-      background: $primary;
-      border-radius: 0px 3px 3px 0px;
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
 
       .q-icon {
         font-size: 15px;
