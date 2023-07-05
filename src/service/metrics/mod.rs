@@ -15,7 +15,7 @@
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
-use crate::meta::prom::{Metadata, METADATA_LABEL};
+use crate::common::meta::prom::{Metadata, METADATA_LABEL};
 
 pub mod json;
 pub mod prom;

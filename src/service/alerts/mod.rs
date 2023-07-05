@@ -20,12 +20,12 @@ use std::io::Error;
 
 use super::search::sql::Sql;
 use super::{db, triggers};
+use crate::common::meta::alert::{Alert, AlertList, Trigger};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::search::Query;
+use crate::common::meta::{self, StreamType};
 use crate::common::notification::send_notification;
 use crate::handler::grpc::cluster_rpc;
-use crate::meta::alert::{Alert, AlertList, Trigger};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::search::Query;
-use crate::meta::{self, StreamType};
 
 pub mod destinations;
 pub mod templates;
@@ -253,7 +253,7 @@ pub async fn trigger_alert(
 mod test {
     use super::*;
     use crate::common::json;
-    use crate::meta::alert::{AllOperator, Condition};
+    use crate::common::meta::alert::{AllOperator, Condition};
 
     fn prepare_test_alert_object(name: &str, stream: &str) -> Alert {
         Alert {

@@ -15,11 +15,11 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::infra::{
+use crate::common::infra::{
     cache, cluster,
     config::{RwHashMap, CONFIG},
 };
-use crate::meta::common::FileMeta;
+use crate::common::meta::common::FileMeta;
 
 pub mod broadcast;
 pub mod local;

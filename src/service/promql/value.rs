@@ -18,7 +18,7 @@ use serde::{
 };
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use crate::meta::prom::NAME_LABEL;
+use crate::common::meta::prom::NAME_LABEL;
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;

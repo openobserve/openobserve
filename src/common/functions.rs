@@ -1,13 +1,13 @@
-use crate::{infra::config::ENRICHMENT_TABLES, meta::organization::DEFAULT_ORG};
+use crate::common::{infra::config::ENRICHMENT_TABLES, meta::organization::DEFAULT_ORG};
 use std::collections::HashMap;
 use vector_enrichment::{Table, TableRegistry};
 
-use crate::meta::functions::VRLCompilerConfig;
+use crate::common::meta::functions::VRLCompilerConfig;
 
 pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
     let org_key = &format!("{}/", org_id);
 
-    crate::infra::config::QUERY_FUNCTIONS
+    crate::common::infra::config::QUERY_FUNCTIONS
         .iter()
         .filter_map(|transform| {
             let key = transform.key();

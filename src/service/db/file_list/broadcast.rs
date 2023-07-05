@@ -17,10 +17,10 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
+use crate::common::infra::cluster::{self, get_internal_grpc_token};
+use crate::common::infra::config::{RwHashMap, CONFIG};
+use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::cluster::{self, get_internal_grpc_token};
-use crate::infra::config::{RwHashMap, CONFIG};
-use crate::meta::common::FileKey;
 
 lazy_static! {
     pub static ref EVENTS: RwHashMap<String, Arc<mpsc::Sender<Vec<FileKey>>>> = DashMap::default();

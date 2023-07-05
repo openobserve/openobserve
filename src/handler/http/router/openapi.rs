@@ -15,8 +15,8 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
+use crate::common::meta;
 use crate::handler::http::request;
-use crate::meta;
 
 #[derive(OpenApi)]
 #[openapi(

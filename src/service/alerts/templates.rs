@@ -15,9 +15,9 @@
 use actix_web::{http, HttpResponse};
 use std::io::Error;
 
-use crate::infra::config::ALERTS_DESTINATIONS;
-use crate::meta::alert::DestinationTemplate;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::infra::config::ALERTS_DESTINATIONS;
+use crate::common::meta::alert::DestinationTemplate;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
 
 #[tracing::instrument(skip_all)]

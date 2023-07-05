@@ -19,7 +19,7 @@ use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use crate::{common::json, infra::config::CONFIG, meta::StreamType};
+use crate::common::{infra::config::CONFIG, json, meta::StreamType};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {

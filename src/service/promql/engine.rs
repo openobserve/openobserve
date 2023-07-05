@@ -34,8 +34,8 @@ use promql_parser::{
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use crate::infra::config::CONFIG;
-use crate::meta::prom::{HASH_LABEL, VALUE_LABEL};
+use crate::common::infra::config::CONFIG;
+use crate::common::meta::prom::{HASH_LABEL, VALUE_LABEL};
 use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
 
 pub struct Engine {

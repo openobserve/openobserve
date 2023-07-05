@@ -15,8 +15,8 @@
 use std::io::Write;
 
 use crate::common;
-use crate::infra::{cache::file_list, ider, storage};
-use crate::meta::{
+use crate::common::infra::{cache::file_list, ider, storage};
+use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::ScanStats,
     StreamType,

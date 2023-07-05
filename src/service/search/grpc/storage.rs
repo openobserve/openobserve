@@ -18,12 +18,12 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{info_span, Instrument};
 
-use crate::infra::{
+use crate::common::infra::{
     cache::file_data,
     config::CONFIG,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::{self, stream::ScanStats};
+use crate::common::meta::{self, stream::ScanStats};
 use crate::service::{
     db, file_list,
     search::{

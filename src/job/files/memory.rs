@@ -17,13 +17,13 @@ use datafusion::arrow::json::{reader::infer_json_schema, RawReaderBuilder};
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::{json, utils::populate_file_meta};
-use crate::infra::{
+use crate::common::infra::{
     cluster,
     config::{CONFIG, FILE_EXT_PARQUET},
     metrics, storage, wal,
 };
-use crate::meta::{common::FileMeta, StreamType};
+use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::{json, utils::populate_file_meta};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 pub async fn run() -> Result<(), anyhow::Error> {

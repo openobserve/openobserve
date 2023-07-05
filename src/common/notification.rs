@@ -15,7 +15,7 @@
 use std::error::Error as StdError;
 
 use crate::common::json::{self, Value};
-use crate::meta::alert::{self, Alert};
+use crate::common::meta::alert::{self, Alert};
 use crate::service::db;
 
 pub async fn send_notification(
@@ -101,9 +101,9 @@ pub async fn send_notification(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meta::alert::{AlertDestination, Condition, DestinationTemplate, Trigger};
-    use crate::meta::search::Query;
-    use crate::meta::StreamType;
+    use crate::common::meta::alert::{AlertDestination, Condition, DestinationTemplate, Trigger};
+    use crate::common::meta::search::Query;
+    use crate::common::meta::StreamType;
 
     #[actix_web::test]
     async fn test_send_notification() {

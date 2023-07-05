@@ -18,7 +18,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 use tonic::Status;
 use tonic::{codegen::*, Response};
 
-use crate::infra::config::CONFIG;
+use crate::common::infra::config::CONFIG;
 use crate::service::traces::handle_trace_request;
 
 #[derive(Default)]

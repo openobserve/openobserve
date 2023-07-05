@@ -18,8 +18,8 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
-use crate::infra::config::{STREAM_SCHEMAS, USERS};
-use crate::meta::organization::{
+use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
+use crate::common::meta::organization::{
     OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
 };
 use crate::service::organization::get_passcode;

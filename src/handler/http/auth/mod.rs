@@ -21,13 +21,13 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 
+use crate::common::infra::config::CONFIG;
+use crate::common::meta::ingestion::INGESTION_EP;
+use crate::common::meta::user::UserRole;
 use crate::common::{
     self,
     auth::{get_hash, is_root_user},
 };
-use crate::infra::config::CONFIG;
-use crate::meta::ingestion::INGESTION_EP;
-use crate::meta::user::UserRole;
 use crate::service::{db, users};
 
 pub async fn validator(
@@ -227,7 +227,7 @@ pub async fn validator_gcp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meta::user::UserRequest;
+    use crate::common::meta::user::UserRequest;
 
     #[actix_web::test]
     async fn test_validate() {
@@ -236,7 +236,7 @@ mod tests {
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
             },
@@ -247,7 +247,7 @@ mod tests {
             UserRequest {
                 email: "user@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::meta::user::UserRole::Member,
+                role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
             },

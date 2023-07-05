@@ -23,13 +23,13 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::common::str::find;
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
+use crate::common::infra::{
     config::CONFIG,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
+use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
+use crate::common::str::find;
+use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -778,7 +778,7 @@ mod tests {
         let org_id = "test_org";
         let col = "_timestamp";
         let table = "default";
-        let query = crate::meta::search::Query {
+        let query = crate::common::meta::search::Query {
             sql: format!("select {} from {} ", col, table),
             from: 0,
             size: 100,
@@ -792,10 +792,10 @@ mod tests {
             query_fn: None,
         };
 
-        let req: crate::meta::search::Request = crate::meta::search::Request {
+        let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
             query,
             aggs: HashMap::new(),
-            encoding: crate::meta::search::RequestEncoding::Empty,
+            encoding: crate::common::meta::search::RequestEncoding::Empty,
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -861,7 +861,7 @@ mod tests {
 
         let org_id = "test_org";
         for (sql, ok, time_range) in sqls {
-            let query = crate::meta::search::Query {
+            let query = crate::common::meta::search::Query {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
@@ -874,10 +874,10 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
             };
-            let req: crate::meta::search::Request = crate::meta::search::Request {
+            let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
-                encoding: crate::meta::search::RequestEncoding::Empty,
+                encoding: crate::common::meta::search::RequestEncoding::Empty,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
@@ -947,7 +947,7 @@ mod tests {
 
         let org_id = "test_org";
         for (sql, ok, limit, time_range) in sqls {
-            let query = crate::meta::search::Query {
+            let query = crate::common::meta::search::Query {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
@@ -960,10 +960,10 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
             };
-            let req: crate::meta::search::Request = crate::meta::search::Request {
+            let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
-                encoding: crate::meta::search::RequestEncoding::Empty,
+                encoding: crate::common::meta::search::RequestEncoding::Empty,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();

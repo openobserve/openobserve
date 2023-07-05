@@ -19,15 +19,15 @@ use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use std::{collections::HashMap, io::Write, sync::Arc};
 
-use crate::common::json;
-use crate::infra::{
+use crate::common::infra::{
     cache,
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, FILE_EXT_PARQUET},
     db::etcd,
     dist_lock, ider, metrics, storage,
 };
-use crate::meta::{
+use crate::common::json;
+use crate::common::meta::{
     common::{FileKey, FileMeta},
     StreamType,
 };

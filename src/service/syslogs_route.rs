@@ -16,10 +16,10 @@ use actix_web::{http::StatusCode, HttpResponse};
 use ipnetwork::IpNetwork;
 use std::io;
 
-use crate::infra::config::SYSLOG_ROUTES;
+use crate::common::infra::config::SYSLOG_ROUTES;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::syslog::{SyslogRoute, SyslogRoutes, SyslogServer};
 use crate::job;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::syslog::{SyslogRoute, SyslogRoutes, SyslogServer};
 use crate::service::db::syslog;
 
 #[tracing::instrument(skip_all)]
@@ -50,7 +50,7 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
         }
     }
 
-    route.id = crate::infra::ider::generate();
+    route.id = crate::common::infra::ider::generate();
     if let Err(e) = syslog::set(&route).await {
         return Ok(Response::InternalServerError(e).into());
     }

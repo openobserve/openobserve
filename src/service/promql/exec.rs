@@ -21,7 +21,7 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-use crate::meta::stream::ScanStats;
+use crate::common::meta::stream::ScanStats;
 use crate::service::promql::{
     micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
 };

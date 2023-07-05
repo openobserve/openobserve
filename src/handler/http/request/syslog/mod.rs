@@ -16,7 +16,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
 
 use crate::{
-    meta::syslog::{SyslogRoute, SyslogServer},
+    common::meta::syslog::{SyslogRoute, SyslogServer},
     service::syslogs_route::{self},
 };
 

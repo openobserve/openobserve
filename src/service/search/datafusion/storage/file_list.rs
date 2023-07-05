@@ -17,7 +17,7 @@ use dashmap::DashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 
-use crate::infra::config::RwHashMap;
+use crate::common::infra::config::RwHashMap;
 use crate::service::file_list;
 
 pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
@@ -61,7 +61,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_storage_file_list() {
-        let meta = crate::meta::common::FileMeta {
+        let meta = crate::common::meta::common::FileMeta {
             min_ts: 100,
             max_ts: 200,
             records: 10000,
@@ -69,7 +69,7 @@ mod tests {
             compressed_size: 1,
         };
         let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
-        crate::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
+        crate::common::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
         set(session_id, &[file_name.to_string()]);
 

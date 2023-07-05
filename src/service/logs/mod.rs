@@ -18,11 +18,11 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
 use crate::common::hasher::get_fields_key_xxh3;
+use crate::common::infra::config::CONFIG;
 use crate::common::json::{Map, Value};
-use crate::infra::config::CONFIG;
-use crate::meta::alert::{Alert, Evaluate, Trigger};
-use crate::meta::ingestion::RecordStatus;
-use crate::meta::StreamType;
+use crate::common::meta::alert::{Alert, Evaluate, Trigger};
+use crate::common::meta::ingestion::RecordStatus;
+use crate::common::meta::StreamType;
 use crate::service::schema::check_for_schema;
 
 pub mod bulk;

@@ -22,7 +22,7 @@ use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
 
-use crate::infra::cache::tmpfs;
+use crate::common::infra::cache::tmpfs;
 
 /// A specialized `Error` for in-memory object store-related errors
 #[derive(ThisError, Debug)]

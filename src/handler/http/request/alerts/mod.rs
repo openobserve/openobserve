@@ -20,7 +20,7 @@ use ahash::AHashMap as HashMap;
 use std::io::Error;
 
 use crate::{
-    meta::{self, alert::Alert, StreamType},
+    common::meta::{self, alert::Alert, StreamType},
     service::alerts,
 };
 

@@ -24,8 +24,8 @@ use uuid::Uuid;
 use super::config::{RwHashMap, CONFIG, INSTANCE_ID};
 use super::db::ETCD_CLIENT;
 use super::errors::{Error, Result};
+use crate::common::infra::db::{etcd, Event};
 use crate::common::json;
-use crate::infra::db::{etcd, Event};
 use crate::service::db;
 
 static LOCAL_NODE_KEY_TTL: i64 = 10; // node ttl, seconds

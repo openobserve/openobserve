@@ -17,8 +17,8 @@ use actix_web::{route, web, HttpRequest, HttpResponse};
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
+use crate::common::infra::cluster;
+use crate::common::infra::config::CONFIG;
 
 const QUERIER_ROUTES: [&str; 10] = [
     "/_search",
