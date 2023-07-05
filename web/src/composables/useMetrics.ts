@@ -82,14 +82,8 @@ const defaultObject = {
   },
 };
 
-// let searchObj = reactive(structuredClone(defaultObject));
-// let localLogsObj:any = useLocalLogsObj();
-// let searchObj = {};
-// if (typeof localLogsObj === "object") {
-// searchObj = localLogsObj.value;
-// } else {
+
 let searchObj = reactive(Object.assign({}, defaultObject));
-// }
 
 const useMetrics = () => {
   const resetSearchObj = () => {

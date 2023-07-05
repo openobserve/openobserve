@@ -172,7 +172,6 @@ import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
-  useLocalLogsObj,
   b64EncodeUnicode,
   useLocalTraceFilterField,
   verifyOrganizationStatus,
@@ -1196,7 +1195,6 @@ export default defineComponent({
       getConsumableDateTime,
       runQueryFn,
       setQuery,
-      useLocalLogsObj,
       searchAroundData,
       getTraceDetails,
       verifyOrganizationStatus,
@@ -1304,13 +1302,6 @@ export default defineComponent({
     },
     runQuery() {
       if (this.searchObj.runQuery == true) {
-        this.useLocalLogsObj({
-          organizationIdentifier: this.searchObj.organizationIdetifier,
-          runQuery: this.searchObj.runQuery,
-          loading: this.searchObj.loading,
-          config: this.searchObj.config,
-          meta: this.searchObj.meta,
-        });
         this.runQueryFn();
       }
     },
