@@ -45,8 +45,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
  * upload compressed files to storage & delete moved files from local
  */
 async fn move_files_to_storage() -> Result<(), anyhow::Error> {
-    let files = wal::MEMORY_FILES.list();
-
+    // need to clone here, to avoid thread boundry issues across awaits
+    let files = wal::MEMORY_FILES.list().clone();
     // use multiple threads to upload files
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
