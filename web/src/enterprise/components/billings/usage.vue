@@ -29,50 +29,57 @@
         />
       </div>
     </div>
-    <reactive-line-chart
-      :key="JSON.stringify(chartData.value)"
-      :data="chartData"
-    ></reactive-line-chart>
+    <div v-if="!dataLoading">
+      <trace-chart
+        ref="usageChart"
+        id="billing-usage"
+        :chart="chartData"
+      ></trace-chart>
+    </div>
+    <div v-else class="text-h6 text-weight-medium text-center">Loading...</div>
   </q-page>
 </template>
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onMounted } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
-import ReactiveLineChart from "@/components/shared/plotly/doubleLinechart.vue";
+import TraceChart from "@/plugins/traces/TraceChart.vue";
 import { useI18n } from "vue-i18n";
 import BillingService from "@/services/billings";
 
+let currentDate = new Date(); // Get the current date and time
+
+// Subtract 30 days from the current date
+let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
 const blankChartObj: any = {
-  id: "panel_usage",
-  data: [
-    {
-      x: [],
-      y: [],
+  data: [],
+  layout: {
+    xaxis: {
+      type: "date",
     },
-    {
-      x: [],
-      y: [],
+    yaxis: {
+      ticksuffix: " MB",
+      type: "linear",
     },
-    {
-      x: [],
-      y: [],
-    },
-  ],
-  chartParams: { title: "" },
+    autosize: true,
+  },
 };
 
 export default defineComponent({
   name: "Usage",
   components: {
-    ReactiveLineChart,
+    TraceChart,
   },
   setup() {
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
     const usageDate = ref("30days");
+    const usageChart = ref();
+    const dataLoading = ref(false);
     let chartData = ref(blankChartObj);
+    let eventIndexMap: any = [];
     onMounted(() => {
       getUsage();
     });
@@ -81,6 +88,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading usage data...",
       });
+      dataLoading.value = true;
       BillingService.get_data_usage(
         store.state.selectedOrganization.identifier,
         usageDate.value
@@ -95,20 +103,49 @@ export default defineComponent({
                 usage_timestamp: string;
                 size: string;
               }) => {
-                if (data.event == "bulk") {
-                  chartObj.data[0].x.push(data.usage_timestamp);
-                  chartObj.data[0].y.push(data.size);
-                } else if (data.event == "search") {
-                  chartObj.data[1].x.push(data.usage_timestamp);
-                  chartObj.data[1].y.push(data.size);
+                let eventIndex = eventIndexMap.indexOf(data.event);
+                if (eventIndex > -1) {
+                  if (chartObj.data[eventIndex] === undefined) {
+                    chartObj.data[eventIndex] = {
+                      x: [],
+                      y: [],
+                      name: data.event,
+                      type: "scatter",
+                      mode: "lines",
+                    };
+                  }
+                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
+                  chartObj.data[eventIndex].y.push(
+                    Math.round(parseInt(data.size) / 1024 / 1024)
+                  );
                 } else {
-                  chartObj.data[2].x.push(data.usage_timestamp);
-                  chartObj.data[2].y.push(data.size);
+                  // If the event value is not found, add it to eventIndexMap and chartObj
+                  // let newIndex = eventIndexMap.length;
+                  eventIndexMap.push(data.event);
+                  eventIndex = eventIndexMap.indexOf(data.event);
+                  chartObj.data[eventIndex] = {
+                    x: [],
+                    y: [],
+                    name: data.event,
+                    type: "scatter",
+                    mode: "lines",
+                  };
+
+                  // Update the newly added index with the data values
+                  chartObj.data[eventIndex].x.push(data.usage_timestamp);
+                  chartObj.data[eventIndex].y.push(
+                    Math.round(parseInt(data.size) / 1024 / 1024)
+                  );
                 }
               }
             );
           }
           chartData.value = chartObj;
+          setTimeout(() => {
+            dataLoading.value = false;
+            usageChart.value.reDraw();
+            usageChart.value.forceReLayout();
+          }, 1000);
           dismiss();
         })
         .catch((e) => {
@@ -127,7 +164,9 @@ export default defineComponent({
       t,
       store,
       chartData,
+      usageChart,
       usageDate,
+      dataLoading,
       options: ["30days", "60days", "3months", "6months"],
       selectUsageDate,
     };
