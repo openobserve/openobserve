@@ -90,7 +90,7 @@ export default defineComponent({
     name: "AddSettingVariable",
     props: ['isAddVariable'],
 
-    setup(props) {
+    setup(props, { emit }) {
         const { t } = useI18n();
         const store = useStore();
         const data: any = reactive({
@@ -164,7 +164,7 @@ export default defineComponent({
                 variableData
                 );
 
-                props.isAddVariable = false
+                emit('save');
 
             } else {
 
@@ -179,7 +179,7 @@ export default defineComponent({
                 variableData
                 );
 
-                props.isAddVariable = false
+                emit('save');
             }
         }
 

@@ -4,7 +4,7 @@
         <div>
             <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
           </div>
-        <AddSettingVariable :isAddVariable="isAddVariable"/>
+        <AddSettingVariable :isAddVariable="isAddVariable" @save="handleSaveVariable"/>
       </div>
       <div v-else class="column full-height">
           
@@ -26,6 +26,17 @@
                 <!-- add delete icon in actions column -->
                 <template #body-cell-actions="props">
                   <q-td :props="props">
+                    <q-btn
+                      icon="edit"
+                      class="q-ml-xs"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('dashboard.edit')"
+                      @click="editVariableFn(props)"
+                    ></q-btn>
                     <q-btn
                       :icon="outlinedDelete"
                       :title="t('dashboard.delete')"
@@ -87,6 +98,7 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+    const selectedVariable = ref(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
     const columns = ref<QTableProps["columns"]>([
@@ -157,11 +169,34 @@ export default defineComponent({
         await getDashboardData()
       }
     }
-
+    const handleSaveVariable = () => {
+      isAddVariable.value = false;
+      getDashboardData()
+    };
     const goBackToDashboardList = () => {
       isAddVariable.value = false
     }
+    const editVariableFn = (props: any) => {
+      selectedVariable.value = props.row;
+      isAddVariable.value = true;
+    };
+    // const editVarFn = async () => {
+    //   console.log("Edit variable---", selectedVariable.value);
+    //   isAddVariable.value = false;
+      
+      
+    //   if (selectedVariable.value) {
+    //     const variableName = selectedVariable?.value?.name
+        
+    //     await updateVariable(
+    //       store,
+    //       route.query.dashboard,
+    //       variableName
+    //       );
+    //     }
 
+    //   await getDashboardData()
+    // }
     return {
       t,
       disableColor,
@@ -183,7 +218,9 @@ export default defineComponent({
       showDeleteDialogFn,
       confirmDeleteDialog,
       deleteVariableFn,
-      goBackToDashboardList
+      goBackToDashboardList,
+      editVariableFn,
+      handleSaveVariable
     };
   },
 });

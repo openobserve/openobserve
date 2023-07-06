@@ -258,6 +258,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
+    "edit":"Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
     "search": "Search Dashboard",
     "name": "Name",
