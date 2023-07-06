@@ -153,7 +153,7 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import type { AlertData } from "@/ts/interfaces/index";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "AlertList",
@@ -323,10 +323,10 @@ export default defineComponent({
         .then((res) => {
           destinations.value = res.data;
         })
-        .catch((err) =>
+        .catch(() =>
           $q.notify({
             type: "negative",
-            message: err.data.message,
+            message: "Error while fetching destinations.",
             timeout: 2000,
           })
         );
@@ -431,7 +431,7 @@ export default defineComponent({
         .catch((err) => {
           $q.notify({
             type: "negative",
-            message: err.data.message,
+            message: err?.data?.message || 'Error while deleting alert.',
             timeout: 2000,
           });
         });

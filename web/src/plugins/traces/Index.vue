@@ -172,14 +172,13 @@ import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import TransformService from "@/services/jstransform";
 import {
-  useLocalLogsObj,
   b64EncodeUnicode,
   useLocalTraceFilterField,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage } from "@/utils/common";
+import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import { number } from "@intlify/core-base";
 import { stringLiteral } from "@babel/types";
 
@@ -319,7 +318,8 @@ export default defineComponent({
 
         return;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while getting functions");
       }
     }
 
@@ -363,7 +363,8 @@ export default defineComponent({
             });
           });
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while getting streams");
       }
     }
 
@@ -403,7 +404,8 @@ export default defineComponent({
           searchObj.loading = false;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while loading streams");
       }
     }
 
@@ -476,7 +478,8 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while getting consumable date time");
       }
     }
 
@@ -631,7 +634,8 @@ export default defineComponent({
 
         return req;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Invalid SQL Syntax");
       }
     }
 
@@ -756,7 +760,9 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        console.log(e?.message);
+        searchObj.loading = false;
+        showErrorNotification("Search request failed");
       }
     }
 
@@ -841,7 +847,8 @@ export default defineComponent({
           });
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while extracting fields");
       }
     }
 
@@ -900,7 +907,8 @@ export default defineComponent({
 
         searchObj.loading = false;
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while updaing grid columns");
       }
     }
 
@@ -1168,7 +1176,8 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        throw new ErrorException("Request failed.");
+        searchObj.loading = false;
+        showErrorNotification("Request failed.");
       }
     };
 
@@ -1186,7 +1195,6 @@ export default defineComponent({
       getConsumableDateTime,
       runQueryFn,
       setQuery,
-      useLocalLogsObj,
       searchAroundData,
       getTraceDetails,
       verifyOrganizationStatus,
@@ -1206,7 +1214,7 @@ export default defineComponent({
       return this.searchObj.config.splitterModel;
     },
     changeOrganization() {
-      return this.store.state.selectedOrganization.identifier;
+      return this.store.state.selectedOrganization?.identifier;
     },
     changeStream() {
       return this.searchObj.data.stream.selectedStream;
@@ -1294,13 +1302,6 @@ export default defineComponent({
     },
     runQuery() {
       if (this.searchObj.runQuery == true) {
-        this.useLocalLogsObj({
-          organizationIdentifier: this.searchObj.organizationIdetifier,
-          runQuery: this.searchObj.runQuery,
-          loading: this.searchObj.loading,
-          config: this.searchObj.config,
-          meta: this.searchObj.meta,
-        });
         this.runQueryFn();
       }
     },

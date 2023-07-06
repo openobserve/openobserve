@@ -113,8 +113,8 @@
                     column.name == 'source'
                       ? column.prop(row)
                       : searchObj.data.resultGrid.columns.length > 2 &&
-                        column.prop(row, column.name).length > 100
-                      ? column.prop(row, column.name).substr(0, 100) + '...'
+                        (column.prop(row, column.name)?.length || 0) > 100
+                      ? (column.prop(row, column.name)?.substr(0, 100) || '') + '...'
                       : column.name != '@timestamp'
                       ? row[column.name]
                       : column.prop(row, column.name)
@@ -125,7 +125,7 @@
                       : searchObj.data.query
                   "
                   :title="
-                    column.prop(row, column.name).length > 100 &&
+                    (column.prop(row, column.name)?.length || 0) > 100 &&
                     column.name != 'source'
                       ? column.prop(row, column.name)
                       : ''
@@ -158,10 +158,10 @@
                   title="Exclude Term"
                   round
                 >
-                <q-icon color="currentColor">
-                  <NotEqualIcon></NotEqualIcon>
-                </q-icon>
-              </q-btn>
+                  <q-icon color="currentColor">
+                    <NotEqualIcon></NotEqualIcon>
+                  </q-icon>
+                </q-btn>
               </div>
             </q-td>
           </q-tr>
@@ -181,7 +181,7 @@
               <div class="q-pl-md">
                 {
                 <div
-                  class="log_json_content "
+                  class="log_json_content"
                   v-for="key in Object.keys(row)"
                   :key="key"
                 >
@@ -207,10 +207,9 @@
                               round
                               class="q-mr-sm pointer"
                             >
-                             <q-icon color="currentColor">
-                              <EqualIcon></EqualIcon>
-                             </q-icon>
-                            </q-btn
+                              <q-icon color="currentColor">
+                                <EqualIcon></EqualIcon>
+                              </q-icon> </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -227,10 +226,9 @@
                               round
                               class="q-mr-sm pointer"
                             >
-                             <q-icon color="currentColor">
-                              <NotEqualIcon></NotEqualIcon>
-                             </q-icon>
-                            </q-btn
+                              <q-icon color="currentColor">
+                                <NotEqualIcon></NotEqualIcon>
+                              </q-icon> </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -315,7 +313,8 @@ export default defineComponent({
     HighLight,
     BarChart,
     DetailTable,
-    EqualIcon, NotEqualIcon
+    EqualIcon,
+    NotEqualIcon,
   },
   emits: [
     "update:scroll",
@@ -656,12 +655,12 @@ export default defineComponent({
 }
 
 .q-table--dark .table-header {
-    // text-transform: capitalize;
+  // text-transform: capitalize;
 
-    .table-head-chip {
-      background-color: #565656;
-    }
+  .table-head-chip {
+    background-color: #565656;
   }
+}
 
 .thead-sticky tr:last-child > * {
   top: 0;

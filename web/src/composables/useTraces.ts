@@ -47,7 +47,7 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: "0",
+    refreshInterval: 0,
     refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
@@ -126,14 +126,7 @@ const defaultObject = {
   },
 };
 
-// let searchObj = reactive(structuredClone(defaultObject));
-// let localLogsObj:any = useLocalLogsObj();
-// let searchObj = {};
-// if (typeof localLogsObj === "object") {
-// searchObj = localLogsObj.value;
-// } else {
 let searchObj = reactive(Object.assign({}, defaultObject));
-// }
 
 const useLogs = () => {
   const resetSearchObj = () => {
