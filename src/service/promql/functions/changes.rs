@@ -16,15 +16,17 @@ use datafusion::error::Result;
 
 use crate::service::promql::value::{RangeValue, Value};
 
-pub(crate) fn idelta(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "idelta", exec, false)
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
+pub(crate) fn changes(data: &Value) -> Result<Value> {
+    super::eval_idelta(data, "changes", exec, false)
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.samples.len() < 2 {
-        return None;
-    }
-    let last = data.samples.last().unwrap();
-    let previous = data.samples.get(data.samples.len() - 2).unwrap();
-    Some(last.value - previous.value)
+    let changes = data
+        .samples
+        .iter()
+        .zip(data.samples.iter().skip(1))
+        .map(|(current, next)| (!current.value.eq(&next.value) as u32) as f64)
+        .sum();
+    Some(changes)
 }
