@@ -18,12 +18,12 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::common::file::{get_file_contents, get_file_meta, scan_files};
+use crate::common::infra::{config::CONFIG, errors, ider, metrics, wal};
+use crate::common::meta;
 use crate::handler::grpc::cluster_rpc::{
     metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
     MetricsWalFileRequest, MetricsWalFileResponse,
 };
-use crate::infra::{config::CONFIG, errors, ider, metrics, wal};
-use crate::meta;
 use crate::service::promql::search as SearchService;
 
 pub struct Querier;

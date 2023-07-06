@@ -19,12 +19,12 @@ use serde::Serialize;
 use std::io::Error;
 use utoipa::ToSchema;
 
-use crate::common::json;
-use crate::infra::{
+use crate::common::infra::{
     cache, cluster,
     config::{self, CONFIG, INSTANCE_ID, SYSLOG_ENABLED},
 };
-use crate::meta::functions::ZoFunction;
+use crate::common::json;
+use crate::common::meta::functions::ZoFunction;
 use crate::service::{db, search::datafusion::DEFAULT_FUNCTIONS};
 
 #[derive(Serialize, ToSchema)]

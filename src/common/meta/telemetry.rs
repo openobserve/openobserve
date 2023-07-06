@@ -15,9 +15,9 @@
 use segment::{message::Track, Client, Message};
 use std::collections::HashMap;
 
+use crate::common::infra::cache::stats;
+use crate::common::infra::config::*;
 use crate::common::json;
-use crate::infra::cache::stats;
-use crate::infra::config::*;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 
@@ -143,9 +143,9 @@ pub fn add_zo_info(data: &mut HashMap<String, json::Value>) {
         );
     }
 
-    let roles = crate::infra::cluster::load_local_node_role();
-    if !crate::infra::cluster::is_single_node(&roles) {
-        match crate::infra::cluster::get_cached_online_nodes() {
+    let roles = crate::common::infra::cluster::load_local_node_role();
+    if !crate::common::infra::cluster::is_single_node(&roles) {
+        match crate::common::infra::cluster::get_cached_online_nodes() {
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());

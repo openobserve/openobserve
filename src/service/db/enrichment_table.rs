@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use vrl::prelude::NotNan;
 
-use crate::infra::cache::stats;
-use crate::service::search as SearchService;
-use crate::{
-    common::json,
+use crate::common::infra::cache::stats;
+use crate::common::{
+    json,
     meta::{self, search::Request},
 };
+use crate::service::search as SearchService;
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let stats = stats::get_stream_stats(org_id, name, meta::StreamType::EnrichmentTables);

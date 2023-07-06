@@ -21,10 +21,11 @@ use std::io::Error;
 use uuid::Uuid;
 
 use super::db;
+use crate::common::{infra::config::USERS, meta::user::UpdateUser};
 use crate::{
     common::auth::get_hash,
-    infra::config::ROOT_USER,
-    meta::{
+    common::infra::config::ROOT_USER,
+    common::meta::{
         http::HttpResponse as MetaHttpResponse,
         organization::DEFAULT_ORG,
         user::{UserOrg, UserRequest},
@@ -32,9 +33,8 @@ use crate::{
 };
 use crate::{
     common::auth::is_root_user,
-    meta::user::{User, UserList, UserResponse, UserRole},
+    common::meta::user::{User, UserList, UserResponse, UserRole},
 };
-use crate::{infra::config::USERS, meta::user::UpdateUser};
 
 pub async fn post_user(org_id: &str, usr_req: UserRequest) -> Result<HttpResponse, Error> {
     let existing_user = if is_root_user(&usr_req.email) {
@@ -384,7 +384,7 @@ mod tests {
             User {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),
                 token: "token".to_string(),
                 first_name: "admin".to_owned(),
@@ -419,7 +419,7 @@ mod tests {
             UserRequest {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },
@@ -435,7 +435,7 @@ mod tests {
             UserRequest {
                 email: "user@example.com".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },
@@ -447,7 +447,7 @@ mod tests {
             User {
                 email: "admin@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),
                 token: "token".to_string(),
                 first_name: "admin".to_owned(),
@@ -467,7 +467,7 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
-                role: Some(crate::meta::user::UserRole::Member),
+                role: Some(crate::common::meta::user::UserRole::Member),
             },
         )
         .await;
@@ -485,7 +485,7 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: None,
                 new_password: None,
-                role: Some(crate::meta::user::UserRole::Admin),
+                role: Some(crate::common::meta::user::UserRole::Admin),
             },
         )
         .await;

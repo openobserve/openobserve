@@ -19,8 +19,8 @@ use actix_web::{
 use std::io::Error;
 
 use super::db;
-use crate::meta::alert::Trigger;
-use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::alert::Trigger;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[tracing::instrument(skip_all)]
 pub async fn save_trigger(
@@ -64,7 +64,7 @@ mod tests {
                 stream: "TestStream".to_string(),
                 org: "dummy".to_string(),
                 last_sent_at: 0,
-                stream_type: crate::meta::StreamType::Logs,
+                stream_type: crate::common::meta::StreamType::Logs,
                 count: 0,
                 is_ingest_time: false,
             },
@@ -76,7 +76,7 @@ mod tests {
         let resp = crate::service::alerts::get_alert(
             "dummy".to_string(),
             "TestStream".to_string(),
-            crate::meta::StreamType::Logs,
+            crate::common::meta::StreamType::Logs,
             "TestAlert".to_string(),
         )
         .await;

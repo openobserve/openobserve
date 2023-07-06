@@ -4,16 +4,16 @@ use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use std::io::Read;
 
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::infra::{cluster, config::CONFIG, metrics};
-use crate::meta::usage::UsageType;
-use crate::meta::{
+use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::usage::UsageType;
+use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
         AWSRecordType, GCPIngestionRequest, GCPIngestionResponse, RecordStatus, StreamStatus,
     },
     StreamType,
 };
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::usage::report_usage_stats;
 use crate::service::{db, ingestion::write_file};
 

@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::infra::errors;
+use crate::common::infra::errors;
 
 /// HTTP response
 /// code 200 is success

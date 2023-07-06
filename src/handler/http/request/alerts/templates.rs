@@ -15,7 +15,7 @@
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::{meta::alert::DestinationTemplate, service::alerts::templates};
+use crate::{common::meta::alert::DestinationTemplate, service::alerts::templates};
 
 /** CreateTemplate */
 #[utoipa::path(

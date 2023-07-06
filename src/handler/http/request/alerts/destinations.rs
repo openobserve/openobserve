@@ -15,9 +15,9 @@
 use actix_web::{delete, get, http, post, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::db;
-use crate::{meta::alert::AlertDestination, service::alerts::destinations};
+use crate::{common::meta::alert::AlertDestination, service::alerts::destinations};
 
 /** CreateDestination */
 #[utoipa::path(

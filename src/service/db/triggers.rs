@@ -14,13 +14,13 @@
 
 use std::sync::Arc;
 
+use crate::common::infra::config::TRIGGERS;
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::TRIGGERS;
-use crate::infra::db::Event;
-use crate::meta::alert::Trigger;
+use crate::common::meta::alert::Trigger;
 
 pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
     Ok(db
         .get(&key)
@@ -30,7 +30,7 @@ pub async fn get(alert_name: &str) -> Result<Option<Trigger>, anyhow::Error> {
 }
 
 pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
     Ok(db
         .put(&key.clone(), json::to_vec(trigger).unwrap().into())
@@ -38,13 +38,13 @@ pub async fn set(alert_name: &str, trigger: &Trigger) -> Result<(), anyhow::Erro
 }
 
 pub async fn delete(alert_name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/trigger/{alert_name}");
     Ok(db.delete(&key.clone(), false).await?)
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/trigger/";
     for (item_key, item_value) in db.list(key).await? {
         let item_key = item_key.strip_prefix(key).unwrap();
@@ -56,7 +56,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/trigger/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();

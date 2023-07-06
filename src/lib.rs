@@ -15,9 +15,7 @@
 #![cfg_attr(coverage_nightly, feature(no_coverage))]
 pub mod common;
 pub mod handler;
-pub mod infra;
 pub mod job;
-pub mod meta;
 pub mod service;
 
 #[macro_use]

@@ -4,7 +4,7 @@ use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::{
+use crate::common::{
     infra::{config::CONFIG, metrics},
     meta::{
         usage::{RequestStats, UsageData, UsageEvent, UsageType},

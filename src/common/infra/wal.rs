@@ -22,11 +22,11 @@ use std::{
 };
 
 use crate::common::file::get_file_contents;
-use crate::infra::{
+use crate::common::infra::{
     config::{CONFIG, FILE_EXT_JSON},
     ider, metrics,
 };
-use crate::meta::StreamType;
+use crate::common::meta::StreamType;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);

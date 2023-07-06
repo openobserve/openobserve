@@ -15,7 +15,7 @@
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::{meta, service::traces::otlp_http};
+use crate::{common::meta, service::traces::otlp_http};
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

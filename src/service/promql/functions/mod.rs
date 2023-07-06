@@ -14,7 +14,7 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::meta::prom::NAME_LABEL;
+use crate::common::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod avg_over_time;

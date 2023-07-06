@@ -14,7 +14,7 @@
 
 use crate::{
     common::auth::is_root_user,
-    infra::{
+    common::infra::{
         cluster::get_internal_grpc_token,
         config::{CONFIG, ROOT_USER, USERS},
     },
@@ -88,7 +88,7 @@ mod tests {
     use tonic::metadata::MetadataValue;
 
     use super::*;
-    use crate::{infra::config::INSTANCE_ID, meta::user::User};
+    use crate::common::{infra::config::INSTANCE_ID, meta::user::User};
 
     #[actix_web::test]
     async fn test_check_no_auth() {
@@ -98,7 +98,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -125,7 +125,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -150,7 +150,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),

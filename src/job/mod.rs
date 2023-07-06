@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
-use crate::infra::{cluster, ider};
-use crate::meta::organization::DEFAULT_ORG;
-use crate::meta::user::UserRequest;
+use crate::common::infra::config::{CONFIG, INSTANCE_ID, SYSLOG_ENABLED};
+use crate::common::infra::{cluster, ider};
+use crate::common::meta::organization::DEFAULT_ORG;
+use crate::common::meta::user::UserRequest;
 use crate::service::{db, users};
 use regex::Regex;
 
@@ -47,7 +47,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             UserRequest {
                 email: CONFIG.auth.root_user_email.clone(),
                 password: CONFIG.auth.root_user_password.clone(),
-                role: crate::meta::user::UserRole::Root,
+                role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
             },

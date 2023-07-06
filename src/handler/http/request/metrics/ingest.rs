@@ -15,7 +15,7 @@
 use actix_web::{http, post, web, HttpResponse};
 use std::io::Error;
 
-use crate::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::service::metrics;
 
 /** _json ingestion API */

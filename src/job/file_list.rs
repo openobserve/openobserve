@@ -16,11 +16,11 @@ use std::{fs, path::Path};
 use tokio::time;
 
 use crate::common::file::scan_files;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::storage;
-use crate::infra::wal;
-use crate::meta::StreamType;
+use crate::common::infra::cluster;
+use crate::common::infra::config::CONFIG;
+use crate::common::infra::storage;
+use crate::common::infra::wal;
+use crate::common::meta::StreamType;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

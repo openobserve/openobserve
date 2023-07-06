@@ -15,7 +15,7 @@
 use actix_web::{http::StatusCode, HttpResponse};
 use std::io;
 
-use crate::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
+use crate::common::meta::{self, dashboards::Dashboard, http::HttpResponse as MetaHttpResponse};
 use crate::service::db::dashboard;
 
 #[tracing::instrument(skip(dashboard))]
@@ -24,7 +24,7 @@ pub async fn create_dashboard(
     mut dashboard: Dashboard,
 ) -> Result<HttpResponse, io::Error> {
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
-    dashboard.dashboard_id = crate::infra::ider::generate();
+    dashboard.dashboard_id = crate::common::infra::ider::generate();
     if let Err(e) = dashboard::put(org_id, &dashboard).await {
         return Ok(Response::InternalServerError(e).into());
     }

@@ -14,8 +14,8 @@
 
 use tokio::time::{self, Duration};
 
-use crate::infra::cluster;
-use crate::infra::config::{CONFIG, METRIC_CLUSTER_LEADER};
+use crate::common::infra::cluster;
+use crate::common::infra::config::{CONFIG, METRIC_CLUSTER_LEADER};
 use crate::service::db;
 
 pub async fn run() -> Result<(), anyhow::Error> {

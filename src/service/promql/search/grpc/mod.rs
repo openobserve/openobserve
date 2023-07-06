@@ -20,9 +20,9 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+use crate::common::infra::{cache::tmpfs, errors::Result};
+use crate::common::meta::stream::ScanStats;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::{cache::tmpfs, errors::Result};
-use crate::meta::stream::ScanStats;
 use crate::service::{
     promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
     search,

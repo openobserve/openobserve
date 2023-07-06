@@ -16,12 +16,12 @@ use chrono::{TimeZone, Utc};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use crate::common::{file::scan_files, json};
-use crate::infra::{config::CONFIG, wal};
-use crate::meta::{
+use crate::common::infra::{config::CONFIG, wal};
+use crate::common::meta::{
     common::{FileKey, FileMeta},
     StreamType,
 };
+use crate::common::{file::scan_files, json};
 
 pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow::Error> {
     let file_data = FileKey {

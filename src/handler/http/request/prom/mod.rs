@@ -17,9 +17,9 @@ use promql_parser::parser;
 use std::io::Error;
 
 use crate::{
+    common::infra::errors,
+    common::meta::{self, http::HttpResponse as MetaHttpResponse},
     common::time::{parse_milliseconds, parse_str_to_timestamp_micros},
-    infra::errors,
-    meta::{self, http::HttpResponse as MetaHttpResponse},
     service::{metrics, promql},
 };
 

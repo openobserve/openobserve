@@ -19,13 +19,13 @@ use actix_web::{
 use std::io::Error;
 
 use super::ingestion::compile_vrl_function;
-use crate::meta::{
+use crate::common::meta::{
     functions::{StreamFunctionsList, StreamOrder, StreamTransform},
     http::HttpResponse as MetaHttpResponse,
 };
+use crate::common::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
+use crate::common::{meta::functions::FunctionList, meta::StreamType};
 use crate::service::db;
-use crate::{infra::config::STREAM_FUNCTIONS, meta::functions::Transform};
-use crate::{meta::functions::FunctionList, meta::StreamType};
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";

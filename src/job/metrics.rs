@@ -3,12 +3,12 @@ use std::path::Path;
 use tokio::time;
 
 use crate::common::file::scan_files;
-use crate::infra::cache;
-use crate::infra::cluster;
-use crate::infra::config::CONFIG;
-use crate::infra::config::USERS;
-use crate::infra::metrics;
-use crate::meta::StreamType;
+use crate::common::infra::cache;
+use crate::common::infra::cluster;
+use crate::common::infra::config::CONFIG;
+use crate::common::infra::config::USERS;
+use crate::common::infra::metrics;
+use crate::common::meta::StreamType;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
@@ -72,7 +72,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
         .with_label_values(&[])
