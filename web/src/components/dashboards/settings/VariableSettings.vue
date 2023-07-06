@@ -4,7 +4,7 @@
         <div>
             <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
           </div>
-        <AddSettingVariable :isAddVariable="isAddVariable" @save="handleSaveVariable"/>
+        <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableData="selectedVariable"/>
       </div>
       <div v-else class="column full-height">
           
@@ -35,7 +35,7 @@
                       round
                       flat
                       :title="t('dashboard.edit')"
-                      @click="editVariableFn(props)"
+                      @click="editVariableFn(props.row.name)"
                     ></q-btn>
                     <q-btn
                       :icon="outlinedDelete"
@@ -146,6 +146,7 @@ export default defineComponent({
     }
 
     const addVariables = () => {
+      selectedVariable.value = null
       isAddVariable.value = true
     }
 
@@ -176,27 +177,20 @@ export default defineComponent({
     const goBackToDashboardList = () => {
       isAddVariable.value = false
     }
-    const editVariableFn = (props: any) => {
-      selectedVariable.value = props.row;
-      isAddVariable.value = true;
-    };
-    // const editVarFn = async () => {
-    //   console.log("Edit variable---", selectedVariable.value);
-    //   isAddVariable.value = false;
-      
-      
-    //   if (selectedVariable.value) {
-    //     const variableName = selectedVariable?.value?.name
-        
-    //     await updateVariable(
-    //       store,
-    //       route.query.dashboard,
-    //       variableName
-    //       );
-    //     }
+    const editVariableFn = async (name: any) => {
+      console.log('Editing variable');
 
-    //   await getDashboardData()
-    // }
+      const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))?.variables?.list
+
+      selectedVariable.value = data.find((it:any) => it.name === name);
+
+      console.log('Variable updated');
+
+      isAddVariable.value = true;
+
+      console.log('Variable mode set to edit');
+    };
+
     return {
       t,
       disableColor,
@@ -220,6 +214,7 @@ export default defineComponent({
       deleteVariableFn,
       goBackToDashboardList,
       editVariableFn,
+      selectedVariable,
       handleSaveVariable
     };
   },
