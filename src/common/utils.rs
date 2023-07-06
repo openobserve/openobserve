@@ -16,10 +16,10 @@ use datafusion::arrow::{datatypes::Schema, json as arrow_json, record_batch::Rec
 use datafusion::{datasource::MemTable, prelude::SessionContext};
 use std::sync::Arc;
 
+use crate::common::infra::config::{CONFIG, FILE_EXT_JSON};
 use crate::common::json;
-use crate::infra::config::{CONFIG, FILE_EXT_JSON};
-use crate::meta::common::FileMeta;
-use crate::meta::StreamType;
+use crate::common::meta::common::FileMeta;
+use crate::common::meta::StreamType;
 
 #[inline(always)]
 pub fn increment_stream_file_num_v1(file_name: &str) -> u32 {

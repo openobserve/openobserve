@@ -24,12 +24,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::{
-    handler::grpc::cluster_rpc,
-    meta::{stream::ScanStats, usage::RequestStats},
-    service::usage::report_usage_stats,
-};
-use crate::{
+use crate::common::{
     infra::{
         cluster,
         config::CONFIG,
@@ -38,11 +33,16 @@ use crate::{
     meta::StreamType,
 };
 use crate::{
-    meta::usage::UsageType,
+    common::meta::usage::UsageType,
     service::{
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
     },
+};
+use crate::{
+    common::meta::{stream::ScanStats, usage::RequestStats},
+    handler::grpc::cluster_rpc,
+    service::usage::report_usage_stats,
 };
 
 pub mod grpc;

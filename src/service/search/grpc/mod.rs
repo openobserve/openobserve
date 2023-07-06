@@ -21,12 +21,12 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
+use crate::common::infra::{
     cluster,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::{stream::ScanStats, StreamType};
+use crate::common::meta::{stream::ScanStats, StreamType};
+use crate::handler::grpc::cluster_rpc;
 use crate::service::db;
 
 mod storage;

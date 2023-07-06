@@ -14,12 +14,12 @@
 
 use std::sync::Arc;
 
-use crate::{
-    common::json,
+use crate::common::{
     infra::{
         config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
         db::{self, Event},
     },
+    json,
     meta::syslog::SyslogRoute,
 };
 

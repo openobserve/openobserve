@@ -19,19 +19,19 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::infra::{
+use crate::common::infra::{
     cluster,
     config::{CONFIG, SYSLOG_ROUTES},
     metrics,
 };
-use crate::meta::{
+use crate::common::meta::{
     alert::{Alert, Trigger},
     http::HttpResponse as MetaHttpResponse,
     ingestion::{IngestionResponse, StreamSchemaChk, StreamStatus},
     syslog::SyslogRoute,
     StreamType,
 };
+use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 
 use super::StreamMeta;

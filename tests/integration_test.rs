@@ -19,10 +19,10 @@ mod tests {
     use chrono::Utc;
     use core::time;
     use openobserve::{
+        common::infra::{config::CONFIG, db::default},
         common::json,
+        common::meta::dashboards::{Dashboard, Dashboards},
         handler::http::router::*,
-        infra::{config::CONFIG, db::default},
-        meta::dashboards::{Dashboard, Dashboards},
     };
     use prost::Message;
     use std::{env, fs, str, sync::Once, thread};

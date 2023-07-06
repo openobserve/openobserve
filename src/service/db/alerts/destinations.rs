@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use crate::common::infra::config::ALERTS_DESTINATIONS;
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::ALERTS_DESTINATIONS;
-use crate::infra::db::Event;
-use crate::meta::alert::{AlertDestination, AlertDestinationResponse};
+use crate::common::meta::alert::{AlertDestination, AlertDestinationResponse};
 use crate::service::db;
 
 pub async fn get(
@@ -16,7 +16,7 @@ pub async fn get(
         let template = db::alerts::templates::get(org_id, &dest.template).await?;
         Some(dest.to_dest_resp(template))
     } else {
-        let db = &crate::infra::db::DEFAULT;
+        let db = &crate::common::infra::db::DEFAULT;
         let key = format!("/destinations/{org_id}/{name}");
         match db.get(&key).await {
             Ok(val) => {
@@ -36,7 +36,7 @@ pub async fn set(
     name: &str,
     mut destination: AlertDestination,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     destination.name = Some(name.to_owned());
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db
@@ -45,13 +45,13 @@ pub async fn set(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/destinations/{org_id}/{name}");
     Ok(db.delete(&key, false).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/destinations/{org_id}");
     let mut temp_list: Vec<AlertDestinationResponse> = Vec::new();
     for item_value in db.list_values(&key).await? {
@@ -63,7 +63,7 @@ pub async fn list(org_id: &str) -> Result<Vec<AlertDestinationResponse>, anyhow:
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/destinations/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -92,7 +92,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/destinations/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

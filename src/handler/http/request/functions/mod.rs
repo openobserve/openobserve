@@ -17,9 +17,9 @@ use actix_web::{http, HttpRequest};
 use ahash::AHashMap as HashMap;
 use std::io::Error;
 
-use crate::meta;
-use crate::meta::functions::StreamOrder;
-use crate::meta::functions::Transform;
+use crate::common::meta;
+use crate::common::meta::functions::StreamOrder;
+use crate::common::meta::functions::Transform;
 
 /** CreateFunction*/
 #[utoipa::path(

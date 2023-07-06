@@ -22,12 +22,12 @@ use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
 use std::sync::Arc;
 
+use crate::common::infra::config::{CONFIG, LOCAL_SCHEMA_LOCKER};
+use crate::common::infra::db::etcd;
 use crate::common::json;
-use crate::infra::config::{CONFIG, LOCAL_SCHEMA_LOCKER};
-use crate::infra::db::etcd;
-use crate::meta::prom::METADATA_LABEL;
-use crate::meta::stream::SchemaEvolution;
-use crate::meta::{ingestion::StreamSchemaChk, StreamType};
+use crate::common::meta::prom::METADATA_LABEL;
+use crate::common::meta::stream::SchemaEvolution;
+use crate::common::meta::{ingestion::StreamSchemaChk, StreamType};
 use crate::service::db;
 use crate::service::search::server_internal_error;
 
@@ -651,7 +651,7 @@ pub async fn add_stream_schema(
     };
     metadata.insert("created_at".to_string(), min_ts.to_string());
     if stream_type == StreamType::Traces {
-        let settings = crate::meta::stream::StreamSettings {
+        let settings = crate::common::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
             full_text_search_keys: vec![],
             data_retention: 0,

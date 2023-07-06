@@ -15,7 +15,7 @@
 use dashmap::DashSet;
 use std::sync::Arc;
 
-use crate::{infra::db::Event, meta::StreamType};
+use crate::common::{infra::db::Event, meta::StreamType};
 
 lazy_static! {
     static ref CACHE: DashSet<String, ahash::RandomState> = DashSet::default();
@@ -43,7 +43,7 @@ pub async fn delete_stream(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
 
     // write in cache
@@ -65,7 +65,7 @@ pub async fn process_stream(
     date_range: Option<(&str, &str)>,
     node: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
     Ok(db.put(&db_key, node.to_string().into()).await?)
@@ -78,7 +78,7 @@ pub async fn get_stream(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> String {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
     match db.get(&db_key).await {
@@ -103,7 +103,7 @@ pub async fn delete_stream_done(
     stream_type: StreamType,
     date_range: Option<(&str, &str)>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     db.delete_if_exists(&format!("/compact/delete/{key}"), false)
         .await
@@ -117,7 +117,7 @@ pub async fn delete_stream_done(
 
 pub async fn list() -> Result<Vec<String>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/delete/";
     let ret = db.list(key).await?;
     for (item_key, _) in ret {
@@ -128,7 +128,7 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/delete/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -156,7 +156,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/compact/delete/";
     let ret = db.list(key).await?;
     for (item_key, _) in ret {

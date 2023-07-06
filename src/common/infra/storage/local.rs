@@ -16,20 +16,20 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    limit::LimitStore, path::Path, Error, GetResult, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, Result,
+    limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetResult, ListResult,
+    MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
 
 use super::{format_key, CONCURRENT_REQUESTS};
-use crate::infra::{config::CONFIG, metrics};
+use crate::common::infra::{config::CONFIG, metrics};
 
-pub struct Remote {
+pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
 }
 
-impl Default for Remote {
+impl Default for Local {
     fn default() -> Self {
         Self {
             client: LimitStore::new(init_client(), CONCURRENT_REQUESTS),
@@ -37,26 +37,26 @@ impl Default for Remote {
     }
 }
 
-impl std::fmt::Debug for Remote {
+impl std::fmt::Debug for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("storage for remote")
+        f.write_str("storage for local disk")
     }
 }
 
-impl std::fmt::Display for Remote {
+impl std::fmt::Display for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("storage for remote")
+        f.write_str("storage for local disk")
     }
 }
 
 #[async_trait]
-impl ObjectStore for Remote {
+impl ObjectStore for Local {
     async fn put(&self, location: &Path, bytes: Bytes) -> Result<()> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
         match self.client.put(&(format_key(&file).into()), bytes).await {
-            Ok(_) => {
+            Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
@@ -69,11 +69,11 @@ impl ObjectStore for Remote {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                log::info!("s3 File upload succeeded: {}", file);
+                log::info!("disk File upload succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
-                log::error!("s3 File upload error: {:?}", err);
+                log::error!("disk File upload error: {:?}", err);
                 Err(err)
             }
         }
@@ -178,95 +178,13 @@ impl ObjectStore for Remote {
     }
 }
 
-fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
-    let mut builder = object_store::aws::AmazonS3Builder::from_env()
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
-                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates)
-                .with_allow_http(true),
-        )
-        .with_profile("default")
-        .with_bucket_name(&CONFIG.s3.bucket_name)
-        .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style);
-    if !CONFIG.s3.server_url.is_empty() {
-        builder = builder.with_endpoint(&CONFIG.s3.server_url);
-    }
-    if !CONFIG.s3.region_name.is_empty() {
-        builder = builder.with_region(&CONFIG.s3.region_name);
-    }
-    if !CONFIG.s3.access_key.is_empty() {
-        builder = builder.with_access_key_id(&CONFIG.s3.access_key);
-    }
-    if !CONFIG.s3.secret_key.is_empty() {
-        builder = builder.with_secret_access_key(&CONFIG.s3.secret_key);
-    }
-    builder.build()
-}
-
-fn init_azure_config() -> object_store::Result<object_store::azure::MicrosoftAzure> {
-    let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
-                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates),
-        )
-        .with_container_name(&CONFIG.s3.bucket_name);
-    if !CONFIG.s3.access_key.is_empty() {
-        builder = builder.with_account(&CONFIG.s3.access_key);
-    }
-    if !CONFIG.s3.secret_key.is_empty() {
-        builder = builder.with_access_key(&CONFIG.s3.secret_key);
-    }
-    builder.build()
-}
-
-fn init_gcp_config() -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
-                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates),
-        )
-        .with_bucket_name(&CONFIG.s3.bucket_name);
-    if !CONFIG.s3.access_key.is_empty() {
-        builder = builder.with_service_account_path(&CONFIG.s3.access_key);
-    }
-    builder.build()
-}
-
 fn init_client() -> Box<dyn object_store::ObjectStore> {
-    if CONFIG.common.print_key_config {
-        log::info!("s3 init config: {:?}", CONFIG.s3);
-    }
-
-    match CONFIG.s3.provider.as_str() {
-        "aws" | "s3" => match init_aws_config() {
-            Ok(client) => Box::new(client),
-            Err(e) => {
-                panic!("s3 init config error: {:?}", e);
-            }
-        },
-        "azure" => match init_azure_config() {
-            Ok(client) => Box::new(client),
-            Err(e) => {
-                panic!("azure init config error: {:?}", e);
-            }
-        },
-        "gcs" | "gcp" => match init_gcp_config() {
-            Ok(client) => Box::new(client),
-            Err(e) => {
-                panic!("gcp init config error: {:?}", e);
-            }
-        },
-        _ => match init_aws_config() {
-            Ok(client) => Box::new(client),
-            Err(e) => {
-                panic!("{} init config error: {:?}", CONFIG.s3.provider, e);
-            }
-        },
-    }
+    Box::new(
+        LocalFileSystem::new_with_prefix(
+            std::path::Path::new(&CONFIG.common.data_stream_dir)
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap(),
+    )
 }

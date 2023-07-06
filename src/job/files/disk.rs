@@ -21,13 +21,13 @@ use std::{
 };
 use tokio::{sync::Semaphore, task, time};
 
-use crate::common::{file::scan_files, json, utils::populate_file_meta};
-use crate::infra::{
+use crate::common::infra::{
     cluster,
     config::{CONFIG, FILE_EXT_PARQUET},
     metrics, storage, wal,
 };
-use crate::meta::{common::FileMeta, StreamType};
+use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::{file::scan_files, json, utils::populate_file_meta};
 use crate::service::{db, schema::schema_evolution, search::datafusion::new_writer};
 
 pub async fn run() -> Result<(), anyhow::Error> {

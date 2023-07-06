@@ -32,7 +32,7 @@ pub mod value;
 pub use engine::Engine;
 pub use exec::Query;
 
-use crate::meta::stream::ScanStats;
+use crate::common::meta::stream::ScanStats;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s

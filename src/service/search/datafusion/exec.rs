@@ -44,9 +44,9 @@ use super::storage::{file_list, StorageType};
 
 use super::transform_udf::get_all_transform;
 
+use crate::common::infra::{cache::tmpfs, config::CONFIG};
 use crate::common::json;
-use crate::infra::{cache::tmpfs, config::CONFIG};
-use crate::meta::{common::FileMeta, search::Session as SearchSession, sql};
+use crate::common::meta::{common::FileMeta, search::Session as SearchSession, sql};
 use crate::service::search::sql::Sql;
 use once_cell::sync::Lazy;
 

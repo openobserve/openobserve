@@ -16,7 +16,7 @@ use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
 
 use crate::{
-    meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
+    common::meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
     service::promql::value::{
         signature_without_labels, InstantValue, Labels, Sample, Signature, Value,
     },

@@ -20,8 +20,8 @@ use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use super::{Event, EventData};
-use crate::infra::cluster;
-use crate::infra::{config::CONFIG, errors::*};
+use crate::common::infra::cluster;
+use crate::common::infra::{config::CONFIG, errors::*};
 
 lazy_static! {
     pub static ref SLED_CLIENT: Option<::sled::Db> = connect_sled();

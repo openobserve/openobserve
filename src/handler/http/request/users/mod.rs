@@ -16,11 +16,11 @@ use actix_web::{delete, get, http, post, put, web, HttpResponse};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use std::io::Error;
 
-use crate::meta;
-use crate::meta::user::UpdateUser;
-use crate::meta::user::UserOrgRole;
-use crate::meta::user::UserRequest;
-use crate::meta::user::{SignInResponse, SignInUser};
+use crate::common::meta;
+use crate::common::meta::user::UpdateUser;
+use crate::common::meta::user::UserOrgRole;
+use crate::common::meta::user::UserRequest;
+use crate::common::meta::user::{SignInResponse, SignInUser};
 use crate::service::users;
 
 /** ListUsers */

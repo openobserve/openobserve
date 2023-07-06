@@ -16,8 +16,8 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::infra::config::CONFIG;
-use crate::meta::StreamType;
+use crate::common::infra::config::CONFIG;
+use crate::common::meta::StreamType;
 use crate::service::db;
 
 mod file_list;

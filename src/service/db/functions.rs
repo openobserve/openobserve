@@ -14,13 +14,13 @@
 
 use std::sync::Arc;
 
+use crate::common::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS};
-use crate::infra::db::Event;
-use crate::meta::functions::{StreamFunctionsList, Transform};
+use crate::common::meta::functions::{StreamFunctionsList, Transform};
 
 pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
 
     Ok(db
         .put(
@@ -31,20 +31,20 @@ pub async fn set(org_id: &str, name: &str, js_func: Transform) -> Result<(), any
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let val = db.get(&format!("/function/{org_id}/{name}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(db
         .delete(&format!("/function/{org_id}/{name}"), false)
         .await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(db
         .list(&format!("/function/{org_id}/"))
         .await?
@@ -54,7 +54,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/function/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -102,7 +102,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/function/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -131,7 +131,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/function/";
     db.delete(key, true).await?;
     let key = "/transform/";

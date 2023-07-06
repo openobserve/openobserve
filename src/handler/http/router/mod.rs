@@ -36,7 +36,7 @@ use super::request::syslog;
 use super::request::traces::*;
 use super::request::users;
 use super::request::{alerts::*, enrichment_table};
-use crate::infra::config::CONFIG;
+use crate::common::infra::config::CONFIG;
 
 pub mod openapi;
 pub mod ui;
