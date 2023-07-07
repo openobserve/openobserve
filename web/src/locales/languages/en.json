@@ -251,6 +251,7 @@
     "off": "Turn Off"
   },
   "dashboard": {
+    "selectField":"Field",
     "selectIndex": "Stream",
     "selectStreamType": "Stream Type",
     "header": "Dashboards",
@@ -285,8 +286,8 @@
     "generalSettingsTitle": "General Settings",
     "addGeneralSettings": "General",
     "extraOptions": "Options",
-    "nameOfVariable": "Name of variable",
-    "labelOfVariable": "Label of variable",
+    "nameOfVariable": "Name",
+    "labelOfVariable": "Label (optional)",
     "ValueOfVariable": "Value of variable",
     "typeOfVariable": "Type of variable"
   },
