@@ -47,10 +47,10 @@
             </div>
             <!-- show the auto add variables for the custom fields -->
             <div v-if="variableData.type == 'custom_fields'">
-                    <div v-for="(option, index) in variableData.options" :key="index" class="flex flex-row space-x-4">
-                        <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']" class="textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
+                    <div v-for="(option, index) in variableData.options" :key="index" class="row">
+                        <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']" class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
                             :label="'Label'  + (index + 1) + ' *'" name="label" />
-                        <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']" class="textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].value" :label="'Value'+ ' *'"
+                        <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']" class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].value" :label="'Value'+ ' *'"
                             name="value" />
                         <div>
                             <q-btn flat style="margin-top: 33px" round @click="removeField(index)" icon="cancel" />
