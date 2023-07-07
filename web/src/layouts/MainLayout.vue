@@ -231,15 +231,7 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import {
-  ref,
-  defineComponent,
-  KeepAlive,
-  computed,
-  onMounted,
-  watch,
-  markRaw,
-} from "vue";
+import { ref, defineComponent, KeepAlive, computed, onMounted, watch, markRaw } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -340,8 +332,6 @@ export default defineComponent({
 
     const orgOptions = ref([{ label: Number, value: String }]);
 
-    const nonReactiveSlackIcon = markRaw(SlackIcon);
-
     let user = store.state.userInfo;
 
     var linksList = ref([
@@ -394,7 +384,7 @@ export default defineComponent({
       },
       {
         title: t("menu.slack"),
-        iconComponent: nonReactiveSlackIcon,
+        iconComponent: markRaw(SlackIcon),
         link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
         target: "_blank",
         external: true,
