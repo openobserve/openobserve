@@ -1,10 +1,7 @@
 <template>
     <div>
       <div v-if="isAddVariable" class="column full-height">
-        <div>
-            <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
-          </div>
-        <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableName="selectedVariable"/>
+        <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableName="selectedVariable" @close="goBackToDashboardList"/>
       </div>
       <div v-else class="column full-height">
           <DashboardHeader title="Variables" >

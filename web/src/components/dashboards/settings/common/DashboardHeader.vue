@@ -14,7 +14,7 @@
     <div>
         <div class="row items-center no-wrap q-mb-sm">
             <div v-if="backButton" class="col-auto">
-                <q-btn no-caps @click="onBackClicked" padding="xs" outline icon="arrow_back_ios_new" />
+                <q-btn class="q-mr-md" no-caps @click="onBackClicked" padding="xs" outline icon="arrow_back_ios_new" />
             </div>
             <div class="col">
                 <div class="text-h6">

@@ -1,11 +1,8 @@
 <template>
     <div>
         <div class="column full-height">
-            <div class="col q-my-sm">
-                <div class="text-body1 text-bold ">
-                    {{ variableData.label }}
-                </div>
-            </div>
+             <DashboardHeader :title="title" backButton @back="close" >
+             </DashboardHeader>
             <div class="col">
                 <div>
                     <q-select class="textbox showLabelOnTop" filled stack-label input-debounce="0" outlined dense
@@ -65,12 +62,12 @@
             </div>
             <div class="flex justify-center q-mt-lg">
             <q-btn
-                  v-close-popup
                   class="q-mb-md text-bold"
                   :label="t('dashboard.cancel')"
                   text-color="light-text"
                   padding="sm md"
                   no-caps
+                  @click="close"
                 />
               <div>
                 <q-btn :loading="saveVariableApiCall.isLoading.value" @click="saveVariableApiCall.execute()" 
@@ -92,11 +89,13 @@ import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons"
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading"
-
+import DashboardHeader from "./common/DashboardHeader.vue"
+ 
 export default defineComponent({
     name: "AddSettingVariable",
     props: ['variableName'],
-
+    components: { DashboardHeader },
+    emits: ['close'],
     setup(props, { emit }) {
         const { t } = useI18n();
         const store = useStore();
@@ -110,6 +109,7 @@ export default defineComponent({
             selectedStreamFields: []
         });
         const route = useRoute();
+        const title=ref("Add Variable")
         // const model = ref(null)
         // const filteredStreams = ref([]);
         const variableTypes = ref([
@@ -151,6 +151,7 @@ export default defineComponent({
 
             if (props.variableName) {
                 editMode.value = true
+                title.value="Edit Variable"
                 // Fetch dashboard data
                 const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))?.variables?.list
                  // Find the variable to edit
@@ -228,6 +229,10 @@ export default defineComponent({
             data.currentFieldsList = data.schemaResponse.find((item: any) => item.name === stream)?.schema || [];
         }
 
+        const close = () => {
+            emit('close')
+        }
+
         return {
             variableData,
             t,
@@ -244,7 +249,9 @@ export default defineComponent({
             removeField,
             addField,
             saveData,
-            saveVariableApiCall
+            saveVariableApiCall,
+            close,
+            title
         }
     }
 
