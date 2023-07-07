@@ -16,15 +16,8 @@
 <template>
     <div class="column full-height">
       <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
-      <div class="q-w-md">
+      <div>
         <q-form ref="addDashboardForm" @submit="onSubmit">
-          <q-input
-            v-if="beingUpdated"
-            v-model="dashboardData.id"
-            :readonly="beingUpdated"
-            :disabled="beingUpdated"
-            :label="t('dashboard.id')"
-          />
           <q-input
             v-model="dashboardData.title"
             :label="t('dashboard.name') + ' *'"
@@ -51,6 +44,7 @@
           />
           <div class="flex justify-center q-mt-lg">
             <q-btn
+              ref="closeBtn"
               v-close-popup
               class="q-mb-md text-bold"
               :label="t('dashboard.cancel')"
@@ -59,13 +53,14 @@
               no-caps
             />
             <q-btn
-              :disable="dashboardData.name === ''"
+              :disable="dashboardData.title === ''"
               :label="t('dashboard.save')"
               class="q-mb-md text-bold no-border q-ml-md"
               color="secondary"
               padding="sm xl"
               type="submit"
               no-caps
+              :loading="saveDashboardApi.isLoading.value"
             />
           </div>
         </q-form>
@@ -73,61 +68,40 @@
     </div>
 </template>
   
-  <script lang="ts">
-  import { defineComponent, onActivated, onMounted, ref } from "vue";
-  import dashboardService from "../../../services/dashboards";
-  import { useI18n } from "vue-i18n";
-  import { useStore } from "vuex";
-  import { isProxy, toRaw, reactive } from "vue";
-  import { getImageURL } from "../../../utils/zincutils";
-  import { getDashboard } from "@/utils/commons";
-  import { useRoute } from "vue-router";
-  import DashboardHeader from "./common/DashboardHeader.vue";
+<script lang="ts">
+import { defineComponent, onMounted, ref, type Ref } from "vue";
+import dashboardService from "../../../services/dashboards";
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { isProxy, toRaw, reactive } from "vue";
+import { getDashboard, updateDashboard } from "@/utils/commons";
+import { useRoute } from "vue-router";
+import DashboardHeader from "./common/DashboardHeader.vue";
+import { useLoading } from "@/composables/useLoading";
+import { useQuasar } from "quasar";
 
-  // const defaultValue = () => {
-  //   return {
-  //     id: "",
-  //     name: "",
-  //     description: "",
-  //   };
-  // };
-  
-  let callDashboard: Promise<{ data: any }>;
-  
   export default defineComponent({
     name: "GeneralSettings",
     components: {
       DashboardHeader,
     },
-    // props: {
-    //   modelValue: {
-    //     type: Object,
-    //     default: () => defaultValue(),
-    //   },
-    // },
     emits: ["update:modelValue", "updated", "finish"],
     setup() {
       const store: any = useStore();
-      const beingUpdated: any = ref(false);
-      const addDashboardForm: any = ref(null);
-      const disableColor: any = ref("");
-       const dashboardData = reactive({
+      const { t } = useI18n();
+      const $q = useQuasar();
+      const route = useRoute();
+      
+      const addDashboardForm: Ref<any> = ref(null);
+      const closeBtn :Ref<any>= ref(null);
+
+      const dashboardData = reactive({
         title: "",
         description: "",
       });
-      const isValidIdentifier: any = ref(true);
-      const { t } = useI18n();
-      const route = useRoute();
-
-      //generate random integer number for dashboard Id
-      function getRandInteger() {
-        return Math.floor(Math.random() * (9999999999 - 100 + 1)) + 100;
-      }
       
       const getDashboardData = async () => {
         const data = await getDashboard(store, route.query.dashboard);
-        // console.log("data:", data.title);
-        // console.log("data:", data.description);
         dashboardData.title = data.title;
         dashboardData.description = data.description;
       };
@@ -135,101 +109,56 @@
       onMounted(async () => {
         await getDashboardData();
       })
-      return {
-        t,
-        disableColor,
-        isPwd: ref(true),
-        beingUpdated,
-        status,
-        dashboardData,
-        addDashboardForm,
-        store,
-        getRandInteger,
-        isValidIdentifier,
-        getImageURL,
-        getDashboardData
-      };
-    },
-    
-    // created() {
-    //   if (this.modelValue && this.modelValue.id) {
-    //     this.beingUpdated = true;
-    //     this.disableColor = "grey-5";
-    //     this.dashboardData = {
-    //       id: this.modelValue.id,
-    //       name: this.modelValue.name,
-    //       description: this.modelValue.description,
-    //     };
-    //   }
-    // },
-    
-    methods: {
-      onRejected(rejectedEntries: string | any[]) {
-        this.$q.notify({
-          type: "negative",
-          message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
+
+      const saveDashboardApi = useLoading(async () => {
+        // get the latest dashboard data and update the title and description
+        const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)));
+
+        // update the values
+        data.title = dashboardData.title;
+        data.description = dashboardData.description;
+
+        // now lets save it
+        await updateDashboard(
+          store,
+          store.state.selectedOrganization.identifier,
+          route.query.dashboard,
+          data
+        )
+
+        $q.notify({
+          type: "positive",
+          message: "Dashboard updated successfully."
         });
-      },
-      onSubmit() {
-        const dismiss = this.$q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
-        this.addDashboardForm.validate().then((valid: any) => {
+      })
+
+      const onSubmit = () => {
+        addDashboardForm.value.validate().then((valid: any) => {
           if (!valid) {
             return false;
           }
-  
-          const dashboardId = this.dashboardData.id;
-          delete this.dashboardData.id;
-  
-          if (dashboardId == "") {
-            const obj = toRaw(this.dashboardData);
-            const baseObj = {
-              title: obj.name,
-              // NOTE: the dashboard ID is generated at the server side,
-              // in "Create a dashboard" request handler. The server
-              // doesn't care what value we put here as long as it's
-              // a string.
-              dashboardId: "",
-              description: obj.description,
-              role: "",
-              owner: this.store.state.userInfo.name,
-              created: new Date().toISOString(),
-              panels: [],
-            };
-  
-            callDashboard = dashboardService.create(
-              this.store.state.selectedOrganization.identifier,
-              baseObj
-            );
-          }
-          callDashboard
-            .then((res: { data: any }) => {
-              const data = res.data;
-              this.dashboardData = {
-                id: "",
-                name: "",
-                description: "",
-              };
-  
-              this.$emit("update:modelValue", data);
-              this.$emit("updated", data.dashboardId);
-              this.addDashboardForm.resetValidation();
-              dismiss();
-            })
+
+          saveDashboardApi.execute()
             .catch((err: any) => {
-              this.$q.notify({
+              $q.notify({
                 type: "negative",
                 message: JSON.stringify(
                   err.response.data["error"] || "Dashboard creation failed."
                 ),
               });
-              dismiss();
             });
         });
-      },
+      }
+
+      return {
+        t,
+        dashboardData,
+        addDashboardForm,
+        store,
+        saveDashboardApi,
+        onSubmit,
+        closeBtn
+      };
     },
   });
   </script>
