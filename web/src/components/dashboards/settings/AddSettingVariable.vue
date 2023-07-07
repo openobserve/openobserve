@@ -64,7 +64,7 @@
                 </div>
             </div>
             <div>
-                <q-btn @click="saveData()">Save</q-btn>
+                <q-btn :loading="saveVariableApiCall.isLoading.value" @click="saveVariableApiCall.execute()" color="secondary">Save</q-btn>
             </div>
         </div>
     </div>
@@ -78,6 +78,7 @@ import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplet
 import { useStore } from "vuex";
 import { addVariable, updateVariable } from "../../../utils/commons"
 import { useRoute } from "vue-router";
+import { useLoading } from "../../../composables/useLoading"
 
 export default defineComponent({
     name: "AddSettingVariable",
@@ -159,6 +160,8 @@ export default defineComponent({
             variableData.options.splice(index, 1)
         }
 
+        const saveVariableApiCall = useLoading(() => saveData())
+
         const saveData = async () => {
             const dashId = route.query.dashboard + "";
             console.log("dashId", dashId);
@@ -233,6 +236,7 @@ export default defineComponent({
             removeField,
             addField,
             saveData,
+            saveVariableApiCall
         }
     }
 
