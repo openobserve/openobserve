@@ -32,6 +32,7 @@
         v-model="splitterModel"
         unit="px"
         style="height: calc(100vh - 65px)"
+        disable
       >
         <template v-slot:before>
           <div class="functions-tabs" style="width: 100%;">
