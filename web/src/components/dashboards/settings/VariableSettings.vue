@@ -52,8 +52,8 @@
                 </template>
               </q-table>
               <ConfirmDialog
-                title="Delete dashboard"
-                message="Are you sure you want to delete the dashboard?"
+                title="Delete Variable"
+                message="Are you sure you want to delete the variable?"
                 @update:ok="deleteVariableFn"
                 @update:cancel="confirmDeleteDialog = false"
                 v-model="confirmDeleteDialog"
