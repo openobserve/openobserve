@@ -17,7 +17,7 @@ use datafusion::error::Result;
 use crate::service::promql::value::{RangeValue, Value};
 
 pub(crate) fn irate(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "irate", exec)
+    super::eval_idelta(data, "irate", exec, false)
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
