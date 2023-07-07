@@ -21,7 +21,7 @@ use sqlparser::ast::{
 };
 use sqlparser::parser::Parser;
 
-use crate::infra::config::CONFIG;
+use crate::common::infra::config::CONFIG;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
@@ -853,7 +853,7 @@ mod tests {
     use sqlparser::parser::Parser;
 
     use super::*;
-    use crate::meta::sql::SqlValue;
+    use crate::common::meta::sql::SqlValue;
 
     #[test]
     fn parse_sql_works() {

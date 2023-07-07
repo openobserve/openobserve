@@ -20,9 +20,9 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+use crate::common::infra::{cache::tmpfs, errors::Result};
+use crate::common::meta::stream::ScanStats;
 use crate::handler::grpc::cluster_rpc;
-use crate::infra::{cache::tmpfs, errors::Result};
-use crate::meta::stream::ScanStats;
 use crate::service::{
     promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
     search,
@@ -123,26 +123,23 @@ pub async fn search(
         value::Value::Instant(v) => {
             resp.result.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                samples: vec![],
                 sample: Some((&v.sample).into()),
-                scalar: None,
+                ..Default::default()
             });
         }
         value::Value::Range(v) => {
             resp.result.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 samples: v.samples.iter().map(|x| x.into()).collect(),
-                sample: None,
-                scalar: None,
+                ..Default::default()
             });
         }
         value::Value::Vector(v) => {
             v.iter().for_each(|v| {
                 resp.result.push(cluster_rpc::Series {
                     metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                    samples: vec![],
                     sample: Some((&v.sample).into()),
-                    scalar: None,
+                    ..Default::default()
                 });
             });
         }
@@ -151,25 +148,26 @@ pub async fn search(
                 resp.result.push(cluster_rpc::Series {
                     metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                     samples: v.samples.iter().map(|x| x.into()).collect(),
-                    sample: None,
-                    scalar: None,
+                    ..Default::default()
                 });
             });
         }
         value::Value::Sample(v) => {
             resp.result.push(cluster_rpc::Series {
-                metric: vec![],
-                samples: vec![],
                 sample: Some((&v).into()),
-                scalar: None,
+                ..Default::default()
             });
         }
         value::Value::Float(v) => {
             resp.result.push(cluster_rpc::Series {
-                metric: vec![],
-                samples: vec![],
-                sample: None,
                 scalar: Some(v),
+                ..Default::default()
+            });
+        }
+        value::Value::String(v) => {
+            resp.result.push(cluster_rpc::Series {
+                stringliteral: Some(v),
+                ..Default::default()
             });
         }
     }

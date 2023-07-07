@@ -18,8 +18,8 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use crate::common::auth::is_root_user;
-use crate::infra::config::{STREAM_SCHEMAS, USERS};
-use crate::meta::organization::{
+use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
+use crate::common::meta::organization::{
     OrgDetails, OrgUser, OrganizationResponse, PasscodeResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
 };
 use crate::service::organization::get_passcode;
@@ -116,6 +116,7 @@ pub async fn organizations(credentials: BasicAuth) -> Result<HttpResponse, Error
             orgs.push(org)
         }
     }
+    orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))

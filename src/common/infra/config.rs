@@ -24,11 +24,13 @@ use sys_info::hostname;
 use vector_enrichment::TableRegistry;
 
 use crate::common::file::get_file_meta;
-use crate::meta::alert::{AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer};
-use crate::meta::functions::{StreamFunctionsList, Transform};
-use crate::meta::prom::ClusterLeader;
-use crate::meta::syslog::SyslogRoute;
-use crate::meta::user::User;
+use crate::common::meta::alert::{
+    AlertDestination, AlertList, DestinationTemplate, Trigger, TriggerTimer,
+};
+use crate::common::meta::functions::{StreamFunctionsList, Transform};
+use crate::common::meta::prom::ClusterLeader;
+use crate::common::meta::syslog::SyslogRoute;
+use crate::common::meta::user::User;
 use crate::service::enrichment::StreamTable;
 
 pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
@@ -78,6 +80,8 @@ pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLoc
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(DashMap::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
+pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
+    Lazy::new(|| Arc::new(DashMap::default)());
 
 #[derive(EnvConfig)]
 pub struct Config {

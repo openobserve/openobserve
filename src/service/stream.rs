@@ -16,13 +16,13 @@ use actix_web::{http, http::StatusCode, HttpResponse};
 use datafusion::arrow::datatypes::Schema;
 use std::io::Error;
 
-use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
-use crate::infra::{cache::stats, config::STREAM_SCHEMAS};
-use crate::meta::{
+use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
+use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
+use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
 use crate::service::db;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;

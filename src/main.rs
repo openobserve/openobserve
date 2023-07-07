@@ -35,6 +35,12 @@ use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 
 use openobserve::{
+    common::infra::{
+        cluster,
+        config::{CONFIG, USERS, VERSION},
+        metrics, wal,
+    },
+    common::meta,
     common::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
@@ -47,12 +53,7 @@ use openobserve::{
         },
         http::router::*,
     },
-    infra::{
-        cluster,
-        config::{CONFIG, USERS, VERSION},
-        metrics, wal,
-    },
-    job, meta,
+    job,
     service::{db, router, users},
 };
 

@@ -66,7 +66,7 @@ pub trait Db: Sync + 'static {
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
     async fn delete_if_exists(&self, key: &str, with_prefix: bool) -> Result<()> {
-        use crate::infra::errors::{DbError, Error};
+        use crate::common::infra::errors::{DbError, Error};
 
         match self.delete(key, with_prefix).await {
             Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),

@@ -119,7 +119,7 @@
               style="padding-left: 0 !important"
               v-model="searchObj.meta.refreshInterval"
             />
-            <q-separator vertical inset />
+            <!-- <q-separator vertical inset /> -->
             <q-btn
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
@@ -257,8 +257,8 @@ export default defineComponent({
   },
   props: {
     fieldValues: {
-      type: Array,
-      default: () => [],
+      type: Object,
+      default: () => ({}),
     },
   },
   setup(props, { emit }) {
@@ -328,7 +328,7 @@ export default defineComponent({
 
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
-        if (searchObj.data.parsedQuery.from.length > 0) {
+        if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&
@@ -454,7 +454,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",
@@ -927,8 +927,8 @@ export default defineComponent({
     color: white;
 
     .q-btn__content {
-      background: $primary;
-      border-radius: 0px 3px 3px 0px;
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
 
       .q-icon {
         font-size: 15px;

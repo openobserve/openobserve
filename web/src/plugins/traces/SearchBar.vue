@@ -45,7 +45,7 @@
             dense
             flat
             title="Run query"
-            class="q-pa-none search-button bg-primary"
+            class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
               searchObj.loading || searchObj.data.streamResults.length == 0
@@ -126,7 +126,7 @@ export default defineComponent({
       searchObj.data.query = value;
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
-        if (searchObj.data.parsedQuery.from.length > 0) {
+        if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
               searchObj.data.stream.selectedStream.value &&
@@ -402,8 +402,8 @@ export default defineComponent({
     color: white;
 
     .q-btn__content {
-      background: $primary;
-      border-radius: 0px 3px 3px 0px;
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
 
       .q-icon {
         font-size: 15px;

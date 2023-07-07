@@ -193,7 +193,7 @@ import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage } from "@/utils/common";
+import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
@@ -374,7 +374,8 @@ export default defineComponent({
             });
           });
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        showErrorNotification("Error while getting streams");
       }
     }
 
@@ -416,7 +417,8 @@ export default defineComponent({
           searchObj.loading = false;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while loading streams");
       }
     }
 
@@ -484,7 +486,8 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        throw new ErrorException(e.message);
+        searchObj.loading = false;
+        console.log("Error while getting consumable date time");
       }
     }
 
@@ -501,7 +504,8 @@ export default defineComponent({
 
         chartData.value = cloneDeep(dashboardPanelData.data);
       } catch (e) {
-        throw new ErrorException("Request failed.", e.message);
+        searchObj.loading = false;
+        showErrorNotification("Request failed.");
       }
     }
 
@@ -811,8 +815,8 @@ div.plotly-notifier {
     color: white;
 
     .q-btn__content {
-      background: $primary;
-      border-radius: 0px 3px 3px 0px;
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
 
       .q-icon {
         font-size: 15px;

@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
+use crate::common::infra::config::{ROOT_USER, USERS};
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::{ROOT_USER, USERS};
-use crate::infra::db::Event;
-use crate::meta::user::{DBUser, User, UserRole};
+use crate::common::meta::user::{DBUser, User, UserRole};
 
 #[tracing::instrument]
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
@@ -32,7 +32,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
     let org_id = org_id.expect("BUG");
 
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
@@ -41,7 +41,7 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
 #[tracing::instrument]
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
     let val = db.get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
@@ -49,7 +49,7 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 
 #[tracing::instrument(skip_all)]
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{}", user.email);
     db.put(&key, json::to_vec(&user).unwrap().into()).await?;
     // cache user
@@ -73,13 +73,13 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 
 #[tracing::instrument]
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/user/{name}");
     Ok(db.delete(&key, false).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/user/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -119,7 +119,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/user/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -138,7 +138,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn root_user_exists() -> bool {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/user/";
     let mut ret = db.list_values(key).await.unwrap();
     ret.retain(|item| {
@@ -148,13 +148,13 @@ pub async fn root_user_exists() -> bool {
             .as_ref()
             .unwrap()
             .role
-            .eq(&crate::meta::user::UserRole::Root)
+            .eq(&crate::common::meta::user::UserRole::Root)
     });
     !ret.is_empty()
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/user/";
     db.delete(key, true).await?;
     Ok(())
@@ -163,7 +163,7 @@ pub async fn reset() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meta::user::UserOrg;
+    use crate::common::meta::user::UserOrg;
 
     #[actix_web::test]
     async fn test_user() {
@@ -176,7 +176,7 @@ mod tests {
             first_name: "admin".to_owned(),
             last_name: "".to_owned(),
             organizations: vec![UserOrg {
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 name: org_id.clone(),
                 token: "Abcd".to_string(),
             }],

@@ -20,15 +20,15 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::{flatten, json};
-use crate::infra::{cluster, config::CONFIG};
-use crate::meta::{
+use crate::common::infra::{cluster, config::CONFIG};
+use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
     traces::{Event, Span, SpanRefType},
     usage::UsageType,
     StreamType,
 };
+use crate::common::{flatten, json};
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record, write_file},

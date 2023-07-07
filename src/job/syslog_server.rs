@@ -24,8 +24,8 @@ use tokio::{
 use crate::handler::tcp_udp::STOP_SRV;
 use crate::service::db::syslog::toggle_syslog_setting;
 use crate::{
+    common::infra::config::{CONFIG, SYSLOG_ENABLED},
     handler::tcp_udp::{tcp_server, udp_server},
-    infra::config::{CONFIG, SYSLOG_ENABLED},
 };
 
 //TCP UDP Server

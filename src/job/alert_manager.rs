@@ -14,7 +14,7 @@
 
 use tokio::time;
 
-use crate::infra::cluster::is_alert_manager;
+use crate::common::infra::cluster::is_alert_manager;
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {

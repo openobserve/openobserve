@@ -16,7 +16,7 @@ use actix_web::web::Query;
 use ahash::AHashMap as HashMap;
 use std::io::{Error, ErrorKind};
 
-use crate::meta::StreamType;
+use crate::common::meta::StreamType;
 
 #[inline(always)]
 pub(crate) fn get_stream_type_from_request(

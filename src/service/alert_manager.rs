@@ -16,11 +16,11 @@ use chrono::Utc;
 use std::collections::HashMap;
 use tokio::time;
 
+use crate::common::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
+use crate::common::meta;
+use crate::common::meta::alert::{Evaluate, Trigger, TriggerTimer};
+use crate::common::meta::search::Request;
 use crate::common::notification::send_notification;
-use crate::infra::config::{TRIGGERS, TRIGGERS_IN_PROCESS};
-use crate::meta;
-use crate::meta::alert::{Evaluate, Trigger, TriggerTimer};
-use crate::meta::search::Request;
 use crate::service::search as SearchService;
 use crate::service::triggers;
 

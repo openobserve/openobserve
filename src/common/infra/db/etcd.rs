@@ -27,8 +27,8 @@ use tokio::time;
 use tonic::transport::{Certificate, ClientTlsConfig, Identity};
 
 use super::{Event, EventData};
-use crate::infra::cluster;
-use crate::infra::{config::CONFIG, errors::*};
+use crate::common::infra::cluster;
+use crate::common::infra::{config::CONFIG, errors::*};
 
 /// max operations in txn request
 pub const MAX_OPS_PER_TXN: usize = 120; // etcd hard coded limit is 128

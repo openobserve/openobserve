@@ -18,9 +18,9 @@ use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use std::io::Read;
 
-use crate::infra::{cluster, config::CONFIG, metrics};
-use crate::meta::usage::UsageType;
-use crate::meta::{
+use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::usage::UsageType;
+use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
         AWSRecordType, KinesisFHData, KinesisFHIngestionResponse, KinesisFHRequest, StreamStatus,

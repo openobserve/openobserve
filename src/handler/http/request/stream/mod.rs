@@ -17,7 +17,7 @@ use ahash::AHashMap as HashMap;
 use std::io::{Error, ErrorKind};
 
 use crate::common::http::get_stream_type_from_request;
-use crate::meta::{
+use crate::common::meta::{
     self,
     stream::{ListStream, StreamSettings},
     StreamType,

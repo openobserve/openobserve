@@ -31,8 +31,8 @@ use vrl::compiler::{runtime::Runtime, CompilationResult, Program};
 use vrl::compiler::{TargetValueRef, VrlRuntime};
 
 use crate::{
+    common::infra::config::QUERY_FUNCTIONS,
     common::json,
-    infra::config::QUERY_FUNCTIONS,
     service::{ingestion::compile_vrl_function, logs::get_value},
 };
 

@@ -15,7 +15,7 @@
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use std::io::Error;
 
-use crate::{meta::dashboards::Dashboard, service::dashboards};
+use crate::{common::meta::dashboards::Dashboard, service::dashboards};
 
 /** CreateDashboard */
 #[utoipa::path(

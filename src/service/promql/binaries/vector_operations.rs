@@ -2,7 +2,7 @@ use ahash::{HashMap, HashSet};
 
 use crate::service::promql::{
     binaries::scalar_binary_operations,
-    value::{signature, InstantValue, Sample, Signature, Value},
+    value::{signature, InstantValue, LabelsExt, Sample, Signature, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
@@ -31,7 +31,7 @@ pub async fn vector_scalar_bin_op(
             !is_comparison_operator || *value > 0.0
         })
         .map(|(instant, value)| InstantValue {
-            labels: instant.labels.clone(),
+            labels: instant.labels.without_metric_name(),
             sample: Sample {
                 timestamp: instant.sample.timestamp,
                 value,

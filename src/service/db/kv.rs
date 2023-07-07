@@ -14,8 +14,8 @@
 
 use std::sync::Arc;
 
-use crate::infra::config::KVS;
-use crate::infra::db::{self, Event};
+use crate::common::infra::config::KVS;
+use crate::common::infra::db::{self, Event};
 
 fn mk_keys(org_id: &str, key: &str) -> (String, String) {
     let cache_key = format!("{org_id}/{key}");

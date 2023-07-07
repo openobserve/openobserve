@@ -122,7 +122,7 @@
           style="border: 1px solid #dbdbdb; border-radius: 5px"
           @keyup="editorUpdate"
           @focusout="updateCondtions"
-          class="q-py-sm showLabelOnTop"
+          class="showLabelOnTop"
           resize
           :rules="[(val: any) => !!val || 'Field is required!']"
         ></div>
@@ -404,6 +404,10 @@ export default defineComponent({
     const updateCondtions = (e: any) => {
       const ast = parser.astify(e.target.value);
       sqlAST.value = ast;
+
+      // If sqlAST.value.columns is not type of array then return
+      if (!Array.isArray(sqlAST.value.columns)) return;
+
       sqlAST.value.columns.forEach(function (item: any, index: any) {
         let val;
         if (item["as"] === undefined || item["as"] === null) {
@@ -454,7 +458,7 @@ export default defineComponent({
         minimap: {
           enabled: false,
         },
-      theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
       });
       editorobj.onKeyUp((e: any) => {
         if (editorobj.getValue() != "") {
@@ -714,7 +718,7 @@ export default defineComponent({
 #editor {
   width: 100%;
   min-height: 5rem;
-  padding-bottom: 14px;
+  // padding-bottom: 14px;
   resize: both;
 }
 .alert-condition {

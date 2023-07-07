@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{common::json, infra::db, meta::dashboards::Dashboard};
+use crate::common::{infra::db, json, meta::dashboards::Dashboard};
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {

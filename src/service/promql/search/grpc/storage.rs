@@ -21,8 +21,8 @@ use datafusion::{
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
-use crate::infra::{cache::file_data, config::CONFIG};
-use crate::meta::{
+use crate::common::infra::{cache::file_data, config::CONFIG};
+use crate::common::meta::{
     search::Session as SearchSession,
     stream::{ScanStats, StreamParams},
     StreamType,

@@ -18,9 +18,9 @@ use object_store::ObjectStore;
 use once_cell::sync::Lazy;
 
 use super::{config::CONFIG, metrics};
+use crate::common::infra::ider;
+use crate::common::meta::StreamType;
 use crate::common::utils::is_local_disk_storage;
-use crate::infra::ider;
-use crate::meta::StreamType;
 
 pub mod local;
 pub mod remote;
@@ -127,7 +127,7 @@ pub fn generate_partioned_file_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::infra::config::FILE_EXT_PARQUET;
+    use crate::common::infra::config::FILE_EXT_PARQUET;
 
     #[test]
     fn test_generate_partioned_file_key() {

@@ -18,8 +18,8 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 
-use crate::infra::config::RwHashMap;
-use crate::infra::errors::*;
+use crate::common::infra::config::RwHashMap;
+use crate::common::infra::errors::*;
 
 static FILES: Lazy<RwHashMap<String, File>> = Lazy::new(DashMap::default);
 static DATA: Lazy<RwHashMap<String, Bytes>> = Lazy::new(DashMap::default);

@@ -14,7 +14,7 @@
 
 use uuid::Uuid;
 
-use crate::meta;
+use crate::common::meta;
 use crate::service::promql;
 
 pub mod auth;

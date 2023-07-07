@@ -19,12 +19,12 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use super::StreamMeta;
+use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
-use crate::infra::{cluster, config::CONFIG, metrics};
 
-use crate::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::meta::usage::{RequestStats, UsageType};
-use crate::meta::{
+use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
         BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,

@@ -14,7 +14,7 @@
 
 use datafusion::error::{DataFusionError, Result};
 
-use crate::meta::prom::NAME_LABEL;
+use crate::common::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod avg_over_time;
@@ -24,10 +24,12 @@ mod histogram;
 mod idelta;
 mod increase;
 mod irate;
+mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod rate;
 mod sum_over_time;
+mod time_operations;
 
 pub(crate) use avg_over_time::avg_over_time;
 pub(crate) use count_over_time::count_over_time;
@@ -36,12 +38,13 @@ pub(crate) use histogram::histogram_quantile;
 pub(crate) use idelta::idelta;
 pub(crate) use increase::increase;
 pub(crate) use irate::irate;
+pub(crate) use math_operations::*;
 pub(crate) use max_over_time::max_over_time;
 pub(crate) use min_over_time::min_over_time;
 pub(crate) use rate::rate;
-pub(crate) use sum_over_time::sum_over_time;
-
 use strum::EnumString;
+pub(crate) use sum_over_time::sum_over_time;
+pub(crate) use time_operations::*;
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
@@ -92,6 +95,7 @@ pub(crate) enum Func {
     Sgn,
     Sort,
     SortDesc,
+    Sqrt,
     SumOverTime,
     Time,
     Timestamp,
