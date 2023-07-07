@@ -123,7 +123,6 @@ export const getAllDashboards = async (store: any) => {
       );
     })
     .catch((error) => {
-      // console.log(error);
     });
 };
 
@@ -191,8 +190,6 @@ export const addVariable = async (
   variableData: any
 ) => {
 
-  console.log("common: Inside add variable");
-  
   if (
     !store.state.allDashboardList ||
     store.state.allDashboardList.length == 0
@@ -202,34 +199,29 @@ export const addVariable = async (
 
   const currentDashboard = findDashboard(dashboardId, store);
   if (!currentDashboard.variables) {
-    console.log("common: currentDashboard", currentDashboard);
-    
+
     currentDashboard.variables = {};
-    currentDashboard.variables.list = []
-  }
-  console.log("common: currentDashboard", currentDashboard);
-  
-
-  const variableExists = currentDashboard.variables.list.filter((it: any) => it.name == variableData.name)
-  console.log("common: variableExists", variableExists);
-  
-
-  if(variableExists.length){
-    throw new Error("Variable already exists")
+    currentDashboard.variables.list = [];
   }
 
-  currentDashboard.variables.list.push(variableData)
+  const variableExists = currentDashboard.variables.list.filter(
+    (it: any) => it.name == variableData.name
+  );
 
-  console.log("common: currentDashboard", currentDashboard);
-  
-    return await updateDashboard(
-      store,
-      store.state.selectedOrganization.identifier,
-      dashboardId,
-      currentDashboard
-    );
+  if (variableExists.length) {
+    
+    throw new Error("Variable already exists");
+  }
 
-}
+  currentDashboard.variables.list.push(variableData);
+
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+};
 
 export const deleteVariable = async (
   store: any,
@@ -254,7 +246,7 @@ export const deleteVariable = async (
     dashboardId,
     currentDashboard
   );
-}
+};
 
 export const deletePanel = async (
   store: any,
@@ -291,34 +283,27 @@ export const deletePanel = async (
 export const updateVariable = async (
   store: any,
   dashboardId: any,
+  variableName: any,
   variableData: any
 ) => {
-    // get the object of panel id
+  // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
-  console.log("Start updateVariable"); // Added console.log statement for debugging
+  // Get the current dashboard from the store
   const currentDashboard = findDashboard(dashboardId, store);
-  const variableExists = currentDashboard.variables.list.find(
-    (it: any) => it.name == variableData.name
-  );
-  if (variableExists) {
-    console.log("Variable already exists"); // Added console.log statement for debugging
-    // throw new Error("Variable already exists");
-  }
-
-  //remove panel from current dashboard
+  // Find the index of the variable in the list
   const variableIndex = currentDashboard.variables.list.findIndex(
-    (variable: any) => variable.name == variableData.name
+    (variable: any) => variable.name == variableName
   );
+  // Update the variable data in the list
   currentDashboard.variables.list[variableIndex] = variableData;
-  // currentDashboard.variables.list = currentDashboard.variables.list;
+  // Update the dashboard in the store
   await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
     dashboardId,
     currentDashboard
   );
-  console.log("End updateVariable"); // Added console.log statement for debugging
 };
 
 export const updatePanel = async (
@@ -331,7 +316,6 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store);
 
-  //remove panel from current dashboard
   const panelIndex = currentDashboard.panels.findIndex(
     (panel: any) => panel.id == panelData.id
   );

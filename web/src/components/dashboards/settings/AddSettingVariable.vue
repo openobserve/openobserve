@@ -76,13 +76,13 @@ import { useI18n } from "vue-i18n";
 import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete"
 import { useStore } from "vuex";
-import { addVariable, updateVariable } from "../../../utils/commons"
+import { addVariable, getDashboard, updateVariable } from "../../../utils/commons"
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading"
 
 export default defineComponent({
     name: "AddSettingVariable",
-    props: ['variableData'],
+    props: ['variableName'],
 
     setup(props, { emit }) {
         const { t } = useI18n();
@@ -133,19 +133,17 @@ export default defineComponent({
 
         const editMode = ref(false)
 
-        onMounted(() => {
+        onMounted(async () => {
             getStreamList();
 
-            if (props.variableData) {
+            if (props.variableName) {
                 editMode.value = true
-                console.log(variableData);
-                console.log(props.variableData);
-
-                Object.assign(variableData, props.variableData)
-                console.log('-----------------------------------');
-
-                console.log(variableData);
-                console.log(props.variableData);
+                // Fetch dashboard data
+                const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))?.variables?.list
+                 // Find the variable to edit
+                const edit = data.find((it:any) => it.name === props.variableName);
+                // Assign edit data to variableData
+                Object.assign(variableData, edit)
 
             } else {
                 editMode.value = false
@@ -164,15 +162,13 @@ export default defineComponent({
 
         const saveData = async () => {
             const dashId = route.query.dashboard + "";
-            console.log("dashId", dashId);
 
             if (editMode.value) {
-                console.log(" inside update variable");
-                console.log("variableData", variableData);
 
                 await updateVariable(
                     store,
                     dashId,
+                    props.variableName,
                     toRaw(variableData)
                 );
 
@@ -180,7 +176,6 @@ export default defineComponent({
 
             } else {
 
-                console.log("Inside add variable");
                 if (variableData.type != 'query') {
                     delete variableData["query_data"];
                 }

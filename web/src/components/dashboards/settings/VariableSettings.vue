@@ -4,7 +4,7 @@
         <div>
             <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
           </div>
-        <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableData="selectedVariable"/>
+        <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableName="selectedVariable"/>
       </div>
       <div v-else class="column full-height">
           
@@ -128,7 +128,6 @@ export default defineComponent({
     });
 
     onActivated(async () => {
-      console.log("on activated called");
       await getDashboardData();
     })
 
@@ -136,7 +135,6 @@ export default defineComponent({
     const getDashboardData = async () => {
       const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard)))?.variables?.list
       dashboardVariableData.data = data.map((it:any, index:number) => {
-        console.log("---it", it);
         
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -151,7 +149,6 @@ export default defineComponent({
     }
 
     const showDeleteDialogFn = (props: any) => {
-      console.log("props", props);
       
       selectedDelete.value = props.row;
       confirmDeleteDialog.value = true;
@@ -178,17 +175,9 @@ export default defineComponent({
       isAddVariable.value = false
     }
     const editVariableFn = async (name: any) => {
-      console.log('Editing variable');
-
-      const data = JSON.parse(JSON.stringify(await getDashboard(store, route.query.dashboard)))?.variables?.list
-
-      selectedVariable.value = data.find((it:any) => it.name === name);
-
-      console.log('Variable updated');
+      selectedVariable.value = name
 
       isAddVariable.value = true;
-
-      console.log('Variable mode set to edit');
     };
 
     return {
