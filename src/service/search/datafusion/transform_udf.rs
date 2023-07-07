@@ -14,7 +14,7 @@
 
 use ahash::AHashMap;
 use arrow::array::StructArray;
-use arrow_schema::Field;
+use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringArray},
@@ -63,7 +63,7 @@ fn create_user_df(
         create_udf(
             fn_name,
             input_vec,
-            Arc::new(DataType::Struct(output_type)),
+            Arc::new(DataType::Struct(output_type.into())),
             Volatility::Immutable,
             pow_scalar,
         )
@@ -172,7 +172,13 @@ fn get_udf_vrl(
             }
             data_vec.sort_by(|a, b| a.0.name().cmp(b.0.name()));
 
-            let result = StructArray::from(data_vec);
+            let fields: Fields = data_vec
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<Field>>()
+                .into();
+            let array_ref = data_vec.iter().map(|x| x.1.clone()).collect();
+            let result = StructArray::new(fields, array_ref, None);
             Ok(Arc::new(result) as ArrayRef)
         } else {
             let result = StringArray::from(res_data_vec);

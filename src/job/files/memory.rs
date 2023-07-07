@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use bytes::Bytes;
-use datafusion::arrow::json::{reader::infer_json_schema, RawReaderBuilder};
+use datafusion::arrow::json::{reader::infer_json_schema, ReaderBuilder};
 use std::{io::BufReader, sync::Arc};
 use tokio::{sync::Semaphore, task, time};
 
@@ -197,7 +197,7 @@ async fn upload_file(
 
     if res_records.is_empty() {
         let json_reader = BufReader::new(buf.as_ref());
-        let json = RawReaderBuilder::new(arrow_schema.clone())
+        let json = ReaderBuilder::new(arrow_schema.clone())
             .build(json_reader)
             .unwrap();
         for batch in json {
@@ -207,7 +207,7 @@ async fn upload_file(
         }
     } else {
         let mut json = vec![];
-        let mut decoder = RawReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
+        let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
 
         for value in res_records {
             decoder

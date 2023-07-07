@@ -70,7 +70,7 @@ pub fn new_writer<'a>(
 ) -> ArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema.index_of(&CONFIG.common.column_timestamp).unwrap();
     let writer_props = WriterProperties::builder()
-        .set_compression(get_parquet_compression())
+        //.set_compression(get_parquet_compression())
         .set_write_batch_size(8192)
         .set_data_pagesize_limit(1024 * 512)
         .set_max_row_group_size(1024 * 1024 * 256)
