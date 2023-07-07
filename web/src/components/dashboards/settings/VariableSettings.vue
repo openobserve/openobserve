@@ -18,7 +18,6 @@
                 :columns="columns"
                 row-key="name"
                 :pagination="pagination"
-                :loading="loading"
               >
                 <template #no-data>
                   <NoData />
@@ -196,7 +195,6 @@ export default defineComponent({
       isAddVariable,
       columns,
       pagination,
-      loading: ref(false),
       outlinedDelete,
       showDeleteDialogFn,
       confirmDeleteDialog,
