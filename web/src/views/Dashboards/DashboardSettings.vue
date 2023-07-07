@@ -14,7 +14,7 @@
     <div class="q-pa-none" :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'" style="min-height: inherit">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 q-mx-md text-bold">
+          <div class="q-mx-md q-my-md text-h6">
             {{ t('dashboard.setting') }}
           </div>
         </div>
@@ -27,10 +27,11 @@
           />
         </div>
       </div>
+      <q-separator></q-separator>
       <q-splitter
         v-model="splitterModel"
         unit="px"
-        style="min-height: calc(100vh - 57px)"
+        style="height: calc(100vh - 65px)"
       >
         <template v-slot:before>
           <div class="functions-tabs" style="width: 100%;">
@@ -46,14 +47,14 @@
           </div>
         </template>
         <template v-slot:after>
-          <div class="q-mx-md q-my-sm" style="width: 50vw;">
+          <div class="q-mx-md q-my-sm scroll" style="width: 35vw;">
             <q-tab-panels
                 v-model="activeTab"
                 animated
                 swipeable
                 vertical
-                transition-prev="jump-up"
-                transition-next="jump-up"
+                transition-prev="fade"
+                transition-next="fade"
                 >
                 <q-tab-panel name="generalSettings">
                    <GeneralSettings />
@@ -63,10 +64,6 @@
                     <VariableSettings />
                 </q-tab-panel>
             </q-tab-panels>
-            <!-- :templates="templates"
-              :functionAssociatedStreams="functionAssociatedStreams"
-              @get:functionAssociatedStreams="getFunctionAssociatedStreams"
-              @get:templates="getTemplates" -->
           </div>
         </template>
       </q-splitter>
