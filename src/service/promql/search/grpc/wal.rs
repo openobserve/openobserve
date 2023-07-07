@@ -24,13 +24,13 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
+use crate::common::infra::{
     cache::tmpfs,
     cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     config::CONFIG,
 };
-use crate::meta::{search::Session as SearchSession, stream::ScanStats, StreamType};
+use crate::common::meta::{search::Session as SearchSession, stream::ScanStats, StreamType};
+use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
     search::{

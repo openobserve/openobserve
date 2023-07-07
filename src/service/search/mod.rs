@@ -22,19 +22,19 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
-use crate::common::{flatten, json, str::find};
-use crate::handler::grpc::cluster_rpc;
-use crate::infra::{
+use crate::common::infra::{
     cluster,
     config::CONFIG,
     dist_lock,
     errors::{Error, ErrorCodes},
 };
-use crate::meta::{
+use crate::common::meta::{
     search,
     stream::{ScanStats, StreamParams},
     StreamType,
 };
+use crate::common::{flatten, json, str::find};
+use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, file_list};
 
 use super::get_partition_key_query;

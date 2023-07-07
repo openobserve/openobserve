@@ -19,14 +19,14 @@ use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
 use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::{flatten, json, time};
-use crate::infra::{cluster, config::CONFIG, metrics};
-use crate::meta::usage::{RequestStats, UsageType};
-use crate::meta::{
+use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
     StreamType,
 };
+use crate::common::{flatten, json, time};
 use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,

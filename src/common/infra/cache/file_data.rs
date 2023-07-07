@@ -18,9 +18,9 @@ use once_cell::sync::Lazy;
 use std::cmp::max;
 use std::sync::RwLock;
 
-use crate::infra::config::CONFIG;
-use crate::infra::metrics;
-use crate::infra::storage;
+use crate::common::infra::config::CONFIG;
+use crate::common::infra::metrics;
+use crate::common::infra::storage;
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
 

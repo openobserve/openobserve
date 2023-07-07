@@ -16,8 +16,8 @@ use datafusion::arrow::datatypes::Schema;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties, format::SortingColumn};
 use std::sync::Arc;
 
-use crate::infra::config::{get_parquet_compression, CONFIG};
-use crate::meta::functions::ZoFunction;
+use crate::common::infra::config::{get_parquet_compression, CONFIG};
+use crate::common::meta::functions::ZoFunction;
 
 mod date_format_udf;
 pub mod exec;

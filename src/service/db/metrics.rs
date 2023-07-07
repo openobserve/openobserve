@@ -15,16 +15,16 @@
 use bytes::Bytes;
 use std::sync::Arc;
 
+use crate::common::infra::config::METRIC_CLUSTER_LEADER;
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::METRIC_CLUSTER_LEADER;
-use crate::infra::db::Event;
-use crate::meta::prom::ClusterLeader;
+use crate::common::meta::prom::ClusterLeader;
 
 pub async fn set_prom_cluster_info(
     cluster: &str,
     members: Vec<String>,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/metrics_members/{cluster}");
     Ok(db.put(&key, Bytes::from(members.join(","))).await?)
 }
@@ -33,13 +33,13 @@ pub async fn set_prom_cluster_leader(
     cluster: &str,
     leader: &ClusterLeader,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/metrics_leader/{cluster}");
     Ok(db.put(&key, json::to_vec(&leader).unwrap().into()).await?)
 }
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/metrics_leader/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -68,7 +68,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/metrics_leader/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

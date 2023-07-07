@@ -8,9 +8,9 @@ use reqwest::Client;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 
-use crate::{
-    common::json,
+use crate::common::{
     infra::{config::CONFIG, ider::generate},
+    json,
 };
 
 pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {

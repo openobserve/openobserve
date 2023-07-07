@@ -14,7 +14,7 @@
 
 use super::{db, triggers};
 use crate::common::flatten;
-use crate::infra::wal::get_or_create;
+use crate::common::infra::wal::get_or_create;
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
@@ -33,13 +33,13 @@ use crate::common::{
     notification::send_notification,
 };
 
-use crate::infra::config::STREAM_FUNCTIONS;
-use crate::infra::config::{CONFIG, STREAM_ALERTS};
-use crate::infra::metrics;
+use crate::common::infra::config::STREAM_FUNCTIONS;
+use crate::common::infra::config::{CONFIG, STREAM_ALERTS};
+use crate::common::infra::metrics;
 
-use crate::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::meta::usage::RequestStats;
-use crate::meta::{
+use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
+use crate::common::meta::usage::RequestStats;
+use crate::common::meta::{
     alert::{Alert, Trigger},
     StreamType,
 };
@@ -322,7 +322,7 @@ pub fn _write_file(
         if entry.is_empty() {
             continue;
         }
-        let file = crate::infra::wal::get_or_create(
+        let file = crate::common::infra::wal::get_or_create(
             thread_id,
             org_id,
             stream_name,

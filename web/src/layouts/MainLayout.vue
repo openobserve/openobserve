@@ -20,7 +20,11 @@
         <div class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
-            :src="store.state.theme == 'dark' ? getImageURL('images/common/open_observe_logo_2.svg') : getImageURL('images/common/open_observe_logo.svg')"
+            :src="
+              store.state.theme == 'dark'
+                ? getImageURL('images/common/open_observe_logo_2.svg')
+                : getImageURL('images/common/open_observe_logo.svg')
+            "
             @click="goToHome"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
@@ -29,7 +33,7 @@
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-          <ThemeSwitcher></ThemeSwitcher>
+        <ThemeSwitcher></ThemeSwitcher>
         <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
           <div
             type="warning"
@@ -70,7 +74,13 @@
           @click="navigateToDocs()"
         />
         <div class="languageWrapper">
-          <q-btn-dropdown unelevated no-caps flat class="languageDdl" :icon="selectedLanguage.icon">
+          <q-btn-dropdown
+            unelevated
+            no-caps
+            flat
+            class="languageDdl"
+            :icon="selectedLanguage.icon"
+          >
             <template #label>
               <div class="row no-wrap">
                 {{ selectedLanguage.label }}
@@ -155,8 +165,14 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer :mini="miniMode" bordered show-if-above @mouseover="miniMode = false" @mouseout="miniMode = true"
-      mini-to-overlay>
+    <q-drawer
+      :mini="miniMode"
+      bordered
+      show-if-above
+      @mouseover="miniMode = false"
+      @mouseout="miniMode = true"
+      mini-to-overlay
+    >
       <q-list class="leftNavList">
         <menu-link
           v-for="nav in linksList"
@@ -229,7 +245,18 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
-import { outlinedHome, outlinedSearch, outlinedBarChart, outlinedAccountTree, outlinedDashboard, outlinedWindow, outlinedReportProblem, outlinedFilterAlt, outlinedPerson, outlinedFormatListBulleted } from '@quasar/extras/material-icons-outlined'
+import {
+  outlinedHome,
+  outlinedSearch,
+  outlinedBarChart,
+  outlinedAccountTree,
+  outlinedDashboard,
+  outlinedWindow,
+  outlinedReportProblem,
+  outlinedFilterAlt,
+  outlinedPerson,
+  outlinedFormatListBulleted,
+} from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 
 let mainLayoutMixin: any = null;
@@ -263,8 +290,8 @@ export default defineComponent({
     "q-icon": QIcon,
     "q-select": QSelect,
     ThemeSwitcher,
-    SlackIcon
-},
+    SlackIcon,
+  },
   methods: {
     navigateToDocs() {
       window.open("https://openobserve.ai/docs", "_blank");
@@ -291,11 +318,10 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-      const $q = useQuasar();
+    const $q = useQuasar();
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
-
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -479,7 +505,7 @@ export default defineComponent({
         },
       });
       useLocalOrganization(selectedOrg.value);
-      store.state.selectedOrganization = selectedOrg;
+      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
     };
 
     const setSelectedOrganization = () => {
@@ -501,7 +527,7 @@ export default defineComponent({
             UserObj: any;
             ingest_threshold: number;
             search_threshold: number;
-            CustomerBillingObj: { subscription_type: string, note: string };
+            CustomerBillingObj: { subscription_type: string; note: string };
             status: string;
           }) => {
             const optiondata: any = {
@@ -522,7 +548,7 @@ export default defineComponent({
 
             if (
               config.isCloud == "true" &&
-              localOrg.value.identifier == data.identifier &&
+              localOrg.value?.identifier == data?.identifier &&
               (customOrganization == "" || customOrganization == undefined)
             ) {
               // localOrg.value.subscription_type =
@@ -818,7 +844,7 @@ export default defineComponent({
 
   &.q-btn {
     .q-icon {
-      &+.row {
+      & + .row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }
@@ -889,7 +915,6 @@ export default defineComponent({
     color: #565656;
     font-weight: 600;
   }
-
 }
 
 .dark-mode {

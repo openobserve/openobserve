@@ -1,4 +1,4 @@
-use crate::infra::{config::CONFIG, db::etcd, errors::Result};
+use crate::common::infra::{config::CONFIG, db::etcd, errors::Result};
 
 #[inline(always)]
 pub async fn lock(key: &str) -> Result<Option<etcd::Locker>> {

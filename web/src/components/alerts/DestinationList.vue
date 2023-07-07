@@ -143,7 +143,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationData } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 interface ConformDelete {
   visible: boolean;
@@ -312,9 +312,13 @@ export default defineComponent({
           .then(() => getDestinations())
           .catch((err) => {
             if (err.response.data.code === 403) {
+              const message =
+                err.response.data?.message ||
+                err.response.data?.error ||
+                "Error while deleting destination";
               q.notify({
                 type: "negative",
-                message: err.response.data.message,
+                message,
                 timeout: 2000,
               });
             }
@@ -376,7 +380,7 @@ export default defineComponent({
       perPageOptions,
       resultTotal,
       pagination,
-      outlinedDelete
+      outlinedDelete,
     };
   },
 });

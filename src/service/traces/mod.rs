@@ -25,14 +25,14 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::{flatten, json};
-use crate::infra::{cluster, config::CONFIG, wal};
-use crate::meta::{
+use crate::common::infra::{cluster, config::CONFIG, wal};
+use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
     traces::{Event, Span, SpanRefType},
     StreamType,
 };
+use crate::common::{flatten, json};
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record},

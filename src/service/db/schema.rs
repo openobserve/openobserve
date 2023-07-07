@@ -17,13 +17,13 @@ use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use std::sync::Arc;
 
+use crate::common::infra::cache;
+use crate::common::infra::config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS};
+use crate::common::infra::db::Event;
 use crate::common::json;
+use crate::common::meta::stream::StreamSchema;
+use crate::common::meta::StreamType;
 use crate::common::utils::is_local_disk_storage;
-use crate::infra::cache;
-use crate::infra::config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS};
-use crate::infra::db::Event;
-use crate::meta::stream::StreamSchema;
-use crate::meta::StreamType;
 use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -42,7 +42,7 @@ pub async fn get(
         return Ok(schema.value().clone().last().unwrap().clone());
     }
 
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -68,7 +68,7 @@ pub async fn get_from_db(
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
 
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -99,7 +99,7 @@ pub async fn get_versions(
         return Ok(STREAM_SCHEMAS.get(map_key).unwrap().value().clone());
     }
 
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(match db.get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
@@ -125,7 +125,7 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let mut versions: Vec<Schema>;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
@@ -183,7 +183,7 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     Ok(db.delete(&key, false).await?)
 }
 
@@ -234,7 +234,7 @@ pub async fn list(
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema));
     }
 
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
@@ -267,7 +267,7 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/schema/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -334,7 +334,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/schema/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {

@@ -21,13 +21,13 @@ use std::{
 };
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::common::json;
-use crate::infra::{
+use crate::common::infra::{
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, STREAM_SCHEMAS},
     dist_lock, ider, storage,
 };
-use crate::meta::common::FileKey;
+use crate::common::json;
+use crate::common::meta::common::FileKey;
 use crate::service::db;
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {

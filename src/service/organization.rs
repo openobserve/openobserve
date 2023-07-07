@@ -16,8 +16,8 @@ use rand::distributions::{Alphanumeric, DistString};
 
 use super::stream::get_streams;
 use crate::common::auth::is_root_user;
-use crate::meta::organization::{IngestionPasscode, OrgSummary};
-use crate::meta::user::UserOrg;
+use crate::common::meta::organization::{IngestionPasscode, OrgSummary};
+use crate::common::meta::user::UserOrg;
 use crate::service::db;
 
 #[tracing::instrument]
@@ -79,7 +79,7 @@ pub async fn update_passcode(org_id: Option<&str>, user_id: &str) -> IngestionPa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{meta::user::UserRequest, service::users};
+    use crate::{common::meta::user::UserRequest, service::users};
 
     #[actix_web::test]
     async fn test_organization() {
@@ -91,7 +91,7 @@ mod tests {
             UserRequest {
                 email: user_id.to_string(),
                 password: "pass".to_string(),
-                role: crate::meta::user::UserRole::Admin,
+                role: crate::common::meta::user::UserRole::Admin,
                 first_name: "admin".to_owned(),
                 last_name: "".to_owned(),
             },

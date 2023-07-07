@@ -19,9 +19,9 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use tokio::sync::RwLock;
 
+use crate::common::infra::{config::CONFIG, storage};
 use crate::common::json;
-use crate::infra::{config::CONFIG, storage};
-use crate::meta::common::FileKey;
+use crate::common::meta::common::FileKey;
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -50,7 +50,13 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
             tokio::task::spawn(async move {
                 let mut count = 0;
                 for file in chunk {
-                    count += proccess_file(&file).await?;
+                    match process_file(&file).await {
+                        Ok(file_count) => count += file_count,
+                        Err(err) => {
+                            log::error!("Error processing file: {:?} {:?}", file, err);
+                            continue;
+                        }
+                    }
                     tokio::task::yield_now().await;
                 }
                 Ok(count)
@@ -85,7 +91,7 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn proccess_file(file: &str) -> Result<usize, anyhow::Error> {
+async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
     // download file list from storage
     let data = storage::get(file).await?;
     // uncompress file

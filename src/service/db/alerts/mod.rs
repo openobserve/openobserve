@@ -14,11 +14,11 @@
 
 use std::sync::Arc;
 
+use crate::common::infra::config::{STREAM_ALERTS, TRIGGERS_IN_PROCESS};
+use crate::common::infra::db::Event;
 use crate::common::json;
-use crate::infra::config::{STREAM_ALERTS, TRIGGERS_IN_PROCESS};
-use crate::infra::db::Event;
-use crate::meta::alert::{Alert, AlertList};
-use crate::meta::StreamType;
+use crate::common::meta::alert::{Alert, AlertList};
+use crate::common::meta::StreamType;
 
 pub mod destinations;
 pub mod templates;
@@ -35,7 +35,7 @@ pub async fn get(
         val.list.retain(|alert| alert.name.eq(name));
         val.list.first().cloned()
     } else {
-        let db = &crate::infra::db::DEFAULT;
+        let db = &crate::common::infra::db::DEFAULT;
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         match db.get(&key).await {
             Ok(val) => json::from_slice(&val).unwrap(),
@@ -52,7 +52,7 @@ pub async fn set(
     name: &str,
     alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     Ok(db.put(&key, json::to_vec(&alert).unwrap().into()).await?)
 }
@@ -63,7 +63,7 @@ pub async fn delete(
     stream_type: StreamType,
     name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
     match db.delete(&key, false).await {
         Ok(_) => {
@@ -80,7 +80,7 @@ pub async fn list(
     stream_name: Option<&str>,
     stream_type: Option<StreamType>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
 
     let loc_stream_type = if stream_type.is_some() {
         stream_type.unwrap()
@@ -102,7 +102,7 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/alerts/";
     let mut events = db.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -149,7 +149,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/alerts/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
@@ -167,7 +167,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = &crate::infra::db::DEFAULT;
+    let db = &crate::common::infra::db::DEFAULT;
     let key = "/alerts/";
     Ok(db.delete(key, true).await?)
 }

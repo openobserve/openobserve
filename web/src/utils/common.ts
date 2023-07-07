@@ -15,55 +15,63 @@
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
 import { useLocalOrganization, getPath } from "./zincutils";
+import { useQuasar } from "quasar";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
-export const getDefaultOrganization = async (userInfo: any, org_identifier: any) => {
-  await organizationsService.os_list(0, 1000, "id", false, "", org_identifier).then((res: any) => {
-    const localOrg: any = useLocalOrganization();
-    if (
-      localOrg.value != null &&
-      localOrg.value.user_email !== userInfo.email
-    ) {
-      localOrg.value = null;
-      useLocalOrganization("");
-    }
+const $q = useQuasar();
 
-    orgOptions.value = res.data.data.map(
-      (data: {
-        id: any;
-        name: any;
-        org_type: any;
-        identifier: any;
-        user_obj: any;
-        ingest_threshold: number;
-        search_threshold: number;
-        note: string;
-      }) => {
-        const optiondata: any = {
-          label: data.name,
-          id: data.id,
-          type: data.org_type,
-          identifier: data.identifier,
-          user_email: userInfo.email,
-          ingest_threshold: data.ingest_threshold,
-          search_threshold: data.search_threshold,
-          note: data.note,
-        };
-
-        if (
-          ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
-            data.org_type == "default" &&
-            userInfo.email == data.user_obj.email) ||
-          res.data.data.length == 1
-        ) {
-          selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-          useLocalOrganization(selectedOrg.value);
-          //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
-        }
-        return optiondata;
+export const getDefaultOrganization = async (
+  userInfo: any,
+  org_identifier: any
+) => {
+  await organizationsService
+    .os_list(0, 1000, "id", false, "", org_identifier)
+    .then((res: any) => {
+      const localOrg: any = useLocalOrganization();
+      if (
+        localOrg.value != null &&
+        localOrg.value.user_email !== userInfo.email
+      ) {
+        localOrg.value = null;
+        useLocalOrganization("");
       }
-    );
+
+      orgOptions.value = res.data.data.map(
+        (data: {
+          id: any;
+          name: any;
+          org_type: any;
+          identifier: any;
+          user_obj: any;
+          ingest_threshold: number;
+          search_threshold: number;
+          note: string;
+        }) => {
+          const optiondata: any = {
+            label: data.name,
+            id: data.id,
+            type: data.org_type,
+            identifier: data.identifier,
+            user_email: userInfo.email,
+            ingest_threshold: data.ingest_threshold,
+            search_threshold: data.search_threshold,
+            note: data.note,
+          };
+
+          if (
+            ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
+              data.org_type == "default" &&
+              userInfo.email == data.user_obj.email) ||
+            res.data.data.length == 1
+          ) {
+            selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
+            useLocalOrganization(selectedOrg.value);
+            //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
+          }
+          return optiondata;
+        }
+      );
       return res.data.data;
     });
 };
@@ -98,3 +106,20 @@ export const logsErrorMessage = (code: number) => {
     return "";
   }
 };
+
+export const showErrorNotification = (message: string) => {
+  $q.notify({
+    type: "negative",
+    message: message,
+    timeout: 5000,
+    actions: [
+      {
+        icon: "close",
+        color: "white",
+        handler: () => {
+          /* ... */
+        },
+      },
+    ],
+  });
+}

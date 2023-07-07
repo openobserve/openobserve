@@ -14,7 +14,7 @@
 
 use tokio::time;
 
-use crate::{infra::config::CONFIG, meta::telemetry::Telemetry};
+use crate::common::{infra::config::CONFIG, meta::telemetry::Telemetry};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(

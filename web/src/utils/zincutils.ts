@@ -73,7 +73,9 @@ const useLocalStorage = (
 
     return value;
   } catch (e) {
-    console.log(`Error: Error in UseLocalStorage for key: ${key}`);
+    console.log(
+      `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`
+    );
   }
 };
 

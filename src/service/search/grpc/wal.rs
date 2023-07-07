@@ -21,13 +21,13 @@ use std::{io::BufReader, path::Path, sync::Arc, time::UNIX_EPOCH};
 use tracing::{info_span, Instrument};
 
 use crate::common::file::{get_file_contents, get_file_meta, scan_files};
-use crate::infra::{
+use crate::common::infra::{
     cache::tmpfs,
     config::CONFIG,
     errors::{Error, ErrorCodes},
     ider, wal,
 };
-use crate::meta::{self, stream::ScanStats};
+use crate::common::meta::{self, stream::ScanStats};
 use crate::service::{
     db,
     search::{

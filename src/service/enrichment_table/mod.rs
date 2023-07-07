@@ -23,13 +23,13 @@ use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
 
-use crate::infra::{
+use crate::common::infra::{
     cache::stats,
     cluster,
     config::{CONFIG, STREAM_SCHEMAS},
 };
-use crate::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
-use crate::{common::json, meta::usage::UsageType};
+use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+use crate::common::{json, meta::usage::UsageType};
 
 use super::{
     compact::retention,

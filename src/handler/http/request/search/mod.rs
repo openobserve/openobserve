@@ -22,12 +22,12 @@ use std::io::Error;
 use crate::common::base64;
 use crate::common::functions;
 use crate::common::http::get_stream_type_from_request;
+use crate::common::infra::config::CONFIG;
+use crate::common::infra::{errors, metrics};
 use crate::common::json;
-use crate::infra::config::CONFIG;
-use crate::infra::{errors, metrics};
-use crate::meta::http::HttpResponse as MetaHttpResponse;
-use crate::meta::usage::{RequestStats, UsageType};
-use crate::meta::{self, StreamType};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::{self, StreamType};
 use crate::service::search as SearchService;
 use crate::service::usage::report_usage_stats;
 

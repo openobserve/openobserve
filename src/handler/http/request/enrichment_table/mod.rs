@@ -16,7 +16,7 @@ use actix_multipart::Multipart;
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use std::io::Error;
 
-use crate::{meta, service::enrichment_table::save_enrichment_data};
+use crate::{common::meta, service::enrichment_table::save_enrichment_data};
 
 /** CreateEnrichmentTable */
 #[utoipa::path(
