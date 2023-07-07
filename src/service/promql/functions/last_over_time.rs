@@ -16,15 +16,19 @@ use datafusion::error::Result;
 
 use crate::service::promql::value::{RangeValue, Value};
 
-pub(crate) fn idelta(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "idelta", exec, false)
+pub(crate) fn last_over_time(data: &Value) -> Result<Value> {
+    // NOTE: Comment taken from prometheus golang source.
+    // The last_over_time function acts like offset; thus, it
+    // should keep the metric name.  For all the other range
+    // vector functions, the only change needed is to drop the
+    // metric name in the output.
+    // i.e. keep_name_label = true
+    super::eval_idelta(data, "last_over_time", exec, true)
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.samples.len() < 2 {
+    if data.samples.is_empty() {
         return None;
     }
-    let last = data.samples.last().unwrap();
-    let previous = data.samples.get(data.samples.len() - 2).unwrap();
-    Some(last.value - previous.value)
+    Some(data.samples.last().unwrap().value)
 }

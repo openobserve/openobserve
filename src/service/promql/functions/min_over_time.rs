@@ -17,7 +17,7 @@ use datafusion::error::Result;
 use crate::service::promql::value::{RangeValue, Value};
 
 pub(crate) fn min_over_time(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "min_over_time", exec)
+    super::eval_idelta(data, "min_over_time", exec, false)
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
