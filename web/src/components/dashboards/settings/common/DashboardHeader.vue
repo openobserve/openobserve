@@ -12,12 +12,12 @@
 
 <template>
     <div>
-        <div class="row items-center no-wrap">
+        <div class="row items-center no-wrap q-mb-sm">
             <div v-if="backButton" class="col-auto">
                 <q-btn no-caps @click="onBackClicked" padding="xs" outline icon="arrow_back_ios_new" />
             </div>
             <div class="col">
-                <div class="q-mb-sm text-h6">
+                <div class="text-h6">
                     {{ title }}
                 </div>
             </div>

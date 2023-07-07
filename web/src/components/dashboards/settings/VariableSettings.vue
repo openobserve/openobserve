@@ -7,10 +7,11 @@
         <AddSettingVariable v-if="isAddVariable" @save="handleSaveVariable" :variableName="selectedVariable"/>
       </div>
       <div v-else class="column full-height">
-          
-          <div>
-              <q-btn color="primary" icon="add" :label="t(`dashboard.NewVariable`)" @click="addVariables" />
-          </div>
+          <DashboardHeader title="Variables" >
+            <template #right>
+              <q-btn color="secondary" :label="t(`dashboard.newVariable`)" @click="addVariables" />              
+            </template>
+          </DashboardHeader>
           <div>
               <q-table
                 ref="qTable"
@@ -70,16 +71,19 @@ import { useRoute } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 import { getDashboard, deleteVariable } from "../../../utils/commons";
 import  AddSettingVariable from "./AddSettingVariable.vue"
+import  DashboardHeader from "./common/DashboardHeader.vue"
 import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
 import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
+import type { QTableProps } from "quasar";
 
 export default defineComponent({
   name: "VariableSettings",
   components: {
     AddSettingVariable,
     NoData,
-    ConfirmDialog
+    ConfirmDialog,
+    DashboardHeader
   },
  
   setup(props) {
@@ -106,6 +110,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 70px",
       },
       {
         name: "name",
@@ -119,6 +124,8 @@ export default defineComponent({
         field: "actions",
         label: t("dashboard.actions"),
         align: "center",
+        sortable: false,
+        style: "width: 110px",
       },
     ]);
 
