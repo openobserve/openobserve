@@ -16,15 +16,14 @@ use datafusion::error::Result;
 
 use crate::service::promql::value::{RangeValue, Value};
 
-pub(crate) fn idelta(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "idelta", exec, false)
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
+pub(crate) fn absent_over_time(data: &Value) -> Result<Value> {
+    super::eval_idelta(data, "absent_over_time", exec, false)
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
-    if data.samples.len() < 2 {
-        return None;
+    if data.samples.is_empty() {
+        return Some(1.0);
     }
-    let last = data.samples.last().unwrap();
-    let previous = data.samples.get(data.samples.len() - 2).unwrap();
-    Some(last.value - previous.value)
+    None
 }
