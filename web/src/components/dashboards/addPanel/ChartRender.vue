@@ -517,12 +517,12 @@ export default defineComponent({
                   traces = yAxisKeys?.map((key: any) => {
                       
                       const trace = {
-                          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
                           marker: {
                               color:
-                                  props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                  props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
                                   "#5960b2",
                               opacity: 0.8,
                           },
@@ -551,12 +551,12 @@ export default defineComponent({
                   //generate trace based on the y axis keys
                   traces = yAxisKeys?.map((key: any) => {
                       const trace = {
-                          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
                           marker: {
                               color:
-                                  props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                  props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
                                   "#5960b2",
                               opacity: 0.8,
                           },
@@ -585,12 +585,12 @@ export default defineComponent({
                   //generate trace based on the y axis keys
                   traces = yAxisKeys?.map((key: any) => {
                       const trace = {
-                          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
                           marker: {
                               color:
-                                  props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                  props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
                                   "#5960b2",
                               opacity: 0.8,
                           },
@@ -619,12 +619,12 @@ export default defineComponent({
                   //generate trace based on the y axis keys
                   traces = yAxisKeys?.map((key: any) => {
                       const trace = {
-                          name: props.data.fields?.y.find((it: any) => it.alias == key).label,
+                          name: props.data.fields?.y.find((it: any) => it.alias == key)?.label,
                           ...getPropsByChartTypeForTraces(),
                           showlegend: props.data.config?.show_legends,
                           marker: {
                               color:
-                                  props.data.fields?.y.find((it: any) => it.alias == key).color ||
+                                  props.data.fields?.y.find((it: any) => it.alias == key)?.color ||
                                   "#5960b2",
                               opacity: 0.8,
                           },
@@ -806,7 +806,6 @@ export default defineComponent({
                     ...getThemeLayoutOptions()
                 };
 
-                console.log('plotly promql layout', layout);
 
                 Plotly.react(plotRef.value, traces, layout, {
                     responsive: true,
@@ -902,7 +901,6 @@ export default defineComponent({
 
       const getLegendPosition = (type: string) => {
         const legendPosition = props.data.config?.legends_position
-        console.log('legendPosition', legendPosition);
         
         switch (legendPosition) {
             case 'bottom':
@@ -1002,13 +1000,13 @@ export default defineComponent({
           switch (props.data.type) {
               case "bar": {
                   const xaxis: any = {
-                      title: props.data.fields?.x[0].label,
+                      title: props.data.fields?.x[0]?.label,
                       tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                       automargin: true,
                   }
 
                   const yaxis: any = {
-                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                       automargin: true,
                       fixedrange: true
                   }
@@ -1029,14 +1027,14 @@ export default defineComponent({
               }
               case "line":{
                   const xaxis: any = {
-                      title: props.data.fields?.x[0].label,
+                      title: props.data.fields?.x[0]?.label,
                       tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                       automargin: true,
                       // rangeslider: { range: xAxisDataWithTicks },
                   }
 
                   const yaxis: any = {
-                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                       automargin: true,
                       fixedrange: true,
                   }
@@ -1055,13 +1053,13 @@ export default defineComponent({
               }
               case "scatter": {
                   const xaxis: any = {
-                      title: props.data.fields?.x[0].label,
+                      title: props.data.fields?.x[0]?.label,
                       tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                       automargin: true,
                   }
 
                   const yaxis: any = {
-                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                       automargin: true,
                       fixedrange: true
                   }
@@ -1082,7 +1080,7 @@ export default defineComponent({
               case "pie":
                   return {
                       xaxis: {
-                          title: props.data.fields?.x[0].label,
+                          title: props.data.fields?.x[0]?.label,
                           tickangle: -20,
                           automargin: true,
                       },
@@ -1090,14 +1088,14 @@ export default defineComponent({
                           tickmode: "array",
                           tickvals: xAxisDataWithTicks,
                           ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                           automargin: true,
                       },
                   };
               case "donut":
                   return {
                       xaxis: {
-                          title: props.data.fields?.x[0].label,
+                          title: props.data.fields?.x[0]?.label,
                           tickangle: -20,
                           automargin: true,
                       },
@@ -1105,20 +1103,20 @@ export default defineComponent({
                           tickmode: "array",
                           tickvals: xAxisDataWithTicks,
                           ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                           automargin: true,
                       },
                   };
               case "h-bar": {
                   const xaxis: any = {
-                      title: props.data.fields?.y[0].label,
+                      title: props.data.fields?.y[0]?.label,
                       tickangle: -20,
                       automargin: true,
                       fixedrange: true
                   }
 
                   const yaxis: any = {
-                      title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+                      title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0]?.label : "",
                       automargin: true,
                   }
 
@@ -1138,13 +1136,13 @@ export default defineComponent({
               }
               case "area": {
                   const xaxis: any = {
-                      title: props.data.fields?.x[0].label,
+                      title: props.data.fields?.x[0]?.label,
                       tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                       automargin: true,
                   }
 
                   const yaxis: any = {
-                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                      title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                       automargin: true,
                       fixedrange: true
                   }
@@ -1165,13 +1163,13 @@ export default defineComponent({
               case "area-stacked":{
 
                 const xaxis: any = {
-                    title: props.data.fields?.x[0].label,
+                    title: props.data.fields?.x[0]?.label,
                     tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                     automargin: true
                   }
 
                 const yaxis: any = {
-                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                     automargin: true,
                     fixedrange: true
                 }
@@ -1197,13 +1195,13 @@ export default defineComponent({
               case "stacked":{
 
                 const xaxis: any = {
-                    title: props.data.fields?.x[0].label,
+                    title: props.data.fields?.x[0]?.label,
                     tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                     automargin: true
                   }
 
                 const yaxis: any = {
-                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                    title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                     automargin: true,
                     fixedrange: true
                 }
@@ -1231,12 +1229,12 @@ export default defineComponent({
                   return {
                       barmode: "stack",
                       xaxis: {
-                          title: props.data.fields?.y[0].label,
+                          title: props.data.fields?.y[0]?.label,
                           tickangle: -20,
                           automargin: true,
                       },
                       yaxis: {
-                          title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0].label : "",
+                          title: props.data.fields?.x?.length == 1 ? props.data.fields.x[0]?.label : "",
                           automargin: true,
                       },
                   };
@@ -1252,12 +1250,12 @@ export default defineComponent({
                           tickmode: "array",
                           tickvals: xAxisDataWithTicks,
                           ticktext: textformat(xAxisDataWithTicks),
-                          title: props.data.fields?.x[0].label,
+                          title: props.data.fields?.x[0]?.label,
                           tickangle: (props.data?.fields?.x[0]?.aggregationFunction == 'histogram') ? 0 : -20,
                           automargin: true,
                       },
                       yaxis: {
-                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0].label : "",
+                          title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                           automargin: true,
                           fixedrange: true
                       },
@@ -1310,13 +1308,14 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
       /* bg color is important for th; just specify one */
-    //   background-color: #fff;
+      background-color: #fff;
   }
 
   :deep(thead tr th) {
       will-change: auto !important;
       position: sticky;
       z-index: 1;
+
   }
 
   /* this will be the loading indicator */
@@ -1331,6 +1330,15 @@ export default defineComponent({
 
   :deep(.q-virtual-scroll) {
       will-change: auto !important;
+  }
+}
+.my-sticky-virtscroll-table.q-dark {
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+      /* bg color is important for th; just specify one */
+    //   background-color: #fff;
+      background-color: $dark-page !important;
   }
 }
 

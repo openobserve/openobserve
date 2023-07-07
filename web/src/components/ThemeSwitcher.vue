@@ -30,7 +30,6 @@ export default defineComponent({
                 // Default to light theme if no saved theme is found
                 darkMode.value = false;
             }
-            console.log(`Mounted with saved theme: ${savedTheme} and darkMode: ${darkMode.value}`);
             setTheme(darkMode.value ? 'dark' : 'light');
         });
 
@@ -42,15 +41,12 @@ export default defineComponent({
             setTheme(darkMode.value ? 'dark' : 'light')
         });
          watch(() => store.state.theme, () => {
-            console.log('theme updated', store.state.theme);
             monaco.editor.setTheme(store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme');
         })
 
         const setTheme = (theme: any) => {
             localStorage.setItem('theme', theme);
-            console.log(`Saved new theme to local storage: ${theme}`);
             $q.dark.set(theme == 'dark');
-            console.log(theme, "newMode");
             store.dispatch("appTheme", theme);
         }
 
