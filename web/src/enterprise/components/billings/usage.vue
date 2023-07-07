@@ -30,11 +30,18 @@
       </div>
     </div>
     <div v-if="!dataLoading">
-      <trace-chart
-        ref="usageChart"
-        id="billing-usage"
-        :chart="chartData"
-      ></trace-chart>
+      <div v-if="chartData.data.length == 0">
+        <div class="text-h6 text-weight-medium text-center">
+          {{ t("billing.messageDataNotFound") }}
+        </div>
+      </div>
+      <div v-else>
+        <trace-chart
+          ref="usageChart"
+          id="billing-usage"
+          :chart="chartData"
+        ></trace-chart>
+      </div>
     </div>
     <div v-else class="text-h6 text-weight-medium text-center">Loading...</div>
   </q-page>
@@ -63,6 +70,7 @@ const blankChartObj: any = {
       type: "linear",
     },
     autosize: true,
+    barmode: "group",
   },
 };
 
@@ -110,8 +118,7 @@ export default defineComponent({
                       x: [],
                       y: [],
                       name: data.event,
-                      type: "scatter",
-                      mode: "lines",
+                      type: "bar",
                     };
                   }
                   chartObj.data[eventIndex].x.push(data.usage_timestamp);
@@ -127,8 +134,7 @@ export default defineComponent({
                     x: [],
                     y: [],
                     name: data.event,
-                    type: "scatter",
-                    mode: "lines",
+                    type: "bar",
                   };
 
                   // Update the newly added index with the data values
