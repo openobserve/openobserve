@@ -15,31 +15,8 @@
 
 <template>
     <div class="column full-height">
-      <div class="q-px-md q-py-md">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <!-- <div v-if="beingUpdated" class="text-body1 text-bold text-dark">
-              {{ t("dashboard.updatedashboard") }}
-            </div>
-            <div v-else class="text-body1 text-bold text-dark">
-              {{ t("dashboard.createdashboard") }}
-            </div> -->
-             <div class="text-body1 text-bold">
-                {{ t("dashboard.generalSettingsTitle") }}
-             </div>
-          </div>
-          <!-- <div class="col-auto">
-            <q-btn
-              v-close-popup
-              round
-              flat
-              :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-            />
-          </div> -->
-        </div>
-      </div>
-      <q-separator />
-      <div class="q-w-md q-mx-lg">
+      <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
+      <div class="q-w-md">
         <q-form ref="addDashboardForm" @submit="onSubmit">
           <q-input
             v-if="beingUpdated"
@@ -105,6 +82,7 @@
   import { getImageURL } from "../../../utils/zincutils";
   import { getDashboard } from "@/utils/commons";
   import { useRoute } from "vue-router";
+  import DashboardHeader from "./common/DashboardHeader.vue";
 
   // const defaultValue = () => {
   //   return {
@@ -118,6 +96,9 @@
   
   export default defineComponent({
     name: "GeneralSettings",
+    components: {
+      DashboardHeader,
+    },
     // props: {
     //   modelValue: {
     //     type: Object,
