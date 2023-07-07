@@ -28,6 +28,7 @@ use crate::common::json;
 use crate::common::meta::prom::METADATA_LABEL;
 use crate::common::meta::stream::SchemaEvolution;
 use crate::common::meta::{ingestion::StreamSchemaChk, StreamType};
+use crate::common::schema_ext::SchemaExt;
 use crate::service::db;
 use crate::service::search::server_internal_error;
 
@@ -101,7 +102,7 @@ pub async fn schema_evolution(
 
                     let metadata = merged.metadata().clone();
 
-                    for field in merged.fields.into_iter() {
+                    for field in merged.to_cloned_fields().into_iter() {
                         let mut field = field.clone();
                         let mut new_meta = field.metadata().clone();
                         if new_meta.contains_key("zo_cast") {
@@ -149,7 +150,7 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
 
         // merge fields
         let mut found_at = 0;
-        for field in schema.fields().iter().sorted_by_key(|v| v.name()) {
+        for field in schema.to_cloned_fields().iter().sorted_by_key(|v| v.name()) {
             let mut new_field = true;
             let mut allowed = false;
             for (stream, mut merged_field) in merged_fields.iter_mut().enumerate() {
@@ -265,7 +266,7 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.fields().to_vec(),
+            schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
         };
     }
@@ -277,7 +278,7 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.fields().to_vec(),
+            schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
         };
     }
@@ -287,7 +288,7 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: false,
             types_delta: None,
-            schema_fields: inferred_schema.fields().to_vec(),
+            schema_fields: inferred_schema.to_cloned_fields(),
             is_schema_changed: false,
         };
     }
@@ -341,7 +342,7 @@ pub async fn check_for_schema(
                 return SchemaEvolution {
                     schema_compatible: true,
                     types_delta: None,
-                    schema_fields: final_schema.fields().to_vec(),
+                    schema_fields: final_schema.to_cloned_fields(),
                     is_schema_changed: true,
                 };
             } else {
@@ -391,7 +392,7 @@ pub async fn check_for_schema(
                     return SchemaEvolution {
                         schema_compatible: true,
                         types_delta: None,
-                        schema_fields: final_schema.fields().to_vec(),
+                        schema_fields: final_schema.to_cloned_fields(),
                         is_schema_changed: true,
                     };
                 } else {
@@ -417,17 +418,17 @@ pub async fn check_for_schema(
             }
         }
     }
-    let schema_fields = schema.fields();
+    let schema_fields = schema.to_cloned_fields();
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
     let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
     let mut is_schema_changed = false;
 
     for f in schema_fields.iter() {
-        merged_fields.insert(f.name().to_owned(), f.to_owned().clone());
+        merged_fields.insert(f.name().to_owned(), f.clone());
     }
 
-    for item in inferred_schema.fields().iter() {
+    for item in inferred_schema.to_cloned_fields().iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
 
@@ -435,19 +436,18 @@ pub async fn check_for_schema(
             Some(existing_field) => {
                 if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.to_owned().clone());
+                        field_datatype_delta.push(existing_field.clone());
                     } else {
                         let allowed =
                             is_widening_conversion(existing_field.data_type(), item_data_type);
                         if allowed {
                             is_schema_changed = true;
                             field_datatype_delta.push(item.to_owned().clone());
-                            merged_fields.insert(item_name.to_owned(), item.to_owned().clone());
+                            merged_fields.insert(item_name.to_owned(), item.clone());
                         } else {
                             let mut meta = existing_field.metadata().clone();
                             meta.insert("zo_cast".to_owned(), true.to_string());
-                            field_datatype_delta
-                                .push(existing_field.to_owned().clone().with_metadata(meta));
+                            field_datatype_delta.push(existing_field.clone().with_metadata(meta));
                         }
                     }
                 }

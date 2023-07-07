@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::arrow::json::{reader::infer_json_schema_from_seekable, RawReaderBuilder};
+use datafusion::arrow::json::{reader::infer_json_schema_from_seekable, ReaderBuilder};
 use std::{
     fs,
     io::{BufReader, Seek, SeekFrom},
@@ -246,8 +246,7 @@ async fn upload_file(
     if res_records.is_empty() {
         file.seek(SeekFrom::Start(0)).unwrap();
         let json_reader = BufReader::new(&file);
-        let json = RawReaderBuilder::new(arrow_schema.clone())
-            .coerce_primitive(true)
+        let json = ReaderBuilder::new(arrow_schema.clone())
             .build(json_reader)
             .unwrap();
         for batch in json {
@@ -257,9 +256,7 @@ async fn upload_file(
         }
     } else {
         let mut json = vec![];
-        let mut decoder = RawReaderBuilder::new(arrow_schema.clone())
-            .coerce_primitive(true)
-            .build_decoder()?;
+        let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
 
         for value in res_records {
             decoder

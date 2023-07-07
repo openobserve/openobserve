@@ -51,8 +51,8 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
 argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
-arrow = { version = "36", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "36", features = ["serde"] }
+arrow = { version = "40", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "40", features = ["serde"] }
 async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
@@ -71,7 +71,7 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "22", features = ["simd"] }
+datafusion = { version = "26", features = ["simd"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -110,7 +110,7 @@ opentelemetry-proto = { version = "0.1", features = [
   "build-server",
 ] }
 parking_lot = "0.12"
-parquet = { version = "36", features = ["arrow", "async"] }
+parquet = { version = "40", features = ["arrow", "async"] }
 prometheus = "0.13"
 promql-parser = "0.1"
 prost = "0.11"
@@ -161,6 +161,6 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = "22"
+datafusion-expr = "26"
 expect-test = "1.4"
 float-cmp = "0.9"

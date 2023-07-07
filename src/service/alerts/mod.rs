@@ -25,6 +25,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 use crate::common::meta::search::Query;
 use crate::common::meta::{self, StreamType};
 use crate::common::notification::send_notification;
+use crate::common::schema_ext::SchemaExt;
 use crate::handler::grpc::cluster_rpc;
 
 pub mod destinations;
@@ -59,7 +60,7 @@ pub async fn save_alert(
     let schema = db::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap();
-    let fields = schema.fields;
+    let fields = schema.to_cloned_fields();
     if fields.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),

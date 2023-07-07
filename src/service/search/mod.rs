@@ -326,13 +326,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
     // hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
+    let empty_vec = vec![];
     let batches_query = match batches.get("query") {
-        Some(batches) => batches.to_owned(),
-        None => Vec::new(),
+        Some(batches) => batches,
+        None => &empty_vec,
     };
     if !batches_query.is_empty() {
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query[0][..])
-        {
+        let batches_query_ref: Vec<&RecordBatch> = batches_query[0].iter().collect();
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batches_query_ref) {
             Ok(res) => res,
             Err(err) => {
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -365,7 +366,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             continue;
         }
         let name = name.strip_prefix("agg_").unwrap().to_string();
-        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch[0][..]) {
+        let batch_ref: Vec<&RecordBatch> = batch[0].iter().collect();
+        let json_rows = match arrow_json::writer::record_batches_to_json_rows(&batch_ref) {
             Ok(res) => res,
             Err(err) => {
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
