@@ -559,12 +559,7 @@ impl Engine {
                 )));
             }
             Func::Rate => functions::rate(&input)?,
-            Func::Resets => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Resets => functions::resets(&input)?,
             Func::Round => functions::round(&input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
