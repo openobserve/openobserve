@@ -65,8 +65,7 @@ impl super::Db for Sled {
 
         match result {
             Ok(Some(data)) => Ok(Bytes::from(data.as_ref().to_vec())),
-            Ok(None) => Err(Error::from(DbError::KeyNotExists(key))),
-            Err(_) => Err(Error::from(DbError::KeyNotExists(key))),
+            Ok(None) | Err(_) => Err(Error::from(DbError::KeyNotExists(key))),
         }
     }
 
