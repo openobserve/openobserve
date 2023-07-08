@@ -20,13 +20,14 @@ use strum::EnumIter;
 pub enum MathOperationsType {
     Abs,
     Ceil,
-    Floor,
     Exp,
-    Sqrt,
+    Floor,
     Ln,
-    Log2,
     Log10,
+    Log2,
     Round,
+    Sgn,
+    Sqrt,
 }
 
 impl MathOperationsType {
@@ -35,12 +36,13 @@ impl MathOperationsType {
         match self {
             Self::Abs => input.abs(),
             Self::Ceil => input.ceil(),
-            Self::Floor => input.floor(),
             Self::Exp => input.exp(),
-            Self::Sqrt => input.sqrt(),
+            Self::Floor => input.floor(),
             Self::Ln => input.ln(),
             Self::Log2 => input.log2(),
             Self::Log10 => input.log10(),
+            Self::Sgn => input.signum(),
+            Self::Sqrt => input.sqrt(),
             Self::Round => input.round(),
         }
     }
@@ -80,6 +82,10 @@ pub(crate) fn sqrt(data: &Value) -> Result<Value> {
 
 pub(crate) fn round(data: &Value) -> Result<Value> {
     exec(data, &MathOperationsType::Round)
+}
+
+pub(crate) fn sgn(data: &Value) -> Result<Value> {
+    exec(data, &MathOperationsType::Sgn)
 }
 
 fn exec(data: &Value, op: &MathOperationsType) -> Result<Value> {

@@ -375,7 +375,8 @@
     "usage": "Usage",
     "manageCards": "Manage Cards",
     "subscriptionCheckout": "Subscription checkout",
-    "everythingDeveloperPlan": "Everything in Developer Plan, plus:"
+    "everythingDeveloperPlan": "Everything in Developer Plan, plus:",
+    "messageDataNotFound": "Data not found"
   },
   "message": {
     "ServerInternalError": "Error: Something wrong went. Internal server error.",
