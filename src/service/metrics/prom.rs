@@ -265,11 +265,11 @@ pub async fn remote_write(
             // get hour key
             let hour_key = crate::service::ingestion::get_hour_key(
                 timestamp,
-                partition_keys.clone(),
+                &partition_keys,
                 value.as_object().unwrap(),
                 None,
             );
-            let hour_buf = buf.entry(hour_key.clone()).or_default();
+            let hour_buf = buf.entry(hour_key).or_default();
             hour_buf.push(value_str);
 
             // real time alert
@@ -295,7 +295,7 @@ pub async fn remote_write(
                                         timestamp,
                                         is_valid: true,
                                         alert_name: alert.name.clone(),
-                                        stream: metric_name.clone().to_string(),
+                                        stream: metric_name.clone(),
                                         org: org_id.to_string(),
                                         stream_type: StreamType::Metrics,
                                         last_sent_at: 0,

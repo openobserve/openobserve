@@ -165,7 +165,7 @@ pub async fn get_stream_alerts<'a>(
 
 pub fn get_hour_key(
     timestamp: i64,
-    partition_keys: Vec<String>,
+    partition_keys: &Vec<String>,
     local_val: &Map<String, Value>,
     suffix: Option<&str>,
 ) -> String {
@@ -181,7 +181,7 @@ pub fn get_hour_key(
         hour_key.push_str("_keeping");
     }
 
-    for key in &partition_keys {
+    for key in partition_keys {
         match local_val.get(key) {
             Some(v) => {
                 let val = if v.is_string() {
