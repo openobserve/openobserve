@@ -265,7 +265,8 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
                 .with_headers(headers),
         )
         .with_trace_config(sdktrace::config().with_resource(Resource::new(vec![
-            KeyValue::new("service.name", CONFIG.common.instance_name.as_str()),
+            KeyValue::new("service.name", CONFIG.common.node_role.as_str()),
+            KeyValue::new("service.instance", CONFIG.common.instance_name.as_str()),
             KeyValue::new("service.version", VERSION),
         ])))
         .install_batch(opentelemetry::runtime::Tokio)?;
