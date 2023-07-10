@@ -94,22 +94,10 @@ const defaultObject = {
     histogram: <any>{},
     editorValue: "",
     datetime: {
-      tab: "relative",
-      relative: {
-        period: {
-          label: "Minutes",
-          value: "Minutes",
-        },
-        value: 15,
-      },
-      absolute: {
-        date: {
-          from: "",
-          to: "",
-        },
-        startTime: "00:00",
-        endTime: "23:59",
-      },
+      startTime: "",
+      endTime: "",
+      relativeTimePeriod: "15m",
+      type: "relative",
     },
     searchAround: {
       indexTimestamp: 0,
