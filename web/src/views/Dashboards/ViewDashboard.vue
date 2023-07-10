@@ -42,7 +42,7 @@
     </div>
     <q-separator></q-separator>
     <q-q-separator></q-q-separator>
-    <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading"
+    <!-- <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading"
       class="flex q-mt-sm q-ml-sm">
       <div v-for="item in variablesData.values" class="q-mr-lg">
         <div v-if="item.type == 'query'">
@@ -52,17 +52,17 @@
             v-model="item.value"
             :options="item.options"
             :label="item.label"
-          ></q-select>
+          ></q-select> -->
           <!-- <q-input v-model="item.name" :label="item.label" dense></q-input> -->
-        </div>
+        <!-- </div>
         <div v-else-if="item.type == 'constant'">
           <q-input v-model="item.name" :label="item.label" dense outlined readonly></q-input>
         </div>
         <div v-else-if="item.type == 'textbox'">
           <q-input v-model="item.name" :label="item.label" dense outlined></q-input>
-        </div>
+        </div> -->
          <!-- v-model="item.value" -->
-        <div v-if="item.type == 'custom_fields'">
+        <!-- <div v-if="item.type == 'custom_fields'">
           <q-select
               outlined
               dense
@@ -72,7 +72,8 @@
             ></q-select>
         </div>
       </div>
-    </div>
+    </div> -->
+    <SettingsData :variables-data="variablesData" :selectedTimeDate="currentTimeObj"></SettingsData>
     <div class="displayDiv" v-if="!(variablesData.isVariablesLoading)">
       <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
@@ -139,6 +140,7 @@ import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
 import streamService from "../../services/stream";
 import DashboardSettings from "./DashboardSettings.vue";
+import SettingsData from "../../components/dashboards/settings/common/SettingsData.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -150,7 +152,8 @@ export default defineComponent({
     NoPanel,
     AutoRefreshInterval,
     ExportDashboard,
-    DashboardSettings
+    DashboardSettings,
+    SettingsData
 },
   setup() {
     const { t } = useI18n();
