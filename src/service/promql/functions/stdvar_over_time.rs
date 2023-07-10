@@ -14,40 +14,14 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{RangeValue, Value};
+use crate::service::promql::{
+    common::std_variance,
+    value::{RangeValue, Value},
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stdvar_over_time
 pub(crate) fn stdvar_over_time(data: &Value) -> Result<Value> {
     super::eval_idelta(data, "stdvar_over_time", exec, false)
-}
-
-fn mean(data: &[f64]) -> Option<f64> {
-    let sum = data.iter().sum::<f64>();
-    let count = data.len();
-
-    match count {
-        positive if positive > 0 => Some(sum / count as f64),
-        _ => None,
-    }
-}
-
-fn std_variance(data: &[f64]) -> Option<f64> {
-    match (mean(data), data.len()) {
-        (Some(data_mean), count) if count > 0 => {
-            let variance = data
-                .iter()
-                .map(|value| {
-                    let diff = data_mean - *value;
-
-                    diff * diff
-                })
-                .sum::<f64>()
-                / count as f64;
-
-            Some(variance)
-        }
-        _ => None,
-    }
 }
 
 fn exec(data: &RangeValue) -> Option<f64> {
