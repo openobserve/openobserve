@@ -22,7 +22,7 @@ use crate::common::meta::prom::ClusterLeader;
 
 pub async fn set_prom_cluster_info(
     cluster: &str,
-    members: Vec<String>,
+    members: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     let key = format!("/metrics_members/{cluster}");
