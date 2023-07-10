@@ -47,6 +47,10 @@ export default defineComponent({
       getVariablesData()
     })
 
+    watch(() => variablesData, () => {
+      emit('variablesData', variablesData)
+    })
+
     const getVariablesData = async () => {
       // do we have variables & date?
       if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {

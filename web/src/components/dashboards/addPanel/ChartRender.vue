@@ -175,11 +175,48 @@ export default defineComponent({
         }
       });
 
-      watch(() => props.variablesData, () => {
-        if(props.data.query && isQueryDependentOnTheVariables()) {
-            fetchQueryData()
+      // [START] variables management
+      let currentDependentVariablesData = props.variablesData?.values || []
+
+      // check when the variables data changes
+      // 1. get the dependent variables
+      // 2. compare the dependent variables data with the old dependent variables Data
+      // 3. if the value of any current variable is changed, call the api
+      watch(() => props.variablesData?.values, () => {
+        console.log(`${props.data.config.title}: variables data changed ${props.variablesData}`);
+        
+        // ensure the query is there
+        if(!props.data?.query) {
+            console.log("Query is missing");
+            return;
         }
-      }, { deep: true });
+
+        // 1. get the dependent variables list
+        const newDependentVariablesData = props?.variablesData?.values?.filter((it: any) =>
+            props.data.query.includes(`$${it.name}`)
+        );
+
+        // if no variables, no need to rerun the query
+        if(!newDependentVariablesData?.length) {
+            console.log("No dependent variables");
+            return;
+        }
+
+        // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
+        const isAllValuesSame = newDependentVariablesData.every((it: any) => {
+            const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
+            return it.value == oldValue?.value;
+        });
+
+        if(!isAllValuesSame) {
+            console.log("Values are not the same");
+            currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
+            fetchQueryData();
+        } else {
+            console.log('values are same', JSON.stringify(currentDependentVariablesData));
+        }
+    }, { deep: true });
+
 
       const isQueryDependentOnTheVariables = () => {
         const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
@@ -187,6 +224,7 @@ export default defineComponent({
         );
         return dependentVariables?.length > 0;
       }
+      // [END] variables management
 
       // If query changes, we need to get the data again and rerender the chart
       watch(
@@ -396,16 +434,16 @@ export default defineComponent({
       };
 
     const replaceQueryValue = (query: any) => {
-        if (props?.variablesData?.values?.length) {
-            const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
-                query.includes(`$${it.name}`)
-            );
-            console.log(`dependentVariables-: ${dependentVariables}`);
+        // if (props?.variablesData?.values?.length) {
+        //     const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+        //         query.includes(`$${it.name}`)
+        //     );
+            console.log(`dependentVariables-: ${currentDependentVariablesData}`);
             
 
-                if(dependentVariables?.length){
+                if(currentDependentVariablesData?.length){
 
-                    props?.variablesData?.values?.forEach((variable:any, index:number) => {
+                    currentDependentVariablesData?.forEach((variable:any) => {
                         const variableName = `$${variable.name}`;
                         const variableValue = variable.value;
                         console.log(`Replacing ${variableName} with ${variableValue}`);
@@ -416,10 +454,10 @@ export default defineComponent({
                 }else{
                     return query
                 }
-        } else {
-            console.log("No variables data found, returning original query");
-            return query;
-        }
+        // } else {
+        //     console.log("No variables data found, returning original query");
+        //     return query;
+        // }
     }
 
       // returns tick length

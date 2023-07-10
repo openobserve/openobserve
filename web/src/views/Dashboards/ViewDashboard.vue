@@ -41,7 +41,6 @@
       </div>
     </div>
     <q-separator></q-separator>
-    <q-q-separator></q-q-separator>
     <!-- <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading"
       class="flex q-mt-sm q-ml-sm">
       <div v-for="item in variablesData.values" class="q-mr-lg">
@@ -177,7 +176,7 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      variablesData = data
+      Object.assign(variablesData,data)
     }
 
     onActivated(async () => {
@@ -432,6 +431,11 @@ export default defineComponent({
       saveDashboard()
     }
 
+    const resizedEvent = (i, newX, newY, newHPx, newWPx) => {
+      window.dispatchEvent(new Event("resize"));
+      saveDashboard()
+    }
+
     const getPanelLayout = (layout, panelId, position) => {
       for (const element of layout) {
         if (element.panelId == panelId) {
@@ -516,6 +520,8 @@ export default defineComponent({
       disableDraggable,
       onUpdatePanel,
       movedEvent,
+      resizedEvent,
+      draggable,
       eventLog,
       getPanelLayout,
       getMinimumHeight,
