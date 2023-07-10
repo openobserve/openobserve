@@ -100,20 +100,23 @@ async fn dispatch(
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
+    let node_type;
     let nodes = if check_querier_route(path) {
+        node_type = cluster::Role::Querier;
         cluster::get_cached_online_querier_nodes()
     } else {
+        node_type = cluster::Role::Ingester;
         cluster::get_cached_online_ingester_nodes()
     };
     if nodes.is_none() {
-        return Ok(HttpResponse::ServiceUnavailable().body("No online nodes"));
+        return Ok(HttpResponse::ServiceUnavailable().body(format!("No online {node_type} nodes")));
     }
 
     // checking nodes
     let mut nodes = nodes.unwrap();
     if nodes.is_empty() {
-        log::error!("Not found online nodes, restaring...");
-        std::process::exit(1);
+        return Ok(HttpResponse::ServiceUnavailable().body(format!("No online {node_type} nodes")));
+        //std::process::exit(1);
     }
 
     // random nodes
