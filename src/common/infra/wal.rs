@@ -14,11 +14,12 @@
 
 use ahash::AHashMap as HashMap;
 use bytes::{Bytes, BytesMut};
+use itertools::chain;
 use once_cell::sync::Lazy;
 use std::{
     fs::{File, OpenOptions},
     io::Write,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
 
 use crate::common::file::get_file_contents;
@@ -84,28 +85,42 @@ pub fn get_search_in_memory_files(
     if !CONFIG.common.wal_memory_mode_enabled {
         return Ok(vec![]);
     }
-    let mut files = Vec::new();
-    // read usesing files in use
-    for data in MANAGER.data.iter() {
-        for (_, file) in data.read().unwrap().iter() {
-            if file.org_id == org_id
-                && file.stream_name == stream_name
-                && file.stream_type == stream_type
-            {
-                if let Ok(data) = file.read() {
-                    files.push(data);
-                }
-            }
-        }
-    }
-    // read memory files waiting to be moved to s3
+
     let prefix = format!("files/{org_id}/{stream_type}/{stream_name}/");
-    for (file, data) in MEMORY_FILES.list() {
-        if file.starts_with(&prefix) {
-            files.push(data.to_vec());
-        }
-    }
-    Ok(files)
+
+    Ok(chain(
+        // read usesing files in use
+        MANAGER.data.iter().flat_map(|data| {
+            data.read()
+                .unwrap()
+                .iter()
+                .filter_map(|(_, file)| {
+                    if file.org_id == org_id
+                        && file.stream_name == stream_name
+                        && file.stream_type == stream_type
+                    {
+                        if let Ok(data) = file.read() {
+                            Some(data)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<Vec<u8>>>() // removing `collect()` would have been
+                                           // even better but can't, due to `data`
+                                           // getting borrowed beyond its lifetime
+        }),
+        MEMORY_FILES.list().iter().filter_map(|(file, data)| {
+            if file.starts_with(&prefix) {
+                Some(data.to_vec())
+            } else {
+                None
+            }
+        }),
+    )
+    .collect())
 }
 
 pub fn flush_all_to_disk() {
@@ -115,7 +130,7 @@ pub fn flush_all_to_disk() {
         }
     }
 
-    for (file, data) in MEMORY_FILES.list() {
+    for (file, data) in MEMORY_FILES.list().iter() {
         let file_path = format!("{}{}", CONFIG.common.data_wal_dir, file);
         let mut f = OpenOptions::new()
             .write(true)
@@ -123,7 +138,7 @@ pub fn flush_all_to_disk() {
             .append(true)
             .open(file_path)
             .unwrap();
-        f.write_all(&data).unwrap();
+        f.write_all(data).unwrap();
     }
 }
 
@@ -258,8 +273,8 @@ impl MemoryFiles {
         }
     }
 
-    pub fn list(&self) -> HashMap<String, Bytes> {
-        self.data.read().unwrap().clone()
+    pub fn list(&self) -> RwLockReadGuard<'_, HashMap<String, Bytes>> {
+        self.data.read().unwrap()
     }
 
     pub fn insert(&self, file_name: String, data: Bytes) {

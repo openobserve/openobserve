@@ -32,7 +32,7 @@ use promql_parser::{
         VectorSelector,
     },
 };
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use crate::common::infra::config::CONFIG;
 use crate::common::meta::prom::{HASH_LABEL, VALUE_LABEL};
@@ -359,6 +359,32 @@ impl Engine {
         })
     }
 
+    async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(0).unwrap()).await
+    }
+
+    async fn call_expr_second_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(1).unwrap()).await
+    }
+
+    async fn call_expr_third_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(2).unwrap()).await
+    }
+
+    fn ensure_two_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 2 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
     async fn call_expr(&mut self, func: &Function, args: &FunctionArgs) -> Result<Value> {
         use crate::service::promql::functions::Func;
 
@@ -366,50 +392,74 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        let last_arg = args
-            .last()
-            .expect("BUG: promql-parser should have validated function arguments");
-        let input = self.exec_expr(&last_arg).await?;
+        // There are a few functions which need no arguments for e.g. time()
+        let functions_without_args: HashSet<String> = HashSet::from_iter(vec!["time".into()]);
+        let input = match functions_without_args.contains(func.name) {
+            true => Value::None,
+            false => {
+                let last_arg = args
+                    .last()
+                    .expect("BUG: promql-parser should have validated function arguments");
+                self.exec_expr(&last_arg).await?
+            }
+        };
 
         Ok(match func_name {
             Func::Abs => functions::abs(&input)?,
-            Func::Absent => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
-            Func::AbsentOverTime => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Absent => functions::absent(&input, self.time)?,
+            Func::AbsentOverTime => functions::absent_over_time(&input)?,
             Func::AvgOverTime => functions::avg_over_time(&input)?,
             Func::Ceil => functions::ceil(&input)?,
-            Func::Changes => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Changes => functions::changes(&input)?,
             Func::Clamp => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err =
+                    "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
+                self.ensure_three_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let min = self.call_expr_second_arg(args).await?;
+                let max = self.call_expr_third_arg(args).await?;
+
+                let (min_f, max_f) = match (min, max) {
+                    (Value::Float(min), Value::Float(max)) => {
+                        if min > max {
+                            return Ok(Value::Vector(vec![]));
+                        }
+                        (min, max)
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(err.into()));
+                    }
+                };
+                functions::clamp(&input, min_f, max_f)?
             }
             Func::ClampMax => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
+                self.ensure_two_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let max = self.call_expr_second_arg(args).await?;
+                let max_f = match max {
+                    Value::Float(max) => max,
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(err.into()));
+                    }
+                };
+                functions::clamp(&input, f64::MIN, max_f)?
             }
             Func::ClampMin => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
+                self.ensure_two_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let min = self.call_expr_second_arg(args).await?;
+                let min_f = match min {
+                    Value::Float(min) => min,
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(err.into()));
+                    }
+                };
+                functions::clamp(&input, min_f, f64::MAX)?
             }
             Func::CountOverTime => functions::count_over_time(&input)?,
             Func::DayOfMonth => functions::day_of_month(&input)?,
@@ -488,6 +538,7 @@ impl Engine {
                     func_name
                 )));
             }
+            Func::LastOverTime => functions::last_over_time(&input)?,
             Func::Ln => functions::ln(&input)?,
             Func::Log10 => functions::log10(&input)?,
             Func::Log2 => functions::log2(&input)?,
@@ -508,12 +559,7 @@ impl Engine {
                 )));
             }
             Func::Rate => functions::rate(&input)?,
-            Func::Resets => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Resets => functions::resets(&input)?,
             Func::Round => functions::round(&input)?,
             Func::Scalar => match input {
                 Value::Float(_) => input,
@@ -524,12 +570,7 @@ impl Engine {
                     )));
                 }
             },
-            Func::Sgn => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Sgn => functions::sgn(&input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Function: {:?}",
@@ -543,6 +584,8 @@ impl Engine {
                 )));
             }
             Func::Sqrt => functions::sqrt(&input)?,
+            Func::StddevOverTime => functions::stddev_over_time(&input)?,
+            Func::StdvarOverTime => functions::stdvar_over_time(&input)?,
             Func::SumOverTime => functions::sum_over_time(&input)?,
             Func::Time => Value::Float(chrono::Utc::now().timestamp() as f64),
             Func::Timestamp => match &input {
@@ -566,12 +609,7 @@ impl Engine {
                     )))
                 }
             },
-            Func::Vector => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Vector => functions::vector(&input, self.time)?,
             Func::Year => functions::year(&input)?,
         })
     }

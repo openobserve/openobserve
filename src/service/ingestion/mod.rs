@@ -165,7 +165,7 @@ pub async fn get_stream_alerts<'a>(
 
 pub fn get_hour_key(
     timestamp: i64,
-    partition_keys: Vec<String>,
+    partition_keys: &Vec<String>,
     local_val: &Map<String, Value>,
     suffix: Option<&str>,
 ) -> String {
@@ -181,7 +181,7 @@ pub fn get_hour_key(
         hour_key.push_str("_keeping");
     }
 
-    for key in &partition_keys {
+    for key in partition_keys {
         match local_val.get(key) {
             Some(v) => {
                 let val = if v.is_string() {
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(
             get_hour_key(
                 1620000000,
-                vec!["country".to_string(), "sport".to_string()],
+                &vec!["country".to_string(), "sport".to_string()],
                 &local_val,
                 None
             ),
@@ -436,14 +436,14 @@ mod tests {
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(1620000000, vec![], &local_val, None),
+            get_hour_key(1620000000, &vec![], &local_val, None),
             "1970_01_01_00_keeping"
         );
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_hour_key(1620000000, vec![], &Map::new(), None),
+            get_hour_key(1620000000, &vec![], &Map::new(), None),
             "1970_01_01_00_keeping"
         );
     }
