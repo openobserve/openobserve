@@ -202,23 +202,9 @@ export default defineComponent({
     onChartUpdate({ start, end }: { start: any; end: any }) {
       if (!(start && end)) return;
       this.searchObj.meta.showDetailTab = false;
-      this.searchObj.runQuery = true;
-      this.searchObj.data.datetime.tab = "absolute";
-      this.searchObj.data.datetime.absolute.date.from = start.split(" ")[0];
-      this.searchObj.data.datetime.absolute.date.to = end.split(" ")[0];
-      this.searchObj.data.datetime.absolute.startTime =
-        start.split(" ")[1].split(":")[0] +
-        ":" +
-        start.split(" ")[1].split(":")[1] +
-        ":" +
-        start.split(" ")[1].split(":")[2];
-      this.searchObj.data.datetime.absolute.endTime =
-        end.split(" ")[1].split(":")[0] +
-        ":" +
-        end.split(" ")[1].split(":")[1] +
-        ":" +
-        end.split(" ")[1].split(":")[2];
-
+      this.searchObj.data.datetime.type = "absolute";
+      this.searchObj.data.datetime.startTime = new Date(start).getTime() * 1000;
+      this.searchObj.data.datetime.endTime = new Date(end).getTime() * 1000;
       this.searchObj.runQuery = true;
       this.$emit("update:datetime");
     },
