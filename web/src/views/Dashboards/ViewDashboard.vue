@@ -73,7 +73,8 @@
         </div>
       </div>
     </div> -->
-    <SettingsData :variables-data="variablesData" :selectedTimeDate="currentTimeObj"></SettingsData>
+    <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="currentTimeObj" 
+      @variablesData="variablesDataUpdated"/>
     <div class="displayDiv" v-if="!(variablesData.isVariablesLoading)">
       <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
@@ -138,9 +139,8 @@ import { deletePanel, updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
-import streamService from "../../services/stream";
 import DashboardSettings from "./DashboardSettings.vue";
-import SettingsData from "../../components/dashboards/settings/common/SettingsData.vue";
+import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -153,7 +153,7 @@ export default defineComponent({
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
-    SettingsData
+    VariablesValueSelector
 },
   setup() {
     const { t } = useI18n();
@@ -173,10 +173,12 @@ export default defineComponent({
     const currentTimeObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref()
-    const variablesData = reactive({
-      isVariablesLoading: false,
-      values: []
-    })
+
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      variablesData = data
+    }
 
     onActivated(async () => {
       console.log("on activated called");
@@ -193,15 +195,8 @@ export default defineComponent({
       )))
       currentDashboardData.data = data
 
-      if(data?.variables && data?.variables?.list.length){
-        console.log("viewDashboard: inside if");
-        
-        variablesData.isVariablesLoading = true
-        await getVariablesData(data)
-      }else{
-
-        console.log("viewDashboard: inside else");
-        data.variables = null
+      // if variables data is null, set it to empty list
+      if(!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
         variablesData.isVariablesLoading = false
         variablesData.values = []
       }
@@ -211,76 +206,6 @@ export default defineComponent({
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
     };
-
-    const getVariablesData = async(data: any) => {
-
-      console.log("data:", data);
-      
-      const currentTempDashboardData = data || currentDashboardData.data
-      const promise = currentTempDashboardData.variables?.list?.map((it)=> {
-        
-        const obj = {name: it.name, label : it.label, type: it.type, value: "", isLoading: false }
-        switch (it.type) {
-          
-          case "query":{
-            obj.isLoading = true
-            console.log("------",currentTimeObj.value.start_time);
-            return streamService
-            .fieldValues({
-              org_identifier: store.state.selectedOrganization.identifier,
-              stream_name: it.query_data.stream,
-              start_time: new Date(currentTimeObj.value.start_time?.toISOString()).getTime() * 1000,
-              end_time: new Date(currentTimeObj.value.end_time?.toISOString()).getTime() * 1000,
-              fields: [it.query_data.field],
-              size: 10,
-              type: it.query_data.stream_type,
-            })
-            .then((res: any) => {
-              obj.isLoading = false
-              if (res.data.hits.length) {
-                console.log("-res-", res.data.hits);
-                
-                obj["options"] = res.data.hits
-                  .find((field: any) => field.field === it.query_data.field)
-                  .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
-                obj.value = obj.options[0] || ""
-
-                return obj
-              } else {
-                return obj
-              }
-            })
-            .catch((err: any) => {
-              return obj
-            })
-            // break;
-          }
-          case "constant":{
-            obj.value = it.value
-            return obj
-            // break;
-          }
-          case "textbox":{
-            obj.value = it.value
-            return obj
-            // break;
-          }
-          case "custom_fields":{
-            obj["options"] = it.options
-            obj.value = obj.options[0] || ""
-            return obj
-            // break;
-          }
-          default:
-            obj.value = it.value
-            return obj
-        }
-      })
-      variablesData.values = await Promise.all(promise)
-      variablesData.isVariablesLoading = false
-      console.log("variablesData", JSON.stringify(variablesData));
-      console.log("-after-",data)
-    }
 
     // back button to render dashboard List page
     const goBackToDashboardList = () => {
@@ -453,7 +378,6 @@ export default defineComponent({
       const c = toRaw(unref(selectedDate.value));
       currentDurationSelectionObj.value = selectedDate.value
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
-      getVariablesData()
     })
 
     // ------- work with query params ----------
@@ -597,6 +521,7 @@ export default defineComponent({
       getMinimumHeight,
       getMinimumWidth,
       variablesData,
+      variablesDataUpdated,
       addSettingsData,
       showDashboardSettingsDialog
     };
