@@ -32,12 +32,12 @@ mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod rate;
+mod resets;
 mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
 mod time_operations;
 mod vector;
-
 
 pub(crate) use absent::absent;
 pub(crate) use absent_over_time::absent_over_time;
@@ -55,12 +55,13 @@ pub(crate) use math_operations::*;
 pub(crate) use max_over_time::max_over_time;
 pub(crate) use min_over_time::min_over_time;
 pub(crate) use rate::rate;
+pub(crate) use resets::resets;
 pub(crate) use stddev_over_time::stddev_over_time;
 pub(crate) use stdvar_over_time::stdvar_over_time;
 use strum::EnumString;
 pub(crate) use sum_over_time::sum_over_time;
-pub(crate) use vector::vector;
 pub(crate) use time_operations::*;
+pub(crate) use vector::vector;
 
 use super::value::LabelsExt;
 
