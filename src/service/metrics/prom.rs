@@ -114,10 +114,6 @@ pub async fn remote_write(
         let mut labels: prom::FxIndexMap<String, String> = event
             .labels
             .drain(..)
-            .filter(|label| {
-                label.name != CONFIG.prom.ha_replica_label
-                    && label.name != CONFIG.prom.ha_cluster_label
-            })
             .map(|label| (label.name, label.value))
             .collect();
 
@@ -141,8 +137,8 @@ pub async fn remote_write(
             if let Some(v) = labels.remove(&CONFIG.prom.ha_replica_label) {
                 replica_label = v;
             };
-            if cluster_name.is_empty() {
-                if let Some(v) = labels.remove(&CONFIG.prom.ha_cluster_label) {
+            if let Some(v) = labels.remove(&CONFIG.prom.ha_cluster_label) {
+                if cluster_name.is_empty() {
                     cluster_name = format!("{}/{}", org_id, v);
                 }
             }
