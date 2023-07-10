@@ -134,7 +134,7 @@ export default defineComponent({
         const variableData = reactive({
             name: "",
             label: "",
-            type: "",
+            type: "query",
             query_data: {
                 stream_type: "",
                 stream: "",
