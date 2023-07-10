@@ -201,12 +201,7 @@ import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import {
-  getQueryParamsForDuration,
-  getDurationObjectFromParams,
-} from "@/utils/date";
-import { showErrorNotification } from "@/utils/common";
-import { b64DecodeUnicode } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -258,6 +253,7 @@ export default defineComponent({
     const promqlKeywords = ref([]);
 
     const chartData = ref({});
+    const { showErrorNotification } = useNotifications();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;

@@ -180,9 +180,10 @@ import {
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage, showErrorNotification } from "@/utils/common";
+import { logsErrorMessage } from "@/utils/common";
 import { number } from "@intlify/core-base";
 import { stringLiteral } from "@babel/types";
+import useNotifications from "@/composables/useNotifications";
 import {
   getDurationObjectFromParams,
   getQueryParamsForDuration,
@@ -260,6 +261,7 @@ export default defineComponent({
     const searchBarRef = ref(null);
     const parser = new Parser();
     const fieldValues = ref({});
+    const { showErrorNotification } = useNotifications();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
