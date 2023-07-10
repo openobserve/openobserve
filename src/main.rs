@@ -151,41 +151,26 @@ async fn main() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let app = if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
-            if CONFIG.common.base_uri.is_empty() {
-                App::new()
-                    .wrap(prometheus.clone())
+        let mut app = App::new().wrap(prometheus.clone());
+        if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+            app = app.service(
+                // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
+                web::scope(&CONFIG.common.base_uri)
                     .service(router::config)
                     .service(router::api)
                     .service(router::aws)
                     .service(router::gcp)
-                    .configure(get_basic_routes)
-            } else {
-                App::new().wrap(prometheus.clone()).service(
-                    web::scope(&CONFIG.common.base_uri)
-                        .service(router::config)
-                        .service(router::api)
-                        .service(router::aws)
-                        .service(router::gcp)
-                        .configure(get_basic_routes),
-                )
-            }
-        } else if CONFIG.common.base_uri.is_empty() {
-            App::new()
-                .wrap(prometheus.clone())
-                .configure(get_config_routes)
-                .configure(get_service_routes)
-                .configure(get_other_service_routes)
-                .configure(get_basic_routes)
+                    .configure(get_basic_routes),
+            )
         } else {
-            App::new().wrap(prometheus.clone()).service(
+            app = app.service(
                 web::scope(&CONFIG.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes),
             )
-        };
+        }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))

@@ -234,7 +234,7 @@ async fn add_valid_record(
     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = super::ingestion::get_hour_key(
         timestamp,
-        stream_meta.partition_keys,
+        &stream_meta.partition_keys,
         local_val,
         Some(&schema_key),
     );

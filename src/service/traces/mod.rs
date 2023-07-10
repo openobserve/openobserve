@@ -211,7 +211,7 @@ pub async fn handle_trace_request(
                 // get hour key
                 let mut hour_key = super::ingestion::get_hour_key(
                     timestamp.try_into().unwrap(),
-                    partition_keys.clone(),
+                    &partition_keys,
                     value.as_object().unwrap(),
                     None,
                 );
