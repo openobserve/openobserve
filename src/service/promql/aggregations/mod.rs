@@ -18,6 +18,7 @@ use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
 
 use super::Engine;
+use crate::common::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{signature, Labels, Signature, Value};
 
 mod avg;
@@ -73,7 +74,7 @@ pub(crate) fn eval_arithmetic(
                 for item in data.iter() {
                     let mut sum_labels = Labels::default();
                     for label in item.labels.iter() {
-                        if labels.contains(&label.name) {
+                        if labels.contains(&label.name) && label.name != NAME_LABEL {
                             sum_labels.push(label.clone());
                         }
                     }
@@ -91,7 +92,7 @@ pub(crate) fn eval_arithmetic(
                 for item in data.iter() {
                     let mut sum_labels = Labels::default();
                     for label in item.labels.iter() {
-                        if !labels.contains(&label.name) {
+                        if !labels.contains(&label.name) && label.name != NAME_LABEL {
                             sum_labels.push(label.clone());
                         }
                     }
