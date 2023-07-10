@@ -62,9 +62,9 @@ pub async fn merge_by_stream(
     }
 
     // get schema
-    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
-    let schema_metadata = schema.metadata.clone();
-    let schema = Arc::new(schema.with_metadata(HashMap::new()));
+    let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let schema_metadata = std::mem::take(&mut schema.metadata);
+    let schema = Arc::new(schema);
     if offset == 0 {
         offset = schema_metadata
             .get("created_at")
