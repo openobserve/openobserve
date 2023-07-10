@@ -453,6 +453,7 @@ pub async fn check_for_schema(
                 }
             }
             None => {
+                is_schema_changed = true;
                 new_field_delta.push(item);
                 merged_fields.insert(item_name.to_owned(), item.to_owned().clone());
             }
