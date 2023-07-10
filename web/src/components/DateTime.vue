@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div icon="info" class="justify-between">
+  <div icon="info" class="justify-between date-time-container">
     <q-btn
       data-test="date-time-btn"
       id="date-time-button"
@@ -26,34 +26,40 @@
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
+      :class="selectedType + 'type'"
     >
       <q-menu
         id="date-time-menu"
         class="date-time-dialog"
         anchor="bottom left"
         self="top left"
+        @before-show="onBeforeShow"
       >
         <div class="flex justify-evenly q-py-sm">
           <q-btn
+            size="md"
             class="tab-button no-border"
             color="primary"
-            :flat="selectedDate.tab !== 'relative'"
-            @click="selectedDate.tab = 'relative'"
+            no-caps
+            :flat="selectedType !== 'relative'"
+            @click="selectedType = 'relative'"
           >
-            RELATIVE
+            Relative
           </q-btn>
           <q-separator vertical inset />
           <q-btn
+            size="md"
             class="tab-button no-border"
             color="primary"
-            :flat="selectedDate.tab !== 'absolute'"
-            @click="selectedDate.tab = 'absolute'"
+            no-caps
+            :flat="selectedType !== 'absolute'"
+            @click="selectedType = 'absolute'"
           >
-            ABSOLUTE
+            Absolute
           </q-btn>
         </div>
         <q-separator />
-        <q-tab-panels v-model="selectedDate.tab" animated>
+        <q-tab-panels v-model="selectedType" animated>
           <q-tab-panel name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
               <div
@@ -62,7 +68,7 @@
                 :key="'date_' + index"
               >
                 <div class="relative-period-name">
-                  {{ period.value }}
+                  {{ period.label }}
                 </div>
                 <div
                   v-for="(item, item_index) in relativeDates[period.value]"
@@ -71,17 +77,17 @@
                   <q-btn
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     :class="
-                      selectedDate.tab == 'relative' &&
-                      selectedDate.relative.period.value == period.value &&
-                      selectedDate.relative.value == item
+                      selectedType == 'relative' &&
+                      relativePeriod == period.value &&
+                      relativeValue == item
                         ? 'rp-selector-selected'
-                        : `rp-selector ${selectedDate.relative.period.value}`
+                        : `rp-selector ${relativePeriod}`
                     "
                     :label="item"
                     outline
                     dense
                     flat
-                    @click="setRelativeDate(period, item)"
+                    @click="setRelativeDate(period.value, item)"
                     :key="'period_' + item_index"
                   />
                 </div>
@@ -93,22 +99,27 @@
                 <div class="row q-gutter-sm">
                   <div class="col">
                     <q-input
-                      v-model="selectedDate.relative.value"
+                      v-model="relativeValue"
                       type="number"
                       dense
                       filled
                       min="1"
-                      @change="calculateMaxValue"
-                    ></q-input>
+                      @update:model-value="onCustomPeriodSelect"
+                    />
                   </div>
                   <div class="col">
                     <q-select
-                      v-model="selectedDate.relative.period"
+                      v-model="relativePeriod"
                       :options="relativePeriods"
                       dense
                       filled
+                      emit-value
                       @update:modelValue="onCustomPeriodSelect"
-                    ></q-select>
+                    >
+                      <template v-slot:selected-item>
+                        <div>{{ getPeriodLabel }}</div>
+                      </template>
+                    </q-select>
                   </div>
                 </div>
               </div>
@@ -118,7 +129,8 @@
             <div class="date-time-table">
               <div class="flex justify-center q-pa-none">
                 <q-date
-                  v-model="selectedDate.absolute.date"
+                  size="sm"
+                  v-model="selectedDate"
                   class="absolute-calendar"
                   range
                   :locale="{
@@ -137,7 +149,7 @@
                 <tr>
                   <td>
                     <q-input
-                      v-model="selectedDate.absolute.startTime"
+                      v-model="selectedTime.startTime"
                       dense
                       filled
                       mask="time"
@@ -149,7 +161,7 @@
                             transition-show="scale"
                             transition-hide="scale"
                           >
-                            <q-time v-model="selectedDate.absolute.startTime">
+                            <q-time v-model="selectedTime.startTime">
                               <div class="row items-center justify-end">
                                 <q-btn
                                   v-close-popup
@@ -166,7 +178,7 @@
                   </td>
                   <td>
                     <q-input
-                      v-model="selectedDate.absolute.endTime"
+                      v-model="selectedTime.endTime"
                       dense
                       filled
                       mask="time"
@@ -178,7 +190,7 @@
                             transition-show="scale"
                             transition-hide="scale"
                           >
-                            <q-time v-model="selectedDate.absolute.endTime">
+                            <q-time v-model="selectedTime.endTime">
                               <div class="row items-center justify-end">
                                 <q-btn
                                   v-close-popup
@@ -198,6 +210,19 @@
             </div>
           </q-tab-panel>
         </q-tab-panels>
+        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
+          <q-separator class="q-my-sm" />
+          <q-btn
+            class="no-border q-py-xs"
+            color="secondary"
+            no-caps
+            size="md"
+            @click="saveDate"
+            v-close-popup
+          >
+            Apply
+          </q-btn>
+        </div>
       </q-menu>
     </q-btn>
   </div>
@@ -205,153 +230,294 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { ref, defineComponent } from "vue";
+import {
+  ref,
+  defineComponent,
+  computed,
+  onMounted,
+  onBeforeMount,
+  watch,
+} from "vue";
 import { getImageURL } from "../utils/zincutils";
-import { cloneDeep } from "lodash-es";
+import { date } from "quasar";
 
 export default defineComponent({
   props: {
-    defaultDate: {
+    type: {
+      type: String,
+      default: "relative",
+    },
+    absoluteTime: {
       type: Object,
       default: null,
     },
-  },
-  data() {
-    return {
-      relativePeriods: [
-        { label: "Minutes", value: "Minutes" },
-        { label: "Hours", value: "Hours" },
-        { label: "Days", value: "Days" },
-        { label: "Weeks", value: "Weeks" },
-        { label: "Months", value: "Months" },
-      ],
-      relativeDates: {
-        Minutes: [1, 5, 10, 15, 30, 45],
-        Hours: [1, 2, 3, 6, 8, 12],
-        Days: [1, 2, 3, 4, 5, 6],
-        Weeks: [1, 2, 3, 4, 5, 6],
-        Months: [1, 2, 3, 4, 5, 6],
-      },
-      selectedDate: {
-        tab: "relative",
-        relative: {
-          period: { label: "Minutes", value: "Minutes" },
-          value: 15,
-        },
-        absolute: {
-          date: {
-            from: new Date().toLocaleDateString("en-ZA"),
-            to: new Date().toLocaleDateString("en-ZA"),
-          },
-          startTime: "00:00",
-          endTime: "23:59",
-        },
-        userChangedValue: false,
-      },
-    };
-  },
-  methods: {
-    setRelativeDate(period, value) {
-      this.selectedDate.tab = "relative";
-      this.selectedDate.relative.period = period;
-      this.selectedDate.relative.value = value;
-      this.$refs.datetimeBtn.$el.click();
+    relativeTime: {
+      type: String,
+      default: "15m",
     },
-    onCustomPeriodSelect() {
-      this.selectedDate.relative.value = 1;
+    autoApply: {
+      type: Boolean,
+      default: false,
     },
   },
-  emits: ["date-change"],
-  setup() {
-    const getDate = () => {
-      return this.selectedDate;
+
+  emits: ["on:date-change"],
+
+  setup(props, { emit }) {
+    const selectedType = ref("relative");
+    const selectedTime = ref({
+      startTime: "00:00",
+      endTime: "23:59",
+    });
+    const selectedDate = ref({
+      from: "",
+      to: "",
+    });
+    const relativePeriod = ref("m");
+    const relativeValue = ref(15);
+
+    const relativePeriods = [
+      { label: "Minutes", value: "m" },
+      { label: "Hours", value: "h" },
+      { label: "Days", value: "d" },
+      { label: "Weeks", value: "w" },
+      { label: "Months", value: "M" },
+    ];
+    const relativeDates = {
+      m: [1, 5, 10, 15, 30, 45],
+      h: [1, 2, 3, 6, 8, 12],
+      d: [1, 2, 3, 4, 5, 6],
+      w: [1, 2, 3, 4, 5, 6],
+      M: [1, 2, 3, 4, 5, 6],
     };
 
-    const setDate = (date: Object) => {
-      this.selectedDate = date;
+    const datetimeBtn = ref(null);
+
+    const displayValue = ref("");
+
+    onMounted(() => {
+      // updateDisplayValue();
+      try {
+        selectedType.value = props.type;
+        setAbsoluteTime(
+          props.absoluteTime?.startTime,
+          props.absoluteTime?.endTime
+        );
+        setRelativeTime(props.relativeTime);
+        saveDate(props.type);
+      } catch (e) {
+        console.log(e);
+      }
+    });
+
+    watch(
+      () => selectedType.value,
+      () => {
+        displayValue.value = getDisplayValue();
+      }
+    );
+
+    watch(
+      () => {
+        selectedTime.value.startTime;
+        selectedTime.value.endTime;
+        selectedDate.value.from;
+        selectedDate.value.to;
+      },
+      () => {
+        saveDate("absolute");
+      },
+      { deep: true }
+    );
+
+    const setRelativeDate = (period, value) => {
+      selectedType.value = "relative";
+      relativePeriod.value = period;
+      relativeValue.value = value;
+      saveDate("relative");
     };
 
-    const datetimeBtn = ref();
+    const onCustomPeriodSelect = () => {
+      saveDate("relative-custom");
+    };
 
-    return { getDate, setDate, datetimeBtn, getImageURL };
-  },
-  beforeMount() {
-    if (this.defaultDate) this.selectedDate = cloneDeep(this.defaultDate);
-  },
-  computed: {
-    displayValue() {
-      if (this.selectedDate.tab === "relative") {
-        this.$emit("date-change", this.selectedDate);
-        return `${this.selectedDate.relative.value} ${this.selectedDate.relative.period.label}`;
-      } else {
-        if (this.selectedDate.absolute.date != null) {
-          if (typeof this.selectedDate.absolute.date != "object") {
-            if (this.selectedDate.absolute.date != "") {
-              this.selectedDate.absolute.date = {
-                from: this.selectedDate.absolute.date,
-                to: this.selectedDate.absolute.date,
-              };
-            } else {
-              const todayDate = new Date().toLocaleDateString("en-ZA");
-              this.selectedDate.absolute.date = {
-                from: todayDate,
-                to: todayDate,
-              };
-            }
-          }
+    const setRelativeTime = (period) => {
+      const periodString = period?.match(/(\d+)([mhdwM])/);
 
-          this.$emit("date-change", this.selectedDate);
-          return `${this.selectedDate.absolute.date.from} ${this.selectedDate.absolute.startTime} - ${this.selectedDate.absolute.date.to} ${this.selectedDate.absolute.endTime}`;
-        } else {
-          const todayDate = new Date().toLocaleDateString("en-ZA");
-          this.selectedDate.absolute.date = {
-            from: todayDate,
-            to: todayDate,
-          };
+      if (periodString) {
+        const periodValue = periodString[1];
+        const periodUnit = periodString[2];
 
-          this.$emit("date-change", this.selectedDate);
-          return `${todayDate} ${this.selectedDate.absolute.startTime} - ${todayDate} ${this.selectedDate.absolute.endTime}`;
+        const periodUnits = ["m", "h", "d", "w", "M"];
+
+        if (periodUnits.includes(periodUnit)) {
+          relativePeriod.value = periodUnit;
+        }
+
+        if (periodValue) {
+          relativeValue.value = parseInt(periodValue);
         }
       }
-    },
-    calculateMaxValue() {
-      if (
-        this.selectedDate.relative.period.value == "Minutes" &&
-        this.selectedDate.relative.value > 60
-      ) {
-        this.selectedDate.relative.value = 60;
-        return false;
-      } else if (
-        this.selectedDate.relative.period.value == "Hours" &&
-        this.selectedDate.relative.value > 24
-      ) {
-        this.selectedDate.relative.value = 24;
-        return false;
-      } else if (
-        this.selectedDate.relative.period.value == "Days" &&
-        this.selectedDate.relative.value > 31
-      ) {
-        this.selectedDate.relative.value = 31;
-        return false;
-      } else if (
-        this.selectedDate.relative.period.value == "Weeks" &&
-        this.selectedDate.relative.value > 6
-      ) {
-        this.selectedDate.relative.value = 6;
-        return false;
-      } else if (
-        this.selectedDate.relative.period.value == "Months" &&
-        this.selectedDate.relative.value > 6
-      ) {
-        this.selectedDate.relative.value = 6;
-        return false;
+    };
+
+    const setAbsoluteTime = (startTime, endTime) => {
+      if (!startTime || !endTime) {
+        var dateString = new Date().toLocaleDateString("en-ZA");
+        selectedDate.value.from = dateString;
+        selectedDate.value.to = dateString;
+        selectedTime.value.startTime = "00:00";
+        selectedTime.value.endTime = "23:59";
+        return;
       }
-      return false;
-    },
+
+      const startDateTime = convertUnixTime(startTime);
+      const endDateTime = convertUnixTime(endTime);
+
+      selectedDate.value.from = startDateTime.date;
+      selectedDate.value.to = endDateTime.date;
+
+      selectedTime.value.startTime = startDateTime.time;
+      selectedTime.value.endTime = endDateTime.time;
+    };
+
+    function convertUnixTime(unixTimeMicros) {
+      // Convert microseconds to milliseconds and create a new Date object
+      var date = new Date(unixTimeMicros / 1000);
+
+      // Extract hour, minute, day, month, and year
+      const hours = ("0" + date.getHours()).slice(-2); // pad with leading zero if needed
+      const minutes = ("0" + date.getMinutes()).slice(-2); // pad with leading zero if needed
+
+      // Build formatted strings
+      var dateString = new Date(date).toLocaleDateString("en-ZA");
+      var timeString = hours + ":" + minutes;
+
+      // Return both strings
+      return { date: dateString, time: timeString };
+    }
+
+    const refresh = () => {
+      saveDate();
+    };
+
+    const saveDate = (dateType) => {
+      displayValue.value = getDisplayValue();
+      const date = getConsumableDateTime();
+      date["valueType"] = dateType || selectedType.value;
+      emit("on:date-change", date);
+    };
+
+    const onBeforeShow = () => {
+      // if (props.modelValue) selectedDate.value = cloneDeep(props.modelValue);
+    };
+
+    const getPeriodLabel = computed(() => {
+      const periodMapping = {
+        m: "Minutes",
+        h: "Hours",
+        d: "Days",
+        w: "Weeks",
+        M: "Months",
+      };
+      return periodMapping[relativePeriod.value];
+    });
+
+    const getConsumableDateTime = () => {
+      if (selectedType.value == "relative") {
+        let period = getPeriodLabel.value.toLowerCase();
+        let periodValue = relativeValue.value;
+
+        // quasar does not support arithmetic on weeks. convert to days.
+        if (relativePeriod.value == "w") {
+          period = "days";
+          periodValue = periodValue * 7;
+        }
+        const subtractObject = '{"' + period + '":' + periodValue + "}";
+
+        const endTimeStamp = new Date();
+
+        const startTimeStamp = date.subtractFromDate(
+          endTimeStamp,
+          JSON.parse(subtractObject)
+        );
+
+        return {
+          startTime: new Date(startTimeStamp).getTime() * 1000,
+          endTime: new Date(endTimeStamp).getTime() * 1000,
+          relativeTimePeriod: relativeValue.value + relativePeriod.value,
+        };
+      } else {
+        let start, end;
+        if (!selectedDate.value.from && !selectedTime.value.startTime) {
+          start = new Date();
+        } else {
+          start = new Date(
+            selectedDate.value.from + " " + selectedTime.value.startTime
+          );
+        }
+
+        if (selectedDate.value.to == "" && selectedTime.value.endTime == "") {
+          end = new Date();
+        } else {
+          end = new Date(
+            selectedDate.value.to + " " + selectedTime.value.endTime
+          );
+        }
+        const rVal = {
+          startTime: new Date(start).getTime() * 1000,
+          endTime: new Date(end).getTime() * 1000,
+          relativeTimePeriod: null,
+        };
+        return rVal;
+      }
+    };
+
+    const getDisplayValue = () => {
+      if (selectedType.value === "relative") {
+        return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
+      } else {
+        if (selectedDate.value != null) {
+          return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+        } else {
+          const todayDate = new Date().toLocaleDateString("en-ZA");
+          return `${todayDate} ${selectedTime.value.startTime} - ${todayDate} ${selectedTime.value.endTime}`;
+        }
+      }
+    };
+
+    return {
+      datetimeBtn,
+      getImageURL,
+      onCustomPeriodSelect,
+      setRelativeDate,
+      relativePeriods,
+      relativeDates,
+      saveDate,
+      onBeforeShow,
+      selectedType,
+      selectedTime,
+      selectedDate,
+      relativePeriod,
+      relativeValue,
+      getPeriodLabel,
+      displayValue,
+      refresh,
+    };
   },
 });
 </script>
 
+<style lang="scss" scoped>
+.date-time-container {
+  .date-time-button {
+    &.relativetype {
+    }
+    &.absolutetype {
+      min-width: 286px;
+    }
+  }
+}
+</style>
 <style lang="scss">
 .q-btn--rectangle {
   border-radius: 3px;
@@ -375,10 +541,6 @@ export default defineComponent({
 
     .block {
       font-weight: 600;
-
-      &::before {
-        content: "Past ";
-      }
     }
   }
 }
@@ -388,8 +550,8 @@ export default defineComponent({
 
   .tab-button {
     &.q-btn {
-      padding-bottom: 0.6rem;
-      padding-top: 0.6rem;
+      padding-bottom: 0.1rem;
+      padding-top: 0.1rem;
       font-size: 0.75rem;
       font-weight: 700;
 
@@ -452,7 +614,7 @@ export default defineComponent({
   height: 32px;
   width: 32px;
   // border: $secondary;
-  background: rgba(0,0,0,0.07);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 .rp-selector-selected {
