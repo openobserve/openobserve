@@ -162,10 +162,10 @@ export default defineComponent({
         isVisible.value = entries[0].isIntersecting;
       }
 
-      watch(()=> isVisible.value, async()=> {
-          if(isDirty.value && props.data.query){
-              fetchQueryData()
-          }
+      watch(() => isVisible.value, async () => {
+        if (isVisible.value && isDirty.value && props.data.query) {
+            fetchQueryData();
+        }
       })
 
       // remove intersection observer
@@ -183,11 +183,8 @@ export default defineComponent({
       // 2. compare the dependent variables data with the old dependent variables Data
       // 3. if the value of any current variable is changed, call the api
       watch(() => props.variablesData?.values, () => {
-        console.log(`${props.data.config.title}: variables data changed ${props.variablesData}`);
-        
         // ensure the query is there
         if(!props.data?.query) {
-            console.log("Query is missing");
             return;
         }
 
@@ -198,7 +195,6 @@ export default defineComponent({
 
         // if no variables, no need to rerun the query
         if(!newDependentVariablesData?.length) {
-            console.log("No dependent variables");
             return;
         }
 
@@ -209,11 +205,11 @@ export default defineComponent({
         });
 
         if(!isAllValuesSame) {
-            console.log("Values are not the same");
             currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
-            fetchQueryData();
-        } else {
-            console.log('values are same', JSON.stringify(currentDependentVariablesData));
+            isDirty.value = true;
+            if(isVisible.value) {
+                fetchQueryData();
+            }
         }
     }, { deep: true });
 
@@ -471,6 +467,7 @@ export default defineComponent({
           if(isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
             return;
           }
+          isDirty.value = false
 
           // continue if it is not dependent on the variables or dependent variables' values are available
           console.log("after can run query based on variables");
