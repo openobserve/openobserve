@@ -44,9 +44,22 @@
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
             <date-time
-              :default-date="searchObj.data.datetime"
+              ref="metricsDateTimeRef"
+              auto-apply
+              :default-type="
+                searchObj.data.datetime.relativeTimePeriod
+                  ? 'relative'
+                  : 'absolute'
+              "
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                searchObj.data.datetime.relativeTimePeriod
+              "
               data-test="logs-search-bar-date-time-dropdown"
-              @date-change="updateDateTime"
+              @on:date-change="updateDateTime"
             />
             <auto-refresh-interval
               class="q-pr-sm"
@@ -202,6 +215,7 @@ import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -537,6 +551,10 @@ export default defineComponent({
         }
 
         // dismiss = Notify();
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(searchObj.data.datetime.startTime / 1000),
+          end_time: new Date(searchObj.data.datetime.endTime / 1000),
+        };
         chartData.value = cloneDeep(dashboardPanelData.data);
         updateUrlQueryParams();
       } catch (e) {
@@ -594,27 +612,28 @@ export default defineComponent({
     const setQuery = () => {};
 
     const updateDateTime = (value: any) => {
-      searchObj.data.datetime = value;
-
-      const timestamp = getConsumableDateTime(searchObj.data.datetime);
-      dashboardPanelData.meta.dateTime = timestamp;
+      searchObj.data.datetime = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod: value.relativeTimePeriod
+          ? value.relativeTimePeriod
+          : searchObj.data.datetime.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        let dateTimeVal;
-        if (value.tab === "relative") {
-          dateTimeVal = value.relative;
-        } else {
-          dateTimeVal = value.absolute;
-        }
-
         segment.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
-          value: dateTimeVal,
-          metric_name: searchObj.data.metrics.selectedMetric,
-          page: "Search Metrics",
+          value: value,
+          //user_org: this.store.state.selectedOrganization.identifier,
+          //user_id: this.store.state.userInfo.email,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
         });
       }
+
+      if (value.valueType === "relative") runQuery();
     };
 
     const updateQueryValue = async (event, value) => {
@@ -761,11 +780,6 @@ export default defineComponent({
         this.router
       );
       this.loadPageData();
-    },
-    changeRelativeDate() {
-      if (this.searchObj.data.datetime.tab == "relative") {
-        this.runQuery();
-      }
     },
     changeRefreshInterval() {
       this.updateUrlQueryParams();
