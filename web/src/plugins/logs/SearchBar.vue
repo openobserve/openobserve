@@ -108,16 +108,16 @@
         <div class="float-left">
           <date-time
             auto-apply
-            :type="
+            :default-type="
               searchObj.data.datetime.relativeTimePeriod
                 ? 'relative'
                 : 'absolute'
             "
-            :absolute-time="{
+            :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
               endTime: searchObj.data.datetime.endTime,
             }"
-            :relative-time="searchObj.data.datetime.relativeTimePeriod"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
             @on:date-change="updateDateTime"
           />

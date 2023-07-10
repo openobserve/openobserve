@@ -217,7 +217,7 @@
             color="secondary"
             no-caps
             size="md"
-            @click="saveDate"
+            @click="saveDate(null)"
             v-close-popup
           >
             Apply
@@ -243,15 +243,15 @@ import { date } from "quasar";
 
 export default defineComponent({
   props: {
-    type: {
+    defaultType: {
       type: String,
       default: "relative",
     },
-    absoluteTime: {
+    defaultAbsoluteTime: {
       type: Object,
       default: null,
     },
-    relativeTime: {
+    defaultRelativeTime: {
       type: String,
       default: "15m",
     },
@@ -298,13 +298,14 @@ export default defineComponent({
     onMounted(() => {
       // updateDisplayValue();
       try {
-        selectedType.value = props.type;
+        selectedType.value = props.defaultType;
         setAbsoluteTime(
-          props.absoluteTime?.startTime,
-          props.absoluteTime?.endTime
+          props.defaultAbsoluteTime?.startTime,
+          props.defaultAbsoluteTime?.endTime
         );
-        setRelativeTime(props.relativeTime);
-        saveDate(props.type);
+        setRelativeTime(props.defaultRelativeTime);
+        displayValue.value = getDisplayValue();
+        if (props.autoApply) saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
       }
@@ -325,7 +326,7 @@ export default defineComponent({
         selectedDate.value.to;
       },
       () => {
-        saveDate("absolute");
+        if (props.autoApply) saveDate("absolute");
       },
       { deep: true }
     );
@@ -334,11 +335,11 @@ export default defineComponent({
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
-      saveDate("relative");
+      if (props.autoApply) saveDate("relative");
     };
 
     const onCustomPeriodSelect = () => {
-      saveDate("relative-custom");
+      if (props.autoApply) saveDate("relative-custom");
     };
 
     const setRelativeTime = (period) => {
