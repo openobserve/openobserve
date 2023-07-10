@@ -62,15 +62,11 @@ impl super::Db for Sled {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         let result = client.get(&key);
-        if result.is_err() {
-            return Err(Error::from(DbError::KeyNotExists(key)));
+
+        match result {
+            Ok(Some(data)) => Ok(Bytes::from(data.as_ref().to_vec())),
+            Ok(None) | Err(_) => Err(Error::from(DbError::KeyNotExists(key))),
         }
-        let result = result.unwrap();
-        if result.is_none() {
-            return Err(Error::from(DbError::KeyNotExists(key)));
-        }
-        let value: Bytes = Bytes::from(result.unwrap().as_ref().to_vec());
-        Ok(value)
     }
 
     async fn put(&self, key: &str, value: Bytes) -> Result<()> {
