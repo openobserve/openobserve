@@ -216,6 +216,7 @@ import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { on } from "events";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -689,6 +690,11 @@ export default defineComponent({
         });
     };
 
+    const onMetricChange = async (metric) => {
+      metricsQueryEditorRef.value.setValue(metric);
+    };
+
+
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
       const date = getDurationObjectFromParams(queryParams);
@@ -750,6 +756,7 @@ export default defineComponent({
       addPanelToDashboard,
       promqlKeywords,
       autoCompletePromqlKeywords,
+      onMetricChange,
     };
   },
   computed: {
@@ -759,7 +766,7 @@ export default defineComponent({
     changeOrganization() {
       return this.store.state.selectedOrganization.identifier;
     },
-    selectedMetrics() {
+    selectedMetric() {
       return this.searchObj.data.metrics.selectedMetric;
     },
     changeRelativeDate() {
@@ -780,6 +787,17 @@ export default defineComponent({
         this.router
       );
       this.loadPageData();
+    },
+    selectedMetric: {
+      deep: true,
+      handler: function (metric) {
+        if (this.searchObj.data.metrics.selectedMetric) {
+          this.onMetricChange(metric);
+          setTimeout(() => {
+            this.runQuery();
+          }, 500);
+        }
+      },
     },
     changeRefreshInterval() {
       this.updateUrlQueryParams();

@@ -168,8 +168,6 @@ import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import TraceDetails from "./TraceDetails.vue";
 import TraceChart from "./TraceChart.vue";
-import { redraw } from "plotly.js";
-import { cloneDeep } from "lodash";
 
 export default defineComponent({
   name: "SearchResult",
