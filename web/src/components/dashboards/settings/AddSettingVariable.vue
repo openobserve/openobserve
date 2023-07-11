@@ -10,7 +10,7 @@
             <div>
               <q-select class="textbox showLabelOnTop" filled stack-label input-debounce="0" outlined dense
                 v-model="variableData.type" :options="variableTypes" :label="t('dashboard.typeOfVariable')"
-                option-value="value" emit-value></q-select>
+                option-value="value" map-options emit-value></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-lg">
               {{ t("dashboard.addGeneralSettings") }}
@@ -29,7 +29,7 @@
             <div class="text-body1 text-bold q-mt-lg">
               {{ t("dashboard.extraOptions") }}
             </div>
-            <div v-if="variableData.type == 'query'">
+            <div v-if="variableData.type == 'query_values'">
               <div class="row">
                 <q-select v-model="variableData.query_data.stream_type" :label="t('dashboard.selectStreamType') + ' *'"
                   :options="data.streamType" input-debounce="0" behavior="menu" filled borderless dense stack-label
@@ -37,8 +37,8 @@
                   :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
                 <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex') + ' *'"
                   :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
-                  stack-label hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated"
-                  option-value="name" option-label="name" emit-value class="textbox showLabelOnTop col no-case"
+                  hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated" stack-label
+                  option-value="name" option-label="name" emit-value class="textbox showLabelOnTop col no-case" 
                   :rules="[(val: any) => !!val || 'Field is required!']">
                 </q-select>
               </div>
@@ -121,8 +121,8 @@ export default defineComponent({
     // const filteredStreams = ref([]);
     const variableTypes = ref([
       {
-        label: 'Query',
-        value: 'query'
+        label: 'Query Values',
+        value: 'query_values'
       },
       {
         label: 'Constant',
@@ -133,15 +133,15 @@ export default defineComponent({
         value: 'textbox'
       },
       {
-        label: 'Custom Fields',
-        value: 'custom_fields'
+        label: 'Custom',
+        value: 'custom'
       }
     ])
 
     const variableData = reactive({
       name: "",
       label: "",
-      type: "query",
+      type: "query_values",
       query_data: {
         stream_type: "",
         stream: "",
@@ -203,7 +203,7 @@ export default defineComponent({
           };
         }
 
-        if (variableData.type !== 'query') {
+        if (variableData.type !== 'query_values') {
           delete variableData["query_data"];
         }
 
