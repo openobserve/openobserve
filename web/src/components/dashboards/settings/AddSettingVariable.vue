@@ -243,6 +243,11 @@ export default defineComponent({
         true
       ).then((res) => {
         data.schemaResponse = res.data?.list || [];
+        if(editMode.value) {
+          // set the dropdown values
+          streamTypeUpdated()
+          streamUpdated()
+        }
       });
     };
 
