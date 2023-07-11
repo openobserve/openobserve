@@ -183,6 +183,7 @@ export default defineComponent({
 
     const saveData = async () => {
       const dashId = route.query.dashboard + "";
+      const dashboardData = JSON.parse(JSON.stringify(await getDashboard(store, dashId)));
 
       if (editMode.value) {
 
@@ -194,10 +195,15 @@ export default defineComponent({
         );
 
         emit('save');
-
       } else {
 
-        if (variableData.type != 'query') {
+         if (!dashboardData?.variables?.list?.length) {
+          dashboardData.variables = {
+            list: []
+          };
+        }
+
+        if (variableData.type !== 'query') {
           delete variableData["query_data"];
         }
 
@@ -206,6 +212,7 @@ export default defineComponent({
           dashId,
           variableData
         );
+        dashboardData.variables.list.push(variableData);
 
         emit('save');
       }
