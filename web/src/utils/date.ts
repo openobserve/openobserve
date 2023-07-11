@@ -1,5 +1,7 @@
 // Copyright 2022 Zinc Labs Inc. and Contributors
 
+import { date } from "quasar";
+
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
@@ -52,7 +54,7 @@ export const generateDurationLabel = (seconds: number) => {
     { label: "y", value: 31536000 },
   ];
 
-  let duration = seconds;
+  const duration = seconds;
   let label = "";
 
   for (let i = units.length - 1; i >= 0; i--) {
@@ -79,50 +81,50 @@ export const generateDurationLabel = (seconds: number) => {
   return label;
 };
 
-export const getQueryParamsForDuration = (obj : any) =>  {
-  let params : any = {};
-  let tab = obj.tab;
-  let period = obj.relative.period;
-  let from = obj.absolute.date.from + " " + obj.absolute.startTime;
-  let to = obj.absolute.date.to + " " + obj.absolute.endTime;
+export const getQueryParamsForDuration = (obj: any) => {
+  const params: any = {};
+  const tab = obj.tab;
+  const period = obj.relative.period;
+  const from = obj.absolute.date.from + " " + obj.absolute.startTime;
+  const to = obj.absolute.date.to + " " + obj.absolute.endTime;
 
   if (tab === "relative") {
-    const labelsToUnitMapping : any = {
+    const labelsToUnitMapping: any = {
       Minutes: "m",
       Hours: "h",
       Days: "d",
       Weeks: "w",
-      Months: "M"
-    }
+      Months: "M",
+    };
 
-    let periodValue = obj.relative.value;
-    let periodLabel = period.label;
-    let periodUnit = labelsToUnitMapping[periodLabel];
+    const periodValue = obj.relative.value;
+    const periodLabel = period.label;
+    const periodUnit = labelsToUnitMapping[periodLabel];
 
     if (periodLabel === "Minutes" && periodUnit === "m") {
-      params['period'] = `${periodValue}${periodUnit}`;
+      params["period"] = `${periodValue}${periodUnit}`;
     } else if (periodLabel === "Hours" && periodUnit === "h") {
-      params['period'] = `${periodValue}${periodUnit}`;
+      params["period"] = `${periodValue}${periodUnit}`;
     } else if (periodLabel === "Days" && periodUnit === "d") {
-      params['period'] = `${periodValue}${periodUnit}`;
+      params["period"] = `${periodValue}${periodUnit}`;
     } else if (periodLabel === "Weeks" && periodUnit === "w") {
-      params['period'] = `${periodValue}${periodUnit}`;
+      params["period"] = `${periodValue}${periodUnit}`;
     } else if (periodLabel === "Months" && periodUnit === "M") {
-      params['period'] = `${periodValue}${periodUnit}`;
+      params["period"] = `${periodValue}${periodUnit}`;
     }
   } else if (tab === "absolute") {
-    let fromTime = new Date(from).getTime();
-    let toTime = new Date(to).getTime();
+    const fromTime = new Date(from).getTime();
+    const toTime = new Date(to).getTime();
 
-    params['from'] = `${fromTime}`;
-    params['to'] = `${toTime}`;
+    params["from"] = `${fromTime}`;
+    params["to"] = `${toTime}`;
   }
 
   return params;
-}
+};
 
 export const getDurationObjectFromParams = (params: any) => {
-  let obj = {
+  const obj = {
     tab: "relative",
     relative: {
       period: { label: "Minutes", value: "Minutes" },
@@ -138,13 +140,13 @@ export const getDurationObjectFromParams = (params: any) => {
     },
   };
 
-  let period = params?.period?.match(/(\d+)([mhdwM])/);
-  let from = params?.from?.match(/(\d+)/);
-  let to = params?.to?.match(/(\d+)/);
+  const period = params?.period?.match(/(\d+)([mhdwM])/);
+  const from = params?.from?.match(/(\d+)/);
+  const to = params?.to?.match(/(\d+)/);
 
   if (period) {
-    let periodValue = period[1];
-    let periodUnit = period[2];
+    const periodValue = period[1];
+    const periodUnit = period[2];
 
     if (periodUnit === "m") {
       obj.relative.period = { label: "Minutes", value: "Minutes" };
@@ -160,19 +162,78 @@ export const getDurationObjectFromParams = (params: any) => {
 
     obj.relative.value = parseInt(periodValue);
   } else if (from && to) {
-    let fromTime = parseInt(from[1]);
-    let toTime = parseInt(to[1]);
+    const fromTime = parseInt(from[1]);
+    const toTime = parseInt(to[1]);
 
     obj.tab = "absolute";
     obj.absolute.date.from = new Date(fromTime).toLocaleDateString("en-ZA");
     obj.absolute.date.to = new Date(toTime).toLocaleDateString("en-ZA");
 
     const startTimeDateObj = new Date(fromTime);
-    obj.absolute.startTime = `${startTimeDateObj.getHours().toString().padStart(2, '0')}:${startTimeDateObj.getMinutes().toString().padStart(2, '0')}`
-    
+    obj.absolute.startTime = `${startTimeDateObj
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${startTimeDateObj
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
+
     const toTimeDateObj = new Date(toTime);
-    obj.absolute.endTime = `${toTimeDateObj.getHours().toString().padStart(2, '0')}:${toTimeDateObj.getMinutes().toString().padStart(2, '0')}`
+    obj.absolute.endTime = `${toTimeDateObj
+      .getHours()
+      .toString()
+      .padStart(2, "0")}:${toTimeDateObj
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
   }
 
   return obj;
-}
+};
+
+export const getConsumableRelativeTime = (period: string) => {
+  const periodString = period?.match(/(\d+)([mhdwM])/);
+
+  if (periodString) {
+    let periodValue: number = parseInt(periodString[1]);
+    let periodUnit: string = periodString[2];
+
+    const periodUnits = ["m", "h", "d", "w", "M"];
+
+    // quasar does not support arithmetic on weeks. convert to days.
+    if (periodUnit == "w") {
+      periodUnit = "days";
+      periodValue = periodValue * 7;
+    }
+
+    const subtractObject =
+      '{"' +
+      getRelativePeriod(periodUnit).toLowerCase() +
+      '":' +
+      periodValue +
+      "}";
+
+    const endTimeStamp = new Date();
+
+    const startTimeStamp = date.subtractFromDate(
+      endTimeStamp,
+      JSON.parse(subtractObject)
+    );
+
+    return {
+      startTime: new Date(startTimeStamp).getTime() * 1000,
+      endTime: new Date(endTimeStamp).getTime() * 1000,
+    };
+  }
+};
+
+export const getRelativePeriod = (period: string) => {
+  const mapping: { [key: string]: string } = {
+    m: "Minutes",
+    h: "Hours",
+    d: "Days",
+    w: "Weeks",
+    M: "Months",
+  };
+  return mapping[period];
+};

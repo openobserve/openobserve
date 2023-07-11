@@ -15,11 +15,9 @@
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
 import { useLocalOrganization, getPath } from "./zincutils";
-import { useQuasar } from "quasar";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
-const $q = useQuasar();
 
 export const getDefaultOrganization = async (
   userInfo: any,
@@ -105,21 +103,4 @@ export const logsErrorMessage = (code: number) => {
   } else {
     return "";
   }
-};
-
-export const showErrorNotification = (message: string) => {
-  $q.notify({
-    type: "negative",
-    message: message,
-    timeout: 5000,
-    actions: [
-      {
-        icon: "close",
-        color: "white",
-        handler: () => {
-          /* ... */
-        },
-      },
-    ],
-  });
 };
