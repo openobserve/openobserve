@@ -311,6 +311,10 @@ pub async fn remote_write(
     }
 
     for (stream_name, stream_data) in metric_data_map {
+        // stream_data could be empty if metric value is nan, check it
+        if stream_data.is_empty() {
+            continue;
+        }
         // write to file
         let mut stream_file_name = "".to_string();
         let req_stats = write_file(
