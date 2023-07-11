@@ -18,7 +18,7 @@
 <template>
   <div ref="resultContainer" class="col column oveflow-hidden q-px-md q-pt-sm">
     <div class="text-semi-bold text-h6 q-pl-sm q-pb-sm">
-      {{ searchObj.data.metrics.selectedMetrics[0] }}
+      {{ searchObj.data.metrics.selectedMetric }}
     </div>
     <div class="search-list" style="width: 100%">
       <MetricLineChart

@@ -22,6 +22,7 @@
         data-test="logs-search-bar"
         ref="searchBarRef"
         v-show="searchObj.data.stream.streamLists.length > 0"
+        :fieldValues="fieldValues"
         :key="searchObj.data.stream.streamLists.length"
         @searchdata="searchData"
       />
@@ -150,11 +151,11 @@
 // @ts-nocheck
 import {
   defineComponent,
-  onMounted,
-  onUpdated,
   ref,
   onDeactivated,
   onActivated,
+  onBeforeMount,
+  watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -175,12 +176,18 @@ import {
   b64EncodeUnicode,
   useLocalTraceFilterField,
   verifyOrganizationStatus,
+  b64DecodeUnicode,
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import { number } from "@intlify/core-base";
 import { stringLiteral } from "@babel/types";
+import {
+  getDurationObjectFromParams,
+  getQueryParamsForDuration,
+} from "@/utils/date";
+import useSqlSuggestions from "@/composables/useSuggestions";
 
 export default defineComponent({
   name: "PageSearch",
@@ -188,6 +195,12 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
+  },
+  props: {
+    fieldValues: {
+      type: Object,
+      default: () => {},
+    },
   },
   methods: {
     searchData() {
@@ -246,7 +259,7 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
-    const tracesScatterChart = ref({});
+    const fieldValues = ref({});
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -632,6 +645,7 @@ export default defineComponent({
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
+        updateUrlQueryParams();
         return req;
       } catch (e) {
         searchObj.loading = false;
@@ -672,6 +686,27 @@ export default defineComponent({
       );
 
       return req;
+    };
+
+    const updateFieldValues = (data) => {
+      const excludedFields = [store.state.zoConfig.timestamp_column];
+      data.forEach((item) => {
+        // Create set for each field values and add values to corresponding set
+        Object.keys(item).forEach((key) => {
+          if (excludedFields.includes(key)) {
+            return;
+          }
+
+          if (fieldValues.value[key] == undefined) {
+            fieldValues.value[key] = new Set();
+          }
+
+          if (!fieldValues.value[key].has(item[key])) {
+            fieldValues.value[key].add(item[key]);
+          }
+        });
+      });
+      console.log("fieldValues", fieldValues.value);
     };
 
     function getQueryData() {
@@ -731,6 +766,7 @@ export default defineComponent({
               searchObj.data.queryResults = res.data;
             }
 
+            updateFieldValues(res.data.hits);
             //extract fields from query response
             extractFields();
 
@@ -1034,9 +1070,13 @@ export default defineComponent({
       // getStreamList();
     }
 
-    onMounted(() => {
+    onBeforeMount(() => {
       if (searchObj.loading == false) {
-        searchBarRef?.value?.setEditorValue("duration>10");
+        // eslint-disable-next-line no-prototype-builtins
+        if (!router.currentRoute.value.query.hasOwnProperty("query")) {
+          searchObj.data.editorValue = "duration>10";
+        }
+        restoreUrlQueryParams();
         loadPageData();
       }
     });
@@ -1181,6 +1221,36 @@ export default defineComponent({
       }
     };
 
+    function restoreUrlQueryParams() {
+      const queryParams = router.currentRoute.value.query;
+      const date = getDurationObjectFromParams(queryParams);
+      if (date) {
+        searchObj.data.datetime = date;
+      }
+      if (queryParams.query) {
+        searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+      }
+    }
+
+    function updateUrlQueryParams() {
+      const date = getQueryParamsForDuration(searchObj.data.datetime);
+      const query = {};
+
+      if (date.period) {
+        query["period"] = date.period;
+      }
+      if (date.from && date.to) {
+        query["from"] = date.from;
+        query["to"] = date.to;
+      }
+
+      query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+
+      query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+      router.push({ query });
+    }
+
     return {
       store,
       router,
@@ -1198,6 +1268,7 @@ export default defineComponent({
       searchAroundData,
       getTraceDetails,
       verifyOrganizationStatus,
+      fieldValues,
     };
   },
   computed: {
