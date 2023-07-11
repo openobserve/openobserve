@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetResult, ListResult,
-    MultipartId, ObjectMeta, ObjectStore, Result,
+    limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
+    ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -94,6 +94,34 @@ impl ObjectStore for Local {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let result = self.client.get(&(format_key(&file).into())).await?;
+
+        // metrics
+        let data = result.bytes().await?;
+        let data_len = data.len();
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data_len as u64);
+
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
+                .inc_by(time);
+        }
+
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        let start = std::time::Instant::now();
+        let file = location.to_string();
+        let result = self
+            .client
+            .get_opts(&(format_key(&file).into()), options)
+            .await?;
 
         // metrics
         let data = result.bytes().await?;

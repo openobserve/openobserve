@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    limit::LimitStore, path::Path, Error, GetResult, ListResult, MultipartId, ObjectMeta,
-    ObjectStore, Result,
+    limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
+    ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -115,6 +115,34 @@ impl ObjectStore for Remote {
         ))
     }
 
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        let start = std::time::Instant::now();
+        let file = location.to_string();
+        let result = self
+            .client
+            .get_opts(&(format_key(&file).into()), options)
+            .await?;
+
+        // metrics
+        let data = result.bytes().await?;
+        let data_len = data.len();
+        let columns = file.split('/').collect::<Vec<&str>>();
+        if columns[0] == "files" {
+            metrics::STORAGE_READ_BYTES
+                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .inc_by(data_len as u64);
+
+            let time = start.elapsed().as_secs_f64();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[3], columns[2], "get"])
+                .inc_by(time);
+        }
+
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
@@ -187,7 +215,6 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
                 .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates)
                 .with_allow_http(true),
         )
-        .with_profile("default")
         .with_bucket_name(&CONFIG.s3.bucket_name)
         .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style);
     if !CONFIG.s3.server_url.is_empty() {

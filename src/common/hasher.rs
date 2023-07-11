@@ -1,6 +1,8 @@
 use arrow_schema::{Field, Schema};
 use itertools::Itertools;
 
+use crate::common::schema_ext::SchemaExt;
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Signature(pub [u8; 32]);
 
@@ -20,11 +22,11 @@ pub fn get_fields_key(fields: &[Field]) -> String {
 }
 
 pub fn get_schema_key(schema: &Schema) -> String {
-    get_fields_key(schema.fields())
+    get_fields_key(&schema.to_cloned_fields())
 }
 
 pub fn get_schema_key_xxh3(schema: &Schema) -> String {
-    get_fields_key_xxh3(schema.fields())
+    get_fields_key_xxh3(&schema.to_cloned_fields())
 }
 
 pub fn get_fields_key_xxh3(fields: &[Field]) -> String {

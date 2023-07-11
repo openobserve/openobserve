@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    path::Path, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -32,6 +32,14 @@ impl FS {
     /// Create new in-memory storage.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn format_location(&self, location: &Path) -> Path {
+        let mut path = location.to_string();
+        if let Some(p) = path.find("/$$/") {
+            path = path[p + 4..].to_string();
+        }
+        path.into()
     }
 
     async fn get_cache(&self, location: &Path) -> Result<Bytes> {
@@ -57,6 +65,7 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
+        let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
             Ok(data) => data,
             Err(_) => return storage::DEFAULT.get(location).await,
@@ -66,7 +75,19 @@ impl ObjectStore for FS {
         ))
     }
 
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        let location = &self.format_location(location);
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.get_opts(location, options).await,
+        };
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+        let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
             Ok(data) => data,
             Err(_) => return storage::DEFAULT.get_range(location, range).await,
@@ -90,6 +111,7 @@ impl ObjectStore for FS {
     }
 
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
+        let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
             Ok(data) => data,
             Err(_) => return storage::DEFAULT.get_ranges(location, ranges).await,
@@ -119,6 +141,7 @@ impl ObjectStore for FS {
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
+        let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
             Ok(data) => data,
             Err(_) => return storage::DEFAULT.head(location).await,
@@ -127,6 +150,7 @@ impl ObjectStore for FS {
             location: location.clone(),
             last_modified: *BASE_TIME,
             size: data.len(),
+            e_tag: None,
         })
     }
 
