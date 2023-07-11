@@ -193,7 +193,7 @@
                 {
                 <div
                   class="log_json_content"
-                  v-for="key in Object.keys(row)"
+                  v-for="(key, index) in Object.keys(row)"
                   :key="key"
                 >
                   <q-btn-dropdown
@@ -265,7 +265,8 @@
                     </q-list>
                   </q-btn-dropdown>
 
-                  <span class="q-pl-xs">{{ key }} : {{ row[key] }},</span>
+                  <span class="q-pl-xs">{{ key }} : {{ row[key] }}</span
+                  ><span v-if="index < Object.keys(row).length - 1">,</span>
                 </div>
                 }
               </div>

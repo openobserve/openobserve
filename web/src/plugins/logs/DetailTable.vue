@@ -18,20 +18,12 @@
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div
-            class="text-body1 text-bold "
-            data-test="log-detail-title-text"
-          >
+          <div class="text-body1 text-bold" data-test="log-detail-title-text">
             {{ t("search.rowDetail") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            icon="cancel"
-          />
+          <q-btn v-close-popup round flat icon="cancel" />
         </div>
       </div>
     </q-card-section>
@@ -126,10 +118,9 @@
                               round
                               class="q-mr-sm pointer"
                             >
-                             <q-icon color="currentColor">
+                              <q-icon color="currentColor">
                                 <EqualIcon></EqualIcon>
-                              </q-icon>
-                            </q-btn
+                              </q-icon> </q-btn
                             >Include Search Term</q-item-label
                           >
                         </q-item-section>
@@ -149,9 +140,8 @@
                               class="q-mr-sm pointer"
                             >
                               <q-icon color="currentColor">
-                               <NotEqualIcon></NotEqualIcon>
-                              </q-icon>
-                            </q-btn
+                                <NotEqualIcon></NotEqualIcon>
+                              </q-icon> </q-btn
                             >Exclude Search Term</q-item-label
                           >
                         </q-item-section>
@@ -179,8 +169,101 @@
           data-test="log-detail-json-content"
           class="q-pa-none q-mb-lg"
         >
-          <div class="indexDetailsContainer">
-            <pre class="json-pre">{{ rowData }}</pre>
+          <div class="q-pt-sm flex justify-start q-px-md copy-log-btn">
+            <q-btn
+              label="Copy to clipboard"
+              dense
+              size="sm"
+              no-caps
+              class="q-px-sm"
+              icon="content_copy"
+              @click="copyContentToClipboard(JSON.stringify(rowData))"
+            />
+          </div>
+          <div class="indexDetailsContainer q-pl-md">
+            {
+            <div
+              class="log_json_content"
+              v-for="(key, index) in Object.keys(rowData)"
+              :key="key"
+            >
+              <q-btn-dropdown
+                data-test="log-details-include-exclude-field-btn"
+                size="0.5rem"
+                flat
+                outlined
+                filled
+                dense
+                class="q-ml-sm pointer"
+                :name="'img:' + getImageURL('images/common/add_icon.svg')"
+              >
+                <q-list>
+                  <q-item clickable v-close-popup>
+                    <q-item-section>
+                      <q-item-label
+                        data-test="log-details-include-field-btn"
+                        @click="
+                          toggleIncludeSearchTerm(`${key}='${rowData[key]}'`)
+                        "
+                        ><q-btn
+                          title="Add to search query"
+                          size="6px"
+                          round
+                          class="q-mr-sm pointer"
+                        >
+                          <q-icon color="currentColor">
+                            <EqualIcon></EqualIcon>
+                          </q-icon> </q-btn
+                        >Include Search Term</q-item-label
+                      >
+                    </q-item-section>
+                  </q-item>
+
+                  <q-item clickable v-close-popup>
+                    <q-item-section>
+                      <q-item-label
+                        data-test="log-details-exclude-field-btn"
+                        @click="
+                          toggleExcludeSearchTerm(`${key}!='${rowData[key]}'`)
+                        "
+                        ><q-btn
+                          title="Add to search query"
+                          size="6px"
+                          round
+                          class="q-mr-sm pointer"
+                        >
+                          <q-icon color="currentColor">
+                            <NotEqualIcon></NotEqualIcon>
+                          </q-icon> </q-btn
+                        >Exclude Search Term</q-item-label
+                      >
+                    </q-item-section>
+                  </q-item>
+                  <!-- <q-item clickable v-close-popup>
+                    <q-item-section>
+                      <q-item-label
+                        data-test="log-details-exclude-field-btn"
+                        @click="key;"
+                        ><q-btn
+                          title="Add field to table"
+                          icon="
+                                visibility
+                              "
+                          size="6px"
+                          round
+                          class="q-mr-sm pointer"
+                        ></q-btn
+                        >Add field to table</q-item-label
+                      >
+                    </q-item-section>
+                  </q-item> -->
+                </q-list>
+              </q-btn-dropdown>
+
+              <span class="q-pl-xs">{{ key }} : {{ rowData[key] }}</span
+              ><span v-if="index < Object.keys(rowData).length - 1">,</span>
+            </div>
+            }
           </div>
         </q-card-section>
       </q-tab-panel>
@@ -262,6 +345,7 @@ import dashboards from "@/services/dashboards";
 import useLogs from "@/composables/useLogs";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { copyToClipboard, useQuasar } from "quasar";
 
 const defaultValue: any = () => {
   return {
@@ -329,6 +413,7 @@ export default defineComponent({
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(false);
     const searchObj = useLogs();
+    const $q = useQuasar();
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -362,6 +447,16 @@ export default defineComponent({
       return newObj;
     };
 
+    const copyContentToClipboard = (log: any) => {
+      copyToClipboard(JSON.stringify(log)).then(() =>
+        $q.notify({
+          type: "positive",
+          message: "Content Copied Successfully!",
+          timeout: 1000,
+        })
+      );
+    };
+
     return {
       t,
       store,
@@ -374,6 +469,7 @@ export default defineComponent({
       getImageURL,
       shouldWrapValues,
       toggleWrapLogDetails,
+      copyContentToClipboard,
     };
   },
   async created() {
@@ -383,7 +479,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .searchdetaildialog {
   width: 60vw;
 }
@@ -394,6 +490,14 @@ export default defineComponent({
 
 .indexDetailsContainer .q-list .q-item {
   height: auto;
+}
+
+.indexDetailsContainer {
+  .log_json_content {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+  }
 }
 
 .q-icon {
@@ -412,5 +516,14 @@ export default defineComponent({
   height: calc(100vh - 290px);
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+</style>
+<style lang="scss">
+.searchdetaildialog {
+  .copy-log-btn {
+    .q-btn .q-icon {
+      font-size: 12px !important;
+    }
+  }
 }
 </style>
