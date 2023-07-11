@@ -517,7 +517,7 @@ export default defineComponent({
                 console.log("inside if");
                 
                 await queryService
-                    .metrics_query({
+                    .metrics_query_range({
                         org_identifier: store.state.selectedOrganization.identifier,
                         query: queryData,
                         start_time: startISOTimestamp,
