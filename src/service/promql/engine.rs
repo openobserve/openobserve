@@ -74,7 +74,7 @@ impl Engine {
                 match val {
                     Value::Vector(v) => {
                         let out = v
-                            .iter()
+                            .par_iter()
                             .map(|instant| InstantValue {
                                 labels: instant.labels.without_metric_name(),
                                 sample: Sample {
@@ -152,10 +152,49 @@ impl Engine {
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Subquery: {:?}",
-                    expr
-                )));
+                let val = self.exec_expr(&expr.expr).await?;
+                let time_window = Some(TimeWindow::new(self.time, expr.range));
+                let matrix = match val{
+                    Value::Vector(v) => {
+                        v.iter()
+                        .map(|v| {
+                            RangeValue{
+                                labels: v.labels.to_owned(),
+                                samples: vec![v.sample],
+                                time_window: time_window.clone()
+                            }
+                        }
+                        )
+                        .collect()
+                    },
+                    Value::Instant(v) => {
+                        vec![RangeValue{
+                            labels: v.labels.to_owned(),
+                            samples: vec![v.sample],
+                            time_window
+                        }]
+                    },
+                    Value::Range(v) => vec![v],
+                    Value::Matrix(vs) => vs,
+                    Value::Sample(s) => vec![RangeValue{
+                        labels: Labels::default(),
+                        samples: vec![s],
+                        time_window
+                    }],
+                    Value::Float(val) => vec![RangeValue{
+                        labels: Labels::default(),
+                        samples: vec![Sample::new(self.time, val)],
+                        time_window
+                    }],
+                    v => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported subquery, the return value should have been a matrix but got {:?}",
+                            v.get_type()
+                        )))
+                    }
+                };
+
+                Value::Matrix(matrix)
             }
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
@@ -535,11 +574,12 @@ impl Engine {
                     // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
                     let default_now_vector = vec![InstantValue {
                         labels: Labels::default(),
-                        sample: Sample::new(self.time, 0.0),
+                        sample: Sample::new(self.time, self.time as f64),
                     }];
                     Value::Vector(default_now_vector)
                 }
                 1 => self.call_expr_first_arg(args).await?,
+
                 _ => {
                     return Err(DataFusionError::NotImplemented(
                         "Invalid args passed to the function".into(),
