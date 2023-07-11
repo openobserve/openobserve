@@ -5,7 +5,7 @@
       </DashboardHeader>
 
       <div>
-        <q-form ref="addVariableForm" @submit="onSubmit">
+        <q-form greedy ref="addVariableForm" @submit="onSubmit">
           <div class="col">
             <div>
               <q-select class="textbox showLabelOnTop" filled stack-label input-debounce="0" outlined dense
@@ -37,8 +37,8 @@
                   :rules="[(val: any) => !!val || 'Field is required!']"></q-select>
                 <q-select v-model="variableData.query_data.stream" :label="t('dashboard.selectIndex') + ' *'"
                   :options="streamsFilteredOptions" input-debounce="0" behavior="menu" use-input filled borderless dense
-                  hide-selected fill-input @filter="streamsFilterFn" @update:model-value="streamUpdated" stack-label
-                  option-value="name" option-label="name" emit-value class="textbox showLabelOnTop col no-case" 
+                  stack-label @filter="streamsFilterFn" @update:model-value="streamUpdated"
+                  option-value="name" option-label="name" emit-value class="textbox showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']">
                 </q-select>
               </div>
