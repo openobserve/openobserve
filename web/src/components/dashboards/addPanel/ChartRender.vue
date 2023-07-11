@@ -399,61 +399,38 @@ export default defineComponent({
       }
 
       const canRunQueryBasedOnVariables = () => {
-        // console.log('variablesData:', props.variablesData);
-        // console.log('data query:', props.data.query);
-        console.log(`${props.data.config.title}: checking variables dependency`);
         
         const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
             props.data.query.includes(`$${it.name}`)
         );
-        console.log(`${props.data.config.title}: dependentVariables` + JSON.stringify(dependentVariables));
 
         if (dependentVariables?.length > 0) {
             const dependentAvailableVariables = dependentVariables.filter(
                 (it: any) => !it.isLoading
                 );
-            console.log(
-            `${props.data.config.title}: dependentAvailableVariables-`,
-            JSON.stringify(dependentAvailableVariables)
-            );
+           
             if (dependentAvailableVariables.length == dependentVariables.length) {
-                console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: true`);
                 return true;
             } else {
-                console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: false`);
                 return false;
             }
         } else {
-            console.log(`${props.data.config.title}: canRunQueryBasedOnVariables: true`);
             return true;
         }
       };
 
     const replaceQueryValue = (query: any) => {
-        // if (props?.variablesData?.values?.length) {
-        //     const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
-        //         query.includes(`$${it.name}`)
-        //     );
-            console.log(`dependentVariables-: ${currentDependentVariablesData}`);
-            
+        if(currentDependentVariablesData?.length){
 
-                if(currentDependentVariablesData?.length){
-
-                    currentDependentVariablesData?.forEach((variable:any) => {
-                        const variableName = `$${variable.name}`;
-                        const variableValue = variable.value;
-                        console.log(`Replacing ${variableName} with ${variableValue}`);
-                        query = query.replace(variableName, variableValue);
-                    });
-                    console.log(`Updated query: ${query}`);
-                    return query;
-                }else{
-                    return query
-                }
-        // } else {
-        //     console.log("No variables data found, returning original query");
-        //     return query;
-        // }
+            currentDependentVariablesData?.forEach((variable:any) => {
+                const variableName = `$${variable.name}`;
+                const variableValue = variable.value;
+                query = query.replace(variableName, variableValue);
+            });
+            return query;
+        }else{
+            return query
+        }
     }
 
       // returns tick length
@@ -462,7 +439,6 @@ export default defineComponent({
 
       // Chart Related Functions
       const fetchQueryData = async () => {
-        console.log("can run query", canRunQueryBasedOnVariables());
           // If the current query is dependent and the the data is not available for the variables, then don't run the query
           if(isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
             return;
@@ -470,9 +446,6 @@ export default defineComponent({
           isDirty.value = false
 
           // continue if it is not dependent on the variables or dependent variables' values are available
-          console.log("after can run query based on variables");
-          
-       
           let queryData = props.data.query;
           const chartParams = {
               title: "Found " + "2" + " hits in " + "10" + " ms",
@@ -494,12 +467,8 @@ export default defineComponent({
               endISOTimestamp =
                   new Date(timestamps.end_time.toISOString()).getTime() * 1000;
           }
-          console.log("before querydata", queryData);
           //replace query value
          
-          console.log("props.data.query",props.data.query);
-          
-
           const query = {
               query: {
                   sql: replaceQueryValue(queryData),
@@ -514,7 +483,6 @@ export default defineComponent({
 
             // Check if stream_type is "metrics", customQuery exists, and queryType is "promql"
             if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
-                console.log("inside if");
                 
                 await queryService
                     .metrics_query_range({

@@ -180,13 +180,10 @@ export default defineComponent({
     }
 
     onActivated(async () => {
-      console.log("on activated called");
-      
       await loadDashboard();
     })
 
     const loadDashboard = async () => {
-      console.log("inside load dashboard");
       
       let data = JSON.parse(JSON.stringify(await getDashboard(
         store,
@@ -283,91 +280,6 @@ export default defineComponent({
         query: { dashboard: route.query.dashboard },
       });
     };
-
-    // const currentDashboardData.data = computed(async function () {
-    //   console.log("before",JSON.stringify(toRaw(currentDashboardData.data)));
-      
-    //   let data = toRaw(currentDashboardData.data);
-    //   const variables = {}
-
-    //   variables["list"] = [
-    //       {
-    //         "type" : "query_value",
-    //         "name" : "namespace1",
-    //         "label" : "NameSpace",
-    //         "queryData" : {
-    //           "streamType" : "logs",
-    //           "stream" : "gke-fluentbit",
-    //           "streamField" : "kubernetes_host",
-    //         }
-    //       },
-    //       {
-    //         "type" : "constant",
-    //         "name" : "namespace2",
-    //         "label" : "NameSpace2",
-    //         "value" : "alpha1"
-    //       }
-    //     ]
-
-    //   data["variables"] = variables
-    //   variablesData.isVariablesLoading = true
-    //   const promise = data.variables.list.map((it)=> {
-        
-    //     const obj = {name: it.name, label : it.label, value: "", isLoading: false }
-    //     switch (it.type) {
-          
-    //       case "query_value":{
-    //         obj.isLoading = true
-    //         console.log("------",currentTimeObj.value.start_time);
-    //         return streamService
-    //         .fieldValues({
-    //           org_identifier: store.state.selectedOrganization.identifier,
-    //           stream_name: it.queryData.stream,
-    //           start_time: new Date(currentTimeObj.value.start_time?.toISOString()).getTime() * 1000,
-    //           end_time: new Date(currentTimeObj.value.end_time?.toISOString()).getTime() * 1000,
-    //           fields: [it.queryData.streamField],
-    //           size: 10,
-    //           type: "traces",
-    //         })
-    //         .then((res: any) => {
-    //           obj.isLoading = false
-    //           if (res.data.hits.length) {
-    //             console.log("-res-", res.data.hits);
-                
-    //             obj["options"] = res.data.hits
-    //               .find((field: any) => field.field === it.queryData.streamField)
-    //               .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
-    //             obj.value = obj.options[0] || ""
-
-    //             return obj
-    //           } else {
-    //             return obj
-    //           }
-    //         })
-    //         .catch((err: any) => {
-    //           return obj
-    //         })
-    //         // break;
-    //       }
-    //       case "constant":{
-    //         obj.value = it.value
-    //         return obj
-    //         // break;
-    //       }
-    //       default:{
-    //         console.log("default");
-    //         break;
-    //       }
-    //     }
-    //   })
-    //   variablesData.values =await Promise.all(promise)
-    //   variablesData.isVariablesLoading = false
-    //   console.log("variablesData", JSON.stringify(variablesData));
-      
-    //   console.log("-after-",data)
-
-    //   return data;
-    // });
     
     const refreshData = () => {
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
@@ -417,7 +329,7 @@ export default defineComponent({
     }
 
     const onUpdatePanel = async(panelDataElementValue: any) => {
-      console.log("on update panel called");
+      // console.log("on update panel called");
       
       await deletePanel(
         store,
