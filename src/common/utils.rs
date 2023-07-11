@@ -102,7 +102,6 @@ pub async fn populate_file_meta(
 mod tests {
     use datafusion::arrow::array::{Int64Array, StringArray};
     use datafusion::arrow::datatypes::{DataType, Field};
-    use datafusion::from_slice::FromSlice;
 
     use super::*;
 
@@ -148,14 +147,9 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from_slice(&["a", "b", "c", "d"])),
-                Arc::new(Int64Array::from_slice(&[1, 2, 1, 2])),
-                Arc::new(Int64Array::from_slice(&[
-                    val - 100,
-                    val - 10,
-                    val - 90,
-                    val,
-                ])),
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
+                Arc::new(Int64Array::from(vec![val - 100, val - 10, val - 90, val])),
             ],
         )
         .unwrap();

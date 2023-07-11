@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
 use object_store::{
-    path::Path, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
 };
 use std::ops::Range;
 use tokio::io::AsyncWrite;
@@ -66,6 +66,16 @@ impl ObjectStore for FS {
         ))
     }
 
+    async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        let data = match self.get_cache(location).await {
+            Ok(data) => data,
+            Err(_) => return storage::DEFAULT.get_opts(location, options).await,
+        };
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let data = match self.get_cache(location).await {
             Ok(data) => data,
@@ -108,6 +118,7 @@ impl ObjectStore for FS {
             location: location.clone(),
             last_modified: *BASE_TIME,
             size: data.len(),
+            e_tag: None,
         })
     }
 

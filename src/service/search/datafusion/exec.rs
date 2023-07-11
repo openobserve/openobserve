@@ -231,7 +231,6 @@ async fn exec_query(
         }
     };
 
-    println!("df schema: {:?}", df.clone().count().await);
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
@@ -1070,7 +1069,6 @@ fn apply_query_fn(
 mod test {
     use arrow::array::Int32Array;
     use arrow_schema::Field;
-    use datafusion::from_slice::FromSlice;
 
     use super::*;
 
@@ -1088,13 +1086,13 @@ mod test {
         // define data.
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
         )
         .unwrap();
 
         let batch2 = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
         )
         .unwrap();
 
@@ -1110,13 +1108,13 @@ mod test {
         // define data.
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
         )
         .unwrap();
 
         let batch2 = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
         )
         .unwrap();
 

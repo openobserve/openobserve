@@ -72,7 +72,7 @@ pub fn new_writer<'a>(
     let writer_props = WriterProperties::builder()
         .set_compression(get_parquet_compression())
         .set_write_batch_size(8192)
-        .set_data_pagesize_limit(1024 * 512)
+        .set_data_page_size_limit(1024 * 512)
         .set_max_row_group_size(1024 * 1024 * 256)
         .set_sorting_columns(Some(
             [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
