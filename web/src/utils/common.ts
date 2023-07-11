@@ -122,4 +122,4 @@ export const showErrorNotification = (message: string) => {
       },
     ],
   });
-}
+};
