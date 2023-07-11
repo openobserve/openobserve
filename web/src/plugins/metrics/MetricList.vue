@@ -263,17 +263,14 @@ export default defineComponent({
     };
 
     const openFilterCreator = (event: any, { name }: any) => {
-      let timestamps = getConsumableDateTime(searchObj.data.datetime);
-
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      const startISOTimestamp: any = searchObj.data.datetime.startTime;
+      const endISOTimestamp: any = searchObj.data.datetime.endTime;
 
       metricLabelValues.value[name] = {
         isLoading: true,
         values: [],
       };
+
       try {
         stream
           .fieldValues({

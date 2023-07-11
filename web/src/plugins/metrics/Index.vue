@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="metrics-page" id="logPage">
+  <q-page class="metrics-page" id="metricsPage">
     <div class="row scroll" style="width: 100%">
       <!-- Note: Splitter max-height to be dynamically calculated with JS -->
       <q-splitter
@@ -201,7 +201,7 @@ import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
@@ -557,6 +557,7 @@ export default defineComponent({
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
+        console.log(chartData.value);
         updateUrlQueryParams();
       } catch (e) {
         searchObj.loading = false;
@@ -694,13 +695,19 @@ export default defineComponent({
       metricsQueryEditorRef.value.setValue(metric);
     };
 
-
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      const date = getDurationObjectFromParams(queryParams);
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
       if (date) {
         searchObj.data.datetime = date;
-        updateDateTime(date);
       }
       if (queryParams.query) {
         searchObj.data.query = b64DecodeUnicode(queryParams.query);
@@ -710,24 +717,28 @@ export default defineComponent({
         searchObj.meta.refreshInterval = queryParams.refresh;
       }
     }
+
     function updateUrlQueryParams() {
       try {
-        const date = getQueryParamsForDuration(searchObj.data.datetime);
+        const date = searchObj.data.datetime;
         const query = {
           stream: searchObj.data.metrics.selectedMetric,
         };
-        if (date.period) {
-          query["period"] = date.period;
+
+        if (date.type == "relative") {
+          query["period"] = date.relativeTimePeriod;
+        } else {
+          query["from"] = date.startTime;
+          query["to"] = date.endTime;
         }
-        if (date.from && date.to) {
-          query["from"] = date.from;
-          query["to"] = date.to;
-        }
+
         query["refresh"] = searchObj.meta.refreshInterval;
+
         if (searchObj.data.query) {
           query["query"] = b64EncodeUnicode(searchObj.data.query);
         }
         query["org_identifier"] = store.state.selectedOrganization.identifier;
+
         router.push({ query });
       } catch (err) {
         console.log(err);

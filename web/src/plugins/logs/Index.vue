@@ -1217,7 +1217,7 @@ export default defineComponent({
           document.getElementById("secondLevel");
         if (secondWrapperElement != null) {
           rect = secondWrapperElement.getBoundingClientRect();
-          secondWrapperElement.style.height = `calc(100vh - ${Math.round(
+          secondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
             rect.top
           )}px)`;
         }
@@ -1225,7 +1225,7 @@ export default defineComponent({
         const thirdWrapperElement: any = document.getElementById("thirdLevel");
         if (thirdWrapperElement != null) {
           rect = thirdWrapperElement.getBoundingClientRect();
-          thirdWrapperElement.style.height = `calc(100vh - ${Math.round(
+          thirdWrapperElement.style.height = `calc(100vh - ${Math.ceil(
             rect.top
           )}px)`;
         }
@@ -1233,23 +1233,23 @@ export default defineComponent({
         const GridElement: any = document.getElementById("searchGridComponent");
         if (GridElement != null) {
           rect = GridElement.getBoundingClientRect();
-          GridElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
+          GridElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
         }
 
         const FLElement = document.getElementById("fieldList");
         if (FLElement != null) {
           rect = FLElement.getBoundingClientRect();
-          FLElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
+          FLElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
         }
 
         const logPagesecondWrapperElement: any =
           document.getElementById("logPage");
         if (logPagesecondWrapperElement != null) {
           rect = logPagesecondWrapperElement.getBoundingClientRect();
-          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
-            rect.top
+          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
+            rect.top + 1
           )}px)`;
-          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
+          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.ceil(
             rect.top + 20
           )}px)`;
         }
@@ -1625,6 +1625,7 @@ export default defineComponent({
       this.refreshData();
     },
     fullSQLMode(newVal) {
+      this.reDrawGrid();
       this.setQuery(newVal);
     },
     getStreamType() {

@@ -647,6 +647,7 @@ export default defineComponent({
         updateUrlQueryParams();
         return req;
       } catch (e) {
+        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }
@@ -1222,7 +1223,16 @@ export default defineComponent({
 
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      const date = getDurationObjectFromParams(queryParams);
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
+
       if (date) {
         searchObj.data.datetime = date;
       }
@@ -1232,7 +1242,7 @@ export default defineComponent({
     }
 
     function updateUrlQueryParams() {
-      const date = getQueryParamsForDuration(searchObj.data.datetime);
+      const date = searchObj.data.datetime;
       const query = {};
 
       if (date.period) {
