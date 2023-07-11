@@ -169,6 +169,7 @@ export default defineComponent({
         );
 
         await getDashboardData()
+        emit("save")
       }
     }
     const handleSaveVariable = () => {
