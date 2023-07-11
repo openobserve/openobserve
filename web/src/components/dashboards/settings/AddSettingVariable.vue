@@ -110,7 +110,7 @@ export default defineComponent({
       schemaResponse: [],
       streamType: ["logs", "metrics", "traces"],
       streams: [],
-      currentFieldsList: [{ label: '', value: '' }],
+      currentFieldsList: [],
 
       // selected values
       selectedStreamFields: []
