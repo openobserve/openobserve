@@ -33,6 +33,7 @@
       hide-selected
       fill-input
       @filter="filterMetrics"
+      @update:model-value="onMetricChange"
     >
       <template #no-option>
         <q-item>
@@ -194,12 +195,12 @@ import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import { getConsumableDateTime } from "@/utils/commons";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
 import stream from "@/services/stream";
 
 export default defineComponent({
   name: "MetricsList",
-  setup() {
+  emits: ["update:change-metric"],
+  setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -215,7 +216,6 @@ export default defineComponent({
         values: { key: string; count: number | string }[];
       };
     }> = ref({});
-    const { dashboardPanelData } = useDashboardPanelData();
 
     watch(
       () => searchObj.data.metrics.metricList.length,
@@ -263,19 +263,14 @@ export default defineComponent({
     };
 
     const openFilterCreator = (event: any, { name }: any) => {
-      console.log("open filter creator", name);
-
-      let timestamps = getConsumableDateTime(searchObj.data.datetime);
-
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      const startISOTimestamp: any = searchObj.data.datetime.startTime;
+      const endISOTimestamp: any = searchObj.data.datetime.endTime;
 
       metricLabelValues.value[name] = {
         isLoading: true,
         values: [],
       };
+
       try {
         stream
           .fieldValues({
@@ -310,6 +305,10 @@ export default defineComponent({
       }
     };
 
+    const onMetricChange = () => {
+      updateMetricLabels();
+    };
+
     return {
       quasar,
       t,
@@ -324,6 +323,7 @@ export default defineComponent({
       filterMetricLabels,
       openFilterCreator,
       metricLabelValues,
+      onMetricChange,
     };
   },
 });

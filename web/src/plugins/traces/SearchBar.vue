@@ -34,9 +34,19 @@
         ></q-btn>
         <div class="float-left">
           <date-time
-            :default-date="searchObj.data.datetime"
+            auto-apply
+            :default-type="
+              searchObj.data.datetime.relativeTimePeriod
+                ? 'relative'
+                : 'absolute'
+            "
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            @date-change="updateDateTime"
+            @on:date-change="updateDateTime"
           />
         </div>
         <div class="search-time q-pl-sm float-left">
@@ -111,7 +121,7 @@ export default defineComponent({
       }
     },
   },
-  setup(props) {
+  setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -198,26 +208,28 @@ export default defineComponent({
     };
 
     const updateDateTime = (value: object) => {
-      searchObj.data.datetime = value;
+      searchObj.data.datetime = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod: value.relativeTimePeriod
+          ? value.relativeTimePeriod
+          : searchObj.data.datetime.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        let dateTimeVal;
-        if (value.tab === "relative") {
-          dateTimeVal = value.relative;
-        } else {
-          dateTimeVal = value.absolute;
-        }
-
         segment.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
-          value: dateTimeVal,
+          value: value,
           //user_org: this.store.state.selectedOrganization.identifier,
           //user_id: this.store.state.userInfo.email,
           stream_name: searchObj.data.stream.selectedStream.value,
           page: "Search Logs",
         });
       }
+
+      if (value.valueType === "relative") emit("searchdata");
     };
 
     const udpateQuery = () => {

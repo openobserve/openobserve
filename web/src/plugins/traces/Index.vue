@@ -180,9 +180,12 @@ import {
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage, showErrorNotification } from "@/utils/common";
+import { logsErrorMessage } from "@/utils/common";
 import { number } from "@intlify/core-base";
 import { stringLiteral } from "@babel/types";
+import useNotifications from "@/composables/useNotifications";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
 import {
   getDurationObjectFromParams,
   getQueryParamsForDuration,
@@ -260,6 +263,7 @@ export default defineComponent({
     const searchBarRef = ref(null);
     const parser = new Parser();
     const fieldValues = ref({});
+    const { showErrorNotification } = useNotifications();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -570,21 +574,16 @@ export default defineComponent({
           searchObj.meta.resultGrid.rowsPerPage;
         req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
-        var timestamps: any = getConsumableDateTime();
-        req.query.start_time = getISOTimestamp(timestamps.start_time);
-        req.query.end_time = getISOTimestamp(timestamps.end_time);
+        var timestamps: any =
+          searchObj.data.datetime.type == "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
 
-        const chartSettings = getChartSettings(timestamps);
-        // if (chartSettings) {
-        //   searchObj.meta.resultGrid.chartKeyFormat =
-        //     chartSettings.chartKeyFormat;
-        //   searchObj.meta.resultGrid.chartInterval = chartSettings.chartInterval;
+        req.query.start_time = timestamps.startTime;
+        req.query.end_time = timestamps.endTime;
 
-        //   req.aggs.histogram = req.aggs.histogram.replaceAll(
-        //     "[INTERVAL]",
-        //     searchObj.meta.resultGrid.chartInterval
-        //   );
-        // }
         req.query["sql_mode"] = "full";
 
         let parseQuery = query.split("|");
@@ -648,6 +647,7 @@ export default defineComponent({
         updateUrlQueryParams();
         return req;
       } catch (e) {
+        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }
@@ -1223,7 +1223,16 @@ export default defineComponent({
 
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      const date = getDurationObjectFromParams(queryParams);
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
+
       if (date) {
         searchObj.data.datetime = date;
       }
@@ -1233,7 +1242,7 @@ export default defineComponent({
     }
 
     function updateUrlQueryParams() {
-      const date = getQueryParamsForDuration(searchObj.data.datetime);
+      const date = searchObj.data.datetime;
       const query = {};
 
       if (date.period) {
@@ -1353,17 +1362,17 @@ export default defineComponent({
         this.loadPageData();
       }
     },
-    changeStream() {
-      if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-        setTimeout(() => {
-          this.runQueryFn();
-        }, 500);
-      }
-    },
-    changeRelativeDate() {
-      if (this.searchObj.data.datetime.tab == "relative") {
-        this.runQueryFn();
-      }
+    changeStream: {
+      handler(stream, oldStream) {
+        if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
+          if (oldStream.value) this.searchObj.data.query = "";
+          if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
+          setTimeout(() => {
+            this.runQueryFn();
+          }, 500);
+        }
+      },
+      immediate: false,
     },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;

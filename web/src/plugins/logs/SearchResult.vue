@@ -114,7 +114,8 @@
                       ? column.prop(row)
                       : searchObj.data.resultGrid.columns.length > 2 &&
                         (column.prop(row, column.name)?.length || 0) > 100
-                      ? (column.prop(row, column.name)?.substr(0, 100) || '') + '...'
+                      ? (column.prop(row, column.name)?.substr(0, 100) || '') +
+                        '...'
                       : column.name != '@timestamp'
                       ? row[column.name]
                       : column.prop(row, column.name)
@@ -345,23 +346,10 @@ export default defineComponent({
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
-      this.searchObj.runQuery = true;
-      this.searchObj.data.datetime.tab = "absolute";
-      this.searchObj.data.datetime.absolute.date.from = start.split(" ")[0];
-      this.searchObj.data.datetime.absolute.date.to = end.split(" ")[0];
-      this.searchObj.data.datetime.absolute.startTime =
-        start.split(" ")[1].split(":")[0] +
-        ":" +
-        start.split(" ")[1].split(":")[1] +
-        ":" +
-        start.split(" ")[1].split(":")[2];
-      this.searchObj.data.datetime.absolute.endTime =
-        end.split(" ")[1].split(":")[0] +
-        ":" +
-        end.split(" ")[1].split(":")[1] +
-        ":" +
-        end.split(" ")[1].split(":")[2];
-
+      this.searchObj.data.datetime.type = "absolute";
+      this.searchObj.data.datetime.startTime = new Date(start).getTime() * 1000;
+      this.searchObj.data.datetime.endTime = new Date(end).getTime() * 1000;
+      console.log("onChartUpdate", this.searchObj.data.datetime);
       this.searchObj.runQuery = true;
       this.$emit("update:datetime");
     },
