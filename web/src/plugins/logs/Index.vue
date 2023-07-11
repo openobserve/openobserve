@@ -213,7 +213,7 @@ import {
 } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage, showErrorNotification } from "@/utils/common";
+import { logsErrorMessage } from "@/utils/common";
 import {
   verifyOrganizationStatus,
   convertTimeFromMicroToMilli,
@@ -221,7 +221,11 @@ import {
 import {
   getQueryParamsForDuration,
   getDurationObjectFromParams,
+  getConsumableRelativeTime,
 } from "@/utils/date";
+import useNotifications from "@/composables/useNotifications";
+import { cloneDeep } from "lodash-es";
+import { d } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -294,7 +298,7 @@ export default defineComponent({
     const searchBarRef = ref(null);
     const parser = new Parser();
     const expandedLogs = ref({});
-
+    const { showErrorNotification } = useNotifications();
     const fieldValues = ref({});
 
     searchObj.organizationIdetifier =
@@ -302,11 +306,11 @@ export default defineComponent({
 
     const getStreamType = computed(() => searchObj.data.stream.streamType);
 
-    function Notify() {
-      return $q.notify({
+    function Notify(timeout: number | undefined | null = 0) {
+      const notify = {
         type: "positive",
         message: "Waiting for response...",
-        timeout: 10000,
+        timeout: timeout,
         actions: [
           {
             icon: "close",
@@ -316,7 +320,9 @@ export default defineComponent({
             },
           },
         ],
-      });
+      };
+
+      return $q.notify(notify);
     }
 
     function getQueryTransform() {
@@ -588,68 +594,47 @@ export default defineComponent({
           },
         };
 
-        var timestamps: any = getConsumableDateTime();
+        var timestamps: any = searchObj.data.datetime.relativeTimePeriod
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod
+            )
+          : cloneDeep(searchObj.data.datetime);
+
         if (
-          timestamps.start_time != "Invalid Date" &&
-          timestamps.end_time != "Invalid Date"
+          timestamps.startTime != "Invalid Date" &&
+          timestamps.endTime != "Invalid Date"
         ) {
           searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
 
-          const startISOTimestamp: any =
-            new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-          const endISOTimestamp: any =
-            new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-          // let timeRangeFilter: String =
-          //   "(_timestamp >= [START_TIME] AND _timestamp < [END_TIME])";
-          // // let timeRangeFilter: String =
-          // //   "time_range(\"_timestamp\", '[START_TIME]','[END_TIME]')";
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[START_TIME]",
-          //   startISOTimestamp
-          // );
-          // timeRangeFilter = timeRangeFilter.replace(
-          //   "[END_TIME]",
-          //   endISOTimestamp
-          // );
-
-          // if (query.trim() != "") {
-          //   query += " and " + timeRangeFilter;
-          // } else {
-          //   query = timeRangeFilter;
-          // }
-
-          req.query.start_time = startISOTimestamp;
-          req.query.end_time = endISOTimestamp;
+          req.query.start_time = timestamps.startTime;
+          req.query.end_time = timestamps.endTime;
 
           searchObj.meta.resultGrid.chartInterval = "10 second";
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 30) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 60 * 30) {
             searchObj.meta.resultGrid.chartInterval = "15 second";
             searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
           }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 60 * 60) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 60 * 60) {
             searchObj.meta.resultGrid.chartInterval = "30 second";
             searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
           }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 2) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 2) {
             searchObj.meta.resultGrid.chartInterval = "1 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 6) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 6) {
             searchObj.meta.resultGrid.chartInterval = "5 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 3600 * 24) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 24) {
             searchObj.meta.resultGrid.chartInterval = "30 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (timestamps.end_time - timestamps.start_time >= 1000 * 86400 * 7) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 86400 * 7) {
             searchObj.meta.resultGrid.chartInterval = "1 hour";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (
-            timestamps.end_time - timestamps.start_time >=
-            1000 * 86400 * 30
-          ) {
+          if (req.query.end_time - req.query.start_time >= 1000 * 86400 * 30) {
             searchObj.meta.resultGrid.chartInterval = "1 day";
             searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
           }
@@ -762,13 +747,22 @@ export default defineComponent({
         return req;
       } catch (e) {
         searchObj.loading = false;
+        console.log(e);
         showErrorNotification("Invalid SQL Syntax");
       }
     }
 
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      const date = getDurationObjectFromParams(queryParams);
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
       if (date) {
         searchObj.data.datetime = date;
       }
@@ -783,17 +777,19 @@ export default defineComponent({
     }
 
     function updateUrlQueryParams() {
-      const date = getQueryParamsForDuration(searchObj.data.datetime);
+      const date = searchObj.data.datetime;
+
       const query = {
         stream: searchObj.data.stream.selectedStream.label,
       };
-      if (date.period) {
-        query["period"] = date.period;
+
+      if (date.type == "relative") {
+        query["period"] = date.relativeTimePeriod;
+      } else {
+        query["from"] = date.startTime;
+        query["to"] = date.endTime;
       }
-      if (date.from && date.to) {
-        query["from"] = date.from;
-        query["to"] = date.to;
-      }
+
       query["refresh"] = searchObj.meta.refreshInterval;
 
       if (searchObj.data.query) {
@@ -807,6 +803,7 @@ export default defineComponent({
     }
 
     function getQueryData() {
+      const dismiss = Notify();
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
           return false;
@@ -834,7 +831,6 @@ export default defineComponent({
           };
           // searchObj.data.editorValue = "";
         }
-        dismiss = Notify();
 
         const queryReq = buildSearch();
 
@@ -904,14 +900,11 @@ export default defineComponent({
             // });
           });
       } catch (e) {
+        dismiss();
         searchObj.loading = false;
         showErrorNotification("Error while searching");
       }
     }
-
-    const resetFieldValues = () => {
-      fieldValues.value = {};
-    };
 
     const updateFieldValues = (data) => {
       const excludedFields = [
@@ -935,6 +928,10 @@ export default defineComponent({
           }
         });
       });
+    };
+
+    const resetFieldValues = () => {
+      fieldValues.value = {};
     };
 
     function extractFields() {
@@ -1220,7 +1217,7 @@ export default defineComponent({
           document.getElementById("secondLevel");
         if (secondWrapperElement != null) {
           rect = secondWrapperElement.getBoundingClientRect();
-          secondWrapperElement.style.height = `calc(100vh - ${Math.round(
+          secondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
             rect.top
           )}px)`;
         }
@@ -1228,7 +1225,7 @@ export default defineComponent({
         const thirdWrapperElement: any = document.getElementById("thirdLevel");
         if (thirdWrapperElement != null) {
           rect = thirdWrapperElement.getBoundingClientRect();
-          thirdWrapperElement.style.height = `calc(100vh - ${Math.round(
+          thirdWrapperElement.style.height = `calc(100vh - ${Math.ceil(
             rect.top
           )}px)`;
         }
@@ -1236,23 +1233,23 @@ export default defineComponent({
         const GridElement: any = document.getElementById("searchGridComponent");
         if (GridElement != null) {
           rect = GridElement.getBoundingClientRect();
-          GridElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
+          GridElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
         }
 
         const FLElement = document.getElementById("fieldList");
         if (FLElement != null) {
           rect = FLElement.getBoundingClientRect();
-          FLElement.style.height = `calc(100vh - ${Math.round(rect.top)}px)`;
+          FLElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
         }
 
         const logPagesecondWrapperElement: any =
           document.getElementById("logPage");
         if (logPagesecondWrapperElement != null) {
           rect = logPagesecondWrapperElement.getBoundingClientRect();
-          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.round(
-            rect.top
+          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
+            rect.top + 1
           )}px)`;
-          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.round(
+          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.ceil(
             rect.top + 20
           )}px)`;
         }
@@ -1323,8 +1320,8 @@ export default defineComponent({
     };
 
     const searchAroundData = (obj: any) => {
+      const dismiss = Notify();
       try {
-        dismiss = Notify();
         searchObj.data.errorCode = 0;
         let query_context = "";
         let query = searchObj.data.query;
@@ -1450,6 +1447,7 @@ export default defineComponent({
             // });
           });
       } catch (e) {
+        dismiss();
         console.log(e.message);
         searchObj.loading = false;
         showErrorNotification("Search around request failed.");
@@ -1597,21 +1595,19 @@ export default defineComponent({
         this.loadPageData();
       }
     },
-    changeStream() {
-      if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-        this.searchObj.data.tempFunctionContent = "";
-        this.searchBarRef.resetFunctionContent();
-        this.searchObj.data.query = "";
-        this.setQuery(this.searchObj.meta.sqlMode);
-        setTimeout(() => {
-          this.runQueryFn();
-        }, 500);
-      }
-    },
-    changeRelativeDate() {
-      if (this.searchObj.data.datetime.tab == "relative") {
-        this.runQueryFn();
-      }
+    changeStream: {
+      handler(stream, streamOld) {
+        if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
+          this.searchObj.data.tempFunctionContent = "";
+          this.searchBarRef.resetFunctionContent();
+          if (streamOld.value) this.searchObj.data.query = "";
+          if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
+          setTimeout(() => {
+            this.runQueryFn();
+          }, 500);
+        }
+      },
+      immediate: false,
     },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
@@ -1629,6 +1625,7 @@ export default defineComponent({
       this.refreshData();
     },
     fullSQLMode(newVal) {
+      this.reDrawGrid();
       this.setQuery(newVal);
     },
     getStreamType() {

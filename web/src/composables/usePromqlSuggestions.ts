@@ -15,7 +15,10 @@ const usePromlqSuggestions = () => {
       open: (val: string) => {},
       close: (val: string) => {},
     },
-    dateTime: null,
+    dateTime: {
+      startTime: new Date().getTime() * 1000,
+      endTime: new Date().getTime() * 1000,
+    },
   });
   const autoCompleteKeywords: any = ref([]);
   const store = useStore();
@@ -129,11 +132,8 @@ const usePromlqSuggestions = () => {
         autoCompleteData.value.query
       );
       autoCompletePromqlKeywords.value = [];
-      const timestamps = getConsumableDateTime(autoCompleteData.value.dateTime);
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      const startISOTimestamp: any = autoCompleteData.value.dateTime.startTime;
+      const endISOTimestamp: any = autoCompleteData.value.dateTime.endTime;
       // import search service and call search.get_promql_series
       if (metricName) labels["__name__"] = metricName;
 

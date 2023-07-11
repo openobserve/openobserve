@@ -25,6 +25,7 @@ mod bottomk;
 mod count;
 mod max;
 mod min;
+mod quantile;
 mod sum;
 mod topk;
 
@@ -33,6 +34,7 @@ pub(crate) use bottomk::bottomk;
 pub(crate) use count::count;
 pub(crate) use max::max;
 pub(crate) use min::min;
+pub(crate) use quantile::quantile;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
 

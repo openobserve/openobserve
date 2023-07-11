@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="metrics-page" id="logPage">
+  <q-page class="metrics-page" id="metricsPage">
     <div class="row scroll" style="width: 100%">
       <!-- Note: Splitter max-height to be dynamically calculated with JS -->
       <q-splitter
@@ -44,9 +44,22 @@
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
             <date-time
-              :default-date="searchObj.data.datetime"
+              ref="metricsDateTimeRef"
+              auto-apply
+              :default-type="
+                searchObj.data.datetime.relativeTimePeriod
+                  ? 'relative'
+                  : 'absolute'
+              "
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                searchObj.data.datetime.relativeTimePeriod
+              "
               data-test="logs-search-bar-date-time-dropdown"
-              @date-change="updateDateTime"
+              @on:date-change="updateDateTime"
             />
             <auto-refresh-interval
               class="q-pr-sm"
@@ -188,7 +201,7 @@ import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
@@ -201,12 +214,9 @@ import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import {
-  getQueryParamsForDuration,
-  getDurationObjectFromParams,
-} from "@/utils/date";
-import { showErrorNotification } from "@/utils/common";
-import { b64DecodeUnicode } from "@/utils/zincutils";
+import useNotifications from "@/composables/useNotifications";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { on } from "events";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -258,6 +268,7 @@ export default defineComponent({
     const promqlKeywords = ref([]);
 
     const chartData = ref({});
+    const { showErrorNotification } = useNotifications();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -541,7 +552,12 @@ export default defineComponent({
         }
 
         // dismiss = Notify();
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(searchObj.data.datetime.startTime / 1000),
+          end_time: new Date(searchObj.data.datetime.endTime / 1000),
+        };
         chartData.value = cloneDeep(dashboardPanelData.data);
+        console.log(chartData.value);
         updateUrlQueryParams();
       } catch (e) {
         searchObj.loading = false;
@@ -598,27 +614,28 @@ export default defineComponent({
     const setQuery = () => {};
 
     const updateDateTime = (value: any) => {
-      searchObj.data.datetime = value;
-
-      const timestamp = getConsumableDateTime(searchObj.data.datetime);
-      dashboardPanelData.meta.dateTime = timestamp;
+      searchObj.data.datetime = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod: value.relativeTimePeriod
+          ? value.relativeTimePeriod
+          : searchObj.data.datetime.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        let dateTimeVal;
-        if (value.tab === "relative") {
-          dateTimeVal = value.relative;
-        } else {
-          dateTimeVal = value.absolute;
-        }
-
         segment.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
-          value: dateTimeVal,
-          metric_name: searchObj.data.metrics.selectedMetric,
-          page: "Search Metrics",
+          value: value,
+          //user_org: this.store.state.selectedOrganization.identifier,
+          //user_id: this.store.state.userInfo.email,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
         });
       }
+
+      if (value.valueType === "relative") runQuery();
     };
 
     const updateQueryValue = async (event, value) => {
@@ -674,12 +691,23 @@ export default defineComponent({
         });
     };
 
+    const onMetricChange = async (metric) => {
+      metricsQueryEditorRef.value.setValue(metric);
+    };
+
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      const date = getDurationObjectFromParams(queryParams);
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
       if (date) {
         searchObj.data.datetime = date;
-        updateDateTime(date);
       }
       if (queryParams.query) {
         searchObj.data.query = b64DecodeUnicode(queryParams.query);
@@ -689,24 +717,28 @@ export default defineComponent({
         searchObj.meta.refreshInterval = queryParams.refresh;
       }
     }
+
     function updateUrlQueryParams() {
       try {
-        const date = getQueryParamsForDuration(searchObj.data.datetime);
+        const date = searchObj.data.datetime;
         const query = {
           stream: searchObj.data.metrics.selectedMetric,
         };
-        if (date.period) {
-          query["period"] = date.period;
+
+        if (date.type == "relative") {
+          query["period"] = date.relativeTimePeriod;
+        } else {
+          query["from"] = date.startTime;
+          query["to"] = date.endTime;
         }
-        if (date.from && date.to) {
-          query["from"] = date.from;
-          query["to"] = date.to;
-        }
+
         query["refresh"] = searchObj.meta.refreshInterval;
+
         if (searchObj.data.query) {
           query["query"] = b64EncodeUnicode(searchObj.data.query);
         }
         query["org_identifier"] = store.state.selectedOrganization.identifier;
+
         router.push({ query });
       } catch (err) {
         console.log(err);
@@ -735,6 +767,7 @@ export default defineComponent({
       addPanelToDashboard,
       promqlKeywords,
       autoCompletePromqlKeywords,
+      onMetricChange,
     };
   },
   computed: {
@@ -744,7 +777,7 @@ export default defineComponent({
     changeOrganization() {
       return this.store.state.selectedOrganization.identifier;
     },
-    selectedMetrics() {
+    selectedMetric() {
       return this.searchObj.data.metrics.selectedMetric;
     },
     changeRelativeDate() {
@@ -766,10 +799,16 @@ export default defineComponent({
       );
       this.loadPageData();
     },
-    changeRelativeDate() {
-      if (this.searchObj.data.datetime.tab == "relative") {
-        this.runQuery();
-      }
+    selectedMetric: {
+      deep: true,
+      handler: function (metric) {
+        if (this.searchObj.data.metrics.selectedMetric) {
+          this.onMetricChange(metric);
+          setTimeout(() => {
+            this.runQuery();
+          }, 500);
+        }
+      },
     },
     changeRefreshInterval() {
       this.updateUrlQueryParams();
