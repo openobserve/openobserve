@@ -256,13 +256,13 @@ export default defineComponent({
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(toRef(data, 'currentFieldsList'), 'name')
 
     const streamTypeUpdated = () => {
-      const streamType = variableData.query_data.stream_type;
+      const streamType = variableData?.query_data?.stream_type;
       const filteredStreams = data.schemaResponse.filter((data: any) => data.stream_type === streamType);
       data.streams = filteredStreams;
     };
 
     const streamUpdated = () => {
-      const stream = variableData.query_data.stream;
+      const stream = variableData?.query_data?.stream;
       data.currentFieldsList = data.schemaResponse.find((item: any) => item.name === stream)?.schema || [];
     }
 
