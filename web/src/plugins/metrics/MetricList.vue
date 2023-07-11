@@ -17,8 +17,10 @@
   <div class="column index-menu">
     <q-select
       data-test="log-search-index-list-select-stream"
-      v-model="searchMetricValue"
-      :label="searchMetricValue ? '' : t('search.selectIndex')"
+      v-model="searchObj.data.metrics.selectedMetric"
+      :label="
+        searchObj.data.metrics.selectedMetric ? '' : t('search.selectIndex')
+      "
       :options="streamOptions"
       data-cy="index-dropdown"
       input-debounce="0"
@@ -222,10 +224,6 @@ export default defineComponent({
       }
     );
 
-    const searchMetricValue: Ref<string> = ref(
-      searchObj.data.metrics.selectedMetrics[0]
-    );
-
     const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;
@@ -236,19 +234,20 @@ export default defineComponent({
       });
     };
 
-    watch(
-      () => searchMetricValue.value,
-      () => {
-        updateMetricLabels();
-      }
-    );
-
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
-        (stream: any) => stream.name === searchMetricValue.value
+        (stream: any) => stream.name === searchObj.data.metrics.selectedMetric
       ).schema;
       filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
+
+    watch(
+      () => searchObj.data.metrics.selectedMetric,
+      (metric) => {
+        if (metric) updateMetricLabels();
+      },
+      { immediate: true }
+    );
 
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
@@ -261,11 +260,6 @@ export default defineComponent({
         }
       }
       return filtered;
-    };
-
-    const updateSelectedMetrics = (metric: any) => {
-      searchObj.data.metrics.selectedMetrics = [];
-      searchObj.data.metrics.selectedMetrics.push(metric);
     };
 
     const openFilterCreator = (event: any, { name }: any) => {
@@ -286,7 +280,7 @@ export default defineComponent({
         stream
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchMetricValue.value,
+            stream_name: searchObj.data.metrics.selectedMetric,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
@@ -325,8 +319,6 @@ export default defineComponent({
       streamOptions,
       getImageURL,
       filterMetrics,
-      updateSelectedMetrics,
-      searchMetricValue,
       filteredMetricLabels,
       searchMetricLabel,
       filterMetricLabels,

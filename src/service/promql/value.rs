@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use once_cell::sync::Lazy;
+use regex::{self, Regex};
 use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,
@@ -19,6 +21,10 @@ use serde::{
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 use crate::common::meta::prom::NAME_LABEL;
+
+// https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
+static RE_VALID_LABEL_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap());
 
 // See https://docs.rs/indexmap/latest/indexmap/#alternate-hashers
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -33,13 +39,31 @@ pub trait LabelsExt {
     /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
     /// ```
     fn without_metric_name(&self) -> Labels;
+
+    /// Return the value of the label associated with this name of the label.
+    fn get_value(&self, name: &str) -> String;
+
+    /// Without label, drops the given label name from the output.
+    fn without_label(&self, name: &str) -> Labels;
 }
 
 impl LabelsExt for Labels {
-    fn without_metric_name(&self) -> Labels {
+    fn without_label(&self, name: &str) -> Labels {
         self.iter()
-            .filter(|label| label.name != NAME_LABEL)
+            .filter(|label| label.name != name)
             .cloned()
+            .collect()
+    }
+
+    fn without_metric_name(&self) -> Labels {
+        self.without_label(NAME_LABEL)
+    }
+
+    fn get_value(&self, name: &str) -> String {
+        self.iter()
+            .filter(|l| l.name == name)
+            .map(|l| l.value.to_string())
+            .take(1)
             .collect()
     }
 }
@@ -48,6 +72,21 @@ impl LabelsExt for Labels {
 pub struct Label {
     pub name: String,
     pub value: String,
+}
+
+impl Label {
+    /// Create a new instance of Label.
+    pub fn new<S: Into<String>>(name: S, value: S) -> Self {
+        Label {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+
+    /// Check if the label name is valid.
+    pub fn is_valid_label_name(name: &str) -> bool {
+        RE_VALID_LABEL_NAME.is_match(name)
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -325,6 +364,13 @@ impl Value {
         }
     }
 
+    pub(crate) fn get_string(&self) -> Option<String> {
+        match self {
+            Value::String(v) => Some(v.into()),
+            _ => None,
+        }
+    }
+
     pub fn get_type(&self) -> &str {
         match self {
             Value::Instant(_) => "vector",
@@ -494,5 +540,10 @@ mod tests {
 
         let delta = extrapolate(&samples, ExtrapolationKind::Delta);
         assert!(approx_eq!(f64, dbg!(delta), 4.0));
+    }
+
+    #[test]
+    fn test_invalid_label_name() {
+        assert!(!Label::is_valid_label_name("~invalid-label-name"));
     }
 }

@@ -56,7 +56,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     metrics: {
       metricList: [],
-      selectedMetrics: [] as string[],
+      selectedMetric: "",
     },
     queryResults: <any>[],
     streamResults: <any>[],

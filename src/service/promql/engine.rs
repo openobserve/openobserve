@@ -68,11 +68,30 @@ impl Engine {
                 param,
                 modifier,
             }) => self.aggregate_exprs(op, expr, param, modifier).await?,
+
             PromExpr::Unary(UnaryExpr { expr }) => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Unary: {:?}",
-                    expr
-                )));
+                let val = self.exec_expr(expr).await?;
+                match val {
+                    Value::Vector(v) => {
+                        let out = v
+                            .iter()
+                            .map(|instant| InstantValue {
+                                labels: instant.labels.clone(),
+                                sample: Sample {
+                                    timestamp: instant.sample.timestamp,
+                                    value: -1.0 * instant.sample.value,
+                                },
+                            })
+                            .collect();
+                        Value::Vector(out)
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported Unary: {:?}",
+                            expr
+                        )));
+                    }
+                }
             }
             PromExpr::Binary(expr) => {
                 let lhs = self.exec_expr(&expr.lhs).await?;
@@ -360,15 +379,28 @@ impl Engine {
     }
 
     async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(0).unwrap()).await
+        self.exec_expr(args.args.get(0).expect("Missing arg 0"))
+            .await
     }
 
     async fn call_expr_second_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(1).unwrap()).await
+        self.exec_expr(args.args.get(1).expect("Missing arg 1"))
+            .await
     }
 
     async fn call_expr_third_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(2).unwrap()).await
+        self.exec_expr(args.args.get(2).expect("Missing arg 2"))
+            .await
+    }
+
+    async fn call_expr_fourth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(3).expect("Missing arg 3"))
+            .await
+    }
+
+    async fn call_expr_fifth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
+        self.exec_expr(args.args.get(4).expect("Missing arg 4"))
+            .await
     }
 
     fn ensure_two_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
@@ -380,6 +412,20 @@ impl Engine {
 
     fn ensure_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
         if args.len() != 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() < 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_five_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() != 5 {
             return Err(DataFusionError::NotImplemented(err.into()));
         }
         Ok(())
@@ -527,16 +573,52 @@ impl Engine {
             Func::Increase => functions::increase(&input)?,
             Func::Irate => functions::irate(&input)?,
             Func::LabelJoin => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
+                self.ensure_ge_three_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid destination label found",)),
+                )?;
+                let separator = self.call_expr_third_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid separator label found",)),
+                )?;
+
+                let mut source_labels = vec![];
+                for each_src in args.args[3..].iter() {
+                    if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
+                        source_labels.push(label);
+                    };
+                }
+                if source_labels.is_empty() {
+                    return Err(DataFusionError::NotImplemented(
+                        "source labels can not be empty or invalid".into(),
+                    ));
+                }
+                functions::label_join(&input, &dst_label, &separator, source_labels)?
             }
             Func::LabelReplace => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)\"";
+
+                self.ensure_five_args(args, err)?;
+                let input = self.call_expr_first_arg(args).await?;
+
+                let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid destination label found",)),
+                )?;
+                let replacement = self.call_expr_third_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid replacement string found",)),
+                )?;
+
+                let src_label = self.call_expr_fourth_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid source label string found",)),
+                )?;
+
+                let regex = self.call_expr_fifth_arg(args).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented(format!("Invalid regex string found",)),
+                )?;
+
+                functions::label_replace(&input, &dst_label, &replacement, &src_label, &regex)?
             }
             Func::LastOverTime => functions::last_over_time(&input)?,
             Func::Ln => functions::ln(&input)?,
