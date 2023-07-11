@@ -76,12 +76,20 @@
                 </div>
               </template>
               <template #after>
-                <div v-if="!areStreamsPresent && searchObj.loading == true">
-                  <q-spinner-dots
-                    color="primary"
-                    size="40px"
-                    style="margin: 0 auto; display: block"
-                  />
+                <div
+                  class="full-height flex justify-center items-center"
+                  v-if="searchObj.loading == true"
+                >
+                  <div class="q-pb-lg">
+                    <q-spinner-hourglass
+                      color="primary"
+                      size="40px"
+                      style="margin: 0 auto; display: block"
+                    />
+                    <span class="text-center">
+                      Hold on tight, we're fetching your logs.
+                    </span>
+                  </div>
                 </div>
                 <div v-else-if="!areStreamsPresent">
                   <h5 data-test="logs-search-error-message" class="text-center">
@@ -223,9 +231,9 @@ import {
   getDurationObjectFromParams,
   getConsumableRelativeTime,
 } from "@/utils/date";
+import { nextTick } from "process";
 import useNotifications from "@/composables/useNotifications";
 import { cloneDeep } from "lodash-es";
-import { d } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -237,6 +245,7 @@ export default defineComponent({
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
+        this.searchObj.loading = true;
         this.searchObj.runQuery = true;
       }
 
@@ -1111,13 +1120,15 @@ export default defineComponent({
         unparsed_x_data: unparsed_x_data,
       };
       searchObj.data.histogram = { xData, yData, chartParams };
-      if (
-        searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
-        searchResultRef.value?.reDrawChart
-      ) {
-        searchResultRef.value.reDrawChart();
-      }
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram == true &&
+          searchObj.meta.sqlMode == false &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
     }
 
     function loadPageData(isFirstLoad: boolean = false) {
