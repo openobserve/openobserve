@@ -55,6 +55,21 @@
           </template>
           <template #after>
             <div
+              class="full-height flex justify-center items-center"
+              v-if="searchObj.loading == true"
+            >
+              <div class="q-pb-lg">
+                <q-spinner-hourglass
+                  color="primary"
+                  size="40px"
+                  style="margin: 0 auto; display: block"
+                />
+                <span class="text-center">
+                  Hold on tight, we're fetching your traces.
+                </span>
+              </div>
+            </div>
+            <div
               v-if="
                 searchObj.data.errorMsg !== '' && searchObj.loading == false
               "
@@ -199,15 +214,10 @@ export default defineComponent({
     IndexList,
     SearchResult,
   },
-  props: {
-    fieldValues: {
-      type: Object,
-      default: () => {},
-    },
-  },
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
+        this.searchObj.loading = true;
         this.searchObj.runQuery = true;
       }
 
@@ -736,12 +746,12 @@ export default defineComponent({
           };
           // searchObj.data.editorValue = "";
         }
-        dismiss = Notify();
+        // dismiss = Notify();
 
         const queryReq = buildSearch();
 
         if (queryReq == null) {
-          dismiss();
+          // dismiss();
           return false;
         }
 
@@ -773,11 +783,11 @@ export default defineComponent({
             generateHistogramData();
             //update grid columns
             updateGridColumns();
-            dismiss();
+            // dismiss();
           })
           .catch((err) => {
             searchObj.loading = false;
-            dismiss();
+            // dismiss();
             if (err.response != undefined) {
               searchObj.data.errorMsg = err.response.data.error;
             } else {

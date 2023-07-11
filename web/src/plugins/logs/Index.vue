@@ -280,6 +280,7 @@ export default defineComponent({
             ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
             150 -
           1;
+
         this.searchObj.loading = true;
         this.getQueryData();
 
@@ -840,11 +841,12 @@ export default defineComponent({
           };
           // searchObj.data.editorValue = "";
         }
+        // dismiss = Notify();
 
         const queryReq = buildSearch();
 
         if (queryReq == null) {
-          dismiss();
+          // dismiss();
           return false;
         }
 
@@ -887,11 +889,11 @@ export default defineComponent({
             generateHistogramData();
             //update grid columns
             updateGridColumns();
-            dismiss();
+            // dismiss();
           })
           .catch((err) => {
             searchObj.loading = false;
-            dismiss();
+            // dismiss();
             if (err.response != undefined) {
               searchObj.data.errorMsg = err.response.data.error;
             } else {
