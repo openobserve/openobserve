@@ -368,7 +368,9 @@ impl Engine {
             token::T_TOPK => aggregations::topk(self, param.clone().unwrap(), &input).await?,
             token::T_BOTTOMK => aggregations::bottomk(self, param.clone().unwrap(), &input).await?,
             token::T_COUNT_VALUES => Value::None,
-            token::T_QUANTILE => Value::None,
+            token::T_QUANTILE => {
+                aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?
+            }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Aggregate: {:?}",
