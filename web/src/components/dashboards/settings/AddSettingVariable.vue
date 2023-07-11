@@ -54,7 +54,7 @@
               dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
           </div>
           <!-- show the auto add variables for the custom fields -->
-          <div v-if="variableData.type == 'custom_fields'">
+          <div v-if="variableData.type == 'custom'">
             <div v-for="(option, index) in variableData.options" :key="index" class="row">
               <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
