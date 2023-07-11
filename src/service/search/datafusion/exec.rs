@@ -230,6 +230,7 @@ async fn exec_query(
             return Err(e);
         }
     };
+
     if !rules.is_empty() {
         let fields = df.schema().fields();
         let mut exprs = Vec::with_capacity(fields.len());
@@ -264,8 +265,9 @@ async fn exec_query(
             ctx.register_table("tbl", df.into_view())?;
         }
     } else if sql.query_fn.is_some() {
-        let batches = df.clone().collect().await?;
-        match handle_query_fn(sql.query_fn.clone().unwrap(), batches, &sql.org_id) {
+        let batches = df.collect().await?;
+        let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
+        match handle_query_fn(sql.query_fn.clone().unwrap(), &batches_ref, &sql.org_id) {
             None => {
                 return Err(datafusion::error::DataFusionError::Execution(
                     "Error applying query function".to_string(),
@@ -371,12 +373,12 @@ async fn get_fast_mode_ctx(
         }
     }
 
-    let fast_sesison = SearchSession {
+    let fast_session = SearchSession {
         id: format!("{}-fast", session.id),
         storage_type: session.storage_type.clone(),
     };
     let mut ctx =
-        register_table(&fast_sesison, schema.clone(), "tbl", &new_files, file_type).await?;
+        register_table(&fast_session, schema.clone(), "tbl", &new_files, file_type).await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -865,7 +867,8 @@ pub async fn merge_parquet_files(
     );
     let df = ctx.sql(&meta_sql).await?;
     let batches = df.collect().await?;
-    let result = arrowJson::writer::record_batches_to_json_rows(&batches[..]).unwrap();
+    let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
+    let result = arrowJson::writer::record_batches_to_json_rows(&batches_ref).unwrap();
     let record = result.first().unwrap();
     let file_meta = FileMeta {
         min_ts: record["min_ts"].as_i64().unwrap(),
@@ -1009,10 +1012,10 @@ pub async fn register_table(
 
 fn handle_query_fn(
     query_fn: String,
-    batches: Vec<RecordBatch>,
+    batches: &[&RecordBatch],
     org_id: &str,
 ) -> Option<Vec<RecordBatch>> {
-    match datafusion::arrow::json::writer::record_batches_to_json_rows(&batches) {
+    match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
         Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id).unwrap_or(None),
         Err(_) => None,
     }
@@ -1048,7 +1051,7 @@ fn apply_query_fn(
             let mut schema_reader = std::io::BufReader::new(first_rec.as_bytes());
             let inf_schema = arrowJson::reader::infer_json_schema(&mut schema_reader, None)?;
             let mut decoder =
-                arrow::json::RawReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
+                arrow::json::ReaderBuilder::new(Arc::new(inf_schema)).build_decoder()?;
 
             for value in rows_val {
                 decoder
@@ -1066,7 +1069,6 @@ fn apply_query_fn(
 mod test {
     use arrow::array::Int32Array;
     use arrow_schema::Field;
-    use datafusion::from_slice::FromSlice;
 
     use super::*;
 
@@ -1084,13 +1086,13 @@ mod test {
         // define data.
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
         )
         .unwrap();
 
         let batch2 = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
         )
         .unwrap();
 
@@ -1106,13 +1108,13 @@ mod test {
         // define data.
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([1, 10, 10, 100]))],
+            vec![Arc::new(Int32Array::from(vec![1, 10, 10, 100]))],
         )
         .unwrap();
 
         let batch2 = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(Int32Array::from_slice([2, 20, 20, 200]))],
+            vec![Arc::new(Int32Array::from(vec![2, 20, 20, 200]))],
         )
         .unwrap();
 

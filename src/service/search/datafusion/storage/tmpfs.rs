@@ -16,8 +16,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream::BoxStream, StreamExt};
-use object_store::{path::Path, MultipartId};
-use object_store::{GetResult, ListResult, ObjectMeta, ObjectStore, Result};
+use object_store::{
+    path::Path, GetOptions, GetResult, ListResult, MultipartId, ObjectMeta, ObjectStore, Result,
+};
 use std::ops::Range;
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
@@ -65,6 +66,15 @@ impl ObjectStore for Tmpfs {
         ))
     }
 
+    async fn get_opts(&self, location: &Path, _options: GetOptions) -> Result<GetResult> {
+        // log::info!("get_opts: {}", location);
+        let data = self.get_bytes(location).await?;
+
+        Ok(GetResult::Stream(
+            futures::stream::once(async move { Ok(data) }).boxed(),
+        ))
+    }
+
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         // log::info!("get_range: {}, {:?}", location, range);
         let data = self.get_bytes(location).await?;
@@ -102,6 +112,7 @@ impl ObjectStore for Tmpfs {
             location: location.clone(),
             last_modified,
             size: bytes.len(),
+            e_tag: None,
         })
     }
 
@@ -115,6 +126,7 @@ impl ObjectStore for Tmpfs {
                 location: file.location.into(),
                 last_modified: file.last_modified,
                 size: file.size,
+                e_tag: None,
             }));
         }
         Ok(futures::stream::iter(values).boxed())
@@ -133,6 +145,7 @@ impl ObjectStore for Tmpfs {
                 location: file.location.into(),
                 last_modified: file.last_modified,
                 size: file.size,
+                e_tag: None,
             });
         }
         Ok(ListResult {
