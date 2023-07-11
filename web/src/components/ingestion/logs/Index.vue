@@ -114,6 +114,19 @@
         />
         <q-route-tab
           v-if="showSyslog"
+          name="syslogNg"
+          :to="{
+            name: 'syslogNg',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+            },
+          }"
+          icon="plagiarism"
+          label="syslog-ng"
+          content-class="tab_content"
+        />
+        <q-route-tab
+          v-if="showSyslog"
           name="syslog"
           :to="{
             name: 'syslog',
@@ -181,6 +194,7 @@ export default defineComponent({
         "vector",
         "syslog",
         "gcpLogs",
+        "syslogNg",
       ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
