@@ -129,7 +129,7 @@ pub async fn remote_write(
             StreamType::Metrics,
             None,
         ) {
-            log::warn!("stream [{metric_name}] is being deleted",);
+            log::warn!("stream [{metric_name}] is being deleted");
             continue;
         }
 
