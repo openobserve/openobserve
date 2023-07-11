@@ -43,7 +43,7 @@
               vertical
             >
                 <q-tab name="generalSettings" icon="settings" :label="t('dashboard.generalSettings')" />
-                <q-tab name="variableSettings" icon="alarm" :label="t('dashboard.variableSettings')" />
+                <q-tab name="variableSettings" icon="data_array" :label="t('dashboard.variableSettings')" />
             </q-tabs>
           </div>
         </template>

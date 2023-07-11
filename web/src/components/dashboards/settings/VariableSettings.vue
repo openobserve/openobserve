@@ -6,7 +6,8 @@
       <div v-else class="column full-height">
           <DashboardHeader title="Variables" >
             <template #right>
-              <q-btn color="secondary" :label="t(`dashboard.newVariable`)" @click="addVariables" />              
+              <q-btn class="text-bold no-border q-ml-md" no-caps no-outline rounded 
+               color="secondary" :label="t(`dashboard.newVariable`)" @click="addVariables" />              
             </template>
           </DashboardHeader>
           <div>
