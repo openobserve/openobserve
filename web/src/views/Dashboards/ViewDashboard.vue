@@ -102,7 +102,7 @@
       full-height
       maximized
     >
-     <DashboardSettings @updated="updateDashboardList" />
+     <DashboardSettings @refresh="loadDashboard" />
     </q-dialog>
     
   </q-page>
@@ -529,7 +529,8 @@ export default defineComponent({
       variablesData,
       variablesDataUpdated,
       addSettingsData,
-      showDashboardSettingsDialog
+      showDashboardSettingsDialog,
+      loadDashboard
     };
   }
 });

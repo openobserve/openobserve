@@ -58,11 +58,11 @@
                 transition-next="fade"
                 >
                 <q-tab-panel name="generalSettings">
-                   <GeneralSettings />
+                   <GeneralSettings @save="refreshRequired"/>
                 </q-tab-panel>
 
                 <q-tab-panel name="variableSettings">
-                    <VariableSettings />
+                    <VariableSettings @save="refreshRequired" />
                 </q-tab-panel>
             </q-tab-panels>
           </div>
@@ -86,14 +86,18 @@
         VariableSettings,
         GeneralSettings
     },
-    setup() {
+    emits: ["refresh"],
+    setup(props, {emit}) {
       const store = useStore();
       const { t } = useI18n();
       const router = useRouter();
       const activeTab: any = ref("generalSettings");
       const templates = ref([]);
       const splitterModel = ref(220);
-    
+
+      const refreshRequired = () => {
+        emit("refresh")
+      }
   
       return {
         t,
@@ -102,7 +106,8 @@
         splitterModel,
         activeTab,
         templates,
-        getImageURL
+        getImageURL,
+        refreshRequired
       };
     },
   });

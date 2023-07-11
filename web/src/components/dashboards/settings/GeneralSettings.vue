@@ -85,8 +85,8 @@ import { useQuasar } from "quasar";
     components: {
       DashboardHeader,
     },
-    emits: ["update:modelValue", "updated", "finish"],
-    setup() {
+    emits: ["save"],
+    setup(props, {emit}) {
       const store: any = useStore();
       const { t } = useI18n();
       const $q = useQuasar();
@@ -130,6 +130,8 @@ import { useQuasar } from "quasar";
           type: "positive",
           message: "Dashboard updated successfully."
         });
+
+        emit("save")
       })
 
       const onSubmit = () => {

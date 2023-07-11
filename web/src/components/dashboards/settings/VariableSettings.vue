@@ -83,8 +83,8 @@ export default defineComponent({
     ConfirmDialog,
     DashboardHeader
   },
- 
-  setup(props) {
+  emits: ['save'],
+  setup(props, {emit}) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
@@ -174,6 +174,7 @@ export default defineComponent({
     const handleSaveVariable = () => {
       isAddVariable.value = false;
       getDashboardData()
+      emit("save")
     };
     const goBackToDashboardList = () => {
       isAddVariable.value = false
