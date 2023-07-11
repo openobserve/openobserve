@@ -142,6 +142,16 @@
                   class="q-mr-xs"
                   size="6px"
                   @click.prevent.stop="
+                    copyLogToClipboard(column.prop(row, column.name).toString())
+                  "
+                  title="Copy"
+                  round
+                  icon="content_copy"
+                />
+                <q-btn
+                  class="q-mr-xs"
+                  size="6px"
+                  @click.prevent.stop="
                     addSearchTerm(`${column.name}='${row[column.name]}'`)
                   "
                   title="Include Term"
