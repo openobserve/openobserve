@@ -210,7 +210,7 @@ export const addVariable = async (
 
   if (variableExists.length) {
     
-    throw new Error("Variable already exists");
+    throw new Error("Variable with same name already exists");
   }
 
   currentDashboard.variables.list.push(variableData);
@@ -301,7 +301,7 @@ export const updateVariable = async (
   );
 
   if (variableExists.length) {
-  throw new Error("Variable already exists");
+  throw new Error("Variable with same name already exists");
   }
   
   // Update the variable data in the list

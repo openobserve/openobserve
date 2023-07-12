@@ -193,15 +193,17 @@ export default defineComponent({
            props.variableName,
            toRaw(variableData)
          );
+         emit('save');
+
        } catch (error) {
         $q.notify({
             type: "negative",
-            message: "Variable with same name already exists",
+            message: error.message,
             timeout: 2000,
           });
        }
 
-        emit('save');
+        
       } else {
 
         if (variableData.type !== 'query_values') {
@@ -214,16 +216,16 @@ export default defineComponent({
         dashId,
         variableData
         );
+        emit('save');
       } 
       catch (error) {
           $q.notify({
             type: "negative",
-            message: "Variable with same name already exists",
+            message: error.message,
             timeout: 2000,
           });
       }
 
-        emit('save');
       }
     }
     const onSubmit = () => {
