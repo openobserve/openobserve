@@ -377,7 +377,6 @@ export default defineComponent({
       addPanelData,
       onDuplicatePanel,
       t,
-      currentDashboardData,
       getDashboard,
       saveDashboard,
       store,

@@ -14,7 +14,10 @@
 -->
 
 <template>
-  <div class="column index-menu">
+  <div
+    class="column index-menu"
+    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+  >
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.metrics.selectedMetric"
@@ -32,9 +35,53 @@
       use-input
       hide-selected
       fill-input
+      class="metric-select-input"
       @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
+      <template v-slot:prepend>
+        <q-icon
+          :title="searchObj.data.metrics.selectedMetricType"
+          size="xs"
+          :name="metricsIconMapping[searchObj.data.metrics.selectedMetricType]"
+        />
+      </template>
+      <template v-slot:option="scope">
+        <q-item
+          :class="
+            store.state.theme === 'dark' &&
+            searchObj.data.metrics.selectedMetric !== scope.opt.value
+              ? 'text-white'
+              : ''
+          "
+          v-bind="scope.itemProps"
+          @click="setSelectedMetricType(scope?.opt)"
+        >
+          <q-item-section
+            :title="scope?.opt?.type"
+            class="metric-explore-metric-icon"
+            avatar
+          >
+            <q-icon
+              size="xs"
+              :name="metricsIconMapping[scope?.opt?.type] || ''"
+            />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>{{ scope.opt.label }}</q-item-label>
+          </q-item-section>
+        </q-item>
+        <!-- <q-item v-bind="scope.itemProps">
+          <q-item-section>
+            <q-item-label
+              >{{ scope.opt.label }}
+              <span class="q-pl-xs text-bold" v-show="scope?.opt?.type"
+                >({{ scope?.opt?.type }})</span
+              >
+            </q-item-label>
+          </q-item-section>
+        </q-item> -->
+      </template>
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -86,6 +133,16 @@
                       >
                         <div class="field_label ellipsis">
                           {{ props.row.name }}
+                        </div>
+                        <div class="field_overlay">
+                          <q-btn
+                            :data-test="`metrics-list-add-${props.row.name}-label-btn`"
+                            :icon="outlinedAdd"
+                            size="0.4rem"
+                            class="q-mr-none"
+                            @click.stop="addLabelToEditor(props.row.name)"
+                            round
+                          />
                         </div>
                       </div>
                     </template>
@@ -187,19 +244,19 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
-import { getConsumableDateTime } from "@/utils/commons";
 import stream from "@/services/stream";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "MetricsList",
-  emits: ["update:change-metric"],
+  emits: ["update:change-metric", "select-label"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -210,12 +267,20 @@ export default defineComponent({
     const selectedMetricLabels = ref([]);
     const searchMetricLabel = ref("");
     const filteredMetricLabels = ref([]);
+    const selectedMetricType = ref("");
     const metricLabelValues: Ref<{
       [key: string]: {
         isLoading: boolean;
         values: { key: string; count: number | string }[];
       };
     }> = ref({});
+
+    const metricsIconMapping: any = {
+      summary: "description",
+      gauge: "speed",
+      histogram: "bar_chart",
+      counter: "pin",
+    };
 
     watch(
       () => searchObj.data.metrics.metricList.length,
@@ -309,6 +374,14 @@ export default defineComponent({
       updateMetricLabels();
     };
 
+    const setSelectedMetricType = (option: any) => {
+      searchObj.data.metrics.selectedMetricType = option.type;
+    };
+
+    const addLabelToEditor = (label: string) => {
+      emit("select-label", label);
+    };
+
     return {
       quasar,
       t,
@@ -324,6 +397,10 @@ export default defineComponent({
       openFilterCreator,
       metricLabelValues,
       onMetricChange,
+      metricsIconMapping,
+      setSelectedMetricType,
+      outlinedAdd,
+      addLabelToEditor,
     };
   },
 });
@@ -658,5 +735,38 @@ export default defineComponent({
       }
     }
   }
+}
+
+.theme-dark {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+
+      .field_overlay {
+        background-color: #3f4143;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.theme-light {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+      .field_overlay {
+        background-color: #e8e8e8;
+        opacity: 1;
+      }
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+.metric-explore-metric-icon {
+  min-width: 28px !important;
+  padding-right: 8px !important;
 }
 </style>
