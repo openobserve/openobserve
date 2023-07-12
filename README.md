@@ -58,10 +58,14 @@ You can also try OpenObserve without installing it in under 2 minutes by trying 
 
 ![Home](./screenshots/logs.webp)
 
+## Traces (Opentelemetry supported)
+
+![Traces using Opentelemetry](./screenshots/traces.webp)
+
 
 ## Visualization and dashboard
 
-![Dashboaard](./screenshots/dashboard.png)
+![Dashboard](./screenshots/dashboard.png)
 
 ## Alerts
 
