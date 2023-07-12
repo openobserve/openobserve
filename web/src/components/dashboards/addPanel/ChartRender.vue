@@ -253,7 +253,13 @@ export default defineComponent({
 
       // just wait till the component is mounted and then create a plotly instance
       onMounted(async () => {
-        
+            observer = new IntersectionObserver(handleIntersection, {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1 // Adjust as needed
+      });
+
+        observer.observe(chartPanelRef.value);
           await nextTick();
           if (props.data.type != "table") {
               await Plotly.newPlot(
@@ -329,13 +335,7 @@ export default defineComponent({
         //       fetchQueryData();
         //   }
 
-        observer = new IntersectionObserver(handleIntersection, {
-            root: null,
-            rootMargin: '0px',
-            threshold: 0.1 // Adjust as needed
-        });
-
-        observer.observe(chartPanelRef.value);
+       
       });
 
       // this is used to clear the data after next tick 
