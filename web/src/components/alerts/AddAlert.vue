@@ -64,16 +64,19 @@
             <q-select
               data-test="add-alert-stream-select"
               v-model="formData.stream_name"
-              :options="indexOptions"
+              :options="filteredStreams"
               :label="t('alerts.stream_name')"
               :loading="isFetchingStreams"
               color="input-border"
               bg-color="input-bg"
               class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
               filled
+              borderless
               dense
+              use-input
+              hide-selected
+              fill-input
+              @filter="filterStreams"
               @update:model-value="updateAlert(formData.stream_name)"
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
@@ -141,13 +144,17 @@
               data-test="add-alert-condition-column-select"
               v-model="formData.condition.column"
               :options="filteredColumns"
-              dense
+              :loading="isFetchingStreams"
               filled
+              borderless
+              dense
               use-input
+              hide-selected
+              fill-input
               input-debounce="500"
               behavior="menu"
               :rules="[(val: any) => !!val || 'Field is required!']"
-              @filter="filterColumns"
+              @filter="filterConditions"
             ></q-select>
           </div>
           <div class="__operator">
@@ -322,6 +329,7 @@ import { useQuasar } from "quasar";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser";
 import segment from "../../services/segment_analytics";
+import { cloneDeep } from "lodash-es";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -367,7 +375,7 @@ export default defineComponent({
     },
   },
   emits: ["update:list", "cancel:hideform"],
-  setup() {
+  setup(props) {
     const store: any = useStore();
     let beingUpdated: boolean = false;
     const addAlertForm: any = ref(null);
@@ -380,6 +388,7 @@ export default defineComponent({
     const q = useQuasar();
     const editorRef: any = ref(null);
     const filteredColumns: any = ref([]);
+    const filteredStreams: Ref<string[]> = ref([]);
     let editorobj: any = null;
     var sqlAST: any = ref(null);
     const selectedRelativeValue = ref("1");
@@ -472,6 +481,7 @@ export default defineComponent({
       updateEditorContent(stream_name);
     };
     const updateEditorContent = (stream_name: string) => {
+      triggerCols.value = [];
       if (stream_name == "") {
         return;
       }
@@ -502,19 +512,21 @@ export default defineComponent({
       },
       { immediate: true }
     );
-    const filterColumns = (val: String, update: Function) => {
+    const filterColumns = (options: any[], val: String, update: Function) => {
+      let filteredOptions: any[] = [];
       if (val === "") {
         update(() => {
-          filteredColumns.value = [...triggerCols.value];
+          filteredOptions = [...options];
         });
-        return;
+        return filteredOptions;
       }
       update(() => {
         const value = val.toLowerCase();
-        filteredColumns.value = triggerCols.value.filter(
+        filteredOptions = options.filter(
           (column: any) => column.toLowerCase().indexOf(value) > -1
         );
       });
+      return filteredOptions;
     };
 
     const updateStreams = (resetStream = true) => {
@@ -531,7 +543,7 @@ export default defineComponent({
       }
 
       isFetchingStreams.value = true;
-      streamService
+      return streamService
         .nameList(
           store.state.selectedOrganization.identifier,
           formData.value.stream_type,
@@ -543,8 +555,17 @@ export default defineComponent({
           indexOptions.value = res.data.list.map((data: any) => {
             return data.name;
           });
+          return Promise.resolve();
         })
+        .catch(() => Promise.reject())
         .finally(() => (isFetchingStreams.value = false));
+    };
+    const filterConditions = (val: string, update: any) => {
+      filteredColumns.value = filterColumns(triggerCols.value, val, update);
+    };
+
+    const filterStreams = (val: string, update: any) => {
+      filteredStreams.value = filterColumns(indexOptions.value, val, update);
     };
     return {
       t,
@@ -577,13 +598,18 @@ export default defineComponent({
       streams,
       updateStreams,
       isFetchingStreams,
+      filterConditions,
+      filteredStreams,
+      filterStreams,
     };
   },
   created() {
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...this.modelValue };
-    this.updateStreams(false);
     this.beingUpdated = this.isUpdated;
+    this.updateStreams(false)?.then(() => {
+      this.updateEditorContent(this.formData.stream_name);
+    });
     if (
       this.modelValue &&
       this.modelValue.name != undefined &&
