@@ -17,9 +17,9 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::Error;
 
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
-use crate::common::meta::prom::MetricType;
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
+    prom::MetricType,
     stream::{Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
