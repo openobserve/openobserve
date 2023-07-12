@@ -14,8 +14,8 @@
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options"
-          :label="item.label || item.name" option-value="value" option-label="value" emit-value></q-select>
+        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options" map-options filled borderless
+          :label="item.label || item.name" option-value="value" option-label="label" emit-value></q-select>
       </div>
     </div>
   </div>
@@ -110,17 +110,14 @@ export default defineComponent({
               .catch((err: any) => {
                 return obj
               })
-            // break;
           }
           case "constant": {
             obj.value = it.value
             return obj
-            // break;
           }
           case "textbox": {
             obj.value = it.value
             return obj
-            // break;
           }
           case "custom": {
             obj["options"] = it.options
@@ -128,12 +125,11 @@ export default defineComponent({
 
             // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
             if (oldVariableObjectSelectedValue) {
-              obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : ""
+              obj.value = oldVariableObjectSelectedValue.value
             }
             else {
-              obj.value = obj.options[0] || ""
+              obj.value = obj.options[0].value || ""
             }
-            // obj.value = obj.options[0] || ""
             return obj
             // break;
           }
