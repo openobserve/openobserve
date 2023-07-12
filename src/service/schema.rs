@@ -320,7 +320,7 @@ pub async fn check_for_schema(
         )
         .await
         {
-            return value;
+            value
         } else {
             SchemaEvolution {
                 schema_compatible: true,
@@ -385,12 +385,12 @@ async fn handle_existing_schema(
             lock.unlock().await.map_err(server_internal_error).unwrap();
             stream_schema_map.insert(stream_name.to_string(), schema.clone());
         }
-        return Some(SchemaEvolution {
+        Some(SchemaEvolution {
             schema_compatible: true,
             types_delta: Some(field_datatype_delta),
             schema_fields: final_fields,
             is_schema_changed,
-        });
+        })
     } else {
         let key = format!(
             "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
@@ -440,12 +440,12 @@ async fn handle_existing_schema(
             *lock_acquired = false;
             drop(lock_acquired); // release lock
 
-            return Some(SchemaEvolution {
+            Some(SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed,
-            });
+            })
         } else {
             // Some other request has already acquired the lock.
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
@@ -453,16 +453,16 @@ async fn handle_existing_schema(
                 .unwrap();
             let (field_datatype_delta, _is_schema_changed, final_fields) =
                 get_schema_changes(&schema, &inferred_schema);
-            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+            stream_schema_map.insert(stream_name.to_string(), schema);
             log::info!("Schema exists for stream {} ", stream_name);
             *lock_acquired = false;
             drop(lock_acquired); // release lock
-            return Some(SchemaEvolution {
+            Some(SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
                 schema_fields: final_fields,
                 is_schema_changed: false,
-            });
+            })
         }
     }
 }
