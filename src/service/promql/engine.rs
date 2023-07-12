@@ -85,6 +85,16 @@ impl Engine {
                             .collect();
                         Value::Vector(out)
                     }
+                    Value::Float(f) => {
+                        let v = InstantValue {
+                            labels: Labels::default(),
+                            sample: Sample {
+                                timestamp: self.time,
+                                value: -1.0 * f,
+                            },
+                        };
+                        Value::Vector(vec![v])
+                    }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {:?}",
@@ -97,20 +107,27 @@ impl Engine {
                 let lhs = self.exec_expr(&expr.lhs).await?;
                 let rhs = self.exec_expr(&expr.rhs).await?;
                 let token = expr.op.id();
-
+                let return_bool = expr.return_bool();
+                let op = expr.op.is_comparison_operator();
                 match (lhs.clone(), rhs.clone()) {
                     (Value::Float(left), Value::Float(right)) => {
-                        let value = binaries::scalar_binary_operations(token, left, right)?;
+                        let value = binaries::scalar_binary_operations(
+                            token,
+                            left,
+                            right,
+                            return_bool,
+                            op,
+                        )?;
                         Value::Float(value)
                     }
                     (Value::Vector(left), Value::Vector(right)) => {
                         binaries::vector_bin_op(expr, &left, &right)?
                     }
                     (Value::Vector(left), Value::Float(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &left, right).await?
+                        binaries::vector_scalar_bin_op(expr, &left, right, false).await?
                     }
                     (Value::Float(left), Value::Vector(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &right, left).await?
+                        binaries::vector_scalar_bin_op(expr, &right, left, true).await?
                     }
                     (Value::None, _) | (_, Value::None) => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -671,7 +688,7 @@ impl Engine {
             Func::StddevOverTime => functions::stddev_over_time(&input)?,
             Func::StdvarOverTime => functions::stdvar_over_time(&input)?,
             Func::SumOverTime => functions::sum_over_time(&input)?,
-            Func::Time => Value::Float(chrono::Utc::now().timestamp() as f64),
+            Func::Time => Value::Float((self.time / 1_000_000) as f64),
             Func::Timestamp => match &input {
                 Value::Vector(instant_value) => {
                     let out: Vec<InstantValue> = instant_value
