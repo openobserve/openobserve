@@ -43,6 +43,7 @@
           <div
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
+            <syntax-guide-metrics class="q-mr-sm" />
             <date-time
               ref="metricsDateTimeRef"
               auto-apply
@@ -217,6 +218,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { on } from "events";
+import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -227,6 +229,7 @@ export default defineComponent({
     QueryEditor,
     ChartRender,
     AddToDashboard,
+    SyntaxGuideMetrics,
   },
   methods: {
     searchData() {
@@ -266,6 +269,7 @@ export default defineComponent({
       updateMetricKeywords,
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
+    const isMounted = ref(false);
 
     const metricTypeMapping: any = {
       Summary: "summary",
@@ -318,12 +322,22 @@ export default defineComponent({
       dashboardPanelData.data.customQuery = true;
     });
 
+    onMounted(() => {
+      setTimeout(() => {
+        isMounted.value = true;
+      });
+    });
+
     onDeactivated(() => {
       clearInterval(refreshIntervalID);
     });
 
     onActivated(() => {
-      if (!searchObj.loading) updateStreams();
+      // As onActivated hook is getting called after mounted hook on rendering component for first time.
+      // we fetch streams in before mount and also in activated (to refresh streams list if streams updated)
+      // So added this flag to avoid calling updateStreams() on first time rendering.
+      // This is just an workaround, need to find better solution while refactoring this component.
+      if (isMounted.value) updateStreams();
       refreshData();
 
       if (
@@ -730,6 +744,7 @@ export default defineComponent({
     function updateUrlQueryParams() {
       try {
         const date = searchObj.data.datetime;
+
         const query = {
           stream: searchObj.data.metrics.selectedMetric,
         };
@@ -740,7 +755,6 @@ export default defineComponent({
           query["from"] = date.startTime;
           query["to"] = date.endTime;
         }
-
         query["refresh"] = searchObj.meta.refreshInterval;
 
         if (searchObj.data.query) {
@@ -777,6 +791,7 @@ export default defineComponent({
       promqlKeywords,
       autoCompletePromqlKeywords,
       onMetricChange,
+      updateUrlQueryParams,
     };
   },
   computed: {
