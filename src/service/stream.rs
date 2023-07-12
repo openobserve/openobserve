@@ -147,6 +147,11 @@ pub fn stream_res(
     let metrics_type = if stream_type == StreamType::Metrics {
         if let Some(metrics_meta) = get_prom_metadata_from_schema(&schema) {
             Some(metrics_meta.metric_type)
+        } else if stream_name.ends_with("_bucket")
+            || stream_name.ends_with("_sum")
+            || stream_name.ends_with("_count")
+        {
+            Some(MetricType::Counter)
         } else {
             Some(MetricType::Empty)
         }
