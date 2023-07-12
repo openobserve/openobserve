@@ -38,7 +38,7 @@ use crate::common::meta::stream::ScanStats;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s
-pub(crate) const MAX_DATA_POINTS: i64 = 1000; // Width of panel
+pub(crate) const MAX_DATA_POINTS: i64 = 256; // Width of panel
 
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
