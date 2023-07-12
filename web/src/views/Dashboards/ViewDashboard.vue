@@ -20,20 +20,15 @@
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
         <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />
-        <span class="q-table__title q-mx-md q-mt-xs">{{ list[0].title }}</span>
+        <span class="q-table__title q-mx-md q-mt-xs">{{ currentDashboardData.data.title }}</span>
       </div>
       <div class="flex">
         <q-btn outline padding="xs" no-caps icon="add" @click="addPanelData">
           <q-tooltip>{{ t('panel.add') }}</q-tooltip>
         </q-btn>
-        <!-- <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="white" text-color="black" no-caps
-          :label="draggable ? t(`panel.cancel`) : t(`panel.edit`)" @click="isDraggableClick" />
-        <q-btn class="q-ml-md q-mb-xs text-bold no-border" padding="sm lg" color="secondary" no-caps :disable="!draggable"
-          :label="t(`panel.save`)" @click="saveDashboardOnClick" /> -->
-        <!-- <q-btn class="q-ml-md q-mb-xs text-bold" outline padding="sm lg" color="red" no-caps
-          :label="t(`dashboard.delete`)" @click="deleteDashboardOnClick" /> -->
-        <!--<q-btn class="q-ml-md q-mb-xs text-bold" padding="sm lg" color="white" no-caps
-            :label="t(`dashboard.goBackToDashboard`)" outline text-color="black" @click="goBackToDashboardList" />-->
+        <q-btn outline padding="xs" class="q-ml-sm" no-caps icon="settings" @click="addSettingsData">
+          <q-tooltip>{{ t('dashboard.setting') }}</q-tooltip>
+        </q-btn>
         <DateTimePicker 
           class="q-ml-sm"
           ref="refDateTime"
@@ -42,35 +37,42 @@
         <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="refreshData"/>
         <q-btn class="q-ml-sm" outline padding="xs" no-caps icon="refresh" @click="refreshData">
         </q-btn>
-        <ExportDashboard :dashboardId="list?.[0]?.dashboardId"/>
+        <ExportDashboard :dashboardId="currentDashboardData.data?.dashboardId"/>
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="displayDiv">
-      <grid-layout v-if="list[0].panels?.length > 0" v-model:layout.sync="list[0].layouts" :col-num="12" :row-height="30"
+    <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="currentTimeObj" 
+      @variablesData="variablesDataUpdated"/>
+    <div class="displayDiv" v-if="!(variablesData.isVariablesLoading)">
+      <grid-layout v-if="currentDashboardData.data.panels?.length > 0" v-model:layout.sync="currentDashboardData.data.layouts" :col-num="12" :row-height="30"
         :is-draggable="draggable" :is-resizable="draggable" :vertical-compact="true" :autoSize="true"
-        :restore-on-drag="true" :use-css-transforms="true" @layout-created="layoutCreatedEvent"
-        @layout-before-mount="layoutBeforeMountEvent" @layout-mounted="layoutMountedEvent"
-        @layout-ready="layoutReadyEvent" @layout-updated="layoutUpdatedEvent">
-        <grid-item class="plotlyBackground" v-for="item in list[0].panels" :key="item.id"
-          :x="getPanelLayout(list[0].layouts, item.id, 'x')" :y="getPanelLayout(list[0].layouts, item.id, 'y')"
-          :w="getPanelLayout(list[0].layouts, item.id, 'w')" :h="getPanelLayout(list[0].layouts, item.id, 'h')"
-          :i="getPanelLayout(list[0].layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resize="resizeEvent"
-          @move="moveEvent" @resized="resizedEvent" @container-resized="containerResizedEvent" @moved="movedEvent"
+        :restore-on-drag="true" :use-css-transforms="true">
+        <grid-item class="plotlyBackground" v-for="item in currentDashboardData.data.panels" :key="item.id"
+          :x="getPanelLayout(currentDashboardData.data.layouts, item.id, 'x')" :y="getPanelLayout(currentDashboardData.data.layouts, item.id, 'y')"
+          :w="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :h="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')"
+          :i="getPanelLayout(currentDashboardData.data.layouts, item.id, 'i')" :minH="getMinimumHeight(item.type)" :minW="getMinimumWidth(item.type)" @resized="resizedEvent" @moved="movedEvent"
           drag-allow-from=".drag-allow">
           <div style="height: 100%;">
             <PanelContainer @updated:chart="onUpdatePanel" @duplicatePanel="onDuplicatePanel" :draggable="draggable" :data="item"
-              :selectedTimeDate="currentTimeObj" 
-              :width="getPanelLayout(list[0].layouts, item.id, 'w')" :height="getPanelLayout(list[0].layouts, item.id, 'h')">
+              :selectedTimeDate="currentTimeObj" :variablesData="variablesData"
+              :width="getPanelLayout(currentDashboardData.data.layouts, item.id, 'w')" :height="getPanelLayout(currentDashboardData.data.layouts, item.id, 'h')">
             </PanelContainer>
           </div>
         </grid-item>
       </grid-layout>
     </div>
-    <div v-if="!list[0].panels?.length">
+    <div v-if="!currentDashboardData.data.panels?.length">
      <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" />
     </div>
+    <q-dialog
+      v-model="showDashboardSettingsDialog"
+      position="right"
+      full-height
+      maximized
+    >
+     <DashboardSettings @refresh="loadDashboard" />
+    </q-dialog>
     
   </q-page>
 </template>
@@ -105,6 +107,8 @@ import { deletePanel, updateDashboard } from "../../utils/commons";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue"
 import ExportDashboard from "../../components/dashboards/ExportDashboard.vue"
+import DashboardSettings from "./DashboardSettings.vue";
+import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -115,8 +119,10 @@ export default defineComponent({
     PanelContainer,
     NoPanel,
     AutoRefreshInterval,
-    ExportDashboard
-  },
+    ExportDashboard,
+    DashboardSettings,
+    VariablesValueSelector
+},
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -125,6 +131,9 @@ export default defineComponent({
     const currentDashboardData = reactive({
       data: {},
     });
+    const showDashboardSettingsDialog = ref(false);
+    const draggable = ref(true);
+    const eventLog = ref([])
 
     const refDateTime: any = ref(null);
     const $q = useQuasar();
@@ -133,39 +142,42 @@ export default defineComponent({
     const refreshInterval = ref(0);
     const selectedDate = ref()
 
-    const initialDateValue = {
-      tab: "relative",
-      startDate: "",
-      startTime: "",
-      endDate: "",
-      endTime: "",
-      selectedRelativePeriod: "Minutes",
-      selectedRelativeValue: 15,
-      selectedFullTime: false,
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData,data)
+    }
+
+    onActivated(async () => {
+      await loadDashboard();
+    })
+
+    const loadDashboard = async () => {
+      
+      let data = JSON.parse(JSON.stringify(await getDashboard(
+        store,
+        route.query.dashboard
+      )))
+      currentDashboardData.data = data
+
+      // if variables data is null, set it to empty list
+      if(!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
+        variablesData.isVariablesLoading = false
+        variablesData.values = []
+      }
+     
     };
 
-    // if the date value change, get the Date and time
-    const dateChange = (dateValue: any) => {
-      const c = toRaw(unref(dateValue));
-      currentDurationSelectionObj.value = dateValue
-      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
+    const addSettingsData = () => {
+      showDashboardSettingsDialog.value = true;
     };
-
-    const initialize = () => { };
 
     // back button to render dashboard List page
-    const goBack = () => {
+    const goBackToDashboardList = () => {
       return router.push("/dashboards");
     };
 
-    const goBackToDashboardList = () => {
-      goBack();
-    };
-
-    const deleteDashboardOnClick = async () => {
-      await deleteDashboard(route.query.dashboard);
-    };
-
+    //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
 
       // Show a loading spinner notification.
@@ -230,28 +242,22 @@ export default defineComponent({
 
     };
 
-    //add dashboardId
-    const addNewPanel = (dashboardId: String) => {
+    //add panel
+    const addPanelData = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: dashboardId },
+        query: { dashboard: route.query.dashboard },
       });
     };
-
-    const addPanelData = () => {
-      addNewPanel(route.query.dashboard);
-    };
-
-    let list = computed(function () {
-      return [toRaw(currentDashboardData.data)];
-    });
-
+    
     const refreshData = () => {
       currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value)
     }
 
     watch(selectedDate, () => {
-      dateChange(selectedDate.value)
+      const c = toRaw(unref(selectedDate.value));
+      currentDurationSelectionObj.value = selectedDate.value
+      currentTimeObj.value = getConsumableDateTime(currentDurationSelectionObj.value);
     })
 
     // ------- work with query params ----------
@@ -269,12 +275,10 @@ export default defineComponent({
       // resize charts if needed
       await nextTick();
       window.dispatchEvent(new Event("resize"))
-      
     })
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate], () => {
-      
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -285,141 +289,35 @@ export default defineComponent({
       })
     })
 
-    initialize();
+    const isDraggableClick = (evt, row) => {
+      draggable.value = !draggable.value;
+    }
 
-    return {
-      currentDashboardData,
-      goBackToDashboardList,
-      deleteDashboardOnClick,
-      addPanelData,
-      onDuplicatePanel,
-      t,
-      list,
-      goBack,
-      getDashboard,
-      dateVal: initialDateValue,
-      // deleteDashboard,
-      addNewPanel,
-      // saveDashboardOnClick,
-      saveDashboard,
-      store,
-      refDateTime,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
-      dateChange,
-      currentTimeObj,
-      refreshInterval,
-      refreshData,
-      selectedDate
-    };
-  },
-  data() {
-    return {
-      computedTimeObj: Date.now(),
-      draggable: true,
-      index: 0,
-      eventLog: [],
-    };
-  },
-  methods: {
-    isDraggableClick(evt, row) {
-      this.draggable = !this.draggable;
-    },
-    disableDraggable(evt, row) {
-      this.draggable = false;
-    },
-    async onUpdatePanel(panelDataElementValue: any) {
+    const disableDraggable = (evt, row) => {
+      draggable.value = false;
+    }
+
+    const onUpdatePanel = async(panelDataElementValue: any) => {
+      // console.log("on update panel called");
+      
       await deletePanel(
-        this.store,
-        this.$route.query.dashboard,
+        store,
+        route.query.dashboard,
         panelDataElementValue.id
       );
-      this.currentDashboardData.data = await getDashboard(
-        this.store,
-        this.$route.query.dashboard
-      );
-    },
-    updateCurrentDateTimeObj() {
-      this.computedTimeObj = Date.now();
-    },
-    moveEvent: function (i, newX, newY) {
-      const msg = "MOVE i=" + i + ", X=" + newX + ", Y=" + newY;
-      this.eventLog.push(msg);
-    },
-    movedEvent: function (i, newX, newY) {
-      const msg = "MOVED i=" + i + ", X=" + newX + ", Y=" + newY;
-      this.eventLog.push(msg);
-      this.saveDashboard()
-    },
-    resizeEvent: function (i, newH, newW, newHPx, newWPx) {
-      const msg =
-        "RESIZE i=" +
-        i +
-        ", H=" +
-        newH +
-        ", W=" +
-        newW +
-        ", H(px)=" +
-        newHPx +
-        ", W(px)=" +
-        newWPx;
-      this.eventLog.push(msg);
-    },
-    resizedEvent: function (i, newX, newY, newHPx, newWPx) {
+      await loadDashboard()
+    }
+
+    const movedEvent = (i, newX, newY) => {
+      saveDashboard()
+    }
+
+    const resizedEvent = (i, newX, newY, newHPx, newWPx) => {
       window.dispatchEvent(new Event("resize"));
-      const msg =
-        "RESIZED i=" +
-        i +
-        ", X=" +
-        newX +
-        ", Y=" +
-        newY +
-        ", H(px)=" +
-        newHPx +
-        ", W(px)=" +
-        newWPx;
-      this.eventLog.push(msg);
-      this.saveDashboard()
-    },
-    containerResizedEvent: function (i, newH, newW, newHPx, newWPx) {
-      const msg =
-        "CONTAINER RESIZED i=" +
-        i +
-        ", H=" +
-        newH +
-        ", W=" +
-        newW +
-        ", H(px)=" +
-        newHPx +
-        ", W(px)=" +
-        newWPx;
-      this.eventLog.push(msg);
-    },
-    layoutCreatedEvent: function (newLayout) {
-      this.eventLog.push("Created layout");
-    },
-    layoutBeforeMountEvent: function (newLayout) {
-      this.eventLog.push("beforeMount layout");
-    },
-    layoutMountedEvent: function (newLayout) {
-      this.eventLog.push("Mounted layout");
-    },
-    layoutReadyEvent: function (newLayout) {
-      this.eventLog.push("Ready layout");
-    },
-    layoutUpdatedEvent: function (newLayout) {
-      this.eventLog.push("Updated layout");
-    },
-    getPanelLayout(layout, panelId, position) {
+      saveDashboard()
+    }
+
+    const getPanelLayout = (layout, panelId, position) => {
       for (const element of layout) {
         if (element.panelId == panelId) {
           if (position == "x") {
@@ -437,8 +335,9 @@ export default defineComponent({
       }
 
       return 0;
-    },
-    getMinimumHeight(type) {
+    }
+
+    const getMinimumHeight = (type) => {
       switch (type) {
         case "area":
         case "bar":
@@ -453,8 +352,9 @@ export default defineComponent({
         default:
           break;
       }
-    },
-    getMinimumWidth(type) {
+    }
+
+    const getMinimumWidth = (type) => {
       switch (type) {
         case "area":
         case "bar":
@@ -469,14 +369,51 @@ export default defineComponent({
         default:
           break;
       }
-    },
-  },
-  async activated() {
-    this.currentDashboardData.data = await getDashboard(
-      this.store,
-      this.$route.query.dashboard
-    );
-  },
+    }
+
+    return {
+      currentDashboardData,
+      goBackToDashboardList,
+      addPanelData,
+      onDuplicatePanel,
+      t,
+      currentDashboardData,
+      getDashboard,
+      saveDashboard,
+      store,
+      refDateTime,
+      filterQuery: ref(""),
+      filterData(rows: string | any[], terms: string) {
+        const filtered = [];
+        terms = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      },
+      currentTimeObj,
+      refreshInterval,
+      refreshData,
+      selectedDate,
+      isDraggableClick,
+      disableDraggable,
+      onUpdatePanel,
+      movedEvent,
+      resizedEvent,
+      draggable,
+      eventLog,
+      getPanelLayout,
+      getMinimumHeight,
+      getMinimumWidth,
+      variablesData,
+      variablesDataUpdated,
+      addSettingsData,
+      showDashboardSettingsDialog,
+      loadDashboard
+    };
+  }
 });
 </script>
 

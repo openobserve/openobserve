@@ -41,7 +41,6 @@ import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import Functions from "../../views/Functions.vue";
 import { routeGuardPendingSubscriptions } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
-
 const useRoutes = () => {
   const parentRoutes: never[] = [];
 
@@ -141,7 +140,7 @@ const useRoutes = () => {
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuardPendingSubscriptions(to, from, next);
-      },
+      }
     },
     {
       path: "/dashboards/import",

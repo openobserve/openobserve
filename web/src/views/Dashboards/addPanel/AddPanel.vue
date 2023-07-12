@@ -60,8 +60,10 @@
                 <div class="layout-panel-container col scroll" style="height:100%;">
                   <Layout />
                   <q-separator />
+                  <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="dashboardPanelData.meta.dateTime" 
+                      @variablesData="variablesDataUpdated"/>
                   <div style="flex:1;">
-                    <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :width="6" @error="handleChartApiError"/>
+                    <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div>
                   <DashboardErrorsComponent :errors="errorData" />
                   <q-separator />
@@ -105,6 +107,7 @@ import { useI18n } from "vue-i18n";
 import {
   addPanel,
   getConsumableDateTime,
+  getDashboard,
   getPanel,
   updatePanel,
 } from "../../../utils/commons";
@@ -116,7 +119,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
-
+import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -129,7 +132,8 @@ export default defineComponent({
     ChartRender,
     DashboardErrorsComponent,
     PanelSidebar,
-    ConfigPanel
+    ConfigPanel,
+    VariablesValueSelector
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
@@ -147,6 +151,13 @@ export default defineComponent({
     const errorData: any = reactive({
       errors: []
     })
+    let variablesData :any = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      Object.assign(variablesData, data)
+    }
+    const currentDashboardData : any = reactive({
+      data: {},
+    });
 
     onDeactivated(async () => {
       // clear a few things
@@ -176,6 +187,7 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value)
       }
+      loadDashboard();
     });
 
     let list = computed(function () {
@@ -184,8 +196,23 @@ export default defineComponent({
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
 
-    const getDashboard = () => {
-      return currentDashboard.dashboardId;
+    // const getDashboard = () => {
+    //   return currentDashboard.dashboardId;
+    // };
+    const loadDashboard = async () => {
+
+      let data = JSON.parse(JSON.stringify(await getDashboard(
+        store,
+        route.query.dashboard
+      )))
+      currentDashboardData.data = data
+
+      // if variables data is null, set it to empty list
+      if (!(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)) {
+        variablesData.isVariablesLoading = false
+        variablesData.values = []
+      }
+
     };
 
     const currentXLabel = computed(() => {
@@ -467,7 +494,6 @@ export default defineComponent({
       goBack,
       savePanelChangesToDashboard,
       runQuery,
-      getDashboard,
       layoutSplitterUpdated,
       currentDashboard,
       list,
@@ -476,7 +502,10 @@ export default defineComponent({
       editMode,
       selectedDate,
       errorData,
-      handleChartApiError
+      handleChartApiError,
+      variablesDataUpdated,
+      currentDashboardData,
+      variablesData,
     };
   },
   methods: {
