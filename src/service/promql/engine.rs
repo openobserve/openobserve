@@ -28,7 +28,7 @@ use promql_parser::{
     label::MatchOp,
     parser::{
         token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
-        MatrixSelector, NumberLiteral, ParenExpr, StringLiteral, TokenType, UnaryExpr,
+        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, TokenType, UnaryExpr,
         VectorSelector,
     },
 };
@@ -206,8 +206,21 @@ impl Engine {
         };
 
         // Evaluation timestamp.
-        let eval_ts = self.time;
-        let start = eval_ts - self.ctx.lookback_delta;
+        let mut eval_ts = self.time;
+        let mut start = eval_ts - self.ctx.lookback_delta;
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    eval_ts -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    eval_ts += micros(offset);
+                }
+            }
+        }
 
         let mut values = vec![];
         for metric in metrics_cache {
@@ -257,9 +270,22 @@ impl Engine {
         };
 
         // Evaluation timestamp --- end of the time window.
-        let eval_ts = self.time;
+        let mut eval_ts = self.time;
         // Start of the time window.
-        let start = eval_ts - micros(range); // e.g. [5m]
+        let mut start = eval_ts - micros(range); // e.g. [5m]
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    eval_ts -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    eval_ts += micros(offset);
+                }
+            }
+        }
 
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
@@ -286,8 +312,21 @@ impl Engine {
         range: Option<Duration>,
     ) -> Result<()> {
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
-        let end = self.ctx.end; // 30 minutes + 5m = 35m
+        let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
+        let mut end = self.ctx.end; // 30 minutes + 5m = 35m
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    end -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    end += micros(offset);
+                }
+            }
+        }
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
