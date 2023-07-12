@@ -57,6 +57,7 @@ const defaultObject = {
     metrics: {
       metricList: [],
       selectedMetric: "",
+      selectedMetricType: "",
     },
     queryResults: <any>[],
     streamResults: <any>[],

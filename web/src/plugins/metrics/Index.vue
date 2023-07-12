@@ -267,6 +267,13 @@ export default defineComponent({
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
 
+    const metricTypeMapping: any = {
+      Summary: "summary",
+      Gauge: "gauge",
+      Histogram: "histogram",
+      Counter: "counter",
+    };
+
     const chartData = ref({});
     const { showErrorNotification } = useNotifications();
 
@@ -289,6 +296,7 @@ export default defineComponent({
               let itemObj = {
                 label: item.name,
                 value: item.name,
+                type: metricTypeMapping[item.metrics_type] || "",
               };
               searchObj.data.metrics.metricList.push(itemObj);
             });
@@ -427,6 +435,7 @@ export default defineComponent({
             let itemObj = {
               label: item.name,
               value: item.name,
+              type: metricTypeMapping[item.metrics_type] || "",
             };
             searchObj.data.metrics.metricList.push(itemObj);
 
@@ -455,18 +464,19 @@ export default defineComponent({
           });
           if (selectedStreamItemObj.label != undefined) {
             searchObj.data.metrics.selectedMetric = selectedStreamItemObj.value;
+            searchObj.data.metrics.selectedMetricType =
+              selectedStreamItemObj.type;
           } else {
             searchObj.loading = false;
             searchObj.data.queryResults = {};
             searchObj.data.metrics.selectedMetric = "";
+            searchObj.data.metrics.selectedMetricType = "";
             searchObj.data.histogram = {
               xData: [],
               yData: [],
               chartParams: {},
             };
           }
-
-          if (isFirstLoad) runQuery();
         } else {
           searchObj.loading = false;
         }
@@ -557,7 +567,6 @@ export default defineComponent({
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
-        console.log(chartData.value);
         updateUrlQueryParams();
       } catch (e) {
         searchObj.loading = false;
@@ -692,7 +701,7 @@ export default defineComponent({
     };
 
     const onMetricChange = async (metric) => {
-      metricsQueryEditorRef.value.setValue(metric);
+      metricsQueryEditorRef.value.setValue(metric + "{}");
     };
 
     function restoreUrlQueryParams() {
@@ -804,9 +813,6 @@ export default defineComponent({
       handler: function (metric) {
         if (this.searchObj.data.metrics.selectedMetric) {
           this.onMetricChange(metric);
-          setTimeout(() => {
-            this.runQuery();
-          }, 500);
         }
       },
     },
