@@ -14,7 +14,10 @@
 -->
 
 <template>
-  <div class="column index-menu" :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+  <div
+    class="column index-menu"
+    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+  >
     <div>
       <q-select
         data-test="log-search-index-list-select-stream"
@@ -98,9 +101,7 @@
                         props.row.name
                       )
                     "
-                    :name="
-                      outlinedVisibility
-                    "
+                    :name="outlinedVisibility"
                     size="1.1rem"
                     title="Add field to table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -228,7 +229,14 @@
                                 {{ value.count }}
                               </div>
                             </div>
-                            <div class="flex row" :class="store.state.theme ==='dark'?'text-white':'text-black'">
+                            <div
+                              class="flex row"
+                              :class="
+                                store.state.theme === 'dark'
+                                  ? 'text-white'
+                                  : 'text-black'
+                              "
+                            >
                               <q-btn
                                 class="q-mr-xs"
                                 size="6px"
@@ -254,10 +262,10 @@
                                 title="Exclude Term"
                                 round
                               >
-                             <q-icon>
-                              <NotEqualIcon></NotEqualIcon>
-                             </q-icon>
-                            </q-btn>
+                                <q-icon>
+                                  <NotEqualIcon></NotEqualIcon>
+                                </q-icon>
+                              </q-btn>
                             </div>
                           </q-item>
                         </q-list>
@@ -292,7 +300,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -305,11 +313,15 @@ import {
   formatLargeNumber,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
-import { getConsumableDateTime } from "@/utils/commons";
 import { Parser } from "node-sql-parser";
-import { outlinedAdd, outlinedVisibility, outlinedVisibilityOff } from '@quasar/extras/material-icons-outlined'
+import {
+  outlinedAdd,
+  outlinedVisibility,
+  outlinedVisibilityOff,
+} from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 interface Filter {
   fieldName: string;
@@ -318,7 +330,7 @@ interface Filter {
 }
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
-  components:{ EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -394,7 +406,9 @@ export default defineComponent({
         return;
       }
 
-      let timestamps = getConsumableDateTime(searchObj.data.datetime);
+      let timestamps = getConsumableRelativeTime(
+        searchObj.data.datetime.relativeTimePeriod
+      );
 
       if (searchObj.data.stream.streamType === "enrichment_tables") {
         const stream = searchObj.data.streamResults.list.find(
@@ -403,20 +417,24 @@ export default defineComponent({
         );
         if (stream.stats) {
           timestamps = {
-            start_time: new Date(
-              convertTimeFromMicroToMilli(stream.stats.doc_time_min - 300000000)
-            ),
-            end_time: new Date(
-              convertTimeFromMicroToMilli(stream.stats.doc_time_max + 300000000)
-            ),
+            startTime:
+              new Date(
+                convertTimeFromMicroToMilli(
+                  stream.stats.doc_time_min - 300000000
+                )
+              ).getTime() * 1000,
+            endTime:
+              new Date(
+                convertTimeFromMicroToMilli(
+                  stream.stats.doc_time_max + 300000000
+                )
+              ).getTime() * 1000,
           };
         }
       }
 
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      const startISOTimestamp: number = timestamps?.startTime || 0;
+      const endISOTimestamp: number = timestamps?.endTime || 0;
 
       fieldValues.value[name] = {
         isLoading: true,
@@ -657,9 +675,9 @@ export default defineComponent({
     &:hover {
       .field-container {
         // background-color: #ffffff;
+      }
     }
   }
-}
 }
 
 .theme-dark {

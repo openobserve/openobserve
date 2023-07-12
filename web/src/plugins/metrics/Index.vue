@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="metrics-page" id="logPage">
+  <q-page class="metrics-page" id="metricsPage">
     <div class="row scroll" style="width: 100%">
       <!-- Note: Splitter max-height to be dynamically calculated with JS -->
       <q-splitter
@@ -44,8 +44,22 @@
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
             <date-time
+              ref="metricsDateTimeRef"
+              auto-apply
+              :default-type="
+                searchObj.data.datetime.relativeTimePeriod
+                  ? 'relative'
+                  : 'absolute'
+              "
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                searchObj.data.datetime.relativeTimePeriod
+              "
               data-test="logs-search-bar-date-time-dropdown"
-              @date-change="updateDateTime"
+              @on:date-change="updateDateTime"
             />
             <auto-refresh-interval
               class="q-pr-sm"
@@ -114,7 +128,7 @@
               }}</q-item-label>
             </h5>
           </div>
-          <div v-else-if="!!!searchObj.data.metrics.selectedMetrics.length">
+          <div v-else-if="!!!searchObj.data.metrics.selectedMetric">
             <h5
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
@@ -175,7 +189,6 @@ import {
   onDeactivated,
   onActivated,
   onBeforeMount,
-  nextTick,
   watch,
 } from "vue";
 import { useQuasar, date } from "quasar";
@@ -184,16 +197,13 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import MetricList from "./MetricList.vue";
-import MetricsViewer from "./MetricsViewer.vue";
 import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage, showErrorNotification } from "@/utils/common";
 import DateTime from "@/components/DateTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
@@ -203,9 +213,10 @@ import useMetricsExplorer from "@/composables/useMetricsExplorer";
 import { cloneDeep } from "lodash-es";
 import AddToDashboard from "./AddToDashboard.vue";
 import { addPanel, getPanelId } from "@/utils/commons";
-import SearchService from "@/services/search";
-import { label } from "aws-amplify";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import useNotifications from "@/composables/useNotifications";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { on } from "events";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -228,7 +239,7 @@ export default defineComponent({
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.metrics.selectedMetrics[0],
+          stream_name: this.searchObj.data.metrics.selectedMetric,
           page: "Metrics explorer",
         });
       }
@@ -257,6 +268,7 @@ export default defineComponent({
     const promqlKeywords = ref([]);
 
     const chartData = ref({});
+    const { showErrorNotification } = useNotifications();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -288,9 +300,34 @@ export default defineComponent({
     const showAddToDashboardDialog = ref(false);
 
     onBeforeMount(() => {
+      if (searchObj.loading == false) {
+        loadPageData(true);
+        refreshData();
+      }
+      restoreUrlQueryParams();
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;
+    });
+
+    onDeactivated(() => {
+      clearInterval(refreshIntervalID);
+    });
+
+    onActivated(() => {
+      if (!searchObj.loading) updateStreams();
+      refreshData();
+
+      if (
+        searchObj.organizationIdetifier !=
+        store.state.selectedOrganization.identifier
+      ) {
+        loadPageData();
+      }
+
+      setTimeout(() => {
+        if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      }, 1500);
     });
 
     function ErrorException(message) {
@@ -336,7 +373,7 @@ export default defineComponent({
       { deep: true }
     );
 
-    function getStreamList() {
+    function getStreamList(isFirstLoad = false) {
       try {
         streamService
           .nameList(
@@ -349,7 +386,7 @@ export default defineComponent({
 
             if (res.data.list.length > 0) {
               //extract stream data from response
-              loadStreamLists();
+              loadStreamLists(isFirstLoad);
             } else {
               searchObj.loading = false;
               searchObj.data.errorMsg =
@@ -379,10 +416,10 @@ export default defineComponent({
       }
     }
 
-    function loadStreamLists() {
+    function loadStreamLists(isFirstLoad = false) {
       try {
         searchObj.data.metrics.metricList = [];
-        searchObj.data.metrics.selectedMetrics = [];
+        searchObj.data.metrics.selectedMetric = "";
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -393,26 +430,43 @@ export default defineComponent({
             };
             searchObj.data.metrics.metricList.push(itemObj);
 
-            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+            // If isFirstLoad is true, then select the stream from query params
+            if (
+              isFirstLoad &&
+              router.currentRoute.value?.query?.stream == item.name
+            ) {
+              lastUpdatedStreamTime = item.stats.doc_time_max;
+              selectedStreamItemObj = itemObj;
+            }
+
+            // If stream from query params dosent match the selected stream, then select the stream from last updated time
+            if (
+              item.stats.doc_time_max >= lastUpdatedStreamTime &&
+              !(
+                router.currentRoute.value.query?.stream &&
+                selectedStreamItemObj.value &&
+                router.currentRoute.value.query.stream ===
+                  selectedStreamItemObj.value
+              )
+            ) {
               lastUpdatedStreamTime = item.stats.doc_time_max;
               selectedStreamItemObj = itemObj;
             }
           });
           if (selectedStreamItemObj.label != undefined) {
-            searchObj.data.metrics.selectedMetrics = [];
-            searchObj.data.metrics.selectedMetrics.push(
-              selectedStreamItemObj.value
-            );
+            searchObj.data.metrics.selectedMetric = selectedStreamItemObj.value;
           } else {
             searchObj.loading = false;
             searchObj.data.queryResults = {};
-            searchObj.data.metrics.selectedMetrics = [];
+            searchObj.data.metrics.selectedMetric = "";
             searchObj.data.histogram = {
               xData: [],
               yData: [],
               chartParams: {},
             };
           }
+
+          if (isFirstLoad) runQuery();
         } else {
           searchObj.loading = false;
         }
@@ -493,16 +547,18 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        if (
-          !searchObj.data.metrics.selectedMetrics.length ||
-          !searchObj.data.query
-        ) {
+        if (!searchObj.data.metrics.selectedMetric || !searchObj.data.query) {
           return false;
         }
 
         // dismiss = Notify();
-
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(searchObj.data.datetime.startTime / 1000),
+          end_time: new Date(searchObj.data.datetime.endTime / 1000),
+        };
         chartData.value = cloneDeep(dashboardPanelData.data);
+        console.log(chartData.value);
+        updateUrlQueryParams();
       } catch (e) {
         searchObj.loading = false;
         showErrorNotification("Request failed.");
@@ -523,43 +579,15 @@ export default defineComponent({
       };
     };
 
-    function loadPageData() {
+    function loadPageData(isFirstLoad = false) {
       // searchObj.loading = true;
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
 
       //get stream list
-      getStreamList();
+      getStreamList(isFirstLoad);
     }
-
-    onMounted(() => {
-      if (searchObj.loading == false) {
-        loadPageData();
-
-        refreshData();
-      }
-    });
-
-    onDeactivated(() => {
-      clearInterval(refreshIntervalID);
-    });
-
-    onActivated(() => {
-      if (!searchObj.loading) updateStreams();
-      refreshData();
-
-      if (
-        searchObj.organizationIdetifier !=
-        store.state.selectedOrganization.identifier
-      ) {
-        loadPageData();
-      }
-
-      setTimeout(() => {
-        if (searchResultRef.value) searchResultRef.value.reDrawChart();
-      }, 1500);
-    });
 
     const refreshData = () => {
       if (
@@ -586,27 +614,28 @@ export default defineComponent({
     const setQuery = () => {};
 
     const updateDateTime = (value: any) => {
-      searchObj.data.datetime = value;
-
-      const timestamp = getConsumableDateTime(searchObj.data.datetime);
-      dashboardPanelData.meta.dateTime = timestamp;
+      searchObj.data.datetime = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod: value.relativeTimePeriod
+          ? value.relativeTimePeriod
+          : searchObj.data.datetime.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
 
       if (config.isCloud == "true" && value.userChangedValue) {
-        let dateTimeVal;
-        if (value.tab === "relative") {
-          dateTimeVal = value.relative;
-        } else {
-          dateTimeVal = value.absolute;
-        }
-
         segment.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
-          value: dateTimeVal,
-          metric_name: searchObj.data.metrics.selectedMetrics[0],
-          page: "Search Metrics",
+          value: value,
+          //user_org: this.store.state.selectedOrganization.identifier,
+          //user_id: this.store.state.userInfo.email,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
         });
       }
+
+      if (value.valueType === "relative") runQuery();
     };
 
     const updateQueryValue = async (event, value) => {
@@ -661,6 +690,60 @@ export default defineComponent({
           dismiss();
         });
     };
+
+    const onMetricChange = async (metric) => {
+      metricsQueryEditorRef.value.setValue(metric);
+    };
+
+    function restoreUrlQueryParams() {
+      const queryParams = router.currentRoute.value.query;
+      if (!queryParams.stream) {
+        return;
+      }
+      const date = {
+        startTime: queryParams.from,
+        endTime: queryParams.to,
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
+      if (date) {
+        searchObj.data.datetime = date;
+      }
+      if (queryParams.query) {
+        searchObj.data.query = b64DecodeUnicode(queryParams.query);
+        dashboardPanelData.data.query = searchObj.data.query;
+      }
+      if (queryParams.refresh) {
+        searchObj.meta.refreshInterval = queryParams.refresh;
+      }
+    }
+
+    function updateUrlQueryParams() {
+      try {
+        const date = searchObj.data.datetime;
+        const query = {
+          stream: searchObj.data.metrics.selectedMetric,
+        };
+
+        if (date.type == "relative") {
+          query["period"] = date.relativeTimePeriod;
+        } else {
+          query["from"] = date.startTime;
+          query["to"] = date.endTime;
+        }
+
+        query["refresh"] = searchObj.meta.refreshInterval;
+
+        if (searchObj.data.query) {
+          query["query"] = b64EncodeUnicode(searchObj.data.query);
+        }
+        query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+        router.push({ query });
+      } catch (err) {
+        console.log(err);
+      }
+    }
     return {
       store,
       router,
@@ -684,6 +767,7 @@ export default defineComponent({
       addPanelToDashboard,
       promqlKeywords,
       autoCompletePromqlKeywords,
+      onMetricChange,
     };
   },
   computed: {
@@ -693,8 +777,8 @@ export default defineComponent({
     changeOrganization() {
       return this.store.state.selectedOrganization.identifier;
     },
-    selectedMetrics() {
-      return this.searchObj.data.metrics.selectedMetrics;
+    selectedMetric() {
+      return this.searchObj.data.metrics.selectedMetric;
     },
     changeRelativeDate() {
       return (
@@ -715,22 +799,19 @@ export default defineComponent({
       );
       this.loadPageData();
     },
-    selectedMetrics: {
+    selectedMetric: {
       deep: true,
-      handler: function () {
-        if (this.searchObj.data.metrics.selectedMetrics.length) {
+      handler: function (metric) {
+        if (this.searchObj.data.metrics.selectedMetric) {
+          this.onMetricChange(metric);
           setTimeout(() => {
             this.runQuery();
           }, 500);
         }
       },
     },
-    changeRelativeDate() {
-      if (this.searchObj.data.datetime.tab == "relative") {
-        this.runQuery();
-      }
-    },
     changeRefreshInterval() {
+      this.updateUrlQueryParams();
       this.refreshData();
     },
   },

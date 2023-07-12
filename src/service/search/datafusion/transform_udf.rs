@@ -14,7 +14,7 @@
 
 use ahash::AHashMap;
 use arrow::array::StructArray;
-use arrow_schema::Field;
+use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringArray},
@@ -63,7 +63,7 @@ fn create_user_df(
         create_udf(
             fn_name,
             input_vec,
-            Arc::new(DataType::Struct(output_type)),
+            Arc::new(DataType::Struct(output_type.into())),
             Volatility::Immutable,
             pow_scalar,
         )
@@ -172,7 +172,13 @@ fn get_udf_vrl(
             }
             data_vec.sort_by(|a, b| a.0.name().cmp(b.0.name()));
 
-            let result = StructArray::from(data_vec);
+            let fields: Fields = data_vec
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<Field>>()
+                .into();
+            let array_ref = data_vec.iter().map(|x| x.1.clone()).collect();
+            let result = StructArray::new(fields, array_ref, None);
             Ok(Arc::new(result) as ArrayRef)
         } else {
             let result = StringArray::from(res_data_vec);
@@ -248,7 +254,6 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::MemTable;
-    use datafusion::from_slice::FromSlice;
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
 
@@ -270,8 +275,8 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from_slice(&["2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"])),
-                Arc::new(Int64Array::from_slice(&[1, 2, 1, 2])),
+                Arc::new(StringArray::from(vec!["2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA", "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"])),
+                Arc::new(Int64Array::from(vec![1, 2, 1, 2])),
             ],
         )
         .unwrap();

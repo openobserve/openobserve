@@ -17,8 +17,10 @@
   <div class="column index-menu">
     <q-select
       data-test="log-search-index-list-select-stream"
-      v-model="searchMetricValue"
-      :label="searchMetricValue ? '' : t('search.selectIndex')"
+      v-model="searchObj.data.metrics.selectedMetric"
+      :label="
+        searchObj.data.metrics.selectedMetric ? '' : t('search.selectIndex')
+      "
       :options="streamOptions"
       data-cy="index-dropdown"
       input-debounce="0"
@@ -31,6 +33,7 @@
       hide-selected
       fill-input
       @filter="filterMetrics"
+      @update:model-value="onMetricChange"
     >
       <template #no-option>
         <q-item>
@@ -192,12 +195,12 @@ import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import { getConsumableDateTime } from "@/utils/commons";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
 import stream from "@/services/stream";
 
 export default defineComponent({
   name: "MetricsList",
-  setup() {
+  emits: ["update:change-metric"],
+  setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -213,17 +216,12 @@ export default defineComponent({
         values: { key: string; count: number | string }[];
       };
     }> = ref({});
-    const { dashboardPanelData } = useDashboardPanelData();
 
     watch(
       () => searchObj.data.metrics.metricList.length,
       () => {
         streamOptions.value = searchObj.data.metrics.metricList;
       }
-    );
-
-    const searchMetricValue: Ref<string> = ref(
-      searchObj.data.metrics.selectedMetrics[0]
     );
 
     const filterMetrics = (val: string, update: any) => {
@@ -236,19 +234,20 @@ export default defineComponent({
       });
     };
 
-    watch(
-      () => searchMetricValue.value,
-      () => {
-        updateMetricLabels();
-      }
-    );
-
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
-        (stream: any) => stream.name === searchMetricValue.value
+        (stream: any) => stream.name === searchObj.data.metrics.selectedMetric
       ).schema;
       filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
+
+    watch(
+      () => searchObj.data.metrics.selectedMetric,
+      (metric) => {
+        if (metric) updateMetricLabels();
+      },
+      { immediate: true }
+    );
 
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
@@ -263,30 +262,20 @@ export default defineComponent({
       return filtered;
     };
 
-    const updateSelectedMetrics = (metric: any) => {
-      searchObj.data.metrics.selectedMetrics = [];
-      searchObj.data.metrics.selectedMetrics.push(metric);
-    };
-
     const openFilterCreator = (event: any, { name }: any) => {
-      console.log("open filter creator", name);
-
-      let timestamps = getConsumableDateTime(searchObj.data.datetime);
-
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+      const startISOTimestamp: any = searchObj.data.datetime.startTime;
+      const endISOTimestamp: any = searchObj.data.datetime.endTime;
 
       metricLabelValues.value[name] = {
         isLoading: true,
         values: [],
       };
+
       try {
         stream
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchMetricValue.value,
+            stream_name: searchObj.data.metrics.selectedMetric,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
@@ -316,6 +305,10 @@ export default defineComponent({
       }
     };
 
+    const onMetricChange = () => {
+      updateMetricLabels();
+    };
+
     return {
       quasar,
       t,
@@ -325,13 +318,12 @@ export default defineComponent({
       streamOptions,
       getImageURL,
       filterMetrics,
-      updateSelectedMetrics,
-      searchMetricValue,
       filteredMetricLabels,
       searchMetricLabel,
       filterMetricLabels,
       openFilterCreator,
       metricLabelValues,
+      onMetricChange,
     };
   },
 });

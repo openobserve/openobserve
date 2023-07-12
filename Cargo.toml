@@ -51,8 +51,8 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 ahash = { version = "0.8", features = ["serde"] }
 anyhow = "1.0"
 argon2 = { version = "0.4", features = ["alloc", "password-hash"] }
-arrow = { version = "36", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "36", features = ["serde"] }
+arrow = { version = "42", features = ["simd", "ipc_compression"] }
+arrow-schema = { version = "42", features = ["serde"] }
 async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
@@ -71,7 +71,7 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "22", features = ["simd"] }
+datafusion = { version = "27", features = ["simd"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -84,15 +84,14 @@ hex = "0.4"
 http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
 ipnetwork = "0.20"
-itertools = "0.10.5"
+itertools = "0.11"
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.10"
 memchr = "2.5"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-object_store = { version = "0.5", features = [
+object_store = { version = "0.6", features = [
   "aws",
-  "aws_profile",
   "azure",
   "gcp",
 ] }
@@ -110,7 +109,7 @@ opentelemetry-proto = { version = "0.1", features = [
   "build-server",
 ] }
 parking_lot = "0.12"
-parquet = { version = "36", features = ["arrow", "async"] }
+parquet = { version = "42", features = ["arrow", "async"] }
 prometheus = "0.13"
 promql-parser = "0.1"
 prost = "0.11"
@@ -161,6 +160,6 @@ prost-build = "0.11"
 tonic-build = { version = "0.8", features = ["prost"] }
 
 [dev-dependencies]
-datafusion-expr = "22"
+datafusion-expr = "27"
 expect-test = "1.4"
 float-cmp = "0.9"

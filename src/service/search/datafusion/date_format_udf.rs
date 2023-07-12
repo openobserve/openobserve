@@ -107,7 +107,6 @@ mod tests {
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::assert_batches_eq;
     use datafusion::datasource::MemTable;
-    use datafusion::from_slice::FromSlice;
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
 
@@ -179,8 +178,8 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from_slice(&["a"])),
-                Arc::new(Int64Array::from_slice(&[data_time])),
+                Arc::new(StringArray::from(vec!["a"])),
+                Arc::new(Int64Array::from(vec![data_time])),
             ],
         )
         .unwrap();

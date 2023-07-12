@@ -373,6 +373,10 @@ pub struct S3 {
     pub request_timeout: u64,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
     pub feature_force_path_style: bool,
+    #[env_config(name = "ZO_S3_FEATURE_HTTP1_ONLY", default = false)]
+    pub feature_http1_only: bool,
+    #[env_config(name = "ZO_S3_FEATURE_HTTP2_ONLY", default = false)]
+    pub feature_http2_only: bool,
     #[env_config(name = "ZO_S3_ALLOW_INVALID_CERTIFICATES", default = false)]
     pub allow_invalid_certificates: bool,
 }
