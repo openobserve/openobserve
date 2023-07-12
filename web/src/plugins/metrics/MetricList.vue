@@ -32,9 +32,47 @@
       use-input
       hide-selected
       fill-input
+      class="metric-select-input"
       @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
+      <template v-slot:prepend>
+        <q-icon
+          :title="searchObj.data.metrics.selectedMetricType"
+          size="xs"
+          :name="metricsIconMapping[searchObj.data.metrics.selectedMetricType]"
+        />
+      </template>
+      <template v-slot:option="scope">
+        <q-item
+          v-bind="scope.itemProps"
+          @click="setSelectedMetricType(scope?.opt)"
+        >
+          <q-item-section
+            :title="scope?.opt?.type"
+            class="metric-explore-metric-icon"
+            avatar
+          >
+            <q-icon
+              size="xs"
+              :name="metricsIconMapping[scope?.opt?.type] || ''"
+            />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>{{ scope.opt.label }}</q-item-label>
+          </q-item-section>
+        </q-item>
+        <!-- <q-item v-bind="scope.itemProps">
+          <q-item-section>
+            <q-item-label
+              >{{ scope.opt.label }}
+              <span class="q-pl-xs text-bold" v-show="scope?.opt?.type"
+                >({{ scope?.opt?.type }})</span
+              >
+            </q-item-label>
+          </q-item-section>
+        </q-item> -->
+      </template>
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -187,7 +225,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -196,6 +234,7 @@ import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import { getConsumableDateTime } from "@/utils/commons";
 import stream from "@/services/stream";
+import { Scope } from "@sentry/vue";
 
 export default defineComponent({
   name: "MetricsList",
@@ -210,12 +249,20 @@ export default defineComponent({
     const selectedMetricLabels = ref([]);
     const searchMetricLabel = ref("");
     const filteredMetricLabels = ref([]);
+    const selectedMetricType = ref("");
     const metricLabelValues: Ref<{
       [key: string]: {
         isLoading: boolean;
         values: { key: string; count: number | string }[];
       };
     }> = ref({});
+
+    const metricsIconMapping: any = {
+      summary: "description",
+      gauge: "speed",
+      histogram: "bar_chart",
+      counter: "pin",
+    };
 
     watch(
       () => searchObj.data.metrics.metricList.length,
@@ -309,6 +356,10 @@ export default defineComponent({
       updateMetricLabels();
     };
 
+    const setSelectedMetricType = (option: any) => {
+      searchObj.data.metrics.selectedMetricType = option.type;
+    };
+
     return {
       quasar,
       t,
@@ -324,6 +375,8 @@ export default defineComponent({
       openFilterCreator,
       metricLabelValues,
       onMetricChange,
+      metricsIconMapping,
+      setSelectedMetricType,
     };
   },
 });
@@ -658,5 +711,12 @@ export default defineComponent({
       }
     }
   }
+}
+</style>
+
+<style lang="scss">
+.metric-explore-metric-icon {
+  min-width: 28px !important;
+  padding-right: 8px !important;
 }
 </style>
