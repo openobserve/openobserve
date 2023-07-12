@@ -200,11 +200,20 @@ export default defineComponent({
           delete variableData["query_data"];
         }
 
+      try {
         await addVariable(
-          store,
-          dashId,
-          variableData
+        store,
+        dashId,
+        variableData
         );
+      } 
+      catch (error) {
+          $q.notify({
+            type: "negative",
+            message: "Variable already exists",
+            timeout: 2000,
+          });
+      }
 
         emit('save');
       }
