@@ -23,9 +23,11 @@ use utoipa::ToSchema;
 
 mod aggregations;
 mod binaries;
+pub mod common;
 mod engine;
 mod exec;
 mod functions;
+
 pub mod search;
 pub mod value;
 
