@@ -10,7 +10,7 @@
           readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="min-width: 100px !important" v-model="item.value" :label="item.label || item.name" dense
+        <q-input style="min-width: 100px !important" debounce="500" v-model="item.value" :label="item.label || item.name" dense
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
