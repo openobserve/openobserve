@@ -76,7 +76,7 @@ impl Engine {
                         let out = v
                             .iter()
                             .map(|instant| InstantValue {
-                                labels: instant.labels.clone(),
+                                labels: instant.labels.without_metric_name(),
                                 sample: Sample {
                                     timestamp: instant.sample.timestamp,
                                     value: -1.0 * instant.sample.value,
@@ -693,10 +693,19 @@ impl Engine {
                 )));
             }
             Func::QuantileOverTime => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
+
+                self.ensure_two_args(args, err)?;
+                let phi_quantile = match self.call_expr_first_arg(args).await {
+                    Ok(Value::Float(v)) => v,
+                    _ => {
+                        return Err(DataFusionError::Plan(format!(
+                            "[quantile] param must be a NumberLiteral"
+                        )))
+                    }
+                };
+                let input = self.call_expr_second_arg(args).await?;
+                functions::quantile_over_time(self.time, phi_quantile, &input)?
             }
             Func::Rate => functions::rate(&input)?,
             Func::Resets => functions::resets(&input)?,
