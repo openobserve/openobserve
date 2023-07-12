@@ -87,6 +87,10 @@ export default defineComponent({
       width: {
           type: Number,
           default: 12,
+      },
+      variablesData: {
+        type: Object,
+        default: () => null
       }
   },
 
@@ -158,10 +162,10 @@ export default defineComponent({
         isVisible.value = entries[0].isIntersecting;
       }
 
-      watch(()=> isVisible.value, async()=> {
-          if(isDirty.value && props.data.query){
-              fetchQueryData()
-          }
+      watch(() => isVisible.value, async () => {
+        if (isVisible.value && isDirty.value && props.data.query) {
+            fetchQueryData();
+        }
       })
 
       // remove intersection observer
@@ -170,6 +174,53 @@ export default defineComponent({
             observer.disconnect();
         }
       });
+
+      // [START] variables management
+      let currentDependentVariablesData = props.variablesData?.values || []
+
+      // check when the variables data changes
+      // 1. get the dependent variables
+      // 2. compare the dependent variables data with the old dependent variables Data
+      // 3. if the value of any current variable is changed, call the api
+      watch(() => props.variablesData?.values, () => {
+        // ensure the query is there
+        if(!props.data?.query) {
+            return;
+        }
+
+        // 1. get the dependent variables list
+        const newDependentVariablesData = props?.variablesData?.values?.filter((it: any) =>
+            props.data.query.includes(`$${it.name}`)
+        );
+
+        // if no variables, no need to rerun the query
+        if(!newDependentVariablesData?.length) {
+            return;
+        }
+
+        // 2. compare with the previously saved variable values, the variables data is an array of objects with name and value
+        const isAllValuesSame = newDependentVariablesData.every((it: any) => {
+            const oldValue = currentDependentVariablesData.find((it2: any) => it2.name == it.name);
+            return it.value == oldValue?.value;
+        });
+
+        if(!isAllValuesSame) {
+            currentDependentVariablesData = JSON.parse(JSON.stringify(newDependentVariablesData));
+            isDirty.value = true;
+            if(isVisible.value) {
+                fetchQueryData();
+            }
+        }
+    }, { deep: true });
+
+
+      const isQueryDependentOnTheVariables = () => {
+        const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+            props.data.query.includes(`$${it.name}`)
+        );
+        return dependentVariables?.length > 0;
+      }
+      // [END] variables management
 
       // If query changes, we need to get the data again and rerender the chart
       watch(
@@ -347,17 +398,55 @@ export default defineComponent({
           return tickVals
       }
 
+      const canRunQueryBasedOnVariables = () => {
+        
+        const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+            props.data.query.includes(`$${it.name}`)
+        );
+
+        if (dependentVariables?.length > 0) {
+            const dependentAvailableVariables = dependentVariables.filter(
+                (it: any) => !it.isLoading
+                );
+           
+            if (dependentAvailableVariables.length == dependentVariables.length) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return true;
+        }
+      };
+
+    const replaceQueryValue = (query: any) => {
+        if(currentDependentVariablesData?.length){
+
+            currentDependentVariablesData?.forEach((variable:any) => {
+                const variableName = `$${variable.name}`;
+                const variableValue = variable.value;
+                query = query.replace(variableName, variableValue);
+            });
+            return query;
+        }else{
+            return query
+        }
+    }
+
       // returns tick length
       // if width is 12, tick length is 10
       const getTickLength = () => props.width - 2
 
       // Chart Related Functions
       const fetchQueryData = async () => {
-        isDirty.value = false
-        // console.log("fetching query data for panel: ", props.data.config.title);
+          // If the current query is dependent and the the data is not available for the variables, then don't run the query
+          if(isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
+            return;
+          }
+          isDirty.value = false
 
-        
-          const queryData = props.data.query;
+          // continue if it is not dependent on the variables or dependent variables' values are available
+          let queryData = props.data.query;
           const chartParams = {
               title: "Found " + "2" + " hits in " + "10" + " ms",
           };
@@ -378,9 +467,11 @@ export default defineComponent({
               endISOTimestamp =
                   new Date(timestamps.end_time.toISOString()).getTime() * 1000;
           }
+          //replace query value
+         
           const query = {
               query: {
-                  sql: queryData,
+                  sql: replaceQueryValue(queryData),
                   sql_mode: "full",
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
@@ -392,11 +483,11 @@ export default defineComponent({
 
             // Check if stream_type is "metrics", customQuery exists, and queryType is "promql"
             if (props.data.fields.stream_type == "metrics" && props.data.customQuery && props.data.queryType == "promql") {
-                // Call metrics_query_range API
+                
                 await queryService
                     .metrics_query_range({
                         org_identifier: store.state.selectedOrganization.identifier,
-                        query: queryData,
+                        query: replaceQueryValue(queryData),
                         start_time: startISOTimestamp,
                         end_time: endISOTimestamp
                     })
