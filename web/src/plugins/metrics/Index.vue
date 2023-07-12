@@ -28,6 +28,7 @@
           <metric-list
             data-test="logs-search-index-list"
             :key="searchObj.data.metrics.metricList"
+            @select-label="addLabelToEditor"
           />
         </template>
         <template #separator>
@@ -767,6 +768,11 @@ export default defineComponent({
         console.log(err);
       }
     }
+    const addLabelToEditor = (label) => {
+      metricsQueryEditorRef.value.setValue(
+        dashboardPanelData.data.query + label
+      );
+    };
     return {
       store,
       router,
@@ -792,6 +798,7 @@ export default defineComponent({
       autoCompletePromqlKeywords,
       onMetricChange,
       updateUrlQueryParams,
+      addLabelToEditor,
     };
   },
   computed: {
