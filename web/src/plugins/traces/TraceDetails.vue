@@ -127,8 +127,8 @@
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
-      <q-spinner color="primary" size="3em" :thickness="2" />
-      <div class="q-pt-sm">Getting trace data</div>
+      <q-spinner-hourglass color="primary" size="3em" :thickness="2" />
+      <div class="q-pt-sm">Fetching your trace.</div>
     </div>
   </div>
 </template>

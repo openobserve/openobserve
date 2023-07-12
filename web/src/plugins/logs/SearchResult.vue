@@ -16,8 +16,12 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column oveflow-hidden">
-    <div class="search-list" ref="searchListContainer" style="width: 100%">
+  <div class="col column oveflow-hidden full-height">
+    <div
+      class="search-list full-height"
+      ref="searchListContainer"
+      style="width: 100%"
+    >
       <BarChart
         data-test="logs-search-result-bar-chart"
         ref="plotChart"
@@ -34,6 +38,7 @@
         id="searchGridComponent"
         type="table"
         ref="searchTableRef"
+        class="logs-search-result-table"
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
         :virtual-scroll-sticky-size-end="0"
@@ -41,6 +46,12 @@
         :virtual-scroll-slice-ratio-before="10"
         :items="searchObj.data.queryResults.hits"
         @virtual-scroll="onScroll"
+        :style="{
+          height:
+            !searchObj.meta.showHistogram || searchObj.meta.sqlMode
+              ? 'calc(100% - 0px)'
+              : 'calc(100% - 150px)',
+        }"
       >
         <template v-slot:before>
           <thead class="thead-sticky text-left">

@@ -15,7 +15,7 @@
 
 <template>
   <div
-    class="column index-menu"
+    class="column index-menu full-height"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div>
@@ -553,6 +553,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+$streamSelectorHeight: 44px;
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
@@ -584,6 +585,7 @@ export default defineComponent({
 
   .index-table {
     width: 100%;
+    height: calc(100% - $streamSelectorHeight);
     // border: 1px solid rgba(0, 0, 0, 0.02);
 
     .q-table {
