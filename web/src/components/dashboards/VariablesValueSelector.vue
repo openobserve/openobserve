@@ -40,8 +40,6 @@ export default defineComponent({
       values: []
     })
 
-    // TODO: update values on time change (if required)
-
     onMounted(() => {
       getVariablesData()
     })
