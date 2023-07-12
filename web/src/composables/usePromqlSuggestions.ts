@@ -256,7 +256,7 @@ const usePromlqSuggestions = () => {
     metricKeywords.value = [];
     metrics.forEach((metric: any) => {
       metricKeywords.value.push({
-        label: metric.label,
+        label: metric.label + (metric.type ? `(${metric.type})` : ""),
         kind: "Variable",
         insertText: metric.label,
       });
