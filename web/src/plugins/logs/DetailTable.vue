@@ -53,7 +53,7 @@
     <q-separator />
 
     <q-tab-panels data-test="log-detail-tab-container" v-model="tab" animated>
-      <q-tab-panel name="table">
+      <q-tab-panel name="table" class="q-pa-none">
         <q-card-section
           class="q-pa-none q-mb-lg"
           data-test="log-detail-table-content"
@@ -87,7 +87,7 @@
               >
                 <q-item-section
                   :data-test="`log-detail-${value}-key`"
-                  class="col-3"
+                  class="col-3 text-weight-regular"
                   >{{ value }}</q-item-section
                 >
                 <q-item-section
@@ -159,7 +159,6 @@
                   >
                 </q-item-section>
               </q-item>
-              <q-item></q-item>
             </q-list>
           </div>
         </q-card-section>
@@ -239,24 +238,6 @@
                       >
                     </q-item-section>
                   </q-item>
-                  <!-- <q-item clickable v-close-popup>
-                    <q-item-section>
-                      <q-item-label
-                        data-test="log-details-exclude-field-btn"
-                        @click="key;"
-                        ><q-btn
-                          title="Add field to table"
-                          icon="
-                                visibility
-                              "
-                          size="6px"
-                          round
-                          class="q-mr-sm pointer"
-                        ></q-btn
-                        >Add field to table</q-item-label
-                      >
-                    </q-item-section>
-                  </q-item> -->
                 </q-list>
               </q-btn-dropdown>
 
@@ -481,7 +462,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .searchdetaildialog {
-  width: 60vw;
+  width: 70vw;
 }
 
 .q-item__section {
@@ -490,6 +471,12 @@ export default defineComponent({
 
 .indexDetailsContainer .q-list .q-item {
   height: auto;
+}
+
+.indexDetailsContainer .q-list .q-item .q-item__section {
+  padding: 4px 8px !important;
+  font-size: 12px;
+  font-family: monospace;
 }
 
 .indexDetailsContainer {
@@ -509,7 +496,7 @@ export default defineComponent({
   word-wrap: break-word;
   display: inline;
   font-weight: normal;
-  font-family: Nunito Sans, sans-serif;
+  font-family: monospace;
 }
 
 .json-pre {
