@@ -487,7 +487,7 @@ export default defineComponent({
                 await queryService
                     .metrics_query_range({
                         org_identifier: store.state.selectedOrganization.identifier,
-                        query: queryData,
+                        query: replaceQueryValue(queryData),
                         start_time: startISOTimestamp,
                         end_time: endISOTimestamp
                     })
