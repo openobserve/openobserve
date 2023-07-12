@@ -405,10 +405,7 @@ async fn handle_existing_schema(
 
         if !*lock_acquired {
             *lock_acquired = true; // We've acquired the lock.
-            log::info!(
-                "Acquired lock for stream {} as schema is empty",
-                stream_name
-            );
+            log::info!("Acquired lock for stream {} to update schema", stream_name);
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
@@ -436,13 +433,13 @@ async fn handle_existing_schema(
                 .await
                 .unwrap();
                 stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
-                *lock_acquired = false;
             } else {
                 //No Change in schema.
-                *lock_acquired = false;
-                drop(lock_acquired); // release lock
                 stream_schema_map.insert(stream_name.to_string(), schema.clone());
             }
+            *lock_acquired = false;
+            drop(lock_acquired); // release lock
+
             return Some(SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
@@ -451,16 +448,21 @@ async fn handle_existing_schema(
             });
         } else {
             // Some other request has already acquired the lock.
-            drop(lock_acquired); // release lock
-            let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
+            let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
-            log::info!(
-                "Schema exists for stream {} after schema is set 2",
-                stream_name
-            );
-            None
+            let (field_datatype_delta, _is_schema_changed, final_fields) =
+                get_schema_changes(&schema, &inferred_schema);
+            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+            log::info!("Schema exists for stream {} ", stream_name);
+            *lock_acquired = false;
+            drop(lock_acquired); // release lock
+            return Some(SchemaEvolution {
+                schema_compatible: true,
+                types_delta: Some(field_datatype_delta),
+                schema_fields: final_fields,
+                is_schema_changed: false,
+            });
         }
     }
 }
@@ -545,7 +547,6 @@ async fn handle_new_schema(
                 .or_insert_with(|| tokio::sync::RwLock::new(false));
 
             let mut lock_acquired = value.write().await; // lock acquired
-
             if !*lock_acquired {
                 *lock_acquired = true; // We've acquired the lock.
                 log::info!(
@@ -571,6 +572,7 @@ async fn handle_new_schema(
                     .await
                     .unwrap();
                     *lock_acquired = false;
+                    drop(lock_acquired); // release lock
                     return Some(SchemaEvolution {
                         schema_compatible: true,
                         types_delta: None,
@@ -578,25 +580,24 @@ async fn handle_new_schema(
                         is_schema_changed: true,
                     });
                 } else {
-                    // Someone else has already acquired the lock.
+                    // No schema change
+                    *lock_acquired = false;
                     drop(lock_acquired); // release lock
                     *schema = chk_schema;
                     log::info!(
-                        "Schema exists for stream {} after schema is set 1",
+                        "Schema exists for stream {} and No schema change",
                         stream_name
                     );
                 }
             } else {
                 // Some other request has already acquired the lock.
+                *lock_acquired = false;
                 drop(lock_acquired); // release lock
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await
                     .unwrap();
                 *schema = chk_schema;
-                log::info!(
-                    "Schema exists for stream {} after schema is set 2",
-                    stream_name
-                );
+                log::info!("Schema exists for stream {} ,already locked", stream_name);
             }
         }
     }
