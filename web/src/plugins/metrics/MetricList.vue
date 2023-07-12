@@ -378,7 +378,7 @@ export default defineComponent({
       searchObj.data.metrics.selectedMetricType = option.type;
     };
 
-    const addLabelToEditor = (label) => {
+    const addLabelToEditor = (label: string) => {
       emit("select-label", label);
     };
 
