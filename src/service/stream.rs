@@ -19,11 +19,14 @@ use std::io::Error;
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
+    prom::MetricType,
     stream::{Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
 use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
 use crate::service::db;
+
+use super::metrics::get_prom_metadata_from_schema;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 const LOCAL: &str = "disk";
@@ -141,10 +144,21 @@ pub fn stream_res(
     };
     stats.created_at = created_at;
 
+    let metrics_type = if stream_type == StreamType::Metrics {
+        if let Some(metrics_meta) = get_prom_metadata_from_schema(&schema) {
+            Some(metrics_meta.metric_type)
+        } else {
+            Some(MetricType::Unknown)
+        }
+    } else {
+        None
+    };
+
     Stream {
         name: stream_name.to_string(),
-        stream_type,
         storage_type: storage_type.to_string(),
+        stream_type,
+        metrics_type,
         schema: mappings,
         stats,
         settings: StreamSettings {
