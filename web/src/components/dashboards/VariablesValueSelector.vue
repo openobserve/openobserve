@@ -2,7 +2,7 @@
   <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
     <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
-        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options"
+        <q-select style="min-width: 100px;"  filled outlined dense v-model="item.value" :options="item.options"
           :label="item.label || item.name"></q-select>
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -15,7 +15,7 @@
       </div>
       <div v-else-if="item.type == 'custom'">
         <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options"
-          :label="item.label || item.name"></q-select>
+          :label="item.label || item.name" option-value="value" option-label="value" emit-value></q-select>
       </div>
     </div>
   </div>
@@ -124,7 +124,16 @@ export default defineComponent({
           }
           case "custom": {
             obj["options"] = it.options
-            obj.value = obj.options[0] || ""
+            let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name)
+
+            // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+            if (oldVariableObjectSelectedValue) {
+              obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : ""
+            }
+            else {
+              obj.value = obj.options[0] || ""
+            }
+            // obj.value = obj.options[0] || ""
             return obj
             // break;
           }
