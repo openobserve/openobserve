@@ -35,7 +35,7 @@ pub type Labels = Vec<Arc<Label>>;
 pub trait LabelsExt {
     /// Remove the metric name i.e. __name__ from the given label
     ///
-    /// ```
+    /// ```json
     /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
     /// ```
     fn without_metric_name(&self) -> Labels;
