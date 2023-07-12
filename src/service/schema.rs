@@ -405,7 +405,7 @@ pub async fn check_for_schema(
                     );
                 }
             } else {
-                // Someone else has already acquired the lock.
+                // Some other request has already acquired the lock.
                 drop(lock_acquired); // release lock
                 let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                     .await
@@ -418,49 +418,20 @@ pub async fn check_for_schema(
             }
         }
     }
-    let schema_fields = schema.to_cloned_fields();
-    let mut field_datatype_delta: Vec<_> = vec![];
-    let mut new_field_delta: Vec<_> = vec![];
-    let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
-    let mut is_schema_changed = false;
 
-    for f in schema_fields.iter() {
-        merged_fields.insert(f.name().to_owned(), f.clone());
-    }
+    if !schema.fields().eq(inferred_schema.fields()) {
+        let mut lock = etcd::Locker::new(&format!(
+            "/schema/lock/{org_id}/{stream_type}/{stream_name}"
+        ));
+        lock.lock(0).await.map_err(server_internal_error).unwrap();
 
-    for item in inferred_schema.to_cloned_fields().iter() {
-        let item_name = item.name();
-        let item_data_type = item.data_type();
+        log::info!("Acquired lock for stream {} to update schema", stream_name);
+        let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
 
-        match merged_fields.get(item_name) {
-            Some(existing_field) => {
-                if existing_field.data_type() != item_data_type {
-                    if !CONFIG.common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.clone());
-                    } else {
-                        let allowed =
-                            is_widening_conversion(existing_field.data_type(), item_data_type);
-                        if allowed {
-                            is_schema_changed = true;
-                            field_datatype_delta.push(item.to_owned().clone());
-                            merged_fields.insert(item_name.to_owned(), item.clone());
-                        } else {
-                            let mut meta = existing_field.metadata().clone();
-                            meta.insert("zo_cast".to_owned(), true.to_string());
-                            field_datatype_delta.push(existing_field.clone().with_metadata(meta));
-                        }
-                    }
-                }
-            }
-            None => {
-                is_schema_changed = true;
-                new_field_delta.push(item);
-                merged_fields.insert(item_name.to_owned(), item.to_owned().clone());
-            }
-        }
-    }
-    let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
-    if is_schema_changed {
+        let (field_datatype_delta, is_schema_changed, final_fields) =
+            get_schema_changes(&schema, &inferred_schema);
         let is_field_delta = !field_datatype_delta.is_empty();
         let mut metadata = schema.metadata().clone();
         if !metadata.contains_key("created_at") {
@@ -471,24 +442,38 @@ pub async fn check_for_schema(
         }
         metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
-        db::schema::set(
-            org_id,
-            stream_name,
-            stream_type,
-            &final_schema,
-            Some(record_ts),
-            is_field_delta,
-        )
-        .await
-        .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
-    }
+        println!("delta is : {:?}", field_datatype_delta);
+        if is_schema_changed {
+            db::schema::set(
+                org_id,
+                stream_name,
+                stream_type,
+                &final_schema,
+                Some(record_ts),
+                is_field_delta,
+            )
+            .await
+            .unwrap();
+            lock.unlock().await.map_err(server_internal_error).unwrap();
+            stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
+        } else {
+            lock.unlock().await.map_err(server_internal_error).unwrap();
+            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+        }
 
-    SchemaEvolution {
-        schema_compatible: true,
-        types_delta: Some(field_datatype_delta),
-        schema_fields: final_fields,
-        is_schema_changed,
+        return SchemaEvolution {
+            schema_compatible: true,
+            types_delta: Some(field_datatype_delta),
+            schema_fields: final_fields,
+            is_schema_changed,
+        };
+    } else {
+        SchemaEvolution {
+            schema_compatible: true,
+            types_delta: None,
+            schema_fields: schema.to_cloned_fields(),
+            is_schema_changed: false,
+        }
     }
     // if !CONFIG.common.widening_schema_evolution {
     //     //return (true, Some(field_datatype_delta), schema.fields().to_vec());
@@ -593,6 +578,52 @@ pub async fn check_for_schema(
     //         is_schema_changed: false,
     //     };
     // }
+}
+
+fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (Vec<Field>, bool, Vec<Field>) {
+    let schema_fields = schema.to_cloned_fields();
+    let mut field_datatype_delta: Vec<_> = vec![];
+    let mut new_field_delta: Vec<_> = vec![];
+    let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
+    let mut is_schema_changed = false;
+
+    for f in schema_fields.iter() {
+        merged_fields.insert(f.name().to_owned(), f.clone());
+    }
+
+    for item in inferred_schema.to_cloned_fields().iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match merged_fields.get(item_name) {
+            Some(existing_field) => {
+                if existing_field.data_type() != item_data_type {
+                    if !CONFIG.common.widening_schema_evolution {
+                        field_datatype_delta.push(existing_field.clone());
+                    } else {
+                        let allowed =
+                            is_widening_conversion(existing_field.data_type(), item_data_type);
+                        if allowed {
+                            is_schema_changed = true;
+                            field_datatype_delta.push(item.to_owned().clone());
+                            merged_fields.insert(item_name.to_owned(), item.clone());
+                        } else {
+                            let mut meta = existing_field.metadata().clone();
+                            meta.insert("zo_cast".to_owned(), true.to_string());
+                            field_datatype_delta.push(existing_field.clone().with_metadata(meta));
+                        }
+                    }
+                }
+            }
+            None => {
+                is_schema_changed = true;
+                new_field_delta.push(item);
+                merged_fields.insert(item_name.to_owned(), item.to_owned().clone());
+            }
+        }
+    }
+    let final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
+    (field_datatype_delta, is_schema_changed, final_fields)
 }
 
 pub async fn stream_schema_exists(
