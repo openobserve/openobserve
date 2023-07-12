@@ -58,16 +58,16 @@
             <div v-for="(option, index) in variableData.options" :key="index" class="row">
               <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].label"
-                :label="'Label' + (index + 1) + ' *'" name="label" />
+                :label="'Label ' + (index + 1) + ' *'" name="label" />
               <q-input dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"
                 class="col textbox showLabelOnTop q-mr-sm" v-model="variableData.options[index].value"
-                :label="'Value' + ' *'" name="value" />
+                :label="'Value ' + (index + 1) + ' *'" name="value" />
               <div>
                 <q-btn flat style="margin-top: 33px" round @click="removeField(index)" icon="cancel" />
               </div>
             </div>
             <div class="flex flex-col">
-              <q-btn @click="addField()">Add Options</q-btn>
+              <q-btn no-caps icon="add" no-outline class="q-mt-md" @click="addField()">Add Option</q-btn>
             </div>
           </div>
           <div class="flex justify-center q-mt-lg">
