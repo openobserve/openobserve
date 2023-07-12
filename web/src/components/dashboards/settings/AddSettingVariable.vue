@@ -185,13 +185,21 @@ export default defineComponent({
       const dashId = route.query.dashboard + "";
 
       if (editMode.value) {
-
-        await updateVariable(
-          store,
-          dashId,
-          props.variableName,
-          toRaw(variableData)
-        );
+       try {
+        
+         await updateVariable(
+           store,
+           dashId,
+           props.variableName,
+           toRaw(variableData)
+         );
+       } catch (error) {
+        $q.notify({
+            type: "negative",
+            message: "Variable with same name already exists",
+            timeout: 2000,
+          });
+       }
 
         emit('save');
       } else {
@@ -210,7 +218,7 @@ export default defineComponent({
       catch (error) {
           $q.notify({
             type: "negative",
-            message: "Variable already exists",
+            message: "Variable with same name already exists",
             timeout: 2000,
           });
       }

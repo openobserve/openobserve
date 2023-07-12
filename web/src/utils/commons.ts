@@ -295,6 +295,15 @@ export const updateVariable = async (
   const variableIndex = currentDashboard.variables.list.findIndex(
     (variable: any) => variable.name == variableName
   );
+  //if name already exists
+  const variableExists = currentDashboard.variables.list.filter(
+  (it: any) => it.name == variableData.name
+  );
+
+  if (variableExists.length) {
+  throw new Error("Variable already exists");
+  }
+  
   // Update the variable data in the list
   currentDashboard.variables.list[variableIndex] = variableData;
   // Update the dashboard in the store
