@@ -2,16 +2,20 @@
   <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
     <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
-        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options" :label="item.label || item.name"></q-select>
+        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options"
+          :label="item.label || item.name"></q-select>
       </div>
       <div v-else-if="item.type == 'constant'">
-        <q-input style="min-width: 100px !important" v-model="item.name" :label="item.label || item.name" dense outlined readonly></q-input>
+        <q-input style="min-width: 100px !important" v-model="item.value" :label="item.label || item.name" dense outlined
+          readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="min-width: 100px !important" v-model="item.name" :label="item.label || item.name" dense outlined></q-input>
+        <q-input style="min-width: 100px !important" v-model="item.value" :label="item.label || item.name" dense
+          outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options" :label="item.label || item.name"></q-select>
+        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options"
+          :label="item.label || item.name"></q-select>
       </div>
     </div>
   </div>
@@ -60,6 +64,9 @@ export default defineComponent({
         return
       }
 
+      // get old variable values
+      const oldVariableValue = JSON.parse(JSON.stringify(variablesData.values))
+
       // continue as we have variables
       const promise = props.variablesConfig?.list?.map((it: any) => {
         const obj: any = { name: it.name, label: it.label, type: it.type, value: "", isLoading: false }
@@ -80,11 +87,21 @@ export default defineComponent({
               .then((res: any) => {
                 obj.isLoading = false
                 if (res.data.hits.length) {
+                  //set options value from the api response
                   obj.options = res.data.hits
                     .find((field: any) => field.field === it.query_data.field)
                     .values.map((value: any) => value.zo_sql_key ? value.zo_sql_key : "null")
-                  obj.value = obj.options[0] || ""
 
+                    // find old value is exists in the dropdown
+                  let oldVariableObjectSelectedValue = oldVariableValue.find((it2: any) => it2.name === it.name)
+
+                  // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+                  if (oldVariableObjectSelectedValue) {
+                    obj.value = obj.options.includes(oldVariableObjectSelectedValue.value) ? oldVariableObjectSelectedValue.value : obj.options.length ? obj.options[0] : ""
+                  }
+                  else {
+                    obj.value = obj.options[0] || ""
+                  }
                   return obj
                 } else {
                   return obj
