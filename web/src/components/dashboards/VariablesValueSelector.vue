@@ -2,19 +2,19 @@
   <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
     <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
-        <q-select style="min-width: 100px;"  filled outlined dense v-model="item.value" :options="item.options"
+        <q-select style="min-width: 150px;"  filled outlined dense v-model="item.value" :options="item.options"
           :label="item.label || item.name"></q-select>
       </div>
       <div v-else-if="item.type == 'constant'">
-        <q-input style="min-width: 100px !important" v-model="item.value" :label="item.label || item.name" dense outlined
+        <q-input style="max-width: 150px !important" v-model="item.value" :label="item.label || item.name" dense outlined
           readonly></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input style="min-width: 100px !important" debounce="500" v-model="item.value" :label="item.label || item.name" dense
+        <q-input style="max-width: 150px !important" debounce="500" v-model="item.value" :label="item.label || item.name" dense
           outlined></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select style="min-width: 100px;" outlined dense v-model="item.value" :options="item.options" map-options filled borderless
+        <q-select style="min-width: 150px;" outlined dense v-model="item.value" :options="item.options" map-options filled borderless
           :label="item.label || item.name" option-value="value" option-label="label" emit-value></q-select>
       </div>
     </div>
