@@ -49,9 +49,13 @@
               </q-select>
             </div>
           </div>
-          <div class="textbox" v-if="['textbox', 'constant'].includes(variableData.type)">
+          <div class="textbox" v-if="['constant'].includes(variableData.type)">
             <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.ValueOfVariable') + ' *'"
               dense filled outlined stack-label :rules="[(val: any) => !!val || 'Field is required!']"></q-input>
+          </div>
+          <div class="textbox" v-if="['textbox'].includes(variableData.type)">
+            <q-input class="showLabelOnTop" v-model="variableData.value" :label="t('dashboard.DefaultValue')"
+              dense filled outlined stack-label></q-input>
           </div>
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
