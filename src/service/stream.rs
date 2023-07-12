@@ -148,7 +148,7 @@ pub fn stream_res(
         if let Some(metrics_meta) = get_prom_metadata_from_schema(&schema) {
             Some(metrics_meta.metric_type)
         } else {
-            Some(MetricType::Unknown)
+            Some(MetricType::Empty)
         }
     } else {
         None
