@@ -8,7 +8,7 @@
     :virtual-scroll-item-size="25"
     :virtual-scroll-sticky-size-start="0"
     :virtual-scroll-sticky-size-end="0"
-    :virtual-scroll-slice-size="300"
+    :virtual-scroll-slice-size="150"
     :virtual-scroll-slice-ratio-before="10"
     :items="rows"
     @virtual-scroll="onScroll"
@@ -168,8 +168,20 @@ export default defineComponent({
   position: sticky;
   opacity: 1;
   z-index: 1;
+  background: #f5f5f5;
+}
+
+.q-table--dark .thead-sticky tr > *,
+.q-table--dark .tfoot-sticky tr > * {
   background: #565656;
-  // color: #090909;
+}
+
+.q-table--dark .table-header {
+  // text-transform: capitalize;
+
+  .table-head-chip {
+    background-color: #565656;
+  }
 }
 .thead-sticky tr:last-child > * {
   top: 0;

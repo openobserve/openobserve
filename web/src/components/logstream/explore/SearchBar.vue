@@ -34,7 +34,18 @@
         >
           <date-time
             data-test="logs-search-bar-date-time-dropdown"
-            @date-change="updateDateTime"
+            auto-apply
+            :default-type="
+              searchObj.data.datetime.relativeTimePeriod
+                ? 'relative'
+                : 'absolute'
+            "
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            @on:date-change="updateDateTime"
           />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
@@ -58,11 +69,8 @@
           id="logsQueryEditor"
           ref="queryEditorRef"
           class="monaco-editor"
-          :show-auto-complete="false"
-          v-model:query="searchObj.data.query"
-          v-model:fields="searchObj.data.stream.selectedStreamFields"
-          v-model:functions="searchObj.data.stream.functions"
-          @update-query="updateQueryValue"
+          v-model:query="query"
+          @update:query="updateQueryValue"
           @run-query="searchData"
         ></query-editor>
       </div>
@@ -72,7 +80,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -90,6 +98,7 @@ import config from "@/aws-exports";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import search from "../../services/search";
 import { emit } from "process";
+import type { IDateTime } from "@/ts/interfaces";
 
 const defaultValue: any = () => {
   return {
@@ -114,7 +123,7 @@ export default defineComponent({
     DateTime,
     QueryEditor,
   },
-  emits: ["searchdata", "update-query"],
+  emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -137,34 +146,21 @@ export default defineComponent({
     const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
     const confirmDialogVisible: boolean = ref(false);
+    const query = ref("");
+
     let confirmCallback;
     let fnEditorobj: any = null;
+
+    onBeforeMount(() => {
+      query.value = props.queryData.query;
+    });
 
     const updateQueryValue = (value: string) => {
       emit("update-query", value);
     };
 
-    const updateDateTime = (value: object) => {
-      searchObj.data.datetime = value;
-
-      if (config.isCloud == "true" && value.userChangedValue) {
-        let dateTimeVal;
-        if (value.tab === "relative") {
-          dateTimeVal = value.relative;
-        } else {
-          dateTimeVal = value.absolute;
-        }
-
-        segment.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: dateTimeVal,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
-        });
-      }
+    const updateDateTime = (value: IDateTime) => {
+      emit("change:date-time", value);
     };
 
     const udpateQuery = () => {
@@ -230,6 +226,7 @@ export default defineComponent({
       resetEditorLayout,
       functionModel,
       functionOptions,
+      query,
     };
   },
 });
