@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::Engine;
+use crate::common::meta::prom::NAME_LABEL;
+use crate::service::promql::value::Label;
+use crate::service::promql::value::{signature, Labels, Signature, Value};
 use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::Expr as PromExpr;
 use promql_parser::parser::LabelModifier;
-
-use super::Engine;
-use crate::service::promql::value::{signature, Labels, Signature, Value};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 mod avg;
 mod bottomk;
@@ -26,6 +29,8 @@ mod count;
 mod max;
 mod min;
 mod quantile;
+mod stddev;
+mod stdvar;
 mod sum;
 mod topk;
 
@@ -35,19 +40,94 @@ pub(crate) use count::count;
 pub(crate) use max::max;
 pub(crate) use min::min;
 pub(crate) use quantile::quantile;
+pub(crate) use stddev::stddev;
+pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
 pub(crate) use topk::topk;
 
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ArithmeticItem {
     pub(crate) labels: Labels,
     pub(crate) value: f64,
     pub(crate) num: usize,
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct StatisticItems {
+    pub(crate) labels: Labels,
+    pub(crate) values: Vec<f64>,
+    pub(crate) current_count: i64,
+    pub(crate) current_mean: f64,
+    pub(crate) current_sum: f64,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct TopItem {
     pub(crate) index: usize,
     pub(crate) value: f64,
+}
+
+pub fn labels_to_include(
+    include_labels: &HashSet<String>,
+    actual_labels: &[Arc<Label>],
+) -> Vec<Arc<Label>> {
+    actual_labels
+        .iter()
+        .flat_map(|label| {
+            if include_labels.contains(&label.name) && label.name != NAME_LABEL {
+                Some(label.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn labels_to_exclude(
+    exclude_labels: &HashSet<String>,
+    actual_labels: &[Arc<Label>],
+) -> Vec<Arc<Label>> {
+    actual_labels
+        .iter()
+        .flat_map(|label| {
+            if !exclude_labels.contains(&label.name) && label.name != NAME_LABEL {
+                Some(label.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn eval_arithmetic_processor(
+    score_values: &mut HashMap<Signature, ArithmeticItem>,
+    f_handler: fn(total: f64, val: f64) -> f64,
+    sum_labels: &Labels,
+    value: f64,
+) {
+    let sum_hash = signature(sum_labels);
+    let entry = score_values.entry(sum_hash).or_insert(ArithmeticItem {
+        labels: sum_labels.clone(),
+        ..Default::default()
+    });
+    entry.value = f_handler(entry.value, value);
+    entry.num += 1;
+}
+
+fn eval_std_dev_var_processor(
+    score_values: &mut HashMap<Signature, StatisticItems>,
+    sum_labels: &Labels,
+    value: f64,
+) {
+    let sum_hash = signature(sum_labels);
+    let entry = score_values.entry(sum_hash).or_insert(StatisticItems {
+        labels: sum_labels.clone(),
+        ..Default::default()
+    });
+    entry.values.push(value);
+    entry.current_count += 1;
+    entry.current_sum += value;
+    entry.current_mean = entry.current_sum / entry.current_count as f64;
 }
 
 pub(crate) fn eval_arithmetic(
@@ -71,52 +151,36 @@ pub(crate) fn eval_arithmetic(
         Some(v) => match v {
             LabelModifier::Include(labels) => {
                 for item in data.iter() {
-                    let mut sum_labels = Labels::default();
-                    for label in item.labels.iter() {
-                        if labels.contains(&label.name) {
-                            sum_labels.push(label.clone());
-                        }
-                    }
-                    let sum_hash = signature(&sum_labels);
-                    let entry = score_values.entry(sum_hash).or_insert(ArithmeticItem {
-                        labels: sum_labels,
-                        value: 0.0,
-                        num: 0,
-                    });
-                    entry.value = f_handler(entry.value, item.sample.value);
-                    entry.num += 1;
+                    let sum_labels = labels_to_include(labels, &item.labels);
+                    eval_arithmetic_processor(
+                        &mut score_values,
+                        f_handler,
+                        &sum_labels,
+                        item.sample.value,
+                    );
                 }
             }
             LabelModifier::Exclude(labels) => {
                 for item in data.iter() {
-                    let mut sum_labels = Labels::default();
-                    for label in item.labels.iter() {
-                        if !labels.contains(&label.name) {
-                            sum_labels.push(label.clone());
-                        }
-                    }
-                    let sum_hash = signature(&sum_labels);
-                    let entry = score_values.entry(sum_hash).or_insert(ArithmeticItem {
-                        labels: sum_labels,
-                        value: 0.0,
-                        num: 0,
-                    });
-                    entry.value = f_handler(entry.value, item.sample.value);
-                    entry.num += 1;
+                    let sum_labels = labels_to_exclude(labels, &item.labels);
+                    eval_arithmetic_processor(
+                        &mut score_values,
+                        f_handler,
+                        &sum_labels,
+                        item.sample.value,
+                    );
                 }
             }
         },
         None => {
             for item in data.iter() {
-                let entry = score_values
-                    .entry(Signature::default())
-                    .or_insert(ArithmeticItem {
-                        labels: Labels::default(),
-                        value: 0.0,
-                        num: 0,
-                    });
-                entry.value = f_handler(entry.value, item.sample.value);
-                entry.num += 1;
+                let sum_labels = Labels::default();
+                eval_arithmetic_processor(
+                    &mut score_values,
+                    f_handler,
+                    &sum_labels,
+                    item.sample.value,
+                );
             }
         }
     }
@@ -173,4 +237,45 @@ pub async fn eval_top(
         .map(|v| data[v.index].clone())
         .collect();
     Ok(Value::Vector(values))
+}
+
+pub(crate) fn eval_std_dev_var(
+    param: &Option<LabelModifier>,
+    data: &Value,
+    f_name: &str,
+) -> Result<Option<HashMap<Signature, StatisticItems>>> {
+    let data = match data {
+        Value::Vector(v) => v,
+        Value::None => return Ok(None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "[{f_name}] function only accepts vector values"
+            )))
+        }
+    };
+
+    let mut score_values = HashMap::default();
+    match param {
+        Some(v) => match v {
+            LabelModifier::Include(labels) => {
+                for item in data.iter() {
+                    let sum_labels = labels_to_include(labels, &item.labels);
+                    eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
+                }
+            }
+            LabelModifier::Exclude(labels) => {
+                for item in data.iter() {
+                    let sum_labels = labels_to_exclude(labels, &item.labels);
+                    eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
+                }
+            }
+        },
+        None => {
+            for item in data.iter() {
+                let sum_labels = Labels::default();
+                eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
+            }
+        }
+    }
+    Ok(Some(score_values))
 }
