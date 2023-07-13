@@ -9,6 +9,8 @@
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import type NotEqualIconVue from "@/components/icons/NotEqualIcon.vue";
+import type EqualIconVue from "@/components/icons/EqualIcon.vue";
  See the License for the specific language governing permissions and
  limitations under the License. 
 -->
@@ -181,18 +183,15 @@
                             :key="value.key + value.count"
                           >
                             <q-list dense>
-                              <q-item
-                                tag="label"
-                                class="q-pr-none no-pointer-events"
-                              >
+                              <q-item tag="label" class="q-pr-none">
                                 <div
                                   class="flex row wrap justify-between"
+                                  style="width: calc(100% - 46px)"
                                   :class="
                                     store.state.theme === 'dark'
                                       ? 'text-grey-4'
                                       : 'text-grey-8'
                                   "
-                                  style="width: 100%"
                                 >
                                   <div
                                     :title="value.key"
@@ -208,6 +207,49 @@
                                   >
                                     {{ value.count }}
                                   </div>
+                                </div>
+                                <div
+                                  class="flex row"
+                                  :class="
+                                    store.state.theme === 'dark'
+                                      ? 'text-white'
+                                      : 'text-black'
+                                  "
+                                >
+                                  <q-btn
+                                    class="q-mr-xs"
+                                    size="6px"
+                                    title="Include Term"
+                                    round
+                                    @click="
+                                      addValueToEditor(
+                                        props.row.name,
+                                        value.key,
+                                        '='
+                                      )
+                                    "
+                                  >
+                                    <q-icon>
+                                      <EqualIcon></EqualIcon>
+                                    </q-icon>
+                                  </q-btn>
+                                  <q-btn
+                                    class="q-mr-xs"
+                                    size="6px"
+                                    title="Include Term"
+                                    round
+                                    @click="
+                                      addValueToEditor(
+                                        props.row.name,
+                                        value.key,
+                                        '!='
+                                      )
+                                    "
+                                  >
+                                    <q-icon>
+                                      <NotEqualIcon></NotEqualIcon>
+                                    </q-icon>
+                                  </q-btn>
                                 </div>
                               </q-item>
                             </q-list>
@@ -253,10 +295,13 @@ import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import stream from "@/services/stream";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label"],
+  components: { EqualIcon, NotEqualIcon },
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -267,28 +312,27 @@ export default defineComponent({
     const selectedMetricLabels = ref([]);
     const searchMetricLabel = ref("");
     const filteredMetricLabels = ref([]);
-    const selectedMetricType = ref("");
     const metricLabelValues: Ref<{
       [key: string]: {
         isLoading: boolean;
-        values: { key: string; count: number | string }[];
+        values: {
+          key: string;
+          count: number | string;
+        }[];
       };
     }> = ref({});
-
     const metricsIconMapping: any = {
       summary: "description",
       gauge: "speed",
       histogram: "bar_chart",
       counter: "pin",
     };
-
     watch(
       () => searchObj.data.metrics.metricList.length,
       () => {
         streamOptions.value = searchObj.data.metrics.metricList;
       }
     );
-
     const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;
@@ -298,14 +342,12 @@ export default defineComponent({
         );
       });
     };
-
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
         (stream: any) => stream.name === searchObj.data.metrics.selectedMetric
       ).schema;
       filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
-
     watch(
       () => searchObj.data.metrics.selectedMetric,
       (metric) => {
@@ -313,7 +355,6 @@ export default defineComponent({
       },
       { immediate: true }
     );
-
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
@@ -326,16 +367,13 @@ export default defineComponent({
       }
       return filtered;
     };
-
     const openFilterCreator = (event: any, { name }: any) => {
       const startISOTimestamp: any = searchObj.data.datetime.startTime;
       const endISOTimestamp: any = searchObj.data.datetime.endTime;
-
       metricLabelValues.value[name] = {
         isLoading: true,
         values: [],
       };
-
       try {
         stream
           .fieldValues({
@@ -369,19 +407,22 @@ export default defineComponent({
         });
       }
     };
-
     const onMetricChange = () => {
       updateMetricLabels();
     };
-
     const setSelectedMetricType = (option: any) => {
       searchObj.data.metrics.selectedMetricType = option.type;
     };
-
     const addLabelToEditor = (label: string) => {
       emit("select-label", label);
     };
-
+    const addValueToEditor = (
+      label: string,
+      value: string,
+      operator: string
+    ) => {
+      addLabelToEditor(`${label}${operator}"${value}"`);
+    };
     return {
       quasar,
       t,
@@ -401,6 +442,7 @@ export default defineComponent({
       setSelectedMetricType,
       outlinedAdd,
       addLabelToEditor,
+      addValueToEditor,
     };
   },
 });
