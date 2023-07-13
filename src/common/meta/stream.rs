@@ -21,19 +21,17 @@ use utoipa::ToSchema;
 
 use crate::common::{infra::config::CONFIG, json, meta::StreamType};
 
-use super::prom::MetricType;
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
     pub name: String,
     pub storage_type: String,
     pub stream_type: StreamType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metrics_type: Option<MetricType>,
     pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics_meta: Option<super::prom::Metadata>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
