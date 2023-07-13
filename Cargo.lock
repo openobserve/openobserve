@@ -3282,6 +3282,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
+name = "kahan"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f21cb50baffe6384be28e8272456e23563bd9dda67abc3bcbf51075fbb7d1f79"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4063,6 +4072,7 @@ dependencies = [
  "indexmap",
  "ipnetwork",
  "itertools",
+ "kahan",
  "lazy_static",
  "log",
  "lru",

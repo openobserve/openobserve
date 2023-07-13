@@ -155,6 +155,7 @@ walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.12"
 flatten-serde-json = "0.1.0"
+kahan = "0.1.4"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -169,4 +170,8 @@ float-cmp = "0.9"
 
 [[bench]]
 name = "flatten_benchmark"
+harness = false
+
+[[bench]]
+name = "kahan_sum_bench"
 harness = false
