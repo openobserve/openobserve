@@ -86,9 +86,14 @@
             <div class="row query-editor-container">
               <div
                 class="col q-pa-sm"
-                style="border-top: 1px solid #dbdbdb; height: 150px"
+                style="border-top: 1px solid #dbdbdb; height: 100%"
               >
                 <div class="q-pb-xs text-bold">PromQL:</div>
+                <div v-show="isZoMetricSelected" class="text-red-5 q-pb-sm">
+                  Please include 'organization', 'stream_type', and 'stream'
+                  labels for this metric. Failure to do so could lead to page
+                  freezing due to the excessive volume of data.
+                </div>
                 <query-editor
                   id="metrics-query-editor"
                   ref="metricsQueryEditorRef"
@@ -148,7 +153,7 @@
             <h5 class="text-center">No result found.</h5>
           </div>
           <template v-if="searchObj.data.metrics.metricList.length">
-            <div class="flex justify-end q-pr-lg q-mb-md">
+            <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
               <q-btn
                 size="md"
                 class="q-px-sm no-border"
@@ -271,6 +276,8 @@ export default defineComponent({
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
     const isMounted = ref(false);
+    const isZoMetricSelected = ref(false);
+    const logStreams = ref([]);
 
     const metricTypeMapping: any = {
       Summary: "summary",
@@ -312,12 +319,13 @@ export default defineComponent({
     };
     const showAddToDashboardDialog = ref(false);
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
+      restoreUrlQueryParams();
+      await getLogStreams();
       if (searchObj.loading == false) {
         loadPageData(true);
         refreshData();
       }
-      restoreUrlQueryParams();
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;
@@ -352,6 +360,20 @@ export default defineComponent({
         if (searchResultRef.value) searchResultRef.value.reDrawChart();
       }, 1500);
     });
+
+    const getLogStreams = () => {
+      streamService
+        .nameList(store.state?.selectedOrganization?.identifier, "logs", false)
+        .then(
+          (res) =>
+            (logStreams.value = res.data.list.map((stream) => ({
+              name: stream.name,
+            })))
+        )
+        .finally(() => {
+          return Promise.resolve();
+        });
+    };
 
     function ErrorException(message) {
       searchObj.loading = false;
@@ -716,7 +738,19 @@ export default defineComponent({
     };
 
     const onMetricChange = async (metric) => {
-      metricsQueryEditorRef.value.setValue(metric + "{}");
+      let labels = "";
+      if (metric && metric.indexOf("zo_") === 0) {
+        labels += `organization="${store.state?.selectedOrganization?.identifier}"`;
+        labels += `,stream_type="logs"`;
+        if (logStreams.value?.length && logStreams.value[0]["name"]) {
+          labels += `,stream="${logStreams.value[0]["name"]}"`;
+        }
+        isZoMetricSelected.value = true;
+      } else {
+        isZoMetricSelected.value = false;
+      }
+      const query = metric + (labels && labels.length ? `{${labels}}` : "{}");
+      metricsQueryEditorRef.value.setValue(query);
     };
 
     function restoreUrlQueryParams() {
@@ -799,6 +833,7 @@ export default defineComponent({
       onMetricChange,
       updateUrlQueryParams,
       addLabelToEditor,
+      isZoMetricSelected,
     };
   },
   computed: {
@@ -849,7 +884,7 @@ export default defineComponent({
 <style lang="scss">
 .query-editor-container {
   .monaco-editor {
-    height: calc(100% - 40px) !important;
+    height: 80px !important;
   }
 }
 div.plotly-notifier {
