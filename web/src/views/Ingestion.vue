@@ -178,7 +178,7 @@ export default defineComponent({
         });
       }
 
-      if (!store.state.organizationPasscode) getOrganizationPasscode();
+      if (!store.state.organizationData.organizationPasscode) getOrganizationPasscode();
     });
 
     const getOrganizationPasscode = () => {

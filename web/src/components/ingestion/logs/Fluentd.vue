@@ -44,7 +44,7 @@
   &lt;auth&gt;
     method basic
     username {{ currUserEmail }}
-    password {{ store.state.organizationPasscode }}
+    password {{ store.state.organizationData.organizationPasscode }}
   &lt;/auth&gt;
 &lt;/match&gt;</pre
     >

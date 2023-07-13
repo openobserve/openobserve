@@ -301,7 +301,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useLogs();
+    let { searchObj, resetSearchObj } = useLogs();
     let dismiss = null;
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
@@ -1174,7 +1174,19 @@ export default defineComponent({
       }
     });
 
+    onMounted(() => {
+      reDrawGrid();
+    });
+
+    onUpdated(() => {
+      // initPageData();
+      reDrawGrid();
+    });
+
     onDeactivated(() => {
+      resetSearchObj();
+      searchBarRef.value.resetFunctionContent();
+      setQuery("");
       clearInterval(refreshIntervalID);
     });
 
@@ -1443,6 +1455,18 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    // const initPageData = () => {
+    //   verifyOrganizationStatus(store.state.organizations, router);
+    //   if (router.currentRoute.value.name == "logs") {
+    //     searchObj.data.tempFunctionContent = "";
+    //     searchBarRef.value.resetFunctionContent();
+    //     searchObj.data.query = "";
+    //     setQuery("");
+    //     searchObj.meta.sqlMode = false;
+    //     loadPageData();
+    //   }
+    // };
+
     return {
       store,
       router,
@@ -1483,9 +1507,6 @@ export default defineComponent({
     },
     moveSplitter() {
       return this.searchObj.config.splitterModel;
-    },
-    changeOrganization() {
-      return this.store.state.selectedOrganization.identifier;
     },
     changeStream() {
       return this.searchObj.data.stream.selectedStream;
@@ -1545,20 +1566,6 @@ export default defineComponent({
       if (this.searchObj.meta.showFields == false) {
         this.searchObj.meta.showFields =
           this.searchObj.config.splitterModel > 0;
-      }
-    },
-    changeOrganization() {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (this.router.currentRoute.value.name == "logs") {
-        this.searchObj.data.tempFunctionContent = "";
-        this.searchBarRef.resetFunctionContent();
-        this.searchObj.data.query = "";
-        this.setQuery("");
-        this.searchObj.meta.sqlMode = false;
-        this.loadPageData();
       }
     },
     changeStream: {
