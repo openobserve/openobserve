@@ -51,9 +51,13 @@
                 <div class="field_label ellipsis">
                   {{ props.row.name }}
                 </div>
-                <div class="field_overlay" :style="{
-                  background: store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
-                }">
+                <div
+                  class="field_overlay"
+                  :style="{
+                    background:
+                      store.state.theme === 'dark' ? '#414345' : '#d9d9d9',
+                  }"
+                >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
@@ -74,7 +78,6 @@
                 expand-icon="
                    expand_more
                 "
-               
                 @before-show="(event: any) => openFilterCreator(event, props.row)"
               >
                 <template v-slot:header>
@@ -85,7 +88,7 @@
                     <div class="field_label ellipsis">
                       {{ props.row.name }}
                     </div>
-                      <div class="field_overlay">
+                    <div class="field_overlay">
                       <q-btn
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
@@ -148,7 +151,14 @@
                                 {{ value.count }}
                               </div>
                             </div>
-                            <div class="flex row" :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'">
+                            <div
+                              class="flex row"
+                              :class="
+                                store.state.theme === 'dark'
+                                  ? 'text-white'
+                                  : 'text-black'
+                              "
+                            >
                               <q-btn
                                 class="q-mr-xs"
                                 size="6px"
@@ -160,10 +170,10 @@
                                   )
                                 "
                               >
-                              <q-icon>
-                                <EqualIcon></EqualIcon>
-                              </q-icon>
-                            </q-btn>
+                                <q-icon>
+                                  <EqualIcon></EqualIcon>
+                                </q-icon>
+                              </q-btn>
                               <q-btn
                                 class="q-mr-xs"
                                 size="6px"
@@ -175,10 +185,10 @@
                                   )
                                 "
                               >
-                               <q-icon>
-                                <NotEqualIcon></NotEqualIcon>
-                               </q-icon>
-                            </q-btn>
+                                <q-icon>
+                                  <NotEqualIcon></NotEqualIcon>
+                                </q-icon>
+                              </q-btn>
                             </div>
                           </q-item>
                         </q-list>
@@ -222,14 +232,15 @@ import useTraces from "../../composables/useTraces";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
-import { outlinedAdd } from '@quasar/extras/material-icons-outlined'
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
-    EqualIcon, NotEqualIcon
+    EqualIcon,
+    NotEqualIcon,
   },
   setup() {
     const store = useStore();
@@ -292,11 +303,6 @@ export default defineComponent({
         event.preventDefault();
         return;
       }
-      const timestamps = getConsumableDateTime(searchObj.data.datetime);
-      const startISOTimestamp: any =
-        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-      const endISOTimestamp: any =
-        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
 
       fieldValues.value[name] = {
         isLoading: true,
@@ -306,8 +312,8 @@ export default defineComponent({
         .fieldValues({
           org_identifier: store.state.selectedOrganization.identifier,
           stream_name: searchObj.data.stream.selectedStream.value,
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
+          start_time: searchObj.data.datetime.startTime,
+          end_time: searchObj.data.datetime.endTime,
           fields: [name],
           size: 10,
           type: "traces",
