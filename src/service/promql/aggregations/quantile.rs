@@ -16,6 +16,7 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::Expr as PromExpr;
 
 use super::Engine;
+use crate::service::promql::common::quantile as calculate_quantile;
 use crate::service::promql::value::Labels;
 use crate::service::promql::value::{InstantValue, Sample, Value};
 
@@ -69,45 +70,4 @@ fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
         sample: Sample { timestamp, value },
     }];
     Ok(Value::Vector(values))
-}
-
-fn calculate_quantile(data: &[f64], quantile: f64) -> Option<f64> {
-    if data.is_empty() {
-        return None;
-    }
-
-    let mut sorted_data = data.to_vec();
-    sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    let n = sorted_data.len();
-    let index = (quantile * (n - 1) as f64) as usize;
-
-    if index == n - 1 {
-        return Some(sorted_data[index]);
-    }
-
-    let lower = sorted_data[index];
-    let upper = sorted_data[index + 1];
-
-    let fraction = quantile * (n - 1) as f64 - index as f64;
-    let quantile_value = lower + (upper - lower) * fraction;
-
-    Some(quantile_value)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_quantile() {
-        let data = vec![4.0, 2.0, 1.0, 3.0, 5.0];
-        let quantile = 0.5;
-        let result = calculate_quantile(&data, quantile);
-        let expected = 3.0;
-        match result {
-            Some(got) => assert_eq!(got, expected),
-            None => assert!(false),
-        }
-    }
 }

@@ -54,6 +54,8 @@ pub enum MetricType {
     Summary,
     Info,
     StateSet,
+    #[serde(rename = "")]
+    Empty,
 }
 
 impl From<proto::metric_metadata::MetricType> for MetricType {

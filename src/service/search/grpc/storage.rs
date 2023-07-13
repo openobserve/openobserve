@@ -254,7 +254,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             if !file_data::exist(&file).unwrap_or_default() {
                 if let Err(e) = file_data::download(&file).await {
-                    log::error!("search->storage: download file err: {}", e);
+                    log::info!("search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
                         if let Err(e) = file_list::delete_parquet_file(&file).await {

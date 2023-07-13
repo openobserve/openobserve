@@ -17,12 +17,11 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div id="secondLevel">
+    <div id="secondLevel" class="full-height">
       <q-splitter
-        class="logs-horizontal-splitter"
+        class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
         horizontal
-        style="height: 100%"
       >
         <template v-slot:before>
           <search-bar
@@ -36,7 +35,7 @@
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel"
+            class="row scroll relative-position thirdlevel full-height overflow-hidden"
             style="width: 100%"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
@@ -44,13 +43,15 @@
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
+              class="full-height"
             >
               <template #before>
-                <div class="relative-position">
+                <div class="relative-position full-height">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="searchObj.data.stream.streamLists"
+                    class="full-height"
                   />
                   <q-btn
                     :icon="
@@ -76,12 +77,20 @@
                 </div>
               </template>
               <template #after>
-                <div v-if="!areStreamsPresent && searchObj.loading == true">
-                  <q-spinner-dots
-                    color="primary"
-                    size="40px"
-                    style="margin: 0 auto; display: block"
-                  />
+                <div
+                  class="full-height flex justify-center items-center"
+                  v-if="searchObj.loading == true"
+                >
+                  <div class="q-pb-lg">
+                    <q-spinner-hourglass
+                      color="primary"
+                      size="40px"
+                      style="margin: 0 auto; display: block"
+                    />
+                    <span class="text-center">
+                      Hold on tight, we're fetching your logs.
+                    </span>
+                  </div>
                 </div>
                 <div v-else-if="!areStreamsPresent">
                   <h5 data-test="logs-search-error-message" class="text-center">
@@ -155,6 +164,7 @@
                   </div>
                   <div
                     data-test="logs-search-search-result"
+                    class="full-height"
                     v-show="
                       searchObj.data.queryResults.hasOwnProperty('total') &&
                       searchObj.data.queryResults.hits.length !== 0
@@ -223,9 +233,9 @@ import {
   getDurationObjectFromParams,
   getConsumableRelativeTime,
 } from "@/utils/date";
+import { nextTick } from "process";
 import useNotifications from "@/composables/useNotifications";
 import { cloneDeep } from "lodash-es";
-import { d } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -237,6 +247,7 @@ export default defineComponent({
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
+        this.searchObj.loading = true;
         this.searchObj.runQuery = true;
       }
 
@@ -271,6 +282,7 @@ export default defineComponent({
             ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
             150 -
           1;
+
         this.searchObj.loading = true;
         this.getQueryData();
 
@@ -466,7 +478,6 @@ export default defineComponent({
               yData: [],
               chartParams: {},
             };
-            // reDrawGrid();
           }
         } else {
           searchObj.loading = false;
@@ -803,7 +814,7 @@ export default defineComponent({
     }
 
     function getQueryData() {
-      const dismiss = Notify();
+      // const dismiss = Notify();
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
           return false;
@@ -831,11 +842,12 @@ export default defineComponent({
           };
           // searchObj.data.editorValue = "";
         }
+        // dismiss = Notify();
 
         const queryReq = buildSearch();
 
         if (queryReq == null) {
-          dismiss();
+          // dismiss();
           return false;
         }
 
@@ -878,11 +890,11 @@ export default defineComponent({
             generateHistogramData();
             //update grid columns
             updateGridColumns();
-            dismiss();
+            // dismiss();
           })
           .catch((err) => {
             searchObj.loading = false;
-            dismiss();
+            // dismiss();
             if (err.response != undefined) {
               searchObj.data.errorMsg = err.response.data.error;
             } else {
@@ -1071,7 +1083,6 @@ export default defineComponent({
         }
 
         searchObj.loading = false;
-        if (searchObj.data.queryResults.aggs) reDrawGrid();
       } catch (e) {
         searchObj.loading = false;
         console.log("Error while updating grid columns:", e.message);
@@ -1111,13 +1122,15 @@ export default defineComponent({
         unparsed_x_data: unparsed_x_data,
       };
       searchObj.data.histogram = { xData, yData, chartParams };
-      if (
-        searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
-        searchResultRef.value?.reDrawChart
-      ) {
-        searchResultRef.value.reDrawChart();
-      }
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram == true &&
+          searchObj.meta.sqlMode == false &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
     }
 
     function loadPageData(isFirstLoad: boolean = false) {
@@ -1149,15 +1162,6 @@ export default defineComponent({
       }
     });
 
-    onMounted(() => {
-      reDrawGrid();
-    });
-
-    onUpdated(() => {
-      // loadPageData();
-      reDrawGrid();
-    });
-
     onDeactivated(() => {
       clearInterval(refreshIntervalID);
     });
@@ -1173,7 +1177,6 @@ export default defineComponent({
         loadPageData();
       }
 
-      reDrawGrid();
       if (
         searchObj.meta.showHistogram == true &&
         searchObj.meta.sqlMode == false &&
@@ -1208,52 +1211,6 @@ export default defineComponent({
       } else {
         loadPageData(true);
       }
-    };
-
-    const reDrawGrid = () => {
-      setTimeout(() => {
-        let rect = {};
-        const secondWrapperElement: any =
-          document.getElementById("secondLevel");
-        if (secondWrapperElement != null) {
-          rect = secondWrapperElement.getBoundingClientRect();
-          secondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
-            rect.top
-          )}px)`;
-        }
-
-        const thirdWrapperElement: any = document.getElementById("thirdLevel");
-        if (thirdWrapperElement != null) {
-          rect = thirdWrapperElement.getBoundingClientRect();
-          thirdWrapperElement.style.height = `calc(100vh - ${Math.ceil(
-            rect.top
-          )}px)`;
-        }
-
-        const GridElement: any = document.getElementById("searchGridComponent");
-        if (GridElement != null) {
-          rect = GridElement.getBoundingClientRect();
-          GridElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
-        }
-
-        const FLElement = document.getElementById("fieldList");
-        if (FLElement != null) {
-          rect = FLElement.getBoundingClientRect();
-          FLElement.style.height = `calc(100vh - ${Math.ceil(rect.top)}px)`;
-        }
-
-        const logPagesecondWrapperElement: any =
-          document.getElementById("logPage");
-        if (logPagesecondWrapperElement != null) {
-          rect = logPagesecondWrapperElement.getBoundingClientRect();
-          logPagesecondWrapperElement.style.height = `calc(100vh - ${Math.ceil(
-            rect.top + 1
-          )}px)`;
-          logPagesecondWrapperElement.style.minHeight = `calc(100vh - ${Math.ceil(
-            rect.top + 20
-          )}px)`;
-        }
-      }, 100);
     };
 
     const runQueryFn = () => {
@@ -1478,7 +1435,6 @@ export default defineComponent({
       splitterModel: ref(17),
       loadPageData,
       getQueryData,
-      reDrawGrid,
       searchResultRef,
       refreshStreamData,
       updateGridColumns,
@@ -1558,9 +1514,6 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      setTimeout(() => {
-        this.reDrawGrid();
-      }, 100);
       if (
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
@@ -1569,11 +1522,6 @@ export default defineComponent({
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
-    },
-    showQuery() {
-      setTimeout(() => {
-        this.reDrawGrid();
-      }, 100);
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -1625,7 +1573,6 @@ export default defineComponent({
       this.refreshData();
     },
     fullSQLMode(newVal) {
-      this.reDrawGrid();
       this.setQuery(newVal);
     },
     getStreamType() {
@@ -1642,11 +1589,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+$navbarHeight: 64px;
+
 div.plotly-notifier {
   visibility: hidden;
 }
 
 .logPage {
+  height: calc(100vh - $navbarHeight);
+  min-height: calc(100vh - $navbarHeight) !important;
+
   .index-menu .field_list .field_overlay .field_label,
   .q-field__native,
   .q-field__input,
