@@ -19,7 +19,7 @@ use std::io::Error;
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
-    prom::MetricType,
+    prom,
     stream::{Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
@@ -144,17 +144,21 @@ pub fn stream_res(
     };
     stats.created_at = created_at;
 
-    let metrics_type = if stream_type == StreamType::Metrics {
-        if let Some(metrics_meta) = get_prom_metadata_from_schema(&schema) {
-            Some(metrics_meta.metric_type)
-        } else if stream_name.ends_with("_bucket")
-            || stream_name.ends_with("_sum")
-            || stream_name.ends_with("_count")
+    let metrics_meta = if stream_type == StreamType::Metrics {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(prom::Metadata {
+            metric_type: prom::MetricType::Empty,
+            metric_family_name: stream_name.to_string(),
+            help: stream_name.to_string(),
+            unit: "".to_string(),
+        });
+        if meta.metric_type == prom::MetricType::Empty
+            && (stream_name.ends_with("_bucket")
+                || stream_name.ends_with("_sum")
+                || stream_name.ends_with("_count"))
         {
-            Some(MetricType::Counter)
-        } else {
-            Some(MetricType::Empty)
+            meta.metric_type = prom::MetricType::Counter;
         }
+        Some(meta)
     } else {
         None
     };
@@ -163,7 +167,6 @@ pub fn stream_res(
         name: stream_name.to_string(),
         storage_type: storage_type.to_string(),
         stream_type,
-        metrics_type,
         schema: mappings,
         stats,
         settings: StreamSettings {
@@ -171,6 +174,7 @@ pub fn stream_res(
             full_text_search_keys,
             data_retention,
         },
+        metrics_meta,
     }
 }
 
