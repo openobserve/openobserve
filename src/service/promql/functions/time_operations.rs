@@ -93,10 +93,8 @@ pub(crate) fn days_in_month(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
-
     let instant_values = match data {
-        Value::Vector(v) => {v
-        }
+        Value::Vector(v) => v,
         _ => {
             return Err(DataFusionError::NotImplemented(format!(
                 "Invalid input for minute value: {:?}",

@@ -187,7 +187,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            if !file_data::exist(&file).unwrap_or_default() {
+            if !file_data::exist(&file) {
                 if let Err(e) = file_data::download(&file).await {
                     log::info!("promql->search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {

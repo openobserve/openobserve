@@ -98,7 +98,7 @@ pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
     buf.write_all(&write_buf)?;
     let compressed_bytes = buf.finish().unwrap();
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-    db::file_list::progress(key, meta, deleted).await?;
+    db::file_list::progress(key, meta, deleted, false).await?;
     db::file_list::broadcast::send(&[file_data]).await?;
 
     // delete the parquet whaterever the file is exists or not
