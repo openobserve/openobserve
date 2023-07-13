@@ -69,7 +69,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 }
 
 // Delete one parquet file and update the file list
-pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
+pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns[0] != "files" || columns.len() < 9 {
         return Ok(());
@@ -102,7 +102,9 @@ pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
     db::file_list::broadcast::send(&[file_data]).await?;
 
     // delete the parquet whaterever the file is exists or not
-    _ = storage::del(&[key]).await;
+    if !file_list_only {
+        _ = storage::del(&[key]).await;
+    }
     Ok(())
 }
 

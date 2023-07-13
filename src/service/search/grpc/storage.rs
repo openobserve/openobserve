@@ -257,7 +257,7 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
                     log::info!("search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) = file_list::delete_parquet_file(&file).await {
+                        if let Err(e) = file_list::delete_parquet_file(&file, true).await {
                             log::error!("search->storage: delete from file_list err: {}", e);
                         }
                         return Some(file);
