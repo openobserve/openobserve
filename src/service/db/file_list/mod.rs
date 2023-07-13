@@ -32,7 +32,12 @@ pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
     Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
 
 #[inline]
-pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), anyhow::Error> {
+pub async fn progress(
+    key: &str,
+    data: FileMeta,
+    delete: bool,
+    download: bool,
+) -> Result<(), anyhow::Error> {
     let old_data = cache::file_list::get_file_from_cache(key);
     match delete {
         true => {
@@ -74,7 +79,8 @@ pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), any
                     );
                 }
             }
-            if CONFIG.memory_cache.cache_latest_files
+            if download
+                && CONFIG.memory_cache.cache_latest_files
                 && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             {
                 // maybe load already merged file, no need report error

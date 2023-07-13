@@ -239,7 +239,7 @@ pub async fn merge_by_stream(
                 let mut cache_success = true;
                 for event in &events {
                     if let Err(e) =
-                        db::file_list::progress(&event.key, event.meta, event.deleted).await
+                        db::file_list::progress(&event.key, event.meta, event.deleted, false).await
                     {
                         cache_success = false;
                         log::error!("[COMPACT] set local cache failed, retrying: {}", e);

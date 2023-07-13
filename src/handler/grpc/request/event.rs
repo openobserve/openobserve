@@ -44,6 +44,7 @@ impl Event for Eventer {
                 &file.key,
                 FileMeta::from(file.meta.as_ref().unwrap()),
                 file.deleted,
+                true,
             )
             .await
             {

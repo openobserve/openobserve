@@ -72,7 +72,7 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
 
     // delete files
     for item in super::DELETED_FILES.iter() {
-        super::progress(item.key(), item.value().to_owned(), true).await?;
+        super::progress(item.key(), item.value().to_owned(), true, false).await?;
     }
 
     log::info!(
@@ -120,7 +120,7 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        super::progress(&item.key, item.meta, item.deleted).await?;
+        super::progress(&item.key, item.meta, item.deleted, false).await?;
     }
     Ok(count)
 }
