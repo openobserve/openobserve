@@ -61,7 +61,7 @@
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="field-table"
+        class="field-table full-height"
         id="fieldList"
       >
         <template #body-cell-name="props">

@@ -27,16 +27,15 @@ import {
   defineComponent,
   ref,
   onMounted,
-  onUpdated,
   nextTick,
   type Ref,
   onDeactivated,
   onUnmounted,
   onActivated,
+  watch,
 } from "vue";
 import * as monaco from "monaco-editor";
 import { useStore } from "vuex";
-import { cloneDeep } from "lodash-es";
 import { debounce } from "quasar";
 
 export default defineComponent({
@@ -64,6 +63,10 @@ export default defineComponent({
     debounceTime: {
       type: Number,
       default: 500,
+    },
+    readOnly: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["update-query", "run-query", "update:query"],
@@ -131,7 +134,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query,
         language: "sql",
-        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",
@@ -153,6 +156,7 @@ export default defineComponent({
           seedSearchStringFromSelection: "never",
         },
         minimap: { enabled: false },
+        readOnly: props.readOnly,
       });
 
       editorObj.onDidChangeModelContent(
@@ -188,6 +192,24 @@ export default defineComponent({
     onUnmounted(() => {
       provider.value?.dispose();
     });
+
+    // update readonly when prop value changes
+    watch(
+      () => props.readOnly,
+      () => {
+        editorObj.updateOptions({ readOnly: props.readOnly });
+      }
+    );
+
+    // update readonly when prop value changes
+    watch(
+      () => props.query,
+      () => {
+        if (props.readOnly || !editorObj.hasWidgetFocus()) {
+          editorObj.getModel().setValue(props.query);
+        }
+      }
+    );
 
     const setValue = (value: string) => {
       if (editorObj?.setValue) editorObj.setValue(value);
