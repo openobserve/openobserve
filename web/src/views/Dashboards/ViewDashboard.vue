@@ -511,6 +511,6 @@ export default defineComponent({
 .plotlyBackground {
   background: #00000000 !important;
   border-radius: 4px;
-  border-color: #494949 !important;
+  border-color: #a3a3a3 !important;
 }
 </style>
