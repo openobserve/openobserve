@@ -91,8 +91,7 @@
                 <div class="q-pb-xs text-bold">PromQL:</div>
                 <div v-show="isZoMetricSelected" class="text-red-5 q-pb-sm">
                   Please include 'organization', 'stream_type', and 'stream'
-                  labels for this metric. Due to the excessive volume of data it
-                  could lead to page freezing.
+                  labels for this metric.
                 </div>
                 <query-editor
                   id="metrics-query-editor"
