@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::service::promql::value::{InstantValue, Labels, LabelsExt, Sample, Value};
+use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
 use chrono::{Datelike, NaiveDate, Timelike};
 use datafusion::error::{DataFusionError, Result};
+use rayon::prelude::*;
 use strum::EnumIter;
 
 #[derive(Debug, EnumIter)]
@@ -92,35 +93,29 @@ pub(crate) fn days_in_month(data: &Value) -> Result<Value> {
 }
 
 fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
-    match &data {
-        Value::Vector(v) => {
-            if v.is_empty() {
-                let now = chrono::Utc::now().timestamp_micros();
-                let instant = InstantValue {
-                    labels: Labels::default(),
-                    sample: Sample::new(now, 0.0),
-                };
-                return Ok(Value::Vector(vec![instant]));
-            }
 
-            let out = v
-                .iter()
-                .map(|instant| {
-                    let ts = op.get_component_from_ts(instant.sample.timestamp);
-                    InstantValue {
-                        labels: instant.labels.without_metric_name(),
-                        sample: Sample::new(instant.sample.timestamp, ts as f64),
-                    }
-                })
-                .collect();
-            Ok(Value::Vector(out))
+    let instant_values = match data {
+        Value::Vector(v) => {v
         }
-        Value::None => Ok(Value::None),
-        _ => Err(DataFusionError::NotImplemented(format!(
-            "Invalid input for minute value: {:?}",
-            data
-        ))),
-    }
+        _ => {
+            return Err(DataFusionError::NotImplemented(format!(
+                "Invalid input for minute value: {:?}",
+                data
+            )));
+        }
+    };
+
+    let out = instant_values
+        .par_iter()
+        .map(|instant| {
+            let ts = op.get_component_from_ts(instant.sample.timestamp);
+            InstantValue {
+                labels: instant.labels.without_metric_name(),
+                sample: Sample::new(instant.sample.timestamp, ts as f64),
+            }
+        })
+        .collect();
+    Ok(Value::Vector(out))
 }
 
 #[cfg(test)]
