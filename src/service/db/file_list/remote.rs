@@ -93,7 +93,12 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
 
 async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
     // download file list from storage
-    let data = storage::get(file).await?;
+    let data = match storage::get(file).await {
+        Ok(data) => data,
+        Err(_) => {
+            return Ok(0);
+        }
+    };
     // uncompress file
     let uncompress = zstd::decode_all(data.reader())?;
     let uncompress_reader = BufReader::new(uncompress.reader());
