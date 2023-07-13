@@ -309,7 +309,9 @@ pub async fn check_for_schema(
         }
     };
 
-    if !schema.fields().eq(inferred_schema.fields()) {
+    let (_, is_schema_changed, _) = get_schema_changes(&schema, &inferred_schema);
+
+    if is_schema_changed {
         if let Some(value) = handle_existing_schema(
             stream_name,
             org_id,
