@@ -309,7 +309,9 @@ pub async fn check_for_schema(
         }
     };
 
-    if !schema.fields().eq(inferred_schema.fields()) {
+    let (_, is_schema_changed, _) = get_schema_changes(&schema, &inferred_schema);
+
+    if is_schema_changed {
         if let Some(value) = handle_existing_schema(
             stream_name,
             org_id,
@@ -352,7 +354,6 @@ async fn handle_existing_schema(
             "/schema/lock/{org_id}/{stream_type}/{stream_name}"
         ));
         lock.lock(0).await.map_err(server_internal_error).unwrap();
-        log::info!("Acquired lock for stream {} to update schema", stream_name);
         let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
             .await
             .unwrap();
@@ -369,6 +370,7 @@ async fn handle_existing_schema(
         metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
         if is_schema_changed {
+            log::info!("Acquired lock for stream {} to update schema", stream_name);
             db::schema::set(
                 org_id,
                 stream_name,
@@ -405,7 +407,7 @@ async fn handle_existing_schema(
 
         if !*lock_acquired {
             *lock_acquired = true; // We've acquired the lock.
-            log::info!("Acquired lock for stream {} to update schema", stream_name);
+
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
@@ -422,6 +424,7 @@ async fn handle_existing_schema(
             metadata.extend(inferred_schema.metadata().to_owned());
             let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
             if is_schema_changed {
+                log::info!("Acquired lock for stream {} to update schema", stream_name);
                 db::schema::set(
                     org_id,
                     stream_name,
