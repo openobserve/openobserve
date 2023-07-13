@@ -113,12 +113,26 @@ const defaultObject = {
   },
 };
 
-let searchObj = reactive(Object.assign({}, defaultObject));
+const searchObj = reactive(Object.assign({}, defaultObject));
 
 const useLogs = () => {
   const resetSearchObj = () => {
-    // delete searchObj.data;
-    searchObj = reactive(Object.assign({}, defaultObject));
+    // searchObj = reactive(Object.assign({}, defaultObject));
+    searchObj.loading = false;
+    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.stream.streamLists = [];
+    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.queryResults = {};
+    searchObj.data.sortedQueryResults = [];
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {},
+    };
+    searchObj.data.tempFunctionContent = "";
+    searchObj.data.query = "";
+    searchObj.meta.sqlMode = false;
   };
 
   const updatedLocalLogFilterField = (): void => {

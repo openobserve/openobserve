@@ -75,7 +75,7 @@ export default defineComponent({
     };
     const accessKey = computed(() => {
       return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationPasscode}`
+        `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
       );
     });
     const kinesisFirehoseContent = ref(null);
