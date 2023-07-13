@@ -40,13 +40,15 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         if cluster::is_router(&node.role) {
             continue;
         }
-        let node = node.clone();
-        let events = EVENTS.entry(node.uuid.clone()).or_insert_with(|| {
+        let node_id = node.uuid.clone();
+        let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
             let (tx, mut rx) = mpsc::channel(1024);
             tokio::task::spawn(async move { send_to_node(node, &mut rx).await });
             Arc::new(tx)
         });
-        events.clone().send(items.to_vec()).await?;
+        if let Err(e) = events.clone().send(items.to_vec()).await {
+            log::error!("send event to node[{}] failed: {}", node_id, e);
+        }
     }
 
     Ok(())

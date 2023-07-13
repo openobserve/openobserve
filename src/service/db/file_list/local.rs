@@ -49,7 +49,8 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     file.write(write_buf.as_ref());
 
     super::progress(key, meta, deleted).await?;
-    super::broadcast::send(&[file_data]).await
+    tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
+    Ok(())
 }
 
 pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {

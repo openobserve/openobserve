@@ -39,6 +39,7 @@ impl Event for Eventer {
 
         let req = req.get_ref();
         for file in req.items.iter() {
+            log::info!("received event:file {:?}", file);
             if let Err(e) = file_list::progress(
                 &file.key,
                 FileMeta::from(file.meta.as_ref().unwrap()),
