@@ -26,6 +26,17 @@
         <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
         <q-space />
       </div>
+      <div class="row">
+        <div
+        style="margin-left: 15px;"
+          v-for="(tab, index) in tabs"
+          :key="index"
+          @click="activeTab = index"
+        >
+          Query {{ index + 1 }}
+        </div>
+        <q-btn flat @click="addTab" icon="add"></q-btn>
+      </div>
       <div>
         <QueryTypeSelector></QueryTypeSelector>
       </div>
@@ -85,7 +96,14 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
+     const tabs = ref([]);
+    const activeTab = ref(null);
 
+    const addTab = () => {
+      const newTab = tabs.value.length + 1;
+      tabs.value.push(newTab);
+      activeTab.value = tabs.value.length - 1;
+    };
     // toggle show query view
     const onDropDownClick= () =>{
       dashboardPanelData.layout.showQueryBar = !dashboardPanelData.layout.showQueryBar
@@ -303,7 +321,10 @@ export default defineComponent({
       onDropDownClick,
       dashboardPanelData,
       confirmQueryModeChangeDialog,
-      onUpdateToggle
+      onUpdateToggle,
+      tabs,
+      activeTab,
+      addTab,
     };
   },
 });
