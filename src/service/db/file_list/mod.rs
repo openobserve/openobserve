@@ -77,12 +77,8 @@ pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), any
             if CONFIG.memory_cache.cache_latest_files
                 && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             {
-                match cache::file_data::download(key).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("service:db:file_list: add {}, download error: {}", key, e);
-                    }
-                }
+                // maybe load already merged file, no need report error
+                _ = cache::file_data::download(key).await;
             }
             if old_data.is_ok() {
                 return Ok(()); // already exists, skip increase stats
