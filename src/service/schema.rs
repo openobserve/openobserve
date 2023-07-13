@@ -350,9 +350,7 @@ async fn handle_existing_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
     if !CONFIG.common.local_mode {
-        let mut lock = etcd::Locker::new(&format!(
-            "/schema/lock/{org_id}/{stream_type}/{stream_name}"
-        ));
+        let mut lock = etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
         lock.lock(0).await.map_err(server_internal_error).unwrap();
         let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
             .await
@@ -491,9 +489,8 @@ async fn handle_new_schema(
         stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
 
         if !CONFIG.common.local_mode {
-            let mut lock = etcd::Locker::new(&format!(
-                "/schema/lock/{org_id}/{stream_type}/{stream_name}"
-            ));
+            let mut lock =
+                etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
             lock.lock(0).await.map_err(server_internal_error).unwrap();
             log::info!("Aquired lock for stream {} as schema is empty", stream_name);
 
