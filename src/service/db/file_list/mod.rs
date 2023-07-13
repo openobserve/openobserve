@@ -31,7 +31,6 @@ pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
 pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
     Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
 
-#[inline]
 pub async fn progress(
     key: &str,
     data: FileMeta,
