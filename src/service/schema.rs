@@ -352,7 +352,6 @@ async fn handle_existing_schema(
             "/schema/lock/{org_id}/{stream_type}/{stream_name}"
         ));
         lock.lock(0).await.map_err(server_internal_error).unwrap();
-        //log::info!("Acquired lock for stream {} to update schema", stream_name);
         let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
             .await
             .unwrap();
