@@ -48,7 +48,7 @@ output.elasticsearch:
   path: "/api/{{ currOrgIdentifier }}/"
   index: default
   username: "{{ currUserEmail }}"
-  password: "{{ store.state.organizationPasscode }}"</pre
+  password: "{{ store.state.organizationData.organizationPasscode }}"</pre
     >
   </div>
 </template>

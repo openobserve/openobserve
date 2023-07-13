@@ -27,22 +27,24 @@
             "
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
+          <span v-if="config.isCloud == 'true'"
+class="absolute beta-text"
             >Beta</span
           >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
         <ThemeSwitcher></ThemeSwitcher>
-        <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
+        <div class="headerMenu float-left" v-if="store.state.organizationData.quotaThresholdMsg">
           <div
             type="warning"
             icon="cloud"
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
-              store.state.quotaThresholdMsg
+            <q-icon name="warning" size="xs"
+class="warning" />{{
+              store.state.organizationData.quotaThresholdMsg
             }}
           </div>
           <q-btn
@@ -123,7 +125,8 @@
           <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md" color="grey"
+text-color="white">
                   <img
                     :src="
                       user.picture
@@ -182,7 +185,7 @@
       </q-list>
     </q-drawer>
 
-    <q-page-container v-if="isLoading">
+    <q-page-container v-if="isLoading" :key="store.state.selectedOrganization.identifier">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
@@ -231,7 +234,15 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive, computed, onMounted, watch, markRaw } from "vue";
+import {
+  ref,
+  defineComponent,
+  KeepAlive,
+  computed,
+  onMounted,
+  watch,
+  markRaw,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -638,6 +649,23 @@ export default defineComponent({
       tracker.setUserID(store.state.userInfo.email);
     }
 
+    const redirectToParentRoute = (machedRoutes: any) => {
+      console.log(machedRoutes)
+      if (machedRoutes.length > 2) {
+        if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
+          machedRoutes[machedRoutes.length - 2].children.forEach(
+            (route: any) => {
+              if (route.name == machedRoutes[machedRoutes.length - 1].name) {
+                router.push({
+                  path: machedRoutes[machedRoutes.length - 2].path,
+                });
+              }
+            }
+          );
+        }
+      }
+    };
+
     return {
       t,
       router,
@@ -656,11 +684,15 @@ export default defineComponent({
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
+      redirectToParentRoute,
     };
   },
   computed: {
     changeOrganization() {
       return this.store.state.organizations;
+    },
+    changeOrganizationIdentifier() {
+      return this.store.state.selectedOrganization.identifier;
     },
     forceFetchOrganization() {
       return this.router.currentRoute.value.query.update_org;
@@ -672,7 +704,14 @@ export default defineComponent({
     },
     changeOrganization() {
       setTimeout(() => {
+        this.redirectToParentRoute(this.$route.matched);
         this.setSelectedOrganization();
+      }, 500);
+    },
+    changeOrganizationIdentifier() {
+      setTimeout(() => {
+        this.redirectToParentRoute(this.$route.matched);
+        // this.setSelectedOrganization();
       }, 500);
     },
   },

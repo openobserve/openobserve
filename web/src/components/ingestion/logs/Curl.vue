@@ -30,7 +30,7 @@
       </div>
     </div>
     <pre ref="content" data-test="curl-content-text">
-curl -u {{ currUserEmail }}:{{ store.state.organizationPasscode }} -k {{
+curl -u {{ currUserEmail }}:{{ store.state.organizationData.organizationPasscode }} -k {{
         endpoint.url
       }}/api/{{ currOrgIdentifier }}/default/_json -d [JSON-DATA]
     </pre>
