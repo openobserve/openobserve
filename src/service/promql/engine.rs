@@ -497,9 +497,35 @@ impl Engine {
         })?;
 
         // There are a few functions which need no arguments for e.g. time()
-        let functions_without_args: HashSet<String> = HashSet::from_iter(vec!["time".into()]);
+        let functions_without_args: HashSet<&str> = HashSet::from_iter(vec![
+            "day_of_month",
+            "day_of_week",
+            "day_of_year",
+            "days_in_month",
+            "hour",
+            "minute",
+            "month",
+            "time",
+            "year",
+        ]);
         let input = match functions_without_args.contains(func.name) {
-            true => Value::None,
+            true => match args.len() {
+                0 => {
+                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
+                    let default_now_vector = vec![InstantValue {
+                        labels: Labels::default(),
+                        sample: Sample::new(self.time, 0.0),
+                    }];
+                    Value::Vector(default_now_vector)
+                }
+                1 => self.call_expr_first_arg(args).await?,
+                _ => {
+                    return Err(DataFusionError::NotImplemented(
+                        "Invalid args passed to the function".into(),
+                    ))
+                }
+            },
             false => {
                 let last_arg = args
                     .last()
