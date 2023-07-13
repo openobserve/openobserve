@@ -53,12 +53,8 @@ impl FileData {
         }
     }
 
-    pub fn get(&mut self, file: &str) -> Result<Bytes, anyhow::Error> {
-        let data = self.data.get(file);
-        if data.is_none() {
-            return Err(anyhow::anyhow!("file not in cache"));
-        }
-        Ok(data.unwrap().to_owned())
+    pub fn get(&mut self, file: &str) -> Option<Bytes> {
+        self.data.get(file).cloned()
     }
 
     pub fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
@@ -115,24 +111,29 @@ impl FileData {
     pub fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[inline]
-pub fn get(file: &str) -> Result<Bytes, anyhow::Error> {
+pub fn get(file: &str) -> Option<Bytes> {
     if !CONFIG.memory_cache.enabled {
-        return Err(anyhow::anyhow!("memory cache is disabled"));
+        return None;
     }
     let mut files = FILES.write().unwrap();
     files.get(file)
 }
 
 #[inline]
-pub fn exist(file: &str) -> Result<bool, anyhow::Error> {
+pub fn exist(file: &str) -> bool {
     let mut files = FILES.write().unwrap();
-    match files.get(file) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    files.get(file).is_some()
 }
 
 #[inline]
@@ -148,6 +149,12 @@ pub fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 pub fn stats() -> (usize, usize) {
     let files = FILES.read().unwrap();
     files.size()
+}
+
+#[inline]
+pub fn len() -> usize {
+    let files = FILES.read().unwrap();
+    files.data.len()
 }
 
 #[inline]
@@ -191,8 +198,24 @@ mod tests {
         assert_eq!(file_data.get(file_key).unwrap(), content);
 
         set(file_key, content.clone()).unwrap();
-        assert!(exist(file_key).unwrap());
+        assert!(exist(file_key));
         assert_eq!(get(file_key).unwrap(), content);
         assert!(stats().0 > 0);
+    }
+
+    #[test]
+    fn test_cache_miss() {
+        let mut file_data = FileData::with_capacity(100);
+        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2.parquet";
+        let content = Bytes::from("Some text");
+        // set one key
+        file_data.set(file_key1, content.clone()).unwrap();
+        assert_eq!(file_data.get(file_key1).unwrap(), content);
+        // set another key, will release first key
+        file_data.set(file_key2, content.clone()).unwrap();
+        assert_eq!(file_data.get(file_key2).unwrap(), content);
+        // get first key, should get error
+        assert!(file_data.get(file_key1).is_none());
     }
 }
