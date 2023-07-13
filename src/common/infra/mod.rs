@@ -20,5 +20,6 @@ pub mod dist_lock;
 pub mod errors;
 pub mod ider;
 pub mod metrics;
+pub mod pod;
 pub mod storage;
 pub mod wal;

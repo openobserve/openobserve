@@ -40,8 +40,8 @@ use openobserve::{
         config::{CONFIG, USERS, VERSION},
         metrics, wal,
     },
-    common::meta,
     common::zo_logger::{self, ZoLogger, EVENT_SENDER},
+    common::{infra::pod::get_pod_limits, meta},
     handler::{
         grpc::{
             auth::check_auth,
@@ -183,6 +183,8 @@ async fn main() -> Result<(), anyhow::Error> {
     .bind(haddr)?;
 
     tokio::task::spawn(async move { zo_logger::send_logs().await });
+    let res = get_pod_limits().await;
+    log::info!("pod limits {:?}", res);
 
     server.workers(CONFIG.limit.http_worker_num).run().await?;
 

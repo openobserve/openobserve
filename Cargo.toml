@@ -60,7 +60,7 @@ awc = "3.1"
 base64 = "0.21"
 blake3 = "1.4"
 bytes = "1.4"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.26", default-features = false, features = ["clock"] }
 clap = { version = "4.1", default-features = false, features = [
   "std",
   "help",
@@ -85,6 +85,8 @@ http-auth-basic = "0.3"
 indexmap = { version = "1.9", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.11"
+kube = { version = "0.83.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.18.0" , features = ["api","v1_26"] }
 lazy_static = "1.4"
 log = "0.4"
 lru = "0.10"
