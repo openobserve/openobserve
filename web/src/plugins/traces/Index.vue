@@ -513,7 +513,7 @@ export default defineComponent({
     const getDefaultRequest = () => {
       return {
         query: {
-          sql: `select min(${store.state.zoConfig.timestamp_column}) as ${store.state.zoConfig.timestamp_column}, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name order by ${store.state.zoConfig.timestamp_column}`,
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time) as start_time, service_name, operation_name, count(span_id) as spans, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id, service_name, operation_name order by zo_sql_timestamp`,
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from: 0,
@@ -688,8 +688,8 @@ export default defineComponent({
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 1000;
-      req.query.start_time = trace._timestamp - 30000000;
-      req.query.end_time = trace._timestamp + 30000000;
+      req.query.start_time = trace.zo_sql_timestamp - 30000000;
+      req.query.end_time = trace.zo_sql_timestamp + 30000000;
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
@@ -716,7 +716,6 @@ export default defineComponent({
           }
         });
       });
-      console.log("fieldValues", fieldValues.value);
     };
 
     function getQueryData() {
@@ -747,7 +746,6 @@ export default defineComponent({
           // searchObj.data.editorValue = "";
         }
         // dismiss = Notify();
-
         const queryReq = buildSearch();
 
         if (queryReq == null) {
@@ -1012,13 +1010,11 @@ export default defineComponent({
       if (searchObj.data.queryResults.hits) {
         searchObj.data.queryResults.hits.forEach(
           (bucket: {
-            [store.state.zoConfig.timestamp_column]: string | number | Date;
+            zo_sql_timestamp: string | number | Date;
             duration: number | Date;
           }) => {
-            unparsed_x_data.push(bucket[store.state.zoConfig.timestamp_column]);
-            let histDate = new Date(
-              Math.floor(bucket[store.state.zoConfig.timestamp_column] / 1000)
-            );
+            unparsed_x_data.push(bucket.zo_sql_timestamp);
+            let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
             xData.push(Math.floor(histDate.getTime()));
             yData.push(Number(bucket.duration.toFixed(2)));
           }
@@ -1086,8 +1082,8 @@ export default defineComponent({
         if (!router.currentRoute.value.query.hasOwnProperty("query")) {
           searchObj.data.editorValue = "duration>10";
         }
-        restoreUrlQueryParams();
         loadPageData();
+        restoreUrlQueryParams();
       }
     });
 
@@ -1233,9 +1229,7 @@ export default defineComponent({
 
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
-      if (!queryParams.stream) {
-        return;
-      }
+
       const date = {
         startTime: queryParams.from,
         endTime: queryParams.to,
@@ -1243,9 +1237,13 @@ export default defineComponent({
         type: queryParams.period ? "relative" : "absolute",
       };
 
-      if (date) {
+      if (
+        date &&
+        ((date.startTime && date.endTime) || date.relativeTimePeriod)
+      ) {
         searchObj.data.datetime = date;
       }
+
       if (queryParams.query) {
         searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       }
@@ -1255,18 +1253,16 @@ export default defineComponent({
       const date = searchObj.data.datetime;
       const query = {};
 
-      if (date.period) {
-        query["period"] = date.period;
-      }
-      if (date.from && date.to) {
-        query["from"] = date.from;
-        query["to"] = date.to;
+      if (date.type == "relative") {
+        query["period"] = date.relativeTimePeriod;
+      } else {
+        query["from"] = date.startTime;
+        query["to"] = date.endTime;
       }
 
       query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
 
       query["org_identifier"] = store.state.selectedOrganization.identifier;
-
       router.push({ query });
     }
 
