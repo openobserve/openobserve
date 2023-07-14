@@ -15,32 +15,35 @@
 
 <template>
   <div>
-    <q-bar class="row sql-bar">
-      <div style="flex: 1;" @click="onDropDownClick">
+   <q-bar class="row sql-bar" style="display: flex; justify-content: space-between;">
+    <div style="display: flex ; flex-direction: row; align-items: center;">
+      <div  @click="onDropDownClick">
         <q-icon
           flat
           :name="!dashboardPanelData.layout.showQueryBar ? 'arrow_right' : 'arrow_drop_down'"
           text-color="black"
           class="q-mr-sm"
         />
-        <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
+        </div>
+        <!-- <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span> -->
         <q-space />
-      </div>
-      <div class="row">
-        <div
-        style="margin-left: 15px;"
+        <div class="row">
+          <div
+          style="margin-right: 10px; cursor: pointer;"
           v-for="(tab, index) in tabs"
           :key="index"
           @click="activeTab = index"
-        >
+          >
           Query {{ index + 1 }}
         </div>
-        <q-btn flat @click="addTab" icon="add"></q-btn>
+      </div>
+        <q-btn flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
       </div>
       <div>
-        <QueryTypeSelector></QueryTypeSelector>
+      <QueryTypeSelector></QueryTypeSelector>
       </div>
-    </q-bar>
+   </q-bar>
+
   </div>
   <div class="row" 
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
