@@ -45,9 +45,13 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
         v-slot:prepend
       >
         <q-icon
-          :title="searchObj.data.metrics.selectedMetric.type"
+          :title="searchObj.data.metrics.selectedMetric?.type"
           size="xs"
-          :name="metricsIconMapping[searchObj.data.metrics.selectedMetric.type]"
+          :name="
+            metricsIconMapping[
+              searchObj.data.metrics.selectedMetric?.type || ''
+            ]
+          "
         />
       </template>
       <template v-slot:option="scope">
