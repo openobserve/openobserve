@@ -23,7 +23,7 @@ use crate::common::infra::{cluster, config::CONFIG, metrics};
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
 
 use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
     ingestion::{
@@ -278,7 +278,8 @@ pub async fn ingest(
             }
         }
     }
-    let mut final_req_stats = RequestStats::default();
+
+    let time = start.elapsed().as_secs_f64();
     for (stream_name, stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
@@ -288,7 +289,7 @@ pub async fn ingest(
         // write to file
         let mut stream_file_name = "".to_string();
 
-        let req_stats = write_file(
+        let mut req_stats = write_file(
             stream_data.data,
             thread_id,
             org_id,
@@ -296,8 +297,18 @@ pub async fn ingest(
             &mut stream_file_name,
             StreamType::Logs,
         );
-        final_req_stats.size += req_stats.size;
-        final_req_stats.records += req_stats.records;
+        req_stats.response_time += time;
+        //metric + data usage
+        let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+        report_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            StreamType::Logs,
+            UsageType::Bulk,
+            fns_length as u16,
+        )
+        .await;
     }
 
     // only one trigger per request, as it updates etcd
@@ -305,18 +316,6 @@ pub async fn ingest(
         super::evaluate_trigger(Some(entry.clone()), stream_alerts_map.clone()).await;
     }
 
-    let time = start.elapsed().as_secs_f64();
-    final_req_stats.response_time += time;
-    //metric + data usage
-    let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
-    report_usage_stats(
-        final_req_stats,
-        org_id,
-        StreamType::Logs,
-        UsageType::Bulk,
-        fns_length as u16,
-    )
-    .await;
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/logs/_bulk",
