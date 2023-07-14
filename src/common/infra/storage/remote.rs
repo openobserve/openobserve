@@ -69,7 +69,6 @@ impl ObjectStore for Remote {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                log::info!("s3 File upload succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
