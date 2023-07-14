@@ -27,7 +27,7 @@
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
-            :key="searchObj.data.metrics.metricList"
+            :key="searchObj.data.metrics.metricList.length"
             @select-label="addLabelToEditor"
           />
         </template>
@@ -46,7 +46,6 @@
           >
             <syntax-guide-metrics class="q-mr-sm" />
             <date-time
-              ref="metricsDateTimeRef"
               auto-apply
               :default-type="
                 searchObj.data.datetime.relativeTimePeriod
@@ -208,6 +207,7 @@ import {
   onActivated,
   onBeforeMount,
   watch,
+  nextTick,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -345,7 +345,7 @@ export default defineComponent({
     onMounted(() => {
       setTimeout(() => {
         isMounted.value = true;
-      });
+      }, 0);
     });
 
     onDeactivated(() => {
@@ -750,7 +750,9 @@ export default defineComponent({
 
     const onMetricChange = async (metric) => {
       const query = metric?.value + "{}";
-      metricsQueryEditorRef.value.setValue(query);
+      nextTick(() => {
+        metricsQueryEditorRef.value.setValue(query);
+      });
     };
 
     function restoreUrlQueryParams() {
