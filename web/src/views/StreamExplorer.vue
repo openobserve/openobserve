@@ -236,11 +236,12 @@ export default defineComponent({
         var timestamps: {
           startTime: number;
           endTime: number;
-        } | null = queryData.value.dateTime.relativeTimePeriod
-          ? getConsumableRelativeTime(
-              queryData.value.dateTime.relativeTimePeriod
-            ) || null
-          : cloneDeep(queryData.value.dateTime);
+        } | null =
+          queryData.value.dateTime.type === "relative"
+            ? getConsumableRelativeTime(
+                queryData.value.dateTime.relativeTimePeriod
+              ) || null
+            : cloneDeep(queryData.value.dateTime);
 
         if (streamData?.value?.stream_type === "enrichment_tables") {
           if (streamData.value.stats) {
