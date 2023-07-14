@@ -33,6 +33,7 @@ pub async fn vector_scalar_bin_op(
 ) -> Result<Value> {
     let is_comparison_operator = expr.op.is_comparison_operator();
     let return_bool = expr.return_bool();
+
     let output: Vec<InstantValue> = left
         .par_iter()
         .flat_map(|instant| {
@@ -57,7 +58,10 @@ pub async fn vector_scalar_bin_op(
                     } else {
                         instant.labels.clone()
                     };
-                    let final_value = if is_comparison_operator && swapped_lhs_rhs {
+
+                    let final_value = if is_comparison_operator && swapped_lhs_rhs && return_bool {
+                        value
+                    } else if is_comparison_operator && swapped_lhs_rhs {
                         instant.sample.value
                     } else {
                         value
@@ -75,6 +79,7 @@ pub async fn vector_scalar_bin_op(
             }
         })
         .collect();
+
     Ok(Value::Vector(output))
 }
 
@@ -208,6 +213,7 @@ fn vector_arithmatic_operators(
 
     let return_bool = expr.return_bool();
     let comparison_operator = expr.op.is_comparison_operator();
+
     // Iterate over left and pick up the corresponding instance from rhs
     let output: Vec<InstantValue> = left
         .par_iter()
