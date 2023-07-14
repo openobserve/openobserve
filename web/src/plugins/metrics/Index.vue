@@ -116,12 +116,21 @@
               </div>
             </div>
           </div>
-          <div v-if="searchObj.loading">
-            <q-spinner-dots
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
+          <div
+            v-if="searchObj.loading"
+            class="flex justify-center items-center"
+            style="height: calc(100% - 300px)"
+          >
+            <div class="q-pb-lg">
+              <q-spinner-hourglass
+                color="primary"
+                size="40px"
+                style="margin: 0 auto; display: block"
+              />
+              <span class="text-center">
+                Hold on tight, fetching metrics.
+              </span>
+            </div>
           </div>
           <div
             v-else-if="
@@ -130,8 +139,8 @@
           >
             <h5 class="text-center">
               <div
-                data-test="logs-search-result-not-found-text"
                 v-if="searchObj.data.errorCode == 0"
+                data-test="logs-search-result-not-found-text"
               >
                 Result not found.
               </div>
@@ -145,7 +154,7 @@
               }}</q-item-label>
             </h5>
           </div>
-          <div v-else-if="!!!searchObj.data.metrics.selectedMetric.value">
+          <div v-else-if="!!!searchObj.data.metrics.selectedMetric?.value">
             <h5
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
@@ -156,13 +165,13 @@
           <div
             v-else-if="
               searchObj.data.queryResults.hasOwnProperty('total') &&
-              !!!searchObj.data.queryResults.hits.length &&
+              !!!searchObj.data.queryResults?.hits?.length &&
               !searchObj.loading
             "
           >
             <h5 class="text-center">No result found.</h5>
           </div>
-          <template v-if="searchObj.data.metrics.metricList.length">
+          <template v-if="searchObj.data.metrics.metricList?.length">
             <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
               <q-btn
                 size="md"
@@ -386,41 +395,6 @@ export default defineComponent({
         });
     };
 
-    function ErrorException(message) {
-      searchObj.loading = false;
-      $q.notify({
-        type: "negative",
-        message: message,
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
-    function Notify() {
-      return $q.notify({
-        type: "positive",
-        message: "Waiting for response...",
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
     watch(
       () => searchObj.data.metrics.metricList,
       (metrics) => {
@@ -431,6 +405,7 @@ export default defineComponent({
 
     function getStreamList(isFirstLoad = false) {
       try {
+        searchObj.loading = true;
         streamService
           .nameList(
             store.state.selectedOrganization.identifier,
@@ -444,7 +419,6 @@ export default defineComponent({
               //extract stream data from response
               loadStreamLists(isFirstLoad);
             } else {
-              searchObj.loading = false;
               searchObj.data.errorMsg =
                 "No stream found in selected organization!";
               searchObj.data.metrics.metricList = [];
@@ -457,7 +431,6 @@ export default defineComponent({
             }
           })
           .catch((e) => {
-            searchObj.loading = false;
             $q.notify({
               type: "negative",
               message:
@@ -465,6 +438,9 @@ export default defineComponent({
                 e.message,
               timeout: 2000,
             });
+          })
+          .finally(() => {
+            searchObj.loading = false;
           });
       } catch (e) {
         searchObj.loading = false;
@@ -516,7 +492,6 @@ export default defineComponent({
               ...selectedStreamItemObj,
             };
           } else {
-            searchObj.loading = false;
             searchObj.data.queryResults = {};
             searchObj.data.metrics.selectedMetric = null;
             searchObj.data.histogram = {
@@ -525,11 +500,8 @@ export default defineComponent({
               chartParams: {},
             };
           }
-        } else {
-          searchObj.loading = false;
         }
       } catch (e) {
-        searchObj.loading = false;
         console.log("Error while loading streams");
       }
     }
@@ -598,7 +570,6 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        searchObj.loading = false;
         console.log("Error while getting consumable date time");
       }
     }
@@ -609,7 +580,6 @@ export default defineComponent({
           return false;
         }
 
-        // dismiss = Notify();
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(searchObj.data.datetime.startTime / 1000),
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
@@ -617,27 +587,11 @@ export default defineComponent({
         chartData.value = cloneDeep(dashboardPanelData.data);
         updateUrlQueryParams();
       } catch (e) {
-        searchObj.loading = false;
         showErrorNotification("Request failed.");
       }
     }
 
-    const getDefaultTrace = (trace: any) => {
-      return {
-        x: [],
-        y: [],
-        unparsed_x: [],
-        name: trace.name || "",
-        type: trace.type || "line",
-        marker: {
-          color: trace.color || "#5960b2",
-          opacity: trace.opacity || 0.8,
-        },
-      };
-    };
-
     function loadPageData(isFirstLoad = false) {
-      // searchObj.loading = true;
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
