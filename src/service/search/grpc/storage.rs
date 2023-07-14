@@ -85,7 +85,8 @@ pub async fn search(
     } else {
         scan_stats.files = files.len() as u64;
         for file in &files {
-            let file_meta = file_list::get_file_meta(file).unwrap_or_default();
+            let file_meta =
+                file_list::get_file_meta(file).map_err(|e| Error::Message(e.to_string()))?;
             // calculate scan size
             scan_stats.records += file_meta.records;
             scan_stats.original_size += file_meta.original_size;

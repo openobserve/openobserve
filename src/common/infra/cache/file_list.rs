@@ -26,29 +26,27 @@ static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<String>>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
-type OrgFilelist = AHashMap<String, TypeFilelist>;
-type TypeFilelist = AHashMap<String, StreamFilelist>;
-type StreamFilelist = AHashMap<String, YearFilelist>;
-type YearFilelist = AHashMap<String, MonthFilelist>;
-type MonthFilelist = AHashMap<String, DayFilelist>;
+type OrgFilelist = RwHashMap<String, TypeFilelist>;
+type TypeFilelist = RwHashMap<String, StreamFilelist>;
+type StreamFilelist = RwHashMap<String, YearFilelist>;
+type YearFilelist = RwHashMap<String, MonthFilelist>;
+type MonthFilelist = RwHashMap<String, DayFilelist>;
 type DayFilelist = Vec<String>;
 
 type KeyColumns = (String, String, String, String, String, String, String);
 
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let mut org_filelist = FILES.entry(org_id).or_insert_with(AHashMap::default);
+    let org_filelist = FILES.entry(org_id).or_insert_with(DashMap::default);
     let type_filelist = org_filelist
         .entry(stream_type)
-        .or_insert_with(AHashMap::default);
+        .or_insert_with(DashMap::default);
     let stream_filelist = type_filelist
         .entry(stream_name)
-        .or_insert_with(AHashMap::default);
-    let year_filelist = stream_filelist
-        .entry(year)
-        .or_insert_with(AHashMap::default);
-    let month_filelist = year_filelist.entry(month).or_insert_with(AHashMap::default);
-    let day_filelist = month_filelist.entry(day).or_insert_with(Vec::new);
+        .or_insert_with(DashMap::default);
+    let year_filelist = stream_filelist.entry(year).or_insert_with(DashMap::default);
+    let month_filelist = year_filelist.entry(month).or_insert_with(DashMap::default);
+    let mut day_filelist = month_filelist.entry(day).or_insert_with(Vec::new);
     day_filelist.push(key.to_string());
     DATA.insert(key.to_string(), val);
     Ok(())
@@ -57,7 +55,7 @@ pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
     DATA.remove(key);
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let mut org_filelist = match FILES.get_mut(&org_id) {
+    let org_filelist = match FILES.get_mut(&org_id) {
         Some(org_filelist) => org_filelist,
         None => return Ok(()),
     };
@@ -77,7 +75,7 @@ pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
         Some(month_filelist) => month_filelist,
         None => return Ok(()),
     };
-    let day_filelist = match month_filelist.get_mut(&day) {
+    let mut day_filelist = match month_filelist.get_mut(&day) {
         Some(day_filelist) => day_filelist,
         None => return Ok(()),
     };
@@ -138,9 +136,9 @@ fn scan_prefix(
     };
 
     if year.is_empty() {
-        for (_, year_cache) in stream_cache.iter() {
-            for (_, month_cache) in year_cache.iter() {
-                for (_, day_cache) in month_cache.iter() {
+        for year_cache in stream_cache.iter() {
+            for month_cache in year_cache.iter() {
+                for day_cache in month_cache.iter() {
                     items.extend(day_cache.iter().map(|x| x.to_string()));
                 }
             }
@@ -153,8 +151,8 @@ fn scan_prefix(
         None => return Ok(items),
     };
     if month.is_empty() {
-        for (_, month_cache) in year_cache.iter() {
-            for (_, day_cache) in month_cache.iter() {
+        for month_cache in year_cache.iter() {
+            for day_cache in month_cache.iter() {
                 items.extend(day_cache.iter().map(|x| x.to_string()));
             }
         }
@@ -166,7 +164,7 @@ fn scan_prefix(
         None => return Ok(items),
     };
     if day.is_empty() {
-        for (_, day_cache) in month_cache.iter() {
+        for day_cache in month_cache.iter() {
             items.extend(day_cache.iter().map(|x| x.to_string()));
         }
         return Ok(items);
@@ -248,16 +246,16 @@ pub fn get_file_num() -> Result<(usize, usize, usize), anyhow::Error> {
     let mut file_list_num = 0;
     for cache in FILES.iter() {
         mem_size += cache.key().len();
-        for (key, type_cache) in cache.value().iter() {
-            mem_size += key.len();
-            for (key, stream_cache) in type_cache.iter() {
-                mem_size += key.len();
-                for (key, year_cache) in stream_cache.iter() {
-                    mem_size += key.len();
-                    for (key, month_cache) in year_cache.iter() {
-                        mem_size += key.len();
-                        for (key, day_cache) in month_cache.iter() {
-                            mem_size += key.len();
+        for type_cache in cache.value().iter() {
+            mem_size += type_cache.len();
+            for stream_cache in type_cache.iter() {
+                mem_size += stream_cache.len();
+                for year_cache in stream_cache.iter() {
+                    mem_size += year_cache.len();
+                    for month_cache in year_cache.iter() {
+                        mem_size += month_cache.len();
+                        for day_cache in month_cache.iter() {
+                            mem_size += day_cache.len();
                             file_list_num += 1;
                             for key in day_cache.iter() {
                                 mem_size += key.len() * 2; // one is in FILES, one is in DATA
@@ -292,7 +290,11 @@ pub fn get_all_stream(org_id: &str, stream_type: StreamType) -> Result<Vec<Strin
         Some(cache) => cache,
         None => return Ok(vec![]),
     };
-    Ok(type_cache.keys().map(|x| x.to_string()).collect())
+    Ok(type_cache
+        .value()
+        .iter()
+        .map(|x| x.key().to_string())
+        .collect())
 }
 
 fn parse_key_columns(key: &str) -> Result<KeyColumns, anyhow::Error> {
@@ -394,18 +396,15 @@ mod tests {
     #[test]
     fn test_delete_file_from_cache() {
         let meta = FileMeta::default();
-        let ret = set_file_to_cache(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-            meta,
-        );
+        let file = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let ret = set_file_to_cache(file, meta);
         assert!(ret.is_ok());
 
-        let meta = FileMeta::default();
-        let ret = set_file_to_cache(
-            "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-            meta,
-        );
+        let ret = del_file_from_cache(file);
         assert!(ret.is_ok());
+
+        let res = get_file_from_cache(file);
+        assert!(res.is_err());
     }
 
     #[actix_web::test]

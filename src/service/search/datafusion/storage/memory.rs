@@ -88,7 +88,8 @@ impl ObjectStore for FS {
         };
         if range.end > data.len() {
             let file = location.to_string();
-            let file_meta = crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+            let file_meta =
+                crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
             log::error!(
                 "get_range: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
                 file,
@@ -116,7 +117,7 @@ impl ObjectStore for FS {
                 if range.end > data.len() {
                     let file = location.to_string();
                     let file_meta =
-                        crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+                        crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
                     log::error!(
                         "get_ranges: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
                         file,

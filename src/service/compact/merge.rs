@@ -354,7 +354,7 @@ async fn merge_files(
                 continue;
             }
             // get the schema version of the file
-            let mut file_meta = file_list::get_file_meta(file).unwrap_or_default();
+            let mut file_meta = file_list::get_file_meta(file)?;
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
                 file_meta.min_ts,

@@ -69,7 +69,6 @@ impl ObjectStore for Local {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                log::info!("disk File upload succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
