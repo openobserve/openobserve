@@ -28,7 +28,7 @@
         <!-- <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span> -->
         <q-space />
         <q-tabs v-model="activeTab">
-          <q-tab v-for="(tab, index) in tabs" :key="index" name="query" :label="'Query ' + (index + 1)">
+          <q-tab no-caps v-for="(tab, index) in tabs" :key="index" name="query" :label="'Query ' + (index + 1)">
           </q-tab>
         </q-tabs>
         <q-btn round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
