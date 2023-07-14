@@ -202,6 +202,7 @@ pub async fn process(
     report_usage_stats(
         req_stats,
         org_id,
+        stream_name,
         StreamType::Logs,
         UsageType::GCPSubscription,
         local_trans.len() as u16,

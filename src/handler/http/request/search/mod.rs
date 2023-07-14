@@ -167,6 +167,7 @@ pub async fn search(
             report_usage_stats(
                 req_stats,
                 &org_id,
+                "", // TODO see if we can steam name
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,
@@ -455,6 +456,7 @@ pub async fn around(
     report_usage_stats(
         req_stats,
         &org_id,
+        &stream_name,
         StreamType::Logs,
         UsageType::SearchAround,
         num_fn,
@@ -654,6 +656,7 @@ pub async fn values(
     report_usage_stats(
         req_stats,
         &org_id,
+        &stream_name,
         StreamType::Logs,
         UsageType::SearchTopNValues,
         num_fn,

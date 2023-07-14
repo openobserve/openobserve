@@ -369,7 +369,15 @@ pub async fn traces_json(
     );
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage
-    report_usage_stats(req_stats, org_id, StreamType::Traces, UsageType::Traces, 0).await;
+    report_usage_stats(
+        req_stats,
+        org_id,
+        traces_stream_name,
+        StreamType::Traces,
+        UsageType::Traces,
+        0,
+    )
+    .await;
 
     let schema_exists = stream_schema_exists(
         org_id,

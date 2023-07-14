@@ -20,7 +20,7 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
@@ -173,7 +173,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             .or_insert(StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
-    let mut final_req_stats = RequestStats::default();
+    let time = start.elapsed().as_secs_f64();
+
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
@@ -185,7 +186,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
         let mut stream_file_name = "".to_string();
-        let req_stats = write_file(
+        let mut req_stats = write_file(
             stream_data,
             thread_id,
             org_id,
@@ -193,12 +194,19 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &mut stream_file_name,
             StreamType::Metrics,
         );
-        final_req_stats.size += req_stats.size;
-        final_req_stats.records += req_stats.records;
+        req_stats.response_time = time;
+
+        report_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            UsageType::JsonMetrics,
+            0,
+        )
+        .await;
     }
 
-    let time = start.elapsed().as_secs_f64();
-    final_req_stats.response_time += time;
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/api/org/ingest/metrics/_json",
@@ -218,14 +226,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         ])
         .inc();
     //let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
-    report_usage_stats(
-        final_req_stats,
-        org_id,
-        StreamType::Metrics,
-        UsageType::JsonMetrics,
-        0,
-    )
-    .await;
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
