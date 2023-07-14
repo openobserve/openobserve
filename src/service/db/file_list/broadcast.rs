@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::common::infra::cluster::{self, get_internal_grpc_token};
+use crate::common::infra::cluster::{self, get_cached_nodes, get_internal_grpc_token};
 use crate::common::infra::config::{RwHashMap, CONFIG};
 use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
@@ -31,7 +31,10 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode {
         return Ok(());
     }
-    let nodes = cluster::get_cached_online_nodes().unwrap();
+    let nodes = get_cached_nodes(|node| {
+        node.status == cluster::NodeStatus::Prepare || node.status == cluster::NodeStatus::Online
+    })
+    .unwrap();
     let local_node_uuid = cluster::LOCAL_NODE_UUID.clone();
     for node in nodes {
         if node.uuid.eq(&local_node_uuid) {
@@ -46,7 +49,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         for _i in 0..5 {
             let node = node.clone();
             let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
-                let (tx, mut rx) = mpsc::channel(1024);
+                let (tx, mut rx) = mpsc::channel(10000);
                 tokio::task::spawn(async move {
                     let node_id = node.uuid.clone();
                     if let Err(e) = send_to_node(node, &mut rx).await {
@@ -78,9 +81,20 @@ async fn send_to_node(
     rx: &mut mpsc::Receiver<Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     loop {
-        if cluster::get_node_by_uuid(&node.uuid).is_none() {
-            return Ok(());
+        // waiting for the node to be online
+        loop {
+            match cluster::get_node_by_uuid(&node.uuid) {
+                None => return Ok(()),
+                Some(v) => {
+                    if v.status == cluster::NodeStatus::Online {
+                        break;
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            tokio::task::yield_now().await;
         }
+        // connect to the node
         let token: MetadataValue<_> = get_internal_grpc_token().parse()?;
         let channel = Channel::from_shared(node.grpc_addr)
             .unwrap()

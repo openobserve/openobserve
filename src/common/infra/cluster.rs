@@ -281,7 +281,7 @@ pub async fn leave() -> Result<()> {
     Ok(())
 }
 
-fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
+pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     if NODES.is_empty() {
         return None;
     }
