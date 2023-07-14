@@ -300,7 +300,7 @@ export const updateVariable = async (
   (it: any) => it.name == variableData.name
   );
 
-  if (variableExists.length) {
+  if (variableName != variableData.name && variableExists.length) {
   throw new Error("Variable with same name already exists");
   }
   
