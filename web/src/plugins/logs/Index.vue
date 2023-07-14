@@ -1167,14 +1167,16 @@ export default defineComponent({
     }
 
     onBeforeMount(() => {
-      if (searchObj.loading == false) {
-        loadPageData(true);
-        restoreUrlQueryParams();
-        refreshData();
-      }
+      // console.log("before mount");
+      // if (searchObj.loading == false) {
+      //   loadPageData(true);
+      //   restoreUrlQueryParams();
+      //   refreshData();
+      // }
     });
 
     onMounted(() => {
+      loadPageData(true);
       reDrawGrid();
     });
 
@@ -1191,15 +1193,16 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      if (!searchObj.loading) updateStreams();
-      refreshData();
+    //   alert("activated");
+    //   // if (!searchObj.loading) updateStreams();
+    //   // refreshData();
 
-      if (
-        searchObj.organizationIdetifier !=
-        store.state.selectedOrganization.identifier
-      ) {
-        loadPageData();
-      }
+    //   // if (
+    //   //   searchObj.organizationIdetifier !=
+    //   //   store.state.selectedOrganization.identifier
+    //   // ) {
+    //   //   loadPageData();
+    //   // }
 
       if (
         searchObj.meta.showHistogram == true &&
@@ -1233,6 +1236,7 @@ export default defineComponent({
             });
           });
       } else {
+        alert("No streams found laodpagedata");
         loadPageData(true);
       }
     };
@@ -1570,15 +1574,18 @@ export default defineComponent({
     },
     changeStream: {
       handler(stream, streamOld) {
-        if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
+        if (
+          this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
+          this.searchObj.data.stream.selectedStream.value != ""
+        ) {
           this.searchObj.data.tempFunctionContent = "";
           this.searchBarRef.resetFunctionContent();
           if (streamOld.value) this.searchObj.data.query = "";
           if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
           this.searchObj.loading = true;
-          setTimeout(() => {
-            this.runQueryFn();
-          }, 500);
+          // setTimeout(() => {
+          //   this.runQueryFn();
+          // }, 500);
         }
       },
       immediate: false,
