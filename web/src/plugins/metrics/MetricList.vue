@@ -32,7 +32,6 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
       behavior="menu"
       filled
       borderless
-      emit-value
       dense
       use-input
       hide-selected
@@ -41,23 +40,29 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
       @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
-      <template v-slot:prepend>
+      <template
+        v-if="searchObj.data.metrics.selectedMetric?.type"
+        v-slot:prepend
+      >
         <q-icon
-          :title="searchObj.data.metrics.selectedMetricType"
+          :title="searchObj.data.metrics.selectedMetric?.type"
           size="xs"
-          :name="metricsIconMapping[searchObj.data.metrics.selectedMetricType]"
+          :name="
+            metricsIconMapping[
+              searchObj.data.metrics.selectedMetric?.type || ''
+            ]
+          "
         />
       </template>
       <template v-slot:option="scope">
         <q-item
           :class="
             store.state.theme === 'dark' &&
-            searchObj.data.metrics.selectedMetric !== scope.opt.value
+            searchObj.data.metrics.selectedMetric?.value !== scope.opt.value
               ? 'text-white'
               : ''
           "
           v-bind="scope.itemProps"
-          @click="setSelectedMetricType(scope?.opt)"
         >
           <q-item-section
             :title="scope?.opt?.type"
@@ -73,16 +78,6 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
             <q-item-label>{{ scope.opt.label }}</q-item-label>
           </q-item-section>
         </q-item>
-        <!-- <q-item v-bind="scope.itemProps">
-          <q-item-section>
-            <q-item-label
-              >{{ scope.opt.label }}
-              <span class="q-pl-xs text-bold" v-show="scope?.opt?.type"
-                >({{ scope?.opt?.type }})</span
-              >
-            </q-item-label>
-          </q-item-section>
-        </q-item> -->
       </template>
       <template #no-option>
         <q-item>
@@ -344,14 +339,15 @@ export default defineComponent({
     };
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
-        (stream: any) => stream.name === searchObj.data.metrics.selectedMetric
+        (stream: any) =>
+          stream.name === searchObj.data.metrics.selectedMetric?.value
       ).schema;
       filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
     watch(
       () => searchObj.data.metrics.selectedMetric,
       (metric) => {
-        if (metric) updateMetricLabels();
+        if (metric?.value) updateMetricLabels();
       },
       { immediate: true }
     );
@@ -378,7 +374,7 @@ export default defineComponent({
         stream
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.metrics.selectedMetric,
+            stream_name: searchObj.data.metrics.selectedMetric?.value,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
