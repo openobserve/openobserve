@@ -89,10 +89,22 @@
                 style="border-top: 1px solid #dbdbdb; height: 100%"
               >
                 <div class="q-pb-xs text-bold">PromQL:</div>
-                <div v-show="isZoMetricSelected" class="text-red-5 q-pb-sm">
-                  Please include 'organization', 'stream_type', and 'stream'
-                  labels for this metric.
+                <div
+                  v-if="searchObj.data.metrics.selectedMetric?.help?.length"
+                  class="flex items-center justify-start q-pb-sm"
+                >
+                  <q-icon name="info" style="font-size: 16px" title="Info" />
+                  <div
+                    class="q-pl-xs info-message"
+                    :style="{
+                      color:
+                        store.state.theme === 'light' ? '#049cbc' : '#3fd5f4',
+                    }"
+                  >
+                    {{ searchObj.data.metrics.selectedMetric.help }}
+                  </div>
                 </div>
+
                 <query-editor
                   id="metrics-query-editor"
                   ref="metricsQueryEditorRef"
@@ -134,7 +146,7 @@
               }}</q-item-label>
             </h5>
           </div>
-          <div v-else-if="!!!searchObj.data.metrics.selectedMetric">
+          <div v-else-if="!!!searchObj.data.metrics.selectedMetric.value">
             <h5
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
@@ -247,7 +259,7 @@ export default defineComponent({
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.metrics.selectedMetric,
+          stream_name: this.searchObj.data.metrics.selectedMetric?.value,
           page: "Metrics explorer",
         });
       }
@@ -275,7 +287,6 @@ export default defineComponent({
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
     const isMounted = ref(false);
-    const isZoMetricSelected = ref(false);
     const logStreams = ref([]);
 
     const metricTypeMapping: any = {
@@ -307,7 +318,8 @@ export default defineComponent({
               let itemObj = {
                 label: item.name,
                 value: item.name,
-                type: metricTypeMapping[item.metrics_type] || "",
+                type: metricTypeMapping[item.metrics_meta.metric_type] || "",
+                help: item.metrics_meta.help || "",
               };
               searchObj.data.metrics.metricList.push(itemObj);
             });
@@ -463,7 +475,7 @@ export default defineComponent({
     function loadStreamLists(isFirstLoad = false) {
       try {
         searchObj.data.metrics.metricList = [];
-        searchObj.data.metrics.selectedMetric = "";
+        searchObj.data.metrics.selectedMetric = null;
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -471,7 +483,8 @@ export default defineComponent({
             let itemObj = {
               label: item.name,
               value: item.name,
-              type: metricTypeMapping[item.metrics_type] || "",
+              type: metricTypeMapping[item.metrics_meta.metric_type] || "",
+              help: item.metrics_meta.help || "",
             };
             searchObj.data.metrics.metricList.push(itemObj);
 
@@ -499,14 +512,13 @@ export default defineComponent({
             }
           });
           if (selectedStreamItemObj.label != undefined) {
-            searchObj.data.metrics.selectedMetric = selectedStreamItemObj.value;
-            searchObj.data.metrics.selectedMetricType =
-              selectedStreamItemObj.type;
+            searchObj.data.metrics.selectedMetric = {
+              ...selectedStreamItemObj,
+            };
           } else {
             searchObj.loading = false;
             searchObj.data.queryResults = {};
-            searchObj.data.metrics.selectedMetric = "";
-            searchObj.data.metrics.selectedMetricType = "";
+            searchObj.data.metrics.selectedMetric = null;
             searchObj.data.histogram = {
               xData: [],
               yData: [],
@@ -737,18 +749,7 @@ export default defineComponent({
     };
 
     const onMetricChange = async (metric) => {
-      let labels = "";
-      if (metric && metric.indexOf("zo_") === 0) {
-        labels += `organization="${store.state?.selectedOrganization?.identifier}"`;
-        labels += `,stream_type="logs"`;
-        if (logStreams.value?.length && logStreams.value[0]["name"]) {
-          labels += `,stream="${logStreams.value[0]["name"]}"`;
-        }
-        isZoMetricSelected.value = true;
-      } else {
-        isZoMetricSelected.value = false;
-      }
-      const query = metric + (labels && labels.length ? `{${labels}}` : "{}");
+      const query = metric?.value + "{}";
       metricsQueryEditorRef.value.setValue(query);
     };
 
@@ -780,7 +781,7 @@ export default defineComponent({
         const date = searchObj.data.datetime;
 
         const query = {
-          stream: searchObj.data.metrics.selectedMetric,
+          stream: searchObj.data.metrics.selectedMetric?.value,
         };
 
         if (date.type == "relative") {
@@ -832,7 +833,6 @@ export default defineComponent({
       onMetricChange,
       updateUrlQueryParams,
       addLabelToEditor,
-      isZoMetricSelected,
     };
   },
   computed: {
@@ -867,7 +867,7 @@ export default defineComponent({
     selectedMetric: {
       deep: true,
       handler: function (metric) {
-        if (this.searchObj.data.metrics.selectedMetric) {
+        if (this.searchObj.data.metrics.selectedMetric?.value) {
           this.onMetricChange(metric);
         }
       },
