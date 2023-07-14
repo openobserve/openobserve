@@ -91,8 +91,27 @@ pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
     Some(quantile_value)
 }
 
+pub fn calculate_trend(
+    index: i64,
+    trend_factor: f64,
+    previous_smoothed: f64,
+    current_smoothed: f64,
+    previous_trend: f64,
+) -> f64 {
+    if index == 0 {
+        return previous_trend;
+    }
+
+    let scaled_trend = trend_factor * (current_smoothed - previous_smoothed);
+    let scaled_previous_trend = (1.0 - trend_factor) * previous_trend;
+
+    scaled_trend + scaled_previous_trend
+}
+
 #[cfg(test)]
 mod tests {
+    // use float_cmp::approx_eq;
+
     use super::*;
 
     #[test]
@@ -106,4 +125,15 @@ mod tests {
             None => assert!(false),
         }
     }
+
+    // #[test]
+    // fn test_holt_winters_calculation() {
+    //     let data = vec![4.0, 2.0, 1.0, 3.0, 5.0];
+    //     let result = holt_winters_calculation(&data, 0.1, 0.1);
+    //     let expected = -2.507;
+    //     match result {
+    //         Some(got) => assert!(approx_eq!(f64, expected, got, epsilon = 0.001)),
+    //         None => assert!(false),
+    //     }
+    // }
 }
