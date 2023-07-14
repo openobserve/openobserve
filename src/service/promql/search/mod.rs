@@ -269,6 +269,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     report_usage_stats(
         req_stats,
         &req.org_id,
+        "", // TODO see if we can add metric name
         StreamType::Metrics,
         UsageType::MetricSearch,
         0,
