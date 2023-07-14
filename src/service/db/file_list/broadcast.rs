@@ -41,13 +41,32 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
             continue;
         }
         let node_id = node.uuid.clone();
-        let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
-            let (tx, mut rx) = mpsc::channel(1024);
-            tokio::task::spawn(async move { send_to_node(node, &mut rx).await });
-            Arc::new(tx)
-        });
-        if let Err(e) = events.clone().send(items.to_vec()).await {
-            log::error!("send event to node[{}] failed: {}", node_id, e);
+        // retry 5 times
+        let mut ok = false;
+        for _i in 0..5 {
+            let node = node.clone();
+            let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
+                let (tx, mut rx) = mpsc::channel(1024);
+                tokio::task::spawn(async move {
+                    let node_id = node.uuid.clone();
+                    if let Err(e) = send_to_node(node, &mut rx).await {
+                        log::error!("send event to node[{}] channel closed: {}", &node_id, e);
+                    }
+                });
+                Arc::new(tx)
+            });
+            if let Err(e) = events.clone().send(items.to_vec()).await {
+                EVENTS.remove(&node_id);
+                log::error!("send event to node[{}] failed: {}, retrying...", node_id, e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                tokio::task::yield_now().await;
+                continue;
+            }
+            ok = true;
+            break;
+        }
+        if !ok {
+            log::error!("send event to node[{}] failed, dropping event", node_id);
         }
     }
 

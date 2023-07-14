@@ -233,8 +233,8 @@ pub async fn merge_by_stream(
             storage::put(&new_file_list_key, compressed_bytes.into()).await?;
 
             // set to local cache & send broadcast
-            // retry 10 times
-            for _ in 0..9 {
+            // retry 5 times
+            for _ in 0..5 {
                 // set to local cache
                 let mut cache_success = true;
                 for event in &events {
