@@ -432,6 +432,9 @@ async fn merge_files(
         datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema).await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
 
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);

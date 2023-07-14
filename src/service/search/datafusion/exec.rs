@@ -871,12 +871,16 @@ pub async fn merge_parquet_files(
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
     let result = arrowJson::writer::record_batches_to_json_rows(&batches_ref).unwrap();
     let record = result.first().unwrap();
-    let file_meta = FileMeta {
-        min_ts: record["min_ts"].as_i64().unwrap(),
-        max_ts: record["max_ts"].as_i64().unwrap(),
-        records: record["num_records"].as_u64().unwrap(),
-        original_size: 0,
-        compressed_size: 0,
+    let file_meta = if record.is_empty() {
+        FileMeta::default()
+    } else {
+        FileMeta {
+            min_ts: record["min_ts"].as_i64().unwrap(),
+            max_ts: record["max_ts"].as_i64().unwrap(),
+            records: record["num_records"].as_u64().unwrap(),
+            original_size: 0,
+            compressed_size: 0,
+        }
     };
 
     // get all sorted data
