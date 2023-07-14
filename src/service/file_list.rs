@@ -36,10 +36,7 @@ pub fn get_file_list(
 
 #[inline]
 pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    match file_list::get_file_from_cache(file) {
-        Ok(v) => Ok(v),
-        Err(_) => Ok(FileMeta::default()),
-    }
+    file_list::get_file_from_cache(file)
 }
 
 #[inline]
@@ -47,7 +44,7 @@ pub fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error
     let mut stats = ScanStats::new();
     stats.files = files.len() as u64;
     for file in files {
-        let resp = get_file_meta(file).unwrap_or_default();
+        let resp = get_file_meta(file)?;
         stats.records += resp.records;
         stats.original_size += resp.original_size;
         stats.compressed_size += resp.compressed_size;
