@@ -1,3 +1,5 @@
+use super::value::Sample;
+
 /// Calculate mean over a slice of f64s
 pub fn mean(data: &[f64]) -> Option<f64> {
     let sum = data.iter().sum::<f64>();
@@ -106,6 +108,53 @@ pub fn calculate_trend(
     let scaled_previous_trend = (1.0 - trend_factor) * previous_trend;
 
     scaled_trend + scaled_previous_trend
+}
+
+pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64, f64)> {
+    let mut num_samples = 0.0;
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    let mut sum_xy = 0.0;
+    let mut sum_x2 = 0.0;
+    let initial_y = samples.get(0)?.value;
+    let mut constant_y = true;
+
+    for (i, sample) in samples.iter().enumerate() {
+        if constant_y && i > 0 && sample.value != initial_y {
+            constant_y = false;
+        }
+        num_samples += 1.0;
+        let x = (sample.timestamp / 1000 - intercept_time) as f64 / 1e3;
+        sum_x += x;
+        sum_y += sample.value;
+        sum_xy += x * sample.value;
+        sum_x2 += x * x;
+    }
+
+    if constant_y {
+        if initial_y.is_infinite() {
+            return None;
+        }
+        return Some((0.0, initial_y));
+    }
+
+    let cov_xy = sum_xy - (sum_x * sum_y) / num_samples;
+    let var_x = sum_x2 - (sum_x * sum_x) / num_samples;
+
+    let slope = cov_xy / var_x;
+    let intercept = (sum_y / num_samples) - (slope * sum_x / num_samples);
+
+    Some((slope, intercept))
+}
+
+pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
+    let updated_sum = sum + increment;
+    let y = if sum.abs() >= increment.abs() {
+        (sum - updated_sum) + increment
+    } else {
+        (increment - updated_sum) + sum
+    };
+    (updated_sum, c + y)
 }
 
 #[cfg(test)]

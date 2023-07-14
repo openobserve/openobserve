@@ -378,6 +378,12 @@ impl Value {
         }
     }
 
+    pub(crate) fn get_float(&self) -> Option<f64> {
+        match self {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
     pub fn get_type(&self) -> &str {
         match self {
             Value::Instant(_) => "vector",
