@@ -169,7 +169,7 @@ export default defineComponent({
       nodeEnter
         .append("circle")
         .attr("r", 10)
-        .style("fill", this.store.state.theme === "dark" ? "#565656" : "#fff")
+        .style("fill", this.store.state.theme === "dark" ? "#181a1b" : "#fff")
         .style("stroke-width", "2px")
         .style("stroke", (d: any) => {
           return d.data.color;

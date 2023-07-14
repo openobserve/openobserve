@@ -35,11 +35,7 @@
           <date-time
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
-            :default-type="
-              searchObj.data.datetime.relativeTimePeriod
-                ? 'relative'
-                : 'absolute'
-            "
+            :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
               endTime: searchObj.data.datetime.endTime,

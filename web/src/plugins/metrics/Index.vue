@@ -23,6 +23,7 @@
         v-model="searchObj.config.splitterModel"
         :limits="searchObj.config.splitterLimit"
         style="width: 100%"
+        @update:model-value="onSplitterUpdate"
       >
         <template #before>
           <metric-list
@@ -47,11 +48,7 @@
             <syntax-guide-metrics class="q-mr-sm" />
             <date-time
               auto-apply
-              :default-type="
-                searchObj.data.datetime.relativeTimePeriod
-                  ? 'relative'
-                  : 'absolute'
-              "
+              :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
                 startTime: searchObj.data.datetime.startTime,
                 endTime: searchObj.data.datetime.endTime,
@@ -763,6 +760,11 @@ export default defineComponent({
         dashboardPanelData.data.query + label
       );
     };
+
+    const onSplitterUpdate = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       store,
       router,
@@ -789,6 +791,7 @@ export default defineComponent({
       onMetricChange,
       updateUrlQueryParams,
       addLabelToEditor,
+      onSplitterUpdate,
     };
   },
   computed: {

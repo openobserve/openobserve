@@ -44,6 +44,7 @@
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
               class="full-height"
+              @update:model-value="onSplitterUpdate"
             >
               <template #before>
                 <div class="relative-position full-height">
@@ -386,6 +387,7 @@ export default defineComponent({
           )
           .then((res) => {
             searchObj.data.streamResults = res.data;
+            searchObj.loading = false;
 
             if (res.data.list.length > 0) {
               getQueryTransform();
@@ -602,11 +604,12 @@ export default defineComponent({
           },
         };
 
-        var timestamps: any = searchObj.data.datetime.relativeTimePeriod
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod
-            )
-          : cloneDeep(searchObj.data.datetime);
+        var timestamps: any =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
 
         if (
           timestamps.startTime != "Invalid Date" &&
@@ -823,6 +826,7 @@ export default defineComponent({
       let dismiss = () => {};
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
+          searchObj.loading = false;
           return false;
         }
 
@@ -855,6 +859,7 @@ export default defineComponent({
 
         if (queryReq == null) {
           dismiss();
+          searchObj.loading = false;
           return false;
         }
 
@@ -1434,6 +1439,10 @@ export default defineComponent({
       else expandedLogs.value[index.toString()] = true;
     };
 
+    const onSplitterUpdate = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       store,
       router,
@@ -1459,6 +1468,7 @@ export default defineComponent({
       expandedLogs,
       updateUrlQueryParams,
       fieldValues,
+      onSplitterUpdate,
     };
   },
   computed: {
@@ -1558,6 +1568,7 @@ export default defineComponent({
           this.searchBarRef.resetFunctionContent();
           if (streamOld.value) this.searchObj.data.query = "";
           if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
+          this.searchObj.loading = true;
           setTimeout(() => {
             this.runQueryFn();
           }, 500);
