@@ -103,7 +103,12 @@ pub async fn broadcast_cache() -> Result<(), anyhow::Error> {
     if files.is_empty() {
         return Ok(());
     }
-    super::broadcast::send(&files).await
+    for chunk in files.chunks(100) {
+        if let Err(e) = super::broadcast::send(chunk).await {
+            log::error!("broadcast cached file list failed: {}", e);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
