@@ -23,7 +23,8 @@ use crate::common::meta::common::FileKey;
 use crate::handler::grpc::cluster_rpc;
 
 lazy_static! {
-    pub static ref EVENTS: RwHashMap<String, Arc<mpsc::Sender<Vec<FileKey>>>> = DashMap::default();
+    pub static ref EVENTS: RwHashMap<String, Arc<mpsc::UnboundedSender<Vec<FileKey>>>> =
+        DashMap::default();
 }
 
 /// send an event to broadcast, will create a new channel for each nodes
@@ -49,7 +50,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
         for _i in 0..5 {
             let node = node.clone();
             let events = EVENTS.entry(node_id.clone()).or_insert_with(|| {
-                let (tx, mut rx) = mpsc::channel(10000);
+                let (tx, mut rx) = mpsc::unbounded_channel();
                 tokio::task::spawn(async move {
                     let node_id = node.uuid.clone();
                     if let Err(e) = send_to_node(node, &mut rx).await {
@@ -58,7 +59,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 });
                 Arc::new(tx)
             });
-            if let Err(e) = events.clone().send(items.to_vec()).await {
+            if let Err(e) = events.clone().send(items.to_vec()) {
                 EVENTS.remove(&node_id);
                 log::error!("send event to node[{}] failed: {}, retrying...", node_id, e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -78,7 +79,7 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
 
 async fn send_to_node(
     node: cluster::Node,
-    rx: &mut mpsc::Receiver<Vec<FileKey>>,
+    rx: &mut mpsc::UnboundedReceiver<Vec<FileKey>>,
 ) -> Result<(), anyhow::Error> {
     loop {
         // waiting for the node to be online
