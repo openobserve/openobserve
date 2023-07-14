@@ -309,7 +309,8 @@ pub async fn check_for_schema(
         }
     };
 
-    let (_, is_schema_changed, _) = get_schema_changes(&schema, &inferred_schema);
+    let (field_datatype_delta, is_schema_changed, final_fields) =
+        get_schema_changes(&schema, &inferred_schema);
 
     if is_schema_changed {
         if let Some(value) = handle_existing_schema(
@@ -326,7 +327,7 @@ pub async fn check_for_schema(
         } else {
             SchemaEvolution {
                 schema_compatible: true,
-                types_delta: None,
+                types_delta: Some(field_datatype_delta),
                 schema_fields: schema.to_cloned_fields(),
                 is_schema_changed: false,
             }
@@ -334,9 +335,9 @@ pub async fn check_for_schema(
     } else {
         SchemaEvolution {
             schema_compatible: true,
-            types_delta: None,
-            schema_fields: schema.to_cloned_fields(),
-            is_schema_changed: false,
+            types_delta: Some(field_datatype_delta),
+            schema_fields: final_fields,
+            is_schema_changed,
         }
     }
 }

@@ -18,21 +18,21 @@ pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
 pub async fn report_usage_stats(
     stats: RequestStats,
     org_id: &str,
+    stream_name: &str,
     stream_type: StreamType,
     event: UsageType,
     num_functions: u16,
 ) {
+    metrics::INGEST_RECORDS
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .inc_by(stats.records);
+    metrics::INGEST_BYTES
+        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .inc_by(stats.size as u64);
+
     if !CONFIG.common.usage_enabled {
         return;
     }
-    let local_stream_type = stream_type.to_string();
-    // metrics
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[&event.to_string(), "200", org_id, "", &local_stream_type])
-        .observe(stats.response_time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[&event.to_string(), "200", org_id, "", &local_stream_type])
-        .inc();
     let request_body = stats.request_body.unwrap_or(event.to_string());
     let now = Utc::now();
     let mut usage = vec![UsageData {

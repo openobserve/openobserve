@@ -158,6 +158,7 @@ pub async fn save_enrichment_data(
     report_usage_stats(
         req_stats,
         org_id,
+        stream_name,
         StreamType::Logs,
         UsageType::EnrichmentTable,
         0,
