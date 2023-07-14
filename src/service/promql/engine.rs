@@ -109,6 +109,7 @@ impl Engine {
                 let token = expr.op.id();
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
+
                 match (lhs.clone(), rhs.clone()) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
