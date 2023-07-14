@@ -37,6 +37,7 @@
           v-model="searchObj.config.splitterModel"
           :limits="searchObj.config.splitterLimit"
           style="width: 100%"
+          @update:model-value="onSplitterUpdate"
         >
           <template #before v-if="searchObj.meta.showFields">
             <index-list
@@ -584,8 +585,8 @@ export default defineComponent({
           searchObj.meta.resultGrid.rowsPerPage;
         req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
-        var timestamps: any =
-          searchObj.data.datetime.type == "relative"
+        let timestamps: any =
+          searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
                 searchObj.data.datetime.relativeTimePeriod
               )
@@ -1266,6 +1267,10 @@ export default defineComponent({
       router.push({ query });
     }
 
+    const onSplitterUpdate = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       store,
       router,
@@ -1284,6 +1289,7 @@ export default defineComponent({
       getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
+      onSplitterUpdate,
     };
   },
   computed: {
