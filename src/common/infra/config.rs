@@ -253,7 +253,7 @@ pub struct Limit {
     pub hb_interval: i64,
     // no need set by environment
     pub cpu_num: usize,
-    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT")]
+    #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 0)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
