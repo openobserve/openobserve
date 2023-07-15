@@ -490,6 +490,12 @@ impl Engine {
         Ok(())
     }
 
+    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
+        match value {
+            Value::Float(f) => Ok(*f),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
+    }
     async fn call_expr(&mut self, func: &Function, args: &FunctionArgs) -> Result<Value> {
         use crate::service::promql::functions::Func;
 
@@ -648,10 +654,18 @@ impl Engine {
                 )));
             }
             Func::HoltWinters => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err =
+                    "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
+                self.ensure_three_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let sf = self.call_expr_second_arg(args).await?;
+                let tf = self.call_expr_third_arg(args).await?;
+
+                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
+                let trend_factor = self.parse_f64_else_err(&tf, err)?;
+
+                functions::holt_winters(&input, scaling_factor, trend_factor)?
             }
             Func::Hour => functions::hour(&input)?,
             Func::Idelta => functions::idelta(&input)?,
