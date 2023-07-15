@@ -41,13 +41,25 @@ pub async fn search(
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
     // get file list
-    let files = match file_list.is_empty() {
+    let mut files = match file_list.is_empty() {
         true => get_file_list(&sql, stream_type).await?,
         false => file_list.to_vec(),
     };
     if files.is_empty() {
         return Ok((HashMap::new(), ScanStats::default()));
     }
+
+    // filter file_list
+    let mut not_exists_files = Vec::new();
+    files.iter().for_each(|f| {
+        if file_list::get_file_meta(f).is_err() {
+            not_exists_files.push(f.clone());
+        }
+    });
+    if !not_exists_files.is_empty() {
+        files.retain(|f| !not_exists_files.contains(f));
+    }
+    let files = files;
 
     // fetch all schema versions, group files by version
     let schema_versions =
