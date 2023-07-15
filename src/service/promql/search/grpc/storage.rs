@@ -64,12 +64,11 @@ pub(crate) async fn create_context(
     }
 
     // filter file_list
-    let mut not_exists_files = Vec::new();
-    files.iter().for_each(|f| {
-        if file_list::get_file_meta(f).is_err() {
-            not_exists_files.push(f.clone());
-        }
-    });
+    let not_exists_files: Vec<String> = files
+        .iter()
+        .filter(|f| file_list::get_file_meta(f).is_err())
+        .cloned()
+        .collect();
     if !not_exists_files.is_empty() {
         files.retain(|f| !not_exists_files.contains(f));
     }
