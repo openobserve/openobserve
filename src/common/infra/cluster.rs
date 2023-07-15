@@ -367,8 +367,7 @@ async fn watch_node_list() -> Result<()> {
                 // also need broadcast own file list to other nodes when an ingester join
                 if item_value.status.eq(&NodeStatus::Online) && is_ingester(&LOCAL_NODE_ROLE) {
                     log::info!(
-                        "cluster->node: broadcast local file_list to new node {:?}[{:?}]",
-                        item_value.uuid,
+                        "cluster->node: broadcast local file_list to new node [{:?}]",
                         item_value.name
                     );
                     db::file_list::local::broadcast_cache().await.unwrap();
