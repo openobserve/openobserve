@@ -233,8 +233,8 @@ pub async fn merge_by_stream(
             storage::put(&new_file_list_key, compressed_bytes.into()).await?;
 
             // set to local cache & send broadcast
-            // retry 10 times
-            for _ in 0..9 {
+            // retry 5 times
+            for _ in 0..5 {
                 // set to local cache
                 let mut cache_success = true;
                 for event in &events {
@@ -432,6 +432,9 @@ async fn merge_files(
         datafusion::exec::merge_parquet_files(tmp_dir.name(), &mut buf, schema).await?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as u64;
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
 
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
