@@ -251,6 +251,7 @@
     "off": "Turn Off"
   },
   "dashboard": {
+    "selectField":"Field",
     "selectIndex": "Stream",
     "selectStreamType": "Stream Type",
     "header": "Dashboards",
@@ -258,6 +259,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete Dashboard",
+    "edit":"Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
     "search": "Search Dashboard",
     "name": "Name",
@@ -275,8 +277,20 @@
     "actions": "Actions",
     "nameRequired": "Name is required",
     "id": "Id",
-    "goBackToDashboard": "Go back to Dashboard",
-    "import": "Import"
+    "goBackToDashboard": "Go back to dashboard",
+    "import": "Import",
+    "setting": "Dashboard Settings",
+    "generalSettings": "General settings",
+    "variableSettings": "Variable settings",
+    "newVariable": "Add Variable",
+    "generalSettingsTitle": "General Settings",
+    "addGeneralSettings": "General",
+    "extraOptions": "Options",
+    "nameOfVariable": "Name",
+    "labelOfVariable": "Label (optional)",
+    "ValueOfVariable": "Value",
+    "DefaultValue": "Default value (optional)",
+    "typeOfVariable": "Type of variable"
   },
   "panel": {
     "header": "Panel",

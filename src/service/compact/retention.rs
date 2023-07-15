@@ -292,7 +292,8 @@ async fn delete_from_file_list(
             // set to local cache
             let mut cache_success = true;
             for event in &items {
-                if let Err(e) = db::file_list::progress(&event.key, event.meta, event.deleted).await
+                if let Err(e) =
+                    db::file_list::progress(&event.key, event.meta, event.deleted, false).await
                 {
                     cache_success = false;
                     log::error!(

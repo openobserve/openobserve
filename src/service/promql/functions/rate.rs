@@ -17,7 +17,7 @@ use datafusion::error::Result;
 use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
 
 pub(crate) fn rate(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "rate", exec, true)
+    super::eval_idelta(data, "rate", exec, false)
 }
 
 fn exec(series: &RangeValue) -> Option<f64> {

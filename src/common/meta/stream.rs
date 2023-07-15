@@ -30,6 +30,8 @@ pub struct Stream {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics_meta: Option<super::prom::Metadata>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

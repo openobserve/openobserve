@@ -123,7 +123,6 @@ export const getAllDashboards = async (store: any) => {
       );
     })
     .catch((error) => {
-      // console.log(error);
     });
 };
 
@@ -185,6 +184,70 @@ export const addPanel = async (
   );
 };
 
+export const addVariable = async (
+  store: any,
+  dashboardId: any,
+  variableData: any
+) => {
+
+  if (
+    !store.state.allDashboardList ||
+    store.state.allDashboardList.length == 0
+  ) {
+    await getAllDashboards(store);
+  }
+
+  const currentDashboard = findDashboard(dashboardId, store);
+  if (!currentDashboard.variables) {
+
+    currentDashboard.variables = {};
+    currentDashboard.variables.list = [];
+  }
+
+  const variableExists = currentDashboard.variables.list.filter(
+    (it: any) => it.name == variableData.name
+  );
+
+  if (variableExists.length) {
+    
+    throw new Error("Variable with same name already exists");
+  }
+
+  currentDashboard.variables.list.push(variableData);
+
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+};
+
+export const deleteVariable = async (
+  store: any,
+  dashboardId: any,
+  variableName: any
+) => {
+  // get the object of panel id
+  // find the dashboard and remove the panel data to dashboard object
+  // call the update dashboard function
+  const currentDashboard = findDashboard(dashboardId, store);
+
+  //remove panel from current dashboard
+  const variableIndex = currentDashboard.variables.list.findIndex(
+    (variable: any) => variable.name == variableName
+  );
+  currentDashboard.variables.list.splice(variableIndex, 1);
+  currentDashboard.variables.list = currentDashboard.variables.list;
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+};
+
 export const deletePanel = async (
   store: any,
   dashboardId: any,
@@ -217,6 +280,41 @@ export const deletePanel = async (
   );
 };
 
+export const updateVariable = async (
+  store: any,
+  dashboardId: any,
+  variableName: any,
+  variableData: any
+) => {
+  // get the object of panel id
+  // find the dashboard and remove the panel data to dashboard object
+  // call the update dashboard function
+  // Get the current dashboard from the store
+  const currentDashboard = findDashboard(dashboardId, store);
+  // Find the index of the variable in the list
+  const variableIndex = currentDashboard.variables.list.findIndex(
+    (variable: any) => variable.name == variableName
+  );
+  //if name already exists
+  const variableExists = currentDashboard.variables.list.filter(
+  (it: any) => it.name == variableData.name
+  );
+
+  if (variableName != variableData.name && variableExists.length) {
+  throw new Error("Variable with same name already exists");
+  }
+  
+  // Update the variable data in the list
+  currentDashboard.variables.list[variableIndex] = variableData;
+  // Update the dashboard in the store
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard
+  );
+};
+
 export const updatePanel = async (
   store: any,
   dashboardId: any,
@@ -227,7 +325,6 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store);
 
-  //remove panel from current dashboard
   const panelIndex = currentDashboard.panels.findIndex(
     (panel: any) => panel.id == panelData.id
   );

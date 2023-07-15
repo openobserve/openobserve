@@ -23,11 +23,13 @@
         v-model="searchObj.config.splitterModel"
         :limits="searchObj.config.splitterLimit"
         style="width: 100%"
+        @update:model-value="onSplitterUpdate"
       >
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
-            :key="searchObj.data.metrics.metricList"
+            :key="searchObj.data.metrics.metricList.length"
+            @select-label="addLabelToEditor"
           />
         </template>
         <template #separator>
@@ -43,14 +45,10 @@
           <div
             class="text-right q-px-lg q-py-sm flex align-center justify-end metrics-date-time"
           >
+            <syntax-guide-metrics class="q-mr-sm" />
             <date-time
-              ref="metricsDateTimeRef"
               auto-apply
-              :default-type="
-                searchObj.data.datetime.relativeTimePeriod
-                  ? 'relative'
-                  : 'absolute'
-              "
+              :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
                 startTime: searchObj.data.datetime.startTime,
                 endTime: searchObj.data.datetime.endTime,
@@ -84,9 +82,25 @@
             <div class="row query-editor-container">
               <div
                 class="col q-pa-sm"
-                style="border-top: 1px solid #dbdbdb; height: 150px"
+                style="border-top: 1px solid #dbdbdb; height: 100%"
               >
                 <div class="q-pb-xs text-bold">PromQL:</div>
+                <div
+                  v-if="searchObj.data.metrics.selectedMetric?.help?.length"
+                  class="flex items-center justify-start q-pb-sm"
+                >
+                  <q-icon name="info" style="font-size: 16px" title="Info" />
+                  <div
+                    class="q-pl-xs info-message"
+                    :style="{
+                      color:
+                        store.state.theme === 'light' ? '#049cbc' : '#3fd5f4',
+                    }"
+                  >
+                    {{ searchObj.data.metrics.selectedMetric.help }}
+                  </div>
+                </div>
+
                 <query-editor
                   id="metrics-query-editor"
                   ref="metricsQueryEditorRef"
@@ -99,12 +113,21 @@
               </div>
             </div>
           </div>
-          <div v-if="searchObj.loading">
-            <q-spinner-dots
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
+          <div
+            v-if="searchObj.loading"
+            class="flex justify-center items-center"
+            style="height: calc(100% - 300px)"
+          >
+            <div class="q-pb-lg">
+              <q-spinner-hourglass
+                color="primary"
+                size="40px"
+                style="margin: 0 auto; display: block"
+              />
+              <span class="text-center">
+                Hold on tight, fetching metrics.
+              </span>
+            </div>
           </div>
           <div
             v-else-if="
@@ -113,8 +136,8 @@
           >
             <h5 class="text-center">
               <div
-                data-test="logs-search-result-not-found-text"
                 v-if="searchObj.data.errorCode == 0"
+                data-test="logs-search-result-not-found-text"
               >
                 Result not found.
               </div>
@@ -128,7 +151,7 @@
               }}</q-item-label>
             </h5>
           </div>
-          <div v-else-if="!!!searchObj.data.metrics.selectedMetric">
+          <div v-else-if="!!!searchObj.data.metrics.selectedMetric?.value">
             <h5
               data-test="logs-search-no-stream-selected-text"
               class="text-center"
@@ -139,14 +162,14 @@
           <div
             v-else-if="
               searchObj.data.queryResults.hasOwnProperty('total') &&
-              !!!searchObj.data.queryResults.hits.length &&
+              !!!searchObj.data.queryResults?.hits?.length &&
               !searchObj.loading
             "
           >
             <h5 class="text-center">No result found.</h5>
           </div>
-          <template v-if="searchObj.data.metrics.metricList.length">
-            <div class="flex justify-end q-pr-lg q-mb-md">
+          <template v-if="searchObj.data.metrics.metricList?.length">
+            <div class="flex justify-end q-pr-lg q-mb-md q-pt-xs">
               <q-btn
                 size="md"
                 class="q-px-sm no-border"
@@ -190,6 +213,7 @@ import {
   onActivated,
   onBeforeMount,
   watch,
+  nextTick,
 } from "vue";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
@@ -217,6 +241,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { on } from "events";
+import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -227,6 +252,7 @@ export default defineComponent({
     QueryEditor,
     ChartRender,
     AddToDashboard,
+    SyntaxGuideMetrics,
   },
   methods: {
     searchData() {
@@ -239,7 +265,7 @@ export default defineComponent({
           button: "Refresh Metrics",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.metrics.selectedMetric,
+          stream_name: this.searchObj.data.metrics.selectedMetric?.value,
           page: "Metrics explorer",
         });
       }
@@ -266,6 +292,15 @@ export default defineComponent({
       updateMetricKeywords,
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
+    const isMounted = ref(false);
+    const logStreams = ref([]);
+
+    const metricTypeMapping: any = {
+      Summary: "summary",
+      Gauge: "gauge",
+      Histogram: "histogram",
+      Counter: "counter",
+    };
 
     const chartData = ref({});
     const { showErrorNotification } = useNotifications();
@@ -289,6 +324,8 @@ export default defineComponent({
               let itemObj = {
                 label: item.name,
                 value: item.name,
+                type: metricTypeMapping[item.metrics_meta.metric_type] || "",
+                help: item.metrics_meta.help || "",
               };
               searchObj.data.metrics.metricList.push(itemObj);
             });
@@ -299,15 +336,22 @@ export default defineComponent({
     };
     const showAddToDashboardDialog = ref(false);
 
-    onBeforeMount(() => {
+    onBeforeMount(async () => {
+      restoreUrlQueryParams();
+      await getLogStreams();
       if (searchObj.loading == false) {
         loadPageData(true);
         refreshData();
       }
-      restoreUrlQueryParams();
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.fields.stream_type = "metrics";
       dashboardPanelData.data.customQuery = true;
+    });
+
+    onMounted(() => {
+      setTimeout(() => {
+        isMounted.value = true;
+      }, 0);
     });
 
     onDeactivated(() => {
@@ -315,7 +359,11 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      if (!searchObj.loading) updateStreams();
+      // As onActivated hook is getting called after mounted hook on rendering component for first time.
+      // we fetch streams in before mount and also in activated (to refresh streams list if streams updated)
+      // So added this flag to avoid calling updateStreams() on first time rendering.
+      // This is just an workaround, need to find better solution while refactoring this component.
+      if (isMounted.value) updateStreams();
       refreshData();
 
       if (
@@ -330,40 +378,19 @@ export default defineComponent({
       }, 1500);
     });
 
-    function ErrorException(message) {
-      searchObj.loading = false;
-      $q.notify({
-        type: "negative",
-        message: message,
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
-
-    function Notify() {
-      return $q.notify({
-        type: "positive",
-        message: "Waiting for response...",
-        timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      });
-    }
+    const getLogStreams = () => {
+      streamService
+        .nameList(store.state?.selectedOrganization?.identifier, "logs", false)
+        .then(
+          (res) =>
+            (logStreams.value = res.data.list.map((stream) => ({
+              name: stream.name,
+            })))
+        )
+        .finally(() => {
+          return Promise.resolve();
+        });
+    };
 
     watch(
       () => searchObj.data.metrics.metricList,
@@ -375,6 +402,7 @@ export default defineComponent({
 
     function getStreamList(isFirstLoad = false) {
       try {
+        searchObj.loading = true;
         streamService
           .nameList(
             store.state.selectedOrganization.identifier,
@@ -388,7 +416,6 @@ export default defineComponent({
               //extract stream data from response
               loadStreamLists(isFirstLoad);
             } else {
-              searchObj.loading = false;
               searchObj.data.errorMsg =
                 "No stream found in selected organization!";
               searchObj.data.metrics.metricList = [];
@@ -401,7 +428,6 @@ export default defineComponent({
             }
           })
           .catch((e) => {
-            searchObj.loading = false;
             $q.notify({
               type: "negative",
               message:
@@ -409,6 +435,9 @@ export default defineComponent({
                 e.message,
               timeout: 2000,
             });
+          })
+          .finally(() => {
+            searchObj.loading = false;
           });
       } catch (e) {
         searchObj.loading = false;
@@ -419,7 +448,7 @@ export default defineComponent({
     function loadStreamLists(isFirstLoad = false) {
       try {
         searchObj.data.metrics.metricList = [];
-        searchObj.data.metrics.selectedMetric = "";
+        searchObj.data.metrics.selectedMetric = null;
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -427,6 +456,8 @@ export default defineComponent({
             let itemObj = {
               label: item.name,
               value: item.name,
+              type: metricTypeMapping[item.metrics_meta.metric_type] || "",
+              help: item.metrics_meta.help || "",
             };
             searchObj.data.metrics.metricList.push(itemObj);
 
@@ -454,24 +485,20 @@ export default defineComponent({
             }
           });
           if (selectedStreamItemObj.label != undefined) {
-            searchObj.data.metrics.selectedMetric = selectedStreamItemObj.value;
+            searchObj.data.metrics.selectedMetric = {
+              ...selectedStreamItemObj,
+            };
           } else {
-            searchObj.loading = false;
             searchObj.data.queryResults = {};
-            searchObj.data.metrics.selectedMetric = "";
+            searchObj.data.metrics.selectedMetric = null;
             searchObj.data.histogram = {
               xData: [],
               yData: [],
               chartParams: {},
             };
           }
-
-          if (isFirstLoad) runQuery();
-        } else {
-          searchObj.loading = false;
         }
       } catch (e) {
-        searchObj.loading = false;
         console.log("Error while loading streams");
       }
     }
@@ -540,7 +567,6 @@ export default defineComponent({
           return rVal;
         }
       } catch (e) {
-        searchObj.loading = false;
         console.log("Error while getting consumable date time");
       }
     }
@@ -551,36 +577,18 @@ export default defineComponent({
           return false;
         }
 
-        // dismiss = Notify();
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(searchObj.data.datetime.startTime / 1000),
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
         };
         chartData.value = cloneDeep(dashboardPanelData.data);
-        console.log(chartData.value);
         updateUrlQueryParams();
       } catch (e) {
-        searchObj.loading = false;
         showErrorNotification("Request failed.");
       }
     }
 
-    const getDefaultTrace = (trace: any) => {
-      return {
-        x: [],
-        y: [],
-        unparsed_x: [],
-        name: trace.name || "",
-        type: trace.type || "line",
-        marker: {
-          color: trace.color || "#5960b2",
-          opacity: trace.opacity || 0.8,
-        },
-      };
-    };
-
     function loadPageData(isFirstLoad = false) {
-      // searchObj.loading = true;
       resetSearchObj();
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
@@ -692,7 +700,10 @@ export default defineComponent({
     };
 
     const onMetricChange = async (metric) => {
-      metricsQueryEditorRef.value.setValue(metric);
+      const query = metric?.value + "{}";
+      nextTick(() => {
+        metricsQueryEditorRef.value.setValue(query);
+      });
     };
 
     function restoreUrlQueryParams() {
@@ -721,8 +732,9 @@ export default defineComponent({
     function updateUrlQueryParams() {
       try {
         const date = searchObj.data.datetime;
+
         const query = {
-          stream: searchObj.data.metrics.selectedMetric,
+          stream: searchObj.data.metrics.selectedMetric?.value,
         };
 
         if (date.type == "relative") {
@@ -731,7 +743,6 @@ export default defineComponent({
           query["from"] = date.startTime;
           query["to"] = date.endTime;
         }
-
         query["refresh"] = searchObj.meta.refreshInterval;
 
         if (searchObj.data.query) {
@@ -744,6 +755,16 @@ export default defineComponent({
         console.log(err);
       }
     }
+    const addLabelToEditor = (label) => {
+      metricsQueryEditorRef.value.setValue(
+        dashboardPanelData.data.query + label
+      );
+    };
+
+    const onSplitterUpdate = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       store,
       router,
@@ -768,6 +789,9 @@ export default defineComponent({
       promqlKeywords,
       autoCompletePromqlKeywords,
       onMetricChange,
+      updateUrlQueryParams,
+      addLabelToEditor,
+      onSplitterUpdate,
     };
   },
   computed: {
@@ -802,11 +826,8 @@ export default defineComponent({
     selectedMetric: {
       deep: true,
       handler: function (metric) {
-        if (this.searchObj.data.metrics.selectedMetric) {
+        if (this.searchObj.data.metrics.selectedMetric?.value) {
           this.onMetricChange(metric);
-          setTimeout(() => {
-            this.runQuery();
-          }, 500);
         }
       },
     },
@@ -821,7 +842,7 @@ export default defineComponent({
 <style lang="scss">
 .query-editor-container {
   .monaco-editor {
-    height: calc(100% - 40px) !important;
+    height: 80px !important;
   }
 }
 div.plotly-notifier {

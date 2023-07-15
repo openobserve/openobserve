@@ -33,7 +33,7 @@ pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
 pub fn set(session_id: &str, files: &[String]) {
     let mut values = Vec::with_capacity(files.len());
     for file in files {
-        let meta = file_list::get_file_meta(file).unwrap();
+        let meta = file_list::get_file_meta(file).expect("file meta must have value");
         let modified = Utc.timestamp_nanos(meta.max_ts * 1000);
         let file = format!("/{}/$$/{}", session_id, file);
         values.push(ObjectMeta {

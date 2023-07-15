@@ -9,12 +9,17 @@
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import type NotEqualIconVue from "@/components/icons/NotEqualIcon.vue";
+import type EqualIconVue from "@/components/icons/EqualIcon.vue";
  See the License for the specific language governing permissions and
  limitations under the License. 
 -->
 
 <template>
-  <div class="column index-menu">
+  <div
+    class="column index-menu"
+    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+  >
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.metrics.selectedMetric"
@@ -27,14 +32,53 @@
       behavior="menu"
       filled
       borderless
-      emit-value
       dense
       use-input
       hide-selected
       fill-input
+      class="metric-select-input"
       @filter="filterMetrics"
       @update:model-value="onMetricChange"
     >
+      <template
+        v-if="searchObj.data.metrics.selectedMetric?.type"
+        v-slot:prepend
+      >
+        <q-icon
+          :title="searchObj.data.metrics.selectedMetric?.type"
+          size="xs"
+          :name="
+            metricsIconMapping[
+              searchObj.data.metrics.selectedMetric?.type || ''
+            ]
+          "
+        />
+      </template>
+      <template v-slot:option="scope">
+        <q-item
+          :class="
+            store.state.theme === 'dark' &&
+            searchObj.data.metrics.selectedMetric?.value !== scope.opt.value
+              ? 'text-white'
+              : ''
+          "
+          v-bind="scope.itemProps"
+        >
+          <q-item-section
+            :title="scope?.opt?.type"
+            class="metric-explore-metric-icon"
+            avatar
+          >
+            <q-icon
+              size="xs"
+              :name="metricsIconMapping[scope?.opt?.type] || ''"
+            />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>{{ scope.opt.label }}</q-item-label>
+          </q-item-section>
+        </q-item>
+      </template>
       <template #no-option>
         <q-item>
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -87,6 +131,16 @@
                         <div class="field_label ellipsis">
                           {{ props.row.name }}
                         </div>
+                        <div class="field_overlay">
+                          <q-btn
+                            :data-test="`metrics-list-add-${props.row.name}-label-btn`"
+                            :icon="outlinedAdd"
+                            size="0.4rem"
+                            class="q-mr-none"
+                            @click.stop="addLabelToEditor(props.row.name)"
+                            round
+                          />
+                        </div>
                       </div>
                     </template>
                     <q-card>
@@ -124,18 +178,15 @@
                             :key="value.key + value.count"
                           >
                             <q-list dense>
-                              <q-item
-                                tag="label"
-                                class="q-pr-none no-pointer-events"
-                              >
+                              <q-item tag="label" class="q-pr-none">
                                 <div
                                   class="flex row wrap justify-between"
+                                  style="width: calc(100% - 46px)"
                                   :class="
                                     store.state.theme === 'dark'
                                       ? 'text-grey-4'
                                       : 'text-grey-8'
                                   "
-                                  style="width: 100%"
                                 >
                                   <div
                                     :title="value.key"
@@ -151,6 +202,49 @@
                                   >
                                     {{ value.count }}
                                   </div>
+                                </div>
+                                <div
+                                  class="flex row"
+                                  :class="
+                                    store.state.theme === 'dark'
+                                      ? 'text-white'
+                                      : 'text-black'
+                                  "
+                                >
+                                  <q-btn
+                                    class="q-mr-xs"
+                                    size="6px"
+                                    title="Include Term"
+                                    round
+                                    @click="
+                                      addValueToEditor(
+                                        props.row.name,
+                                        value.key,
+                                        '='
+                                      )
+                                    "
+                                  >
+                                    <q-icon>
+                                      <EqualIcon></EqualIcon>
+                                    </q-icon>
+                                  </q-btn>
+                                  <q-btn
+                                    class="q-mr-xs"
+                                    size="6px"
+                                    title="Include Term"
+                                    round
+                                    @click="
+                                      addValueToEditor(
+                                        props.row.name,
+                                        value.key,
+                                        '!='
+                                      )
+                                    "
+                                  >
+                                    <q-icon>
+                                      <NotEqualIcon></NotEqualIcon>
+                                    </q-icon>
+                                  </q-btn>
                                 </div>
                               </q-item>
                             </q-list>
@@ -187,19 +281,22 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
-import { getConsumableDateTime } from "@/utils/commons";
 import stream from "@/services/stream";
+import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 export default defineComponent({
   name: "MetricsList",
-  emits: ["update:change-metric"],
+  emits: ["update:change-metric", "select-label"],
+  components: { EqualIcon, NotEqualIcon },
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -213,17 +310,24 @@ export default defineComponent({
     const metricLabelValues: Ref<{
       [key: string]: {
         isLoading: boolean;
-        values: { key: string; count: number | string }[];
+        values: {
+          key: string;
+          count: number | string;
+        }[];
       };
     }> = ref({});
-
+    const metricsIconMapping: any = {
+      summary: "description",
+      gauge: "speed",
+      histogram: "bar_chart",
+      counter: "pin",
+    };
     watch(
       () => searchObj.data.metrics.metricList.length,
       () => {
         streamOptions.value = searchObj.data.metrics.metricList;
       }
     );
-
     const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;
@@ -233,22 +337,20 @@ export default defineComponent({
         );
       });
     };
-
     const updateMetricLabels = () => {
       selectedMetricLabels.value = searchObj.data.streamResults.list.find(
-        (stream: any) => stream.name === searchObj.data.metrics.selectedMetric
+        (stream: any) =>
+          stream.name === searchObj.data.metrics.selectedMetric?.value
       ).schema;
       filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
-
     watch(
       () => searchObj.data.metrics.selectedMetric,
       (metric) => {
-        if (metric) updateMetricLabels();
+        if (metric?.value) updateMetricLabels();
       },
       { immediate: true }
     );
-
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
@@ -261,21 +363,18 @@ export default defineComponent({
       }
       return filtered;
     };
-
     const openFilterCreator = (event: any, { name }: any) => {
       const startISOTimestamp: any = searchObj.data.datetime.startTime;
       const endISOTimestamp: any = searchObj.data.datetime.endTime;
-
       metricLabelValues.value[name] = {
         isLoading: true,
         values: [],
       };
-
       try {
         stream
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.metrics.selectedMetric,
+            stream_name: searchObj.data.metrics.selectedMetric?.value,
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
@@ -304,11 +403,22 @@ export default defineComponent({
         });
       }
     };
-
     const onMetricChange = () => {
       updateMetricLabels();
     };
-
+    const setSelectedMetricType = (option: any) => {
+      searchObj.data.metrics.selectedMetricType = option.type;
+    };
+    const addLabelToEditor = (label: string) => {
+      emit("select-label", label);
+    };
+    const addValueToEditor = (
+      label: string,
+      value: string,
+      operator: string
+    ) => {
+      addLabelToEditor(`${label}${operator}"${value}"`);
+    };
     return {
       quasar,
       t,
@@ -324,6 +434,11 @@ export default defineComponent({
       openFilterCreator,
       metricLabelValues,
       onMetricChange,
+      metricsIconMapping,
+      setSelectedMetricType,
+      outlinedAdd,
+      addLabelToEditor,
+      addValueToEditor,
     };
   },
 });
@@ -658,5 +773,38 @@ export default defineComponent({
       }
     }
   }
+}
+
+.theme-dark {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgb(255, 255, 255, 0.1);
+
+      .field_overlay {
+        background-color: #3f4143;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.theme-light {
+  .field_list {
+    &:hover {
+      box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.17);
+
+      .field_overlay {
+        background-color: #e8e8e8;
+        opacity: 1;
+      }
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+.metric-explore-metric-icon {
+  min-width: 28px !important;
+  padding-right: 8px !important;
 }
 </style>

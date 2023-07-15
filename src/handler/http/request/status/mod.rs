@@ -112,10 +112,11 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"stream_num": stream_num, "mem_size": mem_size}),
     );
 
+    let file_num = cache::file_data::len();
     let (max_size, cur_size) = cache::file_data::stats();
     stats.insert(
         "FILE_DATA",
-        json::json!({"memory_limit":max_size,"mem_size": cur_size}),
+        json::json!({"cache_files":file_num, "memory_limit":max_size,"mem_size": cur_size}),
     );
 
     let (file_list_num, files_num, mem_size) = cache::file_list::get_file_num().unwrap();

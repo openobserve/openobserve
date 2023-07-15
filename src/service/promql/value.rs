@@ -35,7 +35,7 @@ pub type Labels = Vec<Arc<Label>>;
 pub trait LabelsExt {
     /// Remove the metric name i.e. __name__ from the given label
     ///
-    /// ```
+    /// ```json
     /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
     /// ```
     fn without_metric_name(&self) -> Labels;
@@ -165,6 +165,13 @@ pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
     pub time_window: Option<TimeWindow>,
+}
+
+impl RangeValue {
+    /// Returns the values from the `samples` field as an array of f64
+    pub fn get_sample_values(&self) -> Vec<f64> {
+        self.samples.iter().map(|sample| sample.value).collect()
+    }
 }
 
 impl Serialize for RangeValue {

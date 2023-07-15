@@ -133,9 +133,7 @@
                   v-model="selectedDate"
                   class="absolute-calendar"
                   range
-                  :locale="{
-                    daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-                  }"
+                  :locale="dateLocale"
                 />
               </div>
               <div class="notePara">* You can choose multiple date</div>
@@ -295,6 +293,10 @@ export default defineComponent({
 
     const displayValue = ref("");
 
+    const dateLocale = {
+      daysShort: ["S", "M", "T", "W", "T", "F", "S"],
+    };
+
     onMounted(() => {
       // updateDisplayValue();
       try {
@@ -313,8 +315,10 @@ export default defineComponent({
 
     watch(
       () => selectedType.value,
-      () => {
+      (value) => {
         displayValue.value = getDisplayValue();
+        if (props.autoApply)
+          saveDate(value === "absolute" ? "absolute" : "relative-custom");
       }
     );
 
@@ -503,6 +507,7 @@ export default defineComponent({
       getPeriodLabel,
       displayValue,
       refresh,
+      dateLocale,
     };
   },
 });

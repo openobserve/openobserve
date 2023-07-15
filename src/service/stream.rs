@@ -19,11 +19,14 @@ use std::io::Error;
 use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
+    prom,
     stream::{Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
 use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
 use crate::service::db;
+
+use super::metrics::get_prom_metadata_from_schema;
 
 const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
 const LOCAL: &str = "disk";
@@ -141,10 +144,29 @@ pub fn stream_res(
     };
     stats.created_at = created_at;
 
+    let metrics_meta = if stream_type == StreamType::Metrics {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(prom::Metadata {
+            metric_type: prom::MetricType::Empty,
+            metric_family_name: stream_name.to_string(),
+            help: stream_name.to_string(),
+            unit: "".to_string(),
+        });
+        if meta.metric_type == prom::MetricType::Empty
+            && (stream_name.ends_with("_bucket")
+                || stream_name.ends_with("_sum")
+                || stream_name.ends_with("_count"))
+        {
+            meta.metric_type = prom::MetricType::Counter;
+        }
+        Some(meta)
+    } else {
+        None
+    };
+
     Stream {
         name: stream_name.to_string(),
-        stream_type,
         storage_type: storage_type.to_string(),
+        stream_type,
         schema: mappings,
         stats,
         settings: StreamSettings {
@@ -152,6 +174,7 @@ pub fn stream_res(
             full_text_search_keys,
             data_retention,
         },
+        metrics_meta,
     }
 }
 

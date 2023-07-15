@@ -28,7 +28,7 @@ use promql_parser::{
     label::MatchOp,
     parser::{
         token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
-        MatrixSelector, NumberLiteral, ParenExpr, StringLiteral, TokenType, UnaryExpr,
+        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, TokenType, UnaryExpr,
         VectorSelector,
     },
 };
@@ -76,7 +76,7 @@ impl Engine {
                         let out = v
                             .iter()
                             .map(|instant| InstantValue {
-                                labels: instant.labels.clone(),
+                                labels: instant.labels.without_metric_name(),
                                 sample: Sample {
                                     timestamp: instant.sample.timestamp,
                                     value: -1.0 * instant.sample.value,
@@ -84,6 +84,16 @@ impl Engine {
                             })
                             .collect();
                         Value::Vector(out)
+                    }
+                    Value::Float(f) => {
+                        let v = InstantValue {
+                            labels: Labels::default(),
+                            sample: Sample {
+                                timestamp: self.time,
+                                value: -1.0 * f,
+                            },
+                        };
+                        Value::Vector(vec![v])
                     }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -97,20 +107,28 @@ impl Engine {
                 let lhs = self.exec_expr(&expr.lhs).await?;
                 let rhs = self.exec_expr(&expr.rhs).await?;
                 let token = expr.op.id();
+                let return_bool = expr.return_bool();
+                let op = expr.op.is_comparison_operator();
 
                 match (lhs.clone(), rhs.clone()) {
                     (Value::Float(left), Value::Float(right)) => {
-                        let value = binaries::scalar_binary_operations(token, left, right)?;
+                        let value = binaries::scalar_binary_operations(
+                            token,
+                            left,
+                            right,
+                            return_bool,
+                            op,
+                        )?;
                         Value::Float(value)
                     }
                     (Value::Vector(left), Value::Vector(right)) => {
                         binaries::vector_bin_op(expr, &left, &right)?
                     }
                     (Value::Vector(left), Value::Float(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &left, right).await?
+                        binaries::vector_scalar_bin_op(expr, &left, right, false).await?
                     }
                     (Value::Float(left), Value::Vector(right)) => {
-                        binaries::vector_scalar_bin_op(expr, &right, left).await?
+                        binaries::vector_scalar_bin_op(expr, &right, left, true).await?
                     }
                     (Value::None, _) | (_, Value::None) => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -189,8 +207,21 @@ impl Engine {
         };
 
         // Evaluation timestamp.
-        let eval_ts = self.time;
-        let start = eval_ts - self.ctx.lookback_delta;
+        let mut eval_ts = self.time;
+        let mut start = eval_ts - self.ctx.lookback_delta;
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    eval_ts -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    eval_ts += micros(offset);
+                }
+            }
+        }
 
         let mut values = vec![];
         for metric in metrics_cache {
@@ -240,9 +271,22 @@ impl Engine {
         };
 
         // Evaluation timestamp --- end of the time window.
-        let eval_ts = self.time;
+        let mut eval_ts = self.time;
         // Start of the time window.
-        let start = eval_ts - micros(range); // e.g. [5m]
+        let mut start = eval_ts - micros(range); // e.g. [5m]
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    eval_ts -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    eval_ts += micros(offset);
+                }
+            }
+        }
 
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
@@ -269,8 +313,21 @@ impl Engine {
         range: Option<Duration>,
     ) -> Result<()> {
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
-        let end = self.ctx.end; // 30 minutes + 5m = 35m
+        let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
+        let mut end = self.ctx.end; // 30 minutes + 5m = 35m
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    end -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    end += micros(offset);
+                }
+            }
+        }
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -363,8 +420,8 @@ impl Engine {
             token::T_MIN => aggregations::min(sample_time, modifier, &input)?,
             token::T_MAX => aggregations::max(sample_time, modifier, &input)?,
             token::T_GROUP => Value::None,
-            token::T_STDDEV => Value::None,
-            token::T_STDVAR => Value::None,
+            token::T_STDDEV => aggregations::stddev(sample_time, modifier, &input)?,
+            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, &input)?,
             token::T_TOPK => aggregations::topk(self, param.clone().unwrap(), &input).await?,
             token::T_BOTTOMK => aggregations::bottomk(self, param.clone().unwrap(), &input).await?,
             token::T_COUNT_VALUES => Value::None,
@@ -433,6 +490,12 @@ impl Engine {
         Ok(())
     }
 
+    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
+        match value {
+            Value::Float(f) => Ok(*f),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
+    }
     async fn call_expr(&mut self, func: &Function, args: &FunctionArgs) -> Result<Value> {
         use crate::service::promql::functions::Func;
 
@@ -441,9 +504,35 @@ impl Engine {
         })?;
 
         // There are a few functions which need no arguments for e.g. time()
-        let functions_without_args: HashSet<String> = HashSet::from_iter(vec!["time".into()]);
+        let functions_without_args: HashSet<&str> = HashSet::from_iter(vec![
+            "day_of_month",
+            "day_of_week",
+            "day_of_year",
+            "days_in_month",
+            "hour",
+            "minute",
+            "month",
+            "time",
+            "year",
+        ]);
         let input = match functions_without_args.contains(func.name) {
-            true => Value::None,
+            true => match args.len() {
+                0 => {
+                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
+                    let default_now_vector = vec![InstantValue {
+                        labels: Labels::default(),
+                        sample: Sample::new(self.time, 0.0),
+                    }];
+                    Value::Vector(default_now_vector)
+                }
+                1 => self.call_expr_first_arg(args).await?,
+                _ => {
+                    return Err(DataFusionError::NotImplemented(
+                        "Invalid args passed to the function".into(),
+                    ))
+                }
+            },
             false => {
                 let last_arg = args
                     .last()
@@ -565,10 +654,18 @@ impl Engine {
                 )));
             }
             Func::HoltWinters => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err =
+                    "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
+                self.ensure_three_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let sf = self.call_expr_second_arg(args).await?;
+                let tf = self.call_expr_third_arg(args).await?;
+
+                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
+                let trend_factor = self.parse_f64_else_err(&tf, err)?;
+
+                functions::holt_winters(&input, scaling_factor, trend_factor)?
             }
             Func::Hour => functions::hour(&input)?,
             Func::Idelta => functions::idelta(&input)?,
@@ -637,10 +734,19 @@ impl Engine {
                 )));
             }
             Func::QuantileOverTime => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
+
+                self.ensure_two_args(args, err)?;
+                let phi_quantile = match self.call_expr_first_arg(args).await {
+                    Ok(Value::Float(v)) => v,
+                    _ => {
+                        return Err(DataFusionError::Plan(format!(
+                            "[quantile] param must be a NumberLiteral"
+                        )))
+                    }
+                };
+                let input = self.call_expr_second_arg(args).await?;
+                functions::quantile_over_time(self.time, phi_quantile, &input)?
             }
             Func::Rate => functions::rate(&input)?,
             Func::Resets => functions::resets(&input)?,
@@ -671,7 +777,7 @@ impl Engine {
             Func::StddevOverTime => functions::stddev_over_time(&input)?,
             Func::StdvarOverTime => functions::stdvar_over_time(&input)?,
             Func::SumOverTime => functions::sum_over_time(&input)?,
-            Func::Time => Value::Float(chrono::Utc::now().timestamp() as f64),
+            Func::Time => Value::Float((self.time / 1_000_000) as f64),
             Func::Timestamp => match &input {
                 Value::Vector(instant_value) => {
                     let out: Vec<InstantValue> = instant_value

@@ -69,7 +69,6 @@ impl ObjectStore for Remote {
                         .with_label_values(&[columns[1], columns[3], columns[2], "put"])
                         .inc_by(time);
                 }
-                log::info!("s3 File upload succeeded: {}", file);
                 Ok(())
             }
             Err(err) => {
@@ -207,14 +206,19 @@ impl ObjectStore for Remote {
 }
 
 fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
+    let mut opts = object_store::ClientOptions::default()
+        .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
+        .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
+        .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates)
+        .with_allow_http(true);
+    if CONFIG.s3.feature_http1_only {
+        opts = opts.with_http1_only();
+    }
+    if CONFIG.s3.feature_http2_only {
+        opts = opts.with_http2_only();
+    }
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(CONFIG.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(CONFIG.s3.request_timeout))
-                .with_allow_invalid_certificates(CONFIG.s3.allow_invalid_certificates)
-                .with_allow_http(true),
-        )
+        .with_client_options(opts)
         .with_bucket_name(&CONFIG.s3.bucket_name)
         .with_virtual_hosted_style_request(CONFIG.s3.feature_force_path_style);
     if !CONFIG.s3.server_url.is_empty() {

@@ -85,7 +85,8 @@ pub async fn search(
     } else {
         scan_stats.files = files.len() as u64;
         for file in &files {
-            let file_meta = file_list::get_file_meta(file).unwrap_or_default();
+            let file_meta =
+                file_list::get_file_meta(file).map_err(|e| Error::Message(e.to_string()))?;
             // calculate scan size
             scan_stats.records += file_meta.records;
             scan_stats.original_size += file_meta.original_size;
@@ -252,12 +253,12 @@ async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
         let file = file.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            if !file_data::exist(&file).unwrap_or_default() {
+            if !file_data::exist(&file) {
                 if let Err(e) = file_data::download(&file).await {
-                    log::error!("search->storage: download file err: {}", e);
+                    log::info!("search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) = file_list::delete_parquet_file(&file).await {
+                        if let Err(e) = file_list::delete_parquet_file(&file, true).await {
                             log::error!("search->storage: delete from file_list err: {}", e);
                         }
                         return Some(file);

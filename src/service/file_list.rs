@@ -36,10 +36,7 @@ pub fn get_file_list(
 
 #[inline]
 pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    match file_list::get_file_from_cache(file) {
-        Ok(v) => Ok(v),
-        Err(_) => Ok(FileMeta::default()),
-    }
+    file_list::get_file_from_cache(file)
 }
 
 #[inline]
@@ -47,7 +44,7 @@ pub fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error
     let mut stats = ScanStats::new();
     stats.files = files.len() as u64;
     for file in files {
-        let resp = get_file_meta(file).unwrap_or_default();
+        let resp = get_file_meta(file)?;
         stats.records += resp.records;
         stats.original_size += resp.original_size;
         stats.compressed_size += resp.compressed_size;
@@ -69,7 +66,7 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 }
 
 // Delete one parquet file and update the file list
-pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
+pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns[0] != "files" || columns.len() < 9 {
         return Ok(());
@@ -98,11 +95,13 @@ pub async fn delete_parquet_file(key: &str) -> Result<(), anyhow::Error> {
     buf.write_all(&write_buf)?;
     let compressed_bytes = buf.finish().unwrap();
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-    db::file_list::progress(key, meta, deleted).await?;
+    db::file_list::progress(key, meta, deleted, false).await?;
     db::file_list::broadcast::send(&[file_data]).await?;
 
     // delete the parquet whaterever the file is exists or not
-    _ = storage::del(&[key]).await;
+    if !file_list_only {
+        _ = storage::del(&[key]).await;
+    }
     Ok(())
 }
 

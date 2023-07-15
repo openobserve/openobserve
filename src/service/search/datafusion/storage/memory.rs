@@ -42,17 +42,11 @@ impl FS {
         path.into()
     }
 
-    async fn get_cache(&self, location: &Path) -> Result<Bytes> {
+    async fn get_cache(&self, location: &Path) -> Option<Bytes> {
         let path = location.to_string();
         let data = file_data::get(&path);
         tokio::task::yield_now().await;
-        match data {
-            Ok(data) => Ok(data),
-            Err(err) => Err(object_store::Error::NotFound {
-                path,
-                source: err.into(),
-            }),
-        }
+        data
     }
 }
 
@@ -67,8 +61,8 @@ impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
-            Ok(data) => data,
-            Err(_) => return storage::DEFAULT.get(location).await,
+            Some(data) => data,
+            None => return storage::DEFAULT.get(location).await,
         };
         Ok(GetResult::Stream(
             futures::stream::once(async move { Ok(data) }).boxed(),
@@ -78,8 +72,8 @@ impl ObjectStore for FS {
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
-            Ok(data) => data,
-            Err(_) => return storage::DEFAULT.get_opts(location, options).await,
+            Some(data) => data,
+            None => return storage::DEFAULT.get_opts(location, options).await,
         };
         Ok(GetResult::Stream(
             futures::stream::once(async move { Ok(data) }).boxed(),
@@ -89,12 +83,13 @@ impl ObjectStore for FS {
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
         let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
-            Ok(data) => data,
-            Err(_) => return storage::DEFAULT.get_range(location, range).await,
+            Some(data) => data,
+            None => return storage::DEFAULT.get_range(location, range).await,
         };
         if range.end > data.len() {
             let file = location.to_string();
-            let file_meta = crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+            let file_meta =
+                crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
             log::error!(
                 "get_range: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
                 file,
@@ -113,8 +108,8 @@ impl ObjectStore for FS {
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
         let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
-            Ok(data) => data,
-            Err(_) => return storage::DEFAULT.get_ranges(location, ranges).await,
+            Some(data) => data,
+            None => return storage::DEFAULT.get_ranges(location, ranges).await,
         };
         ranges
             .iter()
@@ -122,7 +117,7 @@ impl ObjectStore for FS {
                 if range.end > data.len() {
                     let file = location.to_string();
                     let file_meta =
-                        crate::service::file_list::get_file_meta(&file).unwrap_or_default();
+                        crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
                     log::error!(
                         "get_ranges: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
                         file,
@@ -143,8 +138,8 @@ impl ObjectStore for FS {
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let location = &self.format_location(location);
         let data = match self.get_cache(location).await {
-            Ok(data) => data,
-            Err(_) => return storage::DEFAULT.head(location).await,
+            Some(data) => data,
+            None => return storage::DEFAULT.head(location).await,
         };
         Ok(ObjectMeta {
             location: location.clone(),

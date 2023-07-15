@@ -352,7 +352,8 @@ async fn get_fast_mode_ctx(
     // sort files by time range
     let mut files_meta = HashMap::default();
     files.iter().for_each(|key| {
-        let meta = crate::service::file_list::get_file_meta(key).unwrap_or_default();
+        let meta =
+            crate::service::file_list::get_file_meta(key).expect("file meta must have value");
         files_meta.insert(key, meta);
     });
     let mut files = files.to_vec();

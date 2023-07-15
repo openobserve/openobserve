@@ -5,14 +5,31 @@
       :query-data="queryData"
       @searchdata="getQueryData"
       @update-query="updateQuery"
+      @change:date-time="updateDateTime"
     ></SearchBar>
-    <StreamDataTable
-      class="stream-data-table"
-      :rows="tableData.rows"
-      :columns="tableData.columns"
-      :is-loading="!!isLoading.length"
-      @update:scroll="getDataOnScroll"
-    />
+    <div class="stream-data-table">
+      <template v-if="isLoading.length">
+        <div class="full-height flex justify-center items-center">
+          <div class="q-pb-lg">
+            <q-spinner-hourglass
+              color="primary"
+              size="40px"
+              style="margin: 0 auto; display: block"
+            />
+            <span class="text-center">
+              Hold on tight, we're fetching your stream data.
+            </span>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <StreamDataTable
+          :rows="tableData.rows"
+          :columns="tableData.columns"
+          :is-loading="!!isLoading.length"
+        />
+      </template>
+    </div>
   </div>
 </template>
 
@@ -27,9 +44,10 @@ import { useQuasar } from "quasar";
 import search from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
-import { getConsumableDateTime } from "@/utils/commons";
-import { convertTimeFromMicroToMilli } from "@/utils/zincutils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import type { IDateTime } from "@/ts/interfaces";
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
@@ -48,23 +66,11 @@ export default defineComponent({
       errorMsg: "",
       errorCode: 0,
       dateTime: {
-        tab: "relative",
-        relative: {
-          period: {
-            label: "Minutes",
-            value: "Minutes",
-          },
-          value: 15,
-        },
-        absolute: {
-          date: {
-            from: "",
-            to: "",
-          },
-          startTime: "00:00",
-          endTime: "23:59",
-        },
-      },
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "15m",
+        type: "relative",
+      } as IDateTime,
       pagination: {
         currentPage: 0,
         rowsPerPage: 150,
@@ -227,35 +233,28 @@ export default defineComponent({
           },
         };
 
-        var timestamps: any = getConsumableDateTime(queryData.value.dateTime);
-        if (streamData.value.stream_type === "enrichment_tables") {
+        var timestamps: {
+          startTime: number;
+          endTime: number;
+        } | null =
+          queryData.value.dateTime.type === "relative"
+            ? getConsumableRelativeTime(
+                queryData.value.dateTime.relativeTimePeriod
+              ) || null
+            : cloneDeep(queryData.value.dateTime);
+
+        if (streamData?.value?.stream_type === "enrichment_tables") {
           if (streamData.value.stats) {
             timestamps = {
-              start_time: new Date(
-                convertTimeFromMicroToMilli(
-                  streamData.value.stats.doc_time_min - 300000000
-                )
-              ),
-              end_time: new Date(
-                convertTimeFromMicroToMilli(
-                  streamData.value.stats.doc_time_max + 300000000
-                )
-              ),
+              startTime: streamData.value.stats.doc_time_min - 300000000,
+              endTime: streamData.value.stats.doc_time_max + 300000000,
             };
           }
         }
 
-        if (
-          timestamps.start_time != "Invalid Date" &&
-          timestamps.end_time != "Invalid Date"
-        ) {
-          const startISOTimestamp: any =
-            new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-          const endISOTimestamp: any =
-            new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-
-          req.query.start_time = startISOTimestamp;
-          req.query.end_time = endISOTimestamp;
+        if (timestamps?.startTime && timestamps?.endTime) {
+          req.query.start_time = timestamps.startTime;
+          req.query.end_time = timestamps.endTime;
         } else {
           return false;
         }
@@ -276,9 +275,9 @@ export default defineComponent({
       queryData.value.query = value;
     };
 
-    const getDataOnScroll = () => {
-      queryData.value.pagination.currentPage++;
-      getQueryData();
+    const updateDateTime = (value: IDateTime) => {
+      queryData.value.dateTime = value;
+      if (value.valueType === "relative") getQueryData();
     };
 
     return {
@@ -287,8 +286,8 @@ export default defineComponent({
       getQueryData,
       searchBarRef,
       updateQuery,
-      getDataOnScroll,
       isLoading,
+      updateDateTime,
     };
   },
 });

@@ -48,8 +48,9 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
     file.write(write_buf.as_ref());
 
-    super::progress(key, meta, deleted).await?;
-    super::broadcast::send(&[file_data]).await
+    super::progress(key, meta, deleted, true).await?;
+    tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
+    Ok(())
 }
 
 pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
@@ -91,7 +92,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        super::progress(&item.key, item.meta, item.deleted).await?;
+        super::progress(&item.key, item.meta, item.deleted, false).await?;
     }
     Ok(())
 }
