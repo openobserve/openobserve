@@ -604,12 +604,7 @@ impl Engine {
             Func::DayOfYear => functions::day_of_year(&input)?,
             Func::DaysInMonth => functions::days_in_month(&input)?,
             Func::Delta => functions::delta(&input)?,
-            Func::Deriv => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Deriv => functions::deriv(&input)?,
             Func::Exp => functions::exp(&input)?,
             Func::Floor => functions::floor(&input)?,
             Func::HistogramCount => {
@@ -728,10 +723,17 @@ impl Engine {
             Func::Minute => functions::minute(&input)?,
             Func::Month => functions::month(&input)?,
             Func::PredictLinear => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
+
+                self.ensure_two_args(args, err)?;
+                let input = self.call_expr_first_arg(args).await?;
+
+                let prediction_steps = self.call_expr_second_arg(args).await?.get_float().ok_or(
+                    DataFusionError::NotImplemented(format!(
+                        "Invalid prediction_steps, f64 expected",
+                    )),
+                )?;
+                functions::predict_linear(&input, prediction_steps)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
