@@ -28,6 +28,7 @@ pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
 
 pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
+    log::info!("Load file_list [{prefix}] begin");
     let mut rw = LOADED_FILES.write().await;
     if rw.contains(&prefix) {
         return Ok(());

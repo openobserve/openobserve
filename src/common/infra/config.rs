@@ -274,6 +274,8 @@ pub struct Compact {
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_BLOCKED_ORGS", default = "")] // use comma to split
     pub blocked_orgs: String,
+    #[env_config(name = "ZO_COMPACT_FILES_PREFIX", default = "")]
+    pub load_files_prefix: String,
 }
 
 #[derive(EnvConfig)]
