@@ -84,6 +84,10 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
 #[tracing::instrument(skip_all)]
 async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
+    // check file list cache
+    if let Err(e) = db::file_list::remote::cache_time_range(time_min, time_max).await {
+        log::error!("cache time range error: {}", e);
+    }
     match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,

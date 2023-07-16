@@ -145,7 +145,7 @@ pub async fn merge_by_stream(
 
     // first check file list, if not exist, just get from s3
     let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
-    _ = db::file_list::remote::cache(&file_list_prefix).await;
+    db::file_list::remote::cache(&file_list_prefix).await?;
 
     // get current hour all files
     let files = match file_list::get_file_list(

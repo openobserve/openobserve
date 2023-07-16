@@ -53,6 +53,11 @@ pub(crate) async fn create_context(
         ));
     }
 
+    // check file list cache
+    if let Err(e) = db::file_list::remote::cache_time_range(time_range.0, time_range.1).await {
+        log::error!("cache time range error: {}", e);
+    }
+
     // get file list
     let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
     if files.is_empty() {

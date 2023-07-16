@@ -13,15 +13,20 @@
 // limitations under the License.
 
 use bytes::Buf;
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
-use std::collections::HashSet;
-use std::io::{BufRead, BufReader};
+use std::{
+    collections::HashSet,
+    io::{BufRead, BufReader},
+};
 use tokio::sync::RwLock;
 
-use crate::common::infra::{config::CONFIG, storage};
-use crate::common::json;
-use crate::common::meta::common::FileKey;
+use crate::common::{
+    infra::{config::CONFIG, storage},
+    json,
+    meta::common::FileKey,
+};
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -88,6 +93,23 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
 
+    Ok(())
+}
+
+pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), anyhow::Error> {
+    if time_min == 0 {
+        return Ok(());
+    }
+    if time_max == 0 {
+        time_max = Utc::now().timestamp_micros();
+    }
+    let mut cur_time = time_min;
+    while cur_time <= time_max {
+        let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
+        let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
+        cache(&file_list_prefix).await?;
+        cur_time += Duration::hours(1).num_microseconds().unwrap();
+    }
     Ok(())
 }
 

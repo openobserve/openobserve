@@ -28,6 +28,7 @@ use crate::service::{
     db, file_list,
     search::{
         datafusion::{exec, storage::StorageType},
+        get_times,
         sql::Sql,
     },
 };
@@ -230,7 +231,11 @@ pub async fn search(
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
-    let (time_min, time_max) = sql.meta.time_range.unwrap();
+    let (time_min, time_max) = get_times(sql, stream_type).await;
+    // check file list cache
+    if let Err(e) = db::file_list::remote::cache_time_range(time_min, time_max).await {
+        log::error!("cache time range error: {}", e);
+    }
     let results = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
