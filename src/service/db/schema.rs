@@ -367,22 +367,22 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         };
         STREAM_SCHEMAS.insert(item_key_str.to_string(), json_val);
 
-        let keys = item_key_str.split('/').collect::<Vec<&str>>();
-        let org_id = keys[0];
-        let stream_type = StreamType::from(keys[1]);
-        let stream_name = keys[2];
-        if stream_type.eq(&StreamType::EnrichmentTables) {
-            ENRICHMENT_TABLES.insert(
-                item_key.to_owned(),
-                StreamTable {
-                    org_id: org_id.to_string(),
-                    stream_name: stream_name.to_string(),
-                    data: super::enrichment_table::get(org_id, stream_name)
-                        .await
-                        .unwrap(),
-                },
-            );
-        }
+        // let keys = item_key_str.split('/').collect::<Vec<&str>>();
+        // let org_id = keys[0];
+        // let stream_type = StreamType::from(keys[1]);
+        // let stream_name = keys[2];
+        // if stream_type.eq(&StreamType::EnrichmentTables) {
+        //     ENRICHMENT_TABLES.insert(
+        //         item_key.to_owned(),
+        //         StreamTable {
+        //             org_id: org_id.to_string(),
+        //             stream_name: stream_name.to_string(),
+        //             data: super::enrichment_table::get(org_id, stream_name)
+        //                 .await
+        //                 .unwrap(),
+        //         },
+        //     );
+        // }
     }
     log::info!("Stream schemas Cached");
     Ok(())
