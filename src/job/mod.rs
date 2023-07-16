@@ -123,9 +123,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::file_list::local::cache()
         .await
         .expect("file list local cache failed");
-    db::file_list::remote::cache("")
-        .await
-        .expect("file list remote cache failed");
+    // db::file_list::remote::cache("")
+    //     .await
+    //     .expect("file list remote cache failed");
 
     // Shouldn't serve request until initialization finishes
     log::info!("Start job");
