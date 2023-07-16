@@ -20,7 +20,7 @@ use std::time::Duration;
 use crate::common::infra::cluster;
 use crate::common::infra::config::CONFIG;
 
-const QUERIER_ROUTES: [&str; 10] = [
+const QUERIER_ROUTES: [&str; 13] = [
     "/_search",
     "/_around",
     "/_values",
@@ -31,6 +31,9 @@ const QUERIER_ROUTES: [&str; 10] = [
     "/prometheus/api/v1/metadata",
     "/prometheus/api/v1/labels",
     "/prometheus/api/v1/label/",
+    "/schema",
+    "/settings",
+    "/streams",
 ];
 
 #[inline]

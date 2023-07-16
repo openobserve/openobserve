@@ -88,6 +88,7 @@ pub async fn progress(
             if old_data.is_ok() {
                 return Ok(()); // already exists, skip increase stats
             };
+
             match cache::stats::incr_stream_stats(key, data) {
                 Ok(_) => {}
                 Err(e) => {
