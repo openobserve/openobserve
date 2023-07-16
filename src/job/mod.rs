@@ -123,7 +123,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::file_list::local::cache()
         .await
         .expect("file list local cache failed");
-    if cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
+    if cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
+        || cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
+    {
         db::file_list::remote::cache(&CONFIG.compact.load_files_prefix)
             .await
             .expect("file list remote cache failed");
