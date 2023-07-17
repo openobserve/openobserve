@@ -27,13 +27,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // tokio::task::spawn(async move { run_delete().await });
+    tokio::task::spawn(async move { run_delete().await });
     tokio::task::spawn(async move { run_merge().await });
 
     Ok(())
 }
 
-async fn _run_delete() -> Result<(), anyhow::Error> {
+async fn run_delete() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.compact.interval));
     interval.tick().await; // trigger the first run
     loop {

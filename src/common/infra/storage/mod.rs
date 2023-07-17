@@ -79,8 +79,8 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
                 Ok(_) => {
                     log::info!("Deleted object: {}", file);
                 }
-                Err(e) => {
-                    log::error!("Failed to delete object: {:?}", e);
+                Err(_e) => {
+                    // log::error!("Failed to delete object: {:?}", e);
                 }
             }
         })

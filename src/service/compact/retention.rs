@@ -37,6 +37,20 @@ pub async fn delete_by_stream(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
+    // need check the file_list from the stream create to lifecycle_end
+    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let time_min = match schema.metadata.get("created_at") {
+        Some(created) => created.parse().unwrap_or(0),
+        None => 0,
+    };
+    if time_min == 0 {
+        return Ok(()); // no data, just skip
+    }
+    let time_max = Utc
+        .datetime_from_str(&format!("{lifecycle_end}T23:59:59Z"), "%Y-%m-%dT%H:%M:%SZ")?
+        .timestamp_micros();
+    db::file_list::remote::cache_time_range(time_min, time_max).await?;
+
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
@@ -65,6 +79,10 @@ pub async fn delete_all(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
+    // need check the file_list cache all
+    db::file_list::remote::cache_all().await?;
+
+    // delete the stream
     let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
     let mut locker = dist_lock::lock(&lock_key).await?;
     let node = db::compact::retention::get_stream(org_id, stream_name, stream_type, None).await;
