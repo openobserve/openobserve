@@ -147,6 +147,9 @@
               <div
                 v-if="column.closable && row[column.name]"
                 class="field_overlay"
+                :class="
+                  store.state.theme === 'dark' ? 'field_overlay_dark' : ''
+                "
                 :title="row.name"
               >
                 <q-btn
@@ -701,6 +704,10 @@ export default defineComponent({
     display: flex;
     align-items: center;
     transition: all 0.3s linear;
+
+    &.field_overlay_dark {
+      background-color: #181a1b;
+    }
 
     .q-icon {
       cursor: pointer;
