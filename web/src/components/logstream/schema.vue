@@ -18,20 +18,12 @@
     <q-card-section class="q-pa-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div
-            class="text-body1 text-bold"
-            data-test="schema-title-text"
-          >
+          <div class="text-body1 text-bold" data-test="schema-title-text">
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup
-            round
-            flat
-            icon="close"
-          />
+          <q-btn v-close-popup round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -69,20 +61,10 @@
                     }}
                   </td>
                   <td>
-                    {{
-                      parseInt(indexData.stats.storage_size).toLocaleString(
-                        "en-US"
-                      )
-                    }}
-                    MB
+                    {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </td>
                   <td v-if="isCloud !== 'true'">
-                    {{
-                      parseInt(indexData.stats.compressed_size).toLocaleString(
-                        "en-US"
-                      )
-                    }}
-                    MB
+                    {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </td>
                   <td class="text-center">
                     {{ indexData.stats.doc_time_min }}
@@ -216,7 +198,7 @@ import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { getImageURL } from "@/utils/zincutils";
+import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import store from "@/test/unit/helpers/store";
 
@@ -425,6 +407,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       showDataRetention,
+      formatSizeFromMB,
     };
   },
   created() {
