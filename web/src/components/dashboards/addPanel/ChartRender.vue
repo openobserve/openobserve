@@ -873,11 +873,13 @@ export default defineComponent({
 
                     return  {
                         name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
-                        x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
+                        x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                         y: values.map((value: any) => value[1]),
                         hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"
                     }
                 })
+
+                // result = result.map((it: any) => moment(it + "Z").toISOString(true))
 
                 const layout: any = {
                     title: false,
@@ -914,7 +916,7 @@ export default defineComponent({
                     
                     return  {
                         name: JSON.stringify(metric.metric),
-                        x: values.map((value: any) => (new Date(value[0] * 1000)).toISOString()),
+                        x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                         y: values.map((value: any) => value[1]),
                     }
                 })
