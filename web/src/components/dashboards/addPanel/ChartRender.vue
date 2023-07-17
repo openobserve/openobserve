@@ -1018,6 +1018,16 @@ export default defineComponent({
       const getAxisDataFromKey = (key: string) => {
           // when the key is not available in the data that is not show the default value
           let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
+          // when the key is not available in the data make default value null using below line
+          // let result: string[] = searchQueryData.data.map((item) => item[key] || 'null');
+
+          // check for the histogram _timestamp field
+          // If histogram _timestamp field is found, format the date labels
+          const field = props.data.fields?.x.find((it: any) => it.aggregationFunction == 'histogram' && it.column == store.state.zoConfig.timestamp_column)
+          if (field && field.alias == key) {
+            // now we have the format, convert that format
+            result = result.map((it: any) => moment(it + "Z").toISOString(true))
+          }
           return result
       };
 
@@ -1102,8 +1112,8 @@ export default defineComponent({
                       automargin: true,
                       fixedrange: true
                   }
-
-                  if(props.data.fields?.x.length == 1){
+                 
+                  if(props.data.fields?.x.length == 1 && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
                       xaxis["tickmode"] = "array",
                       xaxis["tickvals"] = xAxisDataWithTicks,
                       xaxis["ticktext"] = textformat(xAxisDataWithTicks)
@@ -1131,7 +1141,7 @@ export default defineComponent({
                       fixedrange: true,
                   }
 
-                  if(props.data.fields?.x.length == 1){
+                  if(props.data.fields?.x.length == 1 && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
                       xaxis["tickmode"] = "array",
                       xaxis["tickvals"] = xAxisDataWithTicks,
                       xaxis["ticktext"] = textformat(xAxisDataWithTicks)
@@ -1156,7 +1166,7 @@ export default defineComponent({
                       fixedrange: true
                   }
 
-                  if(props.data.fields?.x.length == 1){
+                  if(props.data.fields?.x.length == 1 && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
                       xaxis["tickmode"] = "array",
                       xaxis["tickvals"] = xAxisDataWithTicks,
                       xaxis["ticktext"] = textformat(xAxisDataWithTicks)
@@ -1183,7 +1193,7 @@ export default defineComponent({
                           title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                           automargin: true,
                       },
-                  };
+             }
               case "donut":
                   return {
                       xaxis: {
@@ -1198,7 +1208,7 @@ export default defineComponent({
                           title: props.data.fields?.y?.length == 1 ? props.data.fields.y[0]?.label : "",
                           automargin: true,
                       },
-                  };
+              }
               case "h-bar": {
                   const xaxis: any = {
                       title: props.data.fields?.y[0]?.label,
@@ -1212,7 +1222,7 @@ export default defineComponent({
                       automargin: true,
                   }
 
-                  if(props.data.fields?.x.length == 1){
+                  if(props.data.fields?.x.length == 1 && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
                       yaxis["tickmode"] = "array",
                       yaxis["tickvals"] = xAxisDataWithTicks,
                       yaxis["ticktext"] = textformat(xAxisDataWithTicks)
@@ -1239,7 +1249,7 @@ export default defineComponent({
                       fixedrange: true
                   }
 
-                  if(props.data.fields?.x.length == 1){
+                  if(props.data.fields?.x.length == 1 && props.data.fields?.x[0].aggregationFunction != 'histogram' && !props.data.fields?.x[0].column != store.state.zoConfig.timestamp_column){
                       xaxis["tickmode"] = "array",
                       xaxis["tickvals"] = xAxisDataWithTicks,
                       xaxis["ticktext"] = textformat(xAxisDataWithTicks)
