@@ -433,10 +433,11 @@ export default defineComponent({
         let periodValue = relativeValue.value;
 
         // quasar does not support arithmetic on weeks. convert to days.
-        if (relativePeriod.value == "w") {
+        if (relativePeriod.value === "w") {
           period = "days";
           periodValue = periodValue * 7;
         }
+
         const subtractObject = '{"' + period + '":' + periodValue + "}";
 
         const endTimeStamp = new Date();

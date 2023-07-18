@@ -193,16 +193,13 @@ export const getDurationObjectFromParams = (params: any) => {
 
 export const getConsumableRelativeTime = (period: string) => {
   const periodString = period?.match(/(\d+)([mhdwM])/);
-
   if (periodString) {
     let periodValue: number = parseInt(periodString[1]);
     let periodUnit: string = periodString[2];
 
-    const periodUnits = ["m", "h", "d", "w", "M"];
-
     // quasar does not support arithmetic on weeks. convert to days.
     if (periodUnit == "w") {
-      periodUnit = "days";
+      periodUnit = "d";
       periodValue = periodValue * 7;
     }
 
