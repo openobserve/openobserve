@@ -108,7 +108,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
             log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
-            // return Ok(());
+            return Ok(());
         }
     }
 
