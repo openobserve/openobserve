@@ -97,7 +97,21 @@
                         store.state.theme === 'light' ? '#049cbc' : '#3fd5f4',
                     }"
                   >
-                    {{ searchObj.data.metrics.selectedMetric.help }}
+                    <span
+                      v-show="searchObj.data.metrics.selectedMetric.type"
+                      class="text-capitalize"
+                      >{{ searchObj.data.metrics.selectedMetric.type }}</span
+                    >
+                    <span
+                      v-show="searchObj.data.metrics.selectedMetric.type"
+                      class="q-mx-xs"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-4'
+                          : 'text-grey-7'
+                      "
+                      >|</span
+                    >{{ searchObj.data.metrics.selectedMetric.help }}
                   </div>
                 </div>
 
