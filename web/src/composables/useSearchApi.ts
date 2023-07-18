@@ -9,7 +9,7 @@ export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
   let currentDependentVariablesData = props.variablesData?.values || [];
   const store = useStore();
   const errorDetail = ref("");
-  const isDirty =ref(true)
+  // const isDirty =ref(true)
   // const emit = defineEmits(['error']);
   console.log("props", props);
 
@@ -24,7 +24,7 @@ export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
       if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
         return;
       }
-      isDirty.value = false;
+      // isDirty.value = false;
 
       // continue if it is not dependent on the variables or dependent variables' values are available
       let queryData = props.data.query;
@@ -116,7 +116,7 @@ export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
     loading.value = false;
   };
   
-  watch(() => [selectedTimeObj], () => {
+  watch(() => [ selectedTimeObj], () => {
     loadData()
   });
   
@@ -199,7 +199,6 @@ export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
     data,
     loading,
     errorDetail,
-    isDirty,
     isQueryDependentOnTheVariables,
     canRunQueryBasedOnVariables,
     replaceQueryValue,
