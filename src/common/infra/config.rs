@@ -595,7 +595,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-    cfg.common.dynamo_file_list_table = format!("{}-file-list-test", cfg.s3.bucket_name);
+    cfg.common.dynamo_file_list_table = format!("{}-file-list", cfg.s3.bucket_name);
     Ok(())
 }
 
