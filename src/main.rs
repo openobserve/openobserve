@@ -359,14 +359,13 @@ async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "file-list" => {
-            let component = command.get_one::<String>("prefix").unwrap();
-            match component.as_str() {
-                "prefix" => migration::load_file_list_to_dynamo::load("").await?,
-                _ => {
-                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
-                }
+            let prefix = command.get_one::<String>("prefix").unwrap();
+            println!("Running migration with prefix: {}", prefix);
+            if !prefix.is_empty() {
+                migration::load_file_list_to_dynamo::load(prefix).await?
             }
         }
+
         _ => {
             return Err(anyhow::anyhow!("unsupport sub command: {name}"));
         }

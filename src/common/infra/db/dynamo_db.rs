@@ -52,7 +52,7 @@ pub async fn get_dynamo_config() -> aws_config::SdkConfig {
 pub async fn create_dynamo_tables() {
     let client = DYNAMO_DB_CLIENT.get().await;
     let table_name = &CONFIG.common.dynamo_file_list_table;
-    create_file_list_table(&client, table_name).await.unwrap();
+    create_file_list_table(client, table_name).await.unwrap();
 }
 
 async fn create_file_list_table(

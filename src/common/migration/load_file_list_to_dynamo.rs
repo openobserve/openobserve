@@ -23,7 +23,7 @@ use tokio::sync::RwLock;
 use crate::common::infra::{config::CONFIG, storage};
 use crate::common::json;
 use crate::common::meta::common::FileKey;
-use crate::service::db::file_list::BLOCKED_ORGS;
+use crate::service::db::file_list::{self, BLOCKED_ORGS};
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -129,6 +129,6 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         total_count
     );
 
-    //file_list::dynamo::batch_write(file_keys).await?;
+    file_list::dynamo::batch_write(file_keys).await?;
     Ok(count)
 }
