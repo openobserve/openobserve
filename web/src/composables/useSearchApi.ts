@@ -1,141 +1,125 @@
-import { ref, watch, reactive, onMounted} from "vue";
+import { ref, watch, reactive } from "vue";
 import queryService from "../../src/services/search";
 import { useStore } from "vuex";
-// import { defineEmits } from "vue";
 
-export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
-  const data =ref([])
-  const loading = ref(false);
-  let currentDependentVariablesData = props.variablesData?.values || [];
+export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
+  const state = reactive({
+    data: [],
+    loading: false,
+    errorDetail: "",
+  });
+
+  const currentDependentVariablesData = ref(props.variablesData?.values || []);
   const store = useStore();
-  const errorDetail = ref("");
-  // const isDirty =ref(true)
-  // const emit = defineEmits(['error']);
-  console.log("props", props);
+  let controller: AbortController | null = null;
 
   const loadData = async () => {
-    console.log("inside loadData");
-    
-    loading.value = true;
-    //single or multiple API call
-    //wait for all response
-    //merge the dashboard data and set data ref
-      // If the current query is dependent and the the data is not available for the variables, then don't run the query
-      if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
-        return;
-      }
-      // isDirty.value = false;
+    if (controller) {
+      controller.abort(); 
+    }
 
-      // continue if it is not dependent on the variables or dependent variables' values are available
-      let queryData = props.data.query;
-      const chartParams = {
-        title: "Found " + "2" + " hits in " + "10" + " ms",
-      };
+    controller = new AbortController(); 
+    state.loading = true;
 
-      const sqlQueryModified = queryData;
+    if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
+      return;
+    }
 
-      // get query object
-      const timestamps = selectedTimeObj.value;
+    const queryData = props.data.query;
+    const timestamps = selectedTimeObj.value;
+    let startISOTimestamp: any;
+    let endISOTimestamp: any;
+    if (
+      timestamps.start_time != "Invalid Date" &&
+      timestamps.end_time != "Invalid Date"
+    ) {
+      startISOTimestamp =
+        new Date(timestamps.start_time.toISOString()).getTime() * 1000;
+      endISOTimestamp =
+        new Date(timestamps.end_time.toISOString()).getTime() * 1000;
+    }
 
-      let startISOTimestamp: any;
-      let endISOTimestamp: any;
-      if (
-        timestamps.start_time != "Invalid Date" &&
-        timestamps.end_time != "Invalid Date"
-      ) {
-        startISOTimestamp =
-          new Date(timestamps.start_time.toISOString()).getTime() * 1000;
-        endISOTimestamp =
-          new Date(timestamps.end_time.toISOString()).getTime() * 1000;
-      }
-      //replace query value
+    const query = {
+      query: {
+        sql: replaceQueryValue(queryData),
+        sql_mode: "full",
+        start_time: startISOTimestamp,
+        end_time: endISOTimestamp,
+        size: 0,
+      },
+    };
 
-      const query = {
-        query: {
-          sql: replaceQueryValue(queryData),
-          sql_mode: "full",
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-          size: 0,
-        },
-      };
+    state.loading = true;
 
-      loading.value = true;
-
-      // Check if stream_type is "metrics", customQuery exists, and queryType is "promql"
-      if (
-        props.data.fields.stream_type == "metrics" &&
-        props.data.customQuery &&
-        props.data.queryType == "promql"
-      ) {
-        console.log("Calling metrics_query_range API");
-        await queryService
-          .metrics_query_range({
+    if (
+      props.data.fields.stream_type == "metrics" &&
+      props.data.customQuery &&
+      props.data.queryType == "promql"
+    ) {
+      console.log("Calling metrics_query_range API");
+      try {
+        const res = await queryService.metrics_query_range(
+          {
             org_identifier: store.state.selectedOrganization.identifier,
             query: replaceQueryValue(queryData),
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
-          })
-          .then((res) => {
-            // Set searchQueryData.data to the API response data
-            data.value = res.data.data;
-            // Clear errorDetail
-            errorDetail.value = "";
-          })
-          .catch((error) => {
-            // Process API error for "promql"
-            processApiError(error, "promql");
-          })
-          .finally(() => {
-            loading.value = false;
-          });
-      } else {
-        console.log("Calling search API");
-        // Call search API
-        await queryService
-          .search({
+          },
+          { signal: controller.signal }
+        ); 
+
+        state.data = res.data.data;
+        state.errorDetail = "";
+      } catch (error) {
+        processApiError(error, "promql");
+      } finally {
+        state.loading = false;
+      }
+    } else {
+      console.log("Calling search API");
+      try {
+        const res = await queryService.search(
+          {
             org_identifier: store.state.selectedOrganization.identifier,
             query: query,
             page_type: props.data.fields.stream_type,
-          })
-          .then((res) => {
-            // Set searchQueryData.data to the API response hits
-            data.value = res.data.hits;
-            // Clear errorDetail
-            errorDetail.value = "";
-          })
-          .catch((error) => {
-            // Process API error for "sql"
-            processApiError(error, "sql");
-          })
-          .finally(() => {
-            loading.value = false;
-          });
+          },
+          { signal: controller.signal }
+        ); // Pass the signal to the API call
+
+        state.data = res.data.hits;
+        state.errorDetail = "";
+      } catch (error) {
+        processApiError(error, "sql");
+      } finally {
+        state.loading = false;
       }
-    
-    loading.value = false;
+    }
   };
-  
-  watch(() => [ selectedTimeObj], () => {
-    loadData()
-  });
-  
-    const isQueryDependentOnTheVariables = () => {
-      const dependentVariables = props?.variablesData?.values?.filter(
-        (it: any) => props.data.query.includes(`$${it.name}`)
-      );
-      return dependentVariables?.length > 0;
-    };
 
-    const canRunQueryBasedOnVariables = () => {
-      const dependentVariables = props?.variablesData?.values?.filter(
-        (it: any) => props.data.query.includes(`$${it.name}`)
-      );
+  watch(
+    () => [selectedTimeObj],
+    () => {
+      loadData();
+    }
+  );
 
-      if (dependentVariables?.length > 0) {
-        const dependentAvailableVariables = dependentVariables.filter(
-          (it: any) => !it.isLoading
-        );
+  const isQueryDependentOnTheVariables = () => {
+    const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+      props.data.query.includes(`$${it.name}`)
+    );
+    return dependentVariables?.length > 0;
+  };
+
+  const canRunQueryBasedOnVariables = () => {
+    const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
+      props.data.query.includes(`$${it.name}`)
+    );
+
+    if (dependentVariables?.length > 0) {
+      const dependentAvailableVariables = dependentVariables.filter(
+        (it: any) => !it.isLoading
+      );
 
         if (dependentAvailableVariables.length == dependentVariables.length) {
           return true;
@@ -147,61 +131,48 @@ export const useSearchApi = (  selectedTimeObj: any, props: any, emit: any) => {
       }
     };
 
-    const replaceQueryValue = (query: any) => {
-      if (currentDependentVariablesData?.length) {
-        currentDependentVariablesData?.forEach((variable: any) => {
-          const variableName = `$${variable.name}`;
-          const variableValue = variable.value;
-          query = query.replace(variableName, variableValue);
-        });
-        return query;
-      } else {
-        return query;
+  const replaceQueryValue = (query: any) => {
+    if (currentDependentVariablesData.value?.length) {
+      currentDependentVariablesData.value?.forEach((variable: any) => {
+        const variableName = `$${variable.name}`;
+        const variableValue = variable.value;
+        query = query.replace(variableName, variableValue);
+      });
+    }
+    return query;
+  };
+
+  const processApiError = async (error: any, type: any) => {
+
+    switch (type) {
+      case "promql": {
+        const errorDetailValue = error.response?.data?.error || error.message;
+        const trimmedErrorMessage =
+          errorDetailValue.length > 300
+            ? errorDetailValue.slice(0, 300) + " ..."
+            : errorDetailValue;
+        state.errorDetail = trimmedErrorMessage;
+        emit("error", trimmedErrorMessage);
+        break;
       }
-    };
-    const processApiError = async (error: any, type: string) => {
-      switch (type) {
-        case "promql": {
-          // Get the error detail value from the response data or error message
-          const errorDetailValue = error.response?.data?.error || error.message;
-          // Trim the error message if it exceeds 300 characters
-          const trimmedErrorMessage =
-            errorDetailValue.length > 300
-              ? errorDetailValue.slice(0, 300) + " ..."
-              : errorDetailValue;
-          // Set the trimmed error message to the errorDetail value
-          errorDetail.value = trimmedErrorMessage;
-          // Emit an 'error' event with the trimmed error message
-          emit("error", trimmedErrorMessage);
-          break;
-        }
-        case "sql": {
-          // Get the error detail value from the response data or error message
-          const errorDetailValue =
-            error.response?.data.error_detail ?? error.message;
-          // Trim the error message if it exceeds 300 characters
-          const trimmedErrorMessage =
-            errorDetailValue.length > 300
-              ? errorDetailValue.slice(0, 300) + " ..."
-              : errorDetailValue;
-          // Set the trimmed error message to the errorDetail value
-          errorDetail.value = trimmedErrorMessage;
-          // Emit an 'error' event with the trimmed error message
-          emit("error", trimmedErrorMessage);
-          break;
-        }
-        default:
-          break;
+      case "sql": {
+        const errorDetailValue =
+          error.response?.data.error_detail ?? error.message;
+        const trimmedErrorMessage =
+          errorDetailValue.length > 300
+            ? errorDetailValue.slice(0, 300) + " ..."
+            : errorDetailValue;
+        state.errorDetail = trimmedErrorMessage;
+        emit("error", trimmedErrorMessage);
+        break;
       }
-    };
+      default:
+        break;
+    }
+  };
+
   return {
+    ...state,
     loadData,
-    data,
-    loading,
-    errorDetail,
-    isQueryDependentOnTheVariables,
-    canRunQueryBasedOnVariables,
-    replaceQueryValue,
-    processApiError,
   };
 };
