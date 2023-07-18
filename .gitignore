@@ -19,6 +19,7 @@ report.json
 /tmp/
 /data/
 /.env
+/.env_prod
 /integration-tests
 
 #web distribution

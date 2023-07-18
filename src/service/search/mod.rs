@@ -90,7 +90,9 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
         stream_type,
         time_min,
         time_max,
-    ) {
+    )
+    .await
+    {
         Err(_) => vec![],
         Ok(file_list) => {
             let mut files = Vec::with_capacity(file_list.len());
@@ -449,7 +451,7 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 }
 
 /// match a source is a valid file or not
-pub fn match_source(
+pub async fn match_source(
     stream: StreamParams<'_>,
     time_range: Option<(i64, i64)>,
     filters: &[(&str, &str)],
@@ -478,7 +480,7 @@ pub fn match_source(
     }
 
     // check time range
-    let file_meta = file_list::get_file_meta(source).unwrap_or_default();
+    let file_meta = file_list::get_file_meta(source).await.unwrap_or_default();
     if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
         return true;
     }

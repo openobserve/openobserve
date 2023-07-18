@@ -50,11 +50,12 @@ pub async fn search(
     }
 
     // filter file_list
-    let not_exists_files: Vec<String> = files
-        .iter()
-        .filter(|f| file_list::get_file_meta(f).is_err())
-        .cloned()
-        .collect();
+    let mut not_exists_files: Vec<String> = Vec::new();
+    for file in files.iter() {
+        if file_list::get_file_meta(file).await.is_err() {
+            not_exists_files.push(file.clone());
+        }
+    }
     if !not_exists_files.is_empty() {
         files.retain(|f| !not_exists_files.contains(f));
     }
@@ -83,7 +84,7 @@ pub async fn search(
     let mut scan_stats = ScanStats::new();
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
-        scan_stats = match file_list::calculate_files_size(&files) {
+        scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
                 log::error!("calculate files size error: {}", err);
@@ -96,8 +97,9 @@ pub async fn search(
     } else {
         scan_stats.files = files.len() as u64;
         for file in &files {
-            let file_meta =
-                file_list::get_file_meta(file).map_err(|e| Error::Message(e.to_string()))?;
+            let file_meta = file_list::get_file_meta(file)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
             // calculate scan size
             scan_stats.records += file_meta.records;
             scan_stats.original_size += file_meta.original_size;
@@ -237,7 +239,9 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         stream_type,
         time_min,
         time_max,
-    ) {
+    )
+    .await
+    {
         Ok(results) => results,
         Err(err) => {
             log::error!("get file list error: {}", err);

@@ -150,6 +150,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("syslog server run failed");
     }
+    //create dynamo db table
+    if CONFIG.common.use_dynamo_meta_store {
+        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
+    }
 
     Ok(())
 }

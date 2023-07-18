@@ -151,7 +151,9 @@ pub async fn merge_by_stream(
         offset_time_hour,
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
-    ) {
+    )
+    .await
+    {
         Ok(files) => files,
         Err(err) => {
             return Err(err);
@@ -176,7 +178,7 @@ pub async fn merge_by_stream(
             file[..pos].to_string()
         };
         let partition = partition_files_with_size.entry(prefix).or_default();
-        let file_meta = file_list::get_file_meta(&file)?;
+        let file_meta = file_list::get_file_meta(&file).await?;
         partition.push((file.clone(), file_meta.original_size));
     }
 
@@ -354,7 +356,7 @@ async fn merge_files(
                 continue;
             }
             // get the schema version of the file
-            let mut file_meta = file_list::get_file_meta(file)?;
+            let mut file_meta = file_list::get_file_meta(file).await?;
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
                 file_meta.min_ts,

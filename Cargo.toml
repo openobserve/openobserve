@@ -57,6 +57,8 @@ async-trait = "0.1"
 async_once = "0.2"
 async-recursion = "1.0"
 awc = "3.1"
+aws-config = "0.55.3"
+aws-sdk-dynamodb = "0.28.0"
 base64 = "0.21"
 blake3 = "1.4"
 bytes = "1.4"
@@ -138,6 +140,7 @@ thiserror = "1.0"
 time = "0.3"
 tikv-jemallocator = { version = "0.5", optional = true }
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 tonic = { version = "0.8", features = ["prost", "gzip"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.18"

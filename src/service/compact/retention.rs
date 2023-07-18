@@ -100,7 +100,7 @@ pub async fn delete_all(
     } else {
         // delete files from s3
         // first fetch file list from local cache
-        let files = file_list::get_file_list(org_id, stream_name, stream_type, 0, 0)?;
+        let files = file_list::get_file_list(org_id, stream_name, stream_type, 0, 0).await?;
         match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
@@ -202,7 +202,8 @@ pub async fn delete_by_date(
         // delete files from s3
         // first fetch file list from local cache
         let files =
-            file_list::get_file_list(org_id, stream_name, stream_type, time_range.0, time_range.1)?;
+            file_list::get_file_list(org_id, stream_name, stream_type, time_range.0, time_range.1)
+                .await?;
         match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
@@ -251,7 +252,8 @@ async fn delete_from_file_list(
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
     let files =
-        file_list::get_file_list(org_id, stream_name, stream_type, time_range.0, time_range.1)?;
+        file_list::get_file_list(org_id, stream_name, stream_type, time_range.0, time_range.1)
+            .await?;
     if files.is_empty() {
         return Ok(());
     }

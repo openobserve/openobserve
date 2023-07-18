@@ -351,11 +351,12 @@ async fn get_fast_mode_ctx(
 ) -> Result<(SessionContext, Arc<Schema>)> {
     // sort files by time range
     let mut files_meta = HashMap::default();
-    files.iter().for_each(|key| {
-        let meta =
-            crate::service::file_list::get_file_meta(key).expect("file meta must have value");
-        files_meta.insert(key, meta);
-    });
+    for file in files.iter() {
+        let meta = crate::service::file_list::get_file_meta(file)
+            .await
+            .expect("file meta must have value");
+        files_meta.insert(file.clone(), meta);
+    }
     let mut files = files.to_vec();
     files.sort_by(|a, b| {
         let a_meta = files_meta.get(a).unwrap();
@@ -985,10 +986,10 @@ pub async fn register_table(
     };
 
     let prefix = if session.storage_type.eq(&StorageType::FsMemory) {
-        file_list::set(&session.id, files);
+        file_list::set(&session.id, files).await;
         format!("fsm:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::FsNoCache) {
-        file_list::set(&session.id, files);
+        file_list::set(&session.id, files).await;
         format!("fsn:///{}/", session.id)
     } else if session.storage_type.eq(&StorageType::Tmpfs) {
         format!("tmpfs:///{}/", session.id)

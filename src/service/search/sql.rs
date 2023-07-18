@@ -633,6 +633,7 @@ impl Sql {
             is_wal,
             match_min_ts_only,
         )
+        .await
     }
 }
 

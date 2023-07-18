@@ -15,7 +15,7 @@
 use std::io::Write;
 
 use crate::common;
-use crate::common::infra::{cache::file_list, ider, storage};
+use crate::common::infra::{cache::file_list, config::CONFIG, ider, storage};
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     stream::ScanStats,
@@ -24,27 +24,36 @@ use crate::common::meta::{
 use crate::service::db;
 
 #[inline]
-pub fn get_file_list(
+pub async fn get_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     time_min: i64,
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
-    file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
+    if CONFIG.common.use_dynamo_meta_store {
+        db::file_list::dynamo::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
+            .await
+    } else {
+        file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
+    }
 }
 
 #[inline]
-pub fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
-    file_list::get_file_from_cache(file)
+pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        db::file_list::dynamo::get_file_meta(file).await
+    } else {
+        file_list::get_file_from_cache(file)
+    }
 }
 
 #[inline]
-pub fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error> {
+pub async fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
     stats.files = files.len() as u64;
     for file in files {
-        let resp = get_file_meta(file)?;
+        let resp = get_file_meta(file).await?;
         stats.records += resp.records;
         stats.original_size += resp.original_size;
         stats.compressed_size += resp.compressed_size;
@@ -113,7 +122,8 @@ mod test {
     async fn test_get_file_meta() {
         let res = get_file_meta(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",
-        );
+        )
+        .await;
         assert!(res.is_ok());
     }
 }

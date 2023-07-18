@@ -30,10 +30,12 @@ pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data.value().clone())
 }
 
-pub fn set(session_id: &str, files: &[String]) {
+pub async fn set(session_id: &str, files: &[String]) {
     let mut values = Vec::with_capacity(files.len());
     for file in files {
-        let meta = file_list::get_file_meta(file).expect("file meta must have value");
+        let meta = file_list::get_file_meta(file)
+            .await
+            .expect("file meta must have value");
         let modified = Utc.timestamp_nanos(meta.max_ts * 1000);
         let file = format!("/{}/$$/{}", session_id, file);
         values.push(ObjectMeta {
@@ -73,7 +75,7 @@ mod tests {
         let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
         crate::common::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
-        set(session_id, &[file_name.to_string()]);
+        set(session_id, &[file_name.to_string()]).await;
 
         let get_resp = get(session_id);
         assert!(get_resp.unwrap().len() > 0);

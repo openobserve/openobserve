@@ -41,6 +41,7 @@ use openobserve::{
         metrics, wal,
     },
     common::meta,
+    common::migration,
     common::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
@@ -287,6 +288,15 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
+            clap::Command::new("file-list")
+                .about("migrate file-list from s3 to dynamo db")
+                .arg(
+                    clap::Arg::new("prefix")
+                        .short('p')
+                        .long("prefix")
+                        .value_name("prefix")
+                        .help("only migrate specified prefix, default is all"),
+                ),
         ])
         .get_matches();
 
@@ -343,6 +353,15 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         println!("{id}\t{:?}\n{:?}", user.key(), user.value());
                     }
                 }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupport reset component: {component}"));
+                }
+            }
+        }
+        "file-list" => {
+            let component = command.get_one::<String>("prefix").unwrap();
+            match component.as_str() {
+                "prefix" => migration::load_file_list_to_dynamo::load("").await?,
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {component}"));
                 }

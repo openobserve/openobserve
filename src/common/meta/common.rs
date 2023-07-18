@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
+use aws_sdk_dynamodb::types::AttributeValue;
 use serde::{Deserialize, Serialize};
 
 use crate::common::json;
@@ -53,6 +56,82 @@ impl From<FileMeta> for String {
 impl From<FileMeta> for bytes::Bytes {
     fn from(value: FileMeta) -> bytes::Bytes {
         json::to_vec(&value).unwrap().into()
+    }
+}
+
+impl From<&FileKey> for HashMap<String, AttributeValue> {
+    fn from(file_key: &FileKey) -> Self {
+        let mut item = HashMap::new();
+        let file_columns = file_key.key.splitn(5, '/').collect::<Vec<&str>>();
+        item.insert(
+            "stream".to_string(),
+            AttributeValue::S(format!(
+                "{}/{}/{}",
+                file_columns[1], file_columns[2], file_columns[3]
+            )),
+        );
+        item.insert(
+            "file".to_string(),
+            AttributeValue::S(file_columns[4].to_owned()),
+        );
+        item.insert(
+            "deleted".to_string(),
+            AttributeValue::Bool(file_key.deleted),
+        );
+        item.insert(
+            "min_ts".to_string(),
+            AttributeValue::N(file_key.meta.min_ts.to_string()),
+        );
+        item.insert(
+            "max_ts".to_string(),
+            AttributeValue::N(file_key.meta.max_ts.to_string()),
+        );
+        item.insert(
+            "records".to_string(),
+            AttributeValue::N(file_key.meta.records.to_string()),
+        );
+        item.insert(
+            "original_size".to_string(),
+            AttributeValue::N(file_key.meta.original_size.to_string()),
+        );
+        item.insert(
+            "compressed_size".to_string(),
+            AttributeValue::N(file_key.meta.compressed_size.to_string()),
+        );
+        item
+    }
+}
+
+impl From<&HashMap<String, AttributeValue>> for FileKey {
+    fn from(data: &HashMap<String, AttributeValue>) -> Self {
+        let mut item = FileKey::default();
+        for (k, v) in data {
+            match k.as_str() {
+                "file" => {
+                    item.key = v.as_s().unwrap().to_string();
+                }
+                "deleted" => {
+                    item.deleted = v.as_bool().unwrap().to_owned();
+                }
+                "min_ts" => {
+                    item.meta.min_ts = v.as_n().unwrap().parse::<i64>().unwrap();
+                }
+                "max_ts" => {
+                    item.meta.max_ts = v.as_n().unwrap().parse::<i64>().unwrap();
+                }
+                "records" => {
+                    item.meta.records = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                "original_size" => {
+                    item.meta.original_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                "compressed_size" => {
+                    item.meta.compressed_size = v.as_n().unwrap().parse::<u64>().unwrap();
+                }
+                _ => {}
+            }
+        }
+        item
     }
 }
 

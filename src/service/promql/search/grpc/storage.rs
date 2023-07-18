@@ -64,17 +64,18 @@ pub(crate) async fn create_context(
     }
 
     // filter file_list
-    let not_exists_files: Vec<String> = files
-        .iter()
-        .filter(|f| file_list::get_file_meta(f).is_err())
-        .cloned()
-        .collect();
+    let mut not_exists_files: Vec<String> = Vec::new();
+    for file in files.iter() {
+        if file_list::get_file_meta(file).await.is_err() {
+            not_exists_files.push(file.clone());
+        }
+    }
     if !not_exists_files.is_empty() {
         files.retain(|f| !not_exists_files.contains(f));
     }
 
     // calcuate scan size
-    let scan_stats = match file_list::calculate_files_size(&files.to_vec()) {
+    let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("calculate files size error: {}", err);
@@ -159,7 +160,9 @@ async fn get_file_list(
         StreamType::Metrics,
         time_min,
         time_max,
-    ) {
+    )
+    .await
+    {
         Ok(results) => results,
         Err(err) => {
             log::error!("get file list error: {}", err);
@@ -182,7 +185,9 @@ async fn get_file_list(
             &file,
             false,
             false,
-        ) {
+        )
+        .await
+        {
             files.push(file.clone());
         }
     }
