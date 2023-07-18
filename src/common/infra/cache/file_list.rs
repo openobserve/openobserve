@@ -20,14 +20,12 @@ use once_cell::sync::Lazy;
 use crate::common::infra::config::RwHashMap;
 use crate::common::meta::{common::FileMeta, StreamType};
 
-static FILES: Lazy<RwHashMap<String, OrgFilelist>> = Lazy::new(DashMap::default);
+static FILES: Lazy<RwHashMap<String, StreamFilelist>> = Lazy::new(DashMap::default);
 static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
 
 const FILE_LIST_MEM_SIZE: usize = std::mem::size_of::<AHashMap<String, Vec<String>>>();
 const FILE_META_MEM_SIZE: usize = std::mem::size_of::<FileMeta>();
 
-type OrgFilelist = RwHashMap<String, TypeFilelist>;
-type TypeFilelist = RwHashMap<String, StreamFilelist>;
 type StreamFilelist = RwHashMap<String, YearFilelist>;
 type YearFilelist = RwHashMap<String, MonthFilelist>;
 type MonthFilelist = RwHashMap<String, DayFilelist>;
@@ -37,13 +35,8 @@ type KeyColumns = (String, String, String, String, String, String, String);
 
 pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> {
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let org_filelist = FILES.entry(org_id).or_insert_with(DashMap::default);
-    let type_filelist = org_filelist
-        .entry(stream_type)
-        .or_insert_with(DashMap::default);
-    let stream_filelist = type_filelist
-        .entry(stream_name)
-        .or_insert_with(DashMap::default);
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_filelist = FILES.entry(stream_key).or_insert_with(DashMap::default);
     let year_filelist = stream_filelist.entry(year).or_insert_with(DashMap::default);
     let month_filelist = year_filelist.entry(month).or_insert_with(DashMap::default);
     let mut day_filelist = month_filelist.entry(day).or_insert_with(Vec::new);
@@ -55,15 +48,8 @@ pub fn set_file_to_cache(key: &str, val: FileMeta) -> Result<(), anyhow::Error> 
 pub fn del_file_from_cache(key: &str) -> Result<(), anyhow::Error> {
     DATA.remove(key);
     let (org_id, stream_type, stream_name, year, month, day, _hour) = parse_key_columns(key)?;
-    let org_filelist = match FILES.get_mut(&org_id) {
-        Some(org_filelist) => org_filelist,
-        None => return Ok(()),
-    };
-    let type_filelist = match org_filelist.get_mut(&stream_type) {
-        Some(type_filelist) => type_filelist,
-        None => return Ok(()),
-    };
-    let stream_filelist = match type_filelist.get_mut(&stream_name) {
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_filelist = match FILES.get_mut(&stream_key) {
         Some(stream_filelist) => stream_filelist,
         None => return Ok(()),
     };
@@ -122,15 +108,8 @@ fn scan_prefix(
     }
 
     let mut items = Vec::new();
-    let org_cache = match FILES.get(org_id) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    let type_cache = match org_cache.get(&stream_type) {
-        Some(v) => v,
-        None => return Ok(items),
-    };
-    let stream_cache = match type_cache.get(stream_name) {
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_cache = match FILES.get(&stream_key) {
         Some(v) => v,
         None => return Ok(items),
     };
@@ -244,23 +223,17 @@ pub fn get_file_num() -> Result<(usize, usize, usize), anyhow::Error> {
     let files_num = DATA.len();
     let mut mem_size = 0;
     let mut file_list_num = 0;
-    for cache in FILES.iter() {
-        mem_size += cache.key().len();
-        for type_cache in cache.value().iter() {
-            mem_size += type_cache.len();
-            for stream_cache in type_cache.iter() {
-                mem_size += stream_cache.len();
-                for year_cache in stream_cache.iter() {
-                    mem_size += year_cache.len();
-                    for month_cache in year_cache.iter() {
-                        mem_size += month_cache.len();
-                        for day_cache in month_cache.iter() {
-                            mem_size += day_cache.len();
-                            file_list_num += 1;
-                            for key in day_cache.iter() {
-                                mem_size += key.len() * 2; // one is in FILES, one is in DATA
-                            }
-                        }
+    for stream_cache in FILES.iter() {
+        mem_size += stream_cache.key().len();
+        for year_cache in stream_cache.iter() {
+            mem_size += year_cache.len();
+            for month_cache in year_cache.iter() {
+                mem_size += month_cache.len();
+                for day_cache in month_cache.iter() {
+                    mem_size += day_cache.len();
+                    file_list_num += 1;
+                    for key in day_cache.iter() {
+                        mem_size += key.len() * 2; // one is in FILES, one is in DATA
                     }
                 }
             }
