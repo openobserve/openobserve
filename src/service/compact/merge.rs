@@ -466,7 +466,7 @@ async fn write_file_list_s3(
             continue;
         }
         // send broadcast to other nodes
-        if let Err(e) = db::file_list::broadcast::send(&events).await {
+        if let Err(e) = db::file_list::broadcast::send(events).await {
             log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
@@ -497,7 +497,10 @@ async fn write_file_list_dynamo(events: &[FileKey]) -> Result<(), anyhow::Error>
             continue;
         }
         if let Err(e) = db::file_list::dynamo::batch_delete(&del_items).await {
-            log::error!("[COMPACT] batch_delete to dynamo db failed, retrying: {}", e);
+            log::error!(
+                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                e
+            );
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
