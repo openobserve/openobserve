@@ -23,7 +23,7 @@ use tokio::sync::RwLock;
 use crate::common::infra::{config::CONFIG, storage};
 use crate::common::json;
 use crate::common::meta::common::FileKey;
-use crate::service::db::file_list::{self, BLOCKED_ORGS};
+use crate::service::db::file_list::{dynamo, BLOCKED_ORGS, DELETED_FILES};
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
@@ -76,6 +76,13 @@ pub async fn load(prefix: &str) -> Result<(), anyhow::Error> {
         count += task_result?;
     }
 
+    // delete files
+    let delete_files = DELETED_FILES
+        .iter()
+        .map(|v| v.key().clone())
+        .collect::<Vec<String>>();
+    dynamo::batch_delete(&delete_files).await?;
+
     println!(
         "Load file_list [{prefix}] load {}:{} done",
         files.len(),
@@ -116,6 +123,7 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         }
         // check deleted files
         if item.deleted {
+            DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
         count += 1;
@@ -129,6 +137,6 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         total_count
     );
 
-    file_list::dynamo::batch_write(&file_keys).await?;
+    dynamo::batch_write(&file_keys).await?;
     Ok(count)
 }
