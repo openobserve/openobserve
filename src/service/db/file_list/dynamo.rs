@@ -78,7 +78,7 @@ pub async fn write_file(file_key: &FileKey) -> Result<(), anyhow::Error> {
     }
 }
 
-pub async fn batch_write(file_keys: Vec<FileKey>) -> Result<(), anyhow::Error> {
+pub async fn batch_write(file_keys: &[FileKey]) -> Result<(), anyhow::Error> {
     for batch in file_keys.chunks(25) {
         let mut write_requests: Vec<WriteRequest> = vec![];
         for file_key in batch {
@@ -107,7 +107,7 @@ pub async fn batch_write(file_keys: Vec<FileKey>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn batch_delete(file_keys: Vec<String>) -> Result<(), anyhow::Error> {
+pub async fn batch_delete(file_keys: &[String]) -> Result<(), anyhow::Error> {
     for batch in file_keys.chunks(25) {
         let mut write_requests: Vec<WriteRequest> = vec![];
         for file_key in batch {
@@ -278,9 +278,9 @@ mod tests {
                 deleted: false,
             });
         }
-        let resp = batch_write(items).await;
+        let resp = batch_write(&items).await;
         assert!(resp.is_ok());
-        let resp = batch_delete(file_keys).await;
+        let resp = batch_delete(&file_keys).await;
         assert!(resp.is_ok());
     }
 }

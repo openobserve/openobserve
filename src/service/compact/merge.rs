@@ -219,47 +219,12 @@ pub async fn merge_by_stream(
                 });
             }
 
-            // upload the new file_list to storage
-            let new_file_list_key = format!(
-                "file_list/{}/{}.json.zst",
-                offset_time.format("%Y/%m/%d/%H"),
-                ider::generate()
-            );
-            let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-            for file in events.iter() {
-                let mut write_buf = json::to_vec(&file)?;
-                write_buf.push(b'\n');
-                buf.write_all(&write_buf)?;
-            }
-            let compressed_bytes = buf.finish().unwrap();
-            storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-
-            // set to local cache & send broadcast
-            // retry 5 times
-            for _ in 0..5 {
-                // set to local cache
-                let mut cache_success = true;
-                for event in &events {
-                    if let Err(e) =
-                        db::file_list::progress(&event.key, event.meta, event.deleted, false).await
-                    {
-                        cache_success = false;
-                        log::error!("[COMPACT] set local cache failed, retrying: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        break;
-                    }
+            // send file list to storage
+            match write_file_list(offset_time, &events).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("[COMPACT] write file list failed: {}", e);
                 }
-                if !cache_success {
-                    continue;
-                }
-                // send broadcast to other nodes
-                if let Err(e) = db::file_list::broadcast::send(&events).await {
-                    log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-                // broadcast success
-                break;
             }
 
             // delete small files from storage
@@ -453,6 +418,92 @@ async fn merge_files(
         Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
         Err(e) => Err(e),
     }
+}
+
+async fn write_file_list(offset: DateTime<Utc>, events: &[FileKey]) -> Result<(), anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        write_file_list_dynamo(events).await
+    } else {
+        write_file_list_s3(offset, events).await
+    }
+}
+
+async fn write_file_list_s3(
+    offset: DateTime<Utc>,
+    events: &[FileKey],
+) -> Result<(), anyhow::Error> {
+    // upload the new file_list to storage
+    let new_file_list_key = format!(
+        "file_list/{}/{}.json.zst",
+        offset.format("%Y/%m/%d/%H"),
+        ider::generate()
+    );
+    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+    for file in events.iter() {
+        let mut write_buf = json::to_vec(&file)?;
+        write_buf.push(b'\n');
+        buf.write_all(&write_buf)?;
+    }
+    let compressed_bytes = buf.finish().unwrap();
+    storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+
+    // set to local cache & send broadcast
+    // retry 5 times
+    for _ in 0..5 {
+        // set to local cache
+        let mut cache_success = true;
+        for event in events.iter() {
+            if let Err(e) =
+                db::file_list::progress(&event.key, event.meta, event.deleted, false).await
+            {
+                cache_success = false;
+                log::error!("[COMPACT] set local cache failed, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                break;
+            }
+        }
+        if !cache_success {
+            continue;
+        }
+        // send broadcast to other nodes
+        if let Err(e) = db::file_list::broadcast::send(&events).await {
+            log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        // broadcast success
+        break;
+    }
+    Ok(())
+}
+
+async fn write_file_list_dynamo(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    let put_items = events
+        .iter()
+        .filter(|v| !v.deleted)
+        .map(|v| v.to_owned())
+        .collect::<Vec<_>>();
+    let del_items = events
+        .iter()
+        .filter(|v| v.deleted)
+        .map(|v| v.key.clone())
+        .collect::<Vec<_>>();
+    // set to dynamo db
+    // retry 5 times
+    for _ in 0..5 {
+        if let Err(e) = db::file_list::dynamo::batch_write(&put_items).await {
+            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        if let Err(e) = db::file_list::dynamo::batch_delete(&del_items).await {
+            log::error!("[COMPACT] batch_delete to dynamo db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
