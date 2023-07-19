@@ -244,11 +244,7 @@ import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import {
-  b64DecodeUnicode,
-  b64EncodeUnicode,
-  parsePromQlQuery,
-} from "@/utils/zincutils";
+import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
@@ -313,6 +309,7 @@ export default defineComponent({
       autoCompletePromqlKeywords,
       getSuggestions,
       updateMetricKeywords,
+      parsePromQlQuery,
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
     const isMounted = ref(false);
