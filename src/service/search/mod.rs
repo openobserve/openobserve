@@ -141,7 +141,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     } else {
         (file_num / querier_num) + 1
     };
-    log::info!("search->file_list: num: {file_num}, offset: {offset}");
+    log::info!(
+        "search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        meta.meta.time_range
+    );
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     let mut session_id = Uuid::new_v4().to_string();
@@ -270,10 +273,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         if !resp.hits.is_empty() {
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-            log::info!(
-                "search_in_cluster: query num_batches: {:?}",
-                reader.num_batches()
-            );
             let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
             value.push(batch);
         }
@@ -283,11 +282,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             if !agg.hits.is_empty() {
                 let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                log::info!(
-                    "search_in_cluster: agg:{} num_batches: {:?}",
-                    agg.name,
-                    reader.num_batches()
-                );
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
                 value.push(batch);
             }

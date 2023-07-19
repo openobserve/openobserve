@@ -48,6 +48,12 @@ pub async fn search(
     if files.is_empty() {
         return Ok((HashMap::new(), ScanStats::default()));
     }
+    log::info!(
+        "search->storage: org {}, stream {}, load file_list num {}",
+        &sql.org_id,
+        &sql.stream_name,
+        files.len(),
+    );
 
     // filter file_list
     let mut not_exists_files: Vec<String> = Vec::new();

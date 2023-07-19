@@ -96,7 +96,7 @@ pub async fn sql(
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        log::info!("Query agg sql: {}", orig_agg_sql.0);
+        // log::info!("Query agg sql: {}", orig_agg_sql.0);
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
         if meta_sql.is_ok() {
@@ -216,7 +216,7 @@ async fn exec_query(
     };
 
     // Debug SQL
-    log::info!("Query sql: {}", query);
+    // log::info!("Query sql: {}", query);
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,

@@ -592,17 +592,17 @@ impl Sql {
             }
         }
 
-        log::info!(
-            "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
-            sql.stream_name,
-            sql.meta.fields,
-            sql.meta.quick_text,
-            sql.fulltext,
-            sql.meta.time_range,
-            sql.meta.order_by,
-            sql.meta.offset,
-            sql.meta.limit,
-        );
+        // log::info!(
+        //     "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
+        //     sql.stream_name,
+        //     sql.meta.fields,
+        //     sql.meta.quick_text,
+        //     sql.fulltext,
+        //     sql.meta.time_range,
+        //     sql.meta.order_by,
+        //     sql.meta.offset,
+        //     sql.meta.limit,
+        // );
 
         Ok(sql)
     }
