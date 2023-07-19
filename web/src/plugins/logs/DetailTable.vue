@@ -392,7 +392,7 @@ export default defineComponent({
     const tab = ref("table");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
-    const shouldWrapValues: any = ref(false);
+    const shouldWrapValues: any = ref(true);
     const searchObj = useLogs();
     const $q = useQuasar();
 
