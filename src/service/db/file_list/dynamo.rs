@@ -197,7 +197,7 @@ pub async fn query(
     Ok(resp?)
 }
 
-pub async fn get_file_list(
+pub async fn get_stream_file_list(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -218,6 +218,12 @@ pub async fn get_file_list(
         })
         .collect())
 }
+
+/* pub async fn get_file_list(time_min: i64, time_max: i64) -> Result<Vec<String>, anyhow::Error> {
+     let client = DYNAMO_DB_CLIENT.get().await;
+     client.scan().table_name(&CONFIG.common.dynamo_file_list_table).filter_expression(input)
+
+} */
 
 pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     let file_columns = file.splitn(5, '/').collect::<Vec<&str>>();

@@ -32,8 +32,14 @@ pub async fn get_file_list(
     time_max: i64,
 ) -> Result<Vec<String>, anyhow::Error> {
     if CONFIG.common.use_dynamo_meta_store {
-        db::file_list::dynamo::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
-            .await
+        db::file_list::dynamo::get_stream_file_list(
+            org_id,
+            stream_name,
+            stream_type,
+            time_min,
+            time_max,
+        )
+        .await
     } else {
         file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
     }

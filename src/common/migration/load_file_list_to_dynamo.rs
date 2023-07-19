@@ -129,6 +129,6 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         total_count
     );
 
-    file_list::dynamo::batch_write(file_keys).await?;
+    file_list::dynamo::batch_write(&file_keys).await?;
     Ok(count)
 }
