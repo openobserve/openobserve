@@ -2,9 +2,10 @@ import { ref, watch, reactive } from "vue";
 import queryService from "../../src/services/search";
 import { useStore } from "vuex";
 
-export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
+export const useSearchApi = (data: any, selectedTimeObj: any, props: any, emit: any) => {
   const state = reactive({
     data: [],
+    selectedTimeObj,
     loading: false,
     errorDetail: "",
   });
@@ -14,11 +15,9 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
   let controller: AbortController | null = null;
 
   const loadData = async () => {
-    if (controller) {
-      controller.abort(); 
-    }
-
-    controller = new AbortController(); 
+    console.log("loadData");
+    
+    const controller = new AbortController(); 
     state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
@@ -29,6 +28,7 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
     const timestamps = selectedTimeObj.value;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
+    console.log("timestamps", timestamps);
     if (
       timestamps.start_time != "Invalid Date" &&
       timestamps.end_time != "Invalid Date"
@@ -38,7 +38,8 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
       endISOTimestamp =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
     }
-
+ console.log("Query data:", queryData);
+ console.log("Timestamps:", timestamps);
     const query = {
       query: {
         sql: replaceQueryValue(queryData),
@@ -48,13 +49,15 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
         size: 0,
       },
     };
+ console.log("Query:", query);
 
     state.loading = true;
+console.log("Calling search API");
 
     if (
-      props.data.fields.stream_type == "metrics" &&
+      props.data.fields.stream_type === "metrics" &&
       props.data.customQuery &&
-      props.data.queryType == "promql"
+      props.data.queryType === "promql"
     ) {
       console.log("Calling metrics_query_range API");
       try {
@@ -65,7 +68,6 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
           },
-          { signal: controller.signal }
         ); 
 
         state.data = res.data.data;
@@ -84,8 +86,7 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
             query: query,
             page_type: props.data.fields.stream_type,
           },
-          { signal: controller.signal }
-        ); // Pass the signal to the API call
+        ); 
 
         state.data = res.data.hits;
         state.errorDetail = "";
@@ -97,12 +98,18 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
     }
   };
 
-  watch(
-    () => [selectedTimeObj],
-    () => {
-      loadData();
-    }
-  );
+    watch(
+      [() => state.data, () => state.selectedTimeObj],
+      async (
+        [newConfigs, newTimerange],
+        [oldConfigs, oldTimerange],
+        onInvalidate
+      ) => {
+        loadData();
+      }
+    );
+    
+  
 
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
@@ -170,9 +177,9 @@ export const useSearchApi = (selectedTimeObj: any, props: any, emit: any) => {
         break;
     }
   };
-
   return {
     ...state,
     loadData,
+    data: state.data,
   };
 };

@@ -1,10 +1,11 @@
 <template>
     <div>
+        
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref } from "vue";
+import { defineComponent, watch, ref, onMounted } from "vue";
 import { useSearchApi } from "@/composables/useSearchApi";
 
 export default defineComponent({
@@ -17,33 +18,31 @@ export default defineComponent({
         data: {
             required: true,
             type: Object,
-        }
+        },
     },
-    setup(props) {
+    setup(props, context) {
         const chartData = ref([]);
-        console.log("propsss", props.selectedTimeObj);
-        
-        const { data, loadData } = useSearchApi( props.selectedTimeObj, props, (event: any) => {
-            console.log("data",data);
-            
-            console.error(event);
-        });
-console.log("data", data.value);
+        const error = ref("");
+        console.log("props.selectedTimeObj", props.selectedTimeObj);
+        console.log("props.data", props.data);
 
-        watch(() => data.value, (newData) => {
-            chartData.value = newData;
-            console.log('Chart data updated:', newData);
-        });
+        const { loadData, data, errorDetail } = useSearchApi(
+            props.data,
+            props.selectedTimeObj,
+            props,
+            context.emit
+        );
 
-        watch(() => props.selectedTimeObj, (newTimeObj) => {
-            if (newTimeObj.start_time && newTimeObj.end_time) {
-                loadData();
-                console.log("Data loaded");
-            }
+        onMounted(() => {
+            loadData();
         });
 
         return {
+            
+            loadData,
+            data,
             chartData,
+            error,
         };
     },
 });
