@@ -60,13 +60,11 @@ async fn create_file_list_table(
     table_name: &str,
 ) -> Result<(), aws_sdk_dynamodb::Error> {
     let tables = client.list_tables().send().await?;
-    if tables
+    if !tables
         .table_names()
         .unwrap_or(&[])
         .contains(&table_name.to_string())
     {
-        log::info!("Table {} already exists", table_name);
-    } else {
         log::info!("Table not found, creating table {}", table_name);
         let key_schema = vec![
             KeySchemaElement::builder()
