@@ -137,7 +137,9 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
                             :icon="outlinedAdd"
                             size="0.4rem"
                             class="q-mr-none"
-                            @click.stop="addLabelToEditor(props.row.name)"
+                            @click.stop="
+                              addValueToEditor(props.row.name, '', '=')
+                            "
                             round
                           />
                         </div>

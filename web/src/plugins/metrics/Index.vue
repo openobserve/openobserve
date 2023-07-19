@@ -87,10 +87,15 @@
                 <div class="q-pb-xs text-bold">PromQL:</div>
                 <div
                   v-if="searchObj.data.metrics.selectedMetric?.help?.length"
-                  class="flex items-center justify-start q-pb-sm"
+                  class="q-pb-sm"
+                  style="display: inline"
                 >
-                  <q-icon name="info" style="font-size: 16px" title="Info" />
-                  <div
+                  <q-icon
+                    name="info"
+                    style="font-size: 16px; display: inline-block"
+                    title="Info"
+                  />
+                  <span
                     class="q-pl-xs info-message"
                     :style="{
                       color:
@@ -112,7 +117,7 @@
                       "
                       >|</span
                     >{{ searchObj.data.metrics.selectedMetric.help }}
-                  </div>
+                  </span>
                 </div>
 
                 <query-editor
@@ -239,7 +244,11 @@ import useMetrics from "@/composables/useMetrics";
 import { Parser } from "node-sql-parser";
 
 import streamService from "@/services/stream";
-import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
+import {
+  b64DecodeUnicode,
+  b64EncodeUnicode,
+  parsePromQlQuery,
+} from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
@@ -770,9 +779,34 @@ export default defineComponent({
       }
     }
     const addLabelToEditor = (label) => {
-      metricsQueryEditorRef.value.setValue(
-        dashboardPanelData.data.query + label
-      );
+      try {
+        const parsedQuery = parsePromQlQuery(searchObj.data.query);
+        let query = "";
+        if (!parsedQuery.label.hasLabels) {
+          query = dashboardPanelData.data.query + `{${label}}`;
+        } else {
+          query =
+            dashboardPanelData.data.query.slice(
+              0,
+              parsedQuery.label.position.end
+            ) +
+            (dashboardPanelData.data.query[
+              parsedQuery.label.position.end - 1
+            ] !== "," &&
+            parsedQuery.label.position.end - parsedQuery.label.position.start >
+              1
+              ? ","
+              : "") +
+            label +
+            dashboardPanelData.data.query.slice(
+              parsedQuery.label.position.end,
+              dashboardPanelData.data.query.length
+            );
+        }
+        metricsQueryEditorRef.value.setValue(query);
+      } catch (e) {
+        console.log(e);
+      }
     };
 
     const onSplitterUpdate = () => {
