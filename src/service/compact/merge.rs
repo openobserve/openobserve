@@ -23,7 +23,6 @@ use crate::common::infra::{
     cache,
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, FILE_EXT_PARQUET},
-    db::etcd,
     dist_lock, ider, metrics, storage,
 };
 use crate::common::json;
@@ -312,10 +311,8 @@ async fn merge_files(
     let mut new_file_size = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
-    for (new_files_num, (file, size)) in files_with_size.iter().enumerate() {
-        if new_files_num > etcd::MAX_OPS_PER_TXN
-            || new_file_size + size > CONFIG.compact.max_file_size
-        {
+    for (_new_files_num, (file, size)) in files_with_size.iter().enumerate() {
+        if new_file_size + size > CONFIG.compact.max_file_size {
             break;
         }
         new_file_size += size;
