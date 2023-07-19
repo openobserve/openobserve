@@ -261,6 +261,10 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
+    #[env_config(name = "ZO_METRIC_FILE_SIZE_MULTIPLIER", default = 10)]
+    pub metric_file_size_multiplier: u64,
+    #[env_config(name = "ZO_METRIC_RETENTION_MULTIPLIER", default = 3)]
+    pub metric_retention_multiplier: u64,
 }
 
 #[derive(EnvConfig)]

@@ -184,7 +184,7 @@ impl Manager {
         };
 
         let desired_size = if stream_type.eq(&StreamType::Metrics) {
-            CONFIG.limit.max_file_size_on_disk as i64 * 4
+            (CONFIG.limit.max_file_size_on_disk * CONFIG.limit.metric_file_size_multiplier) as i64
         } else {
             CONFIG.limit.max_file_size_on_disk as i64
         };
@@ -326,6 +326,13 @@ impl RwFile {
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
+        let ttl = if stream_type.eq(&StreamType::Metrics) {
+            chrono::Utc::now().timestamp()
+                + (CONFIG.limit.max_file_retention_time * CONFIG.limit.metric_retention_multiplier)
+                    as i64
+        } else {
+            chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
+        };
         RwFile {
             use_cache,
             file,
@@ -335,7 +342,7 @@ impl RwFile {
             stream_type,
             dir: dir_path,
             name: file_name,
-            expired: chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64,
+            expired: ttl,
         }
     }
 
