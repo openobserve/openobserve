@@ -55,7 +55,7 @@ use openobserve::{
         http::router::*,
     },
     job,
-    service::{db, router, users},
+    service::{db, file_list, router, users},
 };
 
 #[cfg(feature = "profiling")]
@@ -297,6 +297,15 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .value_name("prefix")
                         .help("only migrate specified prefix, default is all"),
                 ),
+            clap::Command::new("delete-parquet")
+                .about("delete parquet files from s3 and file_list")
+                .arg(
+                    clap::Arg::new("file")
+                        .short('f')
+                        .long("file")
+                        .value_name("file")
+                        .help("the parquet file name"),
+                ),
         ])
         .get_matches();
 
@@ -365,7 +374,17 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 migration::load_file_list_to_dynamo::load(prefix).await?
             }
         }
-
+        "delete-parquet" => {
+            let file = command.get_one::<String>("file").unwrap();
+            match file_list::delete_parquet_file(file, true).await {
+                Ok(_) => {
+                    println!("delete parquet file {} succeeded", file);
+                }
+                Err(e) => {
+                    println!("delete parquet file {} failed, error: {}", file, e);
+                }
+            }
+        }
         _ => {
             return Err(anyhow::anyhow!("unsupport sub command: {name}"));
         }

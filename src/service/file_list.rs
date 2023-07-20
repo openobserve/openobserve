@@ -82,6 +82,14 @@ pub fn calculate_local_files_size(files: &[String]) -> Result<u64, anyhow::Error
 
 // Delete one parquet file and update the file list
 pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        delete_parquet_file_dynamo(key, file_list_only).await
+    } else {
+        delete_parquet_file_s3(key, file_list_only).await
+    }
+}
+
+async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
     if columns[0] != "files" || columns.len() < 9 {
         return Ok(());
@@ -112,6 +120,17 @@ pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), 
     storage::put(&new_file_list_key, compressed_bytes.into()).await?;
     db::file_list::progress(key, meta, deleted, false).await?;
     db::file_list::broadcast::send(&[file_data]).await?;
+
+    // delete the parquet whaterever the file is exists or not
+    if !file_list_only {
+        _ = storage::del(&[key]).await;
+    }
+    Ok(())
+}
+
+async fn delete_parquet_file_dynamo(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
+    // delete from file list in dynamo
+    db::file_list::dynamo::batch_delete(&[key.to_string()]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
