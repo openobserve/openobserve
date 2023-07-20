@@ -191,8 +191,8 @@ export const addVariable = async (
 ) => {
 
   if (
-    !store.state.allDashboardList ||
-    store.state.allDashboardList.length == 0
+    !store.state.organizationData.allDashboardList ||
+    store.state.organizationData.allDashboardList.length == 0
   ) {
     await getAllDashboards(store);
   }

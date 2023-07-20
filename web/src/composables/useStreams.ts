@@ -12,9 +12,52 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import { reactive } from "vue";
+import { useQuasar } from "quasar";
+import { useStore } from "vuex";
+import StreamService from "@/services/stream";
 
 const useStreams = () => {
+  const store = useStore();
+  const $q = useQuasar();
+
+  const getStreams = async (streamName: string, schema: boolean) => {
+    try {
+      if (
+        store.state.organizationData.streams[streamName] == undefined ||
+        (schema != false &&
+          store.state.organizationData.streams[streamName].schema != schema)
+      ) {
+        return await StreamService.nameList(
+          store.state.selectedOrganization.identifier,
+          streamName,
+          schema
+        )
+          .then((res: any) => {
+            const streamObject: {
+              name: string;
+              list: any;
+              schema: boolean;
+            } = {
+              name: streamName || "all",
+              list: res.data.list,
+              schema: schema,
+            };
+
+            store.dispatch("setStreams", streamObject);
+            return streamObject;
+          })
+          .catch((e: any) => {
+            throw new Error(e.message);
+          });
+      } else {
+        return store.state.organizationData.streams[streamName];
+      }
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  };
+
+  return { getStreams };
 };
 
 export default useStreams;
