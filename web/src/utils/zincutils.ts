@@ -14,7 +14,7 @@
 
 import config from "../aws-exports";
 import { ref, onMounted, onUnmounted } from "vue";
-import { Dialog } from "quasar";
+import { useQuasar, type QNotifyCreateOptions } from "quasar";
 
 const useLocalStorage = (
   key: string,
@@ -346,4 +346,25 @@ export const formatSizeFromMB = (sizeInMB: string) => {
   }
 
   return `${size.toFixed(2)} ${units[index]}`;
+};
+
+export const ooNotify = (timeout: number = 0) => {
+  const $q = useQuasar();
+
+  const notify: QNotifyCreateOptions = {
+    type: "positive",
+    message: "Waiting for response...",
+    timeout: timeout,
+    actions: [
+      {
+        icon: "close",
+        color: "white",
+        handler: () => {
+          /* ... */
+        },
+      },
+    ],
+  };
+
+  return $q.notify(notify);
 };

@@ -27,23 +27,25 @@
             "
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'"
-class="absolute beta-text"
+          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
             >Beta</span
           >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
         <ThemeSwitcher></ThemeSwitcher>
-        <div class="headerMenu float-left" v-if="store.state.organizationData.quotaThresholdMsg">
+        <div
+          class="headerMenu float-left"
+          v-if="store.state.organizationData.quotaThresholdMsg"
+        >
           <div
             type="warning"
             icon="cloud"
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs"
-class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -125,8 +127,8 @@ class="warning" />{{
           <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey"
-text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -185,7 +187,7 @@ text-color="white">
       </q-list>
     </q-drawer>
 
-    <q-page-container v-if="isLoading" :key="store.state.selectedOrganization.identifier">
+    <q-page-container :key="store.state.selectedOrganization.identifier">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
@@ -650,7 +652,7 @@ export default defineComponent({
     }
 
     const redirectToParentRoute = (machedRoutes: any) => {
-      console.log(machedRoutes)
+      console.log(machedRoutes);
       if (machedRoutes.length > 2) {
         if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
           machedRoutes[machedRoutes.length - 2].children.forEach(

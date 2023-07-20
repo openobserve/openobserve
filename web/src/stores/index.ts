@@ -31,6 +31,8 @@ const organizationObj = {
   organizationPasscode: "",
   allDashboardList: [],
   quotaThresholdMsg: "",
+  functions: [],
+  streams: {},
 };
 
 export default createStore({
@@ -92,6 +94,15 @@ export default createStore({
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
     },
+    setFunctions(state, payload) {
+      state.organizationData.functions = payload;
+    },
+    setStreams(state, payload) {
+      state.organizationData.streams[payload.name] = payload;
+    },
+    resetStreams(state, payload) {
+      state.organizationData.streams = payload;
+    },
     // setSearch(state, payload) {
     //   state.search = payload;
     // },
@@ -147,6 +158,15 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setFunctions(context, payload) {
+      context.commit("setFunctions", payload);
+    },
+    setStreams(context, payload) {
+      context.commit("setStreams", payload);
+    },
+    resetStreams(context, payload) {
+      context.commit("resetStreams", payload);
     },
     // setSearch(context, payload) {
     //   context.commit("setSearch", payload);
