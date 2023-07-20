@@ -1,8 +1,13 @@
 import { ref, watch, reactive } from "vue";
-import queryService from "../../src/services/search";
+import queryService from "../services/search";
 import { useStore } from "vuex";
 
-export const useSearchApi = (data: any, selectedTimeObj: any, props: any, emit: any) => {
+export const useSearchApi = (
+  data: any,
+  selectedTimeObj: any,
+  props: any,
+  emit: any
+) => {
   const state = reactive({
     data: [],
     selectedTimeObj,
@@ -16,16 +21,17 @@ export const useSearchApi = (data: any, selectedTimeObj: any, props: any, emit: 
 
   const loadData = async () => {
     console.log("loadData");
-    
-    const controller = new AbortController(); 
+
+    const controller = new AbortController();
     state.loading = true;
 
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
       return;
     }
+    console.log("queryDataa", props.data.query);
 
     const queryData = props.data.query;
-    const timestamps = selectedTimeObj.value;
+    const timestamps = props.selectedTimeObj;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
     console.log("timestamps", timestamps);
@@ -38,8 +44,8 @@ export const useSearchApi = (data: any, selectedTimeObj: any, props: any, emit: 
       endISOTimestamp =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
     }
- console.log("Query data:", queryData);
- console.log("Timestamps:", timestamps);
+    console.log("Query data:", queryData);
+    console.log("Timestamps:", timestamps);
     const query = {
       query: {
         sql: replaceQueryValue(queryData),
@@ -49,67 +55,73 @@ export const useSearchApi = (data: any, selectedTimeObj: any, props: any, emit: 
         size: 0,
       },
     };
- console.log("Query:", query);
+    console.log("Query:", query);
 
     state.loading = true;
-console.log("Calling search API");
+    console.log("Calling search API");
 
     if (
-      props.data.fields.stream_type === "metrics" &&
+      props.data.fields?.stream_type == "metrics" &&
       props.data.customQuery &&
-      props.data.queryType === "promql"
+      props.data.queryType == "promql"
     ) {
       console.log("Calling metrics_query_range API");
-      try {
-        const res = await queryService.metrics_query_range(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: replaceQueryValue(queryData),
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-          },
-        ); 
-
-        state.data = res.data.data;
-        state.errorDetail = "";
-      } catch (error) {
-        processApiError(error, "promql");
-      } finally {
-        state.loading = false;
-      }
+      await queryService
+        .metrics_query_range({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: replaceQueryValue(queryData),
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+        })
+        .then((res) => {
+          // Set searchQueryData.data to the API response data
+          state.data = res.data.data;
+          // Clear errorDetail
+          state.errorDetail = "";
+        })
+        .catch((error) => {
+          // Process API error for "promql"
+          processApiError(error, "promql");
+        })
+        .finally(() => {
+          state.loading = false;
+        });
     } else {
-      console.log("Calling search API");
-      try {
-        const res = await queryService.search(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: query,
-            page_type: props.data.fields.stream_type,
-          },
-        ); 
+      console.log("Calling search APiii");
 
-        state.data = res.data.hits;
-        state.errorDetail = "";
-      } catch (error) {
-        processApiError(error, "sql");
-      } finally {
-        state.loading = false;
-      }
+      // Call search API
+      await queryService
+        .search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: query,
+          page_type: props.data.fields?.stream_type,
+        })
+        .then((res) => {
+          // Set searchQueryData.data to the API response hits
+          state.data = res.data.hits;
+          // Clear errorDetail
+          state.errorDetail = "";
+        })
+        .catch((error) => {
+          // Process API error for "sql"
+          processApiError(error, "sql");
+        })
+        .finally(() => {
+          state.loading = false;
+        });
     }
   };
 
-    watch(
-      [() => state.data, () => state.selectedTimeObj],
-      async (
-        [newConfigs, newTimerange],
-        [oldConfigs, oldTimerange],
-        onInvalidate
-      ) => {
-        loadData();
-      }
-    );
-    
-  
+  watch(
+    () => [props.data, state.selectedTimeObj],
+    async (
+      [newConfigs, newTimerange],
+      [oldConfigs, oldTimerange],
+      onInvalidate
+    ) => {
+      loadData();
+    }
+  );
 
   const isQueryDependentOnTheVariables = () => {
     const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
@@ -128,15 +140,15 @@ console.log("Calling search API");
         (it: any) => !it.isLoading
       );
 
-        if (dependentAvailableVariables.length == dependentVariables.length) {
-          return true;
-        } else {
-          return false;
-        }
-      } else {
+      if (dependentAvailableVariables.length == dependentVariables.length) {
         return true;
+      } else {
+        return false;
       }
-    };
+    } else {
+      return true;
+    }
+  };
 
   const replaceQueryValue = (query: any) => {
     if (currentDependentVariablesData.value?.length) {
@@ -150,7 +162,6 @@ console.log("Calling search API");
   };
 
   const processApiError = async (error: any, type: any) => {
-
     switch (type) {
       case "promql": {
         const errorDetailValue = error.response?.data?.error || error.message;

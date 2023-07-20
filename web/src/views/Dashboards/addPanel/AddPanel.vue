@@ -60,10 +60,14 @@
                 <div class="layout-panel-container col scroll" style="height:100%;">
                   <Layout />
                   <q-separator />
-                  <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables" :selectedTimeDate="dashboardPanelData.meta.dateTime" 
-                      @variablesData="variablesDataUpdated"/>
-                  <div style="flex:1;">
+                  <VariablesValueSelector :variablesConfig="currentDashboardData.data?.variables"
+                    :selectedTimeDate="dashboardPanelData.meta.dateTime" @variablesData="variablesDataUpdated" />
+                  <!-- <div style="flex:1;">
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
+                  </div> -->
+                  <div style="flex:1;">
+                    <MultiQueryChart :selectedTimeObj="dashboardPanelData.meta.dateTime" :data="chartData">
+                    </MultiQueryChart>
                   </div>
                   <DashboardErrorsComponent :errors="errorData" />
                   <q-separator />
@@ -120,6 +124,7 @@ import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
+import MultiQueryChart from "../../../components/MultiQueryChart.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -133,7 +138,8 @@ export default defineComponent({
     DashboardErrorsComponent,
     PanelSidebar,
     ConfigPanel,
-    VariablesValueSelector
+    VariablesValueSelector,
+    MultiQueryChart,
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
