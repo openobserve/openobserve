@@ -1,6 +1,4 @@
 import searchService from "@/services/search";
-import { getConsumableDateTime } from "@/utils/commons";
-import { clone, cloneDeep } from "lodash-es";
 import { nextTick, ref } from "vue";
 import { useStore } from "vuex";
 
@@ -20,16 +18,37 @@ const usePromlqSuggestions = () => {
       endTime: new Date().getTime() * 1000,
     },
   });
-  const autoCompleteKeywords: any = ref([]);
   const store = useStore();
   const autoCompletePromqlKeywords: any = ref([]);
   const metricKeywords: any = ref([]);
 
   const parsePromQlQuery = (query: string) => {
+    const meta = {
+      metricName: "" as string | null,
+      label: {
+        hasLabels: false,
+        position: {
+          start: 0,
+          end: 0,
+        },
+        labels: {},
+      },
+    };
     // Extract metric name
     const metricNameMatch = query.match(/(\w+)\{/);
     const metricName = metricNameMatch ? metricNameMatch[1] : null;
-
+    //Check if curly brace is present
+    const curlyBracesRegex = /{([^{}]*?)}/;
+    const curlyBracesRegexMatch = query.match(curlyBracesRegex);
+    if (curlyBracesRegexMatch) {
+      meta.label.hasLabels = true;
+      // Get start and end position from regex return object
+      meta.label.position.start = curlyBracesRegexMatch.index || 0;
+      meta.label.position.end =
+        (curlyBracesRegexMatch.index || 0) +
+        curlyBracesRegexMatch[1].length +
+        1;
+    }
     // Extract labels
     const labelsMatch = query.match(/\{(.+?)\}/);
     const labels: { [key: string]: string } = {};
@@ -45,8 +64,9 @@ const usePromlqSuggestions = () => {
           if (key && value) labels[key] = value;
         });
     }
-
-    return { metricName, labels };
+    meta["label"]["labels"] = labels;
+    meta["metricName"] = metricName;
+    return meta;
   };
 
   function analyzeLabelFocus(query: string, cursorIndex: number) {
@@ -128,9 +148,10 @@ const usePromlqSuggestions = () => {
 
   const getSuggestions = async () => {
     try {
-      const { metricName, labels }: any = parsePromQlQuery(
-        autoCompleteData.value.query
-      );
+      const parsedQuery: any = parsePromQlQuery(autoCompleteData.value.query);
+      const metricName = parsedQuery?.metricName || "";
+      const labels = parsedQuery?.label?.labels || {};
+
       autoCompletePromqlKeywords.value = [];
       const startISOTimestamp: any = autoCompleteData.value.dateTime.startTime;
       const endISOTimestamp: any = autoCompleteData.value.dateTime.endTime;
@@ -268,6 +289,7 @@ const usePromlqSuggestions = () => {
     autoCompletePromqlKeywords,
     getSuggestions,
     updateMetricKeywords,
+    parsePromQlQuery,
   };
 };
 

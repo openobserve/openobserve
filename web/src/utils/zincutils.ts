@@ -333,3 +333,17 @@ export const formatLargeNumber = (number: number) => {
     return number.toString();
   }
 };
+
+export const formatSizeFromMB = (sizeInMB: string) => {
+  let size = parseFloat(sizeInMB);
+
+  const units = ["KB", "MB", "GB", "TB", "PB"];
+  let index = 1; // Start from MB
+
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index++;
+  }
+
+  return `${size.toFixed(2)} ${units[index]}`;
+};
