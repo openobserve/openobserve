@@ -66,8 +66,7 @@
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div> -->
                   <div style="flex:1;">
-                    <MultiQueryChart :selectedTimeObj="dashboardPanelData.meta.dateTime" :data="chartData">
-                    </MultiQueryChart>
+                    <MultiQueryChart :selectedTimeObj="dashboardPanelData.meta.dateTime" :data="chartData"/>
                   </div>
                   <DashboardErrorsComponent :errors="errorData" />
                   <q-separator />

@@ -7,6 +7,7 @@
 <script lang="ts">
 import { defineComponent, watch, ref, onMounted } from "vue";
 import { useSearchApi } from "@/composables/useSearchApi";
+import { useDataTransform } from "@/composables/useDataTransform";
 
 export default defineComponent({
   name: "MultiQueryChart",
@@ -33,8 +34,11 @@ export default defineComponent({
       context.emit
     );
 
+    const {renderPromQlBasedChart} = useDataTransform(props);
+
     onMounted(() => {
       loadData();
+      renderPromQlBasedChart();
     });
 
     return {

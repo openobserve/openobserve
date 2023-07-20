@@ -2,7 +2,7 @@ import { onMounted, reactive, ref } from 'vue';
 import Plotly from "plotly.js"
 import { useStore } from "vuex";
 
-const renderPromQlBasedChart = (props: any) => {
+export const useDataTransform = (props: any) => {
   const searchQueryData = reactive({
     data: [] as any | Array<any>,
     loading: false,
@@ -10,7 +10,7 @@ const renderPromQlBasedChart = (props: any) => {
   const plotRef: any = ref(null);
   const store = useStore();
 
-  // console.log("props", props);
+  console.log("props", props);
   const renderPromQlBasedChart = () => {
     console.log("propssssssssss");
 
@@ -149,6 +149,6 @@ const renderPromQlBasedChart = (props: any) => {
   return {
     searchQueryData,
     plotRef,
+    renderPromQlBasedChart,
   };
 };
-export default renderPromQlBasedChart ;
