@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div ref="plotref" id="plotly_chart" />
+  <div ref="plotref" id="plotly_chart" class="logs-timeline-chart" />
 </template>
 
 <script lang="ts">
@@ -26,7 +26,7 @@ export default defineComponent({
   name: "logBarChart",
   emits: ["updated:chart"],
   setup(props, { emit }) {
-      const store = useStore();
+    const store = useStore();
     const plotref: any = ref(null);
     const zoomFlag: any = ref(false);
     const trace: any = {
@@ -41,16 +41,19 @@ export default defineComponent({
       },
     };
     const getThemeLayoutOptions = () => ({
-      paper_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
-      plot_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
+      paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+      plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
       font: {
-        size: 12 ,
-        color: store.state.theme === 'dark' ? '#fff' : '#181a1b'
+        size: 12,
+        color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+      },
+    });
+    watch(
+      () => store.state.theme,
+      () => {
+        Plotly.update(plotref.value, {}, getThemeLayoutOptions());
       }
-    })
-    watch(() => store.state.theme, () => {
-      Plotly.update(plotref.value, {}, getThemeLayoutOptions())
-    })
+    );
     const layout: any = {
       title: {
         text: "",
@@ -108,13 +111,12 @@ export default defineComponent({
             dtickrange: ["M12", null],
             value: "%Y",
           },
-          
         ],
       },
       yaxis: {
         fixedrange: true,
       },
-       ...getThemeLayoutOptions(),
+      ...getThemeLayoutOptions(),
     };
     onMounted(async () => {
       await Plotly.newPlot(plotref.value, [trace], layout, {
@@ -123,6 +125,7 @@ export default defineComponent({
       });
 
       plotref.value.on("plotly_relayout", onPlotZoom);
+      plotref.value.on("", onPlotZoom);
     });
 
     onUpdated(async () => {
@@ -184,7 +187,7 @@ export default defineComponent({
         zoomFlag.value = false;
       }
     };
-  
+
     return {
       plotref,
       reDraw,
@@ -194,3 +197,20 @@ export default defineComponent({
   },
 });
 </script>
+<style lang="scss">
+.logs-timeline-chart {
+  .main-svg {
+    .infolayer {
+      .g-gtitle {
+        text {
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+          pointer-events: all;
+        }
+      }
+    }
+  }
+}
+</style>

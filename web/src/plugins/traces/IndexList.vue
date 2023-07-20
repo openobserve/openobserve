@@ -64,7 +64,7 @@
                     style="margin-right: 0.375rem"
                     size="0.4rem"
                     class="q-mr-sm"
-                    @click.stop="addToFilter(props.row.name)"
+                    @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
                 </div>
@@ -95,7 +95,7 @@
                         style="margin-right: 0.375rem"
                         size="0.4rem"
                         class="q-mr-sm"
-                        @click.stop="addToFilter(props.row.name)"
+                        @click.stop="addToFilter(`${props.row.name}=''`)"
                         round
                       />
                     </div>

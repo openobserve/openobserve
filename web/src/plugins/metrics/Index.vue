@@ -87,18 +87,37 @@
                 <div class="q-pb-xs text-bold">PromQL:</div>
                 <div
                   v-if="searchObj.data.metrics.selectedMetric?.help?.length"
-                  class="flex items-center justify-start q-pb-sm"
+                  class="q-pb-sm"
+                  style="display: inline"
                 >
-                  <q-icon name="info" style="font-size: 16px" title="Info" />
-                  <div
+                  <q-icon
+                    name="info"
+                    style="font-size: 16px; display: inline-block"
+                    title="Info"
+                  />
+                  <span
                     class="q-pl-xs info-message"
                     :style="{
                       color:
                         store.state.theme === 'light' ? '#049cbc' : '#3fd5f4',
                     }"
                   >
-                    {{ searchObj.data.metrics.selectedMetric.help }}
-                  </div>
+                    <span
+                      v-show="searchObj.data.metrics.selectedMetric.type"
+                      class="text-capitalize"
+                      >{{ searchObj.data.metrics.selectedMetric.type }}</span
+                    >
+                    <span
+                      v-show="searchObj.data.metrics.selectedMetric.type"
+                      class="q-mx-xs"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-4'
+                          : 'text-grey-7'
+                      "
+                      >|</span
+                    >{{ searchObj.data.metrics.selectedMetric.help }}
+                  </span>
                 </div>
 
                 <query-editor
@@ -290,6 +309,7 @@ export default defineComponent({
       autoCompletePromqlKeywords,
       getSuggestions,
       updateMetricKeywords,
+      parsePromQlQuery,
     } = usePromqlSuggestions();
     const promqlKeywords = ref([]);
     const isMounted = ref(false);
@@ -756,9 +776,34 @@ export default defineComponent({
       }
     }
     const addLabelToEditor = (label) => {
-      metricsQueryEditorRef.value.setValue(
-        dashboardPanelData.data.query + label
-      );
+      try {
+        const parsedQuery = parsePromQlQuery(searchObj.data.query);
+        let query = "";
+        if (!parsedQuery.label.hasLabels) {
+          query = dashboardPanelData.data.query + `{${label}}`;
+        } else {
+          query =
+            dashboardPanelData.data.query.slice(
+              0,
+              parsedQuery.label.position.end
+            ) +
+            (dashboardPanelData.data.query[
+              parsedQuery.label.position.end - 1
+            ] !== "," &&
+            parsedQuery.label.position.end - parsedQuery.label.position.start >
+              1
+              ? ","
+              : "") +
+            label +
+            dashboardPanelData.data.query.slice(
+              parsedQuery.label.position.end,
+              dashboardPanelData.data.query.length
+            );
+        }
+        metricsQueryEditorRef.value.setValue(query);
+      } catch (e) {
+        console.log(e);
+      }
     };
 
     const onSplitterUpdate = () => {
