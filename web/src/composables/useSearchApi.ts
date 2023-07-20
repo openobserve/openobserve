@@ -20,7 +20,7 @@ export const useSearchApi = (
   let controller: AbortController | null = null;
 
   const loadData = async () => {
-    console.log("loadData");
+    // console.log("loadData");
 
     const controller = new AbortController();
     state.loading = true;
@@ -28,13 +28,13 @@ export const useSearchApi = (
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
       return;
     }
-    console.log("queryDataa", props.data.query);
+    // console.log("queryDataa", props.data.query);
 
     const queryData = props.data.query;
     const timestamps = props.selectedTimeObj;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
-    console.log("timestamps", timestamps);
+    // console.log("timestamps", timestamps);
     if (
       timestamps.start_time != "Invalid Date" &&
       timestamps.end_time != "Invalid Date"
@@ -44,8 +44,8 @@ export const useSearchApi = (
       endISOTimestamp =
         new Date(timestamps.end_time.toISOString()).getTime() * 1000;
     }
-    console.log("Query data:", queryData);
-    console.log("Timestamps:", timestamps);
+    // console.log("Query data:", queryData);
+    // console.log("Timestamps:", timestamps);
     const query = {
       query: {
         sql: replaceQueryValue(queryData),
@@ -55,17 +55,17 @@ export const useSearchApi = (
         size: 0,
       },
     };
-    console.log("Query:", query);
+    // console.log("Query:", query);
 
     state.loading = true;
-    console.log("Calling search API");
+    // console.log("Calling search API");
 
     if (
       props.data.fields?.stream_type == "metrics" &&
       props.data.customQuery &&
       props.data.queryType == "promql"
     ) {
-      console.log("Calling metrics_query_range API");
+      // console.log("Calling metrics_query_range API");
       await queryService
         .metrics_query_range({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -87,7 +87,7 @@ export const useSearchApi = (
           state.loading = false;
         });
     } else {
-      console.log("Calling search APiii");
+      // console.log("Calling search APiii");
 
       // Call search API
       await queryService
