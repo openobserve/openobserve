@@ -23,6 +23,7 @@ use tokio::sync::Semaphore;
 
 use crate::common::infra::{cache::file_data, config::CONFIG};
 use crate::common::meta::{
+    common::FileKey,
     search::Session as SearchSession,
     stream::{ScanStats, StreamParams},
     StreamType,
@@ -63,17 +64,6 @@ pub(crate) async fn create_context(
         ));
     }
 
-    // filter file_list
-    let mut not_exists_files: Vec<String> = Vec::new();
-    for file in files.iter() {
-        if file_list::get_file_meta(file).await.is_err() {
-            not_exists_files.push(file.clone());
-        }
-    }
-    if !not_exists_files.is_empty() {
-        files.retain(|f| !not_exists_files.contains(f));
-    }
-
     // calcuate scan size
     let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
@@ -105,7 +95,7 @@ pub(crate) async fn create_context(
         let deleted_files = cache_parquet_files(&files).await?;
         if !deleted_files.is_empty() {
             // remove deleted files
-            files.retain(|f| !deleted_files.contains(f));
+            files.retain(|f| !deleted_files.contains(&f.key));
         }
         log::info!(
             "promql->search->storage: load files {}, into memory cache done",
@@ -152,7 +142,7 @@ async fn get_file_list(
     stream_name: &str,
     time_range: (i64, i64),
     filters: &[(&str, &str)],
-) -> Result<Vec<String>> {
+) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
     let results = match file_list::get_file_list(
         org_id,
@@ -195,25 +185,25 @@ async fn get_file_list(
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>> {
+async fn cache_parquet_files(files: &[FileKey]) -> Result<Vec<String>> {
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
-        let file = file.clone();
+        let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            if !file_data::exist(&file) {
-                if let Err(e) = file_data::download(&file).await {
+            if !file_data::exist(&file_name) {
+                if let Err(e) = file_data::download(&file_name).await {
                     log::info!("promql->search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) = file_list::delete_parquet_file(&file, true).await {
+                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                             log::error!(
                                 "promql->search->storage: delete from file_list err: {}",
                                 e
                             );
                         }
-                        return Some(file);
+                        return Some(file_name);
                     }
                 }
             };

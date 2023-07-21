@@ -203,19 +203,13 @@ pub async fn get_stream_file_list(
     stream_type: StreamType,
     time_min: i64,
     time_max: i64,
-) -> Result<Vec<String>, anyhow::Error> {
+) -> Result<Vec<FileKey>, anyhow::Error> {
     let resp = query(org_id, stream_name, stream_type, Some((time_min, time_max))).await?;
     Ok(resp
         .iter()
         .filter(|v| v.count() > 0)
         .flat_map(|v| v.items().unwrap())
-        .map(|v| {
-            format!(
-                "files/{}/{}",
-                v.get("stream").unwrap().as_s().unwrap(),
-                v.get("file").unwrap().as_s().unwrap()
-            )
-        })
+        .map(FileKey::from)
         .collect())
 }
 

@@ -101,7 +101,7 @@ pub async fn delete_all(
         // delete files from s3
         // first fetch file list from local cache
         let files = file_list::get_file_list(org_id, stream_name, stream_type, 0, 0).await?;
-        match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
+        match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("[COMPACT] delete file failed: {}", e);
@@ -204,7 +204,7 @@ pub async fn delete_by_date(
         let files =
             file_list::get_file_list(org_id, stream_name, stream_type, time_range.0, time_range.1)
                 .await?;
-        match storage::del(&files.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await {
+        match storage::del(&files.iter().map(|v| v.key.as_str()).collect::<Vec<_>>()).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("[COMPACT] delete file failed: {}", e);
@@ -261,7 +261,8 @@ async fn delete_from_file_list(
     let mut file_list_days: HashSet<String> = HashSet::new();
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
-        let columns: Vec<_> = file.split('/').collect();
+        let file_name = file.key.clone();
+        let columns: Vec<_> = file_name.split('/').collect();
         let day_key = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
         file_list_days.insert(day_key);
         let hour_key = format!(
@@ -270,7 +271,7 @@ async fn delete_from_file_list(
         );
         let entry = hours_files.entry(hour_key).or_default();
         entry.push(FileKey {
-            key: file,
+            key: file_name,
             meta: FileMeta::default(),
             deleted: true,
         });
@@ -372,12 +373,12 @@ async fn write_file_list_dynamo(
         // set to dynamo db
         // retry 5 times
         for _ in 0..5 {
-            if let Err(e) = db::file_list::dynamo::batch_write(&put_items).await {
+            if let Err(e) = db::file_list::dynamo_db::batch_write(&put_items).await {
                 log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-            if let Err(e) = db::file_list::dynamo::batch_delete(&del_items).await {
+            if let Err(e) = db::file_list::dynamo_db::batch_delete(&del_items).await {
                 log::error!(
                     "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
                     e

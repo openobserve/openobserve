@@ -23,12 +23,15 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, ErrorCodes},
-};
 use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
 use crate::common::str::find;
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, ErrorCodes},
+    },
+    meta::common::FileKey,
+};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
@@ -610,7 +613,7 @@ impl Sql {
     /// match a source is a valid file or not
     pub async fn match_source(
         &self,
-        source: &str,
+        source: &FileKey,
         match_min_ts_only: bool,
         is_wal: bool,
         stream_type: StreamType,

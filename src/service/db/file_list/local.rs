@@ -54,7 +54,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
     } else {
         // retry 5 times
         for _ in 0..10 {
-            if let Err(e) = super::dynamo::write_file(&file_data).await {
+            if let Err(e) = super::dynamo_db::write_file(&file_data).await {
                 log::error!("[FILE_LIST] Error saving file to dynamo, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             } else {

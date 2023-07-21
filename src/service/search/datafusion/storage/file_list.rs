@@ -18,7 +18,7 @@ use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
-use crate::service::file_list;
+use crate::common::meta::common::FileKey;
 
 pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(DashMap::default);
 
@@ -30,18 +30,15 @@ pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     Ok(data.value().clone())
 }
 
-pub async fn set(session_id: &str, files: &[String]) {
+pub async fn set(session_id: &str, files: &[FileKey]) {
     let mut values = Vec::with_capacity(files.len());
     for file in files {
-        let meta = file_list::get_file_meta(file)
-            .await
-            .expect("file meta must have value");
-        let modified = Utc.timestamp_nanos(meta.max_ts * 1000);
-        let file = format!("/{}/$$/{}", session_id, file);
+        let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
+        let file_name = format!("/{}/$$/{}", session_id, file.key);
         values.push(ObjectMeta {
-            location: file.into(),
+            location: file_name.into(),
             last_modified: modified,
-            size: meta.compressed_size as usize,
+            size: file.meta.compressed_size as usize,
             e_tag: None,
         });
     }
@@ -62,6 +59,7 @@ pub fn clear(session_id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::meta::common::FileKey;
 
     #[actix_web::test]
     async fn test_storage_file_list() {
@@ -73,9 +71,14 @@ mod tests {
             compressed_size: 1,
         };
         let file_name = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet";
+        let file_key = FileKey {
+            key: file_name.to_string(),
+            meta: meta.clone(),
+            deleted: false,
+        };
         crate::common::infra::cache::file_list::set_file_to_cache(file_name, meta).unwrap();
         let session_id = "1234";
-        set(session_id, &[file_name.to_string()]).await;
+        set(session_id, &[file_key]).await;
 
         let get_resp = get(session_id);
         assert!(get_resp.unwrap().len() > 0);

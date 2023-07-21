@@ -21,11 +21,13 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::common::infra::{
-    cluster,
-    errors::{Error, ErrorCodes},
+use crate::common::{
+    infra::{
+        cluster,
+        errors::{Error, ErrorCodes},
+    },
+    meta::{common::FileKey, stream::ScanStats, StreamType},
 };
-use crate::common::meta::{stream::ScanStats, StreamType};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::db;
 
@@ -74,14 +76,14 @@ pub async fn search(
     let req_stype = req.stype;
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
-    let file_list = req.file_list.to_owned();
+    let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = info_span!("service:search:grpc:in_storage");
     let task2 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
-                storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
+                storage::search(&session_id2, sql2, &file_list, stream_type).await
             }
         }
         .instrument(storage_span),

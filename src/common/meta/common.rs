@@ -26,6 +26,16 @@ pub struct FileKey {
     pub deleted: bool,
 }
 
+impl FileKey {
+    pub fn from_file_name(file: &str) -> Self {
+        Self {
+            key: file.to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileMeta {
     pub min_ts: i64, // microseconds
@@ -104,12 +114,16 @@ impl From<&FileKey> for HashMap<String, AttributeValue> {
 
 impl From<&HashMap<String, AttributeValue>> for FileKey {
     fn from(data: &HashMap<String, AttributeValue>) -> Self {
-        let mut item = FileKey::default();
+        let mut item = FileKey {
+            key: format!(
+                "files/{}/{}",
+                data.get("stream").unwrap().as_s().unwrap(),
+                data.get("file").unwrap().as_s().unwrap()
+            ),
+            ..Default::default()
+        };
         for (k, v) in data {
             match k.as_str() {
-                "file" => {
-                    item.key = v.as_s().unwrap().to_string();
-                }
                 "deleted" => {
                     item.deleted = v.as_bool().unwrap().to_owned();
                 }

@@ -29,13 +29,13 @@ message SearchQuery {
 
 // Search request
 message SearchRequest {
-    Job                         job = 1;
-    string                   org_id = 2;
-    string              stream_type = 3;
-    SearchType                stype = 4;
-    SearchQuery               query = 5;
-    repeated string       file_list = 6;
-    repeated SearchAggRequest  aggs = 7;
+    Job                        job = 1;
+    string                  org_id = 2;
+    string             stream_type = 3;
+    SearchType               stype = 4;
+    SearchQuery              query = 5;
+    repeated FileKey     file_list = 6;
+    repeated SearchAggRequest aggs = 7;
 }
 
 // The response message containing the greetings

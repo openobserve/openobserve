@@ -30,9 +30,9 @@ pub async fn get_file_list(
     stream_type: StreamType,
     time_min: i64,
     time_max: i64,
-) -> Result<Vec<String>, anyhow::Error> {
+) -> Result<Vec<FileKey>, anyhow::Error> {
     if CONFIG.common.use_dynamo_meta_store {
-        db::file_list::dynamo::get_stream_file_list(
+        db::file_list::dynamo_db::get_stream_file_list(
             org_id,
             stream_name,
             stream_type,
@@ -41,28 +41,37 @@ pub async fn get_file_list(
         )
         .await
     } else {
-        file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)
+        let files = file_list::get_file_list(org_id, stream_name, stream_type, time_min, time_max)?;
+        let mut file_sizes = Vec::with_capacity(files.len());
+        for file in files {
+            let meta = get_file_meta(&file).await?;
+            file_sizes.push(FileKey {
+                key: file,
+                meta,
+                deleted: false,
+            });
+        }
+        Ok(file_sizes)
     }
 }
 
 #[inline]
 pub async fn get_file_meta(file: &str) -> Result<FileMeta, anyhow::Error> {
     if CONFIG.common.use_dynamo_meta_store {
-        db::file_list::dynamo::get_file_meta(file).await
+        db::file_list::dynamo_db::get_file_meta(file).await
     } else {
         file_list::get_file_from_cache(file)
     }
 }
 
 #[inline]
-pub async fn calculate_files_size(files: &[String]) -> Result<ScanStats, anyhow::Error> {
+pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats, anyhow::Error> {
     let mut stats = ScanStats::new();
     stats.files = files.len() as u64;
     for file in files {
-        let resp = get_file_meta(file).await?;
-        stats.records += resp.records;
-        stats.original_size += resp.original_size;
-        stats.compressed_size += resp.compressed_size;
+        stats.records += file.meta.records;
+        stats.original_size += file.meta.original_size;
+        stats.compressed_size += file.meta.compressed_size;
     }
     Ok(stats)
 }
@@ -130,7 +139,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
 
 async fn delete_parquet_file_dynamo(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
     // delete from file list in dynamo
-    db::file_list::dynamo::batch_delete(&[key.to_string()]).await?;
+    db::file_list::dynamo_db::batch_delete(&[key.to_string()]).await?;
 
     // delete the parquet whaterever the file is exists or not
     if !file_list_only {
