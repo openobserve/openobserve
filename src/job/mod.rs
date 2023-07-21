@@ -120,12 +120,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     // cache file list
-    db::file_list::local::cache()
-        .await
-        .expect("file list local cache failed");
-    db::file_list::remote::cache("")
-        .await
-        .expect("file list remote cache failed");
+    if !CONFIG.common.use_dynamo_meta_store {
+        db::file_list::local::cache()
+            .await
+            .expect("file list local cache failed");
+        db::file_list::remote::cache("")
+            .await
+            .expect("file list remote cache failed");
+    }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Start job");
@@ -149,6 +151,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         syslog_server::run(start_syslog, true)
             .await
             .expect("syslog server run failed");
+    }
+    //create dynamo db table
+    if CONFIG.common.use_dynamo_meta_store {
+        crate::common::infra::db::dynamo_db::create_dynamo_tables().await;
     }
 
     Ok(())

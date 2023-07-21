@@ -22,6 +22,7 @@ pub mod http;
 pub mod infra;
 pub mod json;
 pub mod meta;
+pub mod migration;
 pub mod notification;
 pub mod schema_ext;
 pub mod str;
