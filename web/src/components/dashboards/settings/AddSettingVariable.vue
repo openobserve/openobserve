@@ -59,6 +59,15 @@
                 :options="fieldsFilteredOptions" @filter="fieldsFilterFn" class="textbox showLabelOnTop no-case"
                 option-value="name" option-label="name" emit-value :rules="[(val: any) => !!val || 'Field is required!']">
               </q-select>
+              <div>
+                <q-input class="showLabelOnTop" v-model="variableData.query_data.max_record_size" :label="t('dashboard.DefaultSize')"
+                dense filled outlined stack-label>
+                  <q-btn padding="xs" round flat class="q-ml-sm" no-caps icon="info">
+                    <q-tooltip>{{ t('dashboard.maxRecordSize') }}</q-tooltip>
+                  </q-btn>
+                </q-input>
+              </div>
+              
             </div>
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
@@ -162,6 +171,7 @@ export default defineComponent({
         stream_type: "",
         stream: "",
         field: "",
+        max_record_size: null
       },
       value: "",
       options: []
