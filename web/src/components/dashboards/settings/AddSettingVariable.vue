@@ -60,7 +60,7 @@
                 option-value="name" option-label="name" emit-value :rules="[(val: any) => !!val || 'Field is required!']">
               </q-select>
               <div>
-                <q-input class="showLabelOnTop" v-model="variableData.query_data.max_record_size" :label="t('dashboard.DefaultSize')"
+                <q-input class="showLabelOnTop" type="number" v-model="variableData.query_data.max_record_size" :label="t('dashboard.DefaultSize')"
                 dense filled outlined stack-label>
                   <q-btn padding="xs" round flat class="q-ml-sm" no-caps icon="info">
                     <q-tooltip>{{ t('dashboard.maxRecordSize') }}</q-tooltip>
