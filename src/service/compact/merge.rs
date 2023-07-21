@@ -23,7 +23,6 @@ use crate::common::infra::{
     cache,
     cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, FILE_EXT_PARQUET},
-    db::etcd,
     dist_lock, ider, metrics, storage,
 };
 use crate::common::json;
@@ -151,7 +150,9 @@ pub async fn merge_by_stream(
         offset_time_hour,
         offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
             - Duration::seconds(1).num_microseconds().unwrap(),
-    ) {
+    )
+    .await
+    {
         Ok(files) => files,
         Err(err) => {
             return Err(err);
@@ -169,22 +170,22 @@ pub async fn merge_by_stream(
     }
 
     // do partition by partition key
-    let mut partition_files_with_size: HashMap<String, Vec<(String, u64)>> = HashMap::default();
+    let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
+        let file_name = file.key.clone();
         let prefix = {
-            let pos = file.rfind('/').unwrap();
-            file[..pos].to_string()
+            let pos = file_name.rfind('/').unwrap();
+            file_name[..pos].to_string()
         };
         let partition = partition_files_with_size.entry(prefix).or_default();
-        let file_meta = file_list::get_file_meta(&file)?;
-        partition.push((file.clone(), file_meta.original_size));
+        partition.push(file.to_owned());
     }
 
     for (prefix, files_with_size) in partition_files_with_size.iter_mut() {
         // sort by file size
-        files_with_size.sort_by(|a, b| a.1.cmp(&b.1));
+        files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
         // delete duplicated files
-        files_with_size.dedup_by(|a, b| a.0 == b.0);
+        files_with_size.dedup_by(|a, b| a.key == b.key);
         loop {
             // yield to other tasks
             tokio::task::yield_now().await;
@@ -211,57 +212,28 @@ pub async fn merge_by_stream(
             });
             for file in new_file_list.iter() {
                 events.push(FileKey {
-                    key: file.clone(),
+                    key: file.key.clone(),
                     meta: FileMeta::default(),
                     deleted: true,
                 });
             }
 
-            // upload the new file_list to storage
-            let new_file_list_key = format!(
-                "file_list/{}/{}.json.zst",
-                offset_time.format("%Y/%m/%d/%H"),
-                ider::generate()
-            );
-            let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
-            for file in events.iter() {
-                let mut write_buf = json::to_vec(&file)?;
-                write_buf.push(b'\n');
-                buf.write_all(&write_buf)?;
-            }
-            let compressed_bytes = buf.finish().unwrap();
-            storage::put(&new_file_list_key, compressed_bytes.into()).await?;
-
-            // set to local cache & send broadcast
-            // retry 5 times
-            for _ in 0..5 {
-                // set to local cache
-                let mut cache_success = true;
-                for event in &events {
-                    if let Err(e) =
-                        db::file_list::progress(&event.key, event.meta, event.deleted, false).await
-                    {
-                        cache_success = false;
-                        log::error!("[COMPACT] set local cache failed, retrying: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        break;
-                    }
+            // send file list to storage
+            match write_file_list(offset_time, &events).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("[COMPACT] write file list failed: {}", e);
                 }
-                if !cache_success {
-                    continue;
-                }
-                // send broadcast to other nodes
-                if let Err(e) = db::file_list::broadcast::send(&events).await {
-                    log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-                // broadcast success
-                break;
             }
 
             // delete small files from storage
-            match storage::del(&new_file_list.iter().map(|v| v.as_str()).collect::<Vec<_>>()).await
+            match storage::del(
+                &new_file_list
+                    .iter()
+                    .map(|v| v.key.as_str())
+                    .collect::<Vec<_>>(),
+            )
+            .await
             {
                 Ok(_) => {}
                 Err(e) => {
@@ -269,7 +241,7 @@ pub async fn merge_by_stream(
                 }
             }
             // delete files from file list
-            files_with_size.retain(|value| !&new_file_list.contains(&value.0));
+            files_with_size.retain(|f| !&new_file_list.contains(f));
         }
     }
 
@@ -299,8 +271,8 @@ async fn merge_files(
     stream_type: StreamType,
     schema: Arc<Schema>,
     prefix: &str,
-    files_with_size: &Vec<(String, u64)>,
-) -> Result<(String, FileMeta, Vec<String>), anyhow::Error> {
+    files_with_size: &Vec<FileKey>,
+) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
@@ -308,22 +280,20 @@ async fn merge_files(
     let mut new_file_size = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
-    for (new_files_num, (file, size)) in files_with_size.iter().enumerate() {
-        if new_files_num > etcd::MAX_OPS_PER_TXN
-            || new_file_size + size > CONFIG.compact.max_file_size
-        {
+    for file in files_with_size.iter() {
+        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size {
             break;
         }
-        new_file_size += size;
+        new_file_size += file.meta.original_size;
         new_file_list.push(file.to_owned());
-        log::info!("[COMPACT] merge small file: {}", file);
+        log::info!("[COMPACT] merge small file: {}", &file.key);
         // metrics
         metrics::COMPACT_MERGED_FILES
             .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
             .inc();
         metrics::COMPACT_MERGED_BYTES
             .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-            .inc_by(*size);
+            .inc_by(file.meta.original_size);
     }
     // no files need to merge
     if new_file_list.len() <= 1 {
@@ -333,15 +303,15 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
-        let data = match storage::get(file).await {
+        let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
-                log::error!("[COMPACT] merge small file: {}, err: {}", file, err);
-                deleted_files.push(file);
+                log::error!("[COMPACT] merge small file: {}, err: {}", &file.key, err);
+                deleted_files.push(file.key.clone());
                 continue;
             }
         };
-        tmp_dir.set(file, data)?;
+        tmp_dir.set(&file.key, data)?;
     }
 
     // convert the file to the latest version of schema
@@ -350,23 +320,22 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
-            if deleted_files.contains(&file) {
+            if deleted_files.contains(&file.key) {
                 continue;
             }
             // get the schema version of the file
-            let mut file_meta = file_list::get_file_meta(file)?;
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
-                file_meta.min_ts,
-                file_meta.max_ts,
+                file.meta.min_ts,
+                file.meta.max_ts,
             ) {
                 Some(id) => id,
                 None => {
                     log::error!(
                         "[COMPACT] merge small file: {}, schema version not found, min_ts: {}, max_ts: {}",
-                        file,
-                        file_meta.min_ts,
-                        file_meta.max_ts
+                        &file.key,
+                        file.meta.min_ts,
+                        file.meta.max_ts
                     );
                     // HACK: use the latest verion if not found in schema versions
                     schema_latest_id
@@ -394,13 +363,13 @@ async fn merge_files(
 
             // do the convert
             if CONFIG.compact.fake_mode {
-                log::info!("[COMPACT] fake convert parquet file: {file}");
+                log::info!("[COMPACT] fake convert parquet file: {}", &file.key);
                 continue;
             }
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
-            let file_data = storage::get(file).await?;
-            file_tmp_dir.set(file, file_data)?;
+            let file_data = storage::get(&file.key).await?;
+            file_tmp_dir.set(&file.key, file_data)?;
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
                 &mut buf,
@@ -410,12 +379,11 @@ async fn merge_files(
             )
             .await
             .map_err(|e| {
-                DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", file, e))
+                DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", &file.key, e))
             })?;
-            file_meta.compressed_size = buf.len() as u64;
 
             // replace the file in tmpfs
-            tmp_dir.set(file, buf.into())?;
+            tmp_dir.set(&file.key, buf.into())?;
         }
     }
 
@@ -451,6 +419,95 @@ async fn merge_files(
         Ok(_) => Ok((new_file_key, new_file_meta, new_file_list)),
         Err(e) => Err(e),
     }
+}
+
+async fn write_file_list(offset: DateTime<Utc>, events: &[FileKey]) -> Result<(), anyhow::Error> {
+    if CONFIG.common.use_dynamo_meta_store {
+        write_file_list_dynamo(events).await
+    } else {
+        write_file_list_s3(offset, events).await
+    }
+}
+
+async fn write_file_list_s3(
+    offset: DateTime<Utc>,
+    events: &[FileKey],
+) -> Result<(), anyhow::Error> {
+    // upload the new file_list to storage
+    let new_file_list_key = format!(
+        "file_list/{}/{}.json.zst",
+        offset.format("%Y/%m/%d/%H"),
+        ider::generate()
+    );
+    let mut buf = zstd::Encoder::new(Vec::new(), 3)?;
+    for file in events.iter() {
+        let mut write_buf = json::to_vec(&file)?;
+        write_buf.push(b'\n');
+        buf.write_all(&write_buf)?;
+    }
+    let compressed_bytes = buf.finish().unwrap();
+    storage::put(&new_file_list_key, compressed_bytes.into()).await?;
+
+    // set to local cache & send broadcast
+    // retry 5 times
+    for _ in 0..5 {
+        // set to local cache
+        let mut cache_success = true;
+        for event in events.iter() {
+            if let Err(e) =
+                db::file_list::progress(&event.key, event.meta, event.deleted, false).await
+            {
+                cache_success = false;
+                log::error!("[COMPACT] set local cache failed, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                break;
+            }
+        }
+        if !cache_success {
+            continue;
+        }
+        // send broadcast to other nodes
+        if let Err(e) = db::file_list::broadcast::send(events).await {
+            log::error!("[COMPACT] send broadcast failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        // broadcast success
+        break;
+    }
+    Ok(())
+}
+
+async fn write_file_list_dynamo(events: &[FileKey]) -> Result<(), anyhow::Error> {
+    let put_items = events
+        .iter()
+        .filter(|v| !v.deleted)
+        .map(|v| v.to_owned())
+        .collect::<Vec<_>>();
+    let del_items = events
+        .iter()
+        .filter(|v| v.deleted)
+        .map(|v| v.key.clone())
+        .collect::<Vec<_>>();
+    // set to dynamo db
+    // retry 5 times
+    for _ in 0..5 {
+        if let Err(e) = db::file_list::dynamo_db::batch_write(&put_items).await {
+            log::error!("[COMPACT] batch_write to dynamo db failed, retrying: {}", e);
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        if let Err(e) = db::file_list::dynamo_db::batch_delete(&del_items).await {
+            log::error!(
+                "[COMPACT] batch_delete to dynamo db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        break;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
