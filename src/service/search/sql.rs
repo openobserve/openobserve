@@ -100,7 +100,7 @@ impl Display for SqlMode {
 }
 
 impl Sql {
-    #[tracing::instrument(name = "service:search:sql:new", skip(req))]
+    #[tracing::instrument(name = "service:search:sql:new", skip(req),fields(org_id = req.org_id))]
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);

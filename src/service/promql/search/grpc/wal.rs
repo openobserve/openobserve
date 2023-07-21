@@ -39,7 +39,7 @@ use crate::service::{
     },
 };
 
-#[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
+#[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all,fields(org_id = org_id,stream_name = stream_name))]
 pub(crate) async fn create_context(
     session_id: &str,
     org_id: &str,
@@ -95,7 +95,7 @@ pub(crate) async fn create_context(
 }
 
 /// get file list from local cache, no need match_source, each file will be searched
-#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list")]
+#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list",fields(org_id = org_id,stream_name = stream_name))]
 async fn get_file_list(
     org_id: &str,
     stream_name: &str,

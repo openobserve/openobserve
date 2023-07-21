@@ -33,7 +33,7 @@ use crate::service::{
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -221,7 +221,7 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let mut file_list = match file_list::get_file_list(

@@ -37,7 +37,7 @@ use crate::service::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:enter", skip_all)]
+#[tracing::instrument(name = "service:search:wal:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -220,7 +220,7 @@ pub async fn search(
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let pattern = format!(
         "{}/files/{}/{stream_type}/{}/*.json",

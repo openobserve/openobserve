@@ -47,7 +47,7 @@ pub(crate) mod sql;
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
-#[tracing::instrument(name = "service:search:enter", skip_all)]
+#[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
     org_id: &str,
     stream_type: StreamType,
@@ -82,7 +82,7 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     (time_min, time_max)
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(sql),fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
     let mut file_list = match file_list::get_file_list(
@@ -113,7 +113,11 @@ async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> 
     }
 }
 
-#[tracing::instrument(name = "service:search:cluster", skip_all)]
+#[tracing::instrument(
+    name = "service:search:cluster",
+    skip(req),
+    fields(org_id = req.org_id)
+)]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
 
