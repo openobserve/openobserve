@@ -24,6 +24,7 @@ import path from "path";
 import dotenv from "dotenv";
 import fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import visualizer from "rollup-plugin-visualizer";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -126,7 +127,22 @@ export default defineConfig({
     sourcemap: false,
     target: "es2020",
     rollupOptions: {
-      plugins: [nodePolyfills()],
+      plugins: [
+        nodePolyfills(),
+        visualizer({
+          open: true,
+          gzipSize: true,
+          brotliSize: true,
+        }),
+      ],
+      manualChunks: {
+        analytics: ["@sentry/vue", "@sentry/tracing", "rudder-sdk-js"],
+        "monaco-editor": ["monaco-editor"],
+        plotly: ["plotly.js"],
+        "node-sql-parser": ["node-sql-parser/build/mysql"],
+        d3: ["d3-hierarchy", "d3-selection"],
+        lodash: ["lodash-es", "lodash/lodash.js", "moment"],
+      },
     },
     outDir: path.resolve(__dirname, "dist"),
   },
