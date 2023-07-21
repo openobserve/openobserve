@@ -235,7 +235,7 @@ import { useRouter } from "vue-router";
 
 import MetricList from "./MetricList.vue";
 import useMetrics from "@/composables/useMetrics";
-import { Parser } from "node-sql-parser";
+import { Parser } from "node-sql-parser/build/mysql";
 
 import streamService from "@/services/stream";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
