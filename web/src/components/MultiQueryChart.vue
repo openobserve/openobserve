@@ -1,13 +1,15 @@
 <template>
   <div>
-
+    <Chart :data="chartData" />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, watch, ref, onMounted } from "vue";
 import { useSearchApi } from "@/composables/useSearchApi";
-import { useDataTransform } from "@/composables/useDataTransform";
+// import { useDataTransform } from "@/composables/useDataTransform";
+import { convertData } from "@/utils/Dashboard/convertData";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "MultiQueryChart",
@@ -20,13 +22,21 @@ export default defineComponent({
       required: true,
       type: Object,
     },
+    traces: {
+      required: true,
+      type: Array,
+    },
+    layout: {
+      required: true,
+      type: Object,
+    }
   },
   setup(props, context) {
-    const chartData = ref([]);
+    const chartData = ref();
     const error = ref("");
     console.log("props.selectedTimeObj", props.selectedTimeObj);
     console.log("props.data", props.data);
-
+    const store= useStore();
     const { loadData, data, errorDetail } = useSearchApi(
       props.data,
       props.selectedTimeObj,
@@ -34,15 +44,14 @@ export default defineComponent({
       context.emit
     );
 
-    const {renderPromQlBasedChart} = useDataTransform(props);
-
     onMounted(() => {
       loadData();
-      renderPromQlBasedChart();
     });
 
+    watch(data, () => {
+      chartData.value = convertData(props.traces, props.layout, store);
+    })
     return {
-
       loadData,
       data,
       chartData,
