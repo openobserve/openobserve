@@ -8,7 +8,7 @@
 import { ref, watch, onMounted, computed, defineComponent } from 'vue';
 import { useQuasar } from 'quasar';
 import { useStore } from "vuex";
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { outlinedDarkMode, outlinedLightMode } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({

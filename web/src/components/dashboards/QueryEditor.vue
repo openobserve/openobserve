@@ -29,7 +29,12 @@ import {
   onDeactivated,
   type Ref,
 } from "vue";
-import * as monaco from "monaco-editor";
+
+import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
+import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -226,7 +231,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorRef.value, {
         value: props.query,
         language: "sql",
-        theme: (store.state.theme == 'dark' ? 'vs-dark' : 'myCustomTheme'),
+        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         showFoldingControls: "never",
         wordWrap: "on",
         lineNumbers: "on",
