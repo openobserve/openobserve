@@ -37,7 +37,7 @@ use crate::service::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -179,7 +179,12 @@ pub async fn search(
                 storage_type: StorageType::Tmpfs,
             }
         };
-        let datafusion_span = info_span!("service:search:grpc:wal:datafusion");
+        let datafusion_span = info_span!(
+            "service:search:grpc:wal:datafusion",
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = ?stream_type
+        );
         let task =
             tokio::task::spawn(
                 async move {

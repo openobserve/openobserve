@@ -177,7 +177,7 @@ pub async fn search(
                 }
             }
         }
-        let datafusion_span = info_span!("service:search:grpc:storage:datafusion");
+        let datafusion_span = info_span!("service:search:grpc:storage:datafusion", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
         let task = tokio::task::spawn(
             async move {
                 exec::sql(

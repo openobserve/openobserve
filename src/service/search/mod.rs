@@ -190,7 +190,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         }
 
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!("service:search:cluster:grpc_search");
+        let grpc_span = info_span!("service:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req

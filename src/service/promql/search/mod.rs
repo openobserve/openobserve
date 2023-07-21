@@ -138,7 +138,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         );
 
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!("promql:search:cluster:grpc_search");
+        let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req
