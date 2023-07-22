@@ -50,3 +50,13 @@ message ScanStats {
     uint64 original_size   = 3; // unit: MB
     uint64 compressed_size = 4; // unit: MB
 }
+
+message FileList {
+    repeated FileKey items = 1;
+}
+
+message FileKey {
+    string   key     = 1;
+    FileMeta meta    = 2;
+    bool     deleted = 3;
+}

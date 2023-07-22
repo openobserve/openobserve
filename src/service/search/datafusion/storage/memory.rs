@@ -88,8 +88,9 @@ impl ObjectStore for FS {
         };
         if range.end > data.len() {
             let file = location.to_string();
-            let file_meta =
-                crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
+            let file_meta = crate::service::file_list::get_file_meta(&file)
+                .await
+                .expect("file meta must have value");
             log::error!(
                 "get_range: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
                 file,
@@ -111,28 +112,28 @@ impl ObjectStore for FS {
             Some(data) => data,
             None => return storage::DEFAULT.get_ranges(location, ranges).await,
         };
-        ranges
-            .iter()
-            .map(|range| {
-                if range.end > data.len() {
-                    let file = location.to_string();
-                    let file_meta =
-                        crate::service::file_list::get_file_meta(&file).expect("file meta must have value");
-                    log::error!(
-                        "get_ranges: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
-                        file,
-                        file_meta,
-                        range.end,
-                        data.len()
-                    );
-                    return Err(super::Error::OutOfRange(location.to_string()).into());
-                }
-                if range.start > range.end {
-                    return Err(super::Error::BadRange(location.to_string()).into());
-                }
-                Ok(data.slice(range.clone()))
-            })
-            .collect()
+        let mut data_slices = Vec::with_capacity(ranges.len());
+        for range in ranges.iter() {
+            if range.end > data.len() {
+                let file = location.to_string();
+                let file_meta = crate::service::file_list::get_file_meta(&file)
+                    .await
+                    .expect("file meta must have value");
+                log::error!(
+                    "get_ranges: OutOfRange, file: {:?}, meta: {:?}, range.end {} > data.len() {}",
+                    file,
+                    file_meta,
+                    range.end,
+                    data.len()
+                );
+                return Err(super::Error::OutOfRange(location.to_string()).into());
+            }
+            if range.start > range.end {
+                return Err(super::Error::BadRange(location.to_string()).into());
+            }
+            data_slices.push(data.slice(range.clone()));
+        }
+        Ok(data_slices)
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {

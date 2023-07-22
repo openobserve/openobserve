@@ -21,11 +21,13 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::common::infra::{
-    cluster,
-    errors::{Error, ErrorCodes},
+use crate::common::{
+    infra::{
+        cluster,
+        errors::{Error, ErrorCodes},
+    },
+    meta::{common::FileKey, stream::ScanStats, StreamType},
 };
-use crate::common::meta::{stream::ScanStats, StreamType};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::db;
 
@@ -34,7 +36,7 @@ mod wal;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), Error>;
 
-#[tracing::instrument(name = "service:search:grpc:search", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:search", skip_all,fields(org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
@@ -58,7 +60,7 @@ pub async fn search(
     // search in WAL
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
-    let wal_span = info_span!("service:search:grpc:in_wal");
+    let wal_span = info_span!("service:search:grpc:in_wal", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -74,14 +76,14 @@ pub async fn search(
     let req_stype = req.stype;
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
-    let file_list = req.file_list.to_owned();
-    let storage_span = info_span!("service:search:grpc:in_storage");
+    let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+    let storage_span = info_span!("service:search:grpc:in_storage", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
     let task2 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
-                storage::search(&session_id2, sql2, file_list.as_slice(), stream_type).await
+                storage::search(&session_id2, sql2, &file_list, stream_type).await
             }
         }
         .instrument(storage_span),

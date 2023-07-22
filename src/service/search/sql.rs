@@ -23,12 +23,15 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::common::infra::{
-    config::CONFIG,
-    errors::{Error, ErrorCodes},
-};
 use crate::common::meta::{sql::Sql as MetaSql, stream::StreamParams, StreamType};
 use crate::common::str::find;
+use crate::common::{
+    infra::{
+        config::CONFIG,
+        errors::{Error, ErrorCodes},
+    },
+    meta::common::FileKey,
+};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{db, search::match_source, stream::get_stream_setting_fts_fields};
 
@@ -97,7 +100,7 @@ impl Display for SqlMode {
 }
 
 impl Sql {
-    #[tracing::instrument(name = "service:search:sql:new", skip(req))]
+    #[tracing::instrument(name = "service:search:sql:new", skip(req),fields(org_id = req.org_id))]
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);
@@ -592,17 +595,17 @@ impl Sql {
             }
         }
 
-        log::info!(
-            "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
-            sql.stream_name,
-            sql.meta.fields,
-            sql.meta.quick_text,
-            sql.fulltext,
-            sql.meta.time_range,
-            sql.meta.order_by,
-            sql.meta.offset,
-            sql.meta.limit,
-        );
+        // log::info!(
+        //     "sqlparser: stream_name -> {:?}, fields -> {:?}, partition_key -> {:?}, full_text -> {:?}, time_range -> {:?}, order_by -> {:?}, limit -> {:?},{:?}",
+        //     sql.stream_name,
+        //     sql.meta.fields,
+        //     sql.meta.quick_text,
+        //     sql.fulltext,
+        //     sql.meta.time_range,
+        //     sql.meta.order_by,
+        //     sql.meta.offset,
+        //     sql.meta.limit,
+        // );
 
         Ok(sql)
     }
@@ -610,7 +613,7 @@ impl Sql {
     /// match a source is a valid file or not
     pub async fn match_source(
         &self,
-        source: &str,
+        source: &FileKey,
         match_min_ts_only: bool,
         is_wal: bool,
         stream_type: StreamType,
@@ -633,6 +636,7 @@ impl Sql {
             is_wal,
             match_min_ts_only,
         )
+        .await
     }
 }
 

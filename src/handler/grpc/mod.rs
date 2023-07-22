@@ -98,6 +98,16 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
     }
 }
 
+impl From<&cluster_rpc::FileKey> for meta::common::FileKey {
+    fn from(req: &cluster_rpc::FileKey) -> Self {
+        meta::common::FileKey {
+            key: req.key.clone(),
+            meta: meta::common::FileMeta::from(req.meta.as_ref().unwrap()),
+            deleted: req.deleted,
+        }
+    }
+}
+
 impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
     fn from(req: promql::MetricsQueryRequest) -> Self {
         let req_query = cluster_rpc::MetricsQueryStmt {

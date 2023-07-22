@@ -41,6 +41,7 @@ use openobserve::{
         metrics, wal,
     },
     common::meta,
+    common::migration,
     common::zo_logger::{self, ZoLogger, EVENT_SENDER},
     handler::{
         grpc::{
@@ -54,7 +55,7 @@ use openobserve::{
         http::router::*,
     },
     job,
-    service::{db, router, users},
+    service::{db, file_list, router, users},
 };
 
 #[cfg(feature = "profiling")]
@@ -287,6 +288,24 @@ async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
+            clap::Command::new("file-list")
+                .about("migrate file-list from s3 to dynamo db")
+                .arg(
+                    clap::Arg::new("prefix")
+                        .short('p')
+                        .long("prefix")
+                        .value_name("prefix")
+                        .help("only migrate specified prefix, default is all"),
+                ),
+            clap::Command::new("delete-parquet")
+                .about("delete parquet files from s3 and file_list")
+                .arg(
+                    clap::Arg::new("file")
+                        .short('f')
+                        .long("file")
+                        .value_name("file")
+                        .help("the parquet file name"),
+                ),
         ])
         .get_matches();
 
@@ -345,6 +364,24 @@ async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 _ => {
                     return Err(anyhow::anyhow!("unsupport reset component: {component}"));
+                }
+            }
+        }
+        "file-list" => {
+            let prefix = command.get_one::<String>("prefix").unwrap();
+            println!("Running migration with prefix: {}", prefix);
+            if !prefix.is_empty() {
+                migration::load_file_list_to_dynamo::load(prefix).await?
+            }
+        }
+        "delete-parquet" => {
+            let file = command.get_one::<String>("file").unwrap();
+            match file_list::delete_parquet_file(file, true).await {
+                Ok(_) => {
+                    println!("delete parquet file {} succeeded", file);
+                }
+                Err(e) => {
+                    println!("delete parquet file {} failed, error: {}", file, e);
                 }
             }
         }
