@@ -20,20 +20,24 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-    errors::{Error, Result},
-    metrics,
-};
 use crate::common::meta::functions::StreamTransform;
+use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
     StreamType,
+};
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster,
+        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
+        errors::{Error, Result},
+        metrics,
+    },
+    meta::prom::METRICS_SERIES_TIME,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::usage::report_usage_stats;
@@ -75,6 +79,7 @@ pub async fn remote_write(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
+    let mut metric_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -244,12 +249,46 @@ pub async fn remote_write(
 
             // get json object
             let val_map = value.as_object_mut().unwrap();
+
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            let hash_val: String = hash.into();
+            let key = format!("{}/{}/{}", &org_id, metric_name.clone(), &hash_val);
+
+            val_map.insert(
+                HASH_LABEL.to_string(),
+                json::Value::String(hash_val.clone()),
+            );
+
+            let present = METRIC_SERIES_HASH.get(&key);
+            if present.is_none() {
+                METRIC_SERIES_HASH.insert(key.clone(), true);
+                let mut series_values = val_map.clone();
+                series_values.remove_entry(VALUE_LABEL);
+                series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
+                series_values.insert("org".to_string(), json::Value::String(org_id.to_owned()));
+                series_values.insert(
+                    CONFIG.common.column_timestamp.clone(),
+                    json::Value::Number(METRICS_SERIES_TIME.into()),
+                );
+                let series_str = crate::common::json::to_string(&series_values).unwrap();
+                metric_series_values
+                    .entry(metric_name.clone())
+                    .or_default()
+                    .push(series_str);
+            }
+
             val_map.insert(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
+            let mut final_value_map: json::Map<String, json::Value> = val_map.clone();
+            final_value_map.retain(|k, _| {
+                k.eq(&CONFIG.common.column_timestamp)
+                    || k.eq(HASH_LABEL)
+                    || k.eq(VALUE_LABEL)
+                    || k.eq(NAME_LABEL)
+            });
+
             let value_str = crate::common::json::to_string(&val_map).unwrap();
             chk_schema_by_record(
                 &mut metric_schema_map,
@@ -269,7 +308,8 @@ pub async fn remote_write(
                 None,
             );
             let hour_buf = buf.entry(hour_key).or_default();
-            hour_buf.push(value_str);
+            let final_value_str = crate::common::json::to_string(&final_value_map).unwrap();
+            hour_buf.push(final_value_str);
 
             // real time alert
             if !stream_alerts_map.is_empty() {
@@ -330,7 +370,7 @@ pub async fn remote_write(
             stream_data,
             thread_id,
             org_id,
-            &stream_name,
+            METRIC_NAME,
             &mut stream_file_name,
             StreamType::Metrics,
         );
@@ -355,6 +395,15 @@ pub async fn remote_write(
         )
         .await;
     }
+
+    super::write_series_file(
+        metric_series_values,
+        thread_id,
+        org_id,
+        SERIES_NAME,
+        &mut "".to_string(),
+        StreamType::Metrics,
+    );
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in &stream_trigger_map {
