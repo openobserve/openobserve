@@ -29,6 +29,7 @@ use crate::common::infra::{
     errors::{Error, ErrorCodes},
 };
 use crate::common::meta::{
+    common::FileKey,
     search,
     stream::{ScanStats, StreamParams},
     StreamType,
@@ -46,7 +47,7 @@ pub(crate) mod sql;
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
-#[tracing::instrument(name = "service:search:enter", skip_all)]
+#[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
     org_id: &str,
     stream_type: StreamType,
@@ -81,31 +82,42 @@ async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
     (time_min, time_max)
 }
 
-#[tracing::instrument(skip_all)]
-async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<String> {
+#[tracing::instrument(skip(sql),fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+async fn get_file_list(sql: &sql::Sql, stream_type: StreamType) -> Vec<FileKey> {
     let (time_min, time_max) = get_times(sql, stream_type).await;
-    match file_list::get_file_list(
+    let mut file_list = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
         time_min,
         time_max,
-    ) {
+    )
+    .await
+    {
+        Ok(file_list) => file_list,
         Err(_) => vec![],
-        Ok(file_list) => {
-            let mut files = Vec::with_capacity(file_list.len());
-            for file in file_list {
-                if sql.match_source(&file, false, false, stream_type).await {
-                    files.push(file.clone());
-                }
+    };
+    if CONFIG.common.use_dynamo_meta_store && file_list.len() > 256 {
+        // because match_source need fetch file meta again, so add an limit
+        file_list.sort_by(|a, b| a.key.cmp(&b.key));
+        file_list
+    } else {
+        let mut files = Vec::with_capacity(file_list.len());
+        for file in file_list {
+            if sql.match_source(&file, false, false, stream_type).await {
+                files.push(file.to_owned());
             }
-            files.sort();
-            files
         }
+        files.sort_by(|a, b| a.key.cmp(&b.key));
+        files
     }
 }
 
-#[tracing::instrument(name = "service:search:cluster", skip_all)]
+#[tracing::instrument(
+    name = "service:search:cluster",
+    skip(req),
+    fields(org_id = req.org_id)
+)]
 async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
 
@@ -139,7 +151,10 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     } else {
         (file_num / querier_num) + 1
     };
-    log::info!("search->file_list: num: {file_num}, offset: {offset}");
+    log::info!(
+        "search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        meta.meta.time_range
+    );
 
     // partition request, here plus 1 second, because division is integer, maybe lose some precision
     let mut session_id = Uuid::new_v4().to_string();
@@ -163,8 +178,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
-                req.file_list =
-                    file_list[offset_start..min(offset_start + offset, file_num)].to_vec();
+                req.file_list = file_list[offset_start..min(offset_start + offset, file_num)]
+                    .to_vec()
+                    .iter()
+                    .map(cluster_rpc::FileKey::from)
+                    .collect();
                 offset_start += offset;
             } else if !cluster::is_ingester(&node.role) {
                 continue; // no need more querier
@@ -172,7 +190,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         }
 
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!("service:search:cluster:grpc_search");
+        let grpc_span = info_span!("service:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req
@@ -268,10 +286,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         if !resp.hits.is_empty() {
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-            log::info!(
-                "search_in_cluster: query num_batches: {:?}",
-                reader.num_batches()
-            );
             let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
             value.push(batch);
         }
@@ -281,11 +295,6 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             if !agg.hits.is_empty() {
                 let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
-                log::info!(
-                    "search_in_cluster: agg:{} num_batches: {:?}",
-                    agg.name,
-                    reader.num_batches()
-                );
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
                 value.push(batch);
             }
@@ -449,11 +458,11 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 }
 
 /// match a source is a valid file or not
-pub fn match_source(
+pub async fn match_source(
     stream: StreamParams<'_>,
     time_range: Option<(i64, i64)>,
     filters: &[(&str, &str)],
-    source: &str,
+    source: &FileKey,
     is_wal: bool,
     match_min_ts_only: bool,
 ) -> bool {
@@ -464,12 +473,15 @@ pub fn match_source(
     } = stream;
 
     // match org_id & table
-    if !source.starts_with(format!("files/{}/{}/{}/", org_id, stream_type, stream_name).as_str()) {
+    if !source
+        .key
+        .starts_with(format!("files/{}/{}/{}/", org_id, stream_type, stream_name).as_str())
+    {
         return false;
     }
 
     // check partition key
-    if !filter_source_by_partition_key(source, filters) {
+    if !filter_source_by_partition_key(&source.key, filters) {
         return false;
     }
 
@@ -478,27 +490,26 @@ pub fn match_source(
     }
 
     // check time range
-    let file_meta = file_list::get_file_meta(source).unwrap_or_default();
-    if file_meta.min_ts == 0 || file_meta.max_ts == 0 {
+    if source.meta.min_ts == 0 || source.meta.max_ts == 0 {
         return true;
     }
     log::trace!(
         "time range: {:?}, file time: {}-{}, {}",
         time_range,
-        file_meta.min_ts,
-        file_meta.max_ts,
-        source
+        source.meta.min_ts,
+        source.meta.max_ts,
+        source.key
     );
 
     // match partition clause
     if let Some((time_min, time_max)) = time_range {
         if match_min_ts_only && time_min > 0 {
-            return file_meta.min_ts >= time_min && file_meta.min_ts < time_max;
+            return source.meta.min_ts >= time_min && source.meta.min_ts < time_max;
         }
-        if time_min > 0 && time_min > file_meta.max_ts {
+        if time_min > 0 && time_min > source.meta.max_ts {
             return false;
         }
-        if time_max > 0 && time_max < file_meta.min_ts {
+        if time_max > 0 && time_max < source.meta.min_ts {
             return false;
         }
     }

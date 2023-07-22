@@ -156,6 +156,7 @@ pub struct QueryData {
     pub stream_type: StreamType,
     pub stream: String,
     pub field: String,
+    pub max_record_size: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
