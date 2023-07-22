@@ -82,6 +82,7 @@ pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 pub static LOCAL_SCHEMA_LOCKER: Lazy<RwHashMap<String, tokio::sync::RwLock<bool>>> =
     Lazy::new(|| Arc::new(DashMap::default)());
+pub static METRIC_SERIES_HASH: Lazy<RwHashMap<String, bool>> = Lazy::new(DashMap::default);
 
 #[derive(EnvConfig)]
 pub struct Config {
