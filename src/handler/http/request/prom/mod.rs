@@ -735,7 +735,7 @@ pub async fn format_query_post(
     } else {
         &req.query
     };
-    format_query(&org_id, &query)
+    format_query(&org_id, query)
 }
 
 fn format_query(_org_id: &str, query: &str) -> Result<HttpResponse, Error> {
