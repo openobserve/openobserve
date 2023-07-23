@@ -208,6 +208,11 @@ pub struct RequestLabelValues {
     pub end: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RequestFormatQuery {
+    pub query: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

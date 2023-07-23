@@ -657,7 +657,10 @@ fn validate_metadata_params(
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
                 let err = if sel.name.is_none()
-                    && sel.matchers.find_matcher(meta::prom::NAME_LABEL).is_none()
+                    && sel
+                        .matchers
+                        .find_matcher_value(meta::prom::NAME_LABEL)
+                        .is_none()
                 {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
                 } else if sel.offset.is_some() {
@@ -691,4 +694,58 @@ fn validate_metadata_params(
         parse_str_to_timestamp_micros(&end.unwrap()).map_err(|e| e.to_string())?
     };
     Ok((selector, start, end))
+}
+
+/** prometheus formatting query expressions */
+// refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusFormatQuery",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("query" = String, Query, description = "Prometheus expression query string."),
+    ),
+    responses(
+        (status = 200, description="Success", content_type = "application/json", body = HttpResponse, example = json!({
+            "status" : "success",
+            "data" : "foo / bar"
+        })),
+        (status = 500, description="Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/prometheus/api/v1/format_query")]
+pub async fn format_query_get(
+    org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestFormatQuery>,
+) -> Result<HttpResponse, Error> {
+    format_query(&org_id, &req.query)
+}
+
+#[post("/{org_id}/prometheus/api/v1/format_query")]
+pub async fn format_query_post(
+    org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestFormatQuery>,
+    web::Form(form): web::Form<meta::prom::RequestFormatQuery>,
+) -> Result<HttpResponse, Error> {
+    let query = if !form.query.is_empty() {
+        &form.query
+    } else {
+        &req.query
+    };
+    format_query(&org_id, query)
+}
+
+fn format_query(_org_id: &str, query: &str) -> Result<HttpResponse, Error> {
+    let expr = match promql_parser::parser::parse(query) {
+        Ok(expr) => expr,
+        Err(err) => {
+            return Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(err))
+            );
+        }
+    };
+    Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify())))
 }

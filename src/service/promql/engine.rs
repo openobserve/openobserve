@@ -14,7 +14,6 @@
 
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
-
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -161,11 +160,8 @@ impl Engine {
                     Value::Vector(data)
                 }
             }
-            PromExpr::MatrixSelector(MatrixSelector {
-                vector_selector,
-                range,
-            }) => {
-                let data = self.eval_matrix_selector(vector_selector, *range).await?;
+            PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
+                let data = self.eval_matrix_selector(vs, *range).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
