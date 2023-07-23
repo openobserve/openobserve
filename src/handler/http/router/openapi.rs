@@ -81,6 +81,7 @@ use crate::handler::http::request;
         request::prom::series_get,
         request::prom::labels_get,
         request::prom::label_values,
+        request::prom::format_query_get,
         request::traces::traces_write,
         request::syslog::create_route,
         request::syslog::update_route,
