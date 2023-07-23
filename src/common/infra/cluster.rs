@@ -193,8 +193,8 @@ pub async fn register() -> Result<()> {
         id: node_id,
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.http.port),
-        grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
+        http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
+        grpc_addr: format!("http://{}:{}", get_local_grpc_ip(), CONFIG.grpc.port),
         role: LOCAL_NODE_ROLE.clone(),
         cpu_num: sys_info::cpu_num().unwrap() as u64,
         status: NodeStatus::Prepare,
@@ -402,6 +402,24 @@ pub fn load_local_mode_node() -> Node {
 #[inline(always)]
 fn load_local_node_uuid() -> String {
     Uuid::new_v4().to_string()
+}
+
+#[inline(always)]
+pub fn get_local_http_ip() -> String {
+    if !CONFIG.http.addr.is_empty() {
+        CONFIG.http.addr.clone()
+    } else {
+        get_local_node_ip()
+    }
+}
+
+#[inline(always)]
+pub fn get_local_grpc_ip() -> String {
+    if !CONFIG.grpc.addr.is_empty() {
+        CONFIG.grpc.addr.clone()
+    } else {
+        get_local_node_ip()
+    }
 }
 
 #[inline(always)]
