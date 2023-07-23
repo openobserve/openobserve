@@ -657,7 +657,10 @@ fn validate_metadata_params(
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
                 let err = if sel.name.is_none()
-                    && sel.matchers.find_matcher(meta::prom::NAME_LABEL).is_none()
+                    && sel
+                        .matchers
+                        .find_matcher_value(meta::prom::NAME_LABEL)
+                        .is_none()
                 {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
                 } else if sel.offset.is_some() {
