@@ -23,14 +23,14 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
-    "@aws-amplify/ui-vue": "^2.4.16",
+    "@aws-amplify/ui-vue": "^3.1.21",
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
     "@openreplay/tracker": "^4.1.5",
     "@quasar/extras": "^1.14.3",
     "@segment/analytics-next": "^1.45.0",
     "@sentry/tracing": "^7.17.4",
     "@sentry/vue": "^7.17.4",
-    "aws-amplify": "4.3.43",
+    "aws-amplify": "5.3.5",
     "d3-hierarchy": "^3.1.2",
     "d3-selection": "^3.0.0",
     "jest-canvas-mock": "^2.5.0",
