@@ -27,7 +27,7 @@ use crate::common::infra::{
     errors::{Error, ErrorCodes},
     ider, wal,
 };
-use crate::common::meta::{self, stream::ScanStats};
+use crate::common::meta::{self, common::FileKey, stream::ScanStats};
 use crate::service::{
     db,
     search::{
@@ -37,7 +37,7 @@ use crate::service::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:enter", skip_all)]
+#[tracing::instrument(name = "service:search:wal:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -50,14 +50,16 @@ pub async fn search(
     // cache files
     let work_dir = session_id.to_string();
     for file in files.clone().iter() {
-        match get_file_contents(file) {
+        match get_file_contents(&file.key) {
             Err(_) => {
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
                 scan_stats.original_size += file_data.len() as u64;
-                let file_name =
-                    format!("/{work_dir}/{}", file.split('/').last().unwrap_or_default());
+                let file_name = format!(
+                    "/{work_dir}/{}",
+                    file.key.split('/').last().unwrap_or_default()
+                );
                 tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
             }
         }
@@ -71,7 +73,7 @@ pub async fn search(
             scan_stats.original_size += file_data.len() as u64;
             let file_name = format!("/{work_dir}/{}.json", ider::generate());
             tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
-            files.push(file_name);
+            files.push(FileKey::from_file_name(&file_name));
         }
     }
 
@@ -103,17 +105,20 @@ pub async fn search(
 
     // check schema version
     let files = tmpfs::list(&work_dir).unwrap_or_default();
-    let mut files_group: HashMap<String, Vec<String>> = HashMap::with_capacity(2);
+    let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
     if !CONFIG.common.widening_schema_evolution {
         files_group.insert(
             "latest".to_string(),
-            files.iter().map(|x| x.location.to_string()).collect(),
+            files
+                .iter()
+                .map(|f| FileKey::from_file_name(&f.location))
+                .collect(),
         );
     } else {
         for file in files {
             let schema_version = get_schema_version(&file.location)?;
             let entry = files_group.entry(schema_version).or_insert_with(Vec::new);
-            entry.push(file.location);
+            entry.push(FileKey::from_file_name(&file.location));
         }
     }
 
@@ -121,7 +126,7 @@ pub async fn search(
     let single_group = files_group.len() == 1;
     for (ver, files) in files_group {
         // get schema of the file
-        let file_data = tmpfs::get(files.first().unwrap()).unwrap();
+        let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
         let mut schema_reader = BufReader::new(file_data.as_ref());
         let mut inferred_schema = match infer_json_schema(&mut schema_reader, None) {
             Ok(schema) => schema,
@@ -161,11 +166,11 @@ pub async fn search(
             let id = format!("{session_id}-{ver}");
             // move data to group tmpfs
             for file in files.iter() {
-                let file_data = tmpfs::get(file).unwrap();
+                let file_data = tmpfs::get(&file.key).unwrap();
                 let file_name = format!(
                     "/{}/{}",
                     id,
-                    file.strip_prefix(&format!("/{}/", work_dir)).unwrap()
+                    file.key.strip_prefix(&format!("/{}/", work_dir)).unwrap()
                 );
                 tmpfs::set(&file_name, file_data).expect("tmpfs set success");
             }
@@ -174,7 +179,12 @@ pub async fn search(
                 storage_type: StorageType::Tmpfs,
             }
         };
-        let datafusion_span = info_span!("service:search:grpc:wal:datafusion");
+        let datafusion_span = info_span!(
+            "service:search:grpc:wal:datafusion",
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = ?stream_type
+        );
         let task =
             tokio::task::spawn(
                 async move {
@@ -215,15 +225,15 @@ pub async fn search(
 }
 
 /// get file list from local wal, no need match_source, each file will be searched
-#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all)]
-async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
+#[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let pattern = format!(
         "{}/files/{}/{stream_type}/{}/*.json",
         &CONFIG.common.data_wal_dir, &sql.org_id, &sql.stream_name
     );
     let files = scan_files(&pattern);
 
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(files.len());
     let data_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => path,
         Err(_) => {
@@ -271,11 +281,11 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         let file_name = file.file_name().unwrap().to_str().unwrap();
         let file_name = file_name.replace('_', "/");
         let source_file = format!("{file_path}/{file_name}");
-        if sql
-            .match_source(&source_file, false, true, stream_type)
-            .await
-        {
-            result.push(format!("{}{local_file}", &CONFIG.common.data_wal_dir).replace('\\', "/"));
+        let mut file_key = FileKey::from_file_name(&source_file);
+        if sql.match_source(&file_key, false, true, stream_type).await {
+            file_key.key =
+                format!("{}{local_file}", &CONFIG.common.data_wal_dir).replace('\\', "/");
+            result.push(file_key);
         }
     }
     Ok(result)

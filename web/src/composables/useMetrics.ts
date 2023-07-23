@@ -56,7 +56,12 @@ const defaultObject = {
     additionalErrorMsg: "",
     metrics: {
       metricList: [],
-      selectedMetric: "",
+      selectedMetric: null as null | {
+        type: string;
+        name: string;
+        value: string;
+        help: string;
+      },
       selectedMetricType: "",
     },
     queryResults: <any>[],

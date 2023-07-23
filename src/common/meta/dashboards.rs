@@ -150,12 +150,11 @@ pub struct List {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct QueryData {
-    #[serde(rename = "stream_type")]
     pub stream_type: StreamType,
     pub stream: String,
     pub field: String,
+    pub max_record_size: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

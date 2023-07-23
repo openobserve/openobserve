@@ -22,6 +22,7 @@ use crate::common::infra::{
 use crate::common::meta::common::FileMeta;
 
 pub mod broadcast;
+pub mod dynamo_db;
 pub mod local;
 pub mod remote;
 
@@ -31,8 +32,12 @@ pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
 pub static BLOCKED_ORGS: Lazy<Vec<&str>> =
     Lazy::new(|| CONFIG.compact.blocked_orgs.split(',').collect());
 
-#[inline]
-pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), anyhow::Error> {
+pub async fn progress(
+    key: &str,
+    data: FileMeta,
+    delete: bool,
+    download: bool,
+) -> Result<(), anyhow::Error> {
     let old_data = cache::file_list::get_file_from_cache(key);
     match delete {
         true => {
@@ -74,15 +79,12 @@ pub async fn progress(key: &str, data: FileMeta, delete: bool) -> Result<(), any
                     );
                 }
             }
-            if CONFIG.memory_cache.cache_latest_files
+            if download
+                && CONFIG.memory_cache.cache_latest_files
                 && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
             {
-                match cache::file_data::download(key).await {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("service:db:file_list: add {}, download error: {}", key, e);
-                    }
-                }
+                // maybe load already merged file, no need report error
+                _ = cache::file_data::download(key).await;
             }
             if old_data.is_ok() {
                 return Ok(()); // already exists, skip increase stats

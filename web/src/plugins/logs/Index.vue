@@ -44,6 +44,7 @@
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
               class="full-height"
+              @update:model-value="onSplitterUpdate"
             >
               <template #before>
                 <div class="relative-position full-height">
@@ -193,13 +194,12 @@
 // @ts-nocheck
 import {
   defineComponent,
-  onMounted,
-  onUpdated,
   ref,
   onDeactivated,
   onActivated,
   computed,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { useQuasar, date, is } from "quasar";
 import { useStore } from "vuex";
@@ -233,7 +233,6 @@ import {
   getDurationObjectFromParams,
   getConsumableRelativeTime,
 } from "@/utils/date";
-import { nextTick } from "process";
 import useNotifications from "@/composables/useNotifications";
 import { cloneDeep } from "lodash-es";
 
@@ -283,8 +282,7 @@ export default defineComponent({
             150 -
           1;
 
-        this.searchObj.loading = true;
-        this.getQueryData();
+        this.getQueryData(true);
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -389,6 +387,7 @@ export default defineComponent({
           )
           .then((res) => {
             searchObj.data.streamResults = res.data;
+            searchObj.loading = false;
 
             if (res.data.list.length > 0) {
               getQueryTransform();
@@ -605,11 +604,12 @@ export default defineComponent({
           },
         };
 
-        var timestamps: any = searchObj.data.datetime.relativeTimePeriod
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod
-            )
-          : cloneDeep(searchObj.data.datetime);
+        var timestamps: any =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod
+              )
+            : cloneDeep(searchObj.data.datetime);
 
         if (
           timestamps.startTime != "Invalid Date" &&
@@ -621,31 +621,40 @@ export default defineComponent({
           req.query.end_time = timestamps.endTime;
 
           searchObj.meta.resultGrid.chartInterval = "10 second";
-          if (req.query.end_time - req.query.start_time >= 1000 * 60 * 30) {
+          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
             searchObj.meta.resultGrid.chartInterval = "15 second";
             searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 60 * 60) {
+          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
             searchObj.meta.resultGrid.chartInterval = "30 second";
             searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 2) {
+          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
             searchObj.meta.resultGrid.chartInterval = "1 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 6) {
+          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
             searchObj.meta.resultGrid.chartInterval = "5 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 3600 * 24) {
+          if (
+            req.query.end_time - req.query.start_time >=
+            1000000 * 3600 * 24
+          ) {
             searchObj.meta.resultGrid.chartInterval = "30 minute";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 86400 * 7) {
+          if (
+            req.query.end_time - req.query.start_time >=
+            1000000 * 86400 * 7
+          ) {
             searchObj.meta.resultGrid.chartInterval = "1 hour";
             searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
           }
-          if (req.query.end_time - req.query.start_time >= 1000 * 86400 * 30) {
+          if (
+            req.query.end_time - req.query.start_time >=
+            1000000 * 86400 * 30
+          ) {
             searchObj.meta.resultGrid.chartInterval = "1 day";
             searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
           }
@@ -813,10 +822,11 @@ export default defineComponent({
       router.push({ query });
     }
 
-    function getQueryData() {
-      // const dismiss = Notify();
+    function getQueryData(notify) {
+      let dismiss = () => {};
       try {
         if (searchObj.data.stream.selectedStream.value == "") {
+          searchObj.loading = false;
           return false;
         }
 
@@ -842,12 +852,14 @@ export default defineComponent({
           };
           // searchObj.data.editorValue = "";
         }
-        // dismiss = Notify();
+
+        if (notify) dismiss = Notify();
 
         const queryReq = buildSearch();
 
         if (queryReq == null) {
-          // dismiss();
+          dismiss();
+          searchObj.loading = false;
           return false;
         }
 
@@ -890,11 +902,11 @@ export default defineComponent({
             generateHistogramData();
             //update grid columns
             updateGridColumns();
-            // dismiss();
+            dismiss();
           })
           .catch((err) => {
             searchObj.loading = false;
-            // dismiss();
+            dismiss();
             if (err.response != undefined) {
               searchObj.data.errorMsg = err.response.data.error;
             } else {
@@ -1227,6 +1239,7 @@ export default defineComponent({
       ) {
         clearInterval(refreshIntervalID);
         refreshIntervalID = setInterval(() => {
+          searchObj.loading = true;
           runQueryFn();
         }, parseInt(searchObj.meta.refreshInterval) * 1000);
         $q.notify({
@@ -1426,6 +1439,10 @@ export default defineComponent({
       else expandedLogs.value[index.toString()] = true;
     };
 
+    const onSplitterUpdate = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       store,
       router,
@@ -1451,6 +1468,7 @@ export default defineComponent({
       expandedLogs,
       updateUrlQueryParams,
       fieldValues,
+      onSplitterUpdate,
     };
   },
   computed: {
@@ -1550,6 +1568,7 @@ export default defineComponent({
           this.searchBarRef.resetFunctionContent();
           if (streamOld.value) this.searchObj.data.query = "";
           if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
+          this.searchObj.loading = true;
           setTimeout(() => {
             this.runQueryFn();
           }, 500);

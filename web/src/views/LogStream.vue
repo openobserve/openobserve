@@ -173,9 +173,13 @@ import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
 import segment from "../services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "../utils/zincutils";
+import {
+  getImageURL,
+  verifyOrganizationStatus,
+  formatSizeFromMB,
+} from "../utils/zincutils";
 import config from "@/aws-exports";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -225,17 +229,22 @@ export default defineComponent({
       },
       {
         name: "storage_size",
-        field: "storage_size",
         label: t("logStream.storageSize"),
+        field: (row: any) => formatSizeFromMB(row.storage_size),
         align: "left",
         sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return parseInt(rowA.storage_size) - parseInt(rowB.storage_size);
+        },
       },
       {
         name: "compressed_size",
-        field: "compressed_size",
+        field: (row: any) => formatSizeFromMB(row.compressed_size),
         label: t("logStream.compressedSize"),
         align: "left",
         sortable: true,
+        sort: (a, b, rowA, rowB) =>
+          parseInt(rowA.compressed_size) - parseInt(rowB.compressed_size),
       },
       {
         name: "actions",

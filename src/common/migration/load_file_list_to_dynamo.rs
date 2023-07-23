@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use bytes::Buf;
+use chrono::Local;
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
@@ -22,22 +23,27 @@ use tokio::sync::RwLock;
 use crate::common::infra::{config::CONFIG, storage};
 use crate::common::json;
 use crate::common::meta::common::FileKey;
+use crate::service::db::file_list::{dynamo_db, BLOCKED_ORGS, DELETED_FILES};
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
 
-pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
+pub async fn load(prefix: &str) -> Result<(), anyhow::Error> {
+    println!("Start Loading file_list");
     let prefix = format!("file_list/{prefix}");
     let mut rw = LOADED_FILES.write().await;
     if rw.contains(&prefix) {
         return Ok(());
     }
+    println!("Load file_list [{prefix}] begin");
+    let mut files = storage::list(&prefix).await?;
+    files.sort();
+    for file in files.iter() {
+        println!("file file: {:?}", file);
+    }
 
-    log::info!("Load file_list [{prefix}] begin");
-    let files = storage::list(&prefix).await?;
-    log::info!("Load file_list [{prefix}] gets {} files", files.len());
+    println!("Load file_list [{prefix}] gets {:?} files", files.len());
     if files.is_empty() {
-        // cache result
         rw.insert(prefix);
         return Ok(());
     }
@@ -71,28 +77,22 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     }
 
     // delete files
-    for item in super::DELETED_FILES.iter() {
-        super::progress(item.key(), item.value().to_owned(), true, false).await?;
-    }
+    let delete_files = DELETED_FILES
+        .iter()
+        .map(|v| v.key().clone())
+        .collect::<Vec<String>>();
+    dynamo_db::batch_delete(&delete_files).await?;
 
-    log::info!(
+    println!(
         "Load file_list [{prefix}] load {}:{} done",
         files.len(),
         count
     );
 
-    // cache result
-    rw.insert(prefix);
-
-    // clean deleted files
-    super::DELETED_FILES.clear();
-    super::DELETED_FILES.shrink_to_fit();
-
     Ok(())
 }
 
 async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
-    // download file list from storage
     let data = match storage::get(file).await {
         Ok(data) => data,
         Err(_) => {
@@ -104,28 +104,39 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
     let uncompress_reader = BufReader::new(uncompress.reader());
     // parse file list
     let mut count = 0;
+    let mut total_count = 0;
+    let mut file_keys = Vec::new();
     for line in uncompress_reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
-        count += 1;
         let item: FileKey = json::from_slice(line.as_bytes())?;
-        // check backlist
-        if !super::BLOCKED_ORGS.is_empty() {
+        total_count += 1;
+        // check blocked orgs
+        if !BLOCKED_ORGS.is_empty() {
             let columns = item.key.split('/').collect::<Vec<&str>>();
             let org_id = columns.get(1).unwrap_or(&"");
-            if super::BLOCKED_ORGS.contains(org_id) {
-                // log::error!("Load file_list skip blacklist org: {}", org_id);
+            if BLOCKED_ORGS.contains(org_id) {
                 continue;
             }
         }
         // check deleted files
         if item.deleted {
-            super::DELETED_FILES.insert(item.key, item.meta.to_owned());
+            DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        super::progress(&item.key, item.meta, item.deleted, false).await?;
+        count += 1;
+        file_keys.push(item);
     }
+    let now = Local::now();
+    println!(
+        "{}: Writing files to dynamo {} from total {}",
+        now.format("%Y-%m-%d %H:%M:%S"),
+        file_keys.len(),
+        total_count
+    );
+
+    dynamo_db::batch_write(&file_keys).await?;
     Ok(count)
 }

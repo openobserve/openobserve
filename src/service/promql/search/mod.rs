@@ -47,7 +47,7 @@ use crate::{
 
 pub mod grpc;
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all,fields(org_id = org_id))]
 pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
@@ -55,7 +55,7 @@ pub async fn search(org_id: &str, req: &MetricsQueryRequest) -> Result<Value> {
     search_in_cluster(req).await
 }
 
-#[tracing::instrument(name = "promql:search:cluster", skip_all)]
+#[tracing::instrument(name = "promql:search:cluster", skip_all,fields(org_id = req.org_id))]
 async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
     let op_start = std::time::Instant::now();
 
@@ -138,7 +138,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         );
 
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!("promql:search:cluster:grpc_search");
+        let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req
@@ -269,6 +269,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
     report_usage_stats(
         req_stats,
         &req.org_id,
+        "", // TODO see if we can add metric name
         StreamType::Metrics,
         UsageType::MetricSearch,
         0,

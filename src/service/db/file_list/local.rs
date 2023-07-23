@@ -29,27 +29,40 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
         meta,
         deleted,
     };
-    let mut write_buf = json::to_vec(&file_data)?;
-    write_buf.push(b'\n');
-    let hour_key = if meta.min_ts > 0 {
-        Utc.timestamp_nanos(meta.min_ts * 1000)
-            .format("%Y_%m_%d_%H")
-            .to_string()
-    } else {
-        let columns = key.split('/').collect::<Vec<&str>>();
-        if columns[0] != "files" || columns.len() < 9 {
-            return Ok(());
-        }
-        format!(
-            "{}_{}_{}_{}",
-            columns[4], columns[5], columns[6], columns[7]
-        )
-    };
-    let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
-    file.write(write_buf.as_ref());
+    if !CONFIG.common.use_dynamo_meta_store {
+        let mut write_buf = json::to_vec(&file_data)?;
+        write_buf.push(b'\n');
+        let hour_key = if meta.min_ts > 0 {
+            Utc.timestamp_nanos(meta.min_ts * 1000)
+                .format("%Y_%m_%d_%H")
+                .to_string()
+        } else {
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] != "files" || columns.len() < 9 {
+                return Ok(());
+            }
+            format!(
+                "{}_{}_{}_{}",
+                columns[4], columns[5], columns[6], columns[7]
+            )
+        };
+        let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
+        file.write(write_buf.as_ref());
 
-    super::progress(key, meta, deleted).await?;
-    super::broadcast::send(&[file_data]).await
+        super::progress(key, meta, deleted, true).await?;
+        tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
+    } else {
+        // retry 5 times
+        for _ in 0..10 {
+            if let Err(e) = super::dynamo_db::write_file(&file_data).await {
+                log::error!("[FILE_LIST] Error saving file to dynamo, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            } else {
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub async fn get_all() -> Result<Vec<FileKey>, anyhow::Error> {
@@ -91,7 +104,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;
         }
-        super::progress(&item.key, item.meta, item.deleted).await?;
+        super::progress(&item.key, item.meta, item.deleted, false).await?;
     }
     Ok(())
 }
@@ -102,7 +115,12 @@ pub async fn broadcast_cache() -> Result<(), anyhow::Error> {
     if files.is_empty() {
         return Ok(());
     }
-    super::broadcast::send(&files).await
+    for chunk in files.chunks(100) {
+        if let Err(e) = super::broadcast::send(chunk).await {
+            log::error!("broadcast cached file list failed: {}", e);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

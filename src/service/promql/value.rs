@@ -167,6 +167,13 @@ pub struct RangeValue {
     pub time_window: Option<TimeWindow>,
 }
 
+impl RangeValue {
+    /// Returns the values from the `samples` field as an array of f64
+    pub fn get_sample_values(&self) -> Vec<f64> {
+        self.samples.iter().map(|sample| sample.value).collect()
+    }
+}
+
 impl Serialize for RangeValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -371,6 +378,12 @@ impl Value {
         }
     }
 
+    pub(crate) fn get_float(&self) -> Option<f64> {
+        match self {
+            Value::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
     pub fn get_type(&self) -> &str {
         match self {
             Value::Instant(_) => "vector",

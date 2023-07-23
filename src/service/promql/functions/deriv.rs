@@ -14,22 +14,22 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
+use crate::service::promql::common::linear_regression;
+use crate::service::promql::value::{RangeValue, Value};
 
-pub(crate) fn rate(data: &Value) -> Result<Value> {
-    super::eval_idelta(data, "rate", exec, false)
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
+pub(crate) fn deriv(data: &Value) -> Result<Value> {
+    super::eval_idelta(data, "deriv", exec, false)
 }
 
-fn exec(series: &RangeValue) -> Option<f64> {
-    let tw = series
-        .time_window
-        .as_ref()
-        .expect("BUG: `rate` function requires time window");
-    extrapolated_rate(
-        &series.samples,
-        tw.eval_ts,
-        tw.range,
-        tw.offset,
-        ExtrapolationKind::Rate,
-    )
+fn exec(data: &RangeValue) -> Option<f64> {
+    if data.samples.len() < 2 {
+        return None;
+    }
+    // https://github.com/prometheus/prometheus/issues/2674
+    let value = linear_regression(&data.samples, data.samples[0].timestamp / 1000);
+    match value {
+        Some((slope, _)) => Some(slope),
+        _ => None,
+    }
 }

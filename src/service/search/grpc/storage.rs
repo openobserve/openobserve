@@ -23,7 +23,7 @@ use crate::common::infra::{
     config::CONFIG,
     errors::{Error, ErrorCodes},
 };
-use crate::common::meta::{self, stream::ScanStats};
+use crate::common::meta::{self, common::FileKey, stream::ScanStats};
 use crate::service::{
     db, file_list,
     search::{
@@ -33,11 +33,11 @@ use crate::service::{
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all)]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
-    file_list: &[String],
+    file_list: &[FileKey],
     stream_type: meta::StreamType,
 ) -> super::SearchResult {
     // get file list
@@ -48,6 +48,12 @@ pub async fn search(
     if files.is_empty() {
         return Ok((HashMap::new(), ScanStats::default()));
     }
+    log::info!(
+        "search->storage: org {}, stream {}, load file_list num {}",
+        &sql.org_id,
+        &sql.stream_name,
+        files.len(),
+    );
 
     // fetch all schema versions, group files by version
     let schema_versions =
@@ -67,12 +73,12 @@ pub async fn search(
     }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
-    let mut files_group: HashMap<usize, Vec<String>> =
+    let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
     if !CONFIG.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
-        scan_stats = match file_list::calculate_files_size(&files) {
+        scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
                 log::error!("calculate files size error: {}", err);
@@ -84,25 +90,24 @@ pub async fn search(
         files_group.insert(schema_latest_id, files);
     } else {
         scan_stats.files = files.len() as u64;
-        for file in &files {
-            let file_meta = file_list::get_file_meta(file).unwrap_or_default();
+        for file in files.iter() {
             // calculate scan size
-            scan_stats.records += file_meta.records;
-            scan_stats.original_size += file_meta.original_size;
-            scan_stats.compressed_size += file_meta.compressed_size;
+            scan_stats.records += file.meta.records;
+            scan_stats.original_size += file.meta.original_size;
+            scan_stats.compressed_size += file.meta.compressed_size;
             // check schema version
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
-                file_meta.min_ts,
-                file_meta.max_ts,
+                file.meta.min_ts,
+                file.meta.max_ts,
             ) {
                 Some(id) => id,
                 None => {
                     log::error!(
                         "search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
-                        &file,
-                        file_meta.min_ts,
-                        file_meta.max_ts
+                        &file.key,
+                        file.meta.min_ts,
+                        file.meta.max_ts
                     );
                     // HACK: use the latest verion if not found in schema versions
                     schema_latest_id
@@ -137,7 +142,7 @@ pub async fn search(
         if !deleted_files.is_empty() {
             // remove deleted files from files_group
             for (_, g_files) in files_group.iter_mut() {
-                g_files.retain(|f| !deleted_files.contains(f));
+                g_files.retain(|f| !deleted_files.contains(&f.key));
             }
         }
         log::info!(
@@ -172,7 +177,7 @@ pub async fn search(
                 }
             }
         }
-        let datafusion_span = info_span!("service:search:grpc:storage:datafusion");
+        let datafusion_span = info_span!("service:search:grpc:storage:datafusion", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
         let task = tokio::task::spawn(
             async move {
                 exec::sql(
@@ -216,17 +221,19 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all)]
-async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<String>, Error> {
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all,fields(org_id = sql.org_id,stream_name = sql.stream_name))]
+async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let results = match file_list::get_file_list(
+    let mut file_list = match file_list::get_file_list(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
         time_min,
         time_max,
-    ) {
-        Ok(results) => results,
+    )
+    .await
+    {
+        Ok(file_list) => file_list,
         Err(err) => {
             log::error!("get file list error: {}", err);
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
@@ -235,32 +242,38 @@ async fn get_file_list(sql: &Sql, stream_type: meta::StreamType) -> Result<Vec<S
         }
     };
 
-    let mut files = Vec::new();
-    for file in results {
-        if sql.match_source(&file, false, false, stream_type).await {
-            files.push(file.clone());
+    if CONFIG.common.use_dynamo_meta_store && file_list.len() > 256 {
+        // because match_source need fetch file meta again, so add an limit
+        file_list.sort_by(|a, b| a.key.cmp(&b.key));
+        Ok(file_list)
+    } else {
+        let mut files = Vec::with_capacity(file_list.len());
+        for file in file_list {
+            if sql.match_source(&file, false, false, stream_type).await {
+                files.push(file.clone());
+            }
         }
+        Ok(files)
     }
-    Ok(files)
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(files: &[String]) -> Result<Vec<String>, Error> {
+async fn cache_parquet_files(files: &[FileKey]) -> Result<Vec<String>, Error> {
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
-        let file = file.clone();
+        let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            if !file_data::exist(&file).unwrap_or_default() {
-                if let Err(e) = file_data::download(&file).await {
+            if !file_data::exist(&file_name) {
+                if let Err(e) = file_data::download(&file_name).await {
                     log::info!("search->storage: download file err: {}", e);
                     if e.to_string().to_lowercase().contains("not found") {
                         // delete file from file list
-                        if let Err(e) = file_list::delete_parquet_file(&file).await {
+                        if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                             log::error!("search->storage: delete from file_list err: {}", e);
                         }
-                        return Some(file);
+                        return Some(file_name);
                     }
                 }
             };

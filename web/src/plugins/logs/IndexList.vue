@@ -61,7 +61,7 @@
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="field-table"
+        class="field-table full-height"
         id="fieldList"
       >
         <template #body-cell-name="props">
@@ -91,7 +91,7 @@
                     style="margin-right: 0.375rem"
                     size="0.4rem"
                     class="q-mr-sm"
-                    @click.stop="addToFilter(props.row.name)"
+                    @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
                   <q-icon
@@ -149,7 +149,7 @@
                         style="margin-right: 0.375rem"
                         size="0.4rem"
                         class="q-mr-sm"
-                        @click.stop="addToFilter(props.row.name)"
+                        @click.stop="addToFilter(`${props.row.name}=''`)"
                         round
                       />
                       <q-icon
@@ -322,6 +322,7 @@ import {
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
 
 interface Filter {
   fieldName: string;
@@ -406,9 +407,12 @@ export default defineComponent({
         return;
       }
 
-      let timestamps = getConsumableRelativeTime(
-        searchObj.data.datetime.relativeTimePeriod
-      );
+      let timestamps: any =
+        searchObj.data.datetime.type === "relative"
+          ? getConsumableRelativeTime(
+              searchObj.data.datetime.relativeTimePeriod
+            )
+          : cloneDeep(searchObj.data.datetime);
 
       if (searchObj.data.stream.streamType === "enrichment_tables") {
         const stream = searchObj.data.streamResults.list.find(

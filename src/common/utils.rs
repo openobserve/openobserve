@@ -78,8 +78,13 @@ pub async fn populate_file_meta(
     let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
     let json_rows = arrow_json::writer::record_batches_to_json_rows(&batches_ref)?;
     let mut result: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
-
+    if result.is_empty() {
+        return Ok(());
+    }
     let record = result.pop().expect("No record found");
+    if record.is_null() {
+        return Ok(());
+    }
     file_meta.min_ts = record
         .get("min")
         .expect("No field found: min")

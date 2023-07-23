@@ -309,7 +309,10 @@ pub async fn check_for_schema(
         }
     };
 
-    if !schema.fields().eq(inferred_schema.fields()) {
+    let (field_datatype_delta, is_schema_changed, final_fields) =
+        get_schema_changes(&schema, &inferred_schema);
+
+    if is_schema_changed {
         if let Some(value) = handle_existing_schema(
             stream_name,
             org_id,
@@ -324,7 +327,7 @@ pub async fn check_for_schema(
         } else {
             SchemaEvolution {
                 schema_compatible: true,
-                types_delta: None,
+                types_delta: Some(field_datatype_delta),
                 schema_fields: schema.to_cloned_fields(),
                 is_schema_changed: false,
             }
@@ -332,9 +335,9 @@ pub async fn check_for_schema(
     } else {
         SchemaEvolution {
             schema_compatible: true,
-            types_delta: None,
-            schema_fields: schema.to_cloned_fields(),
-            is_schema_changed: false,
+            types_delta: Some(field_datatype_delta),
+            schema_fields: final_fields,
+            is_schema_changed,
         }
     }
 }
@@ -348,11 +351,8 @@ async fn handle_existing_schema(
     stream_schema_map: &mut AHashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
     if !CONFIG.common.local_mode {
-        let mut lock = etcd::Locker::new(&format!(
-            "/schema/lock/{org_id}/{stream_type}/{stream_name}"
-        ));
+        let mut lock = etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
         lock.lock(0).await.map_err(server_internal_error).unwrap();
-        log::info!("Acquired lock for stream {} to update schema", stream_name);
         let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
             .await
             .unwrap();
@@ -369,6 +369,7 @@ async fn handle_existing_schema(
         metadata.extend(inferred_schema.metadata().to_owned());
         let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
         if is_schema_changed {
+            log::info!("Acquired lock for stream {} to update schema", stream_name);
             db::schema::set(
                 org_id,
                 stream_name,
@@ -405,7 +406,7 @@ async fn handle_existing_schema(
 
         if !*lock_acquired {
             *lock_acquired = true; // We've acquired the lock.
-            log::info!("Acquired lock for stream {} to update schema", stream_name);
+
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
@@ -422,6 +423,7 @@ async fn handle_existing_schema(
             metadata.extend(inferred_schema.metadata().to_owned());
             let final_schema = Schema::new(final_fields.clone()).with_metadata(metadata);
             if is_schema_changed {
+                log::info!("Acquired lock for stream {} to update schema", stream_name);
                 db::schema::set(
                     org_id,
                     stream_name,
@@ -488,9 +490,8 @@ async fn handle_new_schema(
         stream_schema_map.insert(stream_name.to_string(), final_schema.clone());
 
         if !CONFIG.common.local_mode {
-            let mut lock = etcd::Locker::new(&format!(
-                "/schema/lock/{org_id}/{stream_type}/{stream_name}"
-            ));
+            let mut lock =
+                etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
             lock.lock(0).await.map_err(server_internal_error).unwrap();
             log::info!("Aquired lock for stream {} as schema is empty", stream_name);
 

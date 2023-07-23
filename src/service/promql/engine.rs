@@ -109,6 +109,7 @@ impl Engine {
                 let token = expr.op.id();
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
+
                 match (lhs.clone(), rhs.clone()) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -489,6 +490,12 @@ impl Engine {
         Ok(())
     }
 
+    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
+        match value {
+            Value::Float(f) => Ok(*f),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
+    }
     async fn call_expr(&mut self, func: &Function, args: &FunctionArgs) -> Result<Value> {
         use crate::service::promql::functions::Func;
 
@@ -497,9 +504,35 @@ impl Engine {
         })?;
 
         // There are a few functions which need no arguments for e.g. time()
-        let functions_without_args: HashSet<String> = HashSet::from_iter(vec!["time".into()]);
+        let functions_without_args: HashSet<&str> = HashSet::from_iter(vec![
+            "day_of_month",
+            "day_of_week",
+            "day_of_year",
+            "days_in_month",
+            "hour",
+            "minute",
+            "month",
+            "time",
+            "year",
+        ]);
         let input = match functions_without_args.contains(func.name) {
-            true => Value::None,
+            true => match args.len() {
+                0 => {
+                    // Found no arg to pass to, lets use a `vector(time())` as the arg.
+                    // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
+                    let default_now_vector = vec![InstantValue {
+                        labels: Labels::default(),
+                        sample: Sample::new(self.time, 0.0),
+                    }];
+                    Value::Vector(default_now_vector)
+                }
+                1 => self.call_expr_first_arg(args).await?,
+                _ => {
+                    return Err(DataFusionError::NotImplemented(
+                        "Invalid args passed to the function".into(),
+                    ))
+                }
+            },
             false => {
                 let last_arg = args
                     .last()
@@ -571,12 +604,7 @@ impl Engine {
             Func::DayOfYear => functions::day_of_year(&input)?,
             Func::DaysInMonth => functions::days_in_month(&input)?,
             Func::Delta => functions::delta(&input)?,
-            Func::Deriv => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
-            }
+            Func::Deriv => functions::deriv(&input)?,
             Func::Exp => functions::exp(&input)?,
             Func::Floor => functions::floor(&input)?,
             Func::HistogramCount => {
@@ -621,10 +649,18 @@ impl Engine {
                 )));
             }
             Func::HoltWinters => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err =
+                    "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
+                self.ensure_three_args(args, err)?;
+
+                let input = self.call_expr_first_arg(args).await?;
+                let sf = self.call_expr_second_arg(args).await?;
+                let tf = self.call_expr_third_arg(args).await?;
+
+                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
+                let trend_factor = self.parse_f64_else_err(&tf, err)?;
+
+                functions::holt_winters(&input, scaling_factor, trend_factor)?
             }
             Func::Hour => functions::hour(&input)?,
             Func::Idelta => functions::idelta(&input)?,
@@ -687,10 +723,17 @@ impl Engine {
             Func::Minute => functions::minute(&input)?,
             Func::Month => functions::month(&input)?,
             Func::PredictLinear => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
-                )));
+                let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
+
+                self.ensure_two_args(args, err)?;
+                let input = self.call_expr_first_arg(args).await?;
+
+                let prediction_steps = self.call_expr_second_arg(args).await?.get_float().ok_or(
+                    DataFusionError::NotImplemented(format!(
+                        "Invalid prediction_steps, f64 expected",
+                    )),
+                )?;
+                functions::predict_linear(&input, prediction_steps)?
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";

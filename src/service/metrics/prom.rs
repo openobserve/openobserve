@@ -28,7 +28,7 @@ use crate::common::infra::{
     metrics,
 };
 use crate::common::meta::functions::StreamTransform;
-use crate::common::meta::usage::{RequestStats, UsageType};
+use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
@@ -76,7 +76,6 @@ pub async fn remote_write(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut final_req_stats = RequestStats::default();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -310,6 +309,7 @@ pub async fn remote_write(
         }
     }
 
+    let time = start.elapsed().as_secs_f64();
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -317,7 +317,18 @@ pub async fn remote_write(
         }
         // write to file
         let mut stream_file_name = "".to_string();
-        let req_stats = write_file(
+
+        // check if we are allowed to ingest
+        if db::compact::retention::is_deleting_stream(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            None,
+        ) {
+            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+        }
+
+        let mut req_stats = write_file(
             stream_data,
             thread_id,
             org_id,
@@ -325,8 +336,18 @@ pub async fn remote_write(
             &mut stream_file_name,
             StreamType::Metrics,
         );
-        final_req_stats.size += req_stats.size;
-        final_req_stats.records += req_stats.records;
+
+        let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+        req_stats.response_time += time;
+        report_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            UsageType::Metrics,
+            fns_length as u16,
+        )
+        .await;
 
         let _schema_exists = stream_schema_exists(
             org_id,
@@ -359,7 +380,6 @@ pub async fn remote_write(
         }
     }
 
-    let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             "/prometheus/api/v1/write",
@@ -378,17 +398,6 @@ pub async fn remote_write(
             &StreamType::Metrics.to_string(),
         ])
         .inc();
-    final_req_stats.response_time += time;
-    //metric + data usage
-    let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
-    report_usage_stats(
-        final_req_stats,
-        org_id,
-        StreamType::Metrics,
-        UsageType::Metrics,
-        fns_length as u16,
-    )
-    .await;
 
     Ok(())
 }
