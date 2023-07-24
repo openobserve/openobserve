@@ -7,7 +7,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
     console.log("searchQueryData", searchQueryData);
     
 //   const store = useStore();
-  const plotRef: any = ref(null);
+  // const plotRef: any = ref(null);
   // get the x axis key
   const getXAxisKeys = () => {
     return props.data.fields?.x?.length
@@ -87,14 +87,14 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
     }
   };
 
-//   const getThemeLayoutOptions = () => ({
-//     paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-//     plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-//     font: {
-//       size: 12,
-//       color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-//     },
-//   });
+  const getThemeLayoutOptions = () => ({
+    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    font: {
+      size: 12,
+      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+    },
+  });
 
   const getTickLength = () => props.width - 2;
   const getTickLimits = (layout: string[]) => {
@@ -488,9 +488,8 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
     }
   };
 
-  const renderSqlBasedChart = async () => {
   console.log("Query: rendering chart");
-  console.log("Query: chart type", props.data.type);
+  console.log("Query: chart type", props.data);
   // Step 1: Get the X-Axis key
   const xAxisKeys = getXAxisKeys();
 
@@ -796,11 +795,15 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
     console.log('layout', layout);
     console.log('traces', traces);
 
-  Plotly.react(plotRef.value, traces, layout, {
-    responsive: true,
-    displaylogo: false,
-    displayModeBar: false,
-  });
+  // Plotly.react(plotRef.value, traces, layout, {
+  //   responsive: true,
+  //   displaylogo: false,
+  //   displayModeBar: false,
+  // });
+  return {
+    traces,
+    layout,
+  };
 };
-}
+
 
