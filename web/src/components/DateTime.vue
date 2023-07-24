@@ -344,6 +344,7 @@ export default defineComponent({
           value.startTime !== datePayload.value.startTime ||
           value.endTime !== datePayload.value.endTime
         ) {
+          selectedType.value = props.defaultType;
           setAbsoluteTime(value.startTime, value.endTime);
         }
       },
