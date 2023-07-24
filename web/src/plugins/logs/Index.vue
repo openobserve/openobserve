@@ -406,8 +406,6 @@ export default defineComponent({
       // }, 3000);
     };
 
-    
-
     const setQuery = (sqlMode: boolean) => {
       if (!searchBarRef.value) {
         console.error("searchBarRef is null");
