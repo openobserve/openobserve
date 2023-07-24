@@ -68,6 +68,39 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             }
         };
 
+        // check metrics type for Histogram & Summary
+        if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
+            if stream_schema_map.get(&stream_name).is_none() {
+                let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+                if schema == Schema::empty() {
+                    // create the metadata for the stream
+                    let metadata = Metadata {
+                        metric_family_name: stream_name.clone(),
+                        metric_type: metrics_type.as_str().into(),
+                        help: stream_name.clone().replace('_', " "),
+                        unit: "".to_string(),
+                    };
+                    let mut extra_metadata: HashMap<String, String> = HashMap::new();
+                    extra_metadata.insert(
+                        METADATA_LABEL.to_string(),
+                        json::to_string(&metadata).unwrap(),
+                    );
+                    schema = schema.with_metadata(extra_metadata);
+                    db::schema::set(
+                        org_id,
+                        &stream_name,
+                        StreamType::Metrics,
+                        &schema,
+                        Some(chrono::Utc::now().timestamp_micros()),
+                        false,
+                    )
+                    .await?;
+                }
+                stream_schema_map.insert(stream_name.clone(), schema);
+            }
+            continue;
+        }
+
         // apply functions
         let mut record = json::Value::Object(record.to_owned());
         apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
