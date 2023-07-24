@@ -100,10 +100,6 @@ export default defineComponent({
     const destinations = ref([]);
     const splitterModel = ref(220);
 
-    onActivated(() => {
-      redirectRoute();
-    });
-
     onBeforeMount(() => {
       redirectRoute();
     });

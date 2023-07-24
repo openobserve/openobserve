@@ -352,6 +352,10 @@ export default defineComponent({
       "functionList",
       "streamFunctions",
       "enrichmentTables",
+      "alerts",
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
     ];
 
     const orgOptions = ref([{ label: Number, value: String }]);
