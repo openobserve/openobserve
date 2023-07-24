@@ -479,28 +479,6 @@ export default defineComponent({
       exploreStream,
     };
   },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      this.orgData = newVal;
-      if (
-        (newVal != oldVal || this.logStream.values == undefined) &&
-        this.router.currentRoute.value.name == "logstreams"
-      ) {
-        this.logStream = [];
-        this.resultTotal = 0;
-        this.getLogStream();
-      }
-    },
-  },
 });
 </script>
 
