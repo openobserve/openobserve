@@ -77,7 +77,7 @@ datafusion = { version = "27", features = ["simd"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
-etcd-client = { version = "0.10", features = ["tls"] }
+etcd-client = { version = "0.11", features = ["tls"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
