@@ -29,7 +29,7 @@ use vrl::prelude::state;
 
 use crate::common::functions::get_vrl_compiler_config;
 use crate::common::{
-    json::{self, Map, Value},
+    json::{Map, Value},
     notification::send_notification,
 };
 
@@ -122,29 +122,14 @@ pub async fn get_stream_partition_keys(
     stream_name: &str,
     stream_schema_map: &AHashMap<String, Schema>,
 ) -> Vec<String> {
-    let mut keys: Vec<String> = vec![];
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
-        None => return keys,
+        None => return vec![],
     };
-
-    let stream_settings = match schema.metadata().get("settings") {
-        Some(value) => value,
-        None => return keys,
-    };
-
-    let settings: Value = json::from_slice(stream_settings.as_bytes()).unwrap();
-    let part_keys = match settings.get("partition_keys") {
-        Some(value) => value,
-        None => return keys,
-    };
-
-    let mut v: Vec<_> = part_keys.as_object().unwrap().into_iter().collect();
-    v.sort_by(|a, b| a.0.cmp(b.0));
-    for (_, value) in v {
-        keys.push(value.as_str().unwrap().to_string());
+    match super::stream::stream_settings(schema) {
+        None => vec![],
+        Some(v) => v.partition_keys,
     }
-    keys
 }
 
 pub async fn get_stream_alerts<'a>(

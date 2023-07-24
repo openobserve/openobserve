@@ -676,9 +676,8 @@ pub async fn stream_schema_exists(
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if let Some(value) = schema.metadata().get("settings") {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if settings.get("partition_keys").is_some() {
+    if let Some(settings) = super::stream::stream_settings(&schema) {
+        if !settings.partition_keys.is_empty() {
             schema_chk.has_partition_keys = true;
         }
     }
@@ -710,6 +709,7 @@ pub async fn add_stream_schema(
     if stream_type == StreamType::Traces {
         let settings = crate::common::meta::stream::StreamSettings {
             partition_keys: vec!["service_name".to_string()],
+            partition_time_level: None,
             full_text_search_keys: vec![],
             data_retention: 0,
         };

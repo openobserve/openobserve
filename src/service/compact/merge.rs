@@ -25,12 +25,15 @@ use crate::common::infra::{
     config::{CONFIG, FILE_EXT_PARQUET},
     dist_lock, ider, metrics, storage,
 };
-use crate::common::json;
-use crate::common::meta::{
-    common::{FileKey, FileMeta},
-    StreamType,
+use crate::common::{
+    json,
+    meta::{
+        common::{FileKey, FileMeta},
+        stream::PartitionTimeLevel,
+        StreamType,
+    },
 };
-use crate::service::{db, file_list, search::datafusion};
+use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -61,15 +64,13 @@ pub async fn merge_by_stream(
     }
 
     // get schema
-    let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
-    let schema_metadata = std::mem::take(&mut schema.metadata);
+    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    let schema = schema.with_metadata(HashMap::new());
     let schema = Arc::new(schema);
     if offset == 0 {
-        offset = schema_metadata
-            .get("created_at")
-            .unwrap_or(&String::from("0"))
-            .parse::<i64>()
-            .unwrap();
+        offset = stream_created
     }
     if offset == 0 {
         dist_lock::unlock(&mut locker).await?;
@@ -143,13 +144,56 @@ pub async fn merge_by_stream(
     drop(locker);
 
     // get current hour all files
+    let (partition_offset_start, partition_offset_end) =
+        match stream_settings.partition_time_level.unwrap_or_default() {
+            PartitionTimeLevel::Hourly => (
+                offset_time_hour,
+                offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
+                    - Duration::seconds(1).num_microseconds().unwrap(),
+            ),
+            PartitionTimeLevel::Daily => (
+                Utc.with_ymd_and_hms(
+                    offset_time.year(),
+                    offset_time.month(),
+                    offset_time.day(),
+                    0,
+                    0,
+                    0,
+                )
+                .unwrap()
+                .timestamp_micros(),
+                Utc.with_ymd_and_hms(
+                    offset_time.year(),
+                    offset_time.month(),
+                    offset_time.day(),
+                    0,
+                    0,
+                    0,
+                )
+                .unwrap()
+                .timestamp_micros()
+                    + Duration::days(1).num_microseconds().unwrap()
+                    - Duration::seconds(1).num_microseconds().unwrap(),
+            ),
+            PartitionTimeLevel::Monthly => (
+                Utc.with_ymd_and_hms(offset_time.year(), offset_time.month(), 1, 0, 0, 0)
+                    .unwrap()
+                    .timestamp_micros(),
+                Utc.with_ymd_and_hms(offset_time.year(), offset_time.month(), 1, 0, 0, 0)
+                    .unwrap()
+                    .timestamp_micros()
+                    + Duration::days(get_monthly_days(offset_time.year(), offset_time.month()))
+                        .num_microseconds()
+                        .unwrap()
+                    - Duration::seconds(1).num_microseconds().unwrap(),
+            ),
+        };
     let files = match file_list::get_file_list(
         org_id,
         stream_name,
         stream_type,
-        offset_time_hour,
-        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
-            - Duration::seconds(1).num_microseconds().unwrap(),
+        partition_offset_start,
+        partition_offset_end,
     )
     .await
     {
@@ -508,6 +552,21 @@ async fn write_file_list_dynamo(events: &[FileKey]) -> Result<(), anyhow::Error>
         break;
     }
     Ok(())
+}
+
+fn get_monthly_days(year: i32, month: u32) -> i64 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if year % 4 == 0 && year % 100 != 0 || year % 400 == 0 {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 0,
+    }
 }
 
 #[cfg(test)]
