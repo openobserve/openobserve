@@ -351,6 +351,16 @@ async fn merge_files(
             Ok(body) => body,
             Err(err) => {
                 log::error!("[COMPACT] merge small file: {}, err: {}", &file.key, err);
+                if err.to_string().to_lowercase().contains("not found") {
+                    // delete file from file list
+                    if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
+                        log::error!(
+                            "[COMPACT] delete file: {}, from file_list err: {}",
+                            &file.key,
+                            err
+                        );
+                    }
+                }
                 deleted_files.push(file.key.clone());
                 continue;
             }

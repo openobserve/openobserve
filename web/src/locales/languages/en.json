@@ -290,7 +290,9 @@
     "labelOfVariable": "Label (optional)",
     "ValueOfVariable": "Value",
     "DefaultValue": "Default value (optional)",
-    "typeOfVariable": "Type of variable"
+    "typeOfVariable": "Type of variable",
+    "DefaultSize": "Default max record size(optional)",
+    "maxRecordSize": "Default max record size is 10. You can update this value as required"
   },
   "panel": {
     "header": "Panel",

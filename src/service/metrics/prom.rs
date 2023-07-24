@@ -484,9 +484,35 @@ pub(crate) async fn get_metadata(
                 "failed to get metrics' stream schemas: {error}"
             )))
         }
-        Ok(stream_schemas) => {
+        Ok(mut stream_schemas) => {
+            stream_schemas.sort_by(|a, b| a.stream_name.cmp(&b.stream_name));
+            let histogram_summary = stream_schemas
+                .iter()
+                .filter_map(|v| match super::get_prom_metadata_from_schema(&v.schema) {
+                    None => None,
+                    Some(v) => {
+                        if v.metric_type == prom::MetricType::Histogram
+                            || v.metric_type == prom::MetricType::Summary
+                        {
+                            Some(v.metric_family_name)
+                        } else {
+                            None
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut histogram_summary_sub = Vec::with_capacity(histogram_summary.len() * 3);
+            for name in histogram_summary.iter() {
+                histogram_summary_sub.push(format!("{}_bucket", name));
+                histogram_summary_sub.push(format!("{}_count", name));
+                histogram_summary_sub.push(format!("{}_sum", name));
+            }
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
-                get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
+                if histogram_summary_sub.contains(&schema.stream_name) {
+                    None
+                } else {
+                    get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
+                }
             });
             Ok(match req.limit {
                 None => metric_names.collect(),
@@ -659,7 +685,7 @@ pub(crate) async fn get_label_values(
         // This special case doesn't require any SQL to be executed. All we have
         // to do is to collect stream names that satisfy selection criteria
         // (i.e., `selector` and `start`/`end`) and return them.
-        let stream_schemas = db::schema::list(org_id, Some(stream_type), false)
+        let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
@@ -671,7 +697,22 @@ pub(crate) async fn get_label_values(
                     continue;
                 }
             }
-            let stats = stats::get_stream_stats(org_id, &schema.stream_name, stream_type);
+            let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
+                None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
+                Some(metadata) => {
+                    if metadata.metric_type == prom::MetricType::Histogram
+                        || metadata.metric_type == prom::MetricType::Summary
+                    {
+                        stats::get_stream_stats(
+                            org_id,
+                            &format!("{}_sum", schema.stream_name),
+                            stream_type,
+                        )
+                    } else {
+                        stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
+                    }
+                }
+            };
             if stats.time_range_intersects(start, end) {
                 label_values.push(schema.stream_name.clone())
             }
