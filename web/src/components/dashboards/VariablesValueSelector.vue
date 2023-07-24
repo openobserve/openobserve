@@ -15,7 +15,7 @@
       <div v-if="item.type == 'query_values'">
           <!-- <q-select style="min-width: 150px;"  filled outlined dense v-model="item.value" :options="item.options"
             :label="item.label || item.name"></q-select> -->
-          <VariableQueryValueSelectorVue :variableItem="item"/>
+          <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
       <div v-else-if="item.type == 'constant'">
         <q-input style="max-width: 150px !important" v-model="item.value" :label="item.label || item.name" dense outlined
