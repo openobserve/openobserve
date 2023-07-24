@@ -93,9 +93,7 @@ export default defineComponent({
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
-    // onActivated(() => {
-    //   redirectRoute();
-    // });
+
     onBeforeMount(() => {
       redirectRoute();
     });
