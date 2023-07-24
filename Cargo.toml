@@ -77,7 +77,7 @@ datafusion = { version = "27", features = ["simd"] }
 dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
-etcd-client = { version = "0.10", features = ["tls"] }
+etcd-client = { version = "0.11", features = ["tls"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
@@ -113,7 +113,7 @@ opentelemetry-proto = { version = "0.1", features = [
 parking_lot = "0.12"
 parquet = { version = "42", features = ["arrow", "async"] }
 prometheus = "0.13"
-promql-parser = "0.1"
+promql-parser = "0.2"
 prost = "0.11"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }

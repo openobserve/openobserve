@@ -160,6 +160,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(prom::labels_get)
             .service(prom::labels_post)
             .service(prom::label_values)
+            .service(prom::format_query_get)
+            .service(prom::format_query_post)
             .service(create_dashboard)
             .service(update_dashboard)
             .service(list_dashboards)

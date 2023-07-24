@@ -126,6 +126,8 @@ pub struct Auth {
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
+    #[env_config(name = "ZO_HTTP_ADDR", default = "")]
+    pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
 }
@@ -134,6 +136,8 @@ pub struct Http {
 pub struct Grpc {
     #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
     pub port: u16,
+    #[env_config(name = "ZO_GRPC_ADDR", default = "")]
+    pub addr: String,
     #[env_config(name = "ZO_GRPC_TIMEOUT", default = 600)]
     pub timeout: u64,
     #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "zinc-org-id")]
