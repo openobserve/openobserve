@@ -155,12 +155,6 @@
           >
             <h5 class="text-center">
               <div
-                v-if="searchObj.data.errorCode == 0"
-                data-test="logs-search-result-not-found-text"
-              >
-                Result not found.
-              </div>
-              <div
                 data-test="logs-search-error-message"
                 v-html="searchObj.data.errorMsg"
               ></div>
@@ -423,6 +417,7 @@ export default defineComponent({
 
     function getStreamList(isFirstLoad = false) {
       try {
+        searchObj.data.errorMsg = "";
         searchObj.loading = true;
         streamService
           .nameList(
@@ -594,10 +589,14 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        if (!searchObj.data.metrics.selectedMetric || !searchObj.data.query) {
+        if (
+          !searchObj.data.metrics.selectedMetric?.value ||
+          !searchObj.data.query
+        ) {
           return false;
         }
 
+        searchObj.data.errorMsg = "";
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(searchObj.data.datetime.startTime / 1000),
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
@@ -838,15 +837,13 @@ export default defineComponent({
       updateUrlQueryParams,
       addLabelToEditor,
       onSplitterUpdate,
+      resetSearchObj,
     };
   },
   computed: {
     showQuery() {
       return this.searchObj.meta.showQuery;
     },
-    // changeOrganization() {
-    //   return this.store.state.selectedOrganization.identifier;
-    // },
     selectedMetric() {
       return this.searchObj.data.metrics.selectedMetric;
     },
@@ -861,14 +858,6 @@ export default defineComponent({
     },
   },
   watch: {
-    // changeOrganization() {
-    //   // Fetch and update selected metrics
-    //   this.verifyOrganizationStatus(
-    //     this.store.state.organizations,
-    //     this.router
-    //   );
-    //   this.loadPageData();
-    // },
     selectedMetric: {
       deep: true,
       handler: function (metric) {
