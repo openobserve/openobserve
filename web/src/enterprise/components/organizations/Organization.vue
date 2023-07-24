@@ -29,6 +29,22 @@
     >
       <template #no-data><NoData /></template>
 
+      <template #body-cell-actions="props">
+        <q-td :props="props">
+          <q-btn
+            v-if="props.row.role == 'Admin'"
+            icon="group"
+            :title="t('organization.invite')"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="redirectToInviteMember(props)"
+          ></q-btn>
+        </q-td>
+      </template>
+
       <template #top="scope">
         <div class="q-table__title">{{ t("organization.header") }}</div>
         <q-input
@@ -90,6 +106,7 @@
       position="right"
       full-height
       maximized
+      @before-hide="hideJoinOrgDialog"
     >
       <join-organization v-model="organization" @updated="joinOrganization" />
     </q-dialog>
@@ -223,6 +240,12 @@ export default defineComponent({
         label: t("organization.created"),
         align: "left",
         sortable: true,
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("organization.actions"),
+        align: "center",
       },
     ]);
     const perPageOptions = [
@@ -395,6 +418,14 @@ export default defineComponent({
       });
     };
 
+    const hideJoinOrgDialog = () => {
+      router.push({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       store,
@@ -432,6 +463,7 @@ export default defineComponent({
       },
       redirectToInviteMember,
       hideAddOrgDialog,
+      hideJoinOrgDialog,
     };
   },
   methods: {
