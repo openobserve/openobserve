@@ -136,7 +136,10 @@ impl Serialize for StreamSettings {
             part_keys.insert(format!("L{index}"), key.to_string());
         }
         state.serialize_field("partition_keys", &part_keys)?;
-        state.serialize_field("partition_time_level", &self.partition_time_level)?;
+        state.serialize_field(
+            "partition_time_level",
+            &self.partition_time_level.clone().unwrap_or_default(),
+        )?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.end()
@@ -229,6 +232,7 @@ impl ScanStats {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
     #[default]
     Hourly,
