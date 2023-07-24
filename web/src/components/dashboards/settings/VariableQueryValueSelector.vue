@@ -16,18 +16,21 @@ export default defineComponent({
     props: ["modalValue", "variableItem"],
     emits: ["update:modalValue"],
     setup(props: any, { emit }) {
-        console.log("----variableItem-----", props.variableItem);
         
+        //get v-model value for selected value  using props
         const selectedValue = ref(props.variableItem?.value)
 
         const options = toRef(props.variableItem, 'options')
 
+        // get filtered options
         const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } = useSelectAutoComplete(options, 'name')
         
+        // set watcher on variable item changes at that time change the option value
         watch(() => props.variableItem, () => {
             options.value = props.variableItem?.options
         })
 
+        // update selected value
         watch(selectedValue, () => {
             emit("update:modalValue", selectedValue.value)
         })

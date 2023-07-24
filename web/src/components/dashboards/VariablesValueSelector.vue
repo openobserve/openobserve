@@ -13,8 +13,6 @@
   <div v-if="variablesData.values?.length > 0 && !variablesData.isVariablesLoading" class="flex q-mt-sm q-ml-sm">
     <div v-for="item in variablesData.values" class="q-mr-lg q-mt-sm">
       <div v-if="item.type == 'query_values'">
-          <!-- <q-select style="min-width: 150px;"  filled outlined dense v-model="item.value" :options="item.options"
-            :label="item.label || item.name"></q-select> -->
           <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -87,7 +85,7 @@ export default defineComponent({
                             start_time: new Date(props.selectedTimeDate?.start_time?.toISOString()).getTime() * 1000,
                             end_time: new Date(props.selectedTimeDate?.end_time?.toISOString()).getTime() * 1000,
                             fields: [it.query_data.field],
-                            size: it.query_data.max_record_size ? it.query_data.max_record_size : 10,
+                            size: it?.query_data?.max_record_size ? it?.query_data?.max_record_size : 10,
                             type: it.query_data.stream_type,
                         })
                             .then((res: any) => {
