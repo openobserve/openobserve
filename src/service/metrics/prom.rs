@@ -14,12 +14,19 @@
 
 use actix_web::web;
 use ahash::AHashMap;
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{Datelike, Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
+use crate::common::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
+    errors::{Error, Result},
+    metrics,
+};
 use crate::common::meta::functions::StreamTransform;
 use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
 use crate::common::meta::usage::UsageType;
@@ -28,16 +35,6 @@ use crate::common::meta::{
     alert::{Alert, Trigger},
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
     StreamType,
-};
-use crate::common::{
-    infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
-        errors::{Error, Result},
-        metrics,
-    },
-    meta::prom::METRICS_SERIES_TIME,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::usage::report_usage_stats;
@@ -65,6 +62,11 @@ pub async fn remote_write(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
+
+    let now = Utc::now();
+    let date = now.date_naive();
+    let midnight = Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0);
+    let ts = midnight.unwrap().timestamp_micros();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -268,7 +270,7 @@ pub async fn remote_write(
                 series_values.insert("org".to_string(), json::Value::String(org_id.to_owned()));
                 series_values.insert(
                     CONFIG.common.column_timestamp.clone(),
-                    json::Value::Number(METRICS_SERIES_TIME.into()),
+                    json::Value::Number(ts.into()),
                 );
                 let series_str = crate::common::json::to_string(&series_values).unwrap();
                 metric_series_values
