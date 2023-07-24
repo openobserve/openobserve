@@ -169,7 +169,15 @@ impl Engine {
                     Value::Matrix(data)
                 }
             }
-            PromExpr::Call(Call { func, args }) => self.call_expr(func, args).await?,
+            PromExpr::Call(Call { func, args }) => {
+                let output = self.call_expr(func, args).await?;
+                if output.contains_same_label_set() {
+                    return Err(DataFusionError::NotImplemented(
+                        "vector cannot contain metrics with the same labelset".into(),
+                    ));
+                }
+                output
+            }
             PromExpr::Extension(expr) => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Extension: {:?}",
