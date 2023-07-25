@@ -14,14 +14,16 @@
 
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
-use chrono::{Datelike, TimeZone, Utc};
+use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
-use crate::common::infra::config::CONFIG;
-use crate::common::infra::wal::get_or_create;
-use crate::common::meta::prom::{Metadata, METADATA_LABEL};
-use crate::common::meta::StreamType;
+use crate::common::infra::{config::CONFIG, wal::get_or_create};
+use crate::common::meta::{
+    prom::{Metadata, METADATA_LABEL, SERIES_NAME},
+    stream::PartitionTimeLevel,
+    StreamType,
+};
 
 pub mod json;
 pub mod prom;
@@ -61,21 +63,24 @@ pub fn signature_without_labels(
     });
     Signature(hasher.finalize().into())
 }
-pub fn write_series_file(
-    buf: AHashMap<String, Vec<String>>,
-    thread_id: usize,
-    org_id: &str,
-    stream_name: &str,
-    stream_file_name: &mut String,
-    stream_type: StreamType,
-) {
+
+pub fn write_series_file(buf: AHashMap<String, Vec<String>>, thread_id: usize, org_id: &str) {
+    let timestamp = Utc::now().timestamp_micros();
+    let local_val: common::json::Map<String, common::json::Value> = common::json::Map::new();
+    let hour_key = super::ingestion::get_wal_time_key(
+        timestamp,
+        PartitionTimeLevel::Daily,
+        &vec![],
+        &local_val,
+        Some(SERIES_NAME),
+    );
     let mut write_buf = BytesMut::new();
     let file = get_or_create(
         thread_id,
         org_id,
-        stream_name,
-        stream_type,
-        "series",
+        SERIES_NAME,
+        StreamType::Metrics,
+        &hour_key,
         CONFIG.common.wal_memory_mode_enabled,
     );
     for (_, entry) in buf {
@@ -86,10 +91,6 @@ pub fn write_series_file(
         for row in &entry {
             write_buf.put(row.as_bytes());
             write_buf.put("\n".as_bytes());
-        }
-
-        if stream_file_name.is_empty() {
-            *stream_file_name = file.full_name();
         }
         file.write(write_buf.as_ref());
     }

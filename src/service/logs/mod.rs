@@ -22,6 +22,7 @@ use crate::common::infra::config::CONFIG;
 use crate::common::json::{Map, Value};
 use crate::common::meta::alert::{Alert, Evaluate, Trigger};
 use crate::common::meta::ingestion::RecordStatus;
+use crate::common::meta::stream::PartitionTimeLevel;
 use crate::common::meta::StreamType;
 use crate::service::schema::check_for_schema;
 
@@ -232,8 +233,9 @@ async fn add_valid_record(
 
     // get hour key
     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-    let hour_key = super::ingestion::get_hour_key(
+    let hour_key = super::ingestion::get_wal_time_key(
         timestamp,
+        PartitionTimeLevel::Hourly,
         &stream_meta.partition_keys,
         local_val,
         Some(&schema_key),

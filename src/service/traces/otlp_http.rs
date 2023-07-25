@@ -24,6 +24,7 @@ use crate::common::infra::{cluster, config::CONFIG};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
+    stream::PartitionTimeLevel,
     traces::{Event, Span, SpanRefType},
     usage::UsageType,
     StreamType,
@@ -299,8 +300,9 @@ pub async fn traces_json(
 
                     let value_str = crate::common::json::to_string(&val_map).unwrap();
                     // get hour key
-                    let mut hour_key = crate::service::ingestion::get_hour_key(
+                    let mut hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp.try_into().unwrap(),
+                        PartitionTimeLevel::Hourly,
                         &partition_keys,
                         value.as_object().unwrap(),
                         None,

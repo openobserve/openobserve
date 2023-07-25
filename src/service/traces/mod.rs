@@ -25,7 +25,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -33,6 +32,10 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json};
+use crate::common::{
+    infra::{cluster, config::CONFIG, wal},
+    meta::stream::PartitionTimeLevel,
+};
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record},
@@ -208,9 +211,10 @@ pub async fn handle_trace_request(
 
                 let value_str = crate::common::json::to_string(&val_map).unwrap();
 
-                // get hour key
-                let mut hour_key = super::ingestion::get_hour_key(
+                // get wal time key
+                let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
+                    PartitionTimeLevel::Hourly,
                     &partition_keys,
                     value.as_object().unwrap(),
                     None,

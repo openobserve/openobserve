@@ -18,35 +18,32 @@ use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
-use std::collections::HashMap;
-use std::fs::OpenOptions;
+use std::{collections::HashMap, fs::OpenOptions};
 
-use crate::common::meta::functions::StreamTransform;
-use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
-use crate::common::meta::usage::UsageType;
+use crate::common::infra::{
+    cache::stats,
+    cluster,
+    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
+    errors::{Error, Result},
+    metrics,
+};
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
-    prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
+    functions::StreamTransform,
+    prom::{self, HASH_LABEL, METADATA_LABEL, METRIC_NAME, NAME_LABEL, SERIES_NAME, VALUE_LABEL},
+    stream::PartitionTimeLevel,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
-use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
-    ingestion::{chk_schema_by_record, write_file},
+    ingestion::{chk_schema_by_record, get_wal_time_key, write_file},
+    schema::add_stream_schema,
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
-};
-use crate::{
-    common::infra::{
-        cache::stats,
-        cluster,
-        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
-        errors::{Error, Result},
-        metrics,
-    },
-    service::schema::add_stream_schema,
+    usage::report_usage_stats,
 };
 
 pub(crate) mod prometheus {
@@ -67,7 +64,8 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
-    let series_ts = super::get_date_with_midnight_hour();
+    let now = Utc::now();
+    let now_ts = now.timestamp_micros();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -270,7 +268,7 @@ pub async fn remote_write(
                 series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
                 series_values.insert(
                     CONFIG.common.column_timestamp.clone(),
-                    json::Value::Number(series_ts.into()),
+                    json::Value::Number(now_ts.into()),
                 );
                 let series_str = crate::common::json::to_string(&series_values).unwrap();
                 metric_series_values
@@ -303,8 +301,9 @@ pub async fn remote_write(
             .await;
 
             // get hour key
-            let hour_key = crate::service::ingestion::get_hour_key(
+            let hour_key = get_wal_time_key(
                 timestamp,
+                PartitionTimeLevel::Hourly,
                 &partition_keys,
                 value.as_object().unwrap(),
                 None,
@@ -399,14 +398,7 @@ pub async fn remote_write(
     }
     let mut series_file_name = "".to_string();
 
-    super::write_series_file(
-        metric_series_values,
-        thread_id,
-        org_id,
-        SERIES_NAME,
-        &mut series_file_name,
-        StreamType::Metrics,
-    );
+    super::write_series_file(metric_series_values, thread_id, org_id);
 
     let schema_exists = stream_schema_exists(
         org_id,

@@ -28,7 +28,9 @@ use crate::common::infra::{
     cluster,
     config::{CONFIG, STREAM_SCHEMAS},
 };
-use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+use crate::common::meta::{
+    self, http::HttpResponse as MetaHttpResponse, stream::PartitionTimeLevel, StreamType,
+};
 use crate::common::{json, meta::usage::UsageType};
 
 use super::{
@@ -125,8 +127,13 @@ pub async fn save_enrichment_data(
                     .await;
 
                     if records.is_empty() {
-                        hour_key =
-                            super::ingestion::get_hour_key(timestamp, &vec![], &json_record, None);
+                        hour_key = super::ingestion::get_wal_time_key(
+                            timestamp,
+                            PartitionTimeLevel::Hourly,
+                            &vec![],
+                            &json_record,
+                            None,
+                        );
                     }
                     records.push(value_str);
                 }

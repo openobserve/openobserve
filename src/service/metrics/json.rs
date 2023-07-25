@@ -20,21 +20,27 @@ use std::fs::OpenOptions;
 use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
-use crate::common::infra::config::METRIC_SERIES_HASH;
-use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
-use crate::common::meta::usage::UsageType;
+use crate::common::infra::{
+    cluster,
+    config::{CONFIG, METRIC_SERIES_HASH},
+    metrics,
+};
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
-    prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+    prom::{
+        Metadata, HASH_LABEL, METADATA_LABEL, METRIC_NAME, NAME_LABEL, SERIES_NAME, TYPE_LABEL,
+        VALUE_LABEL,
+    },
+    stream::PartitionTimeLevel,
+    usage::UsageType,
     StreamType,
 };
 use crate::common::{flatten, json, time};
-use crate::service::schema::{add_stream_schema, stream_schema_exists};
-use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
-    ingestion::{get_hour_key, write_file},
+    ingestion::{get_wal_time_key, write_file},
+    schema::{add_stream_schema, stream_schema_exists},
+    usage::report_usage_stats,
 };
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
@@ -235,7 +241,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 .await;
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_hour_key(timestamp, &partition_keys, record, None);
+        let hour_key = get_wal_time_key(
+            timestamp,
+            PartitionTimeLevel::Hourly,
+            &partition_keys,
+            record,
+            None,
+        );
         let hour_buf = stream_buf.entry(hour_key).or_default();
         let final_value_str = crate::common::json::to_string(&final_value_map).unwrap();
         hour_buf.push(final_value_str);
@@ -280,16 +292,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         .await;
     }
 
-    let mut series_file_name = "".to_string();
-
-    super::write_series_file(
-        metric_series_values,
-        thread_id,
-        org_id,
-        SERIES_NAME,
-        &mut series_file_name,
-        StreamType::Metrics,
-    );
+    super::write_series_file(metric_series_values, thread_id, org_id);
 
     let schema_exists = stream_schema_exists(
         org_id,

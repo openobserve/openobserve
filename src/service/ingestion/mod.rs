@@ -12,37 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{db, triggers};
-use crate::common::flatten;
-use crate::common::infra::wal::get_or_create;
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
 use datafusion::arrow::json::reader::infer_json_schema;
-use std::collections::BTreeMap;
-use std::io::BufReader;
+use std::{collections::BTreeMap, io::BufReader};
 use vector_enrichment::TableRegistry;
-use vrl::compiler::runtime::Runtime;
-use vrl::compiler::{CompilationResult, TargetValueRef};
-use vrl::prelude::state;
+use vrl::{
+    compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
+    prelude::state,
+};
 
-use crate::common::functions::get_vrl_compiler_config;
+use crate::common::infra::{
+    config::{CONFIG, STREAM_ALERTS, STREAM_FUNCTIONS},
+    metrics,
+    wal::get_or_create,
+};
+use crate::common::meta::{
+    alert::{Alert, Trigger},
+    functions::{StreamTransform, VRLRuntimeConfig},
+    stream::PartitionTimeLevel,
+    usage::RequestStats,
+    StreamType,
+};
 use crate::common::{
+    flatten,
+    functions::get_vrl_compiler_config,
     json::{Map, Value},
     notification::send_notification,
 };
-
-use crate::common::infra::config::STREAM_FUNCTIONS;
-use crate::common::infra::config::{CONFIG, STREAM_ALERTS};
-use crate::common::infra::metrics;
-
-use crate::common::meta::functions::{StreamTransform, VRLRuntimeConfig};
-use crate::common::meta::usage::RequestStats;
-use crate::common::meta::{
-    alert::{Alert, Trigger},
-    StreamType,
-};
+use crate::service::{db, triggers};
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -148,18 +148,29 @@ pub async fn get_stream_alerts<'a>(
     stream_alerts_map.insert(key, alerts);
 }
 
-pub fn get_hour_key(
+pub fn get_wal_time_key(
     timestamp: i64,
+    time_level: PartitionTimeLevel,
     partition_keys: &Vec<String>,
     local_val: &Map<String, Value>,
     suffix: Option<&str>,
 ) -> String {
     // get hour file name
 
-    let mut hour_key = Utc
-        .timestamp_nanos(timestamp * 1000)
-        .format("%Y_%m_%d_%H")
-        .to_string();
+    let mut hour_key = match time_level {
+        PartitionTimeLevel::Hourly => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_%H")
+            .to_string(),
+        PartitionTimeLevel::Daily => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_00")
+            .to_string(),
+        PartitionTimeLevel::Monthly => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_01_00")
+            .to_string(),
+    };
     if let Some(s) = suffix {
         hour_key.push_str(&format!("_{s}"));
     } else {
@@ -405,8 +416,9 @@ mod tests {
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(
+            get_wal_time_key(
                 1620000000,
+                PartitionTimeLevel::Hourly,
                 &vec!["country".to_string(), "sport".to_string()],
                 &local_val,
                 None
@@ -421,14 +433,26 @@ mod tests {
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_hour_key(1620000000, &vec![], &local_val, None),
+            get_wal_time_key(
+                1620000000,
+                PartitionTimeLevel::Hourly,
+                &vec![],
+                &local_val,
+                None
+            ),
             "1970_01_01_00_keeping"
         );
     }
     #[test]
     fn test_get_hour_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_hour_key(1620000000, &vec![], &Map::new(), None),
+            get_wal_time_key(
+                1620000000,
+                PartitionTimeLevel::Hourly,
+                &vec![],
+                &Map::new(),
+                None
+            ),
             "1970_01_01_00_keeping"
         );
     }
