@@ -22,7 +22,6 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
     case "pie":
     case "donut":
     case "scatter":
-    case "table":
     case "metric": {
       if (
         panelSchema?.fields?.stream_type == "metrics" &&
