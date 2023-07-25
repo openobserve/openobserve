@@ -34,8 +34,8 @@ use promql_parser::{
 use rayon::prelude::*;
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
-use crate::common::infra::config::CONFIG;
 use crate::common::meta::prom::{HASH_LABEL, VALUE_LABEL};
+use crate::common::{infra::config::CONFIG, meta::prom::NAME_LABEL};
 use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
 
 pub struct Engine {
@@ -61,6 +61,9 @@ impl Engine {
 
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
+        println!("***************************************");
+        println!("*****************{:?}*********************", prom_expr);
+        println!("***************************************");
         Ok(match &prom_expr {
             PromExpr::Aggregate(AggregateExpr {
                 op,
@@ -189,10 +192,22 @@ impl Engine {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
         }
+
+        let mut selector = selector.clone();
+        if selector.name.is_none() {
+            let name = selector
+                .matchers
+                .find_matcher_value(NAME_LABEL)
+                .expect("Missing selector name")
+                .clone();
+
+            selector.name = Some(name);
+        }
+
         let metrics_name = selector.name.as_ref().expect("Missing selector name");
         let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
         if !cache_exists {
-            self.selector_load_data(selector, None).await?;
+            self.selector_load_data(&selector, None).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
         let metrics_cache = match metrics_cache.get(metrics_name) {
@@ -253,10 +268,22 @@ impl Engine {
         if self.result_type.is_none() {
             self.result_type = Some("matrix".to_string());
         }
-        let metrics_name = selector.name.as_ref().unwrap();
+
+        let mut selector = selector.clone();
+        if selector.name.is_none() {
+            let name = selector
+                .matchers
+                .find_matcher_value(NAME_LABEL)
+                .expect("Missing selector name")
+                .clone();
+
+            selector.name = Some(name);
+        }
+
+        let metrics_name = selector.name.as_ref().expect("Missing selector name");
         let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
         if !cache_exists {
-            self.selector_load_data(selector, Some(range)).await?;
+            self.selector_load_data(&selector, Some(range)).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
         let metrics_cache = match metrics_cache.get(metrics_name) {
@@ -340,7 +367,7 @@ impl Engine {
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &filters)
+            .create_context(&self.ctx.org_id, &table_name, (start, end), &filters)
             .await?;
 
         let mut tasks = Vec::new();
