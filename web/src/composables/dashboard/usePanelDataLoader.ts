@@ -1,26 +1,28 @@
 import { ref, watch, reactive, toRefs, onMounted } from "vue";
-import queryService from "../services/search";
+import queryService from "../../services/search";
 import { useStore } from "vuex";
 
-export const useSearchApi = (
-  data: any,
+export const usePanelDataLoader = (
+  panelSchema: any,
   selectedTimeObj: any,
-  props: any,
-  emit: any
+  variablesData: any
 ) => {
+
+  console.log(panelSchema);
+  
+
   const state = reactive({
     data: [],
-    selectedTimeObj,
     loading: false,
     errorDetail: "",
   });
 
-  const currentDependentVariablesData = ref(props.variablesData?.values || []);
+  const currentDependentVariablesData = ref(variablesData.value?.values || []);
   const store = useStore();
   let controller: AbortController | null = null;
 
   const loadData = async () => {
-    // console.log("loadData");
+    console.log("loadData");
 
     const controller = new AbortController();
     state.loading = true;
@@ -28,10 +30,10 @@ export const useSearchApi = (
     if (isQueryDependentOnTheVariables() && !canRunQueryBasedOnVariables()) {
       return;
     }
-    // console.log("queryDataa", props.data.query);
+    // console.log("queryDataa", panelSchema.value.query);
 
-    const queryData = props.data.query;
-    const timestamps = props.selectedTimeObj;
+    const queryData = panelSchema.value.query;
+    const timestamps = selectedTimeObj.value;
     let startISOTimestamp: any;
     let endISOTimestamp: any;
     // console.log("timestamps", timestamps);
@@ -61,9 +63,9 @@ export const useSearchApi = (
     // console.log("Calling search API");
 
     if (
-      props.data.fields?.stream_type == "metrics" &&
-      props.data.customQuery &&
-      props.data.queryType == "promql"
+      panelSchema.value.fields?.stream_type == "metrics" &&
+      panelSchema.value.customQuery &&
+      panelSchema.value.queryType == "promql"
     ) {
       // console.log("Calling metrics_query_range API");
       await queryService
@@ -94,7 +96,7 @@ export const useSearchApi = (
         .search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: query,
-          page_type: props.data.fields?.stream_type,
+          page_type: panelSchema.value.fields?.stream_type,
         })
         .then((res) => {
           // Set searchQueryData.data to the API response hits
@@ -113,35 +115,37 @@ export const useSearchApi = (
   };
 
   onMounted(() => {
-    if (props.data.query) {
+    console.log("usePanelDataLoader mounted");
+    if (panelSchema.value.query) {
       loadData();
     }
   });
 
   watch(
-    () => [props.data, state.selectedTimeObj],
+    [panelSchema, selectedTimeObj],
     async (
       [newConfigs, newTimerange],
       [oldConfigs, oldTimerange],
       onInvalidate
     ) => {
-      if(props.data.query){
-
+      console.log("usePanelDataLoader: schema changed");
+      
+      if(panelSchema.value.query){
         loadData();
       }
     }
   );
 
   const isQueryDependentOnTheVariables = () => {
-    const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
-      props.data.query.includes(`$${it.name}`)
+    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
+      panelSchema.value.query.includes(`$${it.name}`)
     );
     return dependentVariables?.length > 0;
   };
 
   const canRunQueryBasedOnVariables = () => {
-    const dependentVariables = props?.variablesData?.values?.filter((it: any) =>
-      props.data.query.includes(`$${it.name}`)
+    const dependentVariables = variablesData.value?.values?.filter((it: any) =>
+      panelSchema.value.query.includes(`$${it.name}`)
     );
 
     if (dependentVariables?.length > 0) {
@@ -179,7 +183,6 @@ export const useSearchApi = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
         state.errorDetail = trimmedErrorMessage;
-        emit("error", trimmedErrorMessage);
         break;
       }
       case "sql": {
@@ -190,7 +193,6 @@ export const useSearchApi = (
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
         state.errorDetail = trimmedErrorMessage;
-        emit("error", trimmedErrorMessage);
         break;
       }
       default:

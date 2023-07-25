@@ -66,7 +66,7 @@
                     <ChartRender :data="chartData" :selectedTimeDate="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div> -->
                   <div style="flex:1;">
-                    <MultiQueryChart :selectedTimeObj="dashboardPanelData.meta.dateTime" :data="chartData"/>
+                    <PanelSchemaRenderer :panelSchema="chartData" :selectedTimeObj="dashboardPanelData.meta.dateTime" :variablesData="variablesData" :width="6" @error="handleChartApiError"/>
                   </div>
                   <DashboardErrorsComponent :errors="errorData" />
                   <q-separator />
@@ -123,7 +123,7 @@ import DateTimePicker from "../../../components/DateTimePicker.vue";
 import ChartRender from "../../../components/dashboards/addPanel/ChartRender.vue";
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue"
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
-import MultiQueryChart from "../../../components/MultiQueryChart.vue";
+import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -138,7 +138,7 @@ export default defineComponent({
     PanelSidebar,
     ConfigPanel,
     VariablesValueSelector,
-    MultiQueryChart,
+    PanelSchemaRenderer,
   },
   setup() {
     // This will be used to copy the chart data to the chart renderer component
@@ -242,10 +242,11 @@ export default defineComponent({
     })
 
     const runQuery = () => {
-      // console.log("query change detected to run");
+      console.log("query change detected to run");
       if (!isValid(true)) {
         return
       }
+      console.log("run query");
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       updateDateTime(selectedDate.value)
