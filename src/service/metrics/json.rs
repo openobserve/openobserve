@@ -33,6 +33,7 @@ use crate::common::meta::{
         VALUE_LABEL,
     },
     stream::PartitionTimeLevel,
+    stream::StreamSettings,
     usage::UsageType,
     StreamType,
 };
@@ -41,6 +42,7 @@ use crate::service::{
     db,
     ingestion::{get_wal_time_key, write_file},
     schema::{add_stream_schema, stream_schema_exists},
+    stream::save_stream_settings,
     usage::report_usage_stats,
 };
 
@@ -310,6 +312,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     .await;
 
     if !schema_exists.has_fields {
+        // create series stream schema
         let file = OpenOptions::new()
             .read(true)
             .open(&series_file_name)
@@ -323,6 +326,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             now_ts,
         )
         .await;
+        // set the series stream partition time level is daily
+        let settings = StreamSettings {
+            partition_time_level: Some(PartitionTimeLevel::Daily),
+            ..Default::default()
+        };
+        save_stream_settings(org_id, SERIES_NAME, StreamType::Metrics, settings).await?;
     }
 
     metrics::HTTP_RESPONSE_TIME
