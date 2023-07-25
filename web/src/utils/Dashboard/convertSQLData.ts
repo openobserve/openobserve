@@ -1,8 +1,4 @@
-import { reactive, ref } from "vue";
-import { useStore } from "vuex";
-import Plotly from "plotly.js";
-
-export const convertData = async (props: any, searchQueryData:any, store: any) => {
+export const convertSQLData = async (props: any, searchQueryData:any, store: any) => {
     console.log("renderSqlBasedChart", props);
     console.log("searchQueryData", searchQueryData);
     

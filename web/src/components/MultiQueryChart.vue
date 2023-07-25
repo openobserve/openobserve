@@ -8,10 +8,11 @@
 import { defineComponent, watch, ref, onMounted, watchEffect } from "vue";
 import { useSearchApi } from "@/composables/useSearchApi";
 // import { useDataTransform } from "@/composables/useDataTransform";
-import { convertData } from "@/utils/Dashboard/convertData";
+import { convertSQLData } from "@/utils/Dashboard/convertSQLData";
 import MultiChart from "@/components/dashboards/addPanel/MultiChart.vue";
 import { useStore } from "vuex";
 import Plotly from "plotly.js";
+import { convertPromQLData } from "@/utils/Dashboard/convertPromQLData";
 
 export default defineComponent({
   name: "MultiQueryChart",
@@ -33,12 +34,20 @@ export default defineComponent({
     console.log("props.data", props.data);
     const store = useStore();
     const fetchChartData = async () => {
-      chartData.value = await convertData(
+      chartData.value = await convertSQLData(
         props,
         data,
         store
       );
     };
+
+    const fetchPromQLChartData =async() =>{
+      chartData.value = await convertPromQLData(
+        props,
+        data,
+        store
+      )
+    }
     // const plotRef: any = ref(null);
     const { loadData, data } = useSearchApi(
       props.data,
@@ -47,22 +56,16 @@ export default defineComponent({
       context.emit
     );
 
-    onMounted(() => {
-      loadData();
-      //  fetchChartData();
-    });
-    watch(() => [props.data, props.selectedTimeObj],
-      async () => {
-        console.log(props.data, "inside watch");
-
-        console.log("data changed");
-        loadData();
+    const renderChart = async () => {
+      if (props.data?.fields?.stream_type == "metrics" && props.data?.customQuery && props.data?.queryType == "promql") {
+        fetchPromQLChartData()
+      } else {
+        fetchChartData()
       }
-    );
-
+    }
     watch(data, async () => {
       console.log("data changed, converting");
-      await fetchChartData();
+      await renderChart();
     });
 
     return {
@@ -76,3 +79,4 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped></style>
+@/utils/Dashboard/convertSQLData

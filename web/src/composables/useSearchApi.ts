@@ -1,4 +1,4 @@
-import { ref, watch, reactive, toRefs } from "vue";
+import { ref, watch, reactive, toRefs, onMounted } from "vue";
 import queryService from "../services/search";
 import { useStore } from "vuex";
 
@@ -112,6 +112,12 @@ export const useSearchApi = (
     }
   };
 
+  onMounted(() => {
+    if (props.data.query) {
+      loadData();
+    }
+  });
+
   watch(
     () => [props.data, state.selectedTimeObj],
     async (
@@ -119,7 +125,10 @@ export const useSearchApi = (
       [oldConfigs, oldTimerange],
       onInvalidate
     ) => {
-      loadData();
+      if(props.data.query){
+
+        loadData();
+      }
     }
   );
 
