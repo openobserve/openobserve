@@ -14,6 +14,7 @@
 
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
+use chrono::{Datelike, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::common;
@@ -92,4 +93,10 @@ pub fn write_series_file(
         }
         file.write(write_buf.as_ref());
     }
+}
+
+fn get_date_with_midnight_hour() -> i64 {
+    let date = Utc::now().date_naive();
+    let midnight = Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0);
+    midnight.unwrap().timestamp_micros()
 }

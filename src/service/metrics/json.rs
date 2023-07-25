@@ -16,10 +16,13 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
+use std::fs::OpenOptions;
 use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
+use crate::common::infra::config::METRIC_SERIES_HASH;
 use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
@@ -27,6 +30,7 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time};
+use crate::service::schema::{add_stream_schema, stream_schema_exists};
 use crate::service::usage::report_usage_stats;
 use crate::service::{
     db,
@@ -44,10 +48,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
+    let series_ts = super::get_date_with_midnight_hour();
+
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
     let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut metric_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.iter() {
@@ -107,6 +114,36 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         let record = record.as_object_mut().unwrap();
 
+        // add hash
+        let hash = super::signature_without_labels(
+            record,
+            &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
+        );
+        let hash_val: String = hash.into();
+        let key = format!("{}/{}/{}", &org_id, stream_name.clone(), &hash_val);
+
+        record.insert(
+            HASH_LABEL.to_string(),
+            json::Value::String(hash_val.clone()),
+        );
+
+        let present = METRIC_SERIES_HASH.get(&key);
+        if present.is_none() {
+            METRIC_SERIES_HASH.insert(key.clone(), true);
+            let mut series_values = record.clone();
+            series_values.remove_entry(VALUE_LABEL);
+            series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
+            series_values.insert(
+                CONFIG.common.column_timestamp.clone(),
+                json::Value::Number(series_ts.into()),
+            );
+            let series_str = crate::common::json::to_string(&series_values).unwrap();
+            metric_series_values
+                .entry(stream_name.clone())
+                .or_default()
+                .push(series_str);
+        }
+
         // check timestamp & value
         let timestamp: i64 = match record.get(&CONFIG.common.column_timestamp) {
             None => chrono::Utc::now().timestamp_micros(),
@@ -134,12 +171,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         );
         // remove type from labels
         record.remove(TYPE_LABEL);
-        // add hash
-        let hash = super::signature_without_labels(
-            record,
-            &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
-        );
-        record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
 
         // convert every label to string
         for (k, v) in record.iter_mut() {
@@ -158,6 +189,14 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             }
         }
         let record_str = json::to_string(&record).unwrap();
+
+        let mut final_value_map: json::Map<String, json::Value> = record.clone();
+        final_value_map.retain(|k, _| {
+            k.eq(&CONFIG.common.column_timestamp)
+                || k.eq(HASH_LABEL)
+                || k.eq(VALUE_LABEL)
+                || k.eq(NAME_LABEL)
+        });
 
         // check schema
         if stream_schema_map.get(&stream_name).is_none() {
@@ -198,7 +237,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
         let hour_key = get_hour_key(timestamp, &partition_keys, record, None);
         let hour_buf = stream_buf.entry(hour_key).or_default();
-        hour_buf.push(record_str);
+        let final_value_str = crate::common::json::to_string(&final_value_map).unwrap();
+        hour_buf.push(final_value_str);
 
         // update status
         let stream_status = stream_status_map
@@ -223,7 +263,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_data,
             thread_id,
             org_id,
-            &stream_name,
+            METRIC_NAME,
             &mut stream_file_name,
             StreamType::Metrics,
         );
@@ -236,6 +276,41 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             StreamType::Metrics,
             UsageType::JsonMetrics,
             0,
+        )
+        .await;
+    }
+
+    let mut series_file_name = "".to_string();
+
+    super::write_series_file(
+        metric_series_values,
+        thread_id,
+        org_id,
+        SERIES_NAME,
+        &mut series_file_name,
+        StreamType::Metrics,
+    );
+
+    let schema_exists = stream_schema_exists(
+        org_id,
+        SERIES_NAME,
+        StreamType::Metrics,
+        &mut stream_schema_map,
+    )
+    .await;
+
+    if !schema_exists.has_fields {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(&series_file_name)
+            .unwrap();
+        add_stream_schema(
+            org_id,
+            SERIES_NAME,
+            StreamType::Metrics,
+            &file,
+            &mut stream_schema_map,
+            series_ts,
         )
         .await;
     }

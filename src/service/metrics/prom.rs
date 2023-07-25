@@ -14,19 +14,13 @@
 
 use actix_web::web;
 use ahash::AHashMap;
-use chrono::{Datelike, Duration, TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
-    errors::{Error, Result},
-    metrics,
-};
 use crate::common::meta::functions::StreamTransform;
 use crate::common::meta::prom::{METRIC_NAME, SERIES_NAME};
 use crate::common::meta::usage::UsageType;
@@ -43,6 +37,16 @@ use crate::service::{
     ingestion::{chk_schema_by_record, write_file},
     schema::{set_schema_metadata, stream_schema_exists},
     search as search_service,
+};
+use crate::{
+    common::infra::{
+        cache::stats,
+        cluster,
+        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
+        errors::{Error, Result},
+        metrics,
+    },
+    service::schema::add_stream_schema,
 };
 
 pub(crate) mod prometheus {
@@ -63,10 +67,7 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
-    let now = Utc::now();
-    let date = now.date_naive();
-    let midnight = Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0);
-    let ts = midnight.unwrap().timestamp_micros();
+    let series_ts = super::get_date_with_midnight_hour();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -267,10 +268,9 @@ pub async fn remote_write(
                 let mut series_values = val_map.clone();
                 series_values.remove_entry(VALUE_LABEL);
                 series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
-                series_values.insert("org".to_string(), json::Value::String(org_id.to_owned()));
                 series_values.insert(
                     CONFIG.common.column_timestamp.clone(),
-                    json::Value::Number(ts.into()),
+                    json::Value::Number(series_ts.into()),
                 );
                 let series_str = crate::common::json::to_string(&series_values).unwrap();
                 metric_series_values
@@ -397,15 +397,40 @@ pub async fn remote_write(
         )
         .await;
     }
+    let mut series_file_name = "".to_string();
 
     super::write_series_file(
         metric_series_values,
         thread_id,
         org_id,
         SERIES_NAME,
-        &mut "".to_string(),
+        &mut series_file_name,
         StreamType::Metrics,
     );
+
+    let schema_exists = stream_schema_exists(
+        org_id,
+        SERIES_NAME,
+        StreamType::Metrics,
+        &mut metric_schema_map,
+    )
+    .await;
+
+    if !schema_exists.has_fields {
+        let file = OpenOptions::new()
+            .read(true)
+            .open(&series_file_name)
+            .unwrap();
+        add_stream_schema(
+            org_id,
+            SERIES_NAME,
+            StreamType::Metrics,
+            &file,
+            &mut metric_schema_map,
+            series_ts,
+        )
+        .await;
+    }
 
     // only one trigger per request, as it updates etcd
     for (_, entry) in &stream_trigger_map {
