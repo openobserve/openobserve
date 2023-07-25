@@ -2,7 +2,7 @@
   <div class="q-pl-sm float-left">
     <q-btn-dropdown v-model="btnRefreshInterval" border no-caps class="q-pa-xs">
       <template v-slot:label>
-        <div class="row items-center no-wrap" style="min-width: 65px">
+        <div class="row items-center no-wrap" style="min-width: 36px">
           <q-icon left name="update" />
           <div class="text-center">{{ selectedLabel }}</div>
         </div>
