@@ -61,7 +61,7 @@ pub(crate) async fn create_context(
 
     let ctx = prepare_datafusion_context()?;
 
-    // register table series
+    // register series table
 
     // -- get series files
     let mut series_files = get_file_list(org_id, SERIES_NAME, (0, 0), &[]).await?;
@@ -80,15 +80,12 @@ pub(crate) async fn create_context(
     }
     // -- get schema for series table
     let stream_type = StreamType::Metrics;
-    let schema = match db::schema::get(org_id, SERIES_NAME, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
+    let schema = db::schema::get(org_id, SERIES_NAME, stream_type)
+        .await
+        .map_err(|err| {
             log::error!("get series schema error: {}", err);
-            return Err(datafusion::error::DataFusionError::Execution(
-                err.to_string(),
-            ));
-        }
-    };
+            DataFusionError::Execution(err.to_string())
+        })?;
     // -- register series table
     let schema = Arc::new(
         schema
@@ -109,7 +106,7 @@ pub(crate) async fn create_context(
     )
     .await?;
 
-    // register table values
+    // register values table
 
     // -- get file list
     let mut files = get_file_list(org_id, METRIC_NAME, time_range, filters).await?;
@@ -122,15 +119,13 @@ pub(crate) async fn create_context(
     }
 
     // -- calcuate scan size
-    let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
-        Ok(size) => size,
-        Err(err) => {
+    let scan_stats = file_list::calculate_files_size(&files.to_vec())
+        .await
+        .map_err(|err| {
             log::error!("calculate files size error: {}", err);
-            return Err(datafusion::error::DataFusionError::Execution(
-                "calculate files size error".to_string(),
-            ));
-        }
-    };
+            DataFusionError::Execution("calculate files size error".to_string())
+        })?;
+
     log::info!(
         "promql->search->storage: load files {}, scan_size {}, compressed_size {}",
         scan_stats.files,

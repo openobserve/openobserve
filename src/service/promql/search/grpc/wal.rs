@@ -29,10 +29,16 @@ use crate::common::infra::{
     cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     config::CONFIG,
 };
-use crate::common::meta::{search::Session as SearchSession, stream::ScanStats, StreamType};
+use crate::common::meta::{
+    prom::{METRIC_NAME, SERIES_NAME},
+    search::Session as SearchSession,
+    stream::ScanStats,
+    StreamType,
+};
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
+    metrics::get_value_schema,
     search::{
         datafusion::{
             exec::{prepare_datafusion_context, register_table},
@@ -50,9 +56,9 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     _filters: &[(&str, &str)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
-    // get file list
-    let files = get_file_list(org_id, stream_name, time_range).await?;
-    if files.is_empty() {
+    // check if we are allowed to search
+    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
+        log::error!("stream [{}] is being deleted", stream_name);
         return Ok((
             SessionContext::new(),
             Arc::new(Schema::empty()),
@@ -60,6 +66,67 @@ pub(crate) async fn create_context(
         ));
     }
 
+    let ctx = prepare_datafusion_context()?;
+
+    // register table series
+
+    // -- get series files
+    let series_files = get_file_list(org_id, SERIES_NAME, (0, 0)).await?;
+    if series_files.is_empty() {
+        return Ok((
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+        ));
+    }
+    // -- cache series files
+    let session_id = format!("{session_id}-series");
+    let work_dir = session_id.to_string();
+    for file in series_files {
+        let file_name = format!("/{work_dir}/{}", file.name);
+        tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
+    }
+    // -- get schema for series table
+    let stream_type = StreamType::Metrics;
+    let schema = db::schema::get(org_id, SERIES_NAME, stream_type)
+        .await
+        .map_err(|err| {
+            log::error!("get schema error: {}", err);
+            DataFusionError::Execution(err.to_string())
+        })?;
+    let schema = Arc::new(
+        schema
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+    let session = SearchSession {
+        id: session_id.to_string(),
+        storage_type: StorageType::Tmpfs,
+    };
+
+    register_table(
+        &ctx,
+        &session,
+        schema.clone(),
+        SERIES_NAME,
+        &[],
+        FileType::JSON,
+    )
+    .await?;
+
+    // register table values
+
+    // -- get file list
+    let files = get_file_list(org_id, METRIC_NAME, time_range).await?;
+    if files.is_empty() {
+        return Ok((
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+        ));
+    }
+    // -- cache series files
+    let session_id = format!("{session_id}-values");
     let work_dir = session_id.to_string();
     let mut scan_stats = ScanStats::new();
     scan_stats.files = files.len() as u64;
@@ -76,33 +143,21 @@ pub(crate) async fn create_context(
     );
 
     // fetch all schema versions, get latest schema
-    let stream_type = StreamType::Metrics;
-    let schema = db::schema::get(org_id, stream_name, stream_type)
-        .await
-        .map_err(|err| {
-            log::error!("get schema error: {}", err);
-            DataFusionError::Execution(err.to_string())
-        })?;
-    let schema = Arc::new(
-        schema
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
     let session = SearchSession {
         id: session_id.to_string(),
         storage_type: StorageType::Tmpfs,
     };
 
-    let ctx = prepare_datafusion_context()?;
     register_table(
         &ctx,
         &session,
-        schema.clone(),
-        stream_name,
+        get_value_schema(),
+        METRIC_NAME,
         &[],
         FileType::JSON,
     )
     .await?;
+
     Ok((ctx, schema, scan_stats))
 }
 
