@@ -73,9 +73,17 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
-    let mut ctx = register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?;
 
-    // register UDF
+    let mut ctx = prepare_datafusion_context()?;
+    register_table(
+        &ctx,
+        session,
+        schema.clone(),
+        "tbl",
+        files,
+        file_type.clone(),
+    )
+    .await?;
     register_udf(&mut ctx, &sql.org_id).await;
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
@@ -371,10 +379,16 @@ async fn get_fast_mode_ctx(
         id: format!("{}-fast", session.id),
         storage_type: session.storage_type.clone(),
     };
-    let mut ctx =
-        register_table(&fast_session, schema.clone(), "tbl", &new_files, file_type).await?;
-
-    // register UDF
+    let mut ctx = prepare_datafusion_context()?;
+    register_table(
+        &ctx,
+        &fast_session,
+        schema.clone(),
+        "tbl",
+        &new_files,
+        file_type,
+    )
+    .await?;
     register_udf(&mut ctx, &sql.org_id).await;
 
     Ok((ctx, schema))
@@ -950,13 +964,13 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
 }
 
 pub async fn register_table(
+    ctx: &SessionContext,
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
     files: &[FileKey],
     file_type: FileType,
-) -> Result<SessionContext> {
-    let ctx = prepare_datafusion_context()?;
+) -> Result<()> {
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
@@ -1006,7 +1020,7 @@ pub async fn register_table(
     let table = ListingTable::try_new(config)?;
     ctx.register_table(table_name, Arc::new(table))?;
 
-    Ok(ctx)
+    Ok(())
 }
 
 fn handle_query_fn(

@@ -34,7 +34,10 @@ use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
     search::{
-        datafusion::{exec::register_table, storage::StorageType},
+        datafusion::{
+            exec::{prepare_datafusion_context, register_table},
+            storage::StorageType,
+        },
         MetadataMap,
     },
 };
@@ -90,7 +93,16 @@ pub(crate) async fn create_context(
         storage_type: StorageType::Tmpfs,
     };
 
-    let ctx = register_table(&session, schema.clone(), stream_name, &[], FileType::JSON).await?;
+    let ctx = prepare_datafusion_context()?;
+    register_table(
+        &ctx,
+        &session,
+        schema.clone(),
+        stream_name,
+        &[],
+        FileType::JSON,
+    )
+    .await?;
     Ok((ctx, schema, scan_stats))
 }
 

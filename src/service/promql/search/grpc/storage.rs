@@ -31,7 +31,10 @@ use crate::common::meta::{
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::{exec::register_table, storage::StorageType},
+        datafusion::{
+            exec::{prepare_datafusion_context, register_table},
+            storage::StorageType,
+        },
         match_source,
     },
 };
@@ -125,7 +128,9 @@ pub(crate) async fn create_context(
         storage_type,
     };
 
-    let ctx = register_table(
+    let ctx = prepare_datafusion_context()?;
+    register_table(
+        &ctx,
         &session,
         schema.clone(),
         stream_name,
