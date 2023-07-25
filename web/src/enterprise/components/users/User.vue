@@ -450,26 +450,6 @@ export default defineComponent({
       verifyOrganizationStatus,
     };
   },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      this.orgData = newVal;
-      if (
-        (newVal != oldVal || this.orgMembers.value == undefined) &&
-        this.router.currentRoute.value.name == "users"
-      ) {
-        this.getOrgMembers();
-      }
-    },
-  },
 });
 </script>
 
