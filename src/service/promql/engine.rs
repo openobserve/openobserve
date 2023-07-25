@@ -31,6 +31,7 @@ use promql_parser::{
         VectorSelector,
     },
 };
+use rayon::prelude::*;
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use crate::common::meta::prom::{HASH_LABEL, METRIC_NAME, NAME_LABEL, VALUE_LABEL};
@@ -203,18 +204,17 @@ impl Engine {
         };
 
         // Evaluation timestamp.
-        let mut eval_ts = self.time;
-        let mut start = eval_ts - self.ctx.lookback_delta;
+        let eval_ts = self.time;
+        let start = eval_ts - self.ctx.lookback_delta;
 
+        let mut offset_modifier: i64 = 0;
         if let Some(offset) = selector.offset.clone() {
             match offset {
-                Offset::Pos(offset) => {
-                    start -= micros(offset);
-                    eval_ts -= micros(offset);
+                Offset::Pos(off) => {
+                    offset_modifier = micros(off);
                 }
-                Offset::Neg(offset) => {
-                    start += micros(offset);
-                    eval_ts += micros(offset);
+                Offset::Neg(off) => {
+                    offset_modifier = -micros(off);
                 }
             }
         }
@@ -224,6 +224,7 @@ impl Engine {
             if let Some(last_value) = metric
                 .samples
                 .iter()
+                .map(|s| Sample::new(s.timestamp + offset_modifier, s.value))
                 .filter_map(|s| (start < s.timestamp && s.timestamp <= eval_ts).then_some(s.value))
                 .last()
             {
@@ -267,30 +268,31 @@ impl Engine {
         };
 
         // Evaluation timestamp --- end of the time window.
-        let mut eval_ts = self.time;
+        let eval_ts = self.time;
         // Start of the time window.
-        let mut start = eval_ts - micros(range); // e.g. [5m]
-
+        let start = eval_ts - micros(range); // e.g. [5m]
+        let mut offset_modifier = 0;
         if let Some(offset) = selector.offset.clone() {
             match offset {
                 Offset::Pos(offset) => {
-                    start -= micros(offset);
-                    eval_ts -= micros(offset);
+                    offset_modifier = micros(offset);
                 }
                 Offset::Neg(offset) => {
-                    start += micros(offset);
-                    eval_ts += micros(offset);
+                    offset_modifier = -micros(offset);
                 }
             }
-        }
+        };
 
         let mut values = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
             let samples = metric
                 .samples
-                .iter()
+                .par_iter()
+                .map(|s: &super::value::Sample| super::value::Sample {
+                    timestamp: s.timestamp + offset_modifier,
+                    value: s.value,
+                })
                 .filter(|v| start < v.timestamp && v.timestamp <= eval_ts)
-                .cloned()
                 .collect();
             values.push(RangeValue {
                 labels: metric.labels.clone(),
@@ -309,6 +311,7 @@ impl Engine {
         range: Option<Duration>,
     ) -> Result<()> {
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
+
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
 
