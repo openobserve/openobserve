@@ -75,7 +75,7 @@ export const generateDurationLabel = (seconds: number) => {
   }
 
   if (label === "") {
-    label = `${duration}s`;
+    label = `Off`;
   }
 
   return label;
