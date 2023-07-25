@@ -64,7 +64,12 @@ pub fn signature_without_labels(
     Signature(hasher.finalize().into())
 }
 
-pub fn write_series_file(buf: AHashMap<String, Vec<String>>, thread_id: usize, org_id: &str) {
+pub fn write_series_file(
+    buf: AHashMap<String, Vec<String>>,
+    thread_id: usize,
+    org_id: &str,
+    stream_file_name: &mut String,
+) {
     let timestamp = Utc::now().timestamp_micros();
     let local_val: common::json::Map<String, common::json::Value> = common::json::Map::new();
     let hour_key = super::ingestion::get_wal_time_key(
@@ -83,6 +88,9 @@ pub fn write_series_file(buf: AHashMap<String, Vec<String>>, thread_id: usize, o
         &hour_key,
         CONFIG.common.wal_memory_mode_enabled,
     );
+    if stream_file_name.is_empty() {
+        *stream_file_name = file.full_name();
+    }
     for (_, entry) in buf {
         if entry.is_empty() {
             continue;
@@ -94,10 +102,4 @@ pub fn write_series_file(buf: AHashMap<String, Vec<String>>, thread_id: usize, o
         }
         file.write(write_buf.as_ref());
     }
-}
-
-fn get_date_with_midnight_hour() -> i64 {
-    let date = Utc::now().date_naive();
-    let midnight = Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0);
-    midnight.unwrap().timestamp_micros()
 }

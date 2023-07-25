@@ -32,7 +32,7 @@ use crate::common::meta::{
     alert::{Alert, Trigger},
     functions::StreamTransform,
     prom::{self, HASH_LABEL, METADATA_LABEL, METRIC_NAME, NAME_LABEL, SERIES_NAME, VALUE_LABEL},
-    stream::PartitionTimeLevel,
+    stream::{PartitionTimeLevel, StreamSettings},
     usage::UsageType,
     StreamType,
 };
@@ -40,9 +40,9 @@ use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::{
     db,
     ingestion::{chk_schema_by_record, get_wal_time_key, write_file},
-    schema::add_stream_schema,
-    schema::{set_schema_metadata, stream_schema_exists},
+    schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
     search as search_service,
+    stream::save_stream_settings,
     usage::report_usage_stats,
 };
 
@@ -64,8 +64,7 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
-    let now = Utc::now();
-    let now_ts = now.timestamp_micros();
+    let now_ts = Utc::now().timestamp_micros();
 
     let mut min_ts =
         (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -396,9 +395,14 @@ pub async fn remote_write(
         )
         .await;
     }
-    let mut series_file_name = "".to_string();
 
-    super::write_series_file(metric_series_values, thread_id, org_id);
+    let mut series_file_name = "".to_string();
+    super::write_series_file(
+        metric_series_values,
+        thread_id,
+        org_id,
+        &mut series_file_name,
+    );
 
     let schema_exists = stream_schema_exists(
         org_id,
@@ -419,9 +423,15 @@ pub async fn remote_write(
             StreamType::Metrics,
             &file,
             &mut metric_schema_map,
-            series_ts,
+            now_ts,
         )
         .await;
+        // set the series stream partition time level is daily
+        let settings = StreamSettings {
+            partition_time_level: Some(PartitionTimeLevel::Daily),
+            ..Default::default()
+        };
+        save_stream_settings(org_id, SERIES_NAME, StreamType::Metrics, settings).await?;
     }
 
     // only one trigger per request, as it updates etcd

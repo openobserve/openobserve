@@ -15,6 +15,7 @@
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
+use chrono::Utc;
 use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
 use std::fs::OpenOptions;
 use std::{collections::HashMap, io::BufReader};
@@ -54,7 +55,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
     }
 
-    let series_ts = super::get_date_with_midnight_hour();
+    let now_ts = Utc::now().timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
@@ -141,7 +142,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
             series_values.insert(
                 CONFIG.common.column_timestamp.clone(),
-                json::Value::Number(series_ts.into()),
+                json::Value::Number(now_ts.into()),
             );
             let series_str = crate::common::json::to_string(&series_values).unwrap();
             metric_series_values
@@ -292,7 +293,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         .await;
     }
 
-    super::write_series_file(metric_series_values, thread_id, org_id);
+    let mut series_file_name = "".to_string();
+    super::write_series_file(
+        metric_series_values,
+        thread_id,
+        org_id,
+        &mut series_file_name,
+    );
 
     let schema_exists = stream_schema_exists(
         org_id,
@@ -313,7 +320,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             StreamType::Metrics,
             &file,
             &mut stream_schema_map,
-            series_ts,
+            now_ts,
         )
         .await;
     }
