@@ -27,8 +27,7 @@
             "
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'"
-class="absolute beta-text"
+          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
             >Beta</span
           >
         </div>
@@ -45,8 +44,8 @@ class="absolute beta-text"
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs"
-class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -125,13 +124,12 @@ class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat
-unelevated no-caps
-padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey"
-text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -154,9 +152,8 @@ text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple
-v-close-popup clickable
-@click="signout">
+              <q-item v-ripple v-close-popup
+clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -356,6 +353,7 @@ export default defineComponent({
       "alertList",
       "alertDestinations",
       "alertTemplates",
+      "/ingestion/",
     ];
 
     const orgOptions = ref([{ label: Number, value: String }]);
@@ -669,12 +667,14 @@ export default defineComponent({
     const redirectToParentRoute = (machedRoutes: any) => {
       if (
         machedRoutes.length > 2 &&
-        !excludeParentRedirect.includes(router.currentRoute.value.name)
+        !excludeParentRedirect.includes(router.currentRoute.value.name) &&
+        router.currentRoute.value.path.indexOf("/ingestion/") == -1
       ) {
         if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
           machedRoutes[machedRoutes.length - 2].children.forEach(
             (route: any) => {
               if (route.name == machedRoutes[machedRoutes.length - 1].name) {
+                console.log(machedRoutes[machedRoutes.length - 2].path);
                 router.push({
                   path: machedRoutes[machedRoutes.length - 2].path,
                 });
@@ -728,6 +728,7 @@ export default defineComponent({
       }, 500);
     },
     changeOrganizationIdentifier() {
+      this.store.dispatch("setOrganizationPasscode", "");
       setTimeout(() => {
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();
