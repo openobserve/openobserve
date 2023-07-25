@@ -1,4 +1,4 @@
-import { ref, watch, reactive } from "vue";
+import { ref, watch, reactive, toRefs } from "vue";
 import queryService from "../services/search";
 import { useStore } from "vuex";
 
@@ -189,8 +189,7 @@ export const useSearchApi = (
     }
   };
   return {
-    ...state,
+    ...toRefs(state),
     loadData,
-    data: state.data,
   };
 };

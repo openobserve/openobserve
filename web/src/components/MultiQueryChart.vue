@@ -34,8 +34,8 @@ export default defineComponent({
     const store = useStore();
     const fetchChartData = async () => {
       chartData.value = await convertData(
-        props.data,
-        props.selectedTimeObj,
+        props,
+        data,
         store
       );
     };
@@ -49,14 +49,21 @@ export default defineComponent({
 
     onMounted(() => {
       loadData();
-       fetchChartData();
+      //  fetchChartData();
     });
-     watch(data,
+    watch(() => [props.data, props.selectedTimeObj],
       async () => {
+        console.log(props.data, "inside watch");
+
         console.log("data changed");
-        fetchChartData();
+        loadData();
       }
     );
+
+    watch(data, async () => {
+      console.log("data changed, converting");
+      await fetchChartData();
+    });
 
     return {
       loadData,

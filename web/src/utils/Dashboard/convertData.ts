@@ -10,14 +10,14 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
   // const plotRef: any = ref(null);
   // get the x axis key
   const getXAxisKeys = () => {
-    return props.data.fields?.x?.length
+    return props.data?.fields?.x?.length
       ? props.data.fields?.x.map((it: any) => it.alias)
       : [];
   };
 
   // get the y axis key
   const getYAxisKeys = () => {
-    return props.data.fields?.y?.length
+    return props.data?.fields?.y?.length
       ? props.data.fields?.y.map((it: any) => it.alias)
       : [];
   };
@@ -29,7 +29,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
     return result;
   };
 
-  const getPropsByChartTypeForTraces = () => {
+  const getPropsByChartTypeForTraces = () => {    
     switch (props.data.type) {
       case "bar":
         return {
@@ -170,7 +170,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+              ? props.data.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -201,7 +201,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+              ? props.data.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -233,7 +233,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
             ticktext: textformat(xAxisDataWithTicks),
             title:
               props.data.fields?.y?.length == 1
-                ? props.data.fields.y[0]?.label
+                ? props.data.fields?.y[0]?.label
                 : "",
             automargin: true,
           },
@@ -251,7 +251,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
             ticktext: textformat(xAxisDataWithTicks),
             title:
               props.data.fields?.y?.length == 1
-                ? props.data.fields.y[0]?.label
+                ? props.data.fields?.y[0]?.label
                 : "",
             automargin: true,
           },
@@ -267,7 +267,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.x?.length == 1
-              ? props.data.fields.x[0]?.label
+              ? props.data.fields?.x[0]?.label
               : "",
           automargin: true,
         };
@@ -299,7 +299,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+              ? props.data.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -331,7 +331,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+              ? props.data.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -373,7 +373,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
         const yaxis: any = {
           title:
             props.data.fields?.y?.length == 1
-              ? props.data.fields.y[0]?.label
+              ? props.data.fields?.y[0]?.label
               : "",
           automargin: true,
           fixedrange: true,
@@ -413,7 +413,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
           yaxis: {
             title:
               props.data.fields?.x?.length == 1
-                ? props.data.fields.x[0]?.label
+                ? props.data.fields?.x[0]?.label
                 : "",
             automargin: true,
           },
@@ -440,7 +440,7 @@ export const convertData = async (props: any, searchQueryData:any, store: any) =
           yaxis: {
             title:
               props.data.fields?.y?.length == 1
-                ? props.data.fields.y[0]?.label
+                ? props.data.fields?.y[0]?.label
                 : "",
             automargin: true,
             fixedrange: true,

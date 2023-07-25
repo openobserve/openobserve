@@ -13,14 +13,6 @@ export default defineComponent({
             required: true,
             type: Object,
         },
-        // traces: {
-        //     required: true,
-        //     type: Object,
-        // },
-        // layout: {
-        //     required: true,
-        //     type: Object,
-        // },
     },
     setup(props: any) {
         const plotRef: any = ref(null);
