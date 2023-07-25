@@ -1,11 +1,22 @@
-export const convertSQLData = async (props: any, searchQueryData:any, store: any) => {
-    console.log("renderSqlBasedChart", props);
-    console.log("searchQueryData", searchQueryData);
-    
-//   const store = useStore();
+export const convertSQLData = async (
+  panelSchema: any,
+  searchQueryData: any,
+  store: any
+) => {
+  // console.log("renderSqlBasedChart", props);
+  console.log("searchQueryData", searchQueryData);
+  console.log("panelSchema", panelSchema);
+  const props = {
+    data: panelSchema,
+    width: 6
+  };
+
+  //   const store = useStore();
   // const plotRef: any = ref(null);
   // get the x axis key
   const getXAxisKeys = () => {
+    console.log("props.data.fields.x", props.data?.fields?.x);
+    
     return props.data?.fields?.x?.length
       ? props.data.fields?.x.map((it: any) => it.alias)
       : [];
@@ -13,6 +24,8 @@ export const convertSQLData = async (props: any, searchQueryData:any, store: any
 
   // get the y axis key
   const getYAxisKeys = () => {
+    console.log("props.data.fields.y", props.data?.fields?.y);
+
     return props.data?.fields?.y?.length
       ? props.data.fields?.y.map((it: any) => it.alias)
       : [];
@@ -20,12 +33,16 @@ export const convertSQLData = async (props: any, searchQueryData:any, store: any
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
+    console.log("key", key);
+    
     // when the key is not available in the data that is not show the default value
     let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
+    console.log("result", result);
+    
     return result;
   };
 
-  const getPropsByChartTypeForTraces = () => {    
+  const getPropsByChartTypeForTraces = () => {
     switch (props.data.type) {
       case "bar":
         return {
@@ -98,6 +115,7 @@ export const convertSQLData = async (props: any, searchQueryData:any, store: any
     const n = getTickLength();
 
     // get the range of difference
+    console.log("layout",layout);
     const range = layout.length / n;
 
     // find the indexes at intervals
@@ -114,7 +132,9 @@ export const convertSQLData = async (props: any, searchQueryData:any, store: any
 
   const getPropsByChartTypeForLayout = () => {
     const xAxisKey = getXAxisKeys().length ? getXAxisKeys()[0] : "";
+    console.log("xAxisKey", xAxisKey);
     const xAxisData = getAxisDataFromKey(xAxisKey);
+    console.log("xAxisData", xAxisData);
     const xAxisDataWithTicks = getTickLimits(xAxisData);
 
       console.log("data with tick",xAxisDataWithTicks);
