@@ -89,7 +89,7 @@ export default defineComponent({
     let chartData = ref(blankChartObj);
     let eventIndexMap: any = [];
     onMounted(() => {
-      getUsage();
+      selectUsageDate();
     });
     const getUsage = () => {
       const dismiss = $q.notify({
@@ -176,16 +176,6 @@ export default defineComponent({
       options: ["30days", "60days", "3months", "6months"],
       selectUsageDate,
     };
-  },
-  computed: {
-    organization() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    organization() {
-      this.selectUsageDate();
-    },
   },
 });
 </script>

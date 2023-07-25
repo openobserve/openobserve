@@ -668,7 +668,8 @@ export default defineComponent({
       if (
         machedRoutes.length > 2 &&
         !excludeParentRedirect.includes(router.currentRoute.value.name) &&
-        router.currentRoute.value.path.indexOf("/ingestion/") == -1
+        router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
+        router.currentRoute.value.path.indexOf("/billings/") == -1
       ) {
         if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
           machedRoutes[machedRoutes.length - 2].children.forEach(

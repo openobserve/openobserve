@@ -145,8 +145,6 @@ export default defineComponent({
     });
 
     const getInvoiceHistory = () => {
-      //temporary disabled as stripe integration is in progress
-      return;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading invoice history...",
@@ -216,16 +214,6 @@ export default defineComponent({
       getInvoiceHistory,
       getImageURL,
     };
-  },
-  computed: {
-    organization() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    organization() {
-      this.getInvoiceHistory();
-    },
   },
 });
 </script>
