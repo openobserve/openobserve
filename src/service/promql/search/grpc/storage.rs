@@ -24,12 +24,14 @@ use tokio::sync::Semaphore;
 use crate::common::infra::{cache::file_data, config::CONFIG};
 use crate::common::meta::{
     common::FileKey,
+    prom::{METRIC_NAME, SERIES_NAME},
     search::Session as SearchSession,
     stream::{ScanStats, StreamParams},
     StreamType,
 };
 use crate::service::{
     db, file_list,
+    metrics::get_value_schema,
     search::{
         datafusion::{
             exec::{prepare_datafusion_context, register_table},
@@ -57,8 +59,60 @@ pub(crate) async fn create_context(
         ));
     }
 
-    // get file list
-    let mut files = get_file_list(org_id, stream_name, time_range, filters).await?;
+    let ctx = prepare_datafusion_context()?;
+
+    // register table series
+
+    // -- get series files
+    let mut series_files = get_file_list(org_id, SERIES_NAME, (0, 0), &[]).await?;
+    if series_files.is_empty() {
+        return Ok((
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+        ));
+    }
+    // -- cache series files
+    let deleted_files = cache_parquet_files(&series_files).await?;
+    if !deleted_files.is_empty() {
+        // remove deleted files
+        series_files.retain(|f| !deleted_files.contains(&f.key));
+    }
+    // -- get schema for series table
+    let stream_type = StreamType::Metrics;
+    let schema = match db::schema::get(org_id, SERIES_NAME, stream_type).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("get series schema error: {}", err);
+            return Err(datafusion::error::DataFusionError::Execution(
+                err.to_string(),
+            ));
+        }
+    };
+    // -- register series table
+    let schema = Arc::new(
+        schema
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+    let session = SearchSession {
+        id: format!("{session_id}-series"),
+        storage_type: StorageType::FsMemory,
+    };
+    register_table(
+        &ctx,
+        &session,
+        schema.clone(),
+        SERIES_NAME,
+        &series_files,
+        FileType::PARQUET,
+    )
+    .await?;
+
+    // register table values
+
+    // -- get file list
+    let mut files = get_file_list(org_id, METRIC_NAME, time_range, filters).await?;
     if files.is_empty() {
         return Ok((
             SessionContext::new(),
@@ -67,7 +121,7 @@ pub(crate) async fn create_context(
         ));
     }
 
-    // calcuate scan size
+    // -- calcuate scan size
     let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
@@ -93,7 +147,7 @@ pub(crate) async fn create_context(
         StorageType::FsMemory
     };
 
-    // load files to local cache
+    // -- load files to local cache
     if storage_type == StorageType::FsMemory {
         let deleted_files = cache_parquet_files(&files).await?;
         if !deleted_files.is_empty() {
@@ -106,38 +160,20 @@ pub(crate) async fn create_context(
         );
     }
 
-    // fetch all schema versions, get latest schema
-    let stream_type = StreamType::Metrics;
-    let schema = match db::schema::get(org_id, stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("get schema error: {}", err);
-            return Err(datafusion::error::DataFusionError::Execution(
-                err.to_string(),
-            ));
-        }
-    };
-    let schema = Arc::new(
-        schema
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
-
     let session = SearchSession {
-        id: session_id.to_string(),
+        id: format!("{session_id}-values"),
         storage_type,
     };
-
-    let ctx = prepare_datafusion_context()?;
     register_table(
         &ctx,
         &session,
-        schema.clone(),
-        stream_name,
+        get_value_schema(),
+        METRIC_NAME,
         &files,
         FileType::PARQUET,
     )
     .await?;
+
     Ok((ctx, schema, scan_stats))
 }
 

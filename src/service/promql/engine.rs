@@ -33,8 +33,8 @@ use promql_parser::{
 };
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
-use crate::common::infra::config::CONFIG;
-use crate::common::meta::prom::{HASH_LABEL, VALUE_LABEL};
+use crate::common::meta::prom::{HASH_LABEL, METRIC_NAME, NAME_LABEL, VALUE_LABEL};
+use crate::common::{infra::config::CONFIG, meta::prom::SERIES_NAME};
 use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
 
 pub struct Engine {
@@ -810,19 +810,15 @@ async fn selector_load_data_from_datafusion(
     start: i64,
     end: i64,
 ) -> Result<HashMap<String, RangeValue>> {
-    let table_name = selector.name.as_ref().unwrap();
-    let table = match ctx.table(table_name).await {
+    let metrics_name = selector.name.as_ref().unwrap();
+    // get all series
+    let series_table = match ctx.table(SERIES_NAME).await {
         Ok(v) => v,
         Err(_) => {
             return Ok(HashMap::default());
         }
     };
-
-    let mut df_group = table.clone().filter(
-        col(&CONFIG.common.column_timestamp)
-            .gt(lit(start))
-            .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
-    )?;
+    let mut sereis_df_group = series_table.filter(col(NAME_LABEL).eq(lit(metrics_name)))?;
     for mat in selector.matchers.matchers.iter() {
         if mat.name == CONFIG.common.column_timestamp
             || mat.name == VALUE_LABEL
@@ -832,33 +828,95 @@ async fn selector_load_data_from_datafusion(
         }
         match &mat.op {
             MatchOp::Equal => {
-                df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
+                sereis_df_group =
+                    sereis_df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
             }
             MatchOp::NotEqual => {
-                df_group = df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
+                sereis_df_group =
+                    sereis_df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
             }
             MatchOp::Re(_re) => {
                 let regexp_match_udf =
                     crate::service::search::datafusion::regexp_udf::REGEX_MATCH_UDF.clone();
-                df_group = df_group.filter(
+                sereis_df_group = sereis_df_group.filter(
                     regexp_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
                 )?
             }
             MatchOp::NotRe(_re) => {
                 let regexp_not_match_udf =
                     crate::service::search::datafusion::regexp_udf::REGEX_NOT_MATCH_UDF.clone();
-                df_group = df_group.filter(
+                sereis_df_group = sereis_df_group.filter(
                     regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(mat.value.clone())]),
                 )?
             }
         }
     }
-    let batches = df_group
-        .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+
+    let label_fields = schema
+        .fields()
+        .iter()
+        .filter_map(|f| {
+            if CONFIG.common.column_timestamp.eq(f.name()) {
+                None
+            } else {
+                Some(col(f.name()))
+            }
+        })
+        .collect::<Vec<_>>();
+    let sereis_batches = sereis_df_group
+        .select(label_fields)?
+        .distinct()?
         .collect()
         .await?;
 
     let mut metrics: HashMap<String, RangeValue> = HashMap::default();
+    for batch in &sereis_batches {
+        let hash_values = batch
+            .column_by_name(HASH_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for i in 0..batch.num_rows() {
+            let hash = hash_values.value(i).to_string();
+            metrics.entry(hash).or_insert_with(|| {
+                let mut labels = Vec::with_capacity(batch.num_columns());
+                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
+                    let name = k.name();
+                    if name == &CONFIG.common.column_timestamp || name == HASH_LABEL {
+                        continue;
+                    }
+                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
+                    labels.push(Arc::new(Label {
+                        name: name.to_string(),
+                        value: value.value(i).to_string(),
+                    }));
+                }
+                labels.sort_by(|a, b| a.name.cmp(&b.name));
+                RangeValue::new(labels, Vec::with_capacity(20))
+            });
+        }
+    }
+
+    // get values
+    let values_table = match ctx.table(METRIC_NAME).await {
+        Ok(v) => v,
+        Err(_) => {
+            return Ok(HashMap::default());
+        }
+    };
+
+    let series_hashes = metrics.keys().map(|v| lit(v.clone())).collect::<Vec<_>>();
+    let mut df_group = values_table.filter(
+        col(&CONFIG.common.column_timestamp)
+            .gt(lit(start))
+            .and(col(&CONFIG.common.column_timestamp).lt_eq(lit(end))),
+    )?;
+    df_group = df_group.filter(col(HASH_LABEL).in_list(series_hashes, false))?;
+    let batches = df_group
+        .sort(vec![col(&CONFIG.common.column_timestamp).sort(true, true)])?
+        .collect()
+        .await?;
     for batch in &batches {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
@@ -880,25 +938,7 @@ async fn selector_load_data_from_datafusion(
             .unwrap();
         for i in 0..batch.num_rows() {
             let hash = hash_values.value(i).to_string();
-            let entry = metrics.entry(hash).or_insert_with(|| {
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == &CONFIG.common.column_timestamp
-                        || name == HASH_LABEL
-                        || name == VALUE_LABEL
-                    {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
-                }
-                labels.sort_by(|a, b| a.name.cmp(&b.name));
-                RangeValue::new(labels, Vec::with_capacity(20))
-            });
+            let entry = metrics.get_mut(&hash).unwrap();
             entry
                 .samples
                 .push(Sample::new(time_values.value(i), value_values.value(i)));

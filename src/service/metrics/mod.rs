@@ -15,7 +15,8 @@
 use ahash::AHashMap;
 use bytes::{BufMut, BytesMut};
 use chrono::Utc;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use std::sync::Arc;
 
 use crate::common;
 use crate::common::infra::{config::CONFIG, wal::get_or_create};
@@ -102,4 +103,15 @@ pub fn write_series_file(
         }
         file.write(write_buf.as_ref());
     }
+}
+
+/// The schema of the `value` table is fixed.
+#[inline]
+pub fn get_value_schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
+        Field::new("__name__", DataType::Utf8, false),
+        Field::new("__hash__", DataType::Utf8, false),
+        Field::new("_timestamp", DataType::Int64, false),
+        Field::new("value", DataType::Float64, false),
+    ]))
 }
