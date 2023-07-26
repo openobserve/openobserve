@@ -126,7 +126,7 @@ export default {
   },
   components: { NotEqualIcon, EqualIcon },
   emits: ["copy", "addSearchTerm", "addFieldToTable"],
-  setup(props, { emit }) {
+  setup(props: any, { emit }: any) {
     const store = useStore();
     const copyLogToClipboard = () => {
       emit("copy", props.value);
