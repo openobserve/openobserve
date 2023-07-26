@@ -105,11 +105,21 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
+    let mut is_waiting_streams = false;
     for (key, val) in offsets {
         if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
             log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
-            return Ok(());
+            is_waiting_streams = true;
+            break;
         }
+    }
+
+    if is_waiting_streams {
+        // just compact current hour, no need update offset
+        log::info!("[COMPACT] file_list is starting merge, offset: {time_now_hour}");
+        merge_file_list(time_now_hour).await?;
+        log::info!("[COMPACT] file_list merging is done at offset: {time_now_hour}");
+        return Ok(());
     }
 
     // output file list
