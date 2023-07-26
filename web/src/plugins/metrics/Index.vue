@@ -358,6 +358,7 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       restoreUrlQueryParams();
+      verifyOrganizationStatus(store.state.organizations, router);
       await getLogStreams();
       if (searchObj.loading == false) {
         loadPageData(true);
@@ -843,9 +844,9 @@ export default defineComponent({
     showQuery() {
       return this.searchObj.meta.showQuery;
     },
-    changeOrganization() {
-      return this.store.state.selectedOrganization.identifier;
-    },
+    // changeOrganization() {
+    //   return this.store.state.selectedOrganization.identifier;
+    // },
     selectedMetric() {
       return this.searchObj.data.metrics.selectedMetric;
     },
@@ -860,14 +861,14 @@ export default defineComponent({
     },
   },
   watch: {
-    changeOrganization() {
-      // Fetch and update selected metrics
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      this.loadPageData();
-    },
+    // changeOrganization() {
+    //   // Fetch and update selected metrics
+    //   this.verifyOrganizationStatus(
+    //     this.store.state.organizations,
+    //     this.router
+    //   );
+    //   this.loadPageData();
+    // },
     selectedMetric: {
       deep: true,
       handler: function (metric) {
