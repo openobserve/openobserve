@@ -16,6 +16,7 @@ pub struct UsageData {
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: u64,
+    pub stream: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
