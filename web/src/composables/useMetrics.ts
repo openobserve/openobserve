@@ -73,6 +73,7 @@ const defaultObject = {
       relativeTimePeriod: "15m",
       type: "relative",
     },
+    query: "",
   },
 };
 
