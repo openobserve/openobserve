@@ -1,13 +1,18 @@
 import { onMounted, reactive, ref } from 'vue';
 import Plotly from "plotly.js"
 
-export const convertPromQLData = (props: any, searchQueryData: any, store: any) => {
-  // const searchQueryData = reactive({
-  //   data: [] as any | Array<any>,
-  //   loading: false,
-  // });
-  // const plotRef: any = ref(null);
-  // const store = useStore();
+export const convertPromQLData = (
+  panelSchema: any,
+  searchQueryDataTemp: any,
+  store: any
+) => {
+  const props = {
+    data: panelSchema,
+  };
+
+  const searchQueryData = {
+    data: searchQueryDataTemp,
+  };
   const getPromqlLegendName = (metric: any, label: string) => {
     if (label) {
       let template = label || "";
@@ -45,22 +50,20 @@ export const convertPromQLData = (props: any, searchQueryData: any, store: any) 
     }
   };
 
-  // const getThemeLayoutOptions = () => ({
-  //   paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-  //   plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-  //   font: {
-  //     size: 12,
-  //     color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-  //   },
-  // });
+  const getThemeLayoutOptions = () => ({
+    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    font: {
+      size: 12,
+      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+    },
+  });
   console.log("props", props);
-  console.log("propssssssssss");
-
+  console.log("propssssssssss",searchQueryData.data.resultType);
   switch (searchQueryData.data.resultType) {
     case "matrix": {
       const traces = searchQueryData.data?.result?.map((metric: any) => {
         const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
-        console.log("metric", props.data.config.promql_legend);
 
         return {
           name: getPromqlLegendName(
@@ -92,12 +95,14 @@ export const convertPromQLData = (props: any, searchQueryData: any, store: any) 
         },
         ...getThemeLayoutOptions(),
       };
-
       // Plotly.react(plotRef.value, traces, layout, {
       //   responsive: true,
       //   displaylogo: false,
       //   displayModeBar: false,
       // });
+       console.log("layout", layout);
+       console.log("traces", traces);
+      return { traces, layout };
 
       break;
     }
@@ -131,18 +136,15 @@ export const convertPromQLData = (props: any, searchQueryData: any, store: any) 
         },
         ...getThemeLayoutOptions(),
       };
-
+      console.log("layout", layout);
+      console.log("traces:", traces);
+      return {traces, layout};
       // Plotly.react(plotRef.value, traces, layout, {
-      //   responsive: true,
-      //   displaylogo: false,
-      //   displayModeBar: false,
-      // });
-
-      break;
+        //   responsive: true,
+        //   displaylogo: false,
+        //   displayModeBar: false,
+        // });
+        break;
+      }
     }
-  }
-
-  return {
-    searchQueryData,
-  };
 };
