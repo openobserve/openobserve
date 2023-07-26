@@ -110,6 +110,12 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
+                // This is a very special case, as we treat the float also a `Value::Vector(vec![element])`
+                // therefore, better convert it back to its representation.
+                let rhs = match rhs {
+                    Value::Vector(v) if v.len() == 1 => Value::Float(v[0].sample.value),
+                    _ => rhs,
+                };
                 match (lhs.clone(), rhs.clone()) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -169,7 +175,15 @@ impl Engine {
                     Value::Matrix(data)
                 }
             }
-            PromExpr::Call(Call { func, args }) => self.call_expr(func, args).await?,
+            PromExpr::Call(Call { func, args }) => {
+                let output = self.call_expr(func, args).await?;
+                if output.contains_same_label_set() {
+                    return Err(DataFusionError::NotImplemented(
+                        "vector cannot contain metrics with the same labelset".into(),
+                    ));
+                }
+                output
+            }
             PromExpr::Extension(expr) => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Extension: {:?}",
