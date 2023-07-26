@@ -30,7 +30,7 @@ use crate::common::infra::{
     config::CONFIG,
 };
 use crate::common::meta::{
-    prom::{METRIC_NAME, SERIES_NAME},
+    prom::{SAMPLES_NAME, SERIES_NAME},
     search::Session as SearchSession,
     stream::ScanStats,
     StreamType,
@@ -38,7 +38,7 @@ use crate::common::meta::{
 use crate::handler::grpc::cluster_rpc;
 use crate::service::{
     db,
-    metrics::get_value_schema,
+    metrics::get_sample_table_schema,
     search::{
         datafusion::{
             exec::{prepare_datafusion_context, register_table},
@@ -117,7 +117,7 @@ pub(crate) async fn create_context(
     // register table values
 
     // -- get file list
-    let files = get_file_list(org_id, METRIC_NAME, time_range).await?;
+    let files = get_file_list(org_id, SAMPLES_NAME, time_range).await?;
     if files.is_empty() {
         return Ok((
             SessionContext::new(),
@@ -151,8 +151,8 @@ pub(crate) async fn create_context(
     register_table(
         &ctx,
         &session,
-        get_value_schema(),
-        METRIC_NAME,
+        get_sample_table_schema(),
+        SAMPLES_NAME,
         &[],
         FileType::JSON,
     )

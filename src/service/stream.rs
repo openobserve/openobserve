@@ -64,6 +64,12 @@ pub async fn get_streams(
         .unwrap();
     let mut indices_res = Vec::with_capacity(indices.len());
     for stream_loc in indices {
+        if stream_loc.stream_type.eq(&StreamType::Metrics)
+            && stream_loc.stream_name != prom::SERIES_NAME
+            && stream_loc.stream_name != prom::SAMPLES_NAME
+        {
+            continue; // filter metrics streams
+        }
         let mut stats = stats::get_stream_stats(
             org_id,
             stream_loc.stream_name.as_str(),

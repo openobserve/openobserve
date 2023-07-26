@@ -34,7 +34,7 @@ use promql_parser::{
 use rayon::prelude::*;
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
-use crate::common::meta::prom::{HASH_LABEL, METRIC_NAME, NAME_LABEL, VALUE_LABEL};
+use crate::common::meta::prom::{HASH_LABEL, NAME_LABEL, SAMPLES_NAME, VALUE_LABEL};
 use crate::common::{infra::config::CONFIG, meta::prom::SERIES_NAME};
 use crate::service::promql::{aggregations, binaries, functions, micros, value::*};
 
@@ -902,7 +902,7 @@ async fn selector_load_data_from_datafusion(
     }
 
     // get values
-    let values_table = match ctx.table(METRIC_NAME).await {
+    let values_table = match ctx.table(SAMPLES_NAME).await {
         Ok(v) => v,
         Err(_) => {
             return Ok(HashMap::default());

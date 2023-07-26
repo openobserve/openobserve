@@ -16,9 +16,8 @@ use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use chrono::Utc;
-use datafusion::arrow::{datatypes::Schema, json::reader::infer_json_schema};
-use std::fs::OpenOptions;
-use std::{collections::HashMap, io::BufReader};
+use datafusion::arrow::datatypes::Schema;
+use std::{collections::HashMap, fs::OpenOptions};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{
@@ -29,7 +28,7 @@ use crate::common::infra::{
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
     prom::{
-        Metadata, HASH_LABEL, METADATA_LABEL, METRIC_NAME, NAME_LABEL, SERIES_NAME, TYPE_LABEL,
+        Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, SAMPLES_NAME, SERIES_NAME, TYPE_LABEL,
         VALUE_LABEL,
     },
     stream::PartitionTimeLevel,
@@ -42,7 +41,7 @@ use crate::service::{
     db,
     ingestion::{get_wal_time_key, write_file},
     schema::{add_stream_schema, stream_schema_exists},
-    stream::save_stream_settings,
+    stream::{save_stream_settings, stream_created},
     usage::report_usage_stats,
 };
 
@@ -60,10 +59,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let now_ts = Utc::now().timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
-    let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
-    let mut metric_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut metrics_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut metrics_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
+    let mut metrics_samples_data: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut metrics_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.iter() {
@@ -86,7 +85,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
-            if stream_schema_map.get(&stream_name).is_none() {
+            if metrics_schema_map.get(&stream_name).is_none() {
                 let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
                 if schema == Schema::empty() {
                     // create the metadata for the stream
@@ -112,14 +111,14 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     )
                     .await?;
                 }
-                stream_schema_map.insert(stream_name.clone(), schema);
+                metrics_schema_map.insert(stream_name.clone(), schema);
             }
             continue;
         }
 
         // apply functions
         let mut record = json::Value::Object(record.to_owned());
-        apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
+        apply_func(&mut runtime, org_id, SERIES_NAME, &mut record)?;
 
         let record = record.as_object_mut().unwrap();
 
@@ -129,31 +128,30 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
         );
         let hash_val: String = hash.into();
-        let key = format!("{}/{}/{}", &org_id, stream_name.clone(), &hash_val);
-
         record.insert(
             HASH_LABEL.to_string(),
             json::Value::String(hash_val.clone()),
         );
 
-        let present = METRIC_SERIES_HASH.get(&key);
+        // check series table
+        let series_key = format!("{}/{}/{}", &org_id, stream_name.clone(), &hash_val);
+        let present = METRIC_SERIES_HASH.get(&series_key);
         if present.is_none() {
-            METRIC_SERIES_HASH.insert(key.clone(), true);
+            METRIC_SERIES_HASH.insert(series_key.clone());
             let mut series_values = record.clone();
             series_values.remove_entry(VALUE_LABEL);
-            series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
             series_values.insert(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(now_ts.into()),
             );
             let series_str = crate::common::json::to_string(&series_values).unwrap();
-            metric_series_values
+            metrics_series_values
                 .entry(stream_name.clone())
                 .or_default()
                 .push(series_str);
         }
 
-        // check timestamp & value
+        // check record timestamp & value
         let timestamp: i64 = match record.get(&CONFIG.common.column_timestamp) {
             None => chrono::Utc::now().timestamp_micros(),
             Some(json::Value::Number(s)) => {
@@ -197,22 +195,20 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 }
             }
         }
-        let record_str = json::to_string(&record).unwrap();
 
-        let mut final_value_map: json::Map<String, json::Value> = record.clone();
-        final_value_map.retain(|k, _| {
+        // sample value
+        let mut sample_values: json::Map<String, json::Value> = record.clone();
+        sample_values.retain(|k, _| {
             k.eq(&CONFIG.common.column_timestamp)
                 || k.eq(HASH_LABEL)
                 || k.eq(VALUE_LABEL)
                 || k.eq(NAME_LABEL)
         });
 
-        // check schema
-        if stream_schema_map.get(&stream_name).is_none() {
+        // check schema for current metrics name
+        if metrics_schema_map.get(&stream_name).is_none() {
             let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-            if schema.fields().is_empty() {
-                let mut schema_reader = BufReader::new(record_str.as_bytes());
-                schema = infer_json_schema(&mut schema_reader, None).unwrap();
+            if stream_created(&schema).is_none() {
                 let metadata = Metadata {
                     metric_family_name: stream_name.clone(),
                     metric_type: metrics_type.as_str().into(),
@@ -235,15 +231,14 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 )
                 .await?;
             }
-            stream_schema_map.insert(stream_name.clone(), schema);
+            metrics_schema_map.insert(stream_name.clone(), schema);
         }
 
         // write into buffer
         let partition_keys =
-            crate::service::ingestion::get_stream_partition_keys(&stream_name, &stream_schema_map)
+            crate::service::ingestion::get_stream_partition_keys(SERIES_NAME, &metrics_schema_map)
                 .await;
 
-        let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
         let hour_key = get_wal_time_key(
             timestamp,
             PartitionTimeLevel::Hourly,
@@ -251,53 +246,49 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             record,
             None,
         );
-        let hour_buf = stream_buf.entry(hour_key).or_default();
-        let final_value_str = crate::common::json::to_string(&final_value_map).unwrap();
+        let hour_buf = metrics_samples_data.entry(hour_key).or_default();
+        let final_value_str = crate::common::json::to_string(&sample_values).unwrap();
         hour_buf.push(final_value_str);
 
         // update status
-        let stream_status = stream_status_map
+        let stream_status = metrics_status_map
             .entry(stream_name.clone())
             .or_insert(StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
     let time = start.elapsed().as_secs_f64();
 
-    for (stream_name, stream_data) in stream_data_buf {
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            None,
-        ) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
-        }
-        let mut stream_file_name = "".to_string();
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            org_id,
-            METRIC_NAME,
-            &mut stream_file_name,
-            StreamType::Metrics,
-        );
-        req_stats.response_time = time;
-
-        report_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            UsageType::JsonMetrics,
-            0,
-        )
-        .await;
+    // check if we are allowed to ingest
+    if db::compact::retention::is_deleting_stream(org_id, SAMPLES_NAME, StreamType::Metrics, None) {
+        return Err(anyhow::anyhow!("stream [{SAMPLES_NAME}] is being deleted"));
     }
 
+    // write sample records into sample table
+    let mut stream_file_name = "".to_string();
+    let mut req_stats = write_file(
+        metrics_samples_data,
+        thread_id,
+        org_id,
+        SAMPLES_NAME,
+        &mut stream_file_name,
+        StreamType::Metrics,
+    );
+    req_stats.response_time = time;
+
+    report_usage_stats(
+        req_stats,
+        org_id,
+        SAMPLES_NAME,
+        StreamType::Metrics,
+        UsageType::JsonMetrics,
+        0,
+    )
+    .await;
+
+    // write series data into series table
     let mut series_file_name = "".to_string();
     super::write_series_file(
-        metric_series_values,
+        metrics_series_values,
         thread_id,
         org_id,
         &mut series_file_name,
@@ -307,7 +298,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         org_id,
         SERIES_NAME,
         StreamType::Metrics,
-        &mut stream_schema_map,
+        &mut metrics_schema_map,
     )
     .await;
 
@@ -322,7 +313,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             SERIES_NAME,
             StreamType::Metrics,
             &file,
-            &mut stream_schema_map,
+            &mut metrics_schema_map,
             now_ts,
         )
         .await;
@@ -356,7 +347,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
-        stream_status_map.values().map(|v| v.to_owned()).collect(),
+        metrics_status_map.values().map(|v| v.to_owned()).collect(),
     ))
 }
 

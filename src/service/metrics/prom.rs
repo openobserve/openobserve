@@ -31,7 +31,7 @@ use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
     functions::StreamTransform,
-    prom::{self, HASH_LABEL, METADATA_LABEL, METRIC_NAME, NAME_LABEL, SERIES_NAME, VALUE_LABEL},
+    prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, SAMPLES_NAME, SERIES_NAME, VALUE_LABEL},
     stream::{PartitionTimeLevel, StreamSettings},
     usage::UsageType,
     StreamType,
@@ -39,7 +39,7 @@ use crate::common::meta::{
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::{
     db,
-    ingestion::{chk_schema_by_record, get_wal_time_key, write_file},
+    ingestion::{get_wal_time_key, write_file},
     schema::{add_stream_schema, set_schema_metadata, stream_schema_exists},
     search as search_service,
     stream::save_stream_settings,
@@ -74,12 +74,12 @@ pub async fn remote_write(
     let mut has_entry = false;
     let mut accept_record = false;
     let mut cluster_name: String = String::new();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
-    let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut metric_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut metrics_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut metrics_samples_data: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut metrics_series_values: AHashMap<String, Vec<String>> = AHashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -140,8 +140,6 @@ pub async fn remote_write(
             .map(|label| (label.name.clone(), label.value.clone()))
             .collect();
 
-        let buf = metric_data_map.entry(metric_name.clone()).or_default();
-
         // parse samples
         for sample in event.samples {
             let mut sample_val = sample.value;
@@ -195,73 +193,68 @@ pub async fn remote_write(
             // get partition keys
             let stream_schema = stream_schema_exists(
                 org_id,
-                &metric_name,
+                SERIES_NAME,
                 StreamType::Metrics,
-                &mut metric_schema_map,
+                &mut metrics_schema_map,
             )
             .await;
             let mut partition_keys: Vec<String> = vec![];
             if stream_schema.has_partition_keys {
                 partition_keys = crate::service::ingestion::get_stream_partition_keys(
-                    &metric_name,
-                    &metric_schema_map,
+                    SERIES_NAME,
+                    &metrics_schema_map,
                 )
                 .await;
             }
 
             // Start get stream alerts
-            let key = format!(
-                "{}/{}/{}",
-                &org_id,
-                StreamType::Metrics,
-                metric_name.clone()
-            );
-            crate::service::ingestion::get_stream_alerts(key, &mut stream_alerts_map).await;
+            let alert_key = format!("{}/{}/{}", &org_id, StreamType::Metrics, SERIES_NAME);
+            crate::service::ingestion::get_stream_alerts(alert_key, &mut stream_alerts_map).await;
             // End get stream alert
 
-            let mut runtime = crate::service::ingestion::init_functions_runtime();
-
             // Start Register Transforms for stream
-
+            let mut runtime = crate::service::ingestion::init_functions_runtime();
             let (local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
                     StreamType::Metrics,
-                    &metric_name,
+                    SERIES_NAME,
                 );
 
-            stream_transform_map.insert(metric_name.to_owned(), local_trans.clone());
+            stream_transform_map.insert(SERIES_NAME.to_string(), local_trans.clone());
             // End Register Transforms for stream
 
             let mut value: json::Value = json::to_value(&metric).unwrap();
 
             // Start row based transform
-
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
                 &value,
                 &stream_vrl_map,
-                &metric_name,
+                SERIES_NAME,
                 &mut runtime,
             )?;
-
             // End row based transform
 
             // get json object
             let val_map = value.as_object_mut().unwrap();
 
-            let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
+            // add hash
+            let hash = super::signature_without_labels(
+                val_map,
+                &[VALUE_LABEL, CONFIG.common.column_timestamp.as_str()],
+            );
             let hash_val: String = hash.into();
-            let key = format!("{}/{}/{}", &org_id, metric_name.clone(), &hash_val);
-
             val_map.insert(
                 HASH_LABEL.to_string(),
                 json::Value::String(hash_val.clone()),
             );
 
-            let present = METRIC_SERIES_HASH.get(&key);
+            // check series table
+            let series_key = format!("{}/{}/{}", &org_id, metric_name.clone(), &hash_val);
+            let present = METRIC_SERIES_HASH.get(&series_key);
             if present.is_none() {
-                METRIC_SERIES_HASH.insert(key.clone(), true);
+                METRIC_SERIES_HASH.insert(series_key.clone());
                 let mut series_values = val_map.clone();
                 series_values.remove_entry(VALUE_LABEL);
                 series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
@@ -270,34 +263,26 @@ pub async fn remote_write(
                     json::Value::Number(now_ts.into()),
                 );
                 let series_str = crate::common::json::to_string(&series_values).unwrap();
-                metric_series_values
+                metrics_series_values
                     .entry(metric_name.clone())
                     .or_default()
                     .push(series_str);
             }
 
+            // check record timestamp & value
             val_map.insert(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
-            let mut final_value_map: json::Map<String, json::Value> = val_map.clone();
-            final_value_map.retain(|k, _| {
+
+            // sample value
+            let mut sample_value: json::Map<String, json::Value> = val_map.clone();
+            sample_value.retain(|k, _| {
                 k.eq(&CONFIG.common.column_timestamp)
                     || k.eq(HASH_LABEL)
                     || k.eq(VALUE_LABEL)
                     || k.eq(NAME_LABEL)
             });
-
-            let value_str = crate::common::json::to_string(&val_map).unwrap();
-            chk_schema_by_record(
-                &mut metric_schema_map,
-                org_id,
-                StreamType::Metrics,
-                &metric_name,
-                timestamp,
-                &value_str,
-            )
-            .await;
 
             // get hour key
             let hour_key = get_wal_time_key(
@@ -307,20 +292,20 @@ pub async fn remote_write(
                 value.as_object().unwrap(),
                 None,
             );
-            let hour_buf = buf.entry(hour_key).or_default();
-            let final_value_str = crate::common::json::to_string(&final_value_map).unwrap();
-            hour_buf.push(final_value_str);
+            let hour_buf = metrics_samples_data.entry(hour_key).or_default();
+            let sample_value_str = crate::common::json::to_string(&sample_value).unwrap();
+            hour_buf.push(sample_value_str);
 
             // real time alert
             if !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!(
+                let alert_key = format!(
                     "{}/{}/{}",
                     &org_id,
                     StreamType::Metrics,
-                    metric_name.clone()
+                    SERIES_NAME.to_string(),
                 );
-                if let Some(alerts) = stream_alerts_map.get(&key) {
+                if let Some(alerts) = stream_alerts_map.get(&alert_key) {
                     for alert in alerts {
                         if alert.is_real_time {
                             let set_trigger = meta::alert::Evaluate::evaluate(
@@ -329,12 +314,12 @@ pub async fn remote_write(
                             );
                             if set_trigger {
                                 stream_trigger_map.insert(
-                                    metric_name.clone(),
+                                    SERIES_NAME.to_string(),
                                     Trigger {
                                         timestamp,
                                         is_valid: true,
                                         alert_name: alert.name.clone(),
-                                        stream: metric_name.clone(),
+                                        stream: SERIES_NAME.to_string(),
                                         org: org_id.to_string(),
                                         stream_type: StreamType::Metrics,
                                         last_sent_at: 0,
@@ -352,66 +337,50 @@ pub async fn remote_write(
     }
 
     let time = start.elapsed().as_secs_f64();
-    for (stream_name, stream_data) in metric_data_map {
-        // write to file
-        let mut stream_file_name = "".to_string();
+    // write to file
+    let mut stream_file_name = "".to_string();
 
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            None,
-        ) {
-            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
-        }
-
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            org_id,
-            METRIC_NAME,
-            &mut stream_file_name,
-            StreamType::Metrics,
-        );
-
-        let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
-        req_stats.response_time += time;
-        report_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            UsageType::Metrics,
-            fns_length as u16,
-        )
-        .await;
-
-        let _schema_exists = stream_schema_exists(
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            &mut metric_schema_map,
-        )
-        .await;
+    // check if we are allowed to ingest
+    if db::compact::retention::is_deleting_stream(org_id, SAMPLES_NAME, StreamType::Metrics, None) {
+        return Err(anyhow::anyhow!("stream [{SAMPLES_NAME}] is being deleted",));
     }
 
+    let mut req_stats = write_file(
+        metrics_samples_data,
+        thread_id,
+        org_id,
+        SAMPLES_NAME,
+        &mut stream_file_name,
+        StreamType::Metrics,
+    );
+
+    let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
+    req_stats.response_time += time;
+    report_usage_stats(
+        req_stats,
+        org_id,
+        SAMPLES_NAME,
+        StreamType::Metrics,
+        UsageType::Metrics,
+        fns_length as u16,
+    )
+    .await;
+
+    // check series
     let mut series_file_name = "".to_string();
     super::write_series_file(
-        metric_series_values,
+        metrics_series_values,
         thread_id,
         org_id,
         &mut series_file_name,
     );
-
     let schema_exists = stream_schema_exists(
         org_id,
         SERIES_NAME,
         StreamType::Metrics,
-        &mut metric_schema_map,
+        &mut metrics_schema_map,
     )
     .await;
-
     if !schema_exists.has_fields {
         let file = OpenOptions::new()
             .read(true)
@@ -422,7 +391,7 @@ pub async fn remote_write(
             SERIES_NAME,
             StreamType::Metrics,
             &file,
-            &mut metric_schema_map,
+            &mut metrics_schema_map,
             now_ts,
         )
         .await;

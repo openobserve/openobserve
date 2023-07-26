@@ -42,7 +42,7 @@ use crate::common::{
     json::{Map, Value},
     notification::send_notification,
 };
-use crate::service::{db, triggers};
+use crate::service::{db, stream::stream_created, triggers};
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -286,13 +286,17 @@ pub async fn chk_schema_by_record(
         stream_schema_map.insert(stream_name.to_string(), schema.clone());
         schema
     };
-    if !schema.fields().is_empty() {
+    if stream_created(&schema).is_some() {
         return;
     }
 
-    let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
-    let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
+    let inferred_schema = if record_val.is_empty() {
+        Schema::empty().with_metadata(schema.metadata().clone())
+    } else {
+        let mut schema_reader = BufReader::new(record_val.as_bytes());
+        let inferred_schema = infer_json_schema(&mut schema_reader, None).unwrap();
+        inferred_schema.with_metadata(schema.metadata().clone())
+    };
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
     db::schema::set(
         org_id,

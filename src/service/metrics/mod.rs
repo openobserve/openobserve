@@ -105,9 +105,9 @@ pub fn write_series_file(
     }
 }
 
-/// The schema of the `value` table is fixed.
+/// The schema of the `samples` table.
 #[inline]
-pub fn get_value_schema() -> Arc<Schema> {
+pub fn get_sample_table_schema() -> Arc<Schema> {
     Arc::new(Schema::new(vec![
         Field::new("__name__", DataType::Utf8, false),
         Field::new("__hash__", DataType::Utf8, false),

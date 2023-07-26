@@ -284,7 +284,8 @@ pub async fn ingest(
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
         {
-            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+            log::error!("stream [{stream_name}] is being deleted");
+            continue;
         }
         // write to file
         let mut stream_file_name = "".to_string();

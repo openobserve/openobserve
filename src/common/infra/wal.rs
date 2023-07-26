@@ -183,14 +183,10 @@ impl Manager {
             }
         };
 
-        let desired_size = if stream_type.eq(&StreamType::Metrics) {
-            (CONFIG.limit.max_file_size_on_disk * CONFIG.limit.metric_file_size_multiplier) as i64
-        } else {
-            CONFIG.limit.max_file_size_on_disk as i64
-        };
-
         // check size & ttl
-        if file.size() >= (desired_size) || file.expired() <= chrono::Utc::now().timestamp() {
+        if file.size() >= (CONFIG.limit.max_file_size_on_disk as i64)
+            || file.expired() <= chrono::Utc::now().timestamp()
+        {
             self.data
                 .get(thread_id)
                 .unwrap()
@@ -326,13 +322,7 @@ impl RwFile {
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
-        let ttl = if stream_type.eq(&StreamType::Metrics) {
-            chrono::Utc::now().timestamp()
-                + (CONFIG.limit.max_file_retention_time * CONFIG.limit.metric_retention_multiplier)
-                    as i64
-        } else {
-            chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
-        };
+        let ttl = chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64;
         RwFile {
             use_cache,
             file,

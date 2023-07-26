@@ -25,7 +25,7 @@ pub const VALUE_LABEL: &str = "value";
 pub const LE_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
-pub const METRIC_NAME: &str = "default";
+pub const SAMPLES_NAME: &str = "samples";
 pub const SERIES_NAME: &str = "series";
 pub const METRICS_SERIES_TIME: i64 = 946688400000000;
 

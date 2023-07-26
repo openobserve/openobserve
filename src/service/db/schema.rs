@@ -17,13 +17,13 @@ use chrono::Utc;
 use datafusion::arrow::datatypes::Schema;
 use std::sync::Arc;
 
-use crate::common::infra::cache;
-use crate::common::infra::config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS};
-use crate::common::infra::db::Event;
-use crate::common::json;
-use crate::common::meta::stream::StreamSchema;
-use crate::common::meta::StreamType;
-use crate::common::utils::is_local_disk_storage;
+use crate::common::infra::{
+    cache,
+    config::{CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS},
+    db::Event,
+};
+use crate::common::meta::{prom, stream::StreamSchema, StreamType};
+use crate::common::{json, utils::is_local_disk_storage};
 use crate::service::enrichment::StreamTable;
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -433,6 +433,12 @@ pub fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<Str
             continue;
         }
         let cur_stream_name = columns[2].to_string();
+        if cur_stream_type.eq(&StreamType::Metrics)
+            && cur_stream_name != prom::SERIES_NAME
+            && cur_stream_name != prom::SAMPLES_NAME
+        {
+            continue; // filter metrics streams
+        }
         names.insert(cur_stream_name);
     }
     names.into_iter().collect::<Vec<String>>()
