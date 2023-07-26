@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use ahash::{HashMap, HashSet};
 
 use crate::service::promql::{
     binaries::scalar_binary_operations,
-    value::{signature, InstantValue, LabelsExt, Sample, Signature, Value},
+    value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
@@ -33,7 +35,6 @@ pub async fn vector_scalar_bin_op(
 ) -> Result<Value> {
     let is_comparison_operator = expr.op.is_comparison_operator();
     let return_bool = expr.return_bool();
-
     let output: Vec<InstantValue> = left
         .par_iter()
         .flat_map(|instant| {
@@ -205,20 +206,48 @@ fn vector_arithmatic_operators(
     right: &[InstantValue],
 ) -> Result<Value> {
     let operator = expr.op.id();
-    // Get the hash for the labels on the right
-    let rhs_sig: HashMap<Signature, Sample> = right
-        .par_iter()
-        .map(|item| (signature(&item.labels), item.sample))
-        .collect();
 
     let return_bool = expr.return_bool();
     let comparison_operator = expr.op.is_comparison_operator();
+
+    let mut labels_to_include_set = vec![];
+    let mut labels_to_exclude_set = vec![];
+
+    let is_matching_on = expr.is_matching_on();
+    if is_matching_on {
+        let modifier = expr.modifier.as_ref().unwrap();
+        if modifier.is_matching_on() {
+            labels_to_include_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
+            labels_to_include_set.sort();
+        } else {
+            labels_to_exclude_set = modifier.matching.as_ref().unwrap().labels().labels.clone();
+            labels_to_exclude_set.sort();
+        }
+    }
+
+    // These labels should be used to compare values between lhs - rhs
+    let labels_to_compare = |labels: &Vec<Arc<Label>>| {
+        if is_matching_on {
+            labels.keep(&labels_to_include_set)
+        } else {
+            labels.delete(&labels_to_exclude_set)
+        }
+    };
+
+    // Get the hash for the labels on the right
+    let rhs_sig: HashMap<Signature, Sample> = right
+        .par_iter()
+        .map(|item| {
+            let signature = labels_to_compare(&item.labels).signature();
+            (signature, item.sample)
+        })
+        .collect();
 
     // Iterate over left and pick up the corresponding instance from rhs
     let output: Vec<InstantValue> = left
         .par_iter()
         .flat_map(|item| {
-            let left_sig = signature(&item.labels);
+            let left_sig = labels_to_compare(&item.labels).signature();
             if rhs_sig.contains_key(&left_sig) {
                 Some((item, rhs_sig.get(&left_sig).unwrap()))
             } else {
@@ -234,12 +263,26 @@ fn vector_arithmatic_operators(
                 comparison_operator,
             )
             .ok()
-            .map(|value| InstantValue {
-                labels: lhs_instant.labels.clone(),
-                sample: Sample {
-                    timestamp: lhs_instant.sample.timestamp,
-                    value,
-                },
+            .map(|value| {
+                let mut labels = if return_bool || DROP_METRIC_VECTOR_BIN_OP.contains(&expr.op.id())
+                {
+                    lhs_instant.labels.without_metric_name()
+                } else {
+                    lhs_instant.labels.clone()
+                };
+
+                if let Some(modifier) = expr.modifier.as_ref() {
+                    if modifier.card == VectorMatchCardinality::OneToOne {
+                        labels = labels_to_compare(&labels);
+                    }
+                }
+                InstantValue {
+                    labels,
+                    sample: Sample {
+                        timestamp: lhs_instant.sample.timestamp,
+                        value,
+                    },
+                }
             })
         })
         .collect();

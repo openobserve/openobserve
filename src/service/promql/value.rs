@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ahash::HashSet;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 use serde::{
@@ -45,6 +46,17 @@ pub trait LabelsExt {
 
     /// Without label, drops the given label name from the output.
     fn without_label(&self, name: &str) -> Labels;
+
+    /// Signature for the given set of labels
+    fn signature(&self) -> Signature;
+
+    /// keep the labels as described by the `labels` vector
+    /// and delete everything else
+    fn keep(&self, labels: &[String]) -> Labels;
+
+    /// delete the labels as described by the `labels` vector
+    /// and keep the remaining
+    fn delete(&self, labels: &[String]) -> Labels;
 }
 
 impl LabelsExt for Labels {
@@ -64,6 +76,34 @@ impl LabelsExt for Labels {
             .filter(|l| l.name == name)
             .map(|l| l.value.to_string())
             .take(1)
+            .collect()
+    }
+
+    fn signature(&self) -> Signature {
+        signature(self)
+    }
+
+    fn keep(&self, labels: &[String]) -> Labels {
+        self.iter()
+            .flat_map(|label| {
+                if labels.contains(&label.name) {
+                    Some(label.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn delete(&self, labels: &[String]) -> Labels {
+        self.iter()
+            .flat_map(|label| {
+                if !labels.contains(&label.name) {
+                    Some(label.clone())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }
@@ -415,6 +455,45 @@ impl Value {
                 });
             }
             _ => {}
+        }
+    }
+
+    /// Checks if the vector or matrix types contain duplicated label set or not.
+    /// This is an undefined condition, hence caller should raise an error in
+    /// case this evaluates to `true`.
+    pub fn contains_same_label_set(&self) -> bool {
+        match self {
+            Value::Vector(v) => match v.len() {
+                0 | 1 => false,
+                2 => v[0].labels.signature() == v[1].labels.signature(),
+                _ => {
+                    let mut signatures = HashSet::default();
+                    for instant in v.iter() {
+                        // If the set already contained this value, false is returned.
+                        let new = signatures.insert(instant.labels.signature());
+                        if !new {
+                            return true;
+                        }
+                    }
+                    false
+                }
+            },
+            Value::Matrix(v) => match v.len() {
+                0 | 1 => false,
+                2 => v[0].labels.signature() == v[1].labels.signature(),
+                _ => {
+                    let mut signatures = HashSet::default();
+                    for instant in v.iter() {
+                        // If the set already contained this value, false is returned.
+                        let new = signatures.insert(instant.labels.signature());
+                        if !new {
+                            return true;
+                        }
+                    }
+                    false
+                }
+            },
+            _ => false,
         }
     }
 }

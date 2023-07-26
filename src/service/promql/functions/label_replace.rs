@@ -14,6 +14,7 @@
 
 use crate::service::promql::value::{InstantValue, Label, LabelsExt, Value};
 use datafusion::error::{DataFusionError, Result};
+use rayon::prelude::*;
 use regex::{self, Regex};
 use std::sync::Arc;
 
@@ -46,7 +47,7 @@ pub(crate) fn label_replace(
         .map_err(|_e| DataFusionError::NotImplemented("Invalid regex found".into()))?;
 
     let rate_values: Vec<InstantValue> = data
-        .iter()
+        .par_iter()
         .map(|instant| {
             let labels = if replacement.is_empty() {
                 instant.labels.without_label(dest_label)
