@@ -261,7 +261,7 @@ export default defineComponent({
             150 -
           1;
 
-        this.getQueryData(true);
+        this.getQueryData(true, true);
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
