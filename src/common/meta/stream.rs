@@ -13,13 +13,12 @@
 // limitations under the License.
 
 use arrow_schema::Field;
-use chrono::Duration;
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use utoipa::ToSchema;
 
-use crate::common::{infra::config::CONFIG, json, meta::StreamType};
+use crate::common::{json, meta::StreamType};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -58,33 +57,33 @@ pub struct StreamStats {
     pub compressed_size: f64,
 }
 
-impl StreamStats {
-    /// Returns true iff [start, end] time range intersects with the stream's time range.
-    pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
-        assert!(start <= end);
-        let (min, max) = self.time_range();
-        // [min, max] does *not* intersect with [start, end] if either
-        //
-        // max < start
-        // |--------------------|         |--------------------|
-        // min                  max       start                end
-        //
-        // or min >= end
-        // |--------------------|         |--------------------|
-        // start                end       min                  max
-        //
-        // The time ranges intersect iff !(max < start || min >= end)
-        max >= start && min < end
-    }
+// impl StreamStats {
+//     /// Returns true iff [start, end] time range intersects with the stream's time range.
+//     pub(crate) fn time_range_intersects(&self, start: i64, end: i64) -> bool {
+//         assert!(start <= end);
+//         let (min, max) = self.time_range();
+//         // [min, max] does *not* intersect with [start, end] if either
+//         //
+//         // max < start
+//         // |--------------------|         |--------------------|
+//         // min                  max       start                end
+//         //
+//         // or min >= end
+//         // |--------------------|         |--------------------|
+//         // start                end       min                  max
+//         //
+//         // The time ranges intersect iff !(max < start || min >= end)
+//         max >= start && min < end
+//     }
 
-    fn time_range(&self) -> (i64, i64) {
-        assert!(self.doc_time_min <= self.doc_time_max);
-        let file_push_interval = Duration::seconds(CONFIG.limit.file_push_interval as _)
-            .num_microseconds()
-            .unwrap();
-        (self.doc_time_min, self.doc_time_max + file_push_interval)
-    }
-}
+//     fn time_range(&self) -> (i64, i64) {
+//         assert!(self.doc_time_min <= self.doc_time_max);
+//         let file_push_interval = Duration::seconds(CONFIG.limit.file_push_interval as _)
+//             .num_microseconds()
+//             .unwrap();
+//         (self.doc_time_min, self.doc_time_max + file_push_interval)
+//     }
+// }
 
 impl From<&str> for StreamStats {
     fn from(data: &str) -> Self {

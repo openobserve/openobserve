@@ -21,7 +21,6 @@ use prost::Message;
 use std::{collections::HashMap, fs::OpenOptions};
 
 use crate::common::infra::{
-    cache::stats,
     cluster,
     config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP, METRIC_SERIES_HASH},
     errors::{Error, Result},
@@ -31,7 +30,10 @@ use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
     functions::StreamTransform,
-    prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, SAMPLES_NAME, SERIES_NAME, VALUE_LABEL},
+    prom::{
+        self, HASH_LABEL, LE_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL, SAMPLES_NAME,
+        SERIES_NAME, TYPE_LABEL, VALUE_LABEL,
+    },
     stream::{PartitionTimeLevel, StreamSettings},
     usage::UsageType,
     StreamType,
@@ -504,7 +506,10 @@ pub(crate) async fn get_metadata(
                 histogram_summary_sub.push(format!("{}_sum", name));
             }
             let metric_names = stream_schemas.into_iter().filter_map(|schema| {
-                if histogram_summary_sub.contains(&schema.stream_name) {
+                if schema.stream_name == SERIES_NAME
+                    || schema.stream_name == SAMPLES_NAME
+                    || histogram_summary_sub.contains(&schema.stream_name)
+                {
                     None
                 } else {
                     get_metadata_object(&schema.schema).map(|meta| (schema.stream_name, vec![meta]))
@@ -536,8 +541,8 @@ fn get_metadata_object(schema: &Schema) -> Option<prom::MetadataObject> {
 pub(crate) async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
-    start: i64,
-    end: i64,
+    _start: i64,
+    _end: i64,
 ) -> Result<Vec<serde_json::Value>> {
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
@@ -547,7 +552,7 @@ pub(crate) async fn get_series(
         }
     };
 
-    let schema = db::schema::get(org_id, &metric_name, StreamType::Metrics)
+    let schema = db::schema::get(org_id, SERIES_NAME, StreamType::Metrics)
         .await
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
@@ -564,7 +569,10 @@ pub(crate) async fn get_series(
         return Ok(vec![]);
     }
 
-    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}");
+    let mut sql = format!(
+        "SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {SERIES_NAME} WHERE {} = '{}'",
+        NAME_LABEL, metric_name
+    );
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
@@ -590,7 +598,7 @@ pub(crate) async fn get_series(
             }
         }
         if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
+            sql.push_str(" AND ");
             sql.push_str(&sql_where.join(" AND "));
         }
     }
@@ -600,8 +608,8 @@ pub(crate) async fn get_series(
             sql,
             from: 0,
             size: 1000,
-            start_time: start,
-            end_time: end,
+            start_time: 0, // TODO
+            end_time: 0,   // TODO
             sql_mode: "full".to_string(),
             ..Default::default()
         },
@@ -633,32 +641,24 @@ pub(crate) async fn get_labels(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
-    let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
-        Err(_) => return Ok(vec![]),
-        Ok(schemas) => schemas,
-    };
-    let mut label_names = ahash::HashSet::default();
-    for schema in stream_schemas {
-        if let Some(ref metric_name) = opt_metric_name {
-            if *metric_name != schema.stream_name {
-                // Client has requested a particular metric name, but this stream is
-                // not it.
-                continue;
+    let series = get_series(org_id, selector, start, end).await?;
+    let mut label_names: ahash::HashSet<String> = ahash::HashSet::default();
+    for series in series {
+        if let Some(map) = series.as_object() {
+            for (k, _) in map {
+                if !vec![
+                    CONFIG.common.column_timestamp.as_str(),
+                    VALUE_LABEL,
+                    HASH_LABEL,
+                    TYPE_LABEL,
+                    LE_LABEL,
+                    QUANTILE_LABEL,
+                ]
+                .contains(&k.as_str())
+                {
+                    label_names.insert(k.clone());
+                }
             }
-        }
-        let stats = stats::get_stream_stats(org_id, &schema.stream_name, StreamType::Metrics);
-        if stats.time_range_intersects(start, end) {
-            let field_names = schema
-                .schema
-                .fields()
-                .iter()
-                .map(|f| f.name())
-                .filter(|&s| {
-                    s != &CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
-                })
-                .cloned();
-            label_names.extend(field_names);
         }
     }
     let mut label_names = label_names.into_iter().collect::<Vec<_>>();
@@ -678,41 +678,32 @@ pub(crate) async fn get_label_values(
     let stream_type = StreamType::Metrics;
 
     if label_name == NAME_LABEL {
-        // This special case doesn't require any SQL to be executed. All we have
-        // to do is to collect stream names that satisfy selection criteria
-        // (i.e., `selector` and `start`/`end`) and return them.
-        let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
-            .await
-            .unwrap_or_default();
-        let mut label_values = Vec::with_capacity(stream_schemas.len());
-        for schema in stream_schemas {
-            if let Some(ref metric_name) = opt_metric_name {
-                if *metric_name != schema.stream_name {
-                    // Client has requested a particular metric name, but this stream is
-                    // not it.
-                    continue;
-                }
-            }
-            let stats = match super::get_prom_metadata_from_schema(&schema.schema) {
-                None => stats::get_stream_stats(org_id, &schema.stream_name, stream_type),
-                Some(metadata) => {
-                    if metadata.metric_type == prom::MetricType::Histogram
-                        || metadata.metric_type == prom::MetricType::Summary
-                    {
-                        stats::get_stream_stats(
-                            org_id,
-                            &format!("{}_sum", schema.stream_name),
-                            stream_type,
-                        )
-                    } else {
-                        stats::get_stream_stats(org_id, &schema.stream_name, stream_type)
-                    }
+        let req = meta::search::Request {
+            query: meta::search::Query {
+                sql: format!("SELECT DISTINCT({NAME_LABEL}) AS name FROM {SERIES_NAME}",),
+                from: 0,
+                size: 1000,
+                start_time: start,
+                end_time: end,
+                sql_mode: "full".to_string(),
+                ..Default::default()
+            },
+            aggs: HashMap::new(),
+            encoding: meta::search::RequestEncoding::Empty,
+        };
+        let mut label_values: Vec<String> =
+            match search_service::search(org_id, StreamType::Metrics, &req).await {
+                Ok(resp) => resp
+                    .hits
+                    .iter()
+                    .filter_map(|v| v.as_object().unwrap().get("name"))
+                    .map(|v| v.as_str().unwrap().to_string())
+                    .collect::<Vec<_>>(),
+                Err(err) => {
+                    log::error!("search values error: {:?}", err);
+                    return Err(err);
                 }
             };
-            if stats.time_range_intersects(start, end) {
-                label_values.push(schema.stream_name.clone())
-            }
-        }
         label_values.sort();
         return Ok(label_values);
     }
@@ -738,7 +729,7 @@ pub(crate) async fn get_label_values(
     }
     let req = meta::search::Request {
         query: meta::search::Query {
-            sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),
+            sql: format!("SELECT DISTINCT({label_name}) FROM {SERIES_NAME} WHERE {NAME_LABEL} = '{metric_name}'"),
             from: 0,
             size: 1000,
             start_time: start,
