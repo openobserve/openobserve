@@ -29,7 +29,7 @@
     >
       <template #no-data><NoData /></template>
 
-      <template #body-cell-actions="props">
+      <!-- <template #body-cell-actions="props">
         <q-td :props="props">
           <q-btn
             v-if="props.row.role == 'Admin'"
@@ -43,7 +43,7 @@
             @click="redirectToInviteMember(props)"
           ></q-btn>
         </q-td>
-      </template>
+      </template> -->
 
       <template #top="scope">
         <div class="q-table__title">{{ t("organization.header") }}</div>
@@ -241,12 +241,12 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("organization.actions"),
-        align: "center",
-      },
+      // {
+      //   name: "actions",
+      //   field: "actions",
+      //   label: t("organization.actions"),
+      //   align: "center",
+      // },
     ]);
     const perPageOptions = [
       { label: "5", value: 5 },
