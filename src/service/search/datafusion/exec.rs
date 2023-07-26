@@ -44,12 +44,15 @@ use super::storage::{file_list, StorageType};
 
 use super::transform_udf::get_all_transform;
 
-use crate::common::infra::{cache::tmpfs, config::CONFIG};
 use crate::common::json;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     search::Session as SearchSession,
     sql,
+};
+use crate::common::{
+    flatten,
+    infra::{cache::tmpfs, config::CONFIG},
 };
 use crate::service::search::sql::Sql;
 use once_cell::sync::Lazy;
@@ -1049,7 +1052,7 @@ fn apply_query_fn(
                         &program,
                         &json::Value::Object(hit.clone()),
                     );
-                    (!ret_val.is_null()).then_some(ret_val)
+                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
                 })
                 .collect();
 
