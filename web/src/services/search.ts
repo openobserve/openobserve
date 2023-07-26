@@ -39,8 +39,8 @@ const search = {
     index: string;
     key: string;
     size: string;
-    query_context: string;
-    query_fn: string;
+    query_context: any;
+    query_fn: any;
   }) => {
     let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}`;
     if (query_fn.trim() != "") {
