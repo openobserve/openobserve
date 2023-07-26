@@ -256,7 +256,7 @@ impl Engine {
         let metrics_name = selector.name.as_ref().unwrap();
         let cache_exists = { self.ctx.data_cache.read().await.contains_key(metrics_name) };
         if !cache_exists {
-            self.selector_load_data(selector, None).await?;
+            self.selector_load_data(selector, Some(range)).await?;
         }
         let metrics_cache = self.ctx.data_cache.read().await;
         let metrics_cache = match metrics_cache.get(metrics_name) {
