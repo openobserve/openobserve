@@ -1,17 +1,15 @@
 <template>
-  <div>
-    <div style="height: 100%; position: relative;">
-      <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%">
-        <ChartRenderer :data="panelData" />
-      </div>
-      <!-- <div v-if="!errorDetail" class="noData">{{ noData }}</div> -->
-      <div v-if="errorDetail" class="errorMessage">
-        <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
-      </div>
-      <div v-if="loading" class="row" style="position: absolute; top:0px; width:100%;">
-        <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
-      </div>
+  <div style="height: 100%; position: relative;">
+    <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%">
+      <ChartRenderer :data="panelData" />
+    </div>
+    <!-- <div v-if="!errorDetail" class="noData">{{ noData }}</div> -->
+    <div v-if="errorDetail" class="errorMessage">
+      <q-icon size="md" name="warning" />
+      <div style="height: 80%; width: 100%;">{{ errorDetail }}</div>
+    </div>
+    <div v-if="loading" class="row" style="position: absolute; top:0px; width:100%;">
+      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto;" />
     </div>
   </div>
 </template>
@@ -60,7 +58,8 @@ export default defineComponent({
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
       console.log("PanelSchemaRenderer: new data received from the api, let's convert the data");
-      panelData.value = convertPanelData(props.panelSchema, data, store);
+      console.log("PanelSchemaRenderer: data: ", data.value);
+      panelData.value = convertPanelData(props.panelSchema, data.value, store);
     });
 
     // when the error changes, emit the error

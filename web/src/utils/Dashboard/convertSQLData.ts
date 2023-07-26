@@ -1,14 +1,18 @@
-export const convertSQLData = async (
+export const convertSQLData = (
   panelSchema: any,
-  searchQueryData: any,
+  searchQueryDataTemp: any,
   store: any
 ) => {
   // console.log("renderSqlBasedChart", props);
-  console.log("searchQueryData", searchQueryData);
+  console.log("searchQueryData", searchQueryDataTemp);
   console.log("panelSchema", panelSchema);
   const props = {
     data: panelSchema,
-    width: 6
+    width: 6,
+  };
+
+  const searchQueryData = {
+    data: searchQueryDataTemp,
   };
 
   //   const store = useStore();
@@ -16,7 +20,7 @@ export const convertSQLData = async (
   // get the x axis key
   const getXAxisKeys = () => {
     console.log("props.data.fields.x", props.data?.fields?.x);
-    
+
     return props.data?.fields?.x?.length
       ? props.data.fields?.x.map((it: any) => it.alias)
       : [];
@@ -34,11 +38,11 @@ export const convertSQLData = async (
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
     console.log("key", key);
-    
+
     // when the key is not available in the data that is not show the default value
     let result: string[] = searchQueryData?.data?.map((item: any) => item[key]);
     console.log("result", result);
-    
+
     return result;
   };
 
@@ -115,7 +119,7 @@ export const convertSQLData = async (
     const n = getTickLength();
 
     // get the range of difference
-    console.log("layout",layout);
+    console.log("layout", layout);
     const range = layout.length / n;
 
     // find the indexes at intervals
@@ -137,7 +141,7 @@ export const convertSQLData = async (
     console.log("xAxisData", xAxisData);
     const xAxisDataWithTicks = getTickLimits(xAxisData);
 
-      console.log("data with tick",xAxisDataWithTicks);
+    console.log("data with tick", xAxisDataWithTicks);
 
     switch (props.data.type) {
       case "bar": {
@@ -616,7 +620,7 @@ export const convertSQLData = async (
         };
         return trace;
       });
-        console.log("multiple:- traces", traces);
+      console.log("multiple:- traces", traces);
       break;
     }
     case "donut": {
@@ -651,7 +655,7 @@ export const convertSQLData = async (
         };
         return trace;
       });
-        console.log("multiple:- traces", traces);
+      console.log("multiple:- traces", traces);
       break;
     }
     case "area-stacked": {
@@ -663,7 +667,7 @@ export const convertSQLData = async (
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
       ].filter((it) => it);
-        console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
 
       // create a trace based on second xAxis's unique values
       traces = stackedXAxisUniqueValue?.map((key: any) => {
@@ -691,7 +695,7 @@ export const convertSQLData = async (
         };
         return trace;
       });
-        console.log("multiple:- traces", traces);
+      console.log("multiple:- traces", traces);
       break;
     }
     case "stacked": {
@@ -703,11 +707,14 @@ export const convertSQLData = async (
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
       ].filter((it) => it);
-        console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
 
       // create a trace based on second xAxis's unique values
       traces = stackedXAxisUniqueValue?.map((key: any) => {
-          console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+        console.log(
+          "--inside trace--",
+          props.data.fields?.x.find((it: any) => it.alias == key)
+        );
 
         const trace = {
           name: key,
@@ -732,7 +739,7 @@ export const convertSQLData = async (
         };
         return trace;
       });
-        console.log("multiple:- traces", traces);
+      console.log("multiple:- traces", traces);
       break;
     }
     case "h-stacked": {
@@ -744,11 +751,14 @@ export const convertSQLData = async (
       const stackedXAxisUniqueValue = [
         ...new Set(searchQueryData.data.map((obj: any) => obj[key1])),
       ].filter((it) => it);
-        console.log("stacked x axis unique value", stackedXAxisUniqueValue);
+      console.log("stacked x axis unique value", stackedXAxisUniqueValue);
 
       // create a trace based on second xAxis's unique values
       traces = stackedXAxisUniqueValue?.map((key: any) => {
-          console.log("--inside trace--",props.data.fields?.x.find((it: any) => it.alias == key));
+        console.log(
+          "--inside trace--",
+          props.data.fields?.x.find((it: any) => it.alias == key)
+        );
 
         const trace = {
           name: key,
@@ -766,13 +776,13 @@ export const convertSQLData = async (
         };
         return trace;
       });
-        console.log("multiple:- traces", traces);
+      console.log("multiple:- traces", traces);
       break;
     }
     case "metric": {
       const key1 = yAxisKeys[0];
       const yAxisValue = getAxisDataFromKey(key1);
-        console.log('metric changed',);
+      console.log("metric changed");
       traces = [];
       const trace = {
         ...getPropsByChartTypeForTraces(),
@@ -786,7 +796,7 @@ export const convertSQLData = async (
     }
   }
 
-    console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
+  console.log("Query: props by layout: ", getPropsByChartTypeForLayout());
 
   //generate the layout value of chart
   const layout: any = {
@@ -808,8 +818,8 @@ export const convertSQLData = async (
     ...getThemeLayoutOptions(),
   };
 
-    console.log('layout', layout);
-    console.log('traces', traces);
+  console.log("layout", layout);
+  console.log("traces", traces);
 
   // Plotly.react(plotRef.value, traces, layout, {
   //   responsive: true,
@@ -821,5 +831,3 @@ export const convertSQLData = async (
     layout,
   };
 };
-
-
