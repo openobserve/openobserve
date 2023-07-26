@@ -49,6 +49,7 @@ pub async fn report_usage_stats(
         response_time: stats.response_time,
         num_records: stats.records,
         stream_type,
+        stream: stream_name.to_owned(),
     }];
 
     if num_functions > 0 {
@@ -66,6 +67,7 @@ pub async fn report_usage_stats(
             response_time: stats.response_time,
             num_records: stats.records * num_functions as u64,
             stream_type,
+            stream: stream_name.to_owned(),
         })
     }
     publish_usage(usage).await;
