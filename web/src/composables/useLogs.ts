@@ -75,7 +75,7 @@ const defaultObject = {
     ],
   },
   meta: {
-    refreshInterval: 0,
+    refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
@@ -96,7 +96,7 @@ const defaultObject = {
     scrollInfo: {},
   },
   data: {
-    query: "",
+    query: <any>"",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
@@ -104,11 +104,11 @@ const defaultObject = {
     stream: {
       streamLists: <object[]>[],
       selectedStream: { label: "", value: "" },
-      selectedStreamFields: [],
+      selectedStreamFields: <object[]>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
-      functions: [],
+      functions: <any>[],
       streamType: "logs",
     },
     resultGrid: {
@@ -121,8 +121,8 @@ const defaultObject = {
     sortedQueryResults: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
-    editorValue: "",
-    datetime: {
+    editorValue: <any>"",
+    datetime: <any>{
       startTime: 0,
       endTime: 0,
       relativeTimePeriod: "15m",
@@ -220,7 +220,6 @@ const useLogs = () => {
       });
       return;
     } catch (e) {
-      console.log(e.message);
       showErrorNotification("Error while fetching functions");
     }
   };
@@ -304,16 +303,7 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const date = searchObj.data.datetime;
 
-    const query: {
-      stream: string;
-      period?: string;
-      from?: number;
-      to?: number;
-      refresh: number;
-      sql_mode?: boolean;
-      query?: string;
-      org_identifier: string;
-    } = {
+    const query: any = {
       stream: searchObj.data.stream.selectedStream.label,
       refresh: 0,
       org_identifier: "",
@@ -416,7 +406,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        const parsedSQL = parser.astify(searchObj.data.query);
+        const parsedSQL: any = parser.astify(searchObj.data.query);
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
 
@@ -513,7 +503,7 @@ const useLogs = () => {
       updateUrlQueryParams();
 
       return req;
-    } catch (e) {
+    } catch (e: any) {
       throw new Error(e.message);
     }
   }
@@ -746,7 +736,7 @@ const useLogs = () => {
   function generateHistogramData() {
     try {
       const unparsed_x_data: any[] = [];
-      const xData: string[] = [];
+      const xData: number[] = [];
       const yData: number[] = [];
 
       if (searchObj.data.queryResults.aggs) {
@@ -785,7 +775,7 @@ const useLogs = () => {
   const searchAroundData = (obj: any) => {
     try {
       searchObj.data.errorCode = 0;
-      let query_context: string | undefined = "";
+      let query_context: any = "";
       const query = searchObj.data.query;
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL: any = parser.astify(query);
@@ -793,7 +783,7 @@ const useLogs = () => {
         if (
           !(parsedSQL.columns === "*") &&
           parsedSQL.columns.filter(
-            (e) => e.expr.column === store.state.zoConfig.timestamp_column
+            (e: any) => e.expr.column === store.state.zoConfig.timestamp_column
           ).length === 0
         ) {
           const ts_col = {
@@ -827,7 +817,7 @@ const useLogs = () => {
         query_context = b64EncodeUnicode(query_context);
       }
 
-      let query_fn: string | undefined = "";
+      let query_fn: any = "";
       if (
         searchObj.data.tempFunctionContent != "" &&
         searchObj.meta.toggleFunction
@@ -913,7 +903,7 @@ const useLogs = () => {
       refreshIntervalID = setInterval(() => {
         searchObj.loading = true;
         getQueryData();
-      }, parseInt(searchObj.meta.refreshInterval) * 1000);
+      }, searchObj.meta.refreshInterval * 1000);
       $q.notify({
         message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
         color: "positive",
@@ -951,7 +941,7 @@ const useLogs = () => {
   };
 
   const restoreUrlQueryParams = async () => {
-    const queryParams = router.currentRoute.value.query;
+    const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
       return;
     }
