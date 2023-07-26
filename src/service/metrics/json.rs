@@ -140,6 +140,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             METRIC_SERIES_HASH.insert(series_key.clone());
             let mut series_values = record.clone();
             series_values.remove_entry(VALUE_LABEL);
+            series_values.remove_entry(TYPE_LABEL);
             series_values.insert(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(now_ts.into()),

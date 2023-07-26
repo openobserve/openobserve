@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use datafusion::{
-    arrow::datatypes::Schema,
+    arrow::{datatypes::Schema, json::reader::infer_json_schema},
     datasource::file_format::file_type::FileType,
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
-use std::{sync::Arc, time::Duration};
+use std::{io::BufReader, sync::Arc, time::Duration};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -82,23 +82,31 @@ pub(crate) async fn create_context(
     // -- cache series files
     let session_id = format!("{session_id}-series");
     let work_dir = session_id.to_string();
-    for file in series_files {
+    for file in series_files.clone() {
         let file_name = format!("/{work_dir}/{}", file.name);
         tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
     }
     // -- get schema for series table
     let stream_type = StreamType::Metrics;
-    let schema = db::schema::get(org_id, SERIES_NAME, stream_type)
+    let mut schema = db::schema::get(org_id, SERIES_NAME, stream_type)
         .await
         .map_err(|err| {
             log::error!("get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
-    let schema = Arc::new(
-        schema
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    schema = schema.with_metadata(std::collections::HashMap::new());
+    for file in series_files.iter() {
+        // get schema of the file
+        let file_name = format!("/{work_dir}/{}", file.name);
+        let file_data = tmpfs::get(&file_name).unwrap();
+        let mut schema_reader = BufReader::new(file_data.as_ref());
+        let inferred_schema = infer_json_schema(&mut schema_reader, None).map_err(|err| {
+            log::error!("get schema error: {}", err);
+            DataFusionError::Execution(err.to_string())
+        })?;
+        schema = Schema::try_merge(vec![schema, inferred_schema])?;
+    }
+    let schema = Arc::new(schema.to_owned());
     let session = SearchSession {
         id: session_id.to_string(),
         storage_type: StorageType::Tmpfs,

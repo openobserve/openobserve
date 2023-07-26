@@ -259,6 +259,7 @@ pub async fn remote_write(
                 METRIC_SERIES_HASH.insert(series_key.clone());
                 let mut series_values = val_map.clone();
                 series_values.remove_entry(VALUE_LABEL);
+                series_values.remove_entry(TYPE_LABEL);
                 series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
                 series_values.insert(
                     CONFIG.common.column_timestamp.clone(),
