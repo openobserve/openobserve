@@ -85,4 +85,14 @@ export default defineComponent({
 });
 </script>
   
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.errorMessage{
+    position: absolute; 
+    top:20%;width:100%; 
+    height: 80%; 
+    overflow: hidden;
+    text-align:center;
+    color: rgba(255, 0, 0, 0.8); 
+    text-overflow: ellipsis;
+}
+</style>
