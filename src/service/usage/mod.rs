@@ -5,6 +5,7 @@ use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::common::meta::usage::USAGE_STREAM;
 use crate::common::{
     infra::{config::CONFIG, metrics},
     meta::{
@@ -12,6 +13,8 @@ use crate::common::{
         StreamType,
     },
 };
+
+pub mod stats;
 
 pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
@@ -117,14 +120,18 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
             report_data.push(usage_data);
         }
 
-        let url = url::Url::parse(&CONFIG.common.usage_url).unwrap();
-        let auth = format!("Basic {}", &CONFIG.common.usage_auth);
+        let usage_url = if CONFIG.common.usage_ep.ends_with('/') {
+            format!("{}{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
+        } else {
+            format!("{}/{USAGE_STREAM}/_json", CONFIG.common.usage_ep)
+        };
+        let url = url::Url::parse(&usage_url).unwrap();
         let cl = Arc::clone(&cl);
         tokio::task::spawn(async move {
             let _ = cl
                 .post(url)
                 .header("Content-Type", "application/json")
-                .header(reqwest::header::AUTHORIZATION, auth)
+                .header(reqwest::header::AUTHORIZATION, &CONFIG.common.usage_auth)
                 .json(&report_data)
                 .send()
                 .await;
