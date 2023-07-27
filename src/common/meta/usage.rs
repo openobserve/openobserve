@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const USAGE_STREAM: &str = "usage";
-pub const STATS_STREAM: &str = "stats_demo";
+pub const STATS_STREAM: &str = "stats";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {
