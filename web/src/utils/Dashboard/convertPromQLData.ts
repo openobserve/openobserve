@@ -106,6 +106,8 @@ export const convertPromQLData = (
     }
   });
 
+       
+
   const layout: any = {
     title: false,
     showlegend: props.data.config?.show_legends,
