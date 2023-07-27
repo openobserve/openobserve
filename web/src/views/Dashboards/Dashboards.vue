@@ -273,7 +273,11 @@ export default defineComponent({
 
       // Duplicate the dashboard
       const data = JSON.parse(JSON.stringify(dashboard));
+
+      //change title owner name and created date
       data.title=`${data.title} - Copy`;
+      data.owner= store.state.userInfo.name
+      data.created= new Date().toISOString()
 
       await dashboardService.create(
         store.state.selectedOrganization.identifier,
