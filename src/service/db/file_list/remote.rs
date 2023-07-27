@@ -70,11 +70,6 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         stats = stats + task_result?;
     }
 
-    // delete files
-    for item in super::DELETED_FILES.iter() {
-        super::progress(item.key(), item.value().to_owned(), true, false).await?;
-    }
-
     log::info!(
         "Load file_list [{prefix}] load {}:{} done, download: {}ms, uncompress: {}ms, caching: {}ms",
         files.len(),
@@ -84,12 +79,18 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
         stats.caching_time
     );
 
+    // delete files
+    for item in super::DELETED_FILES.iter() {
+        super::progress(item.key(), item.value().to_owned(), true, false).await?;
+    }
+
     // cache result
-    rw.insert(prefix);
+    rw.insert(prefix.clone());
 
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
+    log::info!("Load file_list [{prefix}] clean done");
 
     Ok(())
 }
