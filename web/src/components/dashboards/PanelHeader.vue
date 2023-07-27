@@ -47,7 +47,7 @@
 <script lang="ts">
 import { computed, defineComponent } from "vue";
 import { toRaw } from 'vue';
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar} from "quasar";
 
@@ -62,6 +62,7 @@ export default defineComponent({
     const panelDataElementObject = toRaw(props.panelDataElement)
     const dashboardId = props.dashboardId
     const router = useRouter();
+    const route = useRoute()
 
     const renderTitle = computed(() => {
       return props.panelDataElement.config?.title
@@ -70,7 +71,7 @@ export default defineComponent({
     const addNewPanel = () => {
       return router.push({
         path: "/dashboards/add_panel",
-        query: { dashboard: String(dashboardId), panelId:panelDataElementObject.id },
+        query: { dashboard: String(route.query.dashboard), panelId:panelDataElementObject.id },
       });
     }
 
