@@ -61,7 +61,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         // without such a label are silently ignored.*
         let upper_bound: f64 = match labels
             .iter()
-            .find(|v| v.name == "le")
+            .find(|v| v.name == LE_LABEL)
             .map(|s| s.value.parse())
         {
             Some(Ok(u)) => u,

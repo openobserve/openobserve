@@ -235,30 +235,30 @@ fn vector_arithmatic_operators(
     };
 
     // Get the hash for the labels on the right
-    let rhs_sig: HashMap<Signature, Sample> = right
+    let rhs_sig: HashMap<Signature, InstantValue> = right
         .par_iter()
-        .map(|item| {
-            let signature = labels_to_compare(&item.labels).signature();
-            (signature, item.sample)
+        .map(|instant| {
+            let signature = labels_to_compare(&instant.labels).signature();
+            (signature, instant.clone())
         })
         .collect();
 
     // Iterate over left and pick up the corresponding instance from rhs
     let output: Vec<InstantValue> = left
         .par_iter()
-        .flat_map(|item| {
-            let left_sig = labels_to_compare(&item.labels).signature();
+        .flat_map(|instant| {
+            let left_sig = labels_to_compare(&instant.labels).signature();
             if rhs_sig.contains_key(&left_sig) {
-                Some((item, rhs_sig.get(&left_sig).unwrap()))
+                Some((instant, rhs_sig.get(&left_sig).unwrap()))
             } else {
                 None
             }
         })
-        .flat_map(|(lhs_instant, rhs_sample)| {
+        .flat_map(|(lhs_instant, rhs_instant)| {
             scalar_binary_operations(
                 operator,
                 lhs_instant.sample.value,
-                rhs_sample.value,
+                rhs_instant.sample.value,
                 return_bool,
                 comparison_operator,
             )
@@ -274,6 +274,19 @@ fn vector_arithmatic_operators(
                 if let Some(modifier) = expr.modifier.as_ref() {
                     if modifier.card == VectorMatchCardinality::OneToOne {
                         labels = labels_to_compare(&labels);
+                    }
+
+                    // group_labels from the `group_x` modifier are taken from the "one"-side.
+                    if let Some(group_labels) = modifier.card.labels() {
+                        for ln in group_labels.labels.iter() {
+                            let value = rhs_instant.labels.get_value(ln);
+                            if !value.is_empty() {
+                                labels.push(Arc::new(Label {
+                                    name: ln.clone(),
+                                    value,
+                                }));
+                            }
+                        }
                     }
                 }
                 InstantValue {

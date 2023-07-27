@@ -22,7 +22,6 @@ pub(crate) fn predict_linear(data: &Value, duration: f64) -> Result<Value> {
     exec(data, duration)
 }
 
-// fn exec(data: &RangeValue, duration:f64) -> Option<f64> {
 fn exec(data: &Value, duration: f64) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,

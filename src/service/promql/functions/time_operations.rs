@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
+use crate::{
+    common::time::parse_i64_to_timestamp_micros,
+    service::promql::value::{InstantValue, LabelsExt, Sample, Value},
+};
 use chrono::{Datelike, NaiveDate, Timelike};
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
@@ -34,6 +37,7 @@ impl TimeOperationType {
     /// Given a timestamp, get the TimeOperationType component from it
     /// for e.g. month(), year(), day() etc.
     pub fn get_component_from_ts(&self, timestamp: i64) -> u32 {
+        let timestamp = parse_i64_to_timestamp_micros(timestamp);
         let naive_datetime = chrono::NaiveDateTime::from_timestamp_micros(timestamp).unwrap();
         match self {
             Self::Minute => naive_datetime.minute(),
@@ -106,7 +110,7 @@ fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
     let out = instant_values
         .par_iter()
         .map(|instant| {
-            let ts = op.get_component_from_ts(instant.sample.timestamp);
+            let ts = op.get_component_from_ts(instant.sample.value as i64);
             InstantValue {
                 labels: instant.labels.without_metric_name(),
                 sample: Sample::new(instant.sample.timestamp, ts as f64),

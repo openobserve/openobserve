@@ -411,6 +411,14 @@ impl Value {
         }
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn get_vector(&self) -> Option<&Vec<InstantValue>> {
+        match self {
+            Value::Vector(values) => Some(values),
+            _ => None,
+        }
+    }
+
     pub(crate) fn get_string(&self) -> Option<String> {
         match self {
             Value::String(v) => Some(v.into()),
@@ -637,5 +645,32 @@ mod tests {
     #[test]
     fn test_invalid_label_name() {
         assert!(!Label::is_valid_label_name("~invalid-label-name"));
+    }
+
+    #[test]
+    fn test_get_value() {
+        let mut labels: Labels = Default::default();
+        labels.push(Arc::new(Label {
+            name: "a".to_owned(),
+            value: "1".to_owned(),
+        }));
+        labels.push(Arc::new(Label {
+            name: "b".to_owned(),
+            value: "2".to_owned(),
+        }));
+        labels.push(Arc::new(Label {
+            name: "c".to_owned(),
+            value: "3".to_owned(),
+        }));
+        labels.push(Arc::new(Label {
+            name: "d".to_owned(),
+            value: "4".to_owned(),
+        }));
+
+        let value = labels.get_value("a");
+        assert!(value == "1");
+
+        let value = labels.get_value("non-existant-label");
+        assert!(value == "");
     }
 }
