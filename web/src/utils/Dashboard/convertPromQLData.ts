@@ -1,5 +1,5 @@
-import { onMounted, reactive, ref } from 'vue';
-import Plotly from "plotly.js"
+import { onMounted, reactive, ref } from "vue";
+import Plotly from "plotly.js";
 
 export const convertPromQLData = (
   panelSchema: any,
@@ -59,92 +59,76 @@ export const convertPromQLData = (
     },
   });
   console.log("props", props);
-  console.log("propssssssssss",searchQueryData.data.resultType);
-  switch (searchQueryData.data.resultType) {
-    case "matrix": {
-      const traces = searchQueryData.data?.result?.map((metric: any) => {
-        const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+  console.log("convertPromQLData: searchQueryData", searchQueryDataTemp);
 
-        return {
-          name: getPromqlLegendName(
-            metric.metric,
-            props.data.config.promql_legend
-          ),
-          x: values.map((value: any) =>
-            new Date(value[0] * 1000).toISOString()
-          ),
-          y: values.map((value: any) => value[1]),
-          hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
-        };
-      });
+  const traces = searchQueryData.data.map((it: any, index: number) => {
+    switch (it.resultType) {
+      case "matrix": {
+        const traces = it?.result?.map((metric: any) => {
+          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
 
-      const layout: any = {
-        title: false,
-        showlegend: props.data.config?.show_legends,
-        autosize: true,
-        legend: {
-          orientation: getLegendPosition("promql"),
-          itemclick: false,
-        },
-        margin: {
-          autoexpand: true,
-          l: 50,
-          r: 50,
-          t: 50,
-          b: 50,
-        },
-        ...getThemeLayoutOptions(),
-      };
-      // Plotly.react(plotRef.value, traces, layout, {
-      //   responsive: true,
-      //   displaylogo: false,
-      //   displayModeBar: false,
-      // });
-       console.log("layout", layout);
-       console.log("traces", traces);
-      return { traces, layout };
+          return {
+            name: getPromqlLegendName(
+              metric.metric,
+              props.data.queries[index].promql_legend
+            ),
+            x: values.map((value: any) =>
+              new Date(value[0] * 1000).toISOString()
+            ),
+            y: values.map((value: any) => value[1]),
+            hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
+          };
+        });
 
-      break;
-    }
-    case "vector": {
-      const traces = searchQueryData.data?.result?.map((metric: any) => {
-        const values = [metric.value];
-        console.log("vector", values);
-
-        return {
-          name: JSON.stringify(metric.metric),
-          x: values.map((value: any) =>
-            new Date(value[0] * 1000).toISOString()
-          ),
-          y: values.map((value: any) => value[1]),
-        };
-      });
-
-      const layout: any = {
-        title: false,
-        showlegend: props.data.config?.show_legends,
-        autosize: true,
-        legend: {
-          orientation: getLegendPosition("promql"),
-          itemclick: false,
-        },
-        margin: {
-          l: props.data.type == "pie" ? 60 : 32,
-          r: props.data.type == "pie" ? 60 : 16,
-          t: 38,
-          b: 32,
-        },
-        ...getThemeLayoutOptions(),
-      };
-      console.log("layout", layout);
-      console.log("traces:", traces);
-      return {traces, layout};
-      // Plotly.react(plotRef.value, traces, layout, {
+        // Plotly.react(plotRef.value, traces, layout, {
         //   responsive: true,
         //   displaylogo: false,
         //   displayModeBar: false,
         // });
+        return traces;
+
+        break;
+      }
+      case "vector": {
+        const traces = it?.result?.map((metric: any) => {
+          const values = [metric.value];
+          console.log("vector", values);
+
+          return {
+            name: JSON.stringify(metric.metric),
+            x: values.map((value: any) =>
+              new Date(value[0] * 1000).toISOString()
+            ),
+            y: values.map((value: any) => value[1]),
+          };
+        });
+        // Plotly.react(plotRef.value, traces, layout, {
+        //   responsive: true,
+        //   displaylogo: false,
+        //   displayModeBar: false,
+        // });
+        return traces;
         break;
       }
     }
+  });
+
+  const layout: any = {
+    title: false,
+    showlegend: props.data.config?.show_legends,
+    autosize: true,
+    legend: {
+      orientation: getLegendPosition("promql"),
+      itemclick: false,
+    },
+    margin: {
+      autoexpand: true,
+      l: 50,
+      r: 50,
+      t: 50,
+      b: 50,
+    },
+    ...getThemeLayoutOptions(),
+  };
+  return { traces: traces.flat(), layout };
 };

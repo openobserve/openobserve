@@ -67,27 +67,39 @@ export const usePanelDataLoader = (
       panelSchema.value.customQuery &&
       panelSchema.value.queryType == "promql"
     ) {
+      console.log("usePanelDataLoader: ", JSON.stringify(panelSchema));
       // console.log("Calling metrics_query_range API");
-      await queryService
-        .metrics_query_range({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: replaceQueryValue(queryData),
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-        })
-        .then((res) => {
-          // Set searchQueryData.data to the API response data
-          state.data = res.data.data;
-          // Clear errorDetail
-          state.errorDetail = "";
-        })
-        .catch((error) => {
-          // Process API error for "promql"
-          processApiError(error, "promql");
-        })
-        .finally(() => {
-          state.loading = false;
-        });
+      const queryPromises = panelSchema.value.queries?.map(async (it: any) => {
+        console.log("usePanelDataLoader: querypromises map", it.query);
+
+        return queryService
+          .metrics_query_range({
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: replaceQueryValue(it.query),
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+          })
+          .then((res) => {
+            // Set searchQueryData.data to the API response data
+            state.errorDetail = "";
+            return res.data.data;
+            // Clear errorDetail
+          })
+          .catch((error) => {
+            console.log("oops, error", error);
+
+            // Process API error for "promql"
+            processApiError(error, "promql");
+          });
+        // .finally(() => {
+        //   state.loading = false;
+        // });
+      });
+      console.log("usePanelDataLoader: querypromises", queryPromises);
+
+      const queryResults = await Promise.all(queryPromises);
+      state.loading = false;
+      state.data = queryResults;
     } else {
       // console.log("Calling search APiii");
 
@@ -129,8 +141,8 @@ export const usePanelDataLoader = (
       onInvalidate
     ) => {
       console.log("usePanelDataLoader: schema changed");
-      
-      if(panelSchema.value.query){
+
+      if (panelSchema.value.query) {
         loadData();
       }
     }

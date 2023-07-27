@@ -32,27 +32,38 @@ const colors = [
   '#c4ccd3'
 ]
 
-const getDefaultDashboardPanelData = () => (
-  {
-    data: {
-      id: "",
-      type: "bar",
-      fields: {
-        stream: '',
-        stream_type: 'logs',
-        x: <any>[],
-        y: <any>[],
-        filter: <any>[]
+const getDefaultDashboardPanelData = () => ({
+  data: {
+    id: "",
+    type: "bar",
+    fields: {
+      stream: "",
+      stream_type: "logs",
+      x: <any>[],
+      y: <any>[],
+      filter: <any>[],
+    },
+    config: {
+      title: "",
+      description: "",
+      show_legends: true,
+      legends_position: null,
+      promql_legend: "",
+      unit: null,
+      unit_custom: null
+    },
+    queries: [
+      {
+        query:
+          'histogram_quantile(0.95, sum(irate(zo_grpc_response_time_bucket{namespace="ziox-alpha1"}[5m])) by (le, exported_endpoint))',
+        promql_legend: "q1-{exported_endpoint}",
       },
-      config: {
-        title: "",
-        description: "",
-        show_legends: true,
-        legends_position: null,
-        promql_legend: "",
-        unit: null,
-        unit_custom: null
+      {
+        query:
+          'histogram_quantile(0.98, sum(irate(zo_grpc_response_time_bucket{namespace="ziox-alpha1"}[5m])) by (le, exported_endpoint))',
+        promql_legend: "q2-{exported_endpoint}",
       },
+    ],
       queryType: "sql",
       query: "",
       customQuery: false
