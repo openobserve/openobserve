@@ -27,6 +27,14 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   ? window.location.origin + window.location.pathname.slice(0, pos)
   : window.location.origin;
 
+const organizationObj = {
+  organizationPasscode: "",
+  allDashboardList: [],
+  quotaThresholdMsg: "",
+  functions: [],
+  streams: {},
+};
+
 export default createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
@@ -34,33 +42,12 @@ export default createStore({
     loggedIn: false,
     loadingState: true,
     errorLoadingState: false,
-    indexData: [],
     selectedOrganization: useLocalOrganization() ? useLocalOrganization() : {},
     organizations: [],
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
-    organizationPasscode: "",
     theme: "",
-    // allCurrentDashboards: {},
-    // currentSelectedDashboard: {},
-    // currentPanelsData: [],
-    allDashboardList: [],
-    search: {
-      query: {
-        dateVal: {
-          tab: "relative",
-          startDate: new Date().toLocaleDateString("en-ZA"),
-          startTime: "00:00",
-          endDate: new Date().toLocaleDateString("en-ZA"),
-          endTime: "23:59",
-          selectedRelativePeriod: "Minutes",
-          selectedRelativeValue: 15,
-          selectedFullTime: false,
-        },
-      },
-    },
-    streamFields: [],
-    quotaThresholdMsg: "",
+    organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
   },
   mutations: {
@@ -80,9 +67,9 @@ export default createStore({
     setUserInfo(state, payload) {
       state.userInfo = payload;
     },
-    setIndexData(state, payload) {
-      state.indexData = payload;
-    },
+    // setIndexData(state, payload) {
+    //   state.indexData = payload;
+    // },
     setSelectedOrganization(state, payload) {
       state.selectedOrganization = payload;
     },
@@ -96,7 +83,7 @@ export default createStore({
       state.searchCollapsibleSection = payload;
     },
     setOrganizationPasscode(state, payload) {
-      state.organizationPasscode = payload;
+      state.organizationData.organizationPasscode = payload;
     },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
@@ -105,26 +92,35 @@ export default createStore({
     //   state.currentSelectedDashboard = payload;
     // },
     setAllDashboardList(state, payload) {
-      state.allDashboardList = payload;
+      state.organizationData.allDashboardList = payload;
     },
-    setSearch(state, payload) {
-      state.search = payload;
+    setFunctions(state, payload) {
+      state.organizationData.functions = payload;
     },
-    setStreamFields(state, payload) {
-      state.streamFields = payload;
+    setStreams(state, payload) {
+      state.organizationData.streams[payload.name] = payload;
     },
+    resetStreams(state, payload) {
+      state.organizationData.streams = payload;
+    },
+    // setSearch(state, payload) {
+    //   state.search = payload;
+    // },
+    // setStreamFields(state, payload) {
+    //   state.streamFields = payload;
+    // },
     // setCurrentPanelsData(state, payload) {
     //   state.currentPanelsData = payload;
     // },
     setQuotaThresholdMsg(state, payload) {
-      state.quotaThresholdMsg = payload;
+      state.organizationData.quotaThresholdMsg = payload;
     },
     setConfig(state, payload) {
       state.zoConfig = payload;
     },
     appTheme(state, payload) {
       state.theme = payload;
-    }
+    },
   },
   actions: {
     login(context, payload) {
@@ -136,9 +132,9 @@ export default createStore({
     endpoint(context, payload) {
       context.commit("endpoint", payload);
     },
-    setIndexData(context, payload) {
-      context.commit("setIndexData", payload);
-    },
+    // setIndexData(context, payload) {
+    //   context.commit("setIndexData", payload);
+    // },
     setSelectedOrganization(context, payload) {
       context.commit("setSelectedOrganization", payload);
     },
@@ -163,12 +159,21 @@ export default createStore({
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
     },
-    setSearch(context, payload) {
-      context.commit("setSearch", payload);
+    setFunctions(context, payload) {
+      context.commit("setFunctions", payload);
     },
-    setStreamFields(context, payload) {
-      context.commit("setStreamFields", payload);
+    setStreams(context, payload) {
+      context.commit("setStreams", payload);
     },
+    resetStreams(context, payload) {
+      context.commit("resetStreams", payload);
+    },
+    // setSearch(context, payload) {
+    //   context.commit("setSearch", payload);
+    // },
+    // setStreamFields(context, payload) {
+    //   context.commit("setStreamFields", payload);
+    // },
     // setCurrentPanelsData(context, payload) {
     //   context.commit('setCurrentPanelsData', payload);
     // },
@@ -180,7 +185,7 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
-    }
+    },
   },
   modules: {},
 });

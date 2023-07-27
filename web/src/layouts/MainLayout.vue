@@ -34,15 +34,19 @@
 
         <q-toolbar-title></q-toolbar-title>
         <ThemeSwitcher></ThemeSwitcher>
-        <div class="headerMenu float-left" v-if="store.state.quotaThresholdMsg">
+        <div
+          class="headerMenu float-left"
+          v-if="store.state.organizationData.quotaThresholdMsg"
+        >
           <div
             type="warning"
             icon="cloud"
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
-              store.state.quotaThresholdMsg
+            <q-icon name="warning"
+size="xs" class="warning" />{{
+              store.state.organizationData.quotaThresholdMsg
             }}
           </div>
           <q-btn
@@ -120,10 +124,12 @@
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated
+no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -146,7 +152,8 @@
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup clickable @click="signout">
+              <q-item v-ripple v-close-popup
+clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -182,7 +189,7 @@
       </q-list>
     </q-drawer>
 
-    <q-page-container v-if="isLoading">
+    <q-page-container :key="store.state.selectedOrganization.identifier">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
@@ -231,7 +238,15 @@ import {
   getImageURL,
 } from "../utils/zincutils";
 
-import { ref, defineComponent, KeepAlive, computed, onMounted, watch, markRaw } from "vue";
+import {
+  ref,
+  defineComponent,
+  KeepAlive,
+  computed,
+  onMounted,
+  watch,
+  markRaw,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
@@ -329,6 +344,17 @@ export default defineComponent({
       ? router.currentRoute.value.query.org_identifier
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
+    const excludeParentRedirect = [
+      "functions",
+      "functionList",
+      "streamFunctions",
+      "enrichmentTables",
+      "alerts",
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "/ingestion/",
+    ];
 
     const orgOptions = ref([{ label: Number, value: String }]);
 
@@ -638,6 +664,32 @@ export default defineComponent({
       tracker.setUserID(store.state.userInfo.email);
     }
 
+    const redirectToParentRoute = (machedRoutes: any) => {
+      if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
+        router.push({
+          name: "dashboards",
+        });
+      } else if (
+        machedRoutes.length > 2 &&
+        !excludeParentRedirect.includes(router.currentRoute.value.name) &&
+        router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&
+        router.currentRoute.value.path.indexOf("/billings/") == -1
+      ) {
+        if (machedRoutes[machedRoutes.length - 2].children.length > 0) {
+          machedRoutes[machedRoutes.length - 2].children.forEach(
+            (route: any) => {
+              if (route.name == machedRoutes[machedRoutes.length - 1].name) {
+                console.log(machedRoutes[machedRoutes.length - 2].path);
+                router.push({
+                  path: machedRoutes[machedRoutes.length - 2].path,
+                });
+              }
+            }
+          );
+        }
+      }
+    };
+
     return {
       t,
       router,
@@ -656,11 +708,15 @@ export default defineComponent({
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
+      redirectToParentRoute,
     };
   },
   computed: {
     changeOrganization() {
       return this.store.state.organizations;
+    },
+    changeOrganizationIdentifier() {
+      return this.store.state.selectedOrganization.identifier;
     },
     forceFetchOrganization() {
       return this.router.currentRoute.value.query.update_org;
@@ -672,7 +728,15 @@ export default defineComponent({
     },
     changeOrganization() {
       setTimeout(() => {
+        this.redirectToParentRoute(this.$route.matched);
         this.setSelectedOrganization();
+      }, 500);
+    },
+    changeOrganizationIdentifier() {
+      this.store.dispatch("setOrganizationPasscode", "");
+      setTimeout(() => {
+        this.redirectToParentRoute(this.$route.matched);
+        // this.setSelectedOrganization();
       }, 500);
     },
   },

@@ -185,7 +185,6 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
-      console.log("before mount");
       const ingestRoutes = [
         "curl",
         "fluentbit",

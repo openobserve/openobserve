@@ -1305,9 +1305,6 @@ export default defineComponent({
     moveSplitter() {
       return this.searchObj.config.splitterModel;
     },
-    changeOrganization() {
-      return this.store.state.selectedOrganization?.identifier;
-    },
     changeStream() {
       return this.searchObj.data.stream.selectedStream;
     },
@@ -1360,18 +1357,6 @@ export default defineComponent({
       if (this.searchObj.meta.showFields == false) {
         this.searchObj.meta.showFields =
           this.searchObj.config.splitterModel > 0;
-      }
-    },
-    changeOrganization() {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (this.router.currentRoute.value.name == "logs") {
-        this.searchObj.data.query = "";
-        this.setQuery("");
-        this.searchObj.meta.sqlMode = false;
-        this.loadPageData();
       }
     },
     changeStream: {
