@@ -100,7 +100,9 @@ pub async fn sql(
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        // log::info!("Query agg sql: {}", orig_agg_sql.0);
+        if CONFIG.common.print_key_sql {
+            log::info!("Query agg sql: {}", orig_agg_sql.0);
+        }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
         if meta_sql.is_ok() {
@@ -164,18 +166,22 @@ async fn exec_query(
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    files: &[FileKey],
-    file_type: FileType,
+    _files: &[FileKey],
+    _file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
 
-    let mut fast_mode = false;
-    let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
-        fast_mode = true;
-        get_fast_mode_ctx(session, schema, sql, files, file_type).await?
-    } else {
-        (ctx.clone(), schema.clone())
-    };
+    // DEBUG
+    // disabled fast_mode
+    let (q_ctx, schema) = (ctx.clone(), schema.clone());
+
+    let fast_mode = false;
+    // let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
+    //     fast_mode = true;
+    //     get_fast_mode_ctx(session, schema, sql, files, file_type).await?
+    // } else {
+    //     (ctx.clone(), schema.clone())
+    // };
 
     // get used UDF
     let mut field_fns = vec![];
@@ -220,7 +226,9 @@ async fn exec_query(
     };
 
     // Debug SQL
-    // log::info!("Query sql: {}", query);
+    if CONFIG.common.print_key_sql {
+        log::info!("Query sql: {}", query);
+    }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
@@ -346,7 +354,7 @@ async fn exec_query(
     Ok(batches)
 }
 
-async fn get_fast_mode_ctx(
+async fn _get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
     sql: &Arc<Sql>,
@@ -481,7 +489,9 @@ pub async fn merge(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
-    // log::info!("Merge sql: {query_sql}");
+    if CONFIG.common.print_key_sql {
+        log::info!("Merge sql: {query_sql}");
+    }
 
     let df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
