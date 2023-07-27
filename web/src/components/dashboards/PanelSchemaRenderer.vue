@@ -1,7 +1,8 @@
 <template>
   <div style="height: 100%; position: relative;">
     <div v-show="!errorDetail" class="plotlycontainer" style="height: 100%">
-      <ChartRenderer :data="panelData" />
+      <ChartRenderer v-if="panelSchema.type != 'table'" :data="panelData" />
+      <TableRenderer v-else-if="panelSchema.type == 'table'" :data="panelData" />
     </div>
     <!-- <div v-if="!errorDetail" class="noData">{{ noData }}</div> -->
     <div v-if="errorDetail" class="errorMessage">
@@ -15,15 +16,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, onMounted, watchEffect, toRef } from "vue";
+import { defineComponent, watch, ref, onMounted, watchEffect, toRef, toRefs } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-
+import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
-  components: { ChartRenderer },
+  components: { ChartRenderer, TableRenderer },
   props: {
     selectedTimeObj: {
       required: true,
@@ -44,16 +45,10 @@ export default defineComponent({
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({});
 
-    const tempPanelSchema = ref(props.panelSchema)
-    const tempSelectedTimeObj = ref(props.selectedTimeObj)
-    const tempVariablesData = ref(props.variablesData)
+    const { panelSchema, selectedTimeObj, variablesData } = toRefs(props)
 
     // calls the apis to get the data based on the panel config
-    const { data, loading, errorDetail } = usePanelDataLoader(
-      tempPanelSchema,
-      tempSelectedTimeObj,
-      tempVariablesData
-    );
+    const { data, loading, errorDetail } = usePanelDataLoader(panelSchema, selectedTimeObj, variablesData);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(data, async () => {
@@ -67,14 +62,6 @@ export default defineComponent({
       emit("error", errorDetail);
     })
 
-    watch(() => [props.panelSchema, props.selectedTimeObj, props.variablesData], async () => {
-      console.log("props updated");
-      tempPanelSchema.value = props.panelSchema
-      tempSelectedTimeObj.value = props.selectedTimeObj
-      tempVariablesData.value = props.variablesData
-    })
-
-    // -----------------------------------------------------------------------------
     return {
       data,
       loading,
@@ -86,13 +73,14 @@ export default defineComponent({
 </script>
   
 <style lang="scss" scoped>
-.errorMessage{
-    position: absolute; 
-    top:20%;width:100%; 
-    height: 80%; 
-    overflow: hidden;
-    text-align:center;
-    color: rgba(255, 0, 0, 0.8); 
-    text-overflow: ellipsis;
+.errorMessage {
+  position: absolute;
+  top: 20%;
+  width: 100%;
+  height: 80%;
+  overflow: hidden;
+  text-align: center;
+  color: rgba(255, 0, 0, 0.8);
+  text-overflow: ellipsis;
 }
 </style>

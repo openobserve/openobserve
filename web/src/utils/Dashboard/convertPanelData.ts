@@ -1,6 +1,6 @@
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertSQLData } from "@/utils/dashboard/convertSQLData";
-
+import { convertTableData } from "@/utils/dashboard/convertTableData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -9,7 +9,6 @@ import { convertSQLData } from "@/utils/dashboard/convertSQLData";
  * @return {any} The converted data.
  */
 export const convertPanelData = (panelSchema: any, data: any, store: any) => {
-
   // based on the panel config, using the switch calling the appropriate converter
   switch (panelSchema.type) {
     case "area":
@@ -34,7 +33,7 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
       }
     }
     case "table": {
-      return convertTableData();
+      return convertTableData(panelSchema, data);
     }
     case "geomap": {
       return convertMapData();
@@ -46,5 +45,4 @@ export const convertPanelData = (panelSchema: any, data: any, store: any) => {
   }
 };
 
-const convertTableData = () => {}
-const convertMapData = () => {}
+const convertMapData = () => {};
