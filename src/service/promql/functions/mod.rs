@@ -146,9 +146,10 @@ pub(crate) fn eval_idelta(
     let data = match data {
         Value::Matrix(v) => v,
         Value::None => return Ok(Value::None),
-        _ => {
+        v => {
             return Err(DataFusionError::Plan(format!(
-                "{fn_name}: matrix argument expected"
+                "{fn_name}: matrix argument expected but got {}",
+                v.get_type()
             )))
         }
     };
