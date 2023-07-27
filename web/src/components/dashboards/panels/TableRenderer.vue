@@ -25,3 +25,53 @@ export default defineComponent({
   },
 })
 </script>
+
+<style lang="scss" scoped>
+.my-sticky-virtscroll-table {
+  /* height or max-height is important */
+  height: calc(100% - 1px);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+      /* bg color is important for th; just specify one */
+      background-color: #fff;
+  }
+
+  :deep(thead tr th) {
+      will-change: auto !important;
+      position: sticky;
+      z-index: 1;
+
+  }
+
+  /* this will be the loading indicator */
+  :deep(thead tr:last-child th) {
+      /* height of all previous header rows */
+      top: 48px;
+  }
+
+  :deep(thead tr:first-child th) {
+      top: 0;
+  }
+
+  :deep(.q-virtual-scroll) {
+      will-change: auto !important;
+  }
+}
+.my-sticky-virtscroll-table.q-dark {
+  :deep(.q-table__top),
+  :deep(.q-table__bottom),
+  :deep(thead tr:first-child th) {
+      /* bg color is important for th; just specify one */
+    //   background-color: #fff;
+      background-color: $dark-page !important;
+  }
+}
+</style>
