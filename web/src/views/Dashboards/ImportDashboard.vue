@@ -100,6 +100,10 @@ export default defineComponent({
         try {
           const data = JSON.parse(reader.result)
 
+          //set owner name and creator name to import dashboard
+          data.owner= store.state.userInfo.name
+          data.created= new Date().toISOString()
+
           dashboardService.create(
             store.state.selectedOrganization.identifier,
             data
