@@ -115,8 +115,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     }
 
     if is_waiting_streams {
-        // it waiting, no need update offset
-        // -- compact last hour, because it just done compaction that generated a lot of small file_list files
+        // compact last hour, because it just done compaction that generated a lot of small file_list files
         let time_last_hour = time_now - Duration::hours(1);
         let time_last_hour = Utc
             .with_ymd_and_hms(
@@ -132,10 +131,11 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         log::info!("[COMPACT] file_list is starting merge, offset: {time_last_hour}");
         merge_file_list(time_last_hour).await?;
         log::info!("[COMPACT] file_list merging is done at offset: {time_last_hour}");
-        // -- compact current hour, because it continue to generate small file_list files
+        // compact current hour, because it continue to generate small file_list files
         log::info!("[COMPACT] file_list is starting merge, offset: {time_now_hour}");
         merge_file_list(time_now_hour).await?;
         log::info!("[COMPACT] file_list merging is done at offset: {time_now_hour}");
+        // it waiting, no need update offset
         return Ok(());
     }
 
