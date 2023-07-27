@@ -117,7 +117,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -143,7 +143,7 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
-    const ingestTabType = ref("");
+    const ingestTabType = ref("curl");
 
     onBeforeMount(() => {
       const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics"];
@@ -171,14 +171,21 @@ export default defineComponent({
       } else if (router.currentRoute.value.name === "ingestion") {
         ingestTabType.value = "ingestLogs";
         router.push({
-          name: "ingestLogs",
+          name: "curl",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+
+        return;
       }
 
-      if (!store.state.organizationPasscode) getOrganizationPasscode();
+      if (
+        !store.state.organizationData.organizationPasscode &&
+        router.currentRoute.value.name != "ingestion"
+      ) {
+        getOrganizationPasscode();
+      }
     });
 
     const getOrganizationPasscode = () => {
@@ -257,19 +264,6 @@ export default defineComponent({
       getImageURL,
       ingestTabType,
     };
-  },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      verifyOrganizationStatus(this.store.state.organizations, this.router);
-      if (newVal != oldVal) {
-        this.getOrganizationPasscode();
-      }
-    },
   },
 });
 </script>

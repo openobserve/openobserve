@@ -41,14 +41,14 @@
             label="Payment Methods"
             content-class="tab_content"
           /> -->
-          <q-route-tab
+          <!-- <q-route-tab
             exact
             name="invoice_history"
             :to="'/billings/invoice_history'"
             :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
             label="Invoice History"
             content-class="tab_content"
-          />
+          /> -->
         </q-tabs>
       </template>
 
@@ -61,7 +61,7 @@
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -81,15 +81,15 @@ export default defineComponent({
     const router: any = useRouter();
     const billingtab = ref("usage");
 
-    onMounted(() => {
+    onBeforeMount(() => {
       if (router.currentRoute.value.name == "billings") {
         billingtab.value = "usage";
         router.push({ path: "/billings/usage" });
-      } else {
-        billingtab.value = router.currentRoute.value.name;
-        router.push({ path: "/billings/" + router.currentRoute.value.name });
       }
-      // getOrganizationPasscode();
+      // else {
+      //   billingtab.value = router.currentRoute.value.name;
+      //   router.push({ path: "/billings/" + router.currentRoute.value.name });
+      // }
     });
 
     return {

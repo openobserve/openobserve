@@ -493,27 +493,6 @@ export default defineComponent({
       verifyOrganizationStatus,
     };
   },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (
-        newVal != oldVal &&
-        this.router.currentRoute.value.name == "alertList"
-      ) {
-        this.resultTotal = 0;
-        this.alerts = [];
-        this.getAlerts();
-      }
-    },
-  },
 });
 </script>
 

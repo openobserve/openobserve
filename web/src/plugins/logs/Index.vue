@@ -28,7 +28,7 @@
             data-test="logs-search-bar"
             ref="searchBarRef"
             :fieldValues="fieldValues"
-            :key="searchObj.data.stream.streamLists.length || 1"
+            :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
           />
         </template>
@@ -172,11 +172,11 @@
                     "
                   >
                     <search-result
+                      :key="searchObj.data.histogram.xData.length || -1"
                       ref="searchResultRef"
                       :expandedLogs="expandedLogs"
                       @update:datetime="searchData"
                       @update:scroll="getMoreData"
-                      @search:timeboxed="searchAroundData"
                       @expandlog="toggleExpandLog"
                     />
                   </div>
@@ -198,43 +198,22 @@ import {
   onDeactivated,
   onActivated,
   computed,
-  onBeforeMount,
-  nextTick,
+  onMounted,
 } from "vue";
-import { useQuasar, date, is } from "quasar";
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
 import SearchResult from "./SearchResult.vue";
 import useLogs from "@/composables/useLogs";
-import { deepKeys, byString } from "@/utils/json";
 import { Parser } from "node-sql-parser";
 
-import streamService from "@/services/stream";
-import searchService from "@/services/search";
-import TransformService from "@/services/jstransform";
-import {
-  b64EncodeUnicode,
-  useLocalLogFilterField,
-  b64DecodeUnicode,
-} from "@/utils/zincutils";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { logsErrorMessage } from "@/utils/common";
-import {
-  verifyOrganizationStatus,
-  convertTimeFromMicroToMilli,
-} from "@/utils/zincutils";
-import {
-  getQueryParamsForDuration,
-  getDurationObjectFromParams,
-  getConsumableRelativeTime,
-} from "@/utils/date";
-import useNotifications from "@/composables/useNotifications";
-import { cloneDeep } from "lodash-es";
+import { verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -300,477 +279,23 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
-    const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useLogs();
-    let dismiss = null;
+    let {
+      searchObj,
+      resetSearchObj,
+      getQueryData,
+      getStreamList,
+      fieldValues,
+      getFunctions,
+      updateGridColumns,
+      refreshData,
+      updateUrlQueryParams,
+      loadLogsData,
+    } = useLogs();
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
     const expandedLogs = ref({});
-    const { showErrorNotification } = useNotifications();
-    const fieldValues = ref({});
-
-    searchObj.organizationIdetifier =
-      store.state.selectedOrganization.identifier;
-
-    const getStreamType = computed(() => searchObj.data.stream.streamType);
-
-    function Notify(timeout: number | undefined | null = 0) {
-      const notify = {
-        type: "positive",
-        message: "Waiting for response...",
-        timeout: timeout,
-        actions: [
-          {
-            icon: "close",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
-      };
-
-      return $q.notify(notify);
-    }
-
-    function getQueryTransform() {
-      try {
-        searchObj.data.stream.functions = [];
-        TransformService.list(
-          1,
-          100000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
-          .then((res) => {
-            res.data.list.map((data: any) => {
-              let args: any = [];
-              for (let i = 0; i < parseInt(data.num_args); i++) {
-                args.push("'${1:value}'");
-              }
-
-              let itemObj = {
-                name: data.name,
-                args: "(" + args.join(",") + ")",
-              };
-              searchObj.data.transforms.push({
-                name: data.name,
-                function: data.function,
-              });
-              if (!data.stream_name) {
-                searchObj.data.stream.functions.push(itemObj);
-              }
-            });
-          })
-          .catch((err) => console.log(err));
-
-        return;
-      } catch (e) {
-        console.log(e.message);
-        searchObj.loading = false;
-        showErrorNotification("Error while fetching functions");
-      }
-    }
-
-    function getStreamList(isFirstLoad = false) {
-      try {
-        const streamType = searchObj.data.stream.streamType || "logs";
-        streamService
-          .nameList(
-            store.state.selectedOrganization.identifier,
-            streamType,
-            true
-          )
-          .then((res) => {
-            searchObj.data.streamResults = res.data;
-            searchObj.loading = false;
-
-            if (res.data.list.length > 0) {
-              getQueryTransform();
-
-              //extract stream data from response
-              loadStreamLists(isFirstLoad);
-            } else {
-              searchObj.loading = false;
-              searchObj.data.errorMsg =
-                "No stream found in selected organization!";
-              searchObj.data.stream.streamLists = [];
-              searchObj.data.stream.selectedStream = { label: "", value: "" };
-              searchObj.data.stream.selectedStreamFields = [];
-              searchObj.data.queryResults = {};
-              searchObj.data.sortedQueryResults = [];
-              searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {},
-              };
-            }
-          })
-          .catch((e) => {
-            searchObj.loading = false;
-            $q.notify({
-              type: "negative",
-              message:
-                "Error while pulling index for selected organization" +
-                e.message,
-              timeout: 2000,
-            });
-          });
-      } catch (e) {
-        console.log(e.message);
-        searchObj.loading = false;
-        showErrorNotification("Error while fetching streams");
-      }
-    }
-
-    function loadStreamLists(isFirstLoad = false) {
-      try {
-        searchObj.data.stream.streamLists = [];
-        searchObj.data.stream.selectedStream = { label: "", value: "" };
-        if (searchObj.data.streamResults.list.length > 0) {
-          let lastUpdatedStreamTime = 0;
-          let selectedStreamItemObj = {};
-          searchObj.data.streamResults.list.map((item: any) => {
-            let itemObj = {
-              label: item.name,
-              value: item.name,
-            };
-            searchObj.data.stream.streamLists.push(itemObj);
-
-            // If isFirstLoad is true, then select the stream from query params
-            if (
-              isFirstLoad &&
-              router.currentRoute.value?.query?.stream == item.name
-            ) {
-              lastUpdatedStreamTime = item.stats.doc_time_max;
-              selectedStreamItemObj = itemObj;
-            }
-
-            // If stream from query params dosent match the selected stream, then select the stream from last updated time
-            if (
-              item.stats.doc_time_max >= lastUpdatedStreamTime &&
-              !(
-                router.currentRoute.value.query?.stream &&
-                selectedStreamItemObj.value &&
-                router.currentRoute.value.query.stream ===
-                  selectedStreamItemObj.value
-              )
-            ) {
-              lastUpdatedStreamTime = item.stats.doc_time_max;
-              selectedStreamItemObj = itemObj;
-            }
-          });
-
-          if (selectedStreamItemObj.label != undefined) {
-            searchObj.data.stream.selectedStream = selectedStreamItemObj;
-          } else {
-            searchObj.loading = false;
-            searchObj.data.queryResults = {};
-            searchObj.data.sortedQueryResults = [];
-            searchObj.data.stream.selectedStreamFields = [];
-            searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
-            };
-          }
-        } else {
-          searchObj.loading = false;
-        }
-      } catch (e) {
-        searchObj.loading = false;
-        showErrorNotification("Error while loading streams.");
-      }
-    }
-
-    function getConsumableDateTime() {
-      try {
-        if (searchObj.data.stream.streamType === "enrichment_tables") {
-          const stream = searchObj.data.streamResults.list.find(
-            (stream) =>
-              stream.name === searchObj.data.stream.selectedStream.value
-          );
-          if (stream.stats) {
-            return {
-              start_time: new Date(
-                convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_min - 300000000
-                )
-              ),
-              end_time: new Date(
-                convertTimeFromMicroToMilli(
-                  stream.stats.doc_time_max + 300000000
-                )
-              ),
-            };
-          }
-        }
-        if (searchObj.data.datetime.tab == "relative") {
-          let period = "";
-          let periodValue = 0;
-          // quasar does not support arithmetic on weeks. convert to days.
-
-          if (
-            searchObj.data.datetime.relative.period.label.toLowerCase() ==
-            "weeks"
-          ) {
-            period = "days";
-            periodValue = searchObj.data.datetime.relative.value * 7;
-          } else {
-            period =
-              searchObj.data.datetime.relative.period.label.toLowerCase();
-            periodValue = searchObj.data.datetime.relative.value;
-          }
-          const subtractObject = '{"' + period + '":' + periodValue + "}";
-
-          let endTimeStamp = new Date();
-          if (searchObj.data.resultGrid.currentPage > 0) {
-            endTimeStamp = searchObj.data.resultGrid.currentDateTime;
-          } else {
-            searchObj.data.resultGrid.currentDateTime = endTimeStamp;
-          }
-
-          const startTimeStamp = date.subtractFromDate(
-            endTimeStamp,
-            JSON.parse(subtractObject)
-          );
-
-          return {
-            start_time: startTimeStamp,
-            end_time: endTimeStamp,
-          };
-        } else {
-          let start, end;
-          if (
-            searchObj.data.datetime.absolute.date.from == "" &&
-            searchObj.data.datetime.absolute.startTime == ""
-          ) {
-            start = new Date();
-          } else {
-            start = new Date(
-              searchObj.data.datetime.absolute.date.from +
-                " " +
-                searchObj.data.datetime.absolute.startTime
-            );
-          }
-          if (
-            searchObj.data.datetime.absolute.date.to == "" &&
-            searchObj.data.datetime.absolute.endTime == ""
-          ) {
-            end = new Date();
-          } else {
-            end = new Date(
-              searchObj.data.datetime.absolute.date.to +
-                " " +
-                searchObj.data.datetime.absolute.endTime
-            );
-          }
-          const rVal = {
-            start_time: start,
-            end_time: end,
-          };
-          return rVal;
-        }
-      } catch (e) {
-        searchObj.loading = false;
-        console.log("Error while getting consumable date time :", e.message);
-      }
-    }
-
-    function buildSearch() {
-      try {
-        let query = searchObj.data.editorValue;
-
-        var req: any = {
-          query: {
-            sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
-            start_time: (new Date().getTime() - 900000) * 1000,
-            end_time: new Date().getTime() * 1000,
-            from: searchObj.data.queryResults?.hits?.length || 0,
-            size: parseInt(
-              (searchObj.data.queryResults?.hits?.length || 0) + 150,
-              10
-            ),
-          },
-          aggs: {
-            histogram:
-              "select histogram(" +
-              store.state.zoConfig.timestamp_column +
-              ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
-          },
-        };
-
-        var timestamps: any =
-          searchObj.data.datetime.type === "relative"
-            ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod
-              )
-            : cloneDeep(searchObj.data.datetime);
-
-        if (
-          timestamps.startTime != "Invalid Date" &&
-          timestamps.endTime != "Invalid Date"
-        ) {
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-
-          req.query.start_time = timestamps.startTime;
-          req.query.end_time = timestamps.endTime;
-
-          searchObj.meta.resultGrid.chartInterval = "10 second";
-          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
-            searchObj.meta.resultGrid.chartInterval = "15 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
-            searchObj.meta.resultGrid.chartInterval = "30 second";
-            searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
-            searchObj.meta.resultGrid.chartInterval = "1 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
-            searchObj.meta.resultGrid.chartInterval = "5 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (
-            req.query.end_time - req.query.start_time >=
-            1000000 * 3600 * 24
-          ) {
-            searchObj.meta.resultGrid.chartInterval = "30 minute";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (
-            req.query.end_time - req.query.start_time >=
-            1000000 * 86400 * 7
-          ) {
-            searchObj.meta.resultGrid.chartInterval = "1 hour";
-            searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-          }
-          if (
-            req.query.end_time - req.query.start_time >=
-            1000000 * 86400 * 30
-          ) {
-            searchObj.meta.resultGrid.chartInterval = "1 day";
-            searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-          }
-
-          req.aggs.histogram = req.aggs.histogram.replaceAll(
-            "[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval
-          );
-        } else {
-          return false;
-        }
-
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL = parser.astify(searchObj.data.query);
-          if (parsedSQL.limit != null) {
-            req.query.size = parsedSQL.limit.value[0].value;
-
-            if (parsedSQL.limit.seperator == "offset") {
-              req.query.from = parsedSQL.limit.value[1].value || 0;
-            }
-
-            parsedSQL.limit = null;
-
-            query = parser.sqlify(parsedSQL);
-
-            //replace backticks with \" for sql_mode
-            query = query.replace(/`/g, '"');
-            searchObj.loading = true;
-            searchObj.data.queryResults.hits = [];
-            searchObj.data.queryResults.total = 0;
-          }
-
-          req.query.sql = query;
-          req.query["sql_mode"] = "full";
-          delete req.aggs;
-        } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
-
-          if (whereClause.trim() != "") {
-            whereClause = whereClause
-              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-            whereClause = whereClause
-              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-            const parsedSQL = whereClause.split(" ");
-            searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-              parsedSQL.forEach((node: any, index: any) => {
-                if (node == field.name) {
-                  node = node.replaceAll('"', "");
-                  parsedSQL[index] = '"' + node + '"';
-                }
-              });
-            });
-
-            whereClause = parsedSQL.join(" ");
-
-            req.query.sql = req.query.sql.replace(
-              "[WHERE_CLAUSE]",
-              " WHERE " + whereClause
-            );
-          } else {
-            req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          }
-
-          req.query.sql = req.query.sql.replace(
-            "[QUERY_FUNCTIONS]",
-            queryFunctions
-          );
-
-          req.query.sql = req.query.sql.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream.value
-          );
-          // const parsedSQL = parser.astify(req.query.sql);
-          // const unparsedSQL = parser.sqlify(parsedSQL);
-          // console.log(unparsedSQL);
-        }
-
-        if (searchObj.data.resultGrid.currentPage > 0) {
-          delete req.aggs;
-        }
-
-        if (store.state.zoConfig.sql_base64_enabled) {
-          req["encoding"] = "base64";
-          req.query.sql = b64EncodeUnicode(req.query.sql);
-          if (
-            !searchObj.meta.sqlMode &&
-            searchObj.data.resultGrid.currentPage == 0
-          ) {
-            req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
-          }
-        }
-
-        updateUrlQueryParams();
-
-        return req;
-      } catch (e) {
-        searchObj.loading = false;
-        console.log(e);
-        showErrorNotification("Invalid SQL Syntax");
-      }
-    }
 
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
@@ -796,462 +321,92 @@ export default defineComponent({
       }
     }
 
-    function updateUrlQueryParams() {
-      const date = searchObj.data.datetime;
-
-      const query = {
-        stream: searchObj.data.stream.selectedStream.label,
-      };
-
-      if (date.type == "relative") {
-        query["period"] = date.relativeTimePeriod;
-      } else {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      }
-
-      query["refresh"] = searchObj.meta.refreshInterval;
-
-      if (searchObj.data.query) {
-        query["sql_mode"] = searchObj.meta.sqlMode;
-        query["query"] = b64EncodeUnicode(searchObj.data.query);
-      }
-
-      query["org_identifier"] = store.state.selectedOrganization.identifier;
-
-      router.push({ query });
-    }
-
-    function getQueryData(notify) {
-      let dismiss = () => {};
-      try {
-        if (searchObj.data.stream.selectedStream.value == "") {
-          searchObj.loading = false;
-          return false;
-        }
-
-        searchObj.data.searchAround.indexTimestamp = -1;
-        searchObj.data.searchAround.size = 0;
-        if (searchObj.data.searchAround.histogramHide) {
-          searchObj.data.searchAround.histogramHide = false;
-          searchObj.meta.showHistogram = true;
-        }
-
-        searchObj.data.errorMsg = "";
-        if (searchObj.data.resultGrid.currentPage == 0) {
-          // searchObj.data.stream.selectedFields = [];
-          // searchObj.data.stream.addToFilter = "";
-          searchObj.data.queryResults = {};
-          // searchObj.data.resultGrid.columns = [];
-          searchObj.data.sortedQueryResults = [];
-          // searchObj.data.streamResults = [];
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: {},
-          };
-          // searchObj.data.editorValue = "";
-        }
-
-        if (notify) dismiss = Notify();
-
-        const queryReq = buildSearch();
-
-        if (queryReq == null) {
-          dismiss();
-          searchObj.loading = false;
-          return false;
-        }
-
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent
-          );
-        }
-
-        searchObj.data.errorCode = 0;
-        searchService
-          .search({
-            org_identifier: searchObj.organizationIdetifier,
-            query: queryReq,
-            page_type: getStreamType.value,
-          })
-          .then((res) => {
-            searchObj.loading = false;
-            if (res.data.from > 0) {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size += res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
-              // searchObj.data.queryResults.aggs.histogram.push(
-              //   ...res.data.aggs.histogram
-              // );
-            } else {
-              resetFieldValues();
-              searchObj.data.queryResults = res.data;
-            }
-
-            updateFieldValues(res.data.hits);
-
-            //extract fields from query response
-            extractFields();
-
-            generateHistogramData();
-            //update grid columns
-            updateGridColumns();
-            dismiss();
-          })
-          .catch((err) => {
-            searchObj.loading = false;
-            dismiss();
-            if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error;
-            } else {
-              searchObj.data.errorMsg = err.message;
-            }
-            const customMessage = logsErrorMessage(err.response.data.code);
-            searchObj.data.errorCode = err.response.data.code;
-            if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
-
-            // $q.notify({
-            //   message: searchObj.data.errorMsg,
-            //   color: "negative",
-            // });
-          });
-      } catch (e) {
-        dismiss();
-        searchObj.loading = false;
-        showErrorNotification("Error while searching");
-      }
-    }
-
-    const updateFieldValues = (data) => {
-      const excludedFields = [
-        store.state.zoConfig.timestamp_column,
-        "log",
-        "msg",
-      ];
-      data.forEach((item) => {
-        // Create set for each field values and add values to corresponding set
-        Object.keys(item).forEach((key) => {
-          if (excludedFields.includes(key)) {
-            return;
-          }
-
-          if (fieldValues.value[key] == undefined) {
-            fieldValues.value[key] = new Set();
-          }
-
-          if (!fieldValues.value[key].has(item[key])) {
-            fieldValues.value[key].add(item[key]);
-          }
-        });
-      });
-    };
-
-    const resetFieldValues = () => {
-      fieldValues.value = {};
-    };
-
-    function extractFields() {
-      try {
-        searchObj.data.stream.selectedStreamFields = [];
-        if (searchObj.data.streamResults.list.length > 0) {
-          const queryResult = [];
-          const tempFieldsName = [];
-          const ignoreFields = [store.state.zoConfig.timestamp_column];
-          let ftsKeys;
-
-          searchObj.data.streamResults.list.forEach((stream: any) => {
-            if (searchObj.data.stream.selectedStream.value == stream.name) {
-              queryResult.push(...stream.schema);
-              ftsKeys = new Set([
-                ...stream.settings.full_text_search_keys,
-                ...ignoreFields,
-              ]);
-            }
-          });
-
-          queryResult.forEach((field: any) => {
-            tempFieldsName.push(field.name);
-          });
-
-          if (searchObj.data.queryResults.hits.length > 0) {
-            let firstRecord = searchObj.data.queryResults.hits[0];
-
-            Object.keys(firstRecord).forEach((key) => {
-              if (!tempFieldsName.includes(key)) {
-                queryResult.push({ name: key, type: "Utf8" });
-              }
-            });
-          }
-
-          let fields: any = {};
-          queryResult.forEach((row: any) => {
-            // let keys = deepKeys(row);
-            // for (let i in row) {
-            if (fields[row.name] == undefined) {
-              fields[row.name] = {};
-              searchObj.data.stream.selectedStreamFields.push({
-                name: row.name,
-                ftsKey: ftsKeys.has(row.name),
-              });
-            }
-            // }
-          });
-        }
-      } catch (e) {
-        searchObj.loading = false;
-        console.log("Error while extracting fields :", e.message);
-      }
-    }
-
-    function updateGridColumns() {
-      try {
-        searchObj.data.resultGrid.columns = [];
-
-        const logFilterField: any =
-          useLocalLogFilterField()?.value != null
-            ? useLocalLogFilterField()?.value
-            : {};
-        const logFieldSelectedValue =
-          logFilterField[
-            `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
-          ];
-        const selectedFields = (logFilterField && logFieldSelectedValue) || [];
-        if (
-          !searchObj.data.stream.selectedFields.length &&
-          selectedFields.length
-        ) {
-          return (searchObj.data.stream.selectedFields = selectedFields);
-        }
-        searchObj.data.stream.selectedFields = selectedFields;
-
-        searchObj.data.resultGrid.columns.push({
-          name: "@timestamp",
-          field: (row: any) =>
-            date.formatDate(
-              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
-            ),
-          prop: (row: any) =>
-            date.formatDate(
-              Math.floor(row[store.state.zoConfig.timestamp_column] / 1000),
-              "MMM DD, YYYY HH:mm:ss.SSS Z"
-            ),
-          label: t("search.timestamp"),
-          align: "left",
-          sortable: true,
-        });
-        if (searchObj.data.stream.selectedFields.length == 0) {
-          // if (searchObj.meta.resultGrid.manualRemoveFields == false) {
-          //   searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-          //     if (
-          //       (field.name == "log" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf("log") ==
-          //           -1) ||
-          //       (field.name == "message" &&
-          //         searchObj.data.stream.selectedStreamFields.indexOf(
-          //           "message"
-          //         ) == -1)
-          //     ) {
-          //       searchObj.data.stream.selectedFields.push(field.name);
-          //     }
-          //   });
-          // }
-
-          searchObj.meta.resultGrid.manualRemoveFields = false;
-          if (searchObj.data.stream.selectedFields.length == 0) {
-            searchObj.data.resultGrid.columns.push({
-              name: "source",
-              field: (row: any) => JSON.stringify(row),
-              prop: (row: any) => JSON.stringify(row),
-              label: "source",
-              align: "left",
-              sortable: true,
-            });
-          }
-        } else {
-          searchObj.data.stream.selectedFields.forEach((field: any) => {
-            searchObj.data.resultGrid.columns.push({
-              name: field,
-              field: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              prop: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              label: field,
-              align: "left",
-              sortable: true,
-              closable: true,
-            });
-          });
-        }
-
-        searchObj.loading = false;
-      } catch (e) {
-        searchObj.loading = false;
-        console.log("Error while updating grid columns:", e.message);
-      }
-    }
-
-    function generateHistogramData() {
-      const unparsed_x_data: any[] = [];
-      const xData: string[] = [];
-      const yData: number[] = [];
-
-      if (searchObj.data.queryResults.aggs) {
-        searchObj.data.queryResults.aggs.histogram.map(
-          (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
-          }) => {
-            unparsed_x_data.push(bucket.zo_sql_key);
-            let histDate = new Date(bucket.zo_sql_key + "Z");
-            xData.push(Math.floor(histDate.getTime()));
-            yData.push(parseInt(bucket.zo_sql_num, 10));
-          }
-        );
-      }
-
-      const chartParams = {
-        title:
-          "Showing " +
-          searchObj.data.queryResults.hits.length +
-          " out of " +
-          searchObj.data.queryResults.total.toLocaleString() +
-          " hits in " +
-          searchObj.data.queryResults.took +
-          " ms. (Scan Size: " +
-          searchObj.data.queryResults.scan_size +
-          "MB)",
-        unparsed_x_data: unparsed_x_data,
-      };
-      searchObj.data.histogram = { xData, yData, chartParams };
-      nextTick(() => {
-        if (
-          searchObj.meta.showHistogram == true &&
-          searchObj.meta.sqlMode == false &&
-          searchResultRef.value?.reDrawChart
-        ) {
-          searchResultRef.value.reDrawChart();
-        }
-      });
-    }
-
-    function loadPageData(isFirstLoad: boolean = false) {
-      searchObj.loading = true;
-      searchObj.data.resultGrid.currentPage = 0;
-      resetSearchObj();
-      searchObj.organizationIdetifier =
-        store.state.selectedOrganization.identifier;
-
-      //get stream list
-      getStreamList(isFirstLoad);
-    }
-
-    function refreshStreamData() {
-      // searchObj.loading = true;
-      // this.searchObj.data.resultGrid.currentPage = 0;
-      // resetSearchObj();
-      // searchObj.organizationIdetifier =
-      //   store.state.selectedOrganization.identifier;
-      // //get stream list
-      // getStreamList();
-    }
-
-    onBeforeMount(() => {
-      if (searchObj.loading == false) {
-        loadPageData(true);
-        restoreUrlQueryParams();
-        refreshData();
-      }
-    });
+    // async function loadPageData() {
+    //   try {
+    //     loadLogsData();
+    //   } catch (e) {
+    //     searchObj.loading = false;
+    //     console.log(e);
+    //   }
+    // }
 
     onDeactivated(() => {
-      clearInterval(refreshIntervalID);
+      // resetSearchObj();
+      // searchBarRef.value.resetFunctionContent();
+      // setQuery("");
+      // clearInterval(refreshIntervalID);
     });
 
-    onActivated(() => {
-      if (!searchObj.loading) updateStreams();
-      refreshData();
+    onActivated(async () => {
+      searchObj.organizationIdetifier =
+        store.state.selectedOrganization.identifier;
+      restoreUrlQueryParams();
+      loadLogsData();
 
-      if (
-        searchObj.organizationIdetifier !=
-        store.state.selectedOrganization.identifier
-      ) {
-        loadPageData();
-      }
+      //   // alert("activated");
+      //   // if (!searchObj.loading) updateStreams();
+      //   refreshData();
 
-      if (
-        searchObj.meta.showHistogram == true &&
-        searchObj.meta.sqlMode == false &&
-        router.currentRoute.value.path.indexOf("/logs") > -1
-      ) {
-        setTimeout(() => {
-          if (searchResultRef.value) searchResultRef.value.reDrawChart();
-        }, 1500);
-      }
+      //   if (
+      //     searchObj.organizationIdetifier !=
+      //     store.state.selectedOrganization.identifier
+      //   ) {
+      //     loadPageData();
+      //   }
+
+      //   if (
+      //     searchObj.meta.showHistogram == true &&
+      //     searchObj.meta.sqlMode == false &&
+      //     router.currentRoute.value.path.indexOf("/logs") > -1
+      //   ) {
+      //     setTimeout(() => {
+      //       if (searchResultRef.value) searchResultRef.value.reDrawChart();
+      //     }, 1500);
+      //   }
     });
 
-    const updateStreams = () => {
-      if (searchObj.data.streamResults?.list?.length) {
-        const streamType = searchObj.data.stream.streamType || "logs";
-        streamService
-          .nameList(
-            store.state.selectedOrganization.identifier,
-            streamType,
-            true
-          )
-          .then((response: any) => {
-            searchObj.data.streamResults = response.data;
-            searchObj.data.stream.streamLists = [];
-            response.data.list.map((item: any) => {
-              let itemObj = {
-                label: item.name,
-                value: item.name,
-              };
-              searchObj.data.stream.streamLists.push(itemObj);
-            });
-          });
-      } else {
-        loadPageData(true);
-      }
+    // const updateStreams = () => {
+    //   if (searchObj.data.streamResults?.list?.length) {
+    //     const streamType = searchObj.data.stream.streamType || "logs";
+    //     streamService
+    //       .nameList(
+    //         store.state.selectedOrganization.identifier,
+    //         streamType,
+    //         true
+    //       )
+    //       .then((response: any) => {
+    //         searchObj.data.streamResults = response.data;
+    //         searchObj.data.stream.streamLists = [];
+    //         response.data.list.map((item: any) => {
+    //           let itemObj = {
+    //             label: item.name,
+    //             value: item.name,
+    //           };
+    //           searchObj.data.stream.streamLists.push(itemObj);
+    //         });
+    //       });
+    //   } else {
+    //     loadPageData(true);
+    //   }
+    // };
+
+    const runQueryFn = async () => {
+      // searchObj.data.resultGrid.currentPage = 0;
+      // searchObj.runQuery = false;
+      // expandedLogs.value = {};
+      await getQueryData();
+      // setTimeout(() => {
+      //   if (
+      //     searchObj.meta.showHistogram == true &&
+      //     searchObj.meta.sqlMode == false &&
+      //     searchResultRef.value?.reDrawChart
+      //   ) {
+      //     searchResultRef.value.reDrawChart();
+      //   }
+      // }, 3000);
     };
 
-    const runQueryFn = () => {
-      searchObj.data.resultGrid.currentPage = 0;
-      searchObj.runQuery = false;
-      expandedLogs.value = {};
-      getQueryData();
-    };
-
-    const refreshData = () => {
-      if (
-        searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
-      ) {
-        clearInterval(refreshIntervalID);
-        refreshIntervalID = setInterval(() => {
-          searchObj.loading = true;
-          runQueryFn();
-        }, parseInt(searchObj.meta.refreshInterval) * 1000);
-        $q.notify({
-          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-          color: "positive",
-          position: "top",
-          timeout: 1000,
-        });
-      } else {
-        clearInterval(refreshIntervalID);
-      }
-    };
+    
 
     const setQuery = (sqlMode: boolean) => {
       if (!searchBarRef.value) {
@@ -1289,141 +444,6 @@ export default defineComponent({
       }
     };
 
-    const searchAroundData = (obj: any) => {
-      const dismiss = Notify();
-      try {
-        searchObj.data.errorCode = 0;
-        let query_context = "";
-        let query = searchObj.data.query;
-        if (searchObj.meta.sqlMode == true) {
-          const parsedSQL: any = parser.astify(query);
-          //hack add time stamp column to parsedSQL if not already added
-          if (
-            !(parsedSQL.columns === "*") &&
-            parsedSQL.columns.filter(
-              (e) => e.expr.column === store.state.zoConfig.timestamp_column
-            ).length === 0
-          ) {
-            const ts_col = {
-              expr: {
-                type: "column_ref",
-                table: null,
-                column: store.state.zoConfig.timestamp_column,
-              },
-              as: null,
-            };
-            parsedSQL.columns.push(ts_col);
-          }
-          parsedSQL.where = null;
-          query_context = b64EncodeUnicode(
-            parser.sqlify(parsedSQL).replace(/`/g, '"')
-          );
-        } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = "";
-          } else {
-            whereClause = "";
-          }
-          query_context =
-            `SELECT *${queryFunctions} FROM "` +
-            searchObj.data.stream.selectedStream.value +
-            `" `;
-          query_context = b64EncodeUnicode(query_context);
-        }
-
-        let query_fn = "";
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
-        }
-
-        searchService
-          .search_around({
-            org_identifier: searchObj.organizationIdetifier,
-            index: searchObj.data.stream.selectedStream.value,
-            key: obj.key,
-            size: obj.size,
-            query_context: query_context,
-            query_fn: query_fn,
-          })
-          .then((res) => {
-            searchObj.loading = false;
-            if (res.data.from > 0) {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size += res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
-            } else {
-              searchObj.data.queryResults = res.data;
-            }
-            //extract fields from query response
-            extractFields();
-            generateHistogramData();
-            //update grid columns
-            updateGridColumns();
-
-            if (searchObj.meta.showHistogram) {
-              searchObj.meta.showHistogram = false;
-              searchObj.data.searchAround.histogramHide = true;
-            }
-            segment.track("Button Click", {
-              button: "Search Around Data",
-              user_org: store.state.selectedOrganization.identifier,
-              user_id: store.state.userInfo.email,
-              stream_name: searchObj.data.stream.selectedStream.value,
-              show_timestamp: obj.key,
-              show_size: obj.size,
-              show_histogram: searchObj.meta.showHistogram,
-              sqlMode: searchObj.meta.sqlMode,
-              showFields: searchObj.meta.showFields,
-              page: "Search Logs - Search around data",
-            });
-
-            const visibleIndex =
-              obj.size > 30 ? obj.size / 2 - 12 : obj.size / 2;
-            setTimeout(() => {
-              searchResultRef.value.searchTableRef.scrollTo(
-                visibleIndex,
-                "start-force"
-              );
-            }, 500);
-
-            dismiss();
-          })
-          .catch((err) => {
-            searchObj.loading = false;
-            dismiss();
-            if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error;
-            } else {
-              searchObj.data.errorMsg = err.message;
-            }
-
-            const customMessage = logsErrorMessage(err.response.data.code);
-            searchObj.data.errorCode = err.response.data.code;
-            if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage);
-            }
-
-            // $q.notify({
-            //   message: searchObj.data.errorMsg,
-            //   color: "negative",
-            // });
-          });
-      } catch (e) {
-        dismiss();
-        console.log(e.message);
-        searchObj.loading = false;
-        showErrorNotification("Search around request failed.");
-      }
-    };
-
     const collapseFieldList = () => {
       if (searchObj.meta.showFields) searchObj.meta.showFields = false;
       else searchObj.meta.showFields = true;
@@ -1450,25 +470,21 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel: ref(17),
-      loadPageData,
+      // loadPageData,
       getQueryData,
       searchResultRef,
-      refreshStreamData,
-      updateGridColumns,
-      getConsumableDateTime,
       runQueryFn,
       refreshData,
       setQuery,
-      searchAroundData,
       verifyOrganizationStatus,
-      getStreamList,
       collapseFieldList,
       areStreamsPresent,
       toggleExpandLog,
       expandedLogs,
-      updateUrlQueryParams,
       fieldValues,
       onSplitterUpdate,
+      updateGridColumns,
+      updateUrlQueryParams,
     };
   },
   computed: {
@@ -1484,12 +500,9 @@ export default defineComponent({
     moveSplitter() {
       return this.searchObj.config.splitterModel;
     },
-    changeOrganization() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-    changeStream() {
-      return this.searchObj.data.stream.selectedStream;
-    },
+    // changeStream() {
+    //   return this.searchObj.data.stream.selectedStream;
+    // },
     changeRelativeDate() {
       return (
         this.searchObj.data.datetime.relative.value +
@@ -1547,35 +560,24 @@ export default defineComponent({
           this.searchObj.config.splitterModel > 0;
       }
     },
-    changeOrganization() {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (this.router.currentRoute.value.name == "logs") {
-        this.searchObj.data.tempFunctionContent = "";
-        this.searchBarRef.resetFunctionContent();
-        this.searchObj.data.query = "";
-        this.setQuery("");
-        this.searchObj.meta.sqlMode = false;
-        this.loadPageData();
-      }
-    },
-    changeStream: {
-      handler(stream, streamOld) {
-        if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-          this.searchObj.data.tempFunctionContent = "";
-          this.searchBarRef.resetFunctionContent();
-          if (streamOld.value) this.searchObj.data.query = "";
-          if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
-          this.searchObj.loading = true;
-          setTimeout(() => {
-            this.runQueryFn();
-          }, 500);
-        }
-      },
-      immediate: false,
-    },
+    // changeStream: {
+    //   handler(stream, streamOld) {
+    //     if (
+    //       this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
+    //       this.searchObj.data.stream.selectedStream.value != ""
+    //     ) {
+    //       this.searchObj.data.tempFunctionContent = "";
+    //       this.searchBarRef.resetFunctionContent();
+    //       if (streamOld.value) this.searchObj.data.query = "";
+    //       if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
+    //       this.searchObj.loading = true;
+    //       // setTimeout(() => {
+    //       //   this.runQueryFn();
+    //       // }, 500);
+    //     }
+    //   },
+    //   immediate: false,
+    // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       setTimeout(() => {

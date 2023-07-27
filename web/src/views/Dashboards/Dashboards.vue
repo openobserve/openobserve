@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
+  <q-page class="q-pa-none" :key="store.state.selectedOrganization.identifier">
     <!-- add dashboard table -->
     <q-table
       ref="qTable"
@@ -328,7 +328,7 @@ export default defineComponent({
         });
     };
     const dashboards = computed(function () {
-      const dashboardList = toRaw(store.state.allDashboardList);
+      const dashboardList = toRaw(store.state.organizationData.allDashboardList);
       return dashboardList.map((board: any, index) => {
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -349,7 +349,7 @@ export default defineComponent({
         await dashboardService
           .delete(store.state.selectedOrganization.identifier, dashboardId)
           .then((res) => {
-            const dashboards = toRaw(store.state.allDashboardList);
+            const dashboards = toRaw(store.state.organizationData.allDashboardList);
             const newDashboards = dashboards.filter(
               (dashboard) => dashboard.dashboardId != dashboardId
             );
@@ -431,26 +431,6 @@ export default defineComponent({
     },
     onRowClick(evt, row) {
       this.routeToViewD(row);
-    },
-  },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      this.orgData.identifier = newVal;
-      if (
-        (newVal != oldVal || this.dashboards.value == undefined) &&
-        this.router.currentRoute.value.name == "dashboards"
-      ) {
-        this.getDashboards(this.store.state.selectedOrganization.id);
-      }
     },
   },
 });

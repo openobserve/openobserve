@@ -35,7 +35,7 @@ destination d_openobserve_http {
         index("syslog-ng")
         type("")
         user("{{ currUserEmail }}")
-        password("{{ store.state.organizationPasscode }}")
+        password("{{ store.state.organizationData.organizationPasscode }}")
         url("{{ endpoint.url }}/api/{{ currOrgIdentifier }}/_bulk")
         template("$(format-json --scope rfc5424 --scope dot-nv-pairs
         --rekey .* --shift 1 --scope nv-pairs
