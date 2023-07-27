@@ -18,7 +18,7 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
 use crate::common::infra::config::RwHashMap;
-use crate::common::meta::{common::FileMeta, StreamType};
+use crate::common::meta::{common::FileMeta, prom::SERIES_NAME, StreamType};
 
 static FILES: Lazy<RwHashMap<String, OrgFilelist>> = Lazy::new(DashMap::default);
 static DATA: Lazy<RwHashMap<String, FileMeta>> = Lazy::new(DashMap::default);
@@ -201,6 +201,10 @@ pub fn get_file_list(
         let time_min = Utc.timestamp_nanos(time_min * 1000);
         let time_max = Utc.timestamp_nanos(time_max * 1000);
         if time_min + Duration::hours(48) >= time_max {
+            // Hack for daily query
+            if stream_name == SERIES_NAME && stream_type == StreamType::Metrics {
+                keys.push(time_min.format("%Y/%m/%d/00/").to_string());
+            }
             // less than 48 hours, generate keys by hours
             let mut time_min = Utc
                 .with_ymd_and_hms(

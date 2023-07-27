@@ -14,7 +14,7 @@
 
 use actix_web::web;
 use ahash::AHashMap;
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -67,9 +67,6 @@ pub async fn remote_write(
     }
 
     let now_ts = Utc::now().timestamp_micros();
-
-    let mut min_ts =
-        (Utc::now() + Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -160,11 +157,6 @@ pub async fn remote_write(
                 labels: labels.clone(),
                 value: sample_val,
             };
-
-            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            if timestamp < min_ts {
-                min_ts = timestamp;
-            }
 
             if first_line && dedup_enabled {
                 match METRIC_CLUSTER_LEADER.get(&cluster_name) {
@@ -260,7 +252,6 @@ pub async fn remote_write(
                 let mut series_values = val_map.clone();
                 series_values.remove_entry(VALUE_LABEL);
                 series_values.remove_entry(TYPE_LABEL);
-                series_values.insert(HASH_LABEL.to_string(), json::Value::String(hash_val));
                 series_values.insert(
                     CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(now_ts.into()),
@@ -273,6 +264,7 @@ pub async fn remote_write(
             }
 
             // check record timestamp & value
+            let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             val_map.insert(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),

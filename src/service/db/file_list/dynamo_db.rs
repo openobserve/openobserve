@@ -24,6 +24,7 @@ use crate::common::{
     infra::{config::CONFIG, db::dynamo_db::DYNAMO_DB_CLIENT},
     meta::{
         common::{FileKey, FileMeta},
+        prom::SERIES_NAME,
         StreamType,
     },
 };
@@ -156,7 +157,7 @@ pub async fn query(
         return Ok(vec![]); // disallow empty query
     }
     let stream = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let (file_start, file_end) = if time_range.is_none() {
+    let (mut file_start, file_end) = if time_range.is_none() {
         ("".to_string(), "".to_string())
     } else {
         let (t1, t2) = time_range.unwrap();
@@ -168,6 +169,12 @@ pub async fn query(
             t2.format("%Y/%m/%d/%H/").to_string(),
         )
     };
+    // Hack for daily query
+    if stream_name == SERIES_NAME && stream_type == StreamType::Metrics {
+        let (t1, _) = time_range.unwrap();
+        let t1: DateTime<Utc> = Utc.timestamp_nanos(t1 * 1000);
+        file_start = t1.format("%Y/%m/%d/00/").to_string();
+    }
     let client = DYNAMO_DB_CLIENT.get().await;
     let query = if time_range.is_none() {
         client
