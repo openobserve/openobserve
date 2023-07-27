@@ -134,7 +134,7 @@ async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
         }
         super::progress(&item.key, item.meta, item.deleted, false).await?;
     }
-    stats.uncompress_time =
+    stats.caching_time =
         start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
     Ok(stats)
 }
