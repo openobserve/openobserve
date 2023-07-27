@@ -14,9 +14,11 @@
 
 use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
+use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use std::sync::Arc;
 
+use super::value::LabelsExt;
 use super::Engine;
 use crate::common::meta::prom::NAME_LABEL;
 use crate::service::promql::value::{signature, Label, Labels, Signature, Value};
@@ -189,6 +191,7 @@ pub async fn eval_top(
     ctx: &mut Engine,
     param: Box<PromExpr>,
     data: &Value,
+    modifier: &Option<LabelModifier>,
     is_bottom: bool,
 ) -> Result<Value> {
     let fn_name = if is_bottom { "bottomk" } else { "topk" };
@@ -213,26 +216,70 @@ pub async fn eval_top(
         }
     };
 
-    let mut score_values = Vec::new();
-    for (i, item) in data.iter().enumerate() {
-        if item.sample.value.is_nan() {
-            continue;
+    let mut score_values: HashMap<Signature, Vec<TopItem>> = HashMap::default();
+    match modifier {
+        Some(v) => match v {
+            LabelModifier::Include(labels) => {
+                for (i, item) in data.iter().enumerate() {
+                    let sum_labels = labels_to_include(&labels.labels, &item.labels);
+                    if item.sample.value.is_nan() {
+                        continue;
+                    }
+                    let signature = sum_labels.signature();
+                    let value = score_values.entry(signature).or_insert(vec![]);
+                    value.push(TopItem {
+                        index: i,
+                        value: item.sample.value,
+                    });
+                }
+            }
+            LabelModifier::Exclude(labels) => {
+                for (i, item) in data.iter().enumerate() {
+                    let sum_labels = labels_to_exclude(&labels.labels, &item.labels);
+                    if item.sample.value.is_nan() {
+                        continue;
+                    }
+                    let signature = sum_labels.signature();
+                    let value = score_values.entry(signature).or_insert(vec![]);
+                    value.push(TopItem {
+                        index: i,
+                        value: item.sample.value,
+                    });
+                }
+            }
+        },
+        None => {
+            for (i, item) in data.iter().enumerate() {
+                let sum_labels = Labels::default();
+                if item.sample.value.is_nan() {
+                    continue;
+                }
+                let signature = sum_labels.signature();
+                let value = score_values.entry(signature).or_insert(vec![]);
+                value.push(TopItem {
+                    index: i,
+                    value: item.sample.value,
+                });
+            }
         }
-        score_values.push(TopItem {
-            index: i,
-            value: item.sample.value,
-        });
     }
 
-    if is_bottom {
-        score_values.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
+    let comparator = if is_bottom {
+        |a: &TopItem, b: &TopItem| a.value.partial_cmp(&b.value).unwrap()
     } else {
-        score_values.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap());
-    }
+        |a: &TopItem, b: &TopItem| b.value.partial_cmp(&a.value).unwrap()
+    };
+
     let values = score_values
-        .iter()
-        .take(n)
-        .map(|v| data[v.index].clone())
+        .values()
+        .flat_map(|items| {
+            items
+                .iter()
+                .sorted_by(|a, b| comparator(a, b))
+                .take(n)
+                .collect::<Vec<_>>()
+        })
+        .map(|item| data[item.index].clone())
         .collect();
     Ok(Value::Vector(values))
 }

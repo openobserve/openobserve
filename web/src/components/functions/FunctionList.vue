@@ -452,25 +452,25 @@ export default defineComponent({
     };
   },
   computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
+    // selectedOrg() {
+    //   return this.store.state.selectedOrganization.identifier;
+    // },
   },
   watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      if (
-        (newVal != oldVal || this.jsTransforms.value == undefined) &&
-        this.router.currentRoute.value.name == "functions"
-      ) {
-        this.resultTotal = 0;
-        this.jsTransforms = [];
-        this.getJSTransforms();
-      }
-    },
+    // selectedOrg(newVal: any, oldVal: any) {
+    //   this.verifyOrganizationStatus(
+    //     this.store.state.organizations,
+    //     this.router
+    //   );
+    //   if (
+    //     (newVal != oldVal || this.jsTransforms.value == undefined) &&
+    //     this.router.currentRoute.value.name == "functions"
+    //   ) {
+    //     this.resultTotal = 0;
+    //     this.jsTransforms = [];
+    //     this.getJSTransforms();
+    //   }
+    // },
   },
 });
 </script>

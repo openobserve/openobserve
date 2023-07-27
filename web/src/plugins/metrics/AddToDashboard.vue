@@ -130,7 +130,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     onBeforeMount(() => {
-      if (!store.state.allDashboardList?.length) {
+      if (!store.state.organizationData.allDashboardList?.length) {
         getAllDashboards(store).then(() => {
           updateDashboardOptions();
         });
@@ -142,7 +142,7 @@ export default defineComponent({
     const updateDashboardOptions = () => {
       dashboardList.value = [];
       filteredDashboards.value = [];
-      store.state.allDashboardList.forEach((dashboard: any) => {
+      store.state.organizationData.allDashboardList.forEach((dashboard: any) => {
         dashboardList.value.push({
           id: dashboard.dashboardId,
           label: dashboard.title,

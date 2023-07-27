@@ -38,6 +38,7 @@
         hide-selected
         fill-input
         @filter="filterStreamFn"
+        @update:model-value="handleQueryData"
       >
         <template #no-option>
           <q-item>
@@ -337,7 +338,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj, updatedLocalLogFilterField } = useLogs();
+    const { searchObj, updatedLocalLogFilterField, handleQueryData } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -551,6 +552,7 @@ export default defineComponent({
       outlinedAdd,
       outlinedVisibilityOff,
       outlinedVisibility,
+      handleQueryData,
     };
   },
 });

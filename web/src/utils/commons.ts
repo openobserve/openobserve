@@ -127,7 +127,7 @@ export const getAllDashboards = async (store: any) => {
 };
 
 function findDashboard(dashboardId: string, store: any) {
-  const dashboards = store.state.allDashboardList;
+  const dashboards = store.state.organizationData.allDashboardList;
   return dashboards.find((it: any) => it.dashboardId === dashboardId);
 }
 
@@ -141,8 +141,8 @@ export const addPanel = async (
   // call the update dashboard function
 
   if (
-    !store.state.allDashboardList ||
-    store.state.allDashboardList.length == 0
+    !store.state.organizationData.allDashboardList ||
+    store.state.organizationData.allDashboardList.length == 0
   ) {
     await getAllDashboards(store);
   }
@@ -191,8 +191,8 @@ export const addVariable = async (
 ) => {
 
   if (
-    !store.state.allDashboardList ||
-    store.state.allDashboardList.length == 0
+    !store.state.organizationData.allDashboardList ||
+    store.state.organizationData.allDashboardList.length == 0
   ) {
     await getAllDashboards(store);
   }
@@ -356,8 +356,8 @@ export const updateDashboard = async (
 
 export const getDashboard = async (store: any, dashboardId: any) => {
   if (
-    !store.state.allDashboardList ||
-    store.state.allDashboardList.length == 0
+    !store.state.organizationData.allDashboardList ||
+    store.state.organizationData.allDashboardList.length == 0
   ) {
     await getAllDashboards(store);
   }
@@ -366,8 +366,8 @@ export const getDashboard = async (store: any, dashboardId: any) => {
 
 export const getPanel = async (store: any, dashboardId: any, panelId: any) => {
   if (
-    !store.state.allDashboardList ||
-    store.state.allDashboardList.length == 0
+    !store.state.organizationData.allDashboardList ||
+    store.state.organizationData.allDashboardList.length == 0
   ) {
     await getAllDashboards(store);
   }

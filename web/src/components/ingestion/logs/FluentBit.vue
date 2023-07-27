@@ -41,7 +41,7 @@
   Json_date_key    {{ store.state.zoConfig.timestamp_column }}
   Json_date_format iso8601
   HTTP_User {{ currUserEmail }}
-  HTTP_Passwd {{ store.state.organizationPasscode }}
+  HTTP_Passwd {{ store.state.organizationData.organizationPasscode }}
   compress gzip</pre
     >
   </div>

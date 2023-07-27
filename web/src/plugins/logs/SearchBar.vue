@@ -15,7 +15,6 @@
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
-    <!-- {{ searchObj.data }} -->
     <div class="row">
       <div class="float-right col q-mb-xs">
         <q-toggle
@@ -124,6 +123,7 @@
               class="q-mr-sm q-px-none logs-auto-refresh-interval"
               style="padding-left: 0 !important"
               v-model="searchObj.meta.refreshInterval"
+              update:modelValue="refreshData"
             />
             <!-- <q-separator vertical inset /> -->
             <q-btn
@@ -133,7 +133,7 @@
               flat
               title="Run query"
               class="q-pa-none search-button"
-              @click="searchData"
+              @click="handleQueryData"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
@@ -162,7 +162,7 @@
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
-              @run-query="searchData"
+              @run-query="handleQueryData"
             ></query-editor>
           </template>
           <template #after>
@@ -274,7 +274,7 @@ export default defineComponent({
     const $q = useQuasar();
     const store = useStore();
 
-    const { searchObj } = useLogs();
+    const { searchObj, refreshData, handleQueryData } = useLogs();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -699,6 +699,8 @@ export default defineComponent({
       functionModel,
       functionOptions,
       filterFn,
+      refreshData,
+      handleQueryData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
     };
@@ -715,6 +717,9 @@ export default defineComponent({
     },
     confirmMessage() {
       return "Are you sure you want to update the function?";
+    },
+    resetFunction() {
+      return this.searchObj.data.tempFunctionName;
     },
   },
   watch: {
@@ -766,6 +771,11 @@ export default defineComponent({
       if (newVal != "") {
         this.searchObj.config.fnSplitterModel = 60;
         this.searchObj.meta.toggleFunction = true;
+      }
+    },
+    resetFunction(newVal) {
+      if (newVal == "") {
+        this.resetFunctionContent();
       }
     },
   },

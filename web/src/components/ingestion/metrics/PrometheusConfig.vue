@@ -36,7 +36,7 @@ remote_write:
   - url: {{ endpoint.url }}/api/{{ currOrgIdentifier }}/prometheus/api/v1/write
     basic_auth:
       username: {{ currUserEmail }}
-      password: {{ store.state.organizationPasscode }}
+      password: {{ store.state.organizationData.organizationPasscode }}
     </pre>
   </div>
 </template>
@@ -77,7 +77,7 @@ export default defineComponent({
     };
     const accessKey = computed(() => {
       return b64EncodeUnicode(
-        `${props.currUserEmail}:${store.state.organizationPasscode}`
+        `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
       );
     });
     const copyTracesContent = ref(null);

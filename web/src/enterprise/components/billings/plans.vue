@@ -42,7 +42,16 @@
     >
       {{ t("billing.subtitle") }}
     </div>
-    <div v-if="store.state.selectedOrganization.hasOwnProperty('note') && store.state.selectedOrganization.note != ''" class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"><q-icon name="warning" class="q-pt-sm"></q-icon>{{ store.state.selectedOrganization.note }}</div>
+    <div
+      v-if="
+        store.state.selectedOrganization.hasOwnProperty('note') &&
+        store.state.selectedOrganization.note
+      "
+      class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"
+    >
+      <q-icon name="warning" class="q-pt-sm"></q-icon
+      >{{ store.state.selectedOrganization.note }}
+    </div>
     <div v-if="loading">
       <q-spinner-dots
         color="primary"
@@ -72,8 +81,8 @@
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat
-round dense v-close-popup />
+          <q-btn icon="close"
+flat round dense v-close-popup />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -98,8 +107,8 @@ round dense v-close-popup />
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat
-round dense v-close-popup />
+          <q-btn icon="close"
+flat round dense v-close-popup />
         </q-card-section>
 
         <q-card-section>
@@ -133,8 +142,8 @@ round dense v-close-popup />
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn label="Cancel" color="secondary"
-v-close-popup />
+          <q-btn label="Cancel"
+color="secondary" v-close-popup />
           <q-btn
             label="Confirm"
             color="primary"
@@ -459,16 +468,6 @@ export default defineComponent({
       proLoading,
       confirm_downgrade_subscription,
     };
-  },
-  computed: {
-    organization() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    organization() {
-      this.loadSubscription();
-    },
   },
 });
 </script>

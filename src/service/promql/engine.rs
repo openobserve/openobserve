@@ -474,8 +474,12 @@ impl Engine {
             token::T_GROUP => Value::None,
             token::T_STDDEV => aggregations::stddev(sample_time, modifier, &input)?,
             token::T_STDVAR => aggregations::stdvar(sample_time, modifier, &input)?,
-            token::T_TOPK => aggregations::topk(self, param.clone().unwrap(), &input).await?,
-            token::T_BOTTOMK => aggregations::bottomk(self, param.clone().unwrap(), &input).await?,
+            token::T_TOPK => {
+                aggregations::topk(self, param.clone().unwrap(), modifier, &input).await?
+            }
+            token::T_BOTTOMK => {
+                aggregations::bottomk(self, param.clone().unwrap(), modifier, &input).await?
+            }
             token::T_COUNT_VALUES => Value::None,
             token::T_QUANTILE => {
                 aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?

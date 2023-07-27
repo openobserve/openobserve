@@ -26,6 +26,7 @@
             vertical
           >
             <q-route-tab
+              default
               name="functions"
               :to="{
                 name: 'functionList',
@@ -88,13 +89,11 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
-    const activeTab: any = ref("functionAssociatedStreams");
+    const activeTab: any = ref("functions");
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
-    onActivated(() => {
-      redirectRoute();
-    });
+
     onBeforeMount(() => {
       redirectRoute();
     });

@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-md">
+  <q-page class="q-pa-md" :key="store.state.selectedOrganization.identifier">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex">
         <q-btn no-caps @click="goBackToDashboardList" padding="xs" outline icon="arrow_back_ios_new" />

@@ -13,11 +13,16 @@
 // limitations under the License.
 
 use datafusion::error::Result;
-use promql_parser::parser::Expr as PromExpr;
+use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 
 use super::Engine;
 use crate::service::promql::value::Value;
 
-pub async fn bottomk(ctx: &mut Engine, param: Box<PromExpr>, data: &Value) -> Result<Value> {
-    super::eval_top(ctx, param, data, true).await
+pub async fn bottomk(
+    ctx: &mut Engine,
+    param: Box<PromExpr>,
+    modifier: &Option<LabelModifier>,
+    data: &Value,
+) -> Result<Value> {
+    super::eval_top(ctx, param, data, modifier, true).await
 }

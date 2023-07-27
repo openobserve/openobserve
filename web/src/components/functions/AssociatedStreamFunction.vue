@@ -35,7 +35,8 @@
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+          <q-th v-for="col in props.cols" :key="col.name"
+:props="props">
             {{ col.label }}
           </q-th>
         </q-tr>
@@ -51,13 +52,15 @@
               dense
               flat
               size="xs"
-               :icon="expandedRow.name != props.row.name
-                   ? 'expand_more'
-                   :'expand_less'
-                 "
+              :icon="
+                expandedRow.name != props.row.name
+                  ? 'expand_more'
+                  : 'expand_less'
+              "
             />
           </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+          <q-td v-for="col in props.cols" :key="col.name"
+:props="props">
             {{ col.value }}
           </q-td>
         </q-tr>
@@ -263,7 +266,7 @@ import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { outlinedDelete } from '@quasar/extras/material-icons-outlined'
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -367,7 +370,7 @@ export default defineComponent({
     let deleteStreamName = "";
     let deleteStreamType = "";
     const loadingFunctions = ref(false);
-    const expandedRow = ref({name:"", stream_type:""});
+    const expandedRow = ref({ name: "", stream_type: "" });
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any | null>(null);
     const filterFunctions = ref([]);
@@ -414,6 +417,9 @@ export default defineComponent({
                 };
               });
 
+            if (logStream.value.length > 0) {
+              getAllFunctions();
+            }
             // logStream.value.forEach((element: any) => {
             //   if (element.name == router.currentRoute.value.query.dialog) {
             //     listSchema({ row: element });
@@ -500,7 +506,10 @@ export default defineComponent({
             apiData
           )
           .then(() => {
-            return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
+            return getStreamFunctions(
+              expandedRow.value.name,
+              expandedRow.value.stream_type
+            );
           })
           .finally(() => {
             addFunctionInProgressLoading.value = false;
@@ -512,7 +521,7 @@ export default defineComponent({
 
     const toggleStreamRow = (props: any) => {
       if (expandedRow.value.name == props.row.name) {
-        expandedRow.value = {name:"", stream_type:""};
+        expandedRow.value = { name: "", stream_type: "" };
       } else {
         expandedRow.value.name = props.row.name;
         expandedRow.value.stream_type = props.row.stream_type;
@@ -523,13 +532,16 @@ export default defineComponent({
       }
     };
 
-    const getStreamFunctions = async (stream_name: any, stream_type: string) => {
+    const getStreamFunctions = async (
+      stream_name: any,
+      stream_type: string
+    ) => {
       loadingFunctions.value = stream_name ? true : false;
       await jsTransformService
         .stream_function(
           store.state.selectedOrganization.identifier,
           stream_name,
-          stream_type,
+          stream_type
         )
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
@@ -557,7 +569,10 @@ export default defineComponent({
           functionName
         )
         .then(() => {
-          return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
+          return getStreamFunctions(
+            expandedRow.value.name,
+            expandedRow.value.stream_type
+          );
         })
         .finally(() => {
           addFunctionInProgressLoading.value = false;
@@ -626,7 +641,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      getAllFunctions();
+      // getAllFunctions();
     });
 
     onActivated(() => {
@@ -637,7 +652,7 @@ export default defineComponent({
       //     }
       //   });
       // }
-      getAllFunctions();
+      // getAllFunctions();
       if (
         previousOrgIdentifier.value !=
         store.state.selectedOrganization.identifier
