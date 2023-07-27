@@ -123,10 +123,10 @@ export const convertPromQLData = (
     },
     margin: {
       autoexpand: true,
-      l: 50,
-      r: 50,
-      t: 50,
-      b: 50,
+      l: 60,
+      r: 60,
+      t: 60,
+      b: 60,
     },
     ...getThemeLayoutOptions(),
   };
