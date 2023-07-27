@@ -1,5 +1,9 @@
 use super::StreamType;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+pub const USAGE_STREAM: &str = "usage";
+pub const STATS_STREAM: &str = "stats_demo";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {
@@ -40,6 +44,17 @@ pub enum UsageEvent {
     Search,
     Functions,
     Other,
+}
+
+impl fmt::Display for UsageEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UsageEvent::Ingestion => write!(f, "Ingestion"),
+            UsageEvent::Search => write!(f, "Search"),
+            UsageEvent::Functions => write!(f, "Functions"),
+            UsageEvent::Other => write!(f, "Other"),
+        }
+    }
 }
 
 impl From<UsageType> for UsageEvent {
