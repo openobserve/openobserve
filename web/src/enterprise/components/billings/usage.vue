@@ -149,8 +149,8 @@ export default defineComponent({
           chartData.value = chartObj;
           setTimeout(() => {
             dataLoading.value = false;
-            usageChart.value.reDraw();
-            usageChart.value.forceReLayout();
+            if (usageChart.value) usageChart.value.reDraw();
+            if (usageChart.value) usageChart.value.forceReLayout();
           }, 1000);
           dismiss();
         })
