@@ -665,7 +665,11 @@ export default defineComponent({
     }
 
     const redirectToParentRoute = (machedRoutes: any) => {
-      if (
+      if (router.currentRoute.value.path.indexOf("/dashboards/") > -1) {
+        router.push({
+          name: "dashboards",
+        });
+      } else if (
         machedRoutes.length > 2 &&
         !excludeParentRedirect.includes(router.currentRoute.value.name) &&
         router.currentRoute.value.path.indexOf("/ingestion/") == -1 &&

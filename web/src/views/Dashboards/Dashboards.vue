@@ -433,26 +433,6 @@ export default defineComponent({
       this.routeToViewD(row);
     },
   },
-  computed: {
-    selectedOrg() {
-      return this.store.state.selectedOrganization.identifier;
-    },
-  },
-  watch: {
-    selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
-      this.orgData.identifier = newVal;
-      if (
-        (newVal != oldVal || this.dashboards.value == undefined) &&
-        this.router.currentRoute.value.name == "dashboards"
-      ) {
-        this.getDashboards(this.store.state.selectedOrganization.id);
-      }
-    },
-  },
 });
 </script>
 
