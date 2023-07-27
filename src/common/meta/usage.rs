@@ -8,7 +8,7 @@ pub struct UsageData {
     pub hour: u32,
     pub month: u32,
     pub year: i32,
-    pub organization_identifier: String,
+    pub org_id: String,
     pub request_body: String,
     pub size: f64,
     pub unit: String,
@@ -16,10 +16,25 @@ pub struct UsageData {
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: u64,
-    pub stream: String,
+    pub stream_name: String,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq)]
+pub struct GroupKey {
+    pub stream_name: String,
+    pub org_id: String,
+    pub stream_type: StreamType,
+    pub day: u32,
+    pub hour: u32,
+    pub event: UsageEvent,
+}
+
+pub struct AggregatedData {
+    pub usage_data: UsageData,
+    pub count: u64,
+}
+
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum UsageEvent {
     Ingestion,
     Search,

@@ -229,7 +229,7 @@ pub struct Common {
     pub usage_url: String,
     #[env_config(name = "ZO_USAGE_AUTH", default = "")]
     pub usage_auth: String,
-    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 20)]
+    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 200)]
     pub usage_batch_size: usize,
     #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
     pub use_dynamo_meta_store: bool,
