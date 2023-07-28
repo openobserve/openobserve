@@ -101,7 +101,6 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // check compact is done
     let offsets = db::compact::files::list_offset().await?;
     if offsets.is_empty() {
-        log::info!("[COMPACT] file_list no stream had done compact, just waiting");
         return Ok(()); // no stream
     }
     // compact offset already is next hour, we need fix it, get the latest compact offset
