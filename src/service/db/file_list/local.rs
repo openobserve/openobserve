@@ -51,6 +51,7 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
 
         super::progress(key, meta, deleted, true).await?;
         tokio::task::spawn(async move { super::broadcast::send(&[file_data]).await });
+        tokio::task::yield_now().await;
     } else {
         // retry 5 times
         for _ in 0..10 {

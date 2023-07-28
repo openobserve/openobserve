@@ -15,63 +15,56 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::{infra::config::RwHashMap, meta::StreamType};
+use crate::common::infra::config::RwHashMap;
 
-static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(DashMap::default);
+pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(DashMap::default);
 
-fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
-    format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
+fn mk_key(org_id: &str) -> String {
+    format!("/compact/organization/{org_id}")
 }
 
-pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType) -> (i64, String) {
-    let key = mk_key(org_id, stream_type, stream_name);
-    if let Some(offset) = CACHES.get(&key) {
-        return (*offset, "".to_string());
-    }
-
+pub async fn get_offset(org_id: &str) -> (i64, String) {
     let db = &crate::common::infra::db::DEFAULT;
+    let key = mk_key(org_id);
     let value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
-    let (offset, node) = if value.contains(';') {
+    if value.contains(';') {
         let mut parts = value.split(';');
         let offset: i64 = parts.next().unwrap().parse().unwrap();
         let node = parts.next().unwrap().to_string();
         (offset, node)
     } else {
         (value.parse().unwrap(), String::from(""))
-    };
-    CACHES.insert(key.clone(), offset);
-    (offset, node)
+    }
 }
 
 pub async fn set_offset(
     org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
     offset: i64,
+    node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.insert(key, offset);
-    Ok(())
+    let db = &crate::common::infra::db::DEFAULT;
+    let key = mk_key(org_id);
+    let val = if let Some(node) = node {
+        format!("{};{}", offset, node)
+    } else {
+        offset.to_string()
+    };
+    Ok(db.put(&key, val.into()).await?)
 }
 
-pub async fn del_offset(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<(), anyhow::Error> {
-    let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.remove(&key);
+pub async fn del_offset(org_id: &str) -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
+    let key = mk_key(org_id);
     db.delete_if_exists(&key, false).await.map_err(Into::into)
 }
 
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
     let db = &crate::common::infra::db::DEFAULT;
-    let key = "/compact/files/";
+    let key = "/compact/organization/";
     let ret = db.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
@@ -85,33 +78,4 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
         items.push((item_key.to_string(), offset));
     }
     Ok(items)
-}
-
-pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
-    let db = &crate::common::infra::db::DEFAULT;
-    for item in CACHES.iter() {
-        let key = item.key().to_string();
-        let offset = item.value().to_string();
-        db.put(&key, offset.into()).await?;
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_files() {
-        const OFFSET: i64 = 100;
-        set_offset("nexus", "default", "logs".into(), OFFSET)
-            .await
-            .unwrap();
-        sync_cache_to_db().await.unwrap();
-        assert_eq!(
-            get_offset("nexus", "default", "logs".into()).await,
-            (OFFSET, "".to_string())
-        );
-        assert!(!list_offset().await.unwrap().is_empty());
-    }
 }
