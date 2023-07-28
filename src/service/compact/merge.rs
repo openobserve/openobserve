@@ -132,7 +132,7 @@ pub async fn merge_by_stream(
         // -- no check it
         // }
         let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
+        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
         return Ok(());
     }
 
@@ -214,7 +214,7 @@ pub async fn merge_by_stream(
 
     // write new offset
     let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-    db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
+    db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
 
     // metrics
     let time = start.elapsed().as_secs_f64();
@@ -494,8 +494,7 @@ mod tests {
     #[tokio::test]
     async fn test_compact() {
         let off_set = Duration::hours(2).num_microseconds().unwrap();
-        let _ =
-            db::compact::files::set_offset("nexus", "default", "logs".into(), off_set, None).await;
+        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
         let resp = merge_by_stream("nexus", "default", "logs".into()).await;
         assert!(resp.is_ok());
     }

@@ -29,6 +29,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { run_delete().await });
     tokio::task::spawn(async move { run_merge().await });
+    tokio::task::spawn(async move { run_sync_to_db().await });
 
     Ok(())
 }
@@ -60,5 +61,22 @@ async fn run_merge() -> Result<(), anyhow::Error> {
             log::error!("[COMPACTOR] run data merge error: {}", ret.err().unwrap());
         }
         drop(locker);
+    }
+}
+
+async fn run_sync_to_db() -> Result<(), anyhow::Error> {
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.compact.sync_to_db_interval,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        let ret = service::db::compact::files::sync_cache_to_db().await;
+        if ret.is_err() {
+            log::error!(
+                "[COMPACTOR] run offset sync to db error: {}",
+                ret.err().unwrap()
+            );
+        }
     }
 }
