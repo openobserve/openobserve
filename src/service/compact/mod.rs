@@ -143,7 +143,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         let (_offset, node) = db::compact::organization::get_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
-            return Ok(()); // not this node, just skip
+            continue;
         }
 
         // before start merging, set current node to lock the organization
@@ -154,7 +154,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::error!("[COMPACT] organization {org_id} is merging by {node}");
             dist_lock::unlock(&mut locker).await?;
-            return Ok(()); // not this node, just skip
+            continue;
         }
         if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
             db::compact::organization::set_offset(&org_id, 0, Some(&LOCAL_NODE_UUID.clone()))
