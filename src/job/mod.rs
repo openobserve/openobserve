@@ -25,6 +25,7 @@ mod file_list;
 mod files;
 mod metrics;
 mod prom;
+mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
@@ -144,6 +145,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { file_list::run().await });
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { metrics::run().await });
+
+    if CONFIG.common.usage_enabled {
+        tokio::task::spawn(async move { stats::run().await });
+    }
 
     // Syslog server start
     let start_syslog = *SYSLOG_ENABLED.read();

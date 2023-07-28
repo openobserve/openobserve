@@ -226,10 +226,10 @@ pub struct Common {
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
     #[env_config(name = "ZO_USAGE_ENDPOINT", default = "")]
-    pub usage_url: String,
+    pub usage_ep: String,
     #[env_config(name = "ZO_USAGE_AUTH", default = "")]
     pub usage_auth: String,
-    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 20)]
+    #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 200)]
     pub usage_batch_size: usize,
     #[env_config(name = "ZO_DYNAMO_META_STORE_ENABLED", default = false)]
     pub use_dynamo_meta_store: bool,
@@ -492,7 +492,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.common.usage_enabled
-        && (cfg.common.usage_url.is_empty() || cfg.common.usage_auth.is_empty())
+        && (cfg.common.usage_ep.is_empty() || cfg.common.usage_auth.is_empty())
     {
         return Err(anyhow::anyhow!("Please specify url/auth to report usage."));
     }
