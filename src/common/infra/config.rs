@@ -353,7 +353,7 @@ pub struct Etcd {
     pub key_file: String,
     #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
     pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 10000)]
+    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
 }
 

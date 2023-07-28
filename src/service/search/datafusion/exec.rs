@@ -432,6 +432,9 @@ pub async fn merge(
     }
 
     // rewrite sql
+    if CONFIG.common.print_key_sql {
+        log::info!("merge sql before handle offset: {}", sql);
+    }
     let query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
             if offset > 0
@@ -450,6 +453,10 @@ pub async fn merge(
             return Err(e);
         }
     };
+    if CONFIG.common.print_key_sql {
+        log::info!("merge sql after handle offset: {}", query_sql);
+    }
+
     // log::info!(
     //     "merge_rewrite_sql took {:.3} seconds.",
     //     start.elapsed().as_secs_f64()
