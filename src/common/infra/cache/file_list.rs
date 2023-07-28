@@ -104,7 +104,7 @@ fn scan_prefix(
     } else if hour.is_empty() {
         format!("{year}/{month}/{day}/")
     } else {
-        format!("{year}/{month}/{day}/{hour}/")
+        format!("{year}/{month}/{day}/{hour}")
     };
     for date_cache in stream_cache.iter() {
         let date_key = date_cache.key();
