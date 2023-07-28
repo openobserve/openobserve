@@ -25,33 +25,28 @@
           class="q-mr-sm"
         />
         </div>
-        <!-- <span class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span> -->
         <q-space />
-        <q-tabs v-model="activeTab">
-          <q-tab no-caps v-for="(tab, index) in tabs" :key="index" name="query" :label="'Query ' + (index + 1)">
+        <q-tabs v-if="promqlMode" v-model="activeTab">
+          <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
+            :label="'Query ' + (index + 1)">
           </q-tab>
         </q-tabs>
-        <q-btn round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
+        <span v-if="!promqlMode" class="text-subtitle2 text-weight-bold">{{ t('panel.sql') }}</span>
+        <q-btn v-if="promqlMode" round flat @click="addTab" icon="add" style="margin-right: 10px;"></q-btn>
       </div>
       <div>
-      <QueryTypeSelector></QueryTypeSelector>
+        <QueryTypeSelector></QueryTypeSelector>
       </div>
-   </q-bar>
+    </q-bar>
 
   </div>
-  <div class="row" 
-    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
+  <div class="row" :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px;' : 'height: auto;'"
     style="overflow: hidden;">
     <div class="col">
-      <query-editor
-      ref="queryEditorRef"
-      class="monaco-editor"
-      v-model:query="dashboardPanelData.data.query"
-      v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
-      v-model:functions="dashboardPanelData.meta.stream.functions"
-      @run-query="searchData"
-      :readOnly="!dashboardPanelData.data.customQuery"
-      ></query-editor>
+      <query-editor ref="queryEditorRef" class="monaco-editor" v-model:query="currentQuery"
+        v-model:fields="dashboardPanelData.meta.stream.selectedStreamFields"
+        v-model:functions="dashboardPanelData.meta.stream.functions" @run-query="searchData"
+        :readOnly="!dashboardPanelData.data.customQuery"></query-editor>
       <div style="color: red;" class="q-mx-sm">{{ dashboardPanelData.meta.errors.queryErrors.join(', ') }}&nbsp;</div>
     </div>
   </div>
@@ -59,7 +54,7 @@
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, reactive, toRaw, onActivated } from "vue";
+import { defineComponent, ref, watch, reactive, toRaw, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -89,18 +84,35 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { dashboardPanelData, updateXYFieldsOnCustomQueryChange } = useDashboardPanelData()
+    const { dashboardPanelData, promqlMode, updateXYFieldsOnCustomQueryChange } = useDashboardPanelData()
     const confirmQueryModeChangeDialog = ref(false)
     const parser = new Parser();
     let streamName = "";
-     const tabs = ref([]);
-    const activeTab = ref(null);
+    const activeTab = ref(0);
+
+    watch(activeTab, () => {
+      console.log('activeTab', typeof activeTab.value);
+    })
 
     const addTab = () => {
-      const newTab = tabs.value.length + 1;
-      tabs.value.push(newTab);
-      activeTab.value = tabs.value.length - 1;
+      dashboardPanelData.data.queries.push({ query: "" });
+      activeTab.value = dashboardPanelData.data.queries.length - 1;
     };
+
+    const currentQuery = computed({
+      get: () => {
+        console.log('query getter accessed');
+        return promqlMode.value ? dashboardPanelData.data.queries[activeTab.value].query : dashboardPanelData.data.query
+      },
+      set: (value) => {
+        if (promqlMode.value) {
+          dashboardPanelData.data.queries[activeTab.value].query = value
+        } else {
+          dashboardPanelData.data.query = value
+        }
+      }
+    })
+
     // toggle show query view
     const onDropDownClick= () =>{
       dashboardPanelData.layout.showQueryBar = !dashboardPanelData.layout.showQueryBar
@@ -316,12 +328,13 @@ export default defineComponent({
       router,
       updateQueryValue,
       onDropDownClick,
+      promqlMode,
       dashboardPanelData,
       confirmQueryModeChangeDialog,
       onUpdateToggle,
-      tabs,
       activeTab,
       addTab,
+      currentQuery
     };
   },
 });

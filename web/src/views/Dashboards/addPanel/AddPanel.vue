@@ -295,9 +295,9 @@ export default defineComponent({
           errors.push("Filters are not supported for PromQL. Remove anything added to the Fitlers.")
         }
 
-        if(!dashboardPanelData.data.query) {
-          errors.push("Query should not be empty")
-        }
+        // if(!dashboardPanelData.data.query) {
+        //   errors.push("Query should not be empty")
+        // }
       } else {
         switch (dashboardPanelData.data.type) {
           case 'donut':

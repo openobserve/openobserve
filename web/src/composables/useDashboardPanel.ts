@@ -65,7 +65,7 @@ const getDefaultDashboardPanelData = () => ({
       },
     ],
       queryType: "sql",
-      query: "",
+      query: "a",
       customQuery: false
     },
     layout: {

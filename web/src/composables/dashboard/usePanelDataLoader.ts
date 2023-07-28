@@ -142,9 +142,10 @@ export const usePanelDataLoader = (
     ) => {
       console.log("usePanelDataLoader: schema changed");
 
-      if (panelSchema.value.query) {
-        loadData();
-      }
+      // TODO: check for query OR queries array for promql
+      // if (panelSchema.value.query) {
+      loadData();
+      // }
     }
   );
 
