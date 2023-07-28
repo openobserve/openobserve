@@ -13,18 +13,25 @@
 // limitations under the License.
 
 use bytes::Buf;
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
-use std::collections::HashSet;
-use std::io::{BufRead, BufReader};
+use std::{
+    collections::HashSet,
+    io::{BufRead, BufReader},
+    sync::atomic,
+};
 use tokio::sync::RwLock;
 
-use crate::common::infra::{config::CONFIG, storage};
-use crate::common::json;
-use crate::common::meta::common::FileKey;
+use crate::common::{
+    infra::{config::CONFIG, storage},
+    json,
+    meta::common::FileKey,
+};
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));
+pub static LOADED_ALL_FILES: atomic::AtomicBool = atomic::AtomicBool::new(false);
 
 pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let prefix = format!("file_list/{prefix}");
@@ -138,6 +145,55 @@ async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
     stats.caching_time =
         start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
     Ok(stats)
+}
+
+pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), anyhow::Error> {
+    if time_min == 0 {
+        return Ok(());
+    }
+    if time_max == 0 {
+        time_max = Utc::now().timestamp_micros();
+    }
+    let mut cur_time = time_min;
+    while cur_time <= time_max {
+        let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
+        let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
+        cache(&file_list_prefix).await?;
+        cur_time += Duration::hours(1).num_microseconds().unwrap();
+    }
+    Ok(())
+}
+
+// cache by day: 2023-01-02
+pub async fn cache_day(day: &str) -> Result<(), anyhow::Error> {
+    let day_start = Utc.datetime_from_str(&format!("{day}T00:00:00Z",), "%Y-%m-%dT%H:%M:%SZ")?;
+    let day_end = Utc.datetime_from_str(&format!("{day}T23:59:59Z",), "%Y-%m-%dT%H:%M:%SZ")?;
+    let time_min = day_start.timestamp_micros();
+    let time_max = day_end.timestamp_micros();
+    cache_time_range(time_min, time_max).await
+}
+
+pub async fn cache_all() -> Result<(), anyhow::Error> {
+    if LOADED_ALL_FILES.load(atomic::Ordering::Relaxed) {
+        return Ok(());
+    }
+    let prefix = format!("file_list/");
+    let files = storage::list(&prefix).await?;
+    let mut prefixes = HashSet::new();
+    for file in files {
+        // file_list/2023/06/26/07/7078998136898850816tVckGD.json.zst
+        let columns = file.split('/').collect::<Vec<_>>();
+        let key = format!(
+            "{}/{}/{}/{}/",
+            columns[1], columns[2], columns[3], columns[4]
+        );
+        prefixes.insert(key);
+    }
+    for prefix in prefixes {
+        cache(&prefix).await?;
+    }
+    LOADED_ALL_FILES.store(true, atomic::Ordering::Relaxed);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Default)]
