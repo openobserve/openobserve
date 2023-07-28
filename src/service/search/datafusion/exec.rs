@@ -166,22 +166,18 @@ async fn exec_query(
     schema: Arc<Schema>,
     rules: &HashMap<String, DataType>,
     sql: &Arc<Sql>,
-    _files: &[FileKey],
-    _file_type: FileType,
+    files: &[FileKey],
+    file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
 
-    // DEBUG
-    // disabled fast_mode
-    let (q_ctx, schema) = (ctx.clone(), schema.clone());
-
-    let fast_mode = false;
-    // let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
-    //     fast_mode = true;
-    //     get_fast_mode_ctx(session, schema, sql, files, file_type).await?
-    // } else {
-    //     (ctx.clone(), schema.clone())
-    // };
+    let mut fast_mode = false;
+    let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
+        fast_mode = true;
+        get_fast_mode_ctx(session, schema, sql, files, file_type).await?
+    } else {
+        (ctx.clone(), schema.clone())
+    };
 
     // get used UDF
     let mut field_fns = vec![];
@@ -354,7 +350,7 @@ async fn exec_query(
     Ok(batches)
 }
 
-async fn _get_fast_mode_ctx(
+async fn get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
     sql: &Arc<Sql>,

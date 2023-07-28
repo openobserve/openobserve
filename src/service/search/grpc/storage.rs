@@ -263,9 +263,6 @@ async fn cache_parquet_files(files: &[FileKey]) -> Result<Vec<String>, Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
         let file_name = file.key.clone();
-        if CONFIG.common.print_key_sql {
-            log::info!("search->storage: download file: {}", file_name);
-        }
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             if !file_data::exist(&file_name) {
