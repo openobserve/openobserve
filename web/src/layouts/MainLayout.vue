@@ -728,7 +728,6 @@ export default defineComponent({
     },
     changeOrganization() {
       setTimeout(() => {
-        this.redirectToParentRoute(this.$route.matched);
         this.setSelectedOrganization();
       }, 500);
     },
