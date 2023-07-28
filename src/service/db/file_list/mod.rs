@@ -89,16 +89,16 @@ pub async fn progress(
             if old_data.is_ok() {
                 return Ok(()); // already exists, skip increase stats
             };
-            match cache::stats::incr_stream_stats(key, data) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!(
-                        "service:db:file_list: add {}, incr_stream_stats error: {}",
-                        key,
-                        e
-                    );
-                }
-            }
+            // match cache::stats::incr_stream_stats(key, data) {
+            //     Ok(_) => {}
+            //     Err(e) => {
+            //         log::error!(
+            //             "service:db:file_list: add {}, incr_stream_stats error: {}",
+            //             key,
+            //             e
+            //         );
+            //     }
+            // }
         }
     }
 
