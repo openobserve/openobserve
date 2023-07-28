@@ -26,7 +26,7 @@
         />
         </div>
         <q-space />
-        <q-tabs v-if="promqlMode" v-model="activeTab">
+        <q-tabs v-if="promqlMode" v-model="activeTab" narrow-indicator dense>
           <q-tab no-caps v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" :name="index"
             :label="'Query ' + (index + 1)">
           </q-tab>
