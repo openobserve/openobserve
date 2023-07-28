@@ -100,7 +100,9 @@ pub async fn sql(
 
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
-        // log::info!("Query agg sql: {}", orig_agg_sql.0);
+        if CONFIG.common.print_key_sql {
+            log::info!("Query agg sql: {}", orig_agg_sql.0);
+        }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
         if meta_sql.is_ok() {
@@ -220,7 +222,9 @@ async fn exec_query(
     };
 
     // Debug SQL
-    // log::info!("Query sql: {}", query);
+    if CONFIG.common.print_key_sql {
+        log::info!("Query sql: {}", query);
+    }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
@@ -442,6 +446,7 @@ pub async fn merge(
             return Err(e);
         }
     };
+
     // log::info!(
     //     "merge_rewrite_sql took {:.3} seconds.",
     //     start.elapsed().as_secs_f64()
@@ -481,7 +486,9 @@ pub async fn merge(
     register_udf(&mut ctx, org_id).await;
 
     // Debug SQL
-    // log::info!("Merge sql: {query_sql}");
+    if CONFIG.common.print_key_sql {
+        log::info!("Merge sql: {query_sql}");
+    }
 
     let df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
