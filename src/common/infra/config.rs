@@ -221,6 +221,8 @@ pub struct Common {
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
     pub print_key_config: bool,
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
     #[env_config(name = "ZO_USAGE_ENDPOINT", default = "")]
@@ -351,7 +353,7 @@ pub struct Etcd {
     pub key_file: String,
     #[env_config(name = "ZO_ETCD_DOMAIN_NAME", default = "")]
     pub domain_name: String,
-    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 10000)]
+    #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
 }
 
