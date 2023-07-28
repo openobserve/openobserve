@@ -64,36 +64,37 @@ const getDefaultDashboardPanelData = () => ({
         promql_legend: "q2-{exported_endpoint}",
       },
     ],
-    queryType: "sql",
-    query: "a",
-    customQuery: false,
-  },
-  layout: {
-    splitter: 20,
-    showQueryBar: false,
-    isConfigPanelOpen: false,
-  },
-  meta: {
-    parsedQuery: "",
-    dragAndDrop: {
-      dragging: false,
-      dragElement: null,
+      queryType: "sql",
+      query: "a",
+      customQuery: false
     },
-    errors: {
-      queryErrors: [],
+    layout: {
+      splitter: 20,
+      showQueryBar: false,
+      isConfigPanelOpen: false
     },
-    editorValue: "",
-    dateTime: { start_time: new Date(), end_time: new Date() },
-    filterValue: <any>[],
-    stream: {
-      selectedStreamFields: [],
-      customQueryFields: [],
-      functions: [],
-      streamResults: <any>[],
-      filterField: "",
-    },
-  },
-});
+    meta: {
+      parsedQuery: "",
+      dragAndDrop: {
+        dragging: false,
+        dragElement: null
+      },
+      errors: {
+        queryErrors: []
+      },
+      editorValue: "",
+      dateTime: {start_time: new Date(), end_time: new Date()},
+      filterValue: <any>[],
+      stream: {
+        selectedStreamFields: [],
+        customQueryFields: [],
+        functions: [],
+        streamResults: <any>[],
+        filterField: "",
+      },
+    }
+  }
+)
 
 let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData()});
 
