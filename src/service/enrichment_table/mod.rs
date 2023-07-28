@@ -23,12 +23,15 @@ use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Error;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster,
-    config::{CONFIG, STREAM_SCHEMAS},
-};
 use crate::common::meta::{self, http::HttpResponse as MetaHttpResponse, StreamType};
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster,
+        config::{CONFIG, STREAM_SCHEMAS},
+    },
+    meta::stream::StreamParams,
+};
 use crate::common::{json, meta::usage::UsageType};
 
 use super::{
@@ -148,10 +151,13 @@ pub async fn save_enrichment_data(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
         &mut stream_file_name,
-        StreamType::EnrichmentTables,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::EnrichmentTables,
+        },
+        None,
     );
     req_stats.response_time = start.elapsed().as_secs_f64();
     //metric + data usage

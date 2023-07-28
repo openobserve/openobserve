@@ -111,11 +111,13 @@ pub struct StreamSchema {
     pub schema: Schema,
 }
 
-#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Default, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub partition_keys: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_empty")]
+    pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub full_text_search_keys: Vec<String>,
@@ -128,15 +130,100 @@ impl Serialize for StreamSettings {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("StreamSettings", 2)?;
+        let mut state = serializer.serialize_struct("StreamSettings", 4)?;
         let mut part_keys = HashMap::new();
         for (index, key) in self.partition_keys.iter().enumerate() {
             part_keys.insert(format!("L{index}"), key.to_string());
         }
         state.serialize_field("partition_keys", &part_keys)?;
+        state.serialize_field(
+            "partition_time_level",
+            &self.partition_time_level.unwrap_or_default(),
+        )?;
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.end()
+    }
+}
+
+impl From<&str> for StreamSettings {
+    fn from(data: &str) -> Self {
+        let settings: json::Value = json::from_slice(data.as_bytes()).unwrap();
+
+        let mut partition_keys = Vec::new();
+        if let Some(value) = settings.get("partition_keys") {
+            let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
+            v.sort_by(|a, b| a.0.cmp(b.0));
+            for (_, value) in v {
+                partition_keys.push(value.as_str().unwrap().to_string());
+            }
+        }
+
+        let mut partition_time_level = None;
+        if let Some(value) = settings.get("partition_time_level") {
+            partition_time_level = Some(PartitionTimeLevel::from(value.as_str().unwrap()));
+        }
+
+        let mut full_text_search_keys = Vec::new();
+        let fts = settings.get("full_text_search_keys");
+        if let Some(value) = fts {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                full_text_search_keys.push(item.as_str().unwrap().to_string())
+            }
+        }
+
+        let mut data_retention = 0;
+        if let Some(v) = settings.get("data_retention") {
+            data_retention = v.as_i64().unwrap();
+        };
+
+        Self {
+            partition_keys,
+            partition_time_level,
+            full_text_search_keys,
+            data_retention,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum PartitionTimeLevel {
+    #[default]
+    Hourly,
+    Daily,
+    Monthly,
+}
+
+impl PartitionTimeLevel {
+    pub fn duration(self) -> i64 {
+        match self {
+            PartitionTimeLevel::Hourly => 3600000,
+            PartitionTimeLevel::Daily => 86400000,
+            PartitionTimeLevel::Monthly => 86400000, // TODO check if needs to be changed returning daily for now
+        }
+    }
+}
+
+impl From<&str> for PartitionTimeLevel {
+    fn from(data: &str) -> Self {
+        match data.to_lowercase().as_str() {
+            "hourly" => PartitionTimeLevel::Hourly,
+            "daily" => PartitionTimeLevel::Daily,
+            "monthly" => PartitionTimeLevel::Monthly,
+            _ => PartitionTimeLevel::Hourly,
+        }
+    }
+}
+
+impl std::fmt::Display for PartitionTimeLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PartitionTimeLevel::Hourly => write!(f, "hourly"),
+            PartitionTimeLevel::Daily => write!(f, "daily"),
+            PartitionTimeLevel::Monthly => write!(f, "monthly"),
+        }
     }
 }
 
@@ -144,7 +231,7 @@ impl Serialize for StreamSettings {
 pub struct ListStream {
     pub list: Vec<Stream>,
 }
-
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
 pub struct StreamParams<'a> {
     pub org_id: &'a str,
     pub stream_name: &'a str,
@@ -182,6 +269,13 @@ impl ScanStats {
         self.original_size = self.original_size / 1024 / 1024;
         self.compressed_size = self.compressed_size / 1024 / 1024;
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub struct PartitioningDetails {
+    pub partition_keys: Vec<String>,
+    pub partition_time_level: PartitionTimeLevel,
 }
 
 #[cfg(test)]

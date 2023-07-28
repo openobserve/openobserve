@@ -20,20 +20,24 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use std::collections::HashMap;
 
-use crate::common::infra::{
-    cache::stats,
-    cluster,
-    config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-    errors::{Error, Result},
-    metrics,
-};
 use crate::common::meta::functions::StreamTransform;
+use crate::common::meta::stream::{PartitioningDetails, StreamParams};
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     self,
     alert::{Alert, Trigger},
     prom::{self, HASH_LABEL, METADATA_LABEL, NAME_LABEL, VALUE_LABEL},
     StreamType,
+};
+use crate::common::{
+    infra::{
+        cache::stats,
+        cluster,
+        config::{CONFIG, METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+        errors::{Error, Result},
+        metrics,
+    },
+    meta::stream::PartitionTimeLevel,
 };
 use crate::common::{json, time::parse_i64_to_timestamp_micros};
 use crate::service::usage::report_usage_stats;
@@ -75,6 +79,7 @@ pub async fn remote_write(
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, Trigger> = AHashMap::new();
     let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
+    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -195,13 +200,25 @@ pub async fn remote_write(
                 &mut metric_schema_map,
             )
             .await;
+
             let mut partition_keys: Vec<String> = vec![];
+            let mut time_key = PartitionTimeLevel::Hourly;
+
             if stream_schema.has_partition_keys {
-                partition_keys = crate::service::ingestion::get_stream_partition_keys(
-                    &metric_name,
-                    &metric_schema_map,
-                )
-                .await;
+                if !stream_partitioning_map.contains_key(&metric_name) {
+                    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                        &metric_name,
+                        &metric_schema_map,
+                    )
+                    .await;
+                    stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
+                    partition_keys = partition_det.partition_keys;
+                    time_key = partition_det.partition_time_level;
+                } else {
+                    let partition_det = stream_partitioning_map.get(&metric_name).unwrap();
+                    partition_keys = partition_det.partition_keys.clone();
+                    time_key = partition_det.partition_time_level;
+                }
             }
 
             // Start get stream alerts
@@ -262,9 +279,10 @@ pub async fn remote_write(
             .await;
 
             // get hour key
-            let hour_key = crate::service::ingestion::get_hour_key(
+            let hour_key = crate::service::ingestion::get_wal_time_key(
                 timestamp,
                 &partition_keys,
+                time_key,
                 value.as_object().unwrap(),
                 None,
             );
@@ -326,14 +344,22 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
+            details.partition_time_level
+        } else {
+            PartitionTimeLevel::Hourly
+        };
 
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            org_id,
-            &stream_name,
             &mut stream_file_name,
-            StreamType::Metrics,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Metrics,
+            },
+            Some(time_level),
         );
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
