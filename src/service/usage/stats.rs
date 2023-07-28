@@ -1,3 +1,4 @@
+use crate::common::infra::dist_lock;
 use crate::common::json;
 use crate::common::meta::stats::Stats;
 use crate::common::meta::usage::{UsageEvent, STATS_STREAM, USAGE_STREAM};
@@ -13,6 +14,9 @@ use std::sync::Arc;
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
+    // get lock
+    let mut locker = dist_lock::lock("/stats/publish_stats").await?;
+
     let last_query_ts = get_last_stats_time().await;
     let current_ts = chrono::Utc::now().timestamp_micros();
 
@@ -32,7 +36,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         Ok(response) => {
             //let res = response.json::<meta::search::Response>().await?;
             let temp = response.bytes().await?;
-            let res: meta::search::Response = json::from_slice(&temp).unwrap();
+            let res: meta::search::Response = json::from_slice(&temp)?;
 
             if !res.hits.is_empty() {
                 match report_stats(res.hits, last_query_ts, current_ts).await {
@@ -56,6 +60,8 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             log::error!("calculate stats error: {:?}", err);
         }
     }
+    // search done, release lock
+    dist_lock::unlock(&mut locker).await?;
     Ok(())
 }
 

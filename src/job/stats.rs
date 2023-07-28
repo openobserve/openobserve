@@ -14,12 +14,11 @@
 
 use tokio::time;
 
-use crate::common::infra::cluster::is_alert_manager;
+use crate::common::infra::cluster::is_compactor;
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // TODO how to make sure only one instance runs it
-    if !is_alert_manager(&super::cluster::LOCAL_NODE_ROLE) {
+    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
     // should run it every 5 minutes
