@@ -299,35 +299,35 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 value.push(batch);
             }
         }
+    }
 
-        // merge all batches
-        for (name, batch) in batches.iter_mut() {
-            let merge_sql = if name == "query" {
-                sql.origin_sql.clone()
-            } else {
-                sql.aggs
-                    .get(name.strip_prefix("agg_").unwrap())
-                    .unwrap()
-                    .0
-                    .clone()
-            };
-            *batch = match datafusion::exec::merge(
-                &sql.org_id,
-                sql.meta.offset,
-                sql.meta.limit,
-                &merge_sql,
-                batch,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
-                }
-            };
-        }
+    // merge all batches
+    for (name, batch) in batches.iter_mut() {
+        let merge_sql = if name == "query" {
+            sql.origin_sql.clone()
+        } else {
+            sql.aggs
+                .get(name.strip_prefix("agg_").unwrap())
+                .unwrap()
+                .0
+                .clone()
+        };
+        *batch = match datafusion::exec::merge(
+            &sql.org_id,
+            sql.meta.offset,
+            sql.meta.limit,
+            &merge_sql,
+            batch,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    err.to_string(),
+                )));
+            }
+        };
     }
 
     // final result
