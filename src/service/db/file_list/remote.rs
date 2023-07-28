@@ -46,12 +46,12 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
     let chunk_size = std::cmp::max(1, files.len() / CONFIG.limit.query_thread_num);
     for chunk in files.chunks(chunk_size) {
         let chunk = chunk.to_vec();
-        let task: tokio::task::JoinHandle<Result<usize, anyhow::Error>> =
+        let task: tokio::task::JoinHandle<Result<ProcessStats, anyhow::Error>> =
             tokio::task::spawn(async move {
-                let mut count = 0;
+                let mut stats = ProcessStats::default();
                 for file in chunk {
                     match process_file(&file).await {
-                        Ok(file_count) => count += file_count,
+                        Ok(ret) => stats = stats + ret,
                         Err(err) => {
                             log::error!("Error processing file: {:?} {:?}", file, err);
                             continue;
@@ -59,57 +59,65 @@ pub async fn cache(prefix: &str) -> Result<(), anyhow::Error> {
                     }
                     tokio::task::yield_now().await;
                 }
-                Ok(count)
+                Ok(stats)
             });
         tasks.push(task);
     }
 
-    let mut count = 0;
+    let mut stats = ProcessStats::default();
     let task_results = try_join_all(tasks).await?;
     for task_result in task_results {
-        count += task_result?;
+        stats = stats + task_result?;
     }
+
+    log::info!(
+        "Load file_list [{prefix}] load {}:{} done, download: {}ms, uncompress: {}ms, caching: {}ms",
+        files.len(),
+        stats.file_count,
+        stats.download_time,
+        stats.uncompress_time,
+        stats.caching_time
+    );
 
     // delete files
     for item in super::DELETED_FILES.iter() {
         super::progress(item.key(), item.value().to_owned(), true, false).await?;
     }
 
-    log::info!(
-        "Load file_list [{prefix}] load {}:{} done",
-        files.len(),
-        count
-    );
-
     // cache result
-    rw.insert(prefix);
+    rw.insert(prefix.clone());
 
     // clean deleted files
     super::DELETED_FILES.clear();
     super::DELETED_FILES.shrink_to_fit();
+    log::info!("Load file_list [{prefix}] clean done");
 
     Ok(())
 }
 
-async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
+async fn process_file(file: &str) -> Result<ProcessStats, anyhow::Error> {
+    let start = std::time::Instant::now();
+    let mut stats = ProcessStats::default();
     // download file list from storage
     let data = match storage::get(file).await {
         Ok(data) => data,
         Err(_) => {
-            return Ok(0);
+            return Ok(stats);
         }
     };
+    stats.download_time = start.elapsed().as_millis() as usize;
+
     // uncompress file
     let uncompress = zstd::decode_all(data.reader())?;
+    stats.uncompress_time = start.elapsed().as_millis() as usize - stats.download_time;
     let uncompress_reader = BufReader::new(uncompress.reader());
     // parse file list
-    let mut count = 0;
     for line in uncompress_reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
-        count += 1;
+        stats.file_count += 1;
         let item: FileKey = json::from_slice(line.as_bytes())?;
         // check backlist
         if !super::BLOCKED_ORGS.is_empty() {
@@ -127,5 +135,28 @@ async fn process_file(file: &str) -> Result<usize, anyhow::Error> {
         }
         super::progress(&item.key, item.meta, item.deleted, false).await?;
     }
-    Ok(count)
+    stats.caching_time =
+        start.elapsed().as_millis() as usize - stats.uncompress_time - stats.download_time;
+    Ok(stats)
+}
+
+#[derive(Debug, Clone, Default)]
+struct ProcessStats {
+    pub file_count: usize,
+    pub download_time: usize,
+    pub uncompress_time: usize,
+    pub caching_time: usize,
+}
+
+impl std::ops::Add<ProcessStats> for ProcessStats {
+    type Output = ProcessStats;
+
+    fn add(self, rhs: ProcessStats) -> Self::Output {
+        ProcessStats {
+            file_count: self.file_count + rhs.file_count,
+            download_time: self.download_time + rhs.download_time,
+            uncompress_time: self.uncompress_time + rhs.uncompress_time,
+            caching_time: self.caching_time + rhs.caching_time,
+        }
+    }
 }
