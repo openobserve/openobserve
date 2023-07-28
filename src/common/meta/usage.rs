@@ -1,5 +1,9 @@
 use super::StreamType;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+pub const USAGE_STREAM: &str = "usage";
+pub const STATS_STREAM: &str = "stats";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {
@@ -8,7 +12,7 @@ pub struct UsageData {
     pub hour: u32,
     pub month: u32,
     pub year: i32,
-    pub organization_identifier: String,
+    pub org_id: String,
     pub request_body: String,
     pub size: f64,
     pub unit: String,
@@ -16,15 +20,41 @@ pub struct UsageData {
     pub response_time: f64,
     pub stream_type: StreamType,
     pub num_records: u64,
-    pub stream: String,
+    pub stream_name: String,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq)]
+pub struct GroupKey {
+    pub stream_name: String,
+    pub org_id: String,
+    pub stream_type: StreamType,
+    pub day: u32,
+    pub hour: u32,
+    pub event: UsageEvent,
+}
+
+pub struct AggregatedData {
+    pub usage_data: UsageData,
+    pub count: u64,
+}
+
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum UsageEvent {
     Ingestion,
     Search,
     Functions,
     Other,
+}
+
+impl fmt::Display for UsageEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UsageEvent::Ingestion => write!(f, "Ingestion"),
+            UsageEvent::Search => write!(f, "Search"),
+            UsageEvent::Functions => write!(f, "Functions"),
+            UsageEvent::Other => write!(f, "Other"),
+        }
+    }
 }
 
 impl From<UsageType> for UsageEvent {

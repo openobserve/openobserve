@@ -142,19 +142,23 @@ impl Request {
 #[schema(as = SearchResponse)]
 pub struct Response {
     pub took: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_detail: Option<ResponseTook>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[schema(value_type = Object)]
     pub aggs: HashMap<String, Vec<json::Value>>,
     pub total: usize,
     pub from: usize,
     pub size: usize,
+    #[serde(default)]
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
 }
