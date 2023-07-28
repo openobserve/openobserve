@@ -323,7 +323,8 @@ pub async fn remote_write(
             StreamType::Metrics,
             None,
         ) {
-            return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue;
         }
 
         let mut req_stats = write_file(

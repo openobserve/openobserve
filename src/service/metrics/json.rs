@@ -216,7 +216,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             StreamType::Metrics,
             None,
         ) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
+            log::warn!("stream [{stream_name}] is being deleted");
+            continue;
         }
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
