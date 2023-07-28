@@ -170,6 +170,7 @@ const useLogs = () => {
     searchObj.data.query = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
+    searchObj.data.editorValue = "";
   };
 
   const updatedLocalLogFilterField = (): void => {
@@ -940,6 +941,31 @@ const useLogs = () => {
     }
   };
 
+  const handleChangeStream = async () => {
+    try {
+      searchObj.data.tempFunctionLoading = false;
+      searchObj.data.tempFunctionName = "";
+      searchObj.data.tempFunctionContent = "";
+      searchObj.data.errorMsg = "No stream found in selected organization!";
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {};
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {},
+      };
+      searchObj.data.query = "";
+      searchObj.data.editorValue = "";
+      searchObj.meta.sqlMode = false;
+      searchObj.runQuery = false;
+      searchObj.loading = true;
+      await getQueryData();
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  };
+
   const restoreUrlQueryParams = async () => {
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
@@ -989,6 +1015,7 @@ const useLogs = () => {
     loadLogsData,
     restoreUrlQueryParams,
     handleQueryData,
+    handleChangeStream,
   };
 };
 
