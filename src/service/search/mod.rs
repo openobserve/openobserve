@@ -126,7 +126,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     let meta = sql::Sql::new(&req).await?;
 
     // get a cluster search queue lock
-    let mut locker = dist_lock::lock("search/cluster_queue").await?;
+    let mut locker = dist_lock::lock("search/cluster_queue", 0).await?;
     let took_wait = start.elapsed().as_millis() as usize;
 
     // get nodes from cluster

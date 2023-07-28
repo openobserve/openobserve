@@ -21,9 +21,8 @@ use std::{collections::HashMap, io::Write, sync::Arc};
 
 use crate::common::infra::{
     cache,
-    cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
     config::{CONFIG, FILE_EXT_PARQUET},
-    dist_lock, ider, metrics, storage,
+    ider, metrics, storage,
 };
 use crate::common::json;
 use crate::common::meta::{
@@ -43,22 +42,15 @@ use crate::service::{db, file_list, search::datafusion};
 /// 10. update last compacted offset
 /// 11. release cluster lock
 pub async fn merge_by_stream(
-    last_file_list_offset: i64,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
-    let lock_key = format!("compact/files/{org_id}/{stream_type}/{stream_name}");
-    let mut locker = dist_lock::lock(&lock_key).await?;
 
     // get last compacted offset
-    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_name, stream_type).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is merging by {node}");
-        dist_lock::unlock(&mut locker).await?;
-        return Ok(()); // not this node, just skip
-    }
+    let (mut offset, _node) =
+        db::compact::files::get_offset(org_id, stream_name, stream_type).await;
 
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
@@ -72,7 +64,6 @@ pub async fn merge_by_stream(
             .unwrap();
     }
     if offset == 0 {
-        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // no data
     }
     let offset = offset;
@@ -88,16 +79,6 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-
-    // check sync offset, if already synced, just set to next hour
-    if offset < last_file_list_offset {
-        // write new offset
-        let offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset, None).await?;
-        // release cluster lock
-        dist_lock::unlock(&mut locker).await?;
-        return Ok(()); // the time is current hour, just wait
-    }
 
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
@@ -125,22 +106,8 @@ pub async fn merge_by_stream(
                     .unwrap()
                     * 3)
     {
-        dist_lock::unlock(&mut locker).await?;
         return Ok(()); // the time is future, just wait
     }
-
-    // before start merging, set current node to lock the stream
-    db::compact::files::set_offset(
-        org_id,
-        stream_name,
-        stream_type,
-        offset,
-        Some(&LOCAL_NODE_UUID.clone()),
-    )
-    .await?;
-    // already bind to this node, we can unlock now
-    dist_lock::unlock(&mut locker).await?;
-    drop(locker);
 
     // get current hour all files
     let files = match file_list::get_file_list(
@@ -529,8 +496,7 @@ mod tests {
         let off_set = Duration::hours(2).num_microseconds().unwrap();
         let _ =
             db::compact::files::set_offset("nexus", "default", "logs".into(), off_set, None).await;
-        let off_set_for_run = Duration::hours(1).num_microseconds().unwrap();
-        let resp = merge_by_stream(off_set_for_run, "nexus", "default", "logs".into()).await;
+        let resp = merge_by_stream("nexus", "default", "logs".into()).await;
         assert!(resp.is_ok());
     }
 }

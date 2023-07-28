@@ -15,7 +15,7 @@ pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
     // get lock
-    let mut locker = dist_lock::lock("/stats/publish_stats").await?;
+    let mut locker = dist_lock::lock("/stats/publish_stats", 0).await?;
 
     let last_query_ts = get_last_stats_time().await;
     let current_ts = chrono::Utc::now().timestamp_micros();
