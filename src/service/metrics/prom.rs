@@ -347,7 +347,7 @@ pub async fn remote_write(
         let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
             details.partition_time_level
         } else {
-            PartitionTimeLevel::Hourly
+            PartitionTimeLevel::Daily
         };
 
         let mut req_stats = write_file(
