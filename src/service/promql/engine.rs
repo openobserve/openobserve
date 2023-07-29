@@ -502,7 +502,16 @@ impl Engine {
             token::T_BOTTOMK => {
                 aggregations::bottomk(self, param.clone().unwrap(), modifier, &input).await?
             }
-            token::T_COUNT_VALUES => Value::None,
+            token::T_COUNT_VALUES => {
+                aggregations::count_values(
+                    self,
+                    sample_time,
+                    param.clone().unwrap(),
+                    modifier,
+                    &input,
+                )
+                .await?
+            }
             token::T_QUANTILE => {
                 aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?
             }

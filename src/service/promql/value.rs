@@ -57,6 +57,12 @@ pub trait LabelsExt {
     /// delete the labels as described by the `labels` vector
     /// and keep the remaining
     fn delete(&self, labels: &[String]) -> Labels;
+
+    /// Sort the labels by name
+    fn sort(&mut self);
+
+    /// Set a new label -> value to this label
+    fn set(&mut self, name: &str, value: &str);
 }
 
 impl LabelsExt for Labels {
@@ -105,6 +111,17 @@ impl LabelsExt for Labels {
                 }
             })
             .collect()
+    }
+
+    fn sort(&mut self) {
+        self.sort_by(|a, b| a.name.cmp(&b.name))
+    }
+
+    fn set(&mut self, name: &str, value: &str) {
+        self.push(Arc::new(Label {
+            name: name.to_string(),
+            value: value.to_string(),
+        }))
     }
 }
 

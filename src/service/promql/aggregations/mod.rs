@@ -18,14 +18,14 @@ use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use std::sync::Arc;
 
-use super::value::LabelsExt;
 use super::Engine;
 use crate::common::meta::prom::NAME_LABEL;
-use crate::service::promql::value::{signature, Label, Labels, Signature, Value};
+use crate::service::promql::value::{Label, Labels, LabelsExt, Signature, Value};
 
 mod avg;
 mod bottomk;
 mod count;
+mod count_values;
 mod group;
 mod max;
 mod min;
@@ -38,6 +38,7 @@ mod topk;
 pub(crate) use avg::avg;
 pub(crate) use bottomk::bottomk;
 pub(crate) use count::count;
+pub(crate) use count_values::count_values;
 pub(crate) use group::group;
 pub(crate) use max::max;
 pub(crate) use min::min;
@@ -52,6 +53,12 @@ pub(crate) struct ArithmeticItem {
     pub(crate) labels: Labels,
     pub(crate) value: f64,
     pub(crate) num: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CountValuesItem {
+    pub(crate) labels: Labels,
+    pub(crate) count: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -107,7 +114,7 @@ fn eval_arithmetic_processor(
     sum_labels: &Labels,
     value: f64,
 ) {
-    let sum_hash = signature(sum_labels);
+    let sum_hash = sum_labels.signature();
     let entry = score_values.entry(sum_hash).or_insert(ArithmeticItem {
         labels: sum_labels.clone(),
         ..Default::default()
@@ -116,12 +123,24 @@ fn eval_arithmetic_processor(
     entry.num += 1;
 }
 
+fn eval_count_values_processor(
+    score_values: &mut HashMap<Signature, CountValuesItem>,
+    sum_labels: &Labels,
+) {
+    let sum_hash = sum_labels.signature();
+    let entry = score_values.entry(sum_hash).or_insert(CountValuesItem {
+        labels: sum_labels.clone(),
+        ..Default::default()
+    });
+    entry.count += 1;
+}
+
 fn eval_std_dev_var_processor(
     score_values: &mut HashMap<Signature, StatisticItems>,
     sum_labels: &Labels,
     value: f64,
 ) {
-    let sum_hash = signature(sum_labels);
+    let sum_hash = sum_labels.signature();
     let entry = score_values.entry(sum_hash).or_insert(StatisticItems {
         labels: sum_labels.clone(),
         ..Default::default()
@@ -321,6 +340,53 @@ pub(crate) fn eval_std_dev_var(
             for item in data.iter() {
                 let sum_labels = Labels::default();
                 eval_std_dev_var_processor(&mut score_values, &sum_labels, item.sample.value);
+            }
+        }
+    }
+    Ok(Some(score_values))
+}
+
+pub(crate) fn eval_count_values(
+    param: &Option<LabelModifier>,
+    data: &Value,
+    f_name: &str,
+    label_name: &str,
+) -> Result<Option<HashMap<Signature, CountValuesItem>>> {
+    let data = match data {
+        Value::Vector(v) => v,
+        Value::None => return Ok(None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "[{f_name}] function only accept vector values"
+            )))
+        }
+    };
+
+    let mut score_values = HashMap::default();
+    match param {
+        Some(v) => match v {
+            LabelModifier::Include(labels) => {
+                let mut labels = labels.labels.clone();
+                labels.push(label_name.to_string());
+                for item in data.iter() {
+                    let sum_labels = labels_to_include(&labels, &item.labels);
+                    eval_count_values_processor(&mut score_values, &sum_labels);
+                }
+            }
+            LabelModifier::Exclude(labels) => {
+                let mut labels = labels.labels.clone();
+                labels.push(label_name.to_string());
+                for item in data.iter() {
+                    let sum_labels = labels_to_exclude(&labels, &item.labels);
+                    eval_count_values_processor(&mut score_values, &sum_labels);
+                }
+            }
+        },
+        None => {
+            for item in data.iter() {
+                let mut sum_labels = Labels::default();
+                sum_labels.set(label_name, item.sample.value.to_string().as_str());
+                eval_count_values_processor(&mut score_values, &sum_labels);
             }
         }
     }
