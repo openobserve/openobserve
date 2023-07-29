@@ -91,8 +91,10 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let db = &crate::common::infra::db::DEFAULT;
     for item in CACHES.clone().iter() {
         let key = item.key().to_string();
-        let offset = item.value().to_string();
-        db.put(&key, offset.into()).await?;
+        let offset = item.value();
+        if *offset > 0 {
+            db.put(&key, offset.to_string().into()).await?;
+        }
     }
     Ok(())
 }
