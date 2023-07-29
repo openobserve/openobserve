@@ -77,6 +77,8 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
                 "[COMPACTOR] run offset sync to db error: {}",
                 ret.err().unwrap()
             );
+        } else {
+            log::info!("[COMPACTOR] sync cache to db done");
         }
     }
 }
