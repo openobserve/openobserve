@@ -30,7 +30,6 @@ use std::{
         Arc,
     },
 };
-use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_subscriber::{prelude::*, Registry};
 
@@ -107,17 +106,12 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // init jobs
     // it must be initialized before the server starts
-    let (tx, rx) = oneshot::channel();
-    tokio::task::spawn(async move {
-        cluster::register_and_keepalive()
-            .await
-            .expect("cluster init failed");
-        job::init().await.expect("job init failed");
-        tx.send(true).unwrap();
-    });
+    cluster::register_and_keepalive()
+        .await
+        .expect("cluster init failed");
+    job::init().await.expect("job init failed");
 
     // gRPC server
-    rx.await?;
     if !cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
         init_grpc_server()?;
     }
