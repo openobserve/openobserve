@@ -254,7 +254,7 @@ pub async fn traces_json(
                         span_kind: span.get("kind").unwrap().to_string(),
                         span_status: span
                             .get("status")
-                            .unwrap_or(&json::Value::String("".to_string()))
+                            .unwrap_or(&json::Value::String("UNSET".to_string()))
                             .to_string(),
                         operation_name: span.get("name").unwrap().as_str().unwrap().to_string(),
                         start_time,
