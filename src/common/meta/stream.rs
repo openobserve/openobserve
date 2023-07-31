@@ -111,7 +111,7 @@ pub struct StreamSchema {
     pub schema: Schema,
 }
 
-#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, ToSchema, Default)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
@@ -123,17 +123,6 @@ pub struct StreamSettings {
     pub full_text_search_keys: Vec<String>,
     #[serde(default)]
     pub data_retention: i64,
-}
-
-impl Default for StreamSettings {
-    fn default() -> Self {
-        Self {
-            partition_keys: Vec::new(),
-            partition_time_level: None,
-            full_text_search_keys: Vec::new(),
-            data_retention: 0,
-        }
-    }
 }
 
 impl Serialize for StreamSettings {

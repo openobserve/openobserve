@@ -147,7 +147,7 @@ pub fn stream_res(
         stream_type,
         schema: mappings,
         stats,
-        settings: settings,
+        settings,
         metrics_meta,
     }
 }
