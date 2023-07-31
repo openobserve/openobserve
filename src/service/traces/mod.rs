@@ -26,7 +26,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
 
-use crate::common::infra::{cluster, config::CONFIG, wal};
 use crate::common::meta::{
     alert::{Alert, Evaluate, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -34,6 +33,10 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json};
+use crate::common::{
+    infra::{cluster, config::CONFIG, wal},
+    meta::stream::StreamParams,
+};
 use crate::service::{
     db,
     ingestion::{format_stream_name, get_partition_key_record},
@@ -82,13 +85,15 @@ pub async fn handle_trace_request(
         &mut traces_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys = crate::service::ingestion::get_stream_partition_keys(
+        let partition_det = crate::service::ingestion::get_stream_partition_keys(
             traces_stream_name,
             &traces_schema_map,
         )
         .await;
+        partition_keys = partition_det.partition_keys;
     }
 
     // Start get stream alerts
@@ -283,9 +288,12 @@ pub async fn handle_trace_request(
         }
         let file = wal::get_or_create(
             thread_id,
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
+            StreamParams {
+                org_id,
+                stream_name: traces_stream_name,
+                stream_type: StreamType::Traces,
+            },
+            None,
             &key,
             false,
         );

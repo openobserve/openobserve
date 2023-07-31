@@ -19,6 +19,7 @@ use datafusion::arrow::datatypes::Schema;
 use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::stream::StreamParams;
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     alert::{Alert, Trigger},
@@ -78,9 +79,10 @@ pub async fn ingest(
     .await;
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys =
+        let partition_det =
             crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
                 .await;
+        partition_keys = partition_det.partition_keys;
     }
     // Start get stream alerts
     let key = format!("{}/{}/{}", &org_id, StreamType::Logs, &stream_name);
@@ -173,10 +175,13 @@ pub async fn ingest(
     let mut req_stats = write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
         &mut stream_file_name,
-        StreamType::Logs,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
+        None,
     );
 
     if stream_file_name.is_empty() {

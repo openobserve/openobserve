@@ -17,6 +17,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use crate::common::infra::{config::CONFIG, wal};
+use crate::common::meta::stream::StreamParams;
 use crate::common::meta::{
     common::{FileKey, FileMeta},
     StreamType,
@@ -46,7 +47,17 @@ pub async fn set(key: &str, meta: FileMeta, deleted: bool) -> Result<(), anyhow:
                 columns[4], columns[5], columns[6], columns[7]
             )
         };
-        let file = wal::get_or_create(0, "", "", StreamType::Filelist, &hour_key, false);
+        let file = wal::get_or_create(
+            0,
+            StreamParams {
+                org_id: "",
+                stream_name: "",
+                stream_type: StreamType::Filelist,
+            },
+            None,
+            &hour_key,
+            false,
+        );
         file.write(write_buf.as_ref());
 
         super::progress(key, meta, deleted, true).await?;
