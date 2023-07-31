@@ -875,7 +875,8 @@ export default defineComponent({
                         name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
                         x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                         y: values.map((value: any) => value[1]),
-                        hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"
+                        hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
+                        ...getPropsByChartTypeForTraces()
                     }
                 })
 
@@ -897,6 +898,7 @@ export default defineComponent({
                         t:50,
                         b:50
                     },
+                    ...getPropsByChartTypeForLayoutForPromQL(),
                     ...getThemeLayoutOptions()
                 };
 
@@ -1366,7 +1368,71 @@ export default defineComponent({
                   };
           }
       };
+        const getPropsByChartTypeForLayoutForPromQL = () => {
+            //   console.log("data with tick",xAxisDataWithTicks);
 
+
+            switch (props.data.type) {
+                case "bar": {
+                    const trace = {
+                        barmode: "group",
+                    }
+                    return trace
+                }
+
+                case "line": {
+                    return
+                }
+
+                case "scatter": {
+                    const trace = {
+                        scattermode: "group",
+                    }
+                    return trace
+                }
+
+                case "pie":{
+                    return
+                }
+                   
+                case "donut":{
+                    return
+                }
+                    
+                case "h-bar": {
+                    const trace = {
+                        barmode: "group",
+                    }
+                    return trace
+                }
+
+                case "area": {
+                    return
+                }
+                  
+                case "area-stacked": {
+                    const layout = {
+                        barmode: "stack",
+                    }
+                    return layout
+                }
+
+                case "stacked": {
+                    const layout = {
+                        barmode: "stack",
+                    }
+                    return layout
+                }
+
+                case "h-stacked":{
+                    return
+                }
+                   
+                case "metric":{
+                    return
+                }
+            }
+        };
     const getThemeLayoutOptions = () => ({
         paper_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
         plot_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
