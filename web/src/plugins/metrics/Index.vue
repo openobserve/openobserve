@@ -61,6 +61,7 @@
             <auto-refresh-interval
               class="q-pr-sm"
               v-model="searchObj.meta.refreshInterval"
+              @update:model-value="onChangeRefreshInterval"
             />
             <q-btn
               data-test="metrics-explorer-run-query-button"
@@ -378,13 +379,13 @@ export default defineComponent({
       // So added this flag to avoid calling updateStreams() on first time rendering.
       // This is just an workaround, need to find better solution while refactoring this component.
       if (isMounted.value) updateStreams();
-      refreshData();
 
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier
       ) {
         loadPageData();
+        refreshData();
       }
 
       setTimeout(() => {
@@ -730,6 +731,7 @@ export default defineComponent({
       if (!queryParams.stream) {
         return;
       }
+
       const date = {
         startTime: queryParams.from,
         endTime: queryParams.to,
@@ -751,7 +753,6 @@ export default defineComponent({
     function updateUrlQueryParams() {
       try {
         const date = searchObj.data.datetime;
-
         const query = {
           stream: searchObj.data.metrics.selectedMetric?.value,
         };
@@ -809,6 +810,11 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    const onChangeRefreshInterval = () => {
+      updateUrlQueryParams();
+      refreshData();
+    };
+
     return {
       store,
       router,
@@ -837,6 +843,7 @@ export default defineComponent({
       addLabelToEditor,
       onSplitterUpdate,
       resetSearchObj,
+      onChangeRefreshInterval,
     };
   },
   computed: {
@@ -852,9 +859,6 @@ export default defineComponent({
         this.searchObj.data.datetime.relative.period.value
       );
     },
-    changeRefreshInterval() {
-      return this.searchObj.meta.refreshInterval;
-    },
   },
   watch: {
     selectedMetric: {
@@ -864,10 +868,6 @@ export default defineComponent({
           this.onMetricChange(metric);
         }
       },
-    },
-    changeRefreshInterval() {
-      this.updateUrlQueryParams();
-      this.refreshData();
     },
   },
 });
