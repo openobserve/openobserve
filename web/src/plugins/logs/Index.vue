@@ -405,6 +405,8 @@ export default defineComponent({
           `" ` +
           whereClause;
 
+        searchObj.data.editorValue = searchObj.data.query;
+
         searchBarRef.value.udpateQuery();
 
         searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
