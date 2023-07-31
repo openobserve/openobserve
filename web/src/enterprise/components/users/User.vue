@@ -59,7 +59,7 @@
             v-model="filterQuery"
             filled
             dense
-            class="col-6 q-pr-sm"
+            class="col-4 q-pr-sm"
             :placeholder="t('user.search')"
           >
             <template #prepend>
@@ -67,35 +67,37 @@
             </template>
           </q-input>
 
-          <div class="col-6 q-pr-sm" v-if="currentUserRole == 'admin'">
+          <div class="col-8 flex" v-if="currentUserRole == 'admin'">
+            <q-separator vertical class="separator q-mr-sm" />
+
             <div
               class="row invite-user"
-              style="width: 82%; display: inline-flex"
+              style="width: calc(100% - 110px); display: inline-flex"
             >
               <q-input
                 v-model="userEmail"
-                class="col-9 q-pl-md"
                 borderless
+                filled
                 dense
                 :placeholder="t('user.inviteByEmail')"
-              >
-              </q-input>
-              <q-separator vertical class="col-1 q-mx-md separator" />
-              <div class="col-2 flex justify-center">
+                style="width: calc(100% - 120px)"
+                class="q-pr-sm"
+              />
+              <div class="flex justify-center">
                 <q-select
                   dense
+                  filled
                   borderless
                   v-model="selectedRole"
                   :options="options"
-                  style="width: 70px"
+                  style="width: 120px"
+                  class="q-pr-sm"
                 />
               </div>
             </div>
             <q-btn
-              v-if="
-                currentUserRole == 'admin'
-              "
-              class="col-1 text-bold no-border"
+              v-if="currentUserRole == 'admin'"
+              class="text-bold no-border"
               padding="sm 0"
               color="secondary"
               no-caps
@@ -104,14 +106,14 @@
               :disable="userEmail == ''"
               style="
                 padding: 7px 9px;
-                min-width: 0px;
                 min-height: 0px;
+                width: 100px;
                 display: block;
                 float: right;
                 top: 1px;
               "
             />
-            <label class="inputHint" style="display: block">{{
+            <label class="inputHint q-pl-md" style="display: block">{{
               t("user.inviteByEmailHint")
             }}</label>
           </div>

@@ -293,7 +293,11 @@ import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import stream from "@/services/stream";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
+import metricService from "@/services/metrics";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import searchService from "@/services/search";
+import { on } from "events";
 
 export default defineComponent({
   name: "MetricsList",
@@ -324,12 +328,18 @@ export default defineComponent({
       histogram: "bar_chart",
       counter: "pin",
     };
+    const { parsePromQlQuery } = usePromqlSuggestions();
     watch(
-      () => searchObj.data.metrics.metricList.length,
+      () => searchObj.data.metrics.metricList,
       () => {
         streamOptions.value = searchObj.data.metrics.metricList;
-      }
+      },
+      { deep: true }
     );
+    onMounted(() => {
+      if (!streamOptions.value.length)
+        streamOptions.value = searchObj.data.metrics.metricList;
+    });
     const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;
@@ -365,7 +375,8 @@ export default defineComponent({
       }
       return filtered;
     };
-    const openFilterCreator = (event: any, { name }: any) => {
+
+    const getMetricsFieldValues = (name: string) => {
       const startISOTimestamp: any = searchObj.data.datetime.startTime;
       const endISOTimestamp: any = searchObj.data.datetime.endTime;
       metricLabelValues.value[name] = {
@@ -405,6 +416,68 @@ export default defineComponent({
         });
       }
     };
+
+    const getFilteredMetricValues = (name: string) => {
+      const parsedQuery: any = parsePromQlQuery(searchObj.data.query);
+      const metricName = parsedQuery?.metricName || "";
+      const labels = parsedQuery?.label?.labels || {};
+      if (metricName) labels["__name__"] = metricName;
+
+      const formattedLabels = Object.keys(labels).map((key) => {
+        return `${key}="${labels[key]}"`;
+      });
+
+      searchService
+        .get_promql_series({
+          org_identifier: store.state.selectedOrganization.identifier,
+          start_time: Number(searchObj.data.datetime.startTime),
+          end_time: Number(searchObj.data.datetime.endTime),
+          labels: `{${formattedLabels.join(",")}}`,
+        })
+        .then((res) => {
+          if (res.data.data.length) {
+            const valuesSet = new Map();
+            res.data.data.forEach((label: any) => {
+              if (!label[name]) return;
+              if (valuesSet.has(label[name])) {
+                valuesSet.set(label[name], valuesSet.get(label[name]) + 1);
+              } else {
+                valuesSet.set(label[name], 1);
+              }
+            });
+            metricLabelValues.value[name]["values"] = [];
+            valuesSet.forEach((value, key) => {
+              metricLabelValues.value[name]["values"].push({
+                key: key ? key : "null",
+                count: value,
+              });
+            });
+          }
+        })
+        .catch((err) => console.log(err))
+        .finally(() => {
+          metricLabelValues.value[name].isLoading = false;
+        });
+    };
+
+    const openFilterCreator = (event: any, { name }: any) => {
+      metricLabelValues.value[name] = {
+        isLoading: true,
+        values: [],
+      };
+      metricService
+        .formatPromqlQuery({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: searchObj.data.query,
+        })
+        .then(() => {
+          getFilteredMetricValues(name);
+        })
+        .catch(() => {
+          getMetricsFieldValues(name);
+        });
+    };
+
     const onMetricChange = () => {
       updateMetricLabels();
     };

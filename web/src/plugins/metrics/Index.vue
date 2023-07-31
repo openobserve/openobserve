@@ -28,7 +28,6 @@
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
-            :key="searchObj.data.metrics.metricList.length"
             @select-label="addLabelToEditor"
           />
         </template>
@@ -154,12 +153,6 @@
             "
           >
             <h5 class="text-center">
-              <div
-                v-if="searchObj.data.errorCode == 0"
-                data-test="logs-search-result-not-found-text"
-              >
-                Result not found.
-              </div>
               <div
                 data-test="logs-search-error-message"
                 v-html="searchObj.data.errorMsg"
@@ -423,6 +416,7 @@ export default defineComponent({
 
     function getStreamList(isFirstLoad = false) {
       try {
+        searchObj.data.errorMsg = "";
         searchObj.loading = true;
         streamService
           .nameList(
@@ -473,7 +467,7 @@ export default defineComponent({
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
-          searchObj.data.streamResults.list.map((item: any) => {
+          searchObj.data.streamResults.list.forEach((item: any) => {
             let itemObj = {
               label: item.name,
               value: item.name,
@@ -481,7 +475,6 @@ export default defineComponent({
               help: item.metrics_meta.help || "",
             };
             searchObj.data.metrics.metricList.push(itemObj);
-
             // If isFirstLoad is true, then select the stream from query params
             if (
               isFirstLoad &&
@@ -518,6 +511,7 @@ export default defineComponent({
               chartParams: {},
             };
           }
+          console.log("metrics updated", searchObj.data.metrics.metricList);
         }
       } catch (e) {
         console.log("Error while loading streams");
@@ -594,10 +588,14 @@ export default defineComponent({
 
     function runQuery() {
       try {
-        if (!searchObj.data.metrics.selectedMetric || !searchObj.data.query) {
+        if (
+          !searchObj.data.metrics.selectedMetric?.value ||
+          !searchObj.data.query
+        ) {
           return false;
         }
 
+        searchObj.data.errorMsg = "";
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(searchObj.data.datetime.startTime / 1000),
           end_time: new Date(searchObj.data.datetime.endTime / 1000),
@@ -838,15 +836,13 @@ export default defineComponent({
       updateUrlQueryParams,
       addLabelToEditor,
       onSplitterUpdate,
+      resetSearchObj,
     };
   },
   computed: {
     showQuery() {
       return this.searchObj.meta.showQuery;
     },
-    // changeOrganization() {
-    //   return this.store.state.selectedOrganization.identifier;
-    // },
     selectedMetric() {
       return this.searchObj.data.metrics.selectedMetric;
     },
@@ -861,14 +857,6 @@ export default defineComponent({
     },
   },
   watch: {
-    // changeOrganization() {
-    //   // Fetch and update selected metrics
-    //   this.verifyOrganizationStatus(
-    //     this.store.state.organizations,
-    //     this.router
-    //   );
-    //   this.loadPageData();
-    // },
     selectedMetric: {
       deep: true,
       handler: function (metric) {

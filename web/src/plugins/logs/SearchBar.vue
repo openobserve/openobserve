@@ -123,7 +123,7 @@
               class="q-mr-sm q-px-none logs-auto-refresh-interval"
               style="padding-left: 0 !important"
               v-model="searchObj.meta.refreshInterval"
-              update:modelValue="refreshData"
+              @update:model-value="onRefreshIntervalUpdate"
             />
             <!-- <q-separator vertical inset /> -->
             <q-btn
@@ -233,7 +233,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "onChangeInterval"],
   methods: {
     searchData() {
       if (this.searchObj.loading == false) {
@@ -672,6 +672,10 @@ export default defineComponent({
       });
     };
 
+    const onRefreshIntervalUpdate = () => {
+      emit("onChangeInterval");
+    };
+
     return {
       t,
       store,
@@ -703,6 +707,7 @@ export default defineComponent({
       handleQueryData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      onRefreshIntervalUpdate,
     };
   },
   computed: {

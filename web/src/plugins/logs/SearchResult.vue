@@ -192,98 +192,13 @@
           </q-tr>
           <q-tr v-if="expandedLogs[index.toString()]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
-              <div class="q-py-xs flex justify-start q-px-md copy-log-btn">
-                <q-btn
-                  label="Copy to clipboard"
-                  dense
-                  size="sm"
-                  no-caps
-                  class="q-px-sm"
-                  icon="content_copy"
-                  @click="copyLogToClipboard(row)"
-                />
-              </div>
-              <div class="q-pl-md">
-                {
-                <div
-                  class="log_json_content"
-                  v-for="(key, index) in Object.keys(row)"
-                  :key="key"
-                >
-                  <q-btn-dropdown
-                    data-test="log-details-include-exclude-field-btn"
-                    size="0.5rem"
-                    flat
-                    outlined
-                    filled
-                    dense
-                    class="q-ml-sm pointer"
-                    :name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  >
-                    <q-list>
-                      <q-item clickable v-close-popup>
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="addSearchTerm(`${key}='${row[key]}'`)"
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <EqualIcon></EqualIcon>
-                              </q-icon> </q-btn
-                            >Include Search Term</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item clickable v-close-popup>
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-exclude-field-btn"
-                            @click="addSearchTerm(`${key}!='${row[key]}'`)"
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <NotEqualIcon></NotEqualIcon>
-                              </q-icon> </q-btn
-                            >Exclude Search Term</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-item clickable v-close-popup>
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-exclude-field-btn"
-                            @click="addFieldToTable(key)"
-                            ><q-btn
-                              title="Add field to table"
-                              icon="
-                                visibility
-                              "
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            ></q-btn
-                            >Add field to table</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </q-btn-dropdown>
-
-                  <span class="q-pl-xs">{{ key }} : {{ row[key] }}</span
-                  ><span v-if="index < Object.keys(row).length - 1">,</span>
-                </div>
-                }
-              </div>
+              <json-preview
+                :value="row"
+                show-copy-button
+                @copy="copyLogToClipboard"
+                @add-field-to-table="addFieldToTable"
+                @add-search-term="addSearchTerm"
+              />
             </td>
           </q-tr>
         </template>
@@ -312,6 +227,7 @@
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
+          @add:table="addFieldToTable"
         />
       </q-dialog>
     </div>
@@ -332,6 +248,7 @@ import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
+import JsonPreview from "./JsonPreview.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -341,6 +258,7 @@ export default defineComponent({
     DetailTable,
     EqualIcon,
     NotEqualIcon,
+    JsonPreview,
   },
   emits: [
     "update:scroll",
@@ -656,11 +574,6 @@ export default defineComponent({
       text-transform: capitalize;
       font-weight: bold;
     }
-  }
-
-  .log_json_content {
-    white-space: pre-wrap;
-    font-family: monospace;
   }
 }
 .thead-sticky tr > *,
