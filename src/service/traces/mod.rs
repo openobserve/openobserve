@@ -21,6 +21,7 @@ use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     common::v1::AnyValue,
+    trace::v1::{status::StatusCode, Status},
 };
 use prost::Message;
 use std::{fs::OpenOptions, io::Error};
@@ -180,6 +181,7 @@ pub async fn handle_trace_request(
                     trace_id: trace_id.clone(),
                     span_id,
                     span_kind: span.kind.to_string(),
+                    span_status: get_span_status(span.status),
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
@@ -375,6 +377,17 @@ fn get_val(attr_val: Option<AnyValue>) -> json::Value {
             None => json::Value::Null,
         },
         None => json::Value::Null,
+    }
+}
+
+fn get_span_status(status: Option<Status>) -> String {
+    match status {
+        Some(v) => match v.code() {
+            StatusCode::Ok => "OK".to_string(),
+            StatusCode::Error => "ERROR".to_string(),
+            StatusCode::Unset => "UNSET".to_string(),
+        },
+        None => "".to_string(),
     }
 }
 
