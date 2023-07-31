@@ -865,89 +865,187 @@ export default defineComponent({
       };
 
       const renderPromQlBasedChart = () => {
-
-        switch(searchQueryData.data.resultType) { 
-            case 'matrix': {
-                const traces = searchQueryData.data?.result?.map((metric: any) => {
-                    const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
-
-                    return  {
-                        name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
-                        x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
-                        y: values.map((value: any) => value[1]),
-                        hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>"
+        switch (props.data.type){
+            case 'bar':
+            case 'line':
+            case 'area':
+            case 'scatter':
+            case 'area-stacked':{
+                switch(searchQueryData.data.resultType) { 
+                    case 'matrix': {
+                        const traces = searchQueryData.data?.result?.map((metric: any) => {
+                            const values = metric.values.sort((a: any,b: any) => a[0] - b[0])
+        
+                            return  {
+                                name: getPromqlLegendName(metric.metric, props.data.config.promql_legend),
+                                x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
+                                y: values.map((value: any) => value[1]),
+                                hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
+                                stackgroup: props.data.type == 'area-stacked' ? 'one' : '',
+                                ...getPropsByChartTypeForTraces()
+                            }
+                        })
+        
+                        // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+        
+                        const layout: any = {
+                            title: false,
+                            showlegend: props.data.config?.show_legends,
+                            autosize: true,
+                            legend: {
+                                // bgcolor: "#f7f7f7",
+                                orientation: getLegendPosition('promql'),
+                                itemclick: false,
+                            },
+                            margin: {
+                                autoexpand: true,
+                                l:50,
+                                r:50,
+                                t:50,
+                                b:50
+                            },
+                            ...getPropsByChartTypeForLayoutForPromQL(),
+                            ...getThemeLayoutOptions()
+                        };
+        
+        
+                        Plotly.react(plotRef.value, traces, layout, {
+                            responsive: true,
+                            displaylogo: false,
+                            displayModeBar: false,
+                        });
+        
+                        break;
                     }
-                })
-
-                // result = result.map((it: any) => moment(it + "Z").toISOString(true))
-
-                const layout: any = {
-                    title: false,
-                    showlegend: props.data.config?.show_legends,
-                    autosize: true,
-                    legend: {
-                        // bgcolor: "#f7f7f7",
-                        orientation: getLegendPosition('promql'),
-                        itemclick: false,
-                    },
-                    margin: {
-                        autoexpand: true,
-                        l:50,
-                        r:50,
-                        t:50,
-                        b:50
-                    },
-                    ...getThemeLayoutOptions()
-                };
-
-
-                Plotly.react(plotRef.value, traces, layout, {
-                    responsive: true,
-                    displaylogo: false,
-                    displayModeBar: false,
-                });
-
+                    case 'vector': {
+                        const traces = searchQueryData.data?.result?.map((metric: any) => {
+                            const values = [metric.value]
+                            // console.log('vector',values);
+                            
+                            return  {
+                                name: JSON.stringify(metric.metric),
+                                x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
+                                y: values.map((value: any) => value[1]),
+                            }
+                        })
+        
+                        const layout: any = {
+                            title: false,
+                            showlegend: props.data.config?.show_legends,
+                            autosize: true,
+                            legend: {
+                                // bgcolor: "#f7f7f7",
+                                orientation: getLegendPosition('promql'),
+                                itemclick: false
+                            },
+                            margin: {
+                                l: props.data.type == 'pie' ? 60 : 32,
+                                r: props.data.type == 'pie' ? 60 : 16,
+                                t: 38,
+                                b: 32,
+                            },
+                            ...getThemeLayoutOptions()
+                        };
+        
+                        Plotly.react(plotRef.value, traces, layout, {
+                            responsive: true,
+                            displaylogo: false,
+                            displayModeBar: false,
+                        });
+        
+                        break;
+                    }
+                }
                 break;
             }
-            case 'vector': {
-                const traces = searchQueryData.data?.result?.map((metric: any) => {
-                    const values = [metric.value]
-                    // console.log('vector',values);
-                    
-                    return  {
-                        name: JSON.stringify(metric.metric),
-                        x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
-                        y: values.map((value: any) => value[1]),
+            case 'metric' : {
+                switch (searchQueryData.data.resultType) {
+                    case 'matrix': {
+                        const traces = searchQueryData.data?.result?.map((metric: any) => {
+                            const values = metric.values.sort((a: any, b: any) => a[0] - b[0])
+                            const value = values[values.length-1][1]
+                            
+                            return {
+                                value,
+                                ...getPropsByChartTypeForTraces()
+                            }
+                        })
+                        
+
+                        // result = result.map((it: any) => moment(it + "Z").toISOString(true))
+
+                        const layout: any = {
+                            title: false,
+                            showlegend: props.data.config?.show_legends,
+                            autosize: true,
+                            legend: {
+                                // bgcolor: "#f7f7f7",
+                                orientation: getLegendPosition('promql'),
+                                itemclick: false,
+                            },
+                            margin: {
+                                autoexpand: true,
+                                l: 50,
+                                r: 50,
+                                t: 50,
+                                b: 50
+                            },
+                            ...getPropsByChartTypeForLayoutForPromQL(),
+                            ...getThemeLayoutOptions()
+                        };
+
+
+                        Plotly.react(plotRef.value, traces, layout, {
+                            responsive: true,
+                            displaylogo: false,
+                            displayModeBar: false,
+                        });
+
+                        break;
                     }
-                })
+                    case 'vector': {
+                        const traces = searchQueryData.data?.result?.map((metric: any) => {
+                            const values = [metric.value]
+                            
+                            // console.log('vector',values);
 
-                const layout: any = {
-                    title: false,
-                    showlegend: props.data.config?.show_legends,
-                    autosize: true,
-                    legend: {
-                        // bgcolor: "#f7f7f7",
-                        orientation: getLegendPosition('promql'),
-                        itemclick: false
-                    },
-                    margin: {
-                        l: props.data.type == 'pie' ? 60 : 32,
-                        r: props.data.type == 'pie' ? 60 : 16,
-                        t: 38,
-                        b: 32,
-                    },
-                    ...getThemeLayoutOptions()
-                };
+                            return {
+                                name: JSON.stringify(metric.metric),
+                                value: metric?.value?.length > 1 ? metric.value[1] : '',
+                                ...getPropsByChartTypeForTraces()
+                            }
+                        })
 
-                Plotly.react(plotRef.value, traces, layout, {
-                    responsive: true,
-                    displaylogo: false,
-                    displayModeBar: false,
-                });
+                        const layout: any = {
+                            title: false,
+                            showlegend: props.data.config?.show_legends,
+                            autosize: true,
+                            legend: {
+                                // bgcolor: "#f7f7f7",
+                                orientation: getLegendPosition('promql'),
+                                itemclick: false
+                            },
+                            margin: {
+                                l: props.data.type == 'pie' ? 60 : 32,
+                                r: props.data.type == 'pie' ? 60 : 16,
+                                t: 38,
+                                b: 32,
+                            },
+                            ...getPropsByChartTypeForLayoutForPromQL(),
+                            ...getThemeLayoutOptions()
+                        };
 
+                        Plotly.react(plotRef.value, traces, layout, {
+                            responsive: true,
+                            displaylogo: false,
+                            displayModeBar: false,
+                        });
+
+                        break;
+                }
+                }
                 break;
             }
-        }
 
         
         // const trace = {
@@ -967,6 +1065,7 @@ export default defineComponent({
 
         //               };
       }
+    }
 
       const getPromqlLegendName = (metric: any, label: string) => {
         if(label) {
@@ -1366,7 +1465,71 @@ export default defineComponent({
                   };
           }
       };
+        const getPropsByChartTypeForLayoutForPromQL = () => {
+            //   console.log("data with tick",xAxisDataWithTicks);
 
+
+            switch (props.data.type) {
+                case "bar": {
+                    const trace = {
+                        barmode: "group",
+                    }
+                    return trace
+                }
+
+                case "line": {
+                    return
+                }
+
+                case "scatter": {
+                    const trace = {
+                        scattermode: "group",
+                    }
+                    return trace
+                }
+
+                case "pie":{
+                    return
+                }
+                   
+                case "donut":{
+                    return
+                }
+                    
+                case "h-bar": {
+                    const trace = {
+                        barmode: "group",
+                    }
+                    return trace
+                }
+
+                case "area": {
+                    return
+                }
+                  
+                case "area-stacked": {
+                    const layout = {
+                        barmode: "stack",
+                    }
+                    return layout
+                }
+
+                case "stacked": {
+                    const layout = {
+                        barmode: "stack",
+                    }
+                    return layout
+                }
+
+                case "h-stacked":{
+                    return
+                }
+                   
+                case "metric":{
+                    return
+                }
+            }
+        };
     const getThemeLayoutOptions = () => ({
         paper_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
         plot_bgcolor: store.state.theme === 'dark' ? '#181a1b' : '#fff',
