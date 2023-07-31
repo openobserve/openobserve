@@ -23,6 +23,7 @@ pub struct Span {
     pub trace_id: String,
     pub span_id: String,
     pub flags: u8,
+    pub span_status: String,
     pub span_kind: String,
     pub operation_name: String,
     pub start_time: u64,
