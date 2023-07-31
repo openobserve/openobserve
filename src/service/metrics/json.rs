@@ -20,7 +20,7 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
-use crate::common::meta::stream::{PartitionTimeLevel, PartitioningDetails, StreamParams};
+use crate::common::meta::stream::{PartitioningDetails, StreamParams};
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
