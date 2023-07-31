@@ -212,7 +212,7 @@ impl PartitionTimeLevel {
         match self {
             PartitionTimeLevel::Hourly => 3600000,
             PartitionTimeLevel::Daily => 86400000,
-            PartitionTimeLevel::None => 3600000, // TODO check if needs to be changed returning daily for now
+            PartitionTimeLevel::None => 3600000,
         }
     }
 }

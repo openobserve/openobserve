@@ -230,7 +230,7 @@ pub fn get_wal_time_key(
             .to_string(),
         PartitionTimeLevel::None => Utc
             .timestamp_nanos(timestamp * 1000)
-            .format("%Y_%m_01_00")
+            .format("%Y_%m_%d_%H")
             .to_string(),
     };
     if let Some(s) = suffix {
