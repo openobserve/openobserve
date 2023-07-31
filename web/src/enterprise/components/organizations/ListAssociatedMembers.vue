@@ -18,7 +18,7 @@
     No data available.
   </div>
   <div v-else class="q-pt-md round-box" id="data-list">
-    <q-toolbar class="text-black bordered-toolbar-title">
+    <q-toolbar class="bordered-toolbar-title">
       <q-toolbar-title>Member List</q-toolbar-title>
     </q-toolbar>
     <q-list bordered separator style="overflow: auto; max-height: calc(800vh)">
@@ -74,7 +74,6 @@ export default defineComponent({
   .bordered-toolbar-title {
     border: 1px solid $input-border;
     border-bottom: none;
-    color: $dark-page;
 
     .q-toolbar__title {
       font-size: 0.75rem;

@@ -15,13 +15,13 @@
 
 <template>
   <q-card class="full-height">
-    <q-card-section class="q-px-md q-py-md text-black">
+    <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold text-dark">
+          <div class="text-body1 text-bold">
             {{ t("organization.invite") }}
           </div>
-          <div class="text-bold text-dark-page captionText">
+          <div class="text-bold captionText">
             ({{ organizationData.name }}: ID#{{ organizationData.id }})
           </div>
         </div>

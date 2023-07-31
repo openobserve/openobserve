@@ -30,6 +30,7 @@
             :fieldValues="fieldValues"
             :key="searchObj.data.transforms.length || -1"
             @searchdata="searchData"
+            @onChangeInterval="onChangeInterval"
           />
         </template>
         <template v-slot:after>
@@ -199,6 +200,8 @@ import {
   onActivated,
   computed,
   onMounted,
+  nextTick,
+  onBeforeMount,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -214,6 +217,7 @@ import { b64DecodeUnicode } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
+import { on } from "events";
 
 export default defineComponent({
   name: "PageSearch",
@@ -261,7 +265,9 @@ export default defineComponent({
             150 -
           1;
 
-        this.getQueryData(true);
+        this.getQueryData(true).then(() => {
+          this.refreshHistogramChart();
+        });
 
         if (config.isCloud == "true") {
           segment.track("Button Click", {
@@ -281,45 +287,43 @@ export default defineComponent({
     const $q = useQuasar();
     let {
       searchObj,
-      resetSearchObj,
       getQueryData,
-      getStreamList,
       fieldValues,
-      getFunctions,
       updateGridColumns,
       refreshData,
       updateUrlQueryParams,
       loadLogsData,
+      updateStreams,
+      restoreUrlQueryParams,
     } = useLogs();
-    let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const parser = new Parser();
     const expandedLogs = ref({});
 
-    function restoreUrlQueryParams() {
-      const queryParams = router.currentRoute.value.query;
-      if (!queryParams.stream) {
-        return;
-      }
-      const date = {
-        startTime: queryParams.from,
-        endTime: queryParams.to,
-        relativeTimePeriod: queryParams.period || null,
-        type: queryParams.period ? "relative" : "absolute",
-      };
-      if (date) {
-        searchObj.data.datetime = date;
-      }
-      if (queryParams.query) {
-        searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-        searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-        searchObj.data.query = b64DecodeUnicode(queryParams.query);
-      }
-      if (queryParams.refresh) {
-        searchObj.meta.refreshInterval = queryParams.refresh;
-      }
-    }
+    // function restoreUrlQueryParams() {
+    //   const queryParams = router.currentRoute.value.query;
+    //   if (!queryParams.stream) {
+    //     return;
+    //   }
+    //   const date = {
+    //     startTime: queryParams.from,
+    //     endTime: queryParams.to,
+    //     relativeTimePeriod: queryParams.period || null,
+    //     type: queryParams.period ? "relative" : "absolute",
+    //   };
+    //   if (date) {
+    //     searchObj.data.datetime = date;
+    //   }
+    //   if (queryParams.query) {
+    //     searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
+    //     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+    //     searchObj.data.query = b64DecodeUnicode(queryParams.query);
+    //   }
+    //   if (queryParams.refresh) {
+    //     searchObj.meta.refreshInterval = queryParams.refresh;
+    //   }
+    // }
 
     // async function loadPageData() {
     //   try {
@@ -338,75 +342,41 @@ export default defineComponent({
     });
 
     onActivated(async () => {
+      if (!searchObj.loading) updateStreams();
+      if (
+        searchObj.organizationIdetifier !=
+        store.state.selectedOrganization.identifier
+      ) {
+        loadLogsData();
+      }
+    });
+
+    onBeforeMount(() => {
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       restoreUrlQueryParams();
       loadLogsData();
-
-      //   // alert("activated");
-      //   // if (!searchObj.loading) updateStreams();
-      //   refreshData();
-
-      //   if (
-      //     searchObj.organizationIdetifier !=
-      //     store.state.selectedOrganization.identifier
-      //   ) {
-      //     loadPageData();
-      //   }
-
-      //   if (
-      //     searchObj.meta.showHistogram == true &&
-      //     searchObj.meta.sqlMode == false &&
-      //     router.currentRoute.value.path.indexOf("/logs") > -1
-      //   ) {
-      //     setTimeout(() => {
-      //       if (searchResultRef.value) searchResultRef.value.reDrawChart();
-      //     }, 1500);
-      //   }
     });
-
-    // const updateStreams = () => {
-    //   if (searchObj.data.streamResults?.list?.length) {
-    //     const streamType = searchObj.data.stream.streamType || "logs";
-    //     streamService
-    //       .nameList(
-    //         store.state.selectedOrganization.identifier,
-    //         streamType,
-    //         true
-    //       )
-    //       .then((response: any) => {
-    //         searchObj.data.streamResults = response.data;
-    //         searchObj.data.stream.streamLists = [];
-    //         response.data.list.map((item: any) => {
-    //           let itemObj = {
-    //             label: item.name,
-    //             value: item.name,
-    //           };
-    //           searchObj.data.stream.streamLists.push(itemObj);
-    //         });
-    //       });
-    //   } else {
-    //     loadPageData(true);
-    //   }
-    // };
 
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
       // expandedLogs.value = {};
       await getQueryData();
-      // setTimeout(() => {
-      //   if (
-      //     searchObj.meta.showHistogram == true &&
-      //     searchObj.meta.sqlMode == false &&
-      //     searchResultRef.value?.reDrawChart
-      //   ) {
-      //     searchResultRef.value.reDrawChart();
-      //   }
-      // }, 3000);
+      refreshHistogramChart();
     };
 
-    
+    const refreshHistogramChart = () => {
+      nextTick(() => {
+        if (
+          searchObj.meta.showHistogram &&
+          !searchObj.meta.sqlMode &&
+          searchResultRef.value?.reDrawChart
+        ) {
+          searchResultRef.value.reDrawChart();
+        }
+      });
+    };
 
     const setQuery = (sqlMode: boolean) => {
       if (!searchBarRef.value) {
@@ -463,6 +433,11 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    const onChangeInterval = () => {
+      updateUrlQueryParams();
+      refreshData();
+    };
+
     return {
       store,
       router,
@@ -485,6 +460,8 @@ export default defineComponent({
       onSplitterUpdate,
       updateGridColumns,
       updateUrlQueryParams,
+      refreshHistogramChart,
+      onChangeInterval,
     };
   },
   computed: {
@@ -520,9 +497,6 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
-    },
-    getStreamType() {
-      return this.searchObj.data.stream.streamType;
     },
   },
   watch: {
@@ -589,21 +563,8 @@ export default defineComponent({
         this.runQueryFn();
       }
     },
-    changeRefreshInterval() {
-      this.updateUrlQueryParams();
-      this.refreshData();
-    },
     fullSQLMode(newVal) {
       this.setQuery(newVal);
-    },
-    getStreamType() {
-      this.searchObj.loading = true;
-      this.searchObj.data.errorMsg = "";
-      this.searchObj.data.stream.streamLists = [];
-      this.searchObj.data.stream.selectedStreamFields = [];
-      this.searchObj.data.queryResults = {};
-      this.searchObj.data.sortedQueryResults = [];
-      this.getStreamList();
     },
   },
 });
