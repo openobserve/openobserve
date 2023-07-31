@@ -269,8 +269,8 @@ pub struct Limit {
     pub http_worker_num: usize,
     #[env_config(name = "ZO_METRIC_FILE_SIZE_MULTIPLIER", default = 10)]
     pub metric_file_size_multiplier: u64,
-    #[env_config(name = "ZO_METRIC_RETENTION_MULTIPLIER", default = 3)]
-    pub metric_retention_multiplier: u64,
+    #[env_config(name = "ZO_METRIC_FILE_MAX_RETENTION", default = "daily")]
+    pub metric_file_max_retention: String,
 }
 
 #[derive(EnvConfig)]
