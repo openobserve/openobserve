@@ -21,7 +21,7 @@ use crate::common::infra::{cache::stats, config::STREAM_SCHEMAS};
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     prom,
-    stream::{Stream, StreamProperty, StreamSettings, StreamStats},
+    stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
     StreamType,
 };
 use crate::common::{json, stream::SQL_FULL_TEXT_SEARCH_FIELDS, utils::is_local_disk_storage};
@@ -132,9 +132,8 @@ pub fn stream_res(
     };
 
     let mut settings = stream_settings(&schema).unwrap_or_default();
-    //special handling for metrics streams
-    if !schema.metadata().is_empty()
-        && settings.partition_time_level.is_none()
+    // special handling for metrics streams
+    if settings.partition_time_level.unwrap_or_default() == PartitionTimeLevel::Unset
         && stream_type.eq(&StreamType::Metrics)
     {
         settings.partition_time_level =

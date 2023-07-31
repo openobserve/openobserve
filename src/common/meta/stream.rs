@@ -187,7 +187,7 @@ impl From<&str> for StreamSettings {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
     #[default]
