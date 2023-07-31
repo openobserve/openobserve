@@ -235,6 +235,7 @@ const useLogs = () => {
     searchObj.data.stream.addToFilter = "";
     searchObj.data.stream.functions = [];
     searchObj.data.stream.streamType = "logs";
+    searchObj.data.stream.streamLists = [];
     resetQueryData();
     resetSearchAroundData();
   }
@@ -289,6 +290,8 @@ const useLogs = () => {
           }
         });
         searchObj.data.stream.selectedStream = selectedStream;
+      } else {
+        searchObj.data.errorMsg = "No stream found in selected organization!";
       }
       return;
     } catch (e: any) {
@@ -312,11 +315,11 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const date = searchObj.data.datetime;
 
-    const query: any = {
-      stream: searchObj.data.stream.selectedStream.label,
-      refresh: 0,
-      org_identifier: "",
-    };
+    const query: any = {};
+
+    if (searchObj.data.stream.selectedStream.label) {
+      query["stream"] = searchObj.data.stream.selectedStream.label;
+    }
 
     if (date.type == "relative") {
       query["period"] = date.relativeTimePeriod;
@@ -522,11 +525,14 @@ const useLogs = () => {
       let dismiss = () => {};
       try {
         searchObj.meta.showDetailTab = false;
-        if (!isPagination) resetQueryData();
 
-        if (searchObj.data.stream.selectedStream.value == "") {
+        if (!searchObj.data.stream.streamLists?.length) {
+          searchObj.loading = false;
           reject(false);
+          return;
         }
+
+        if (!isPagination) resetQueryData();
 
         // if (searchObj.data.searchAround.histogramHide) {
         //   searchObj.data.searchAround.histogramHide = false;
@@ -821,6 +827,7 @@ const useLogs = () => {
 
   const searchAroundData = (obj: any) => {
     try {
+      searchObj.loading = true;
       searchObj.data.errorCode = 0;
       let query_context: any = "";
       const query = searchObj.data.query;
@@ -935,8 +942,10 @@ const useLogs = () => {
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage) + "113";
           }
-        });
+        })
+        .finally(() => (searchObj.loading = false));
     } catch (e: any) {
+      searchObj.loading = false;
       throw new Error(e.message);
     }
   };
