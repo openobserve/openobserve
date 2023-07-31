@@ -133,7 +133,7 @@
               flat
               title="Run query"
               class="q-pa-none search-button"
-              @click="handleQueryData"
+              @click="handleRunQuery"
               :disable="
                 searchObj.loading || searchObj.data.streamResults.length == 0
               "
@@ -162,7 +162,7 @@
               :keywords="autoCompleteKeywords"
               :suggestions="autoCompleteSuggestions"
               @update:query="updateQueryValue"
-              @run-query="handleQueryData"
+              @run-query="handleRunQuery"
             ></query-editor>
           </template>
           <template #after>
@@ -274,7 +274,7 @@ export default defineComponent({
     const $q = useQuasar();
     const store = useStore();
 
-    const { searchObj, refreshData, handleQueryData } = useLogs();
+    const { searchObj, refreshData, handleRunQuery } = useLogs();
     const queryEditorRef = ref(null);
 
     const formData: any = ref(defaultValue());
@@ -704,7 +704,7 @@ export default defineComponent({
       functionOptions,
       filterFn,
       refreshData,
-      handleQueryData,
+      handleRunQuery,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       onRefreshIntervalUpdate,
