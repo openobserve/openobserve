@@ -328,8 +328,8 @@ export default defineComponent({
       () => {
         selectedTime.value.startTime;
         selectedTime.value.endTime;
-        selectedDate.value.from;
-        selectedDate.value.to;
+        selectedDate.value?.from;
+        selectedDate.value?.to;
       },
       () => {
         if (props.autoApply) saveDate("absolute");
