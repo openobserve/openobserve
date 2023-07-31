@@ -956,6 +956,7 @@ export default defineComponent({
                         break;
                     }
                 }
+                break;
             }
             case 'metric' : {
                 switch (searchQueryData.data.resultType) {
@@ -1043,6 +1044,7 @@ export default defineComponent({
                         break;
                 }
                 }
+                break;
             }
 
         
