@@ -332,8 +332,9 @@ impl RwFile {
             (Some(RwLock::new(f)), None)
         };
 
-        let ttl = if let Some(level) = partition_time_level {
-            chrono::Utc::now().timestamp() + level.duration()
+        let level_duration = partition_time_level.unwrap_or_default().duration();
+        let ttl = if level_duration > 0 {
+            chrono::Utc::now().timestamp() + level_duration
         } else {
             chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
         };

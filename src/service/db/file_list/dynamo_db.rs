@@ -20,13 +20,13 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::collections::HashMap;
 use tokio_stream::StreamExt;
 
-use crate::common::{
-    infra::{config::CONFIG, db::dynamo_db::DYNAMO_DB_CLIENT},
-    meta::{
-        common::{FileKey, FileMeta},
-        StreamType,
-    },
+use crate::common::infra::{config::CONFIG, db::dynamo_db::DYNAMO_DB_CLIENT};
+use crate::common::meta::{
+    common::{FileKey, FileMeta},
+    stream::PartitionTimeLevel,
+    StreamType,
 };
+use crate::service::{db, stream};
 
 pub async fn write_file(file_key: &FileKey) -> Result<(), anyhow::Error> {
     let file_columns = file_key.key.splitn(5, '/').collect::<Vec<&str>>();
@@ -163,10 +163,30 @@ pub async fn query(
         let t1: DateTime<Utc> = Utc.timestamp_nanos(t1 * 1000);
         // here must add one hour, because the between does not include the end hour
         let t2: DateTime<Utc> = Utc.timestamp_nanos(t2 * 1000) + Duration::hours(1);
-        (
-            t1.format("%Y/%m/%d/%H/").to_string(),
-            t2.format("%Y/%m/%d/%H/").to_string(),
-        )
+        // Handle partiton time level
+        let schema = db::schema::get(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+        let partition_time_level =
+            stream_settings
+                .partition_time_level
+                .unwrap_or(if stream_type == StreamType::Metrics {
+                    PartitionTimeLevel::from(CONFIG.limit.metric_file_max_retention.as_str())
+                } else {
+                    PartitionTimeLevel::default()
+                });
+        if let PartitionTimeLevel::Daily = partition_time_level {
+            (
+                t1.format("%Y/%m/%d/00/").to_string(),
+                t2.format("%Y/%m/%d/%H/").to_string(),
+            )
+        } else {
+            (
+                t1.format("%Y/%m/%d/%H/").to_string(),
+                t2.format("%Y/%m/%d/%H/").to_string(),
+            )
+        }
     };
     let client = DYNAMO_DB_CLIENT.get().await;
     let query = if time_range.is_none() {

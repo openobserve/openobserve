@@ -202,7 +202,7 @@ pub async fn remote_write(
             .await;
 
             let mut partition_keys: Vec<String> = vec![];
-            let mut time_key = PartitionTimeLevel::Hourly;
+            let mut time_key = PartitionTimeLevel::default();
 
             if stream_schema.has_partition_keys {
                 if !stream_partitioning_map.contains_key(&metric_name) {

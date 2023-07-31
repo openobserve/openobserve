@@ -191,7 +191,7 @@ impl From<&str> for StreamSettings {
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
     #[default]
-    None,
+    Unset,
     Hourly,
     Daily,
 }
@@ -199,9 +199,9 @@ pub enum PartitionTimeLevel {
 impl PartitionTimeLevel {
     pub fn duration(self) -> i64 {
         match self {
+            PartitionTimeLevel::Unset => 0,
             PartitionTimeLevel::Hourly => 3600000,
             PartitionTimeLevel::Daily => 86400000,
-            PartitionTimeLevel::None => 3600000,
         }
     }
 }
@@ -209,10 +209,10 @@ impl PartitionTimeLevel {
 impl From<&str> for PartitionTimeLevel {
     fn from(data: &str) -> Self {
         match data.to_lowercase().as_str() {
+            "unset" => PartitionTimeLevel::Unset,
             "hourly" => PartitionTimeLevel::Hourly,
             "daily" => PartitionTimeLevel::Daily,
-            "none" => PartitionTimeLevel::None,
-            _ => PartitionTimeLevel::Hourly,
+            _ => PartitionTimeLevel::Unset,
         }
     }
 }
@@ -220,9 +220,9 @@ impl From<&str> for PartitionTimeLevel {
 impl std::fmt::Display for PartitionTimeLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            PartitionTimeLevel::Unset => write!(f, "unset"),
             PartitionTimeLevel::Hourly => write!(f, "hourly"),
             PartitionTimeLevel::Daily => write!(f, "daily"),
-            PartitionTimeLevel::None => write!(f, "none"),
         }
     }
 }
