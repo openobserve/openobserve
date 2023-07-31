@@ -14,7 +14,7 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref } from "vue";
+import { reactive, ref, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -40,6 +40,7 @@ import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
 
 import searchService from "@/services/search";
+import type { LogsQueryPayload } from "@/ts/interfaces/query";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -152,6 +153,7 @@ const useLogs = () => {
   const parser = new Parser();
   const fieldValues = ref();
   let refreshIntervalID: any = 0;
+  const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
 
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
@@ -260,7 +262,10 @@ const useLogs = () => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
-        searchObj.data.streamResults.list.map((item: any) => {
+
+        let selectedStream = { label: "", value: "" };
+
+        searchObj.data.streamResults.list.forEach((item: any) => {
           const itemObj: {
             label: string;
             value: string;
@@ -268,18 +273,22 @@ const useLogs = () => {
             label: item.name,
             value: item.name,
           };
+
           searchObj.data.stream.streamLists.push(itemObj);
 
           // If isFirstLoad is true, then select the stream from query params
           if (router.currentRoute.value?.query?.stream == item.name) {
-            searchObj.data.stream.selectedStream = itemObj;
-          } else {
-            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
-              lastUpdatedStreamTime = item.stats.doc_time_max;
-              searchObj.data.stream.selectedStream = itemObj;
-            }
+            selectedStream = itemObj;
+          }
+          if (
+            !router.currentRoute.value?.query?.stream &&
+            item.stats.doc_time_max >= lastUpdatedStreamTime
+          ) {
+            lastUpdatedStreamTime = item.stats.doc_time_max;
+            selectedStream = itemObj;
           }
         });
+        searchObj.data.stream.selectedStream = selectedStream;
       }
       return;
     } catch (e: any) {
@@ -508,78 +517,101 @@ const useLogs = () => {
     }
   }
 
-  const getQueryData = async () => {
-    try {
-      resetQueryData();
-      if (searchObj.data.stream.selectedStream.value == "") {
-        return false;
-      }
+  const getQueryData = (isPagination = false) => {
+    return new Promise((resolve, reject) => {
+      let dismiss = () => {};
+      try {
+        searchObj.meta.showDetailTab = false;
+        if (!isPagination) resetQueryData();
 
-      // if (searchObj.data.searchAround.histogramHide) {
-      //   searchObj.data.searchAround.histogramHide = false;
-      //   searchObj.meta.showHistogram = true;
-      // }
-      const queryReq = buildSearch();
-
-      if (queryReq != null) {
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent
-          );
+        if (searchObj.data.stream.selectedStream.value == "") {
+          reject(false);
         }
 
-        searchObj.data.errorCode = 0;
-        searchService
-          .search({
-            org_identifier: searchObj.organizationIdetifier,
-            query: queryReq,
-            page_type: searchObj.data.stream.streamType,
-          })
-          .then((res) => {
-            if (res.data.from > 0) {
-              searchObj.data.queryResults.from = res.data.from;
-              searchObj.data.queryResults.scan_size += res.data.scan_size;
-              searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.hits.push(...res.data.hits);
-            } else {
-              resetFieldValues();
-              searchObj.data.queryResults = res.data;
-            }
+        // if (searchObj.data.searchAround.histogramHide) {
+        //   searchObj.data.searchAround.histogramHide = false;
+        //   searchObj.meta.showHistogram = true;
+        // }
+        const queryReq = buildSearch();
 
-            updateFieldValues();
+        if (queryReq != null) {
+          if (
+            searchObj.data.tempFunctionContent != "" &&
+            searchObj.meta.toggleFunction
+          ) {
+            queryReq.query["query_fn"] = b64EncodeUnicode(
+              searchObj.data.tempFunctionContent
+            );
+          }
 
-            //extract fields from query response
-            extractFields();
+          if (isPagination) dismiss = showNotification();
 
-            generateHistogramData();
-            //update grid columns
-            updateGridColumns();
-            searchObj.loading = false;
-          })
-          .catch((err) => {
-            searchObj.loading = false;
-            if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error + "114";
-            } else {
-              searchObj.data.errorMsg = err.message + "115";
-            }
-            const customMessage = logsErrorMessage(err.response.data.code);
-            searchObj.data.errorCode = err.response.data.code;
-            if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage) + "116";
-            }
-          });
-      } else {
+          if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
+          else {
+            queryReq.query.start_time =
+              initialQueryPayload.value?.query?.start_time;
+            queryReq.query.end_time =
+              initialQueryPayload.value?.query?.end_time;
+          }
+
+          searchObj.data.errorCode = 0;
+          searchService
+            .search({
+              org_identifier: searchObj.organizationIdetifier,
+              query: queryReq,
+              page_type: searchObj.data.stream.streamType,
+            })
+            .then((res) => {
+              dismiss();
+              if (res.data.from > 0) {
+                searchObj.data.queryResults.from = res.data.from;
+                searchObj.data.queryResults.scan_size += res.data.scan_size;
+                searchObj.data.queryResults.took += res.data.took;
+                searchObj.data.queryResults.hits.push(...res.data.hits);
+              } else {
+                resetFieldValues();
+                searchObj.data.queryResults = res.data;
+              }
+
+              updateFieldValues();
+
+              //extract fields from query response
+              extractFields();
+
+              if (!isPagination) generateHistogramData();
+              else updateHistogramTitle();
+
+              //update grid columns
+              updateGridColumns();
+              searchObj.loading = false;
+              resolve(true);
+            })
+            .catch((err) => {
+              searchObj.loading = false;
+              if (err.response != undefined) {
+                searchObj.data.errorMsg = err.response.data.error + "114";
+              } else {
+                searchObj.data.errorMsg = err.message + "115";
+              }
+              const customMessage = logsErrorMessage(err.response.data.code);
+              searchObj.data.errorCode = err.response.data.code;
+              if (customMessage != "") {
+                searchObj.data.errorMsg = t(customMessage) + "116";
+              }
+              reject(false);
+            });
+        } else {
+          dismiss();
+          searchObj.loading = false;
+          reject(false);
+        }
+      } catch (e: any) {
+        dismiss();
         searchObj.loading = false;
-        return false;
+        showErrorNotification(e.message);
+        reject(false);
       }
-    } catch (e: any) {
-      searchObj.loading = false;
-      throw new Error(e.message);
-    }
+    });
   };
 
   const updateFieldValues = () => {
@@ -732,6 +764,21 @@ const useLogs = () => {
       throw new Error(e.message);
     }
   };
+
+  function updateHistogramTitle() {
+    const title =
+      "Showing " +
+      searchObj.data.queryResults.hits.length +
+      " out of " +
+      searchObj.data.queryResults.total.toLocaleString() +
+      " hits in " +
+      searchObj.data.queryResults.took +
+      " ms. (Scan Size: " +
+      searchObj.data.queryResults.scan_size +
+      "MB)";
+
+    searchObj.data.histogram.chartParams.title = title;
+  }
 
   function generateHistogramData() {
     try {
@@ -918,11 +965,11 @@ const useLogs = () => {
   const loadLogsData = async () => {
     try {
       searchObj.loading = true;
-      await resetSearchObj();
       resetFunctions();
       await getFunctions();
       await getStreamList();
       await getQueryData();
+      refreshData();
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -974,6 +1021,41 @@ const useLogs = () => {
     });
   };
 
+  const showNotification = () => {
+    return $q.notify({
+      type: "positive",
+      message: "Waiting for response...",
+      timeout: 10000,
+      actions: [
+        {
+          icon: "cancel",
+          color: "white",
+          handler: () => {
+            /* ... */
+          },
+        },
+      ],
+    });
+  };
+
+  const updateStreams = async () => {
+    if (searchObj.data.streamResults?.list?.length) {
+      const streamType = searchObj.data.stream.streamType || "logs";
+      const streams = await getStreams(streamType, true);
+      searchObj.data.streamResults = streams;
+      searchObj.data.stream.streamLists = [];
+      streams.list.map((item: any) => {
+        const itemObj = {
+          label: item.name,
+          value: item.name,
+        };
+        searchObj.data.stream.streamLists.push(itemObj);
+      });
+    } else {
+      loadLogsData(true);
+    }
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -989,6 +1071,7 @@ const useLogs = () => {
     loadLogsData,
     restoreUrlQueryParams,
     handleQueryData,
+    updateStreams,
   };
 };
 

@@ -12,7 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import { reactive } from "vue";
+import { cloneDeep } from "lodash-es";
+import { reactive, ref } from "vue";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -55,7 +56,7 @@ const defaultObject = {
     errorCode: 0,
     additionalErrorMsg: "",
     metrics: {
-      metricList: [],
+      metricList: <any>[],
       selectedMetric: null as null | {
         type: string;
         name: string;
@@ -77,15 +78,15 @@ const defaultObject = {
   },
 };
 
-let searchObj = reactive(Object.assign({}, defaultObject));
+const searchObj = ref(cloneDeep(defaultObject));
 
 const useMetrics = () => {
   const resetSearchObj = () => {
     // delete searchObj.data;
-    searchObj = reactive(Object.assign({}, defaultObject));
+    searchObj.value = cloneDeep(defaultObject);
   };
 
-  return { searchObj, resetSearchObj };
+  return { searchObj: searchObj.value, resetSearchObj };
 };
 
 export default useMetrics;

@@ -283,7 +283,7 @@ import type EqualIconVue from "@/components/icons/EqualIcon.vue";
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, watch } from "vue";
+import { defineComponent, ref, type Ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -297,6 +297,7 @@ import metricService from "@/services/metrics";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
+import { on } from "events";
 
 export default defineComponent({
   name: "MetricsList",
@@ -329,11 +330,16 @@ export default defineComponent({
     };
     const { parsePromQlQuery } = usePromqlSuggestions();
     watch(
-      () => searchObj.data.metrics.metricList.length,
+      () => searchObj.data.metrics.metricList,
       () => {
         streamOptions.value = searchObj.data.metrics.metricList;
-      }
+      },
+      { deep: true }
     );
+    onMounted(() => {
+      if (!streamOptions.value.length)
+        streamOptions.value = searchObj.data.metrics.metricList;
+    });
     const filterMetrics = (val: string, update: any) => {
       update(() => {
         streamOptions.value = searchObj.data.metrics.metricList;

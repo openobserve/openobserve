@@ -28,7 +28,6 @@
         <template #before>
           <metric-list
             data-test="logs-search-index-list"
-            :key="searchObj.data.metrics.metricList.length"
             @select-label="addLabelToEditor"
           />
         </template>
@@ -468,7 +467,7 @@ export default defineComponent({
         if (searchObj.data.streamResults.list.length) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
-          searchObj.data.streamResults.list.map((item: any) => {
+          searchObj.data.streamResults.list.forEach((item: any) => {
             let itemObj = {
               label: item.name,
               value: item.name,
@@ -476,7 +475,6 @@ export default defineComponent({
               help: item.metrics_meta.help || "",
             };
             searchObj.data.metrics.metricList.push(itemObj);
-
             // If isFirstLoad is true, then select the stream from query params
             if (
               isFirstLoad &&
@@ -513,6 +511,7 @@ export default defineComponent({
               chartParams: {},
             };
           }
+          console.log("metrics updated", searchObj.data.metrics.metricList);
         }
       } catch (e) {
         console.log("Error while loading streams");
