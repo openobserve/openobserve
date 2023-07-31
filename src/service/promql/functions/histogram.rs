@@ -18,7 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 use crate::{
     common::meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},
     service::promql::value::{
-        signature_without_labels, InstantValue, Labels, Sample, Signature, Value,
+        signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
     },
 };
 
@@ -27,6 +27,13 @@ use crate::{
 struct Bucket {
     upper_bound: f64,
     count: f64,
+}
+
+impl Bucket {
+    #[allow(dead_code)]
+    fn new(upper_bound: f64, count: f64) -> Self {
+        Self { upper_bound, count }
+    }
 }
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L45
@@ -59,13 +66,9 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         // histograms. Each float sample must have a label `le` where the label
         // value denotes the inclusive upper bound of the bucket. *Float samples
         // without such a label are silently ignored.*
-        let upper_bound: f64 = match labels
-            .iter()
-            .find(|v| v.name == LE_LABEL)
-            .map(|s| s.value.parse())
-        {
-            Some(Ok(u)) => u,
-            None | Some(Err(_)) => continue,
+        let upper_bound: f64 = match labels.get_value(LE_LABEL).parse() {
+            Ok(u) => u,
+            Err(_) => continue,
         };
 
         let sig = signature_without_labels(&labels, &[HASH_LABEL, NAME_LABEL, LE_LABEL]);
@@ -84,6 +87,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
 
     let values = metrics_with_buckets
         .into_values()
+        .filter(|bucket| !bucket.buckets.is_empty())
         .map(|mb| InstantValue {
             labels: mb.labels,
             sample: Sample::new(sample_time, bucket_quantile(phi, mb.buckets)),
@@ -117,7 +121,7 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     if buckets.len() < 2 {
         return f64::NAN;
     }
-    let observations = highest_bucket.count;
+    let observations = buckets[buckets.len() - 1].count;
     if observations == 0.0 {
         return f64::NAN;
     }
@@ -136,14 +140,15 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     }
     let bucket_end = buckets[b].upper_bound;
     let mut count = buckets[b].count;
-    let bucket_start = if b == 0 {
-        0.0
-    } else {
+    let bucket_start = if b > 0 {
         count -= buckets[b - 1].count;
         rank -= buckets[b - 1].count;
         buckets[b - 1].upper_bound
+    } else {
+        0.0
     };
-    bucket_start + (bucket_end - bucket_start) * rank / count
+
+    bucket_start + (bucket_end - bucket_start) * (rank / count)
 }
 
 /// `coalesce_buckets` merges buckets with the same upper bound.
@@ -240,6 +245,65 @@ mod tests {
     }
 
     #[test]
+    fn test_coalesce_buckets_regular() {
+        let buckets = vec![
+            Bucket::new(1.0, 2.0),
+            Bucket::new(2.0, 3.0),
+            Bucket::new(2.0, 5.0),
+            Bucket::new(3.0, 4.0),
+            Bucket::new(4.0, 1.0),
+        ];
+
+        let expected_result = vec![
+            Bucket::new(1.0, 2.0),
+            Bucket::new(2.0, 8.0),
+            Bucket::new(3.0, 4.0),
+            Bucket::new(4.0, 1.0),
+        ];
+
+        let result = coalesce_buckets(buckets.clone());
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_coalesce_buckets_empty() {
+        let buckets = vec![];
+
+        let expected_result = vec![];
+
+        let result = coalesce_buckets(buckets.clone());
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_coalesce_buckets_single_element() {
+        let buckets = vec![Bucket::new(1.0, 2.0)];
+
+        let expected_result = vec![Bucket::new(1.0, 2.0)];
+
+        let result = coalesce_buckets(buckets.clone());
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_coalesce_buckets_all_same() {
+        let buckets = vec![
+            Bucket::new(1.0, 2.0),
+            Bucket::new(1.0, 3.0),
+            Bucket::new(1.0, 5.0),
+        ];
+
+        let expected_result = vec![Bucket::new(1.0, 10.0)];
+
+        let result = coalesce_buckets(buckets.clone());
+
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
     fn test_ensure_monotonic() {
         let mut buckets = vec![
             Bucket {
@@ -289,5 +353,72 @@ mod tests {
             ]
         "#]]
         .assert_debug_eq(&buckets);
+    }
+
+    #[test]
+    fn test_ensure_monotonic_single_bucket() {
+        let mut buckets = vec![Bucket::new(1.0, 2.0)];
+        ensure_monotonic(&mut buckets);
+        assert_eq!(buckets, vec![Bucket::new(1.0, 2.0),]);
+    }
+
+    #[test]
+    fn test_ensure_monotonic_increasing() {
+        let mut buckets = vec![
+            Bucket::new(1.0, 2.0),
+            Bucket::new(2.0, 3.0),
+            Bucket::new(3.0, 4.0),
+            Bucket::new(4.0, 5.0),
+        ];
+        ensure_monotonic(&mut buckets);
+        assert_eq!(
+            buckets,
+            vec![
+                Bucket::new(1.0, 2.0),
+                Bucket::new(2.0, 3.0),
+                Bucket::new(3.0, 4.0),
+                Bucket::new(4.0, 5.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_ensure_monotonic_decreasing() {
+        let mut buckets = vec![
+            Bucket::new(1.0, 5.0),
+            Bucket::new(2.0, 4.0),
+            Bucket::new(3.0, 3.0),
+            Bucket::new(4.0, 2.0),
+        ];
+        ensure_monotonic(&mut buckets);
+        assert_eq!(
+            buckets,
+            vec![
+                Bucket::new(1.0, 5.0),
+                Bucket::new(2.0, 5.0),
+                Bucket::new(3.0, 5.0),
+                Bucket::new(4.0, 5.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_ensure_monotonic_mixed() {
+        let mut buckets = vec![
+            Bucket::new(1.0, 5.0),
+            Bucket::new(2.0, 3.0),
+            Bucket::new(3.0, 7.0),
+            Bucket::new(4.0, 2.0),
+        ];
+        ensure_monotonic(&mut buckets);
+        assert_eq!(
+            buckets,
+            vec![
+                Bucket::new(1.0, 5.0),
+                Bucket::new(2.0, 5.0),
+                Bucket::new(3.0, 7.0),
+                Bucket::new(4.0, 7.0),
+            ]
+        );
     }
 }
