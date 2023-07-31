@@ -271,7 +271,7 @@ export default defineComponent({
 
       if (promqlMode.value) {
         // 1. chart type: only line chart is supported
-        const allowedChartTypes = ['line']
+        const allowedChartTypes = ['area','line','bar','scatter','area-stacked','metric']
         if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
           errors.push('Selected chart type is not supported for PromQL. Only line chart is supported.')
         }
