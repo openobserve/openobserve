@@ -187,13 +187,18 @@ impl From<&str> for StreamSettings {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
-    #[default]
     Hourly,
     Daily,
     Monthly,
+}
+
+impl Default for PartitionTimeLevel {
+    fn default() -> Self {
+        CONFIG.limit.metric_file_max_retention.as_str().into()
+    }
 }
 
 impl PartitionTimeLevel {
