@@ -15,6 +15,7 @@
 use super::{db, triggers};
 use crate::common::flatten;
 use crate::common::infra::wal::get_or_create;
+use crate::common::meta::stream::{PartitionTimeLevel, PartitioningDetails, StreamParams};
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::{BufMut, BytesMut};
@@ -121,22 +122,29 @@ pub async fn get_stream_transforms<'a>(
 pub async fn get_stream_partition_keys(
     stream_name: &str,
     stream_schema_map: &AHashMap<String, Schema>,
-) -> Vec<String> {
+) -> PartitioningDetails {
+    let mut partitioning_details = PartitioningDetails::default();
+
     let mut keys: Vec<String> = vec![];
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
-        None => return keys,
+        None => return partitioning_details,
     };
 
     let stream_settings = match schema.metadata().get("settings") {
         Some(value) => value,
-        None => return keys,
+        None => return partitioning_details,
     };
 
     let settings: Value = json::from_slice(stream_settings.as_bytes()).unwrap();
     let part_keys = match settings.get("partition_keys") {
         Some(value) => value,
-        None => return keys,
+        None => return partitioning_details,
+    };
+
+    let time_level: PartitionTimeLevel = match settings.get("partition_time_level") {
+        Some(value) => json::from_value(value.clone()).unwrap(),
+        None => return partitioning_details,
     };
 
     let mut v: Vec<_> = part_keys.as_object().unwrap().into_iter().collect();
@@ -144,7 +152,11 @@ pub async fn get_stream_partition_keys(
     for (_, value) in v {
         keys.push(value.as_str().unwrap().to_string());
     }
-    keys
+
+    partitioning_details.partition_keys = keys;
+    partitioning_details.partition_time_level = time_level;
+
+    partitioning_details
 }
 
 pub async fn get_stream_alerts<'a>(
@@ -195,6 +207,51 @@ pub fn get_hour_key(
         };
     }
     hour_key
+}
+
+pub fn get_wal_time_key(
+    timestamp: i64,
+    partition_keys: &Vec<String>,
+    time_level: PartitionTimeLevel,
+    local_val: &Map<String, Value>,
+    suffix: Option<&str>,
+) -> String {
+    // get time file name
+
+    let mut time_key = match time_level {
+        PartitionTimeLevel::Hourly => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_%H")
+            .to_string(),
+        PartitionTimeLevel::Daily => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_%d_00")
+            .to_string(),
+        PartitionTimeLevel::Monthly => Utc
+            .timestamp_nanos(timestamp * 1000)
+            .format("%Y_%m_01_00")
+            .to_string(),
+    };
+    if let Some(s) = suffix {
+        time_key.push_str(&format!("_{s}"));
+    } else {
+        time_key.push_str("_keeping");
+    }
+
+    for key in partition_keys {
+        match local_val.get(key) {
+            Some(v) => {
+                let val = if v.is_string() {
+                    format!("{}={}", key, v.as_str().unwrap())
+                } else {
+                    format!("{}={}", key, v)
+                };
+                time_key.push_str(&format!("_{}", get_partition_key_record(&val)));
+            }
+            None => continue,
+        };
+    }
+    time_key
 }
 
 // generate partition key for record
@@ -324,9 +381,12 @@ pub fn _write_file(
         }
         let file = crate::common::infra::wal::get_or_create(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
+            None,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
@@ -367,10 +427,9 @@ pub fn init_functions_runtime() -> Runtime {
 pub fn write_file(
     buf: AHashMap<String, Vec<String>>,
     thread_id: usize,
-    org_id: &str,
-    stream_name: &str,
     stream_file_name: &mut String,
-    stream_type: StreamType,
+    stream_params: StreamParams,
+    partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut write_buf = BytesMut::new();
     let mut req_stats = RequestStats::default();
@@ -385,9 +444,8 @@ pub fn write_file(
         }
         let file = get_or_create(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            stream_params,
+            partition_time_level,
             &key,
             CONFIG.common.wal_memory_mode_enabled,
         );
@@ -458,7 +516,10 @@ mod tests {
         let schema = Schema::empty().with_metadata(meta);
         stream_schema_map.insert("olympics".to_string(), schema);
         let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
-        assert_eq!(keys, vec!["country".to_string(), "sport".to_string()]);
+        assert_eq!(
+            keys.partition_keys,
+            vec!["country".to_string(), "sport".to_string()]
+        );
     }
 
     #[actix_web::test]

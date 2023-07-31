@@ -22,12 +22,15 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 
-use crate::common::file::get_file_contents;
-use crate::common::infra::{
-    config::{CONFIG, FILE_EXT_JSON},
-    ider, metrics,
-};
 use crate::common::meta::StreamType;
+use crate::common::{file::get_file_contents, meta::stream::StreamParams};
+use crate::common::{
+    infra::{
+        config::{CONFIG, FILE_EXT_JSON},
+        ider, metrics,
+    },
+    meta::stream::PartitionTimeLevel,
+};
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
@@ -59,13 +62,12 @@ pub struct RwFile {
 
 pub fn get_or_create(
     thread_id: usize,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
+    stream: StreamParams,
+    partition_time_level: Option<PartitionTimeLevel>,
     key: &str,
     use_cache: bool,
 ) -> Arc<RwFile> {
-    MANAGER.get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+    MANAGER.get_or_create(thread_id, stream, partition_time_level, key, use_cache)
 }
 
 pub fn check_in_use(
@@ -207,18 +209,21 @@ impl Manager {
     pub fn create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}");
+        let org_id = stream.org_id;
+        let stream_name = stream.stream_name;
+        let stream_type = stream.stream_type;
+
+        let full_key = format!("{org_id}_{stream_name}_{stream_type}_{key}",);
+
         let file = Arc::new(RwFile::new(
             thread_id,
-            org_id,
-            stream_name,
-            stream_type,
+            stream,
+            partition_time_level,
             key,
             use_cache,
         ));
@@ -232,16 +237,21 @@ impl Manager {
     pub fn get_or_create(
         &self,
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> Arc<RwFile> {
-        if let Some(file) = self.get(thread_id, org_id, stream_name, stream_type, key) {
+        if let Some(file) = self.get(
+            thread_id,
+            stream.org_id,
+            stream.stream_name,
+            stream.stream_type,
+            key,
+        ) {
             file
         } else {
-            self.create(thread_id, org_id, stream_name, stream_type, key, use_cache)
+            self.create(thread_id, stream, partition_time_level, key, use_cache)
         }
     }
 
@@ -295,15 +305,14 @@ impl MemoryFiles {
 impl RwFile {
     fn new(
         thread_id: usize,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
+        stream: StreamParams,
+        partition_time_level: Option<PartitionTimeLevel>,
         key: &str,
         use_cache: bool,
     ) -> RwFile {
         let mut dir_path = format!(
-            "{}files/{org_id}/{stream_type}/{stream_name}/",
-            &CONFIG.common.data_wal_dir
+            "{}files/{}/{}/{}/",
+            &CONFIG.common.data_wal_dir, stream.org_id, stream.stream_type, stream.stream_name
         );
         // Hack for file_list
         let file_list_prefix = "/files//file_list//";
@@ -326,20 +335,20 @@ impl RwFile {
                 .unwrap_or_else(|e| panic!("open wal file [{file_path}] error: {e}"));
             (Some(RwLock::new(f)), None)
         };
-        let ttl = if stream_type.eq(&StreamType::Metrics) {
-            chrono::Utc::now().timestamp()
-                + (CONFIG.limit.max_file_retention_time * CONFIG.limit.metric_retention_multiplier)
-                    as i64
+
+        let ttl = if let Some(level) = partition_time_level {
+            chrono::Utc::now().timestamp() + level.duration()
         } else {
             chrono::Utc::now().timestamp() + CONFIG.limit.max_file_retention_time as i64
         };
+
         RwFile {
             use_cache,
             file,
             cache,
-            org_id: org_id.to_string(),
-            stream_name: stream_name.to_string(),
-            stream_type,
+            org_id: stream.org_id.to_string(),
+            stream_name: stream.stream_name.to_string(),
+            stream_type: stream.stream_type,
             dir: dir_path,
             name: file_name,
             expired: ttl,
@@ -463,7 +472,17 @@ mod tests {
         let stream_type = StreamType::Logs;
         let key = "test_key";
         let use_cache = false;
-        let file = get_or_create(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let file = get_or_create(
+            thread_id,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
+            None,
+            key,
+            use_cache,
+        );
         let data = "test_data".to_string().into_bytes();
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);
@@ -490,7 +509,17 @@ mod tests {
         let stream_type = StreamType::Logs;
         let key = "test_key";
         let use_cache = false;
-        let file = RwFile::new(thread_id, org_id, stream_name, stream_type, key, use_cache);
+        let file = RwFile::new(
+            thread_id,
+            StreamParams {
+                org_id,
+                stream_name,
+                stream_type,
+            },
+            None,
+            key,
+            use_cache,
+        );
         let data = "test_data".to_string().into_bytes();
         file.write(&data);
         assert_eq!(file.read().unwrap(), data);

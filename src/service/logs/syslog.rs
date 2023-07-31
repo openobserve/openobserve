@@ -19,11 +19,6 @@ use datafusion::arrow::datatypes::Schema;
 use std::net::SocketAddr;
 use syslog_loose::{Message, ProcId, Protocol};
 
-use crate::common::infra::{
-    cluster,
-    config::{CONFIG, SYSLOG_ROUTES},
-    metrics,
-};
 use crate::common::meta::{
     alert::{Alert, Trigger},
     http::HttpResponse as MetaHttpResponse,
@@ -32,6 +27,14 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time::parse_timestamp_micro_from_value};
+use crate::common::{
+    infra::{
+        cluster,
+        config::{CONFIG, SYSLOG_ROUTES},
+        metrics,
+    },
+    meta::stream::StreamParams,
+};
 use crate::service::{db, ingestion::write_file, schema::stream_schema_exists};
 
 use super::StreamMeta;
@@ -100,11 +103,13 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
         &mut stream_schema_map,
     )
     .await;
+
     let mut partition_keys: Vec<String> = vec![];
     if stream_schema.has_partition_keys {
-        partition_keys =
+        let partition_det =
             crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map)
                 .await;
+        partition_keys = partition_det.partition_keys;
     }
 
     // Start get stream alerts
@@ -178,10 +183,13 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, ()> {
     write_file(
         buf,
         thread_id,
-        org_id,
-        stream_name,
         &mut stream_file_name,
-        StreamType::Logs,
+        StreamParams {
+            org_id,
+            stream_name,
+            stream_type: StreamType::Logs,
+        },
+        None,
     );
 
     // only one trigger per request, as it updates etcd
