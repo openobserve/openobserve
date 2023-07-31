@@ -20,6 +20,7 @@ use std::{collections::HashMap, io::BufReader};
 use vrl::compiler::runtime::Runtime;
 
 use crate::common::infra::{cluster, config::CONFIG, metrics};
+use crate::common::meta::stream::{PartitioningDetails, StreamParams};
 use crate::common::meta::usage::UsageType;
 use crate::common::meta::{
     ingestion::{IngestionResponse, StreamStatus},
@@ -27,11 +28,9 @@ use crate::common::meta::{
     StreamType,
 };
 use crate::common::{flatten, json, time};
+use crate::service::ingestion::get_wal_time_key;
 use crate::service::usage::report_usage_stats;
-use crate::service::{
-    db,
-    ingestion::{get_hour_key, write_file},
-};
+use crate::service::{db, ingestion::write_file};
 
 pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
@@ -41,13 +40,14 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organisation"));
+        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
     let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.iter() {
@@ -190,13 +190,26 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
-        // write into buffer
-        let partition_keys =
-            crate::service::ingestion::get_stream_partition_keys(&stream_name, &stream_schema_map)
-                .await;
+        let partition_keys: Vec<String>;
+        let time_key;
+
+        if !stream_partitioning_map.contains_key(&stream_name) {
+            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                &stream_name,
+                &stream_schema_map,
+            )
+            .await;
+            stream_partitioning_map.insert(stream_name.to_string(), partition_det.clone());
+            partition_keys = partition_det.partition_keys;
+            time_key = partition_det.partition_time_level;
+        } else {
+            let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
+            partition_keys = partition_det.partition_keys.clone();
+            time_key = partition_det.partition_time_level;
+        }
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_hour_key(timestamp, &partition_keys, record, None);
+        let hour_key = get_wal_time_key(timestamp, &partition_keys, time_key, record, None);
         let hour_buf = stream_buf.entry(hour_key).or_default();
         hour_buf.push(record_str);
 
@@ -219,14 +232,24 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+
+        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
+            details.partition_time_level
+        } else {
+            CONFIG.limit.metric_file_max_retention.as_str().into()
+        };
+
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
             stream_data,
             thread_id,
-            org_id,
-            &stream_name,
             &mut stream_file_name,
-            StreamType::Metrics,
+            StreamParams {
+                org_id,
+                stream_name: &stream_name,
+                stream_type: StreamType::Metrics,
+            },
+            Some(time_level),
         );
         req_stats.response_time = time;
 
