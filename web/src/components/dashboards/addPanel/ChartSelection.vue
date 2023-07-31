@@ -24,7 +24,7 @@
           ]"
 
           v-for="(item, index) in ChartsArray"
-          :disable="promqlMode && item.id != 'line' && item.id != 'area' && item.id != 'bar' && item.id != 'scatter'"
+          :disable="promqlMode && item.id != 'line' && item.id != 'area' && item.id != 'bar' && item.id != 'scatter' && item.id != 'area-stacked'"
           :key="index"
           clickable
           v-ripple

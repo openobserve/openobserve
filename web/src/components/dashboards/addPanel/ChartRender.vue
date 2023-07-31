@@ -876,6 +876,7 @@ export default defineComponent({
                         x: values.map((value: any) => (moment(value[0] * 1000).toISOString(true))),
                         y: values.map((value: any) => value[1]),
                         hovertemplate: "%{x}: %{y:.2f}<br>%{fullData.name}<extra></extra>",
+                         stackgroup: props.data.type == 'area-stacked' ? 'one' : '',
                         ...getPropsByChartTypeForTraces()
                     }
                 })
