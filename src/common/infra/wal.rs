@@ -185,14 +185,10 @@ impl Manager {
             }
         };
 
-        let desired_size = if stream_type.eq(&StreamType::Metrics) {
-            (CONFIG.limit.max_file_size_on_disk * CONFIG.limit.metric_file_size_multiplier) as i64
-        } else {
-            CONFIG.limit.max_file_size_on_disk as i64
-        };
-
         // check size & ttl
-        if file.size() >= (desired_size) || file.expired() <= chrono::Utc::now().timestamp() {
+        if file.size() >= (CONFIG.limit.max_file_size_on_disk).try_into().unwrap()
+            || file.expired() <= chrono::Utc::now().timestamp()
+        {
             self.data
                 .get(thread_id)
                 .unwrap()

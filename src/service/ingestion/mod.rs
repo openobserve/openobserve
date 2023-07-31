@@ -154,7 +154,8 @@ pub async fn get_stream_partition_keys(
     }
 
     partitioning_details.partition_keys = keys;
-    partitioning_details.partition_time_level = time_level;
+
+    partitioning_details.partition_time_level = Some(time_level);
 
     partitioning_details
 }
@@ -227,7 +228,7 @@ pub fn get_wal_time_key(
             .timestamp_nanos(timestamp * 1000)
             .format("%Y_%m_%d_00")
             .to_string(),
-        PartitionTimeLevel::Monthly => Utc
+        PartitionTimeLevel::None => Utc
             .timestamp_nanos(timestamp * 1000)
             .format("%Y_%m_01_00")
             .to_string(),

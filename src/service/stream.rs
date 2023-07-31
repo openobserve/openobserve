@@ -279,6 +279,9 @@ pub fn stream_created(schema: &Schema) -> Option<i64> {
 }
 
 pub fn stream_settings(schema: &Schema) -> Option<StreamSettings> {
+    if schema.metadata().is_empty() {
+        return None;
+    }
     schema
         .metadata()
         .get("settings")

@@ -209,7 +209,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         }
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_wal_time_key(timestamp, &partition_keys, time_key, record, None);
+        let hour_key = get_wal_time_key(
+            timestamp,
+            &partition_keys,
+            time_key.unwrap_or(CONFIG.limit.metric_file_max_retention.as_str().into()),
+            record,
+            None,
+        );
         let hour_buf = stream_buf.entry(hour_key).or_default();
         hour_buf.push(record_str);
 
@@ -236,7 +242,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
             details.partition_time_level
         } else {
-            CONFIG.limit.metric_file_max_retention.as_str().into()
+            Some(CONFIG.limit.metric_file_max_retention.as_str().into())
         };
 
         let mut stream_file_name = "".to_string();
@@ -249,7 +255,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 stream_name: &stream_name,
                 stream_type: StreamType::Metrics,
             },
-            Some(time_level),
+            time_level,
         );
         req_stats.response_time = time;
 
