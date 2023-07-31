@@ -189,6 +189,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let _ = cluster::leave().await;
     // flush WAL cache to disk
     wal::flush_all_to_disk();
+    // flush compact offset cache to disk disk
+    let _ = db::compact::files::sync_cache_to_db().await;
 
     log::info!("server stopped");
 
