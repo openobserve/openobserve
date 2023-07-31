@@ -1,3 +1,5 @@
+import { getThemeLayoutOptions } from "@/utils/Dashboard/getThemeLayoutOptions";
+
 export const convertSQLData = (
   panelSchema: any,
   searchQueryDataTemp: any,
@@ -103,15 +105,6 @@ export const convertSQLData = (
         };
     }
   };
-
-  const getThemeLayoutOptions = () => ({
-    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    font: {
-      size: 12,
-      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-    },
-  });
 
   const getTickLength = () => props.width - 2;
   const getTickLimits = (layout: string[]) => {
@@ -815,7 +808,7 @@ export const convertSQLData = (
       b: 32,
     },
     ...getPropsByChartTypeForLayout(),
-    ...getThemeLayoutOptions(),
+    ...getThemeLayoutOptions(store),
   };
 
   console.log("layout", layout);

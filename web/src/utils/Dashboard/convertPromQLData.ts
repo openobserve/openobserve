@@ -1,5 +1,6 @@
 import { onMounted, reactive, ref } from "vue";
 import Plotly from "plotly.js";
+import { getThemeLayoutOptions } from "@/utils/Dashboard/getThemeLayoutOptions";
 
 export const convertPromQLData = (
   panelSchema: any,
@@ -50,14 +51,6 @@ export const convertPromQLData = (
     }
   };
 
-  const getThemeLayoutOptions = () => ({
-    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    font: {
-      size: 12,
-      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
-    },
-  });
   console.log("props", props);
   console.log("convertPromQLData: searchQueryData", searchQueryDataTemp);
 
@@ -128,7 +121,7 @@ export const convertPromQLData = (
       t: 60,
       b: 60,
     },
-    ...getThemeLayoutOptions(),
+    ...getThemeLayoutOptions(store),
   };
   return { traces: traces.flat(), layout };
 };
