@@ -189,7 +189,7 @@ clickable @click="signout">
       </q-list>
     </q-drawer>
 
-    <q-page-container :key="store.state.selectedOrganization.identifier">
+    <q-page-container :key="store.state.selectedOrganization.identifier" v-if="isLoading">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
