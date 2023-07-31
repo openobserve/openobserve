@@ -38,7 +38,7 @@
         hide-selected
         fill-input
         @filter="filterStreamFn"
-        @update:model-value="handleQueryData"
+        @update:model-value="onStreamChange"
       >
         <template #no-option>
           <q-item>
@@ -338,7 +338,8 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const { searchObj, updatedLocalLogFilterField, handleQueryData } = useLogs();
+    const { searchObj, updatedLocalLogFilterField, handleQueryData } =
+      useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -534,6 +535,17 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = term;
     };
 
+    const onStreamChange = () => {
+      const query = searchObj.meta.sqlMode
+        ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+        : "";
+
+      searchObj.data.editorValue = query;
+      searchObj.data.query = query;
+
+      handleQueryData();
+    };
+
     return {
       t,
       store,
@@ -553,6 +565,7 @@ export default defineComponent({
       outlinedVisibilityOff,
       outlinedVisibility,
       handleQueryData,
+      onStreamChange,
     };
   },
 });

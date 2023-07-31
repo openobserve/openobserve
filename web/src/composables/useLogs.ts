@@ -235,6 +235,7 @@ const useLogs = () => {
     searchObj.data.stream.addToFilter = "";
     searchObj.data.stream.functions = [];
     searchObj.data.stream.streamType = "logs";
+    searchObj.data.stream.streamLists = [];
     resetQueryData();
     resetSearchAroundData();
   }
@@ -289,10 +290,12 @@ const useLogs = () => {
           }
         });
         searchObj.data.stream.selectedStream = selectedStream;
+      } else {
+        searchObj.data.errorMsg = "No stream found in selected organization!";
       }
       return;
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading stream list");
     }
   }
 
@@ -305,18 +308,18 @@ const useLogs = () => {
       loadStreamLists();
       return;
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while getting stream list");
     }
   };
 
   const updateUrlQueryParams = () => {
     const date = searchObj.data.datetime;
 
-    const query: any = {
-      stream: searchObj.data.stream.selectedStream.label,
-      refresh: 0,
-      org_identifier: "",
-    };
+    const query: any = {};
+
+    if (searchObj.data.stream.selectedStream.label) {
+      query["stream"] = searchObj.data.stream.selectedStream.label;
+    }
 
     if (date.type == "relative") {
       query["period"] = date.relativeTimePeriod;
@@ -340,7 +343,6 @@ const useLogs = () => {
   function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
-
       const req: any = {
         query: {
           sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
@@ -513,7 +515,7 @@ const useLogs = () => {
 
       return req;
     } catch (e: any) {
-      throw new Error(e.message);
+      showErrorNotification("Invalid SQL Syntax");
     }
   }
 
@@ -522,11 +524,14 @@ const useLogs = () => {
       let dismiss = () => {};
       try {
         searchObj.meta.showDetailTab = false;
-        if (!isPagination) resetQueryData();
 
-        if (searchObj.data.stream.selectedStream.value == "") {
+        if (!searchObj.data.stream.streamLists?.length) {
+          searchObj.loading = false;
           reject(false);
+          return;
         }
+
+        if (!isPagination) resetQueryData();
 
         // if (searchObj.data.searchAround.histogramHide) {
         //   searchObj.data.searchAround.histogramHide = false;
@@ -608,7 +613,7 @@ const useLogs = () => {
       } catch (e: any) {
         dismiss();
         searchObj.loading = false;
-        showErrorNotification(e.message);
+        showErrorNotification("Error while fetching data");
         reject(false);
       }
     });
@@ -690,7 +695,7 @@ const useLogs = () => {
         });
       }
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while extracting fields");
     }
   }
 
@@ -761,7 +766,7 @@ const useLogs = () => {
         });
       }
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while updating grid columns");
     }
   };
 
@@ -815,12 +820,13 @@ const useLogs = () => {
       };
       searchObj.data.histogram = { xData, yData, chartParams };
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while generating histogram data");
     }
   }
 
   const searchAroundData = (obj: any) => {
     try {
+      searchObj.loading = true;
       searchObj.data.errorCode = 0;
       let query_context: any = "";
       const query = searchObj.data.query;
@@ -935,9 +941,11 @@ const useLogs = () => {
           if (customMessage != "") {
             searchObj.data.errorMsg = t(customMessage) + "113";
           }
-        });
+        })
+        .finally(() => (searchObj.loading = false));
     } catch (e: any) {
-      throw new Error(e.message);
+      searchObj.loading = false;
+      showErrorNotification("Error while fetching data");
     }
   };
 
@@ -971,7 +979,7 @@ const useLogs = () => {
       await getQueryData();
       refreshData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 
@@ -983,7 +991,7 @@ const useLogs = () => {
       searchObj.loading = true;
       await getQueryData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 
@@ -992,7 +1000,7 @@ const useLogs = () => {
       searchObj.loading = true;
       await getQueryData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 

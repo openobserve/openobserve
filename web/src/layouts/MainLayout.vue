@@ -44,8 +44,7 @@
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -124,12 +123,10 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated
-no-caps padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md"
-color="grey" text-color="white">
+                <q-avatar size="md" color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -152,8 +149,7 @@ color="grey" text-color="white">
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item v-ripple v-close-popup
-clickable @click="signout">
+              <q-item v-ripple v-close-popup clickable @click="signout">
                 <q-item-section avatar>
                   <q-avatar
                     size="md"
@@ -189,7 +185,10 @@ clickable @click="signout">
       </q-list>
     </q-drawer>
 
-    <q-page-container :key="store.state.selectedOrganization.identifier" v-if="isLoading">
+    <q-page-container
+      :key="store.state.selectedOrganization.identifier"
+      v-if="isLoading"
+    >
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component
@@ -687,6 +686,10 @@ export default defineComponent({
             }
           );
         }
+      } else {
+        router.push({
+          query: { org_identifier: selectedOrg.value.identifier },
+        });
       }
     };
 
