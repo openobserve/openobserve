@@ -21,7 +21,6 @@
       <search-bar
         data-test="logs-search-bar"
         ref="searchBarRef"
-        v-show="searchObj.data.stream.streamLists.length > 0"
         :fieldValues="fieldValues"
         :key="searchObj.data.stream.streamLists.length"
         @searchdata="searchData"
@@ -30,7 +29,6 @@
         id="tracesThirdLevel"
         class="row scroll traces-search-result-container"
         style="width: 100%"
-        v-if="searchObj.data.stream.streamLists.length > 0"
       >
         <!-- Note: Splitter max-height to be dynamically calculated with JS -->
         <q-splitter
@@ -78,7 +76,10 @@
               <h5 class="text-center">
                 <div
                   data-test="logs-search-result-not-found-text"
-                  v-if="searchObj.data.errorCode == 0"
+                  v-if="
+                    searchObj.data.stream.streamLists.length &&
+                    searchObj.data.errorCode == 0
+                  "
                 >
                   Result not found.
                 </div>
@@ -145,20 +146,6 @@
           </template>
         </q-splitter>
       </div>
-      <div v-else-if="searchObj.loading == true">
-        <q-spinner-dots
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
-        />
-      </div>
-      <div v-else>
-        <h5 data-test="logs-search-error-message" class="text-center">
-          <q-icon name="warning" color="warning" size="10rem" /><br />{{
-            searchObj.data.errorMsg
-          }}
-        </h5>
-      </div>
     </div>
   </q-page>
 </template>
@@ -217,6 +204,14 @@ export default defineComponent({
   },
   methods: {
     searchData() {
+      if (
+        !(
+          this.searchObj.data.stream.streamLists.length &&
+          this.searchObj.data.stream.selectedStream?.label
+        )
+      ) {
+        return;
+      }
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;
         this.searchObj.runQuery = true;
@@ -619,18 +614,6 @@ export default defineComponent({
             .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
             .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
             .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
-
-          const parsedSQL = whereClause.split(" ");
-          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-            parsedSQL.forEach((node: any, index: any) => {
-              if (node == field.name) {
-                node = node.replaceAll('"', "");
-                parsedSQL[index] = '"' + node + '"';
-              }
-            });
-          });
-
-          whereClause = parsedSQL.join(" ");
 
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
