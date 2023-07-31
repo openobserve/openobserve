@@ -14,7 +14,7 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, Ref } from "vue";
+import { reactive, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -1052,7 +1052,7 @@ const useLogs = () => {
         searchObj.data.stream.streamLists.push(itemObj);
       });
     } else {
-      loadLogsData(true);
+      loadLogsData();
     }
   };
 
