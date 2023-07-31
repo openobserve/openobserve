@@ -987,6 +987,15 @@ const useLogs = () => {
     }
   };
 
+  const handleRunQuery = async () => {
+    try {
+      searchObj.loading = true;
+      await getQueryData();
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
+  };
+
   const restoreUrlQueryParams = async () => {
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
@@ -1072,6 +1081,7 @@ const useLogs = () => {
     restoreUrlQueryParams,
     handleQueryData,
     updateStreams,
+    handleRunQuery,
   };
 };
 
