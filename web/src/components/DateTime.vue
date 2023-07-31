@@ -293,6 +293,8 @@ export default defineComponent({
 
     const displayValue = ref("");
 
+    const datePayload = ref({});
+
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
@@ -333,6 +335,22 @@ export default defineComponent({
         if (props.autoApply) saveDate("absolute");
       },
       { deep: true }
+    );
+
+    watch(
+      () => props.defaultAbsoluteTime,
+      (value) => {
+        if (
+          value.startTime !== datePayload.value.startTime ||
+          value.endTime !== datePayload.value.endTime
+        ) {
+          selectedType.value = props.defaultType;
+          setAbsoluteTime(value.startTime, value.endTime);
+        }
+      },
+      {
+        deep: true,
+      }
     );
 
     const setRelativeDate = (period, value) => {
@@ -408,6 +426,7 @@ export default defineComponent({
     const saveDate = (dateType) => {
       displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
+      datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       emit("on:date-change", date);
     };

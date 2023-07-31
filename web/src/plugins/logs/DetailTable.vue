@@ -63,84 +63,13 @@
           data-test="log-detail-json-content"
           class="q-pa-none q-mb-lg"
         >
-          <div class="q-pt-sm flex justify-start q-px-md copy-log-btn">
-            <q-btn
-              label="Copy to clipboard"
-              dense
-              size="sm"
-              no-caps
-              class="q-px-sm"
-              icon="content_copy"
-              @click="copyContentToClipboard(JSON.stringify(rowData))"
-            />
-          </div>
-          <div class="indexDetailsContainer q-pl-md">
-            {
-            <div
-              class="log_json_content"
-              v-for="(key, index) in Object.keys(rowData)"
-              :key="key"
-            >
-              <q-btn-dropdown
-                data-test="log-details-include-exclude-field-btn"
-                size="0.5rem"
-                flat
-                outlined
-                filled
-                dense
-                class="q-ml-sm pointer"
-                :name="'img:' + getImageURL('images/common/add_icon.svg')"
-              >
-                <q-list>
-                  <q-item clickable v-close-popup>
-                    <q-item-section>
-                      <q-item-label
-                        data-test="log-details-include-field-btn"
-                        @click="
-                          toggleIncludeSearchTerm(`${key}='${rowData[key]}'`)
-                        "
-                        ><q-btn
-                          title="Add to search query"
-                          size="6px"
-                          round
-                          class="q-mr-sm pointer"
-                        >
-                          <q-icon color="currentColor">
-                            <EqualIcon></EqualIcon>
-                          </q-icon> </q-btn
-                        >Include Search Term</q-item-label
-                      >
-                    </q-item-section>
-                  </q-item>
-
-                  <q-item clickable v-close-popup>
-                    <q-item-section>
-                      <q-item-label
-                        data-test="log-details-exclude-field-btn"
-                        @click="
-                          toggleExcludeSearchTerm(`${key}!='${rowData[key]}'`)
-                        "
-                        ><q-btn
-                          title="Add to search query"
-                          size="6px"
-                          round
-                          class="q-mr-sm pointer"
-                        >
-                          <q-icon color="currentColor">
-                            <NotEqualIcon></NotEqualIcon>
-                          </q-icon> </q-btn
-                        >Exclude Search Term</q-item-label
-                      >
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-btn-dropdown>
-
-              <span class="q-pl-xs">{{ key }} : {{ rowData[key] }}</span
-              ><span v-if="index < Object.keys(rowData).length - 1">,</span>
-            </div>
-            }
-          </div>
+          <json-preview
+            :value="rowData"
+            show-copy-button
+            @copy="copyContentToClipboard"
+            @add-field-to-table="addFieldToTable"
+            @add-search-term="toggleIncludeSearchTerm"
+          />
         </q-card-section>
       </q-tab-panel>
       <q-tab-panel name="table" class="q-pa-none">
@@ -316,22 +245,17 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onBeforeUnmount,
-  computed,
-} from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
-import dashboards from "@/services/dashboards";
 import useLogs from "@/composables/useLogs";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import JsonPreview from "./JsonPreview.vue";
+import { emit } from "process";
 
 const defaultValue: any = () => {
   return {
@@ -341,13 +265,14 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon, JsonPreview },
   emits: [
     "showPrevDetail",
     "showNextDetail",
     "add:searchterm",
     "remove:searchterm",
     "search:timeboxed",
+    "add:table",
   ],
   props: {
     modelValue: {
@@ -389,7 +314,7 @@ export default defineComponent({
       });
     },
   },
-  setup(props) {
+  setup(props, { emit }) {
     const { t } = useI18n();
     const rowData: any = ref({});
     const router = useRouter();
@@ -443,6 +368,10 @@ export default defineComponent({
       );
     };
 
+    const addFieldToTable = (value: string) => {
+      emit("add:table", value);
+    };
+
     return {
       t,
       store,
@@ -456,6 +385,7 @@ export default defineComponent({
       shouldWrapValues,
       toggleWrapLogDetails,
       copyContentToClipboard,
+      addFieldToTable,
     };
   },
   async created() {
