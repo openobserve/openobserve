@@ -295,7 +295,7 @@ const useLogs = () => {
       }
       return;
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading stream list");
     }
   }
 
@@ -308,7 +308,7 @@ const useLogs = () => {
       loadStreamLists();
       return;
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while getting stream list");
     }
   };
 
@@ -343,7 +343,6 @@ const useLogs = () => {
   function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
-
       const req: any = {
         query: {
           sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
@@ -516,7 +515,7 @@ const useLogs = () => {
 
       return req;
     } catch (e: any) {
-      throw new Error(e.message);
+      showErrorNotification("Invalid SQL Syntax");
     }
   }
 
@@ -614,7 +613,7 @@ const useLogs = () => {
       } catch (e: any) {
         dismiss();
         searchObj.loading = false;
-        showErrorNotification(e.message);
+        showErrorNotification("Error while fetching data");
         reject(false);
       }
     });
@@ -696,7 +695,7 @@ const useLogs = () => {
         });
       }
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while extracting fields");
     }
   }
 
@@ -767,7 +766,7 @@ const useLogs = () => {
         });
       }
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while updating grid columns");
     }
   };
 
@@ -821,7 +820,7 @@ const useLogs = () => {
       };
       searchObj.data.histogram = { xData, yData, chartParams };
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while generating histogram data");
     }
   }
 
@@ -946,7 +945,7 @@ const useLogs = () => {
         .finally(() => (searchObj.loading = false));
     } catch (e: any) {
       searchObj.loading = false;
-      throw new Error(e.message);
+      showErrorNotification("Error while fetching data");
     }
   };
 
@@ -980,7 +979,7 @@ const useLogs = () => {
       await getQueryData();
       refreshData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 
@@ -992,7 +991,7 @@ const useLogs = () => {
       searchObj.loading = true;
       await getQueryData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 
@@ -1001,7 +1000,7 @@ const useLogs = () => {
       searchObj.loading = true;
       await getQueryData();
     } catch (e: any) {
-      throw new Error(e.message);
+      console.log("Error while loading logs data");
     }
   };
 
