@@ -885,6 +885,30 @@ export default defineComponent({
                 case "custom": {
                     return `${value}${props.data.config.unit_custom}`
                 }
+                case "time": {
+                    console.log("Inside time", value);
+                    
+                    const units = [
+                        { unit: "ms", divisor: 0.001 },
+                        { unit: "s", divisor: 1 },
+                        { unit: "m", divisor: 60 },
+                        { unit: "h", divisor: 3600 },
+                        { unit: "D", divisor: 86400 },
+                        { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
+                        { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
+                    ];
+                        for (const unitInfo of units) {
+                            const unitValue = value ? value / unitInfo.divisor : 0 ;
+                            if (unitValue >= 1 && unitValue < 1000) {
+                                return unitValue.toFixed(2) + unitInfo.unit;
+                            }
+                        }
+
+                        console.log("value: ", value);
+                        
+                        // If the value is too large to fit in any unit, return the original seconds
+                        return value + " s";
+                }
                 case "default":{
                     return value;
                 }

@@ -70,10 +70,10 @@ export default defineComponent({
         label: 'Bytes',
         value: 'bytes'
       },
-      // {
-      //   label: 'Bits',
-      //   value: 'bits'
-      // },
+      {
+        label: 'Seconds (s)',
+        value: 'time'
+      },
       {
         label: 'Custom',
         value: 'custom'
