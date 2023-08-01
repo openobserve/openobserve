@@ -883,7 +883,7 @@ export default defineComponent({
                     return `${parseFloat(value).toFixed(2)}PB`;
                 }
                 case "custom": {
-                    return `${value}${props.data.config.unit_custom}`
+                    return `${value}${props.data.config.unit_custom ?? ''}`
                 }
                 case "seconds": {
                     const units = [
@@ -947,7 +947,9 @@ export default defineComponent({
                             }
                         })
                             // Calculate the maximum value size from the 'y' values in the 'traces' array
-                            const maxValueSize = traces.reduce((max: any, it: any) => Math.max(max, Math.max(...it.y)), 0);
+                            const maxValueSize = props.data.type == 'area-stacked' 
+                                ? traces.reduce((sum: any, it: any) => sum + Math.max(...it.y), 0)
+                                : traces.reduce((max: any, it: any) => Math.max(max, Math.max(...it.y)), 0);
 
                             // Calculate the minimum value size from the 'y' values in the 'traces' array
                             const minValueSize = traces.reduce((min: any, it: any) => Math.min(min, Math.min(...it.y)), Infinity);
