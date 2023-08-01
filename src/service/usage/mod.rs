@@ -34,7 +34,7 @@ pub async fn report_usage_stats(
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(stats.size as u64);
 
-    if !CONFIG.common.usage_enabled {
+    if !CONFIG.common.usage_enabled || CONFIG.common.is_cloud_deployment {
         return;
     }
     let request_body = stats.request_body.unwrap_or(event.to_string());
@@ -54,6 +54,9 @@ pub async fn report_usage_stats(
         num_records: stats.records,
         stream_type,
         stream_name: stream_name.to_owned(),
+        min_ts: None,
+        max_ts: None,
+        compressed_size: None,
     }];
 
     if num_functions > 0 {
@@ -72,6 +75,9 @@ pub async fn report_usage_stats(
             num_records: stats.records * num_functions as u64,
             stream_type,
             stream_name: stream_name.to_owned(),
+            min_ts: None,
+            max_ts: None,
+            compressed_size: None,
         })
     }
     publish_usage(usage).await;

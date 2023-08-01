@@ -21,6 +21,12 @@ pub struct UsageData {
     pub stream_type: StreamType,
     pub num_records: u64,
     pub stream_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compressed_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_ts: Option<i64>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
