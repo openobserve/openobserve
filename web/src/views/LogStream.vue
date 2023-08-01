@@ -222,7 +222,7 @@ export default defineComponent({
       },
       {
         name: "doc_num",
-        field: "doc_num",
+        field: (row: any) => row.doc_num.toLocaleString(),
         label: t("logStream.docNum"),
         align: "left",
         sortable: true,
